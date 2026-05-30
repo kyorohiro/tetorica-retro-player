@@ -233,6 +233,7 @@ function App() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [targetWidth, setTargetWidth] = useState<number>(RETRO_PRESETS.pc98.width);
   const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
   const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
@@ -389,6 +390,7 @@ function App() {
     setIsMuted(false);
     setCurrentTime(0);
     setDuration(0);
+    setPlaybackRate(1);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -428,6 +430,7 @@ function App() {
     setIsMuted(videoRef.current.muted || videoRef.current.volume === 0);
     setCurrentTime(videoRef.current.currentTime);
     setDuration(videoRef.current.duration || 0);
+    setPlaybackRate(videoRef.current.playbackRate || 1);
   };
 
   const playVideoWithAudio = async () => {
@@ -483,6 +486,13 @@ function App() {
     setCurrentTime(nextTime);
   };
 
+  const changePlaybackRate = (nextRate: number) => {
+    if (!videoRef.current) return;
+
+    videoRef.current.playbackRate = nextRate;
+    setPlaybackRate(nextRate);
+  };
+
   const paletteModeToUniform = (mode: PaletteMode) => {
     if (mode === "pc98") return 1;
     if (mode === "color32") return 2;
@@ -506,6 +516,48 @@ function App() {
     filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
     filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
   }, [colorLevels, ditherStrength, monoTint, paletteMode, phosphorStrength, scanlineStrength, targetHeight, targetWidth, vignetteStrength]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!videoRef.current) return;
+
+      const target = event.target as HTMLElement | null;
+      const isTypingTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+
+      if (isTypingTarget) return;
+
+      if (event.code === "Space") {
+        event.preventDefault();
+        void togglePlayback();
+        return;
+      }
+
+      if (event.code === "ArrowLeft") {
+        event.preventDefault();
+        seekTo(Math.max(videoRef.current.currentTime - 5, 0));
+        return;
+      }
+
+      if (event.code === "ArrowRight") {
+        event.preventDefault();
+        seekTo(
+          Math.min(
+            videoRef.current.currentTime + 5,
+            videoRef.current.duration || videoRef.current.currentTime + 5,
+          ),
+        );
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const previewFile = async (file: File) => {
     if (!file.type.startsWith("video/")) {
@@ -542,6 +594,7 @@ function App() {
     video.addEventListener("durationchange", syncVideoState);
     video.addEventListener("seeked", syncVideoState);
     video.addEventListener("ended", syncVideoState);
+    video.addEventListener("ratechange", syncVideoState);
 
     try {
       await waitForVideoFrame(video);
@@ -934,6 +987,29 @@ function App() {
                         {isMuted ? "Unmute" : "Mute"}
                       </button>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] text-slate-400">Speed</span>
+                      {[0.5, 1, 2].map((rate) => (
+                        <button
+                          key={rate}
+                          type="button"
+                          onClick={() => {
+                            changePlaybackRate(rate);
+                          }}
+                          className={[
+                            "rounded-lg border px-3 py-1.5 text-slate-100",
+                            playbackRate === rate
+                              ? "border-sky-400 bg-sky-500/20"
+                              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                          ].join(" ")}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Shortcuts: `Space` play/pause, `Left/Right` seek 5 seconds
+                    </p>
                   </div>
                 )}
                 {needsUserPlay && (
