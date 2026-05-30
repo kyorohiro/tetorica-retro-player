@@ -84,7 +84,7 @@ function App() {
                 }}
                 className="w-full rounded-xl border border-dashed border-slate-600 bg-slate-950 p-6 text-center text-sm text-slate-300 transition hover:border-sky-400 hover:bg-slate-900"
               >
-                Drop image/video here, or click to add file
+                Drop image/video/audio here, or click to add file
               </button>
 
               <div className="grid grid-cols-1 gap-2">
@@ -153,7 +153,7 @@ function App() {
                   onSetVignetteStrength={filterState.setVignetteStrength}
                 />
 
-                {player.hasVideo && (
+                {player.hasPlayableMedia && (
                   <VideoControls
                     currentTime={player.currentTime}
                     duration={player.duration}
@@ -223,14 +223,20 @@ function App() {
                     ? "h-full min-h-0 w-full"
                     : "h-[60vh] min-h-[360px] w-full min-w-0"
                 }`}
-              />
+              >
+                {player.hasAudioOnly && (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
+                    Audio preview is playing through the retro audio chain.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/*"
+            accept="image/*,video/*,audio/*"
             multiple
             className="hidden"
             onChange={(ev) => {

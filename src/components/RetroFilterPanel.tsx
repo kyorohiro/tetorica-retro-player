@@ -54,7 +54,7 @@ export function RetroFilterPanel({
   return (
     <>
       <p className="mt-2 break-all">
-        {previewName || "動画がまだ選択されていません"}
+        {previewName || "動画、音声、画像がまだ選択されていません"}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">

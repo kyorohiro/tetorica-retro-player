@@ -15,7 +15,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const spriteRef = useRef<Sprite | null>(null);
   const textureRef = useRef<Texture | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaRef = useRef<HTMLMediaElement | null>(null);
   const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
   const filterRef = useRef<Filter | null>(null);
   const previewRequestIdRef = useRef<number>(0);
@@ -42,7 +42,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [volume, setVolume] = useState<number>(1);
   const [isLooping, setIsLooping] = useState<boolean>(true);
-  const [previewKind, setPreviewKind] = useState<"video" | "image" | "capture" | null>(null);
+  const [previewKind, setPreviewKind] = useState<
+    "video" | "audio" | "image" | "capture" | null
+  >(null);
   const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(true);
   const [lofiAmount, setLofiAmount] = useState<number>(0.55);
   const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(true);
@@ -68,26 +70,27 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     applyFilterStateTo(filterRef.current);
   };
 
-  const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
-    video.pause();
-    if (video.srcObject instanceof MediaStream) {
-      video.srcObject.getTracks().forEach((track) => track.stop());
-      video.srcObject = null;
+  const releaseDetachedMedia = (media: HTMLMediaElement, url?: string) => {
+    media.pause();
+    if (media.srcObject instanceof MediaStream) {
+      media.srcObject.getTracks().forEach((track) => track.stop());
+      media.srcObject = null;
     }
-    video.src = "";
-    video.load();
+    media.src = "";
+    media.load();
 
     if (url) {
       URL.revokeObjectURL(url);
     }
   };
 
-  const waitForVideoFrame = (video: HTMLVideoElement) =>
+  const waitForMediaReady = (media: HTMLMediaElement) =>
     new Promise<void>((resolve, reject) => {
       const cleanup = () => {
-        video.removeEventListener("loadeddata", handleReady);
-        video.removeEventListener("canplay", handleReady);
-        video.removeEventListener("error", handleError);
+        media.removeEventListener("loadeddata", handleReady);
+        media.removeEventListener("canplay", handleReady);
+        media.removeEventListener("loadedmetadata", handleReady);
+        media.removeEventListener("error", handleError);
       };
 
       const handleReady = () => {
@@ -97,18 +100,19 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       const handleError = () => {
         cleanup();
-        reject(new Error("動画の読み込みに失敗しました。"));
+        reject(new Error("メディアの読み込みに失敗しました。"));
       };
 
-      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         resolve();
         return;
       }
 
-      video.addEventListener("loadeddata", handleReady, { once: true });
-      video.addEventListener("canplay", handleReady, { once: true });
-      video.addEventListener("error", handleError, { once: true });
-      video.load();
+      media.addEventListener("loadeddata", handleReady, { once: true });
+      media.addEventListener("canplay", handleReady, { once: true });
+      media.addEventListener("loadedmetadata", handleReady, { once: true });
+      media.addEventListener("error", handleError, { once: true });
+      media.load();
     });
 
   const waitForImageFrame = (image: HTMLImageElement) =>
@@ -183,18 +187,18 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const syncVideoState = () => {
-    if (!videoRef.current) {
+    if (!mediaRef.current) {
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
       return;
     }
 
-    setIsPlaying(!videoRef.current.paused);
-    setCurrentTime(videoRef.current.currentTime);
-    setDuration(videoRef.current.duration || 0);
-    setPlaybackRate(videoRef.current.playbackRate || 1);
-    setIsLooping(videoRef.current.loop);
+    setIsPlaying(!mediaRef.current.paused);
+    setCurrentTime(mediaRef.current.currentTime);
+    setDuration(mediaRef.current.duration || 0);
+    setPlaybackRate(mediaRef.current.playbackRate || 1);
+    setIsLooping(mediaRef.current.loop);
   };
 
   const createDriveCurve = (amount: number) => {
@@ -312,7 +316,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
   };
 
-  const connectVideoAudio = async (video: HTMLVideoElement) => {
+  const connectMediaAudio = async (media: HTMLMediaElement) => {
     const context = await ensureAudioContext();
     if (!context) return;
 
@@ -321,11 +325,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       mediaSourceRef.current = null;
     }
 
-    const mediaSource = context.createMediaElementSource(video);
+    const mediaSource = context.createMediaElementSource(media);
     mediaSource.connect(lofiLowpassRef.current!);
     mediaSourceRef.current = mediaSource;
-    video.muted = false;
-    video.volume = 1;
+    media.muted = false;
+    media.volume = 1;
     updateAudioNodes();
   };
 
@@ -345,7 +349,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     textureRef.current = null;
     mediaSourceRef.current?.disconnect();
     mediaSourceRef.current = null;
-    videoRef.current = null;
+    mediaRef.current = null;
     previewElementRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -367,14 +371,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const playVideoWithAudio = async () => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
     try {
       await ensureAudioContext();
-      videoRef.current.muted = false;
-      videoRef.current.volume = 1;
+      mediaRef.current.muted = false;
+      mediaRef.current.volume = 1;
       setIsMuted(false);
-      await videoRef.current.play();
+      await mediaRef.current.play();
       setPreviewError("");
       setNeedsUserPlay(false);
       updateAudioNodes();
@@ -394,19 +398,19 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const togglePlayback = async () => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
-    if (videoRef.current.paused) {
+    if (mediaRef.current.paused) {
       await playVideoWithAudio();
       return;
     }
 
-    videoRef.current.pause();
+    mediaRef.current.pause();
     syncVideoState();
   };
 
   const toggleMute = () => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
     setIsMuted((current) => {
       const nextValue = !current;
@@ -416,38 +420,38 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const seekTo = (nextTime: number) => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
-    videoRef.current.currentTime = nextTime;
+    mediaRef.current.currentTime = nextTime;
     setCurrentTime(nextTime);
   };
 
   const stepFrame = (direction: -1 | 1) => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
     const frameTime = 1 / 30;
     const nextTime = Math.max(
       0,
       Math.min(
-        videoRef.current.currentTime + frameTime * direction,
-        videoRef.current.duration || videoRef.current.currentTime + frameTime,
+        mediaRef.current.currentTime + frameTime * direction,
+        mediaRef.current.duration || mediaRef.current.currentTime + frameTime,
       ),
     );
 
-    videoRef.current.pause();
-    videoRef.current.currentTime = nextTime;
+    mediaRef.current.pause();
+    mediaRef.current.currentTime = nextTime;
     syncVideoState();
   };
 
   const changePlaybackRate = (nextRate: number) => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
-    videoRef.current.playbackRate = nextRate;
+    mediaRef.current.playbackRate = nextRate;
     setPlaybackRate(nextRate);
   };
 
   const changeVolume = (nextVolume: number) => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
     setVolume(nextVolume);
     setIsMuted(nextVolume === 0);
@@ -455,18 +459,19 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const toggleLoop = () => {
-    if (!videoRef.current) return;
+    if (!mediaRef.current) return;
 
-    videoRef.current.loop = !videoRef.current.loop;
-    setIsLooping(videoRef.current.loop);
+    mediaRef.current.loop = !mediaRef.current.loop;
+    setIsLooping(mediaRef.current.loop);
   };
 
   const previewFile = async (file: File) => {
     const isVideo = file.type.startsWith("video/");
+    const isAudio = file.type.startsWith("audio/");
     const isImage = file.type.startsWith("image/");
 
-    if (!isVideo && !isImage) {
-      setPreviewError("動画または画像ファイルを選んでください。");
+    if (!isVideo && !isAudio && !isImage) {
+      setPreviewError("動画、音声、または画像ファイルを選んでください。");
       return;
     }
 
@@ -484,54 +489,68 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     objectUrlRef.current = url;
 
     try {
-      if (isVideo) {
-        const video = document.createElement("video");
-        video.src = url;
-        video.crossOrigin = "anonymous";
-        video.loop = true;
-        video.muted = false;
-        video.volume = 1;
-        video.playsInline = true;
-        video.autoplay = false;
-        video.preload = "auto";
-        video.addEventListener("play", syncVideoState);
-        video.addEventListener("pause", syncVideoState);
-        video.addEventListener("volumechange", syncVideoState);
-        video.addEventListener("timeupdate", syncVideoState);
-        video.addEventListener("durationchange", syncVideoState);
-        video.addEventListener("seeked", syncVideoState);
-        video.addEventListener("ended", syncVideoState);
-        video.addEventListener("ratechange", syncVideoState);
+      if (isVideo || isAudio) {
+        const media = isVideo
+          ? document.createElement("video")
+          : document.createElement("audio");
+        media.src = url;
+        media.crossOrigin = "anonymous";
+        media.loop = true;
+        media.muted = false;
+        media.volume = 1;
+        media.autoplay = false;
+        media.preload = "auto";
+        media.addEventListener("play", syncVideoState);
+        media.addEventListener("pause", syncVideoState);
+        media.addEventListener("volumechange", syncVideoState);
+        media.addEventListener("timeupdate", syncVideoState);
+        media.addEventListener("durationchange", syncVideoState);
+        media.addEventListener("seeked", syncVideoState);
+        media.addEventListener("ended", syncVideoState);
+        media.addEventListener("ratechange", syncVideoState);
 
-        await waitForVideoFrame(video);
+        if (media instanceof HTMLVideoElement) {
+          media.playsInline = true;
+        }
+
+        await waitForMediaReady(media);
 
         if (requestId !== previewRequestIdRef.current) {
-          releaseDetachedVideo(video, url);
+          releaseDetachedMedia(media, url);
           return;
         }
 
-      const texture = Texture.from(video);
-      texture.source.update();
-      texture.source.scaleMode = "nearest";
+        if (media instanceof HTMLVideoElement) {
+          const texture = Texture.from(media);
+          texture.source.update();
+          texture.source.scaleMode = "nearest";
 
-      const filter = filterRef.current;
-      if (!filter) {
-        throw new Error("Pixi filter is not ready.");
-      }
+          const filter = filterRef.current;
+          if (!filter) {
+            throw new Error("Pixi filter is not ready.");
+          }
 
-      const sprite = new Sprite(texture);
-      sprite.filters = [filter];
+          const sprite = new Sprite(texture);
+          sprite.filters = [filter];
 
-        fitSprite(appRef.current, sprite, video);
-        appRef.current.stage.removeChildren();
-        appRef.current.stage.addChild(sprite);
+          fitSprite(appRef.current, sprite, media);
+          appRef.current.stage.removeChildren();
+          appRef.current.stage.addChild(sprite);
 
-        textureRef.current = texture;
-        spriteRef.current = sprite;
-        videoRef.current = video;
-        previewElementRef.current = video;
-        setPreviewKind("video");
-        await connectVideoAudio(video);
+          textureRef.current = texture;
+          spriteRef.current = sprite;
+          previewElementRef.current = media;
+          setPreviewKind("video");
+        } else {
+          appRef.current.stage.removeChildren();
+          spriteRef.current = null;
+          textureRef.current = null;
+          previewElementRef.current = null;
+          setPreviewKind("audio");
+        }
+
+        mediaRef.current = media;
+        await connectMediaAudio(media);
         syncVideoState();
 
         await playVideoWithAudio();
@@ -566,7 +585,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       textureRef.current = texture;
       spriteRef.current = sprite;
-      videoRef.current = null;
+      mediaRef.current = null;
       previewElementRef.current = image;
       setPreviewKind("image");
       syncVideoState();
@@ -608,7 +627,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     textureRef.current = texture;
     spriteRef.current = sprite;
-    videoRef.current = video;
+    mediaRef.current = video;
     previewElementRef.current = video;
     setPreviewKind(kind);
     syncVideoState();
@@ -661,12 +680,12 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         stopDisplayCapture();
       });
 
-      await waitForVideoFrame(video);
+      await waitForMediaReady(video);
       await video.play();
 
       streamRef.current = stream;
       await attachVideoPreview(video, "capture");
-      await connectVideoAudio(video);
+      await connectMediaAudio(video);
       setNeedsUserPlay(false);
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
@@ -780,7 +799,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!videoRef.current) return;
+      if (!mediaRef.current) return;
 
       const target = event.target as HTMLElement | null;
       const isTypingTarget =
@@ -798,7 +817,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       if (event.code === "KeyJ") {
         event.preventDefault();
-        seekTo(Math.max(videoRef.current.currentTime - 10, 0));
+        seekTo(Math.max(mediaRef.current.currentTime - 10, 0));
         return;
       }
 
@@ -806,8 +825,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         event.preventDefault();
         seekTo(
           Math.min(
-            videoRef.current.currentTime + 10,
-            videoRef.current.duration || videoRef.current.currentTime + 10,
+            mediaRef.current.currentTime + 10,
+            mediaRef.current.duration || mediaRef.current.currentTime + 10,
           ),
         );
         return;
@@ -815,7 +834,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       if (event.code === "ArrowLeft") {
         event.preventDefault();
-        seekTo(Math.max(videoRef.current.currentTime - 5, 0));
+        seekTo(Math.max(mediaRef.current.currentTime - 5, 0));
         return;
       }
 
@@ -823,8 +842,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         event.preventDefault();
         seekTo(
           Math.min(
-            videoRef.current.currentTime + 5,
-            videoRef.current.duration || videoRef.current.currentTime + 5,
+            mediaRef.current.currentTime + 5,
+            mediaRef.current.duration || mediaRef.current.currentTime + 5,
           ),
         );
       }
@@ -853,7 +872,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     lofiAmount,
     isNoiseEnabled,
     noiseLevel,
+    hasPlayableMedia:
+      previewKind === "video" || previewKind === "audio" || previewKind === "capture",
     hasVideo: previewKind === "video" || previewKind === "capture",
+    hasAudioOnly: previewKind === "audio",
     hasImage: previewKind === "image",
     isCaptureActive: previewKind === "capture",
     previewFile,
