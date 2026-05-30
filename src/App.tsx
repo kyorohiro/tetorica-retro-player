@@ -46,6 +46,7 @@ uniform float uPaletteMode;
 uniform float uScanlineStrength;
 uniform float uVignetteStrength;
 uniform float uPhosphorStrength;
+uniform vec3 uMonoTint;
 
 float bayer4x4(vec2 pos)
 {
@@ -139,12 +140,12 @@ vec3 nearestColor32(vec3 color)
   return best;
 }
 
-vec3 monochromePalette(vec3 color, float levels)
+vec3 monochromePalette(vec3 color, float levels, vec3 tint)
 {
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
   float stepped = floor(luminance * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
 
-  return vec3(stepped);
+  return mix(vec3(0.0), tint, stepped);
 }
 
 void main(void)
@@ -164,7 +165,7 @@ void main(void)
   } else if (uPaletteMode < 2.5) {
     color.rgb = nearestColor32(color.rgb);
   } else {
-    color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0));
+    color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0), uMonoTint);
   }
 
   float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
@@ -190,6 +191,14 @@ const RETRO_PRESETS = {
 } as const;
 
 type PaletteMode = "free" | "pc98" | "color32" | "mono";
+type MonoTintMode = "gray" | "green" | "amber" | "ice";
+
+const MONO_TINTS: Record<MonoTintMode, { label: string; rgb: [number, number, number] }> = {
+  gray: { label: "Gray", rgb: [1, 1, 1] },
+  green: { label: "Green", rgb: [0.72, 1, 0.58] },
+  amber: { label: "Amber", rgb: [1, 0.82, 0.45] },
+  ice: { label: "Ice", rgb: [0.7, 0.9, 1] },
+};
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -216,6 +225,7 @@ function App() {
   const [scanlineStrength, setScanlineStrength] = useState<number>(RETRO_PRESETS.pc98.scanline);
   const [vignetteStrength, setVignetteStrength] = useState<number>(RETRO_PRESETS.pc98.vignette);
   const [phosphorStrength, setPhosphorStrength] = useState<number>(RETRO_PRESETS.pc98.phosphor);
+  const [monoTint, setMonoTint] = useState<MonoTintMode>("green");
 
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
     video.pause();
@@ -297,6 +307,7 @@ function App() {
             uScanlineStrength: { value: RETRO_PRESETS.pc98.scanline, type: "f32" },
             uVignetteStrength: { value: RETRO_PRESETS.pc98.vignette, type: "f32" },
             uPhosphorStrength: { value: RETRO_PRESETS.pc98.phosphor, type: "f32" },
+            uMonoTint: { value: new Float32Array(MONO_TINTS.green.rgb), type: "vec3<f32>" },
           },
         },
       });
@@ -308,6 +319,9 @@ function App() {
       filter.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
       filter.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
       filter.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
+      filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[monoTint].rgb[0];
+      filter.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
+      filter.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
       app.renderer.on("resize", fitCurrentSprite);
 
       appRef.current = app;
@@ -435,7 +449,10 @@ function App() {
     filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
     filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
     filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
-  }, [colorLevels, ditherStrength, paletteMode, phosphorStrength, scanlineStrength, targetHeight, targetWidth, vignetteStrength]);
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[monoTint].rgb[0];
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
+  }, [colorLevels, ditherStrength, monoTint, paletteMode, phosphorStrength, scanlineStrength, targetHeight, targetWidth, vignetteStrength]);
 
   const previewFile = async (file: File) => {
     if (!file.type.startsWith("video/")) {
@@ -660,6 +677,30 @@ function App() {
                       </button>
                     </div>
                   </label>
+                  {paletteMode === "mono" && (
+                    <label className="block">
+                      <span className="text-slate-100">Mono tint</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {Object.entries(MONO_TINTS).map(([key, tint]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setMonoTint(key as MonoTintMode);
+                            }}
+                            className={[
+                              "rounded-lg border px-3 py-1.5 text-slate-100",
+                              monoTint === key
+                                ? "border-sky-400 bg-sky-500/20"
+                                : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                            ].join(" ")}
+                          >
+                            {tint.label}
+                          </button>
+                        ))}
+                      </div>
+                    </label>
+                  )}
                   <label className="block">
                     <span className="text-slate-100">Target width: {targetWidth}px</span>
                     <input
