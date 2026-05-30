@@ -940,6 +940,116 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     hasImage: previewKind === "image",
     isCaptureActive: previewKind === "capture",
     previewFile,
+    previewUrl: async (url: string, kind: "video" | "image" | "audio" = "video") => {
+      const requestId = previewRequestIdRef.current;
+
+      try {
+        cleanupPreview();
+
+        if (!appRef.current || !filterRef.current) {
+          throw new Error("Pixi の初期化がまだ終わっていません。");
+        }
+
+        if (kind === "video") {
+          const media = document.createElement("video");
+          media.src = url;
+          media.crossOrigin = "anonymous";
+          media.playsInline = true;
+          media.autoplay = true;
+
+          await waitForVideoFrame(media);
+          try {
+            await media.play();
+          } catch {
+            // ignore play errors (autoplay policy); playback can be started by user
+          }
+
+          const texture = Texture.from(media as HTMLVideoElement);
+          texture.source.update();
+          texture.source.scaleMode = "nearest";
+
+          const filter = filterRef.current;
+          if (!filter) throw new Error("Pixi filter is not ready.");
+
+          const sprite = new Sprite(texture);
+          sprite.filters = filterState.isFilterEnabled ? [filter] : [];
+
+          fitSprite(appRef.current, sprite, media);
+          appRef.current.stage.removeChildren();
+          appRef.current.stage.addChild(sprite);
+
+          textureRef.current = texture;
+          spriteRef.current = sprite;
+          previewElementRef.current = media;
+          setPreviewKind("video");
+          setSourceDimensions({
+            width: media.videoWidth,
+            height: media.videoHeight,
+          });
+        } else if (kind === "image") {
+          const image = new Image();
+          image.src = url;
+          image.crossOrigin = "anonymous";
+          await waitForImageFrame(image);
+
+          const texture = Texture.from(image as HTMLImageElement);
+          texture.source.update();
+          texture.source.scaleMode = "nearest";
+
+          const filter = filterRef.current;
+          if (!filter) throw new Error("Pixi filter is not ready.");
+
+          const sprite = new Sprite(texture);
+          sprite.filters = filterState.isFilterEnabled ? [filter] : [];
+
+          fitSprite(appRef.current, sprite, image);
+          appRef.current.stage.removeChildren();
+          appRef.current.stage.addChild(sprite);
+
+          textureRef.current = texture;
+          spriteRef.current = sprite;
+          previewElementRef.current = image;
+          setPreviewKind("image");
+          setSourceDimensions({
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+          });
+        } else {
+          // audio-only
+          const audio = document.createElement("audio");
+          audio.src = url;
+          audio.crossOrigin = "anonymous";
+          await waitForAudioReady(audio);
+
+          appRef.current.stage.removeChildren();
+          spriteRef.current = null;
+          textureRef.current = null;
+          previewElementRef.current = null;
+          setPreviewKind("audio");
+          setSourceDimensions(null);
+
+          mediaRef.current = audio;
+          await connectMediaAudio(audio);
+          syncVideoState();
+          try {
+            await audio.play();
+          } catch {
+            // ignore
+          }
+        }
+
+        if (requestId !== previewRequestIdRef.current) {
+          return;
+        }
+
+        await playVideoWithAudio();
+      } catch (error) {
+        if (requestId !== previewRequestIdRef.current) return;
+
+        cleanupPreview();
+        setPreviewError(error instanceof Error ? error.message : String(error));
+      }
+    },
     startDisplayCapture,
     stopDisplayCapture,
     togglePlayback,
