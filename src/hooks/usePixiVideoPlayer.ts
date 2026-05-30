@@ -32,20 +32,24 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [isLooping, setIsLooping] = useState<boolean>(true);
   const [previewKind, setPreviewKind] = useState<"video" | "image" | "capture" | null>(null);
 
-  const applyFilterState = () => {
-    if (!filterRef.current) return;
+  const applyFilterStateTo = (filter: Filter | null) => {
+    if (!filter) return;
 
-    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
-    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
-    filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
-    filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = filterState.ditherStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
-    filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = filterState.phosphorStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
+    filter.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
+    filter.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
+    filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
+    filter.resources.pixelUniforms.uniforms.uDitherStrength = filterState.ditherStrength;
+    filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
+    filter.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
+    filter.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
+    filter.resources.pixelUniforms.uniforms.uPhosphorStrength = filterState.phosphorStrength;
+    filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
+    filter.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
+    filter.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
+  };
+
+  const applyFilterState = () => {
+    applyFilterStateTo(filterRef.current);
   };
 
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
@@ -118,10 +122,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     });
 
   const fitSprite = (
+    app: Application | null,
     sprite: Sprite,
     source: HTMLVideoElement | HTMLImageElement,
   ) => {
-    const app = appRef.current;
     if (!app) return;
 
     const sourceWidth =
@@ -146,7 +150,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const fitCurrentSprite = () => {
     if (spriteRef.current && previewElementRef.current) {
-      fitSprite(spriteRef.current, previewElementRef.current);
+      fitSprite(appRef.current, spriteRef.current, previewElementRef.current);
     }
   };
 
@@ -357,7 +361,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       const sprite = new Sprite(texture);
       sprite.filters = [filter];
 
-        fitSprite(sprite, video);
+        fitSprite(appRef.current, sprite, video);
         appRef.current.stage.removeChildren();
         appRef.current.stage.addChild(sprite);
 
@@ -394,7 +398,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       const sprite = new Sprite(texture);
       sprite.filters = [filter];
 
-      fitSprite(sprite, image);
+      fitSprite(appRef.current, sprite, image);
       appRef.current.stage.removeChildren();
       appRef.current.stage.addChild(sprite);
 
@@ -436,7 +440,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const sprite = new Sprite(texture);
     sprite.filters = [filter];
 
-    fitSprite(sprite, video);
+    fitSprite(appRef.current, sprite, video);
     appRef.current?.stage.removeChildren();
     appRef.current?.stage.addChild(sprite);
 
