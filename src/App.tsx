@@ -112,6 +112,41 @@ vec3 nearestPc98(vec3 color)
   return best;
 }
 
+vec3 color32Palette(float index)
+{
+  float r = mod(index, 4.0);
+  float g = mod(floor(index / 4.0), 4.0);
+  float b = mod(floor(index / 16.0), 2.0);
+
+  return vec3(r / 3.0, g / 3.0, b);
+}
+
+vec3 nearestColor32(vec3 color)
+{
+  vec3 best = color32Palette(0.0);
+  float bestDistance = distance(color, best);
+
+  for (int i = 1; i < 32; i++) {
+    vec3 candidate = color32Palette(float(i));
+    float candidateDistance = distance(color, candidate);
+
+    if (candidateDistance < bestDistance) {
+      bestDistance = candidateDistance;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+vec3 monochromePalette(vec3 color, float levels)
+{
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  float stepped = floor(luminance * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+
+  return vec3(stepped);
+}
+
 void main(void)
 {
   vec2 cell = floor(vTextureCoord * uTargetSize);
@@ -122,10 +157,14 @@ void main(void)
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
 
-  if (uPaletteMode > 0.5) {
-    color.rgb = nearestPc98(color.rgb);
-  } else {
+  if (uPaletteMode < 0.5) {
     color.rgb = floor(color.rgb * (uColorLevels - 1.0) + 0.5) / max(uColorLevels - 1.0, 1.0);
+  } else if (uPaletteMode < 1.5) {
+    color.rgb = nearestPc98(color.rgb);
+  } else if (uPaletteMode < 2.5) {
+    color.rgb = nearestColor32(color.rgb);
+  } else {
+    color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0));
   }
 
   float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
@@ -146,7 +185,11 @@ const RETRO_PRESETS = {
   chunky: { label: "Chunky", width: 256, height: 192, colors: 8, dither: 0.2, palette: "free", scanline: 0.08, vignette: 0.04, phosphor: 0.03 },
   arcade: { label: "Arcade", width: 320, height: 224, colors: 12, dither: 0.28, palette: "free", scanline: 0.14, vignette: 0.08, phosphor: 0.05 },
   pc98: { label: "PC-98", width: 640, height: 400, colors: 16, dither: 0.35, palette: "pc98", scanline: 0.09, vignette: 0.06, phosphor: 0.04 },
+  color32: { label: "Color 32", width: 320, height: 200, colors: 32, dither: 0.24, palette: "color32", scanline: 0.08, vignette: 0.05, phosphor: 0.03 },
+  monochrome: { label: "Mono", width: 640, height: 400, colors: 4, dither: 0.18, palette: "mono", scanline: 0.1, vignette: 0.08, phosphor: 0.02 },
 } as const;
+
+type PaletteMode = "free" | "pc98" | "color32" | "mono";
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,7 +212,7 @@ function App() {
   const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
   const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
   const [ditherStrength, setDitherStrength] = useState<number>(RETRO_PRESETS.pc98.dither);
-  const [paletteMode, setPaletteMode] = useState<"free" | "pc98">(RETRO_PRESETS.pc98.palette);
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>(RETRO_PRESETS.pc98.palette);
   const [scanlineStrength, setScanlineStrength] = useState<number>(RETRO_PRESETS.pc98.scanline);
   const [vignetteStrength, setVignetteStrength] = useState<number>(RETRO_PRESETS.pc98.vignette);
   const [phosphorStrength, setPhosphorStrength] = useState<number>(RETRO_PRESETS.pc98.phosphor);
@@ -261,7 +304,7 @@ function App() {
       filter.resources.pixelUniforms.uniforms.uTargetSize[1] = targetHeight;
       filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
       filter.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
-      filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteMode === "pc98" ? 1 : 0;
+      filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(paletteMode);
       filter.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
       filter.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
       filter.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
@@ -373,6 +416,14 @@ function App() {
     syncVideoState();
   };
 
+  const paletteModeToUniform = (mode: PaletteMode) => {
+    if (mode === "pc98") return 1;
+    if (mode === "color32") return 2;
+    if (mode === "mono") return 3;
+
+    return 0;
+  };
+
   useEffect(() => {
     if (!filterRef.current) return;
 
@@ -380,7 +431,7 @@ function App() {
     filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(targetHeight, 1);
     filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
     filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteMode === "pc98" ? 1 : 0;
+    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(paletteMode);
     filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
     filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
     filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
@@ -579,6 +630,34 @@ function App() {
                       >
                         PC-98 16-color
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaletteMode("color32");
+                        }}
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-slate-100",
+                          paletteMode === "color32"
+                            ? "border-sky-400 bg-sky-500/20"
+                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                        ].join(" ")}
+                      >
+                        Color 32
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaletteMode("mono");
+                        }}
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-slate-100",
+                          paletteMode === "mono"
+                            ? "border-sky-400 bg-sky-500/20"
+                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                        ].join(" ")}
+                      >
+                        Monochrome
+                      </button>
                     </div>
                   </label>
                   <label className="block">
@@ -620,7 +699,7 @@ function App() {
                       onChange={(ev) => {
                         setColorLevels(Number(ev.currentTarget.value));
                       }}
-                      disabled={paletteMode === "pc98"}
+                      disabled={paletteMode === "pc98" || paletteMode === "color32"}
                       className="mt-2 w-full"
                     />
                   </label>
