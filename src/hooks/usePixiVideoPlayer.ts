@@ -84,13 +84,12 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
   };
 
-  const waitForMediaReady = (media: HTMLMediaElement) =>
+  const waitForVideoFrame = (video: HTMLVideoElement) =>
     new Promise<void>((resolve, reject) => {
       const cleanup = () => {
-        media.removeEventListener("loadeddata", handleReady);
-        media.removeEventListener("canplay", handleReady);
-        media.removeEventListener("loadedmetadata", handleReady);
-        media.removeEventListener("error", handleError);
+        video.removeEventListener("loadeddata", handleReady);
+        video.removeEventListener("canplay", handleReady);
+        video.removeEventListener("error", handleError);
       };
 
       const handleReady = () => {
@@ -100,19 +99,47 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       const handleError = () => {
         cleanup();
-        reject(new Error("メディアの読み込みに失敗しました。"));
+        reject(new Error("動画の読み込みに失敗しました。"));
       };
 
-      if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         resolve();
         return;
       }
 
-      media.addEventListener("loadeddata", handleReady, { once: true });
-      media.addEventListener("canplay", handleReady, { once: true });
-      media.addEventListener("loadedmetadata", handleReady, { once: true });
-      media.addEventListener("error", handleError, { once: true });
-      media.load();
+      video.addEventListener("loadeddata", handleReady, { once: true });
+      video.addEventListener("canplay", handleReady, { once: true });
+      video.addEventListener("error", handleError, { once: true });
+      video.load();
+    });
+
+  const waitForAudioReady = (audio: HTMLAudioElement) =>
+    new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        audio.removeEventListener("loadedmetadata", handleReady);
+        audio.removeEventListener("canplay", handleReady);
+        audio.removeEventListener("error", handleError);
+      };
+
+      const handleReady = () => {
+        cleanup();
+        resolve();
+      };
+
+      const handleError = () => {
+        cleanup();
+        reject(new Error("音声の読み込みに失敗しました。"));
+      };
+
+      if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        resolve();
+        return;
+      }
+
+      audio.addEventListener("loadedmetadata", handleReady, { once: true });
+      audio.addEventListener("canplay", handleReady, { once: true });
+      audio.addEventListener("error", handleError, { once: true });
+      audio.load();
     });
 
   const waitForImageFrame = (image: HTMLImageElement) =>
@@ -508,7 +535,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           media.playsInline = true;
         }
 
-        await waitForMediaReady(media);
+        if (media instanceof HTMLVideoElement) {
+          await waitForVideoFrame(media);
+        } else {
+          await waitForAudioReady(media);
+        }
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(media, url);
@@ -675,7 +706,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         stopDisplayCapture();
       });
 
-      await waitForMediaReady(video);
+      await waitForVideoFrame(video);
       await video.play();
 
       streamRef.current = stream;

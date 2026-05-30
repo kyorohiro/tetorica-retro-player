@@ -217,15 +217,15 @@ function App() {
                 </button>
               )}
               <div
-                ref={player.canvasHostRef}
-                className={`overflow-hidden rounded-xl bg-slate-950 ${
+                className={`relative overflow-hidden rounded-xl bg-slate-950 ${
                   isPreviewMaximized
                     ? "h-full min-h-0 w-full"
                     : "h-[60vh] min-h-[360px] w-full min-w-0"
                 }`}
               >
+                <div ref={player.canvasHostRef} className="h-full w-full" />
                 {player.hasAudioOnly && (
-                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
                     Audio preview is playing through the retro audio chain.
                   </div>
                 )}
