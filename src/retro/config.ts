@@ -1,4 +1,4 @@
-export type PaletteMode = "free" | "pc98" | "color32" | "mono";
+export type PaletteMode = "free" | "pc98" | "color32" | "color64" | "mono";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 
 export const MONO_TINTS: Record<
@@ -61,6 +61,19 @@ export const RETRO_PRESETS = {
     scanline: 0.08,
     scanline2: 0.0,
     vignette: 0.05,
+    phosphor: 0.03,
+    monoTint: "gray",
+  },
+  color64: {
+    label: "Color 64",
+    width: 320,
+    height: 200,
+    colors: 64,
+    dither: 0.2,
+    palette: "color64",
+    scanline: 0.07,
+    scanline2: 0.0,
+    vignette: 0.04,
     phosphor: 0.03,
     monoTint: "gray",
   },
@@ -138,7 +151,8 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
   if (mode === "color32") return 2;
-  if (mode === "mono") return 3;
+  if (mode === "color64") return 3;
+  if (mode === "mono") return 4;
 
   return 0;
 };

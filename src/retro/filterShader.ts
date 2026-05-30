@@ -138,6 +138,33 @@ vec3 nearestColor32(vec3 color)
   return best;
 }
 
+vec3 color64Palette(float index)
+{
+  float r = mod(index, 4.0);
+  float g = mod(floor(index / 4.0), 4.0);
+  float b = mod(floor(index / 16.0), 4.0);
+
+  return vec3(r / 3.0, g / 3.0, b / 3.0);
+}
+
+vec3 nearestColor64(vec3 color)
+{
+  vec3 best = color64Palette(0.0);
+  float bestDistance = distance(color, best);
+
+  for (int i = 1; i < 64; i++) {
+    vec3 candidate = color64Palette(float(i));
+    float candidateDistance = distance(color, candidate);
+
+    if (candidateDistance < bestDistance) {
+      bestDistance = candidateDistance;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
 vec3 monochromePalette(vec3 color, float levels, vec3 tint)
 {
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
@@ -162,6 +189,8 @@ void main(void)
     color.rgb = nearestPc98(color.rgb);
   } else if (uPaletteMode < 2.5) {
     color.rgb = nearestColor32(color.rgb);
+  } else if (uPaletteMode < 3.5) {
+    color.rgb = nearestColor64(color.rgb);
   } else {
     color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0), uMonoTint);
   }

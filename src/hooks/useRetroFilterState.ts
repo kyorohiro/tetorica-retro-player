@@ -13,13 +13,31 @@ export function useRetroFilterState() {
   const [targetHeight, setTargetHeight] = useState<number>(DEFAULT_PRESET.height);
   const [colorLevels, setColorLevels] = useState<number>(DEFAULT_PRESET.colors);
   const [ditherStrength, setDitherStrength] = useState<number>(DEFAULT_PRESET.dither);
-  const [paletteMode, setPaletteMode] = useState<PaletteMode>(DEFAULT_PRESET.palette);
+  const [paletteMode, rawSetPaletteMode] = useState<PaletteMode>(DEFAULT_PRESET.palette);
   const [scanlineStrength, setScanlineStrength] = useState<number>(DEFAULT_PRESET.scanline);
   const [scanline2Strength, setScanline2Strength] = useState<number>(DEFAULT_PRESET.scanline2);
   const [vignetteStrength, setVignetteStrength] = useState<number>(DEFAULT_PRESET.vignette);
   const [phosphorStrength, setPhosphorStrength] = useState<number>(DEFAULT_PRESET.phosphor);
   const [monoTint, setMonoTint] = useState<MonoTintMode>(DEFAULT_PRESET.monoTint);
   const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(true);
+
+  const setPaletteMode = (nextPalette: PaletteMode) => {
+    rawSetPaletteMode(nextPalette);
+
+    if (nextPalette === "pc98") {
+      setColorLevels(16);
+      return;
+    }
+
+    if (nextPalette === "color32") {
+      setColorLevels(32);
+      return;
+    }
+
+    if (nextPalette === "color64") {
+      setColorLevels(64);
+    }
+  };
 
   const applyPreset = (preset: RetroPresetKey) => {
     const settings = RETRO_PRESETS[preset];
