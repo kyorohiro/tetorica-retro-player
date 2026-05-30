@@ -15,6 +15,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const spriteRef = useRef<Sprite | null>(null);
   const textureRef = useRef<Texture | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const streamOwnedRef = useRef<boolean>(false);
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
   const filterRef = useRef<Filter | null>(null);
@@ -82,10 +83,16 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       filterState.isFilterEnabled && filterRef.current ? [filterRef.current] : [];
   };
 
-  const releaseDetachedMedia = (media: HTMLMediaElement, url?: string) => {
+  const releaseDetachedMedia = (
+    media: HTMLMediaElement,
+    url?: string,
+    stopStream = true,
+  ) => {
     media.pause();
     if (media.srcObject instanceof MediaStream) {
-      media.srcObject.getTracks().forEach((track) => track.stop());
+      if (stopStream) {
+        media.srcObject.getTracks().forEach((track) => track.stop());
+      }
       media.srcObject = null;
     }
     media.src = "";
@@ -390,8 +397,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     mediaSourceRef.current = null;
     mediaRef.current = null;
     previewElementRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    if (streamOwnedRef.current) {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    }
     streamRef.current = null;
+    streamOwnedRef.current = false;
 
     setNeedsUserPlay(false);
     setIsPlaying(false);
@@ -736,6 +746,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       await video.play();
 
       streamRef.current = stream;
+      streamOwnedRef.current = true;
       await attachVideoPreview(video, "capture");
       await connectMediaAudio(video);
       setNeedsUserPlay(false);
@@ -940,6 +951,103 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     hasImage: previewKind === "image",
     isCaptureActive: previewKind === "capture",
     previewFile,
+    previewStream: async (
+      stream: MediaStream,
+      kind: "video" | "audio" = "video",
+      name = "Media Stream",
+    ) => {
+      let requestId = 0;
+
+      try {
+        cleanupPreview();
+        requestId = previewRequestIdRef.current;
+
+        if (!appRef.current || !filterRef.current) {
+          throw new Error("Pixi の初期化がまだ終わっていません。");
+        }
+
+        setPreviewError("");
+        setPreviewName(name);
+
+        if (kind === "video") {
+          const media = document.createElement("video");
+          media.srcObject = stream;
+          media.crossOrigin = "anonymous";
+          media.loop = false;
+          media.muted = false;
+          media.volume = 1;
+          media.playsInline = true;
+          media.autoplay = false;
+          media.preload = "auto";
+          media.addEventListener("play", syncVideoState);
+          media.addEventListener("pause", syncVideoState);
+          media.addEventListener("volumechange", syncVideoState);
+          media.addEventListener("timeupdate", syncVideoState);
+          media.addEventListener("durationchange", syncVideoState);
+          media.addEventListener("seeked", syncVideoState);
+          media.addEventListener("ended", syncVideoState);
+          media.addEventListener("ratechange", syncVideoState);
+
+          await waitForVideoFrame(media);
+
+          if (requestId !== previewRequestIdRef.current) {
+            releaseDetachedMedia(media, undefined, false);
+            return;
+          }
+
+          streamRef.current = stream;
+          streamOwnedRef.current = false;
+          await attachVideoPreview(media, "capture");
+          await connectMediaAudio(media);
+        } else {
+          const media = document.createElement("audio");
+          media.srcObject = stream;
+          media.crossOrigin = "anonymous";
+          media.loop = false;
+          media.muted = false;
+          media.volume = 1;
+          media.preload = "auto";
+          media.addEventListener("play", syncVideoState);
+          media.addEventListener("pause", syncVideoState);
+          media.addEventListener("volumechange", syncVideoState);
+          media.addEventListener("timeupdate", syncVideoState);
+          media.addEventListener("durationchange", syncVideoState);
+          media.addEventListener("seeked", syncVideoState);
+          media.addEventListener("ended", syncVideoState);
+          media.addEventListener("ratechange", syncVideoState);
+          await waitForAudioReady(media);
+
+          if (requestId !== previewRequestIdRef.current) {
+            releaseDetachedMedia(media, undefined, false);
+            return;
+          }
+
+          appRef.current.stage.removeChildren();
+          spriteRef.current = null;
+          textureRef.current = null;
+          previewElementRef.current = null;
+          setPreviewKind("audio");
+          setSourceDimensions(null);
+
+          streamRef.current = stream;
+          streamOwnedRef.current = false;
+          mediaRef.current = media;
+          await connectMediaAudio(media);
+          syncVideoState();
+        }
+
+        if (requestId !== previewRequestIdRef.current) {
+          return;
+        }
+
+        await playVideoWithAudio();
+      } catch (error) {
+        if (requestId !== previewRequestIdRef.current) return;
+
+        cleanupPreview();
+        setPreviewError(error instanceof Error ? error.message : String(error));
+      }
+    },
     previewUrl: async (url: string, kind: "video" | "image" | "audio" = "video") => {
       let requestId = 0;
 

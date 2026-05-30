@@ -9,6 +9,8 @@ import {
 
 type RetroPlayerProps = {
   src?: string;
+  stream?: MediaStream | null;
+  streamName?: string;
   kind?: "video" | "image" | "audio";
   className?: string;
   onError?: (error: Error) => void;
@@ -17,6 +19,8 @@ type RetroPlayerProps = {
 
 export function RetroPlayer({
   src,
+  stream,
+  streamName,
   kind = "video",
   className,
   onError,
@@ -42,6 +46,27 @@ export function RetroPlayer({
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
 
   React.useEffect(() => {
+    if (stream) {
+      void (async () => {
+        try {
+          await player.previewStream(
+            stream,
+            kind === "audio" ? "audio" : "video",
+            streamName,
+          );
+        } catch (error) {
+          if (error instanceof Error) {
+            onError?.(error);
+            return;
+          }
+
+          onError?.(new Error(String(error)));
+        }
+      })();
+
+      return;
+    }
+
     if (!src) return;
 
     void (async () => {
@@ -56,7 +81,7 @@ export function RetroPlayer({
         onError?.(new Error(String(error)));
       }
     })();
-  }, [src, kind, onError]);
+  }, [src, stream, streamName, kind, onError]);
 
   React.useEffect(() => {
     if (!isPreviewMaximized) return;
