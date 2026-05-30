@@ -42,6 +42,10 @@ uniform sampler2D uTexture;
 uniform vec2 uTargetSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
+uniform float uPaletteMode;
+uniform float uScanlineStrength;
+uniform float uVignetteStrength;
+uniform float uPhosphorStrength;
 
 float bayer4x4(vec2 pos)
 {
@@ -70,6 +74,44 @@ float bayer4x4(vec2 pos)
   return matrix[index];
 }
 
+vec3 pc98Palette(float index)
+{
+  if (index < 0.5) return vec3(0.0, 0.0, 0.0);
+  if (index < 1.5) return vec3(0.0, 0.0, 0.6667);
+  if (index < 2.5) return vec3(0.0, 0.6667, 0.0);
+  if (index < 3.5) return vec3(0.0, 0.6667, 0.6667);
+  if (index < 4.5) return vec3(0.6667, 0.0, 0.0);
+  if (index < 5.5) return vec3(0.6667, 0.0, 0.6667);
+  if (index < 6.5) return vec3(0.6667, 0.3333, 0.0);
+  if (index < 7.5) return vec3(0.6667, 0.6667, 0.6667);
+  if (index < 8.5) return vec3(0.3333, 0.3333, 0.3333);
+  if (index < 9.5) return vec3(0.3333, 0.3333, 1.0);
+  if (index < 10.5) return vec3(0.3333, 1.0, 0.3333);
+  if (index < 11.5) return vec3(0.3333, 1.0, 1.0);
+  if (index < 12.5) return vec3(1.0, 0.3333, 0.3333);
+  if (index < 13.5) return vec3(1.0, 0.3333, 1.0);
+  if (index < 14.5) return vec3(1.0, 1.0, 0.3333);
+  return vec3(1.0, 1.0, 1.0);
+}
+
+vec3 nearestPc98(vec3 color)
+{
+  vec3 best = pc98Palette(0.0);
+  float bestDistance = distance(color, best);
+
+  for (int i = 1; i < 16; i++) {
+    vec3 candidate = pc98Palette(float(i));
+    float candidateDistance = distance(color, candidate);
+
+    if (candidateDistance < bestDistance) {
+      bestDistance = candidateDistance;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
 void main(void)
 {
   vec2 cell = floor(vTextureCoord * uTargetSize);
@@ -79,16 +121,31 @@ void main(void)
   vec4 color = texture(uTexture, pixelatedUv);
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-  color.rgb = floor(color.rgb * (uColorLevels - 1.0) + 0.5) / max(uColorLevels - 1.0, 1.0);
+
+  if (uPaletteMode > 0.5) {
+    color.rgb = nearestPc98(color.rgb);
+  } else {
+    color.rgb = floor(color.rgb * (uColorLevels - 1.0) + 0.5) / max(uColorLevels - 1.0, 1.0);
+  }
+
+  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
+  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);
+
+  float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
+  color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);
+
+  float vignette = distance(vTextureCoord, vec2(0.5));
+  color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
+  color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   finalColor = color;
 }
 `;
 
 const RETRO_PRESETS = {
-  chunky: { label: "Chunky", width: 256, height: 192, colors: 8, dither: 0.2 },
-  arcade: { label: "Arcade", width: 320, height: 224, colors: 12, dither: 0.28 },
-  pc98: { label: "PC-98", width: 640, height: 400, colors: 16, dither: 0.35 },
+  chunky: { label: "Chunky", width: 256, height: 192, colors: 8, dither: 0.2, palette: "free", scanline: 0.08, vignette: 0.04, phosphor: 0.03 },
+  arcade: { label: "Arcade", width: 320, height: 224, colors: 12, dither: 0.28, palette: "free", scanline: 0.14, vignette: 0.08, phosphor: 0.05 },
+  pc98: { label: "PC-98", width: 640, height: 400, colors: 16, dither: 0.35, palette: "pc98", scanline: 0.09, vignette: 0.06, phosphor: 0.04 },
 } as const;
 
 function App() {
@@ -112,6 +169,10 @@ function App() {
   const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
   const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
   const [ditherStrength, setDitherStrength] = useState<number>(RETRO_PRESETS.pc98.dither);
+  const [paletteMode, setPaletteMode] = useState<"free" | "pc98">(RETRO_PRESETS.pc98.palette);
+  const [scanlineStrength, setScanlineStrength] = useState<number>(RETRO_PRESETS.pc98.scanline);
+  const [vignetteStrength, setVignetteStrength] = useState<number>(RETRO_PRESETS.pc98.vignette);
+  const [phosphorStrength, setPhosphorStrength] = useState<number>(RETRO_PRESETS.pc98.phosphor);
 
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
     video.pause();
@@ -189,6 +250,10 @@ function App() {
             uTargetSize: { value: new Float32Array([RETRO_PRESETS.pc98.width, RETRO_PRESETS.pc98.height]), type: "vec2<f32>" },
             uColorLevels: { value: RETRO_PRESETS.pc98.colors, type: "f32" },
             uDitherStrength: { value: RETRO_PRESETS.pc98.dither, type: "f32" },
+            uPaletteMode: { value: 1, type: "f32" },
+            uScanlineStrength: { value: RETRO_PRESETS.pc98.scanline, type: "f32" },
+            uVignetteStrength: { value: RETRO_PRESETS.pc98.vignette, type: "f32" },
+            uPhosphorStrength: { value: RETRO_PRESETS.pc98.phosphor, type: "f32" },
           },
         },
       });
@@ -196,6 +261,10 @@ function App() {
       filter.resources.pixelUniforms.uniforms.uTargetSize[1] = targetHeight;
       filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
       filter.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
+      filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteMode === "pc98" ? 1 : 0;
+      filter.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
+      filter.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
+      filter.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
       app.renderer.on("resize", fitCurrentSprite);
 
       appRef.current = app;
@@ -250,9 +319,11 @@ function App() {
       screenWidth / video.videoWidth,
       screenHeight / video.videoHeight,
     );
+    const integerScale = Math.max(1, Math.floor(scale));
+    const appliedScale = scale >= 1 ? integerScale : scale;
 
-    sprite.width = video.videoWidth * scale;
-    sprite.height = video.videoHeight * scale;
+    sprite.width = video.videoWidth * appliedScale;
+    sprite.height = video.videoHeight * appliedScale;
     sprite.x = (screenWidth - sprite.width) / 2;
     sprite.y = (screenHeight - sprite.height) / 2;
   };
@@ -309,7 +380,11 @@ function App() {
     filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(targetHeight, 1);
     filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
     filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
-  }, [colorLevels, ditherStrength, targetHeight, targetWidth]);
+    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteMode === "pc98" ? 1 : 0;
+    filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
+  }, [colorLevels, ditherStrength, paletteMode, phosphorStrength, scanlineStrength, targetHeight, targetWidth, vignetteStrength]);
 
   const previewFile = async (file: File) => {
     if (!file.type.startsWith("video/")) {
@@ -414,6 +489,10 @@ function App() {
     setTargetHeight(settings.height);
     setColorLevels(settings.colors);
     setDitherStrength(settings.dither);
+    setPaletteMode(settings.palette);
+    setScanlineStrength(settings.scanline);
+    setVignetteStrength(settings.vignette);
+    setPhosphorStrength(settings.phosphor);
   };
 
   return (
@@ -470,6 +549,39 @@ function App() {
                 </div>
                 <div className="mt-4 space-y-3">
                   <label className="block">
+                    <span className="text-slate-100">Palette</span>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaletteMode("free");
+                        }}
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-slate-100",
+                          paletteMode === "free"
+                            ? "border-sky-400 bg-sky-500/20"
+                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                        ].join(" ")}
+                      >
+                        Free
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaletteMode("pc98");
+                        }}
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-slate-100",
+                          paletteMode === "pc98"
+                            ? "border-sky-400 bg-sky-500/20"
+                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                        ].join(" ")}
+                      >
+                        PC-98 16-color
+                      </button>
+                    </div>
+                  </label>
+                  <label className="block">
                     <span className="text-slate-100">Target width: {targetWidth}px</span>
                     <input
                       type="range"
@@ -508,6 +620,7 @@ function App() {
                       onChange={(ev) => {
                         setColorLevels(Number(ev.currentTarget.value));
                       }}
+                      disabled={paletteMode === "pc98"}
                       className="mt-2 w-full"
                     />
                   </label>
@@ -523,6 +636,54 @@ function App() {
                       value={ditherStrength}
                       onChange={(ev) => {
                         setDitherStrength(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-slate-100">
+                      Scanline: {scanlineStrength.toFixed(2)}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="0.4"
+                      step="0.01"
+                      value={scanlineStrength}
+                      onChange={(ev) => {
+                        setScanlineStrength(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-slate-100">
+                      Vignette: {vignetteStrength.toFixed(2)}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="0.3"
+                      step="0.01"
+                      value={vignetteStrength}
+                      onChange={(ev) => {
+                        setVignetteStrength(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-slate-100">
+                      Phosphor: {phosphorStrength.toFixed(2)}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="0.2"
+                      step="0.01"
+                      value={phosphorStrength}
+                      onChange={(ev) => {
+                        setPhosphorStrength(Number(ev.currentTarget.value));
                       }}
                       className="mt-2 w-full"
                     />
