@@ -45,6 +45,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [previewKind, setPreviewKind] = useState<
     "video" | "audio" | "image" | "capture" | null
   >(null);
+  const [sourceDimensions, setSourceDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(true);
   const [lofiAmount, setLofiAmount] = useState<number>(0.55);
   const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(true);
@@ -398,6 +402,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     setVolume(1);
     setIsLooping(true);
     setPreviewKind(null);
+    setSourceDimensions(null);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -575,12 +580,17 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           spriteRef.current = sprite;
           previewElementRef.current = media;
           setPreviewKind("video");
+          setSourceDimensions({
+            width: media.videoWidth,
+            height: media.videoHeight,
+          });
         } else {
           appRef.current.stage.removeChildren();
           spriteRef.current = null;
           textureRef.current = null;
           previewElementRef.current = null;
           setPreviewKind("audio");
+          setSourceDimensions(null);
         }
 
         mediaRef.current = media;
@@ -622,6 +632,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       mediaRef.current = null;
       previewElementRef.current = image;
       setPreviewKind("image");
+      setSourceDimensions({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
       syncVideoState();
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
@@ -664,6 +678,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     mediaRef.current = video;
     previewElementRef.current = video;
     setPreviewKind(kind);
+    setSourceDimensions({
+      width: video.videoWidth,
+      height: video.videoHeight,
+    });
     syncVideoState();
   };
 
@@ -910,6 +928,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     playbackRate,
     volume,
     isLooping,
+    sourceDimensions,
     isAudioFxEnabled,
     lofiAmount,
     isNoiseEnabled,

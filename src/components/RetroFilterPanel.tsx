@@ -16,6 +16,7 @@ type RetroFilterPanelProps = {
   previewName: string;
   scanlineStrength: number;
   scanline2Strength: number;
+  sourceDimensions: { width: number; height: number } | null;
   targetHeight: number;
   targetWidth: number;
   vignetteStrength: number;
@@ -31,6 +32,7 @@ type RetroFilterPanelProps = {
   onSetTargetHeight: (value: number) => void;
   onSetTargetWidth: (value: number) => void;
   onSetVignetteStrength: (value: number) => void;
+  onSyncTargetAspect: () => void;
 };
 
 export function RetroFilterPanel({
@@ -43,6 +45,7 @@ export function RetroFilterPanel({
   previewName,
   scanlineStrength,
   scanline2Strength,
+  sourceDimensions,
   targetHeight,
   targetWidth,
   vignetteStrength,
@@ -58,6 +61,7 @@ export function RetroFilterPanel({
   onSetTargetHeight,
   onSetTargetWidth,
   onSetVignetteStrength,
+  onSyncTargetAspect,
 }: RetroFilterPanelProps) {
   return (
     <>
@@ -178,6 +182,27 @@ export function RetroFilterPanel({
             className="mt-2 w-full"
           />
         </label>
+
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+          <div className="text-[11px] text-slate-400">
+            {sourceDimensions
+              ? `Source aspect: ${sourceDimensions.width} x ${sourceDimensions.height}`
+              : "Source aspect: unavailable for audio-only preview"}
+          </div>
+          <button
+            type="button"
+            onClick={onSyncTargetAspect}
+            disabled={!sourceDimensions}
+            className={[
+              "rounded-lg border px-3 py-1.5 text-slate-100",
+              sourceDimensions
+                ? "border-sky-400/50 bg-sky-500/10 hover:bg-sky-500/20"
+                : "cursor-not-allowed border-slate-700 bg-slate-900 text-slate-500",
+            ].join(" ")}
+          >
+            Match aspect
+          </button>
+        </div>
 
         <label className="block">
           <span className="text-slate-100">Color levels: {colorLevels}</span>

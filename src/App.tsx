@@ -12,6 +12,21 @@ function App() {
   const filterState = useRetroFilterState();
   const player = usePixiVideoPlayer(filterState);
 
+  const syncTargetAspect = () => {
+    if (!player.sourceDimensions) return;
+
+    const nextHeight = Math.max(
+      8,
+      Math.round(
+        (filterState.targetWidth / player.sourceDimensions.width) *
+          player.sourceDimensions.height /
+          8,
+      ) * 8,
+    );
+
+    filterState.setTargetHeight(nextHeight);
+  };
+
   useEffect(() => {
     if (!isPreviewMaximized) return;
 
@@ -140,6 +155,7 @@ function App() {
                   previewName={player.previewName}
                   scanlineStrength={filterState.scanlineStrength}
                   scanline2Strength={filterState.scanline2Strength}
+                  sourceDimensions={player.sourceDimensions}
                   targetHeight={filterState.targetHeight}
                   targetWidth={filterState.targetWidth}
                   vignetteStrength={filterState.vignetteStrength}
@@ -155,6 +171,7 @@ function App() {
                   onSetTargetHeight={filterState.setTargetHeight}
                   onSetTargetWidth={filterState.setTargetWidth}
                   onSetVignetteStrength={filterState.setVignetteStrength}
+                  onSyncTargetAspect={syncTargetAspect}
                 />
 
                 {player.hasPlayableMedia && (
