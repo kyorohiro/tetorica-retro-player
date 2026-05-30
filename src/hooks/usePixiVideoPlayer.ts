@@ -412,11 +412,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const toggleMute = () => {
     if (!mediaRef.current) return;
 
-    setIsMuted((current) => {
-      const nextValue = !current;
-      window.requestAnimationFrame(updateAudioNodes);
-      return nextValue;
-    });
+    setIsMuted((current) => !current);
   };
 
   const seekTo = (nextTime: number) => {
@@ -455,7 +451,6 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     setVolume(nextVolume);
     setIsMuted(nextVolume === 0);
-    window.requestAnimationFrame(updateAudioNodes);
   };
 
   const toggleLoop = () => {
