@@ -4,13 +4,11 @@ import {
   MONO_TINTS,
   RETRO_PRESETS,
   paletteModeToUniform,
-  type MonoTintMode,
-  type PaletteMode,
-  type RetroPresetKey,
 } from "../retro/config";
+import type { RetroFilterState } from "./useRetroFilterState";
 import { FILTER_FRAGMENT, FILTER_VERTEX } from "../retro/filterShader";
 
-export function usePixiVideoPlayer() {
+export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const appRef = useRef<Application | null>(null);
@@ -30,30 +28,21 @@ export function usePixiVideoPlayer() {
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [volume, setVolume] = useState<number>(1);
   const [isLooping, setIsLooping] = useState<boolean>(true);
-  const [targetWidth, setTargetWidth] = useState<number>(RETRO_PRESETS.pc98.width);
-  const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
-  const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
-  const [ditherStrength, setDitherStrength] = useState<number>(RETRO_PRESETS.pc98.dither);
-  const [paletteMode, setPaletteMode] = useState<PaletteMode>(RETRO_PRESETS.pc98.palette);
-  const [scanlineStrength, setScanlineStrength] = useState<number>(RETRO_PRESETS.pc98.scanline);
-  const [vignetteStrength, setVignetteStrength] = useState<number>(RETRO_PRESETS.pc98.vignette);
-  const [phosphorStrength, setPhosphorStrength] = useState<number>(RETRO_PRESETS.pc98.phosphor);
-  const [monoTint, setMonoTint] = useState<MonoTintMode>(RETRO_PRESETS.pc98.monoTint);
 
   const applyFilterState = () => {
     if (!filterRef.current) return;
 
-    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(targetWidth, 1);
-    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(targetHeight, 1);
-    filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
-    filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(paletteMode);
-    filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[monoTint].rgb[0];
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
+    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
+    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
+    filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
+    filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = filterState.ditherStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
+    filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = filterState.phosphorStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
   };
 
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
@@ -340,19 +329,6 @@ export function usePixiVideoPlayer() {
     }
   };
 
-  const applyPreset = (preset: RetroPresetKey) => {
-    const settings = RETRO_PRESETS[preset];
-    setTargetWidth(settings.width);
-    setTargetHeight(settings.height);
-    setColorLevels(settings.colors);
-    setDitherStrength(settings.dither);
-    setPaletteMode(settings.palette);
-    setScanlineStrength(settings.scanline);
-    setVignetteStrength(settings.vignette);
-    setPhosphorStrength(settings.phosphor);
-    setMonoTint(settings.monoTint);
-  };
-
   useEffect(() => {
     let cancelled = false;
 
@@ -423,15 +399,15 @@ export function usePixiVideoPlayer() {
   useEffect(() => {
     applyFilterState();
   }, [
-    colorLevels,
-    ditherStrength,
-    monoTint,
-    paletteMode,
-    phosphorStrength,
-    scanlineStrength,
-    targetHeight,
-    targetWidth,
-    vignetteStrength,
+    filterState.colorLevels,
+    filterState.ditherStrength,
+    filterState.monoTint,
+    filterState.paletteMode,
+    filterState.phosphorStrength,
+    filterState.scanlineStrength,
+    filterState.targetHeight,
+    filterState.targetWidth,
+    filterState.vignetteStrength,
   ]);
 
   useEffect(() => {
@@ -505,27 +481,8 @@ export function usePixiVideoPlayer() {
     playbackRate,
     volume,
     isLooping,
-    targetWidth,
-    targetHeight,
-    colorLevels,
-    ditherStrength,
-    paletteMode,
-    scanlineStrength,
-    vignetteStrength,
-    phosphorStrength,
-    monoTint,
     hasVideo: videoRef.current !== null,
-    setTargetWidth,
-    setTargetHeight,
-    setColorLevels,
-    setDitherStrength,
-    setPaletteMode,
-    setScanlineStrength,
-    setVignetteStrength,
-    setPhosphorStrength,
-    setMonoTint,
     previewFile,
-    applyPreset,
     togglePlayback,
     toggleMute,
     seekTo,

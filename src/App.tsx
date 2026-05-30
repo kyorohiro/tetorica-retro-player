@@ -3,11 +3,13 @@ import "./App.css";
 import { RetroFilterPanel } from "./components/RetroFilterPanel";
 import { VideoControls } from "./components/VideoControls";
 import { usePixiVideoPlayer } from "./hooks/usePixiVideoPlayer";
+import { useRetroFilterState } from "./hooks/useRetroFilterState";
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const player = usePixiVideoPlayer();
+  const filterState = useRetroFilterState();
+  const player = usePixiVideoPlayer(filterState);
 
   return (
     <main
@@ -59,26 +61,26 @@ function App() {
                 <p className="font-semibold text-slate-100">Current preview</p>
 
                 <RetroFilterPanel
-                  colorLevels={player.colorLevels}
-                  ditherStrength={player.ditherStrength}
-                  monoTint={player.monoTint}
-                  paletteMode={player.paletteMode}
-                  phosphorStrength={player.phosphorStrength}
+                  colorLevels={filterState.colorLevels}
+                  ditherStrength={filterState.ditherStrength}
+                  monoTint={filterState.monoTint}
+                  paletteMode={filterState.paletteMode}
+                  phosphorStrength={filterState.phosphorStrength}
                   previewName={player.previewName}
-                  scanlineStrength={player.scanlineStrength}
-                  targetHeight={player.targetHeight}
-                  targetWidth={player.targetWidth}
-                  vignetteStrength={player.vignetteStrength}
-                  onApplyPreset={player.applyPreset}
-                  onSetColorLevels={player.setColorLevels}
-                  onSetDitherStrength={player.setDitherStrength}
-                  onSetMonoTint={player.setMonoTint}
-                  onSetPaletteMode={player.setPaletteMode}
-                  onSetPhosphorStrength={player.setPhosphorStrength}
-                  onSetScanlineStrength={player.setScanlineStrength}
-                  onSetTargetHeight={player.setTargetHeight}
-                  onSetTargetWidth={player.setTargetWidth}
-                  onSetVignetteStrength={player.setVignetteStrength}
+                  scanlineStrength={filterState.scanlineStrength}
+                  targetHeight={filterState.targetHeight}
+                  targetWidth={filterState.targetWidth}
+                  vignetteStrength={filterState.vignetteStrength}
+                  onApplyPreset={filterState.applyPreset}
+                  onSetColorLevels={filterState.setColorLevels}
+                  onSetDitherStrength={filterState.setDitherStrength}
+                  onSetMonoTint={filterState.setMonoTint}
+                  onSetPaletteMode={filterState.setPaletteMode}
+                  onSetPhosphorStrength={filterState.setPhosphorStrength}
+                  onSetScanlineStrength={filterState.setScanlineStrength}
+                  onSetTargetHeight={filterState.setTargetHeight}
+                  onSetTargetWidth={filterState.setTargetWidth}
+                  onSetVignetteStrength={filterState.setVignetteStrength}
                 />
 
                 {player.hasVideo && (
