@@ -250,7 +250,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const createDriveCurve = (amount: number) => {
     const samples = 256;
     const curve = new Float32Array(samples);
-    const drive = 1 + amount * 5;
+    const drive = 1 + amount * 10;
 
     for (let index = 0; index < samples; index += 1) {
       const x = (index * 2) / (samples - 1) - 1;
@@ -344,17 +344,24 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const highshelf = lofiHighshelfRef.current;
     const drive = lofiDriveRef.current;
     const noiseGainNode = noiseGainRef.current;
+    const media = mediaRef.current;
 
     if (masterGain) {
       masterGain.gain.value = isMuted ? 0 : volume;
     }
 
+    if (media) {
+      media.muted = isMuted;
+      media.volume = isMuted ? 0 : volume;
+    }
+
     if (lowpass && highshelf && drive) {
       const amount = isAudioFxEnabled ? lofiAmount : 0;
-      lowpass.frequency.value = 16000 - amount * 14200;
-      lowpass.Q.value = 0.3 + amount * 1.8;
-      highshelf.gain.value = -amount * 18;
-      drive.curve = createDriveCurve(amount * 0.6);
+      lowpass.frequency.value = 14000 - amount * 13000;
+      lowpass.Q.value = 0.4 + amount * 2.4;
+      highshelf.frequency.value = 2200 - amount * 1000;
+      highshelf.gain.value = -amount * 24;
+      drive.curve = createDriveCurve(amount);
     }
 
     if (noiseGainNode) {
@@ -374,8 +381,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const mediaSource = context.createMediaElementSource(media);
     mediaSource.connect(lofiLowpassRef.current!);
     mediaSourceRef.current = mediaSource;
-    media.muted = false;
-    media.volume = 1;
+    media.muted = isMuted;
+    media.volume = isMuted ? 0 : volume;
+
     updateAudioNodes();
   };
 
@@ -425,8 +433,6 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     try {
       await ensureAudioContext();
-      mediaRef.current.muted = false;
-      mediaRef.current.volume = 1;
       setIsMuted(false);
       await mediaRef.current.play();
       setPreviewError("");
