@@ -1,218 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Application, Filter, Sprite, Texture, VideoSource } from "pixi.js";
 import "./App.css";
-
-const FILTER_VERTEX = `#version 300 es
-in vec2 aPosition;
-out vec2 vTextureCoord;
-
-uniform vec4 uInputSize;
-uniform vec4 uOutputFrame;
-uniform vec4 uOutputTexture;
-
-vec4 filterVertexPosition(void)
-{
-  vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
-
-  position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
-  position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
-
-  return vec4(position, 0.0, 1.0);
-}
-
-vec2 filterTextureCoord(void)
-{
-  return aPosition * (uOutputFrame.zw * uInputSize.zw);
-}
-
-void main(void)
-{
-  gl_Position = filterVertexPosition();
-  vTextureCoord = filterTextureCoord();
-}
-`;
-
-const FILTER_FRAGMENT = `#version 300 es
-precision mediump float;
-
-in vec2 vTextureCoord;
-out vec4 finalColor;
-
-uniform sampler2D uTexture;
-uniform vec2 uTargetSize;
-uniform float uColorLevels;
-uniform float uDitherStrength;
-uniform float uPaletteMode;
-uniform float uScanlineStrength;
-uniform float uVignetteStrength;
-uniform float uPhosphorStrength;
-uniform vec3 uMonoTint;
-
-float bayer4x4(vec2 pos)
-{
-  int x = int(mod(pos.x, 4.0));
-  int y = int(mod(pos.y, 4.0));
-  int index = x + y * 4;
-
-  float matrix[16];
-  matrix[0] = 0.0 / 16.0;
-  matrix[1] = 8.0 / 16.0;
-  matrix[2] = 2.0 / 16.0;
-  matrix[3] = 10.0 / 16.0;
-  matrix[4] = 12.0 / 16.0;
-  matrix[5] = 4.0 / 16.0;
-  matrix[6] = 14.0 / 16.0;
-  matrix[7] = 6.0 / 16.0;
-  matrix[8] = 3.0 / 16.0;
-  matrix[9] = 11.0 / 16.0;
-  matrix[10] = 1.0 / 16.0;
-  matrix[11] = 9.0 / 16.0;
-  matrix[12] = 15.0 / 16.0;
-  matrix[13] = 7.0 / 16.0;
-  matrix[14] = 13.0 / 16.0;
-  matrix[15] = 5.0 / 16.0;
-
-  return matrix[index];
-}
-
-vec3 pc98Palette(float index)
-{
-  if (index < 0.5) return vec3(0.0, 0.0, 0.0);
-  if (index < 1.5) return vec3(0.0, 0.0, 0.6667);
-  if (index < 2.5) return vec3(0.0, 0.6667, 0.0);
-  if (index < 3.5) return vec3(0.0, 0.6667, 0.6667);
-  if (index < 4.5) return vec3(0.6667, 0.0, 0.0);
-  if (index < 5.5) return vec3(0.6667, 0.0, 0.6667);
-  if (index < 6.5) return vec3(0.6667, 0.3333, 0.0);
-  if (index < 7.5) return vec3(0.6667, 0.6667, 0.6667);
-  if (index < 8.5) return vec3(0.3333, 0.3333, 0.3333);
-  if (index < 9.5) return vec3(0.3333, 0.3333, 1.0);
-  if (index < 10.5) return vec3(0.3333, 1.0, 0.3333);
-  if (index < 11.5) return vec3(0.3333, 1.0, 1.0);
-  if (index < 12.5) return vec3(1.0, 0.3333, 0.3333);
-  if (index < 13.5) return vec3(1.0, 0.3333, 1.0);
-  if (index < 14.5) return vec3(1.0, 1.0, 0.3333);
-  return vec3(1.0, 1.0, 1.0);
-}
-
-vec3 nearestPc98(vec3 color)
-{
-  vec3 best = pc98Palette(0.0);
-  float bestDistance = distance(color, best);
-
-  for (int i = 1; i < 16; i++) {
-    vec3 candidate = pc98Palette(float(i));
-    float candidateDistance = distance(color, candidate);
-
-    if (candidateDistance < bestDistance) {
-      bestDistance = candidateDistance;
-      best = candidate;
-    }
-  }
-
-  return best;
-}
-
-vec3 color32Palette(float index)
-{
-  float r = mod(index, 4.0);
-  float g = mod(floor(index / 4.0), 4.0);
-  float b = mod(floor(index / 16.0), 2.0);
-
-  return vec3(r / 3.0, g / 3.0, b);
-}
-
-vec3 nearestColor32(vec3 color)
-{
-  vec3 best = color32Palette(0.0);
-  float bestDistance = distance(color, best);
-
-  for (int i = 1; i < 32; i++) {
-    vec3 candidate = color32Palette(float(i));
-    float candidateDistance = distance(color, candidate);
-
-    if (candidateDistance < bestDistance) {
-      bestDistance = candidateDistance;
-      best = candidate;
-    }
-  }
-
-  return best;
-}
-
-vec3 monochromePalette(vec3 color, float levels, vec3 tint)
-{
-  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-  float stepped = floor(luminance * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
-
-  return mix(vec3(0.0), tint, stepped);
-}
-
-void main(void)
-{
-  vec2 cell = floor(vTextureCoord * uTargetSize);
-  vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
-  pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
-
-  vec4 color = texture(uTexture, pixelatedUv);
-  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
-  color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-
-  if (uPaletteMode < 0.5) {
-    color.rgb = floor(color.rgb * (uColorLevels - 1.0) + 0.5) / max(uColorLevels - 1.0, 1.0);
-  } else if (uPaletteMode < 1.5) {
-    color.rgb = nearestPc98(color.rgb);
-  } else if (uPaletteMode < 2.5) {
-    color.rgb = nearestColor32(color.rgb);
-  } else {
-    color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0), uMonoTint);
-  }
-
-  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);
-
-  float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
-  color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);
-
-  float vignette = distance(vTextureCoord, vec2(0.5));
-  color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-  color.rgb = clamp(color.rgb, 0.0, 1.0);
-
-  finalColor = color;
-}
-`;
-
-type PaletteMode = "free" | "pc98" | "color32" | "mono";
-type MonoTintMode = "gray" | "green" | "amber" | "ice";
-
-const MONO_TINTS: Record<MonoTintMode, { label: string; rgb: [number, number, number] }> = {
-  gray: { label: "Gray", rgb: [1, 1, 1] },
-  green: { label: "Green", rgb: [0.72, 1, 0.58] },
-  amber: { label: "Amber", rgb: [1, 0.82, 0.45] },
-  ice: { label: "Ice", rgb: [0.7, 0.9, 1] },
-};
-
-const RETRO_PRESETS = {
-  chunky: { label: "Chunky", width: 256, height: 192, colors: 8, dither: 0.2, palette: "free", scanline: 0.08, vignette: 0.04, phosphor: 0.03, monoTint: "gray" },
-  arcade: { label: "Arcade", width: 320, height: 224, colors: 12, dither: 0.28, palette: "free", scanline: 0.14, vignette: 0.08, phosphor: 0.05, monoTint: "gray" },
-  pc98: { label: "PC-98", width: 640, height: 400, colors: 16, dither: 0.35, palette: "pc98", scanline: 0.09, vignette: 0.06, phosphor: 0.04, monoTint: "gray" },
-  color32: { label: "Color 32", width: 320, height: 200, colors: 32, dither: 0.24, palette: "color32", scanline: 0.08, vignette: 0.05, phosphor: 0.03, monoTint: "gray" },
-  monochrome: { label: "Mono", width: 640, height: 400, colors: 4, dither: 0.18, palette: "mono", scanline: 0.1, vignette: 0.08, phosphor: 0.02, monoTint: "gray" },
-  greenTerminal: { label: "Green Terminal", width: 640, height: 400, colors: 4, dither: 0.14, palette: "mono", scanline: 0.12, vignette: 0.1, phosphor: 0.06, monoTint: "green" },
-  amberCrt: { label: "Amber CRT", width: 640, height: 400, colors: 4, dither: 0.16, palette: "mono", scanline: 0.14, vignette: 0.11, phosphor: 0.05, monoTint: "amber" },
-  lcdIce: { label: "LCD Ice", width: 480, height: 300, colors: 5, dither: 0.1, palette: "mono", scanline: 0.03, vignette: 0.03, phosphor: 0.01, monoTint: "ice" },
-} as const satisfies Record<string, {
-  label: string;
-  width: number;
-  height: number;
-  colors: number;
-  dither: number;
-  palette: PaletteMode;
-  scanline: number;
-  vignette: number;
-  phosphor: number;
-  monoTint: MonoTintMode;
-}>;
+import { RetroFilterPanel } from "./components/RetroFilterPanel";
+import { VideoControls } from "./components/VideoControls";
+import {
+  MONO_TINTS,
+  RETRO_PRESETS,
+  paletteModeToUniform,
+  type MonoTintMode,
+  type PaletteMode,
+  type RetroPresetKey,
+} from "./retro/config";
+import { FILTER_FRAGMENT, FILTER_VERTEX } from "./retro/filterShader";
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -246,6 +45,22 @@ function App() {
   const [phosphorStrength, setPhosphorStrength] = useState<number>(RETRO_PRESETS.pc98.phosphor);
   const [monoTint, setMonoTint] = useState<MonoTintMode>(RETRO_PRESETS.pc98.monoTint);
 
+  const applyFilterState = () => {
+    if (!filterRef.current) return;
+
+    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(targetWidth, 1);
+    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(targetHeight, 1);
+    filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
+    filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(paletteMode);
+    filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[monoTint].rgb[0];
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
+    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
+  };
+
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
     video.pause();
     video.src = "";
@@ -254,18 +69,6 @@ function App() {
     if (url) {
       URL.revokeObjectURL(url);
     }
-  };
-
-  const formatTime = (seconds: number) => {
-    if (!Number.isFinite(seconds) || seconds < 0) {
-      return "00:00";
-    }
-
-    const totalSeconds = Math.floor(seconds);
-    const minutes = Math.floor(totalSeconds / 60);
-    const remainSeconds = totalSeconds % 60;
-
-    return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
   };
 
   const waitForVideoFrame = (video: HTMLVideoElement) =>
@@ -297,79 +100,48 @@ function App() {
       video.load();
     });
 
+  const fitSprite = (sprite: Sprite, video: HTMLVideoElement) => {
+    const app = appRef.current;
+    if (!app) return;
+
+    const screenWidth = app.screen.width;
+    const screenHeight = app.screen.height;
+    const scale = Math.min(
+      screenWidth / video.videoWidth,
+      screenHeight / video.videoHeight,
+    );
+    const integerScale = Math.max(1, Math.floor(scale));
+    const appliedScale = scale >= 1 ? integerScale : scale;
+
+    sprite.width = video.videoWidth * appliedScale;
+    sprite.height = video.videoHeight * appliedScale;
+    sprite.x = (screenWidth - sprite.width) / 2;
+    sprite.y = (screenHeight - sprite.height) / 2;
+  };
+
   const fitCurrentSprite = () => {
     if (spriteRef.current && videoRef.current) {
       fitSprite(spriteRef.current, videoRef.current);
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
+  const syncVideoState = () => {
+    if (!videoRef.current) {
+      setIsPlaying(false);
+      setIsMuted(false);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
 
-    const setupPixi = async () => {
-      if (!canvasHostRef.current || appRef.current) return;
-
-      const app = new Application();
-      await app.init({
-        resizeTo: canvasHostRef.current,
-        background: "#020617",
-        antialias: true,
-        preference: "webgl",
-      });
-
-      if (cancelled) {
-        app.destroy(true);
-        return;
-      }
-
-      canvasHostRef.current.appendChild(app.canvas);
-
-      const filter = Filter.from({
-        gl: {
-          vertex: FILTER_VERTEX,
-          fragment: FILTER_FRAGMENT,
-        },
-        resources: {
-          pixelUniforms: {
-            uTargetSize: { value: new Float32Array([RETRO_PRESETS.pc98.width, RETRO_PRESETS.pc98.height]), type: "vec2<f32>" },
-            uColorLevels: { value: RETRO_PRESETS.pc98.colors, type: "f32" },
-            uDitherStrength: { value: RETRO_PRESETS.pc98.dither, type: "f32" },
-            uPaletteMode: { value: 1, type: "f32" },
-            uScanlineStrength: { value: RETRO_PRESETS.pc98.scanline, type: "f32" },
-            uVignetteStrength: { value: RETRO_PRESETS.pc98.vignette, type: "f32" },
-            uPhosphorStrength: { value: RETRO_PRESETS.pc98.phosphor, type: "f32" },
-            uMonoTint: { value: new Float32Array(MONO_TINTS.green.rgb), type: "vec3<f32>" },
-          },
-        },
-      });
-      filter.resources.pixelUniforms.uniforms.uTargetSize[0] = targetWidth;
-      filter.resources.pixelUniforms.uniforms.uTargetSize[1] = targetHeight;
-      filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
-      filter.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
-      filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(paletteMode);
-      filter.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
-      filter.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
-      filter.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
-      filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[monoTint].rgb[0];
-      filter.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
-      filter.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
-      app.renderer.on("resize", fitCurrentSprite);
-
-      appRef.current = app;
-      filterRef.current = filter;
-    };
-
-    void setupPixi();
-
-    return () => {
-      cancelled = true;
-      cleanupPreview();
-      filterRef.current?.destroy();
-      appRef.current?.destroy(true);
-      filterRef.current = null;
-      appRef.current = null;
-    };
-  }, []);
+    setIsPlaying(!videoRef.current.paused);
+    setIsMuted(videoRef.current.muted || videoRef.current.volume === 0);
+    setCurrentTime(videoRef.current.currentTime);
+    setDuration(videoRef.current.duration || 0);
+    setPlaybackRate(videoRef.current.playbackRate || 1);
+    setVolume(videoRef.current.volume);
+    setIsLooping(videoRef.current.loop);
+  };
 
   const cleanupPreview = () => {
     previewRequestIdRef.current += 1;
@@ -402,49 +174,12 @@ function App() {
     }
   };
 
-  const fitSprite = (sprite: Sprite, video: HTMLVideoElement) => {
-    const app = appRef.current;
-    if (!app) return;
-
-    const screenWidth = app.screen.width;
-    const screenHeight = app.screen.height;
-    const scale = Math.min(
-      screenWidth / video.videoWidth,
-      screenHeight / video.videoHeight,
-    );
-    const integerScale = Math.max(1, Math.floor(scale));
-    const appliedScale = scale >= 1 ? integerScale : scale;
-
-    sprite.width = video.videoWidth * appliedScale;
-    sprite.height = video.videoHeight * appliedScale;
-    sprite.x = (screenWidth - sprite.width) / 2;
-    sprite.y = (screenHeight - sprite.height) / 2;
-  };
-
-  const syncVideoState = () => {
-    if (!videoRef.current) {
-      setIsPlaying(false);
-      setIsMuted(false);
-      setCurrentTime(0);
-      setDuration(0);
-      return;
-    }
-
-    setIsPlaying(!videoRef.current.paused);
-    setIsMuted(videoRef.current.muted || videoRef.current.volume === 0);
-    setCurrentTime(videoRef.current.currentTime);
-    setDuration(videoRef.current.duration || 0);
-    setPlaybackRate(videoRef.current.playbackRate || 1);
-    setVolume(videoRef.current.volume);
-    setIsLooping(videoRef.current.loop);
-  };
-
   const playVideoWithAudio = async () => {
     if (!videoRef.current) return;
 
     try {
       videoRef.current.muted = false;
-      videoRef.current.volume = 1;
+      videoRef.current.volume = Math.max(videoRef.current.volume, 1);
       await videoRef.current.play();
       setPreviewError("");
       setNeedsUserPlay(false);
@@ -463,16 +198,6 @@ function App() {
     }
   };
 
-  const toggleMute = () => {
-    if (!videoRef.current) return;
-
-    videoRef.current.muted = !videoRef.current.muted;
-    if (!videoRef.current.muted && videoRef.current.volume === 0) {
-      videoRef.current.volume = 1;
-    }
-    syncVideoState();
-  };
-
   const togglePlayback = async () => {
     if (!videoRef.current) return;
 
@@ -482,6 +207,16 @@ function App() {
     }
 
     videoRef.current.pause();
+    syncVideoState();
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+
+    videoRef.current.muted = !videoRef.current.muted;
+    if (!videoRef.current.muted && videoRef.current.volume === 0) {
+      videoRef.current.volume = 1;
+    }
     syncVideoState();
   };
 
@@ -495,8 +230,7 @@ function App() {
   const stepFrame = (direction: -1 | 1) => {
     if (!videoRef.current) return;
 
-    const fps = 30;
-    const frameTime = 1 / fps;
+    const frameTime = 1 / 30;
     const nextTime = Math.max(
       0,
       Math.min(
@@ -532,95 +266,6 @@ function App() {
     videoRef.current.loop = !videoRef.current.loop;
     setIsLooping(videoRef.current.loop);
   };
-
-  const paletteModeToUniform = (mode: PaletteMode) => {
-    if (mode === "pc98") return 1;
-    if (mode === "color32") return 2;
-    if (mode === "mono") return 3;
-
-    return 0;
-  };
-
-  useEffect(() => {
-    if (!filterRef.current) return;
-
-    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(targetWidth, 1);
-    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(targetHeight, 1);
-    filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
-    filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(paletteMode);
-    filterRef.current.resources.pixelUniforms.uniforms.uScanlineStrength = scanlineStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uVignetteStrength = vignetteStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uPhosphorStrength = phosphorStrength;
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[monoTint].rgb[0];
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[monoTint].rgb[1];
-    filterRef.current.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[monoTint].rgb[2];
-  }, [colorLevels, ditherStrength, monoTint, paletteMode, phosphorStrength, scanlineStrength, targetHeight, targetWidth, vignetteStrength]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!videoRef.current) return;
-
-      const target = event.target as HTMLElement | null;
-      const isTypingTarget =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target?.isContentEditable;
-
-      if (isTypingTarget) return;
-
-      if (event.code === "Space") {
-        event.preventDefault();
-        void togglePlayback();
-        return;
-      }
-
-      if (event.code === "KeyK") {
-        event.preventDefault();
-        void togglePlayback();
-        return;
-      }
-
-      if (event.code === "KeyJ") {
-        event.preventDefault();
-        seekTo(Math.max(videoRef.current.currentTime - 10, 0));
-        return;
-      }
-
-      if (event.code === "KeyL") {
-        event.preventDefault();
-        seekTo(
-          Math.min(
-            videoRef.current.currentTime + 10,
-            videoRef.current.duration || videoRef.current.currentTime + 10,
-          ),
-        );
-        return;
-      }
-
-      if (event.code === "ArrowLeft") {
-        event.preventDefault();
-        seekTo(Math.max(videoRef.current.currentTime - 5, 0));
-        return;
-      }
-
-      if (event.code === "ArrowRight") {
-        event.preventDefault();
-        seekTo(
-          Math.min(
-            videoRef.current.currentTime + 5,
-            videoRef.current.duration || videoRef.current.currentTime + 5,
-          ),
-        );
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
 
   const previewFile = async (file: File) => {
     if (!file.type.startsWith("video/")) {
@@ -670,6 +315,7 @@ function App() {
       const texture = Texture.from(video);
       texture.source.update();
       texture.source.scaleMode = "nearest";
+
       const sprite = new Sprite(texture);
       sprite.filters = [filterRef.current];
 
@@ -682,11 +328,7 @@ function App() {
       videoRef.current = video;
       syncVideoState();
 
-      try {
-        await playVideoWithAudio();
-      } catch {
-        // playVideoWithAudio handles its own error state.
-      }
+      await playVideoWithAudio();
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
         releaseDetachedVideo(video, url);
@@ -703,28 +345,7 @@ function App() {
     }
   };
 
-  const handleDrop = (ev: React.DragEvent) => {
-    ev.preventDefault();
-    const files = ev.dataTransfer.files;
-
-    if (files.length > 0) {
-      void previewFile(files[0]);
-    }
-  };
-
-  const handleDragOver = (ev: React.DragEvent) => {
-    ev.preventDefault();
-  };
-
-  async function selectFiles() {
-    fileInputRef.current?.click();
-  }
-
-  async function selectFolders() {
-    folderInputRef.current?.click();
-  }
-
-  const applyPreset = (preset: keyof typeof RETRO_PRESETS) => {
+  const applyPreset = (preset: RetroPresetKey) => {
     const settings = RETRO_PRESETS[preset];
     setTargetWidth(settings.width);
     setTargetHeight(settings.height);
@@ -737,11 +358,169 @@ function App() {
     setMonoTint(settings.monoTint);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const setupPixi = async () => {
+      if (!canvasHostRef.current || appRef.current) return;
+
+      const app = new Application();
+      await app.init({
+        resizeTo: canvasHostRef.current,
+        background: "#020617",
+        antialias: true,
+        preference: "webgl",
+      });
+
+      if (cancelled) {
+        app.destroy(true);
+        return;
+      }
+
+      canvasHostRef.current.appendChild(app.canvas);
+
+      const filter = Filter.from({
+        gl: {
+          vertex: FILTER_VERTEX,
+          fragment: FILTER_FRAGMENT,
+        },
+        resources: {
+          pixelUniforms: {
+            uTargetSize: {
+              value: new Float32Array([
+                RETRO_PRESETS.pc98.width,
+                RETRO_PRESETS.pc98.height,
+              ]),
+              type: "vec2<f32>",
+            },
+            uColorLevels: { value: RETRO_PRESETS.pc98.colors, type: "f32" },
+            uDitherStrength: { value: RETRO_PRESETS.pc98.dither, type: "f32" },
+            uPaletteMode: { value: 1, type: "f32" },
+            uScanlineStrength: {
+              value: RETRO_PRESETS.pc98.scanline,
+              type: "f32",
+            },
+            uVignetteStrength: {
+              value: RETRO_PRESETS.pc98.vignette,
+              type: "f32",
+            },
+            uPhosphorStrength: {
+              value: RETRO_PRESETS.pc98.phosphor,
+              type: "f32",
+            },
+            uMonoTint: {
+              value: new Float32Array(MONO_TINTS.green.rgb),
+              type: "vec3<f32>",
+            },
+          },
+        },
+      });
+
+      app.renderer.on("resize", fitCurrentSprite);
+      appRef.current = app;
+      filterRef.current = filter;
+      applyFilterState();
+    };
+
+    void setupPixi();
+
+    return () => {
+      cancelled = true;
+      cleanupPreview();
+      filterRef.current?.destroy();
+      appRef.current?.destroy(true);
+      filterRef.current = null;
+      appRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    applyFilterState();
+  }, [
+    colorLevels,
+    ditherStrength,
+    monoTint,
+    paletteMode,
+    phosphorStrength,
+    scanlineStrength,
+    targetHeight,
+    targetWidth,
+    vignetteStrength,
+  ]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!videoRef.current) return;
+
+      const target = event.target as HTMLElement | null;
+      const isTypingTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+
+      if (isTypingTarget) return;
+
+      if (event.code === "Space" || event.code === "KeyK") {
+        event.preventDefault();
+        void togglePlayback();
+        return;
+      }
+
+      if (event.code === "KeyJ") {
+        event.preventDefault();
+        seekTo(Math.max(videoRef.current.currentTime - 10, 0));
+        return;
+      }
+
+      if (event.code === "KeyL") {
+        event.preventDefault();
+        seekTo(
+          Math.min(
+            videoRef.current.currentTime + 10,
+            videoRef.current.duration || videoRef.current.currentTime + 10,
+          ),
+        );
+        return;
+      }
+
+      if (event.code === "ArrowLeft") {
+        event.preventDefault();
+        seekTo(Math.max(videoRef.current.currentTime - 5, 0));
+        return;
+      }
+
+      if (event.code === "ArrowRight") {
+        event.preventDefault();
+        seekTo(
+          Math.min(
+            videoRef.current.currentTime + 5,
+            videoRef.current.duration || videoRef.current.currentTime + 5,
+          ),
+        );
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
     <main
       className="h-screen overflow-y-auto bg-slate-200 text-slate-800"
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
+      onDrop={(ev) => {
+        ev.preventDefault();
+        const files = ev.dataTransfer.files;
+
+        if (files.length > 0) {
+          void previewFile(files[0]);
+        }
+      }}
+      onDragOver={(ev) => {
+        ev.preventDefault();
+      }}
     >
       <div className="mx-auto max-w-5xl px-6 py-8">
         <header className="mb-8">
@@ -756,7 +535,9 @@ function App() {
             <div className="space-y-3">
               <button
                 type="button"
-                onClick={selectFiles}
+                onClick={() => {
+                  fileInputRef.current?.click();
+                }}
                 className="w-full rounded-xl border border-dashed border-slate-600 bg-slate-950 p-6 text-center text-sm text-slate-300 transition hover:border-sky-400 hover:bg-slate-900"
               >
                 Drop video here, or click to add file
@@ -764,7 +545,9 @@ function App() {
 
               <button
                 type="button"
-                onClick={selectFolders}
+                onClick={() => {
+                  folderInputRef.current?.click();
+                }}
                 className="hidden rounded-xl border border-dashed border-slate-600 bg-slate-950 p-6 text-center text-sm text-slate-300 transition hover:border-sky-400 hover:bg-slate-900"
               >
                 Drop folders here, or click to add folders
@@ -772,361 +555,61 @@ function App() {
 
               <div className="rounded-xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
                 <p className="font-semibold text-slate-100">Current preview</p>
-                <p className="mt-2 break-all">
-                  {previewName || "動画がまだ選択されていません"}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {Object.entries(RETRO_PRESETS).map(([key, preset]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        applyPreset(key as keyof typeof RETRO_PRESETS);
-                      }}
-                      className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-slate-100 hover:bg-amber-500/20"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-4 space-y-3">
-                  <label className="block">
-                    <span className="text-slate-100">Palette</span>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaletteMode("free");
-                        }}
-                        className={[
-                          "rounded-lg border px-3 py-1.5 text-slate-100",
-                          paletteMode === "free"
-                            ? "border-sky-400 bg-sky-500/20"
-                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                        ].join(" ")}
-                      >
-                        Free
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaletteMode("pc98");
-                        }}
-                        className={[
-                          "rounded-lg border px-3 py-1.5 text-slate-100",
-                          paletteMode === "pc98"
-                            ? "border-sky-400 bg-sky-500/20"
-                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                        ].join(" ")}
-                      >
-                        PC-98 16-color
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaletteMode("color32");
-                        }}
-                        className={[
-                          "rounded-lg border px-3 py-1.5 text-slate-100",
-                          paletteMode === "color32"
-                            ? "border-sky-400 bg-sky-500/20"
-                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                        ].join(" ")}
-                      >
-                        Color 32
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaletteMode("mono");
-                        }}
-                        className={[
-                          "rounded-lg border px-3 py-1.5 text-slate-100",
-                          paletteMode === "mono"
-                            ? "border-sky-400 bg-sky-500/20"
-                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                        ].join(" ")}
-                      >
-                        Monochrome
-                      </button>
-                    </div>
-                  </label>
-                  {paletteMode === "mono" && (
-                    <label className="block">
-                      <span className="text-slate-100">Mono tint</span>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {Object.entries(MONO_TINTS).map(([key, tint]) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => {
-                              setMonoTint(key as MonoTintMode);
-                            }}
-                            className={[
-                              "rounded-lg border px-3 py-1.5 text-slate-100",
-                              monoTint === key
-                                ? "border-sky-400 bg-sky-500/20"
-                                : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                            ].join(" ")}
-                          >
-                            {tint.label}
-                          </button>
-                        ))}
-                      </div>
-                    </label>
-                  )}
-                  <label className="block">
-                    <span className="text-slate-100">Target width: {targetWidth}px</span>
-                    <input
-                      type="range"
-                      min="160"
-                      max="640"
-                      step="16"
-                      value={targetWidth}
-                      onChange={(ev) => {
-                        setTargetWidth(Number(ev.currentTarget.value));
-                      }}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-slate-100">Target height: {targetHeight}px</span>
-                    <input
-                      type="range"
-                      min="100"
-                      max="400"
-                      step="8"
-                      value={targetHeight}
-                      onChange={(ev) => {
-                        setTargetHeight(Number(ev.currentTarget.value));
-                      }}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-slate-100">Color levels: {colorLevels}</span>
-                    <input
-                      type="range"
-                      min="2"
-                      max="16"
-                      step="1"
-                      value={colorLevels}
-                      onChange={(ev) => {
-                        setColorLevels(Number(ev.currentTarget.value));
-                      }}
-                      disabled={paletteMode === "pc98" || paletteMode === "color32"}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-slate-100">
-                      Bayer dither: {ditherStrength.toFixed(2)}
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={ditherStrength}
-                      onChange={(ev) => {
-                        setDitherStrength(Number(ev.currentTarget.value));
-                      }}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-slate-100">
-                      Scanline: {scanlineStrength.toFixed(2)}
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="0.4"
-                      step="0.01"
-                      value={scanlineStrength}
-                      onChange={(ev) => {
-                        setScanlineStrength(Number(ev.currentTarget.value));
-                      }}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-slate-100">
-                      Vignette: {vignetteStrength.toFixed(2)}
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="0.3"
-                      step="0.01"
-                      value={vignetteStrength}
-                      onChange={(ev) => {
-                        setVignetteStrength(Number(ev.currentTarget.value));
-                      }}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-slate-100">
-                      Phosphor: {phosphorStrength.toFixed(2)}
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="0.2"
-                      step="0.01"
-                      value={phosphorStrength}
-                      onChange={(ev) => {
-                        setPhosphorStrength(Number(ev.currentTarget.value));
-                      }}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                </div>
+
+                <RetroFilterPanel
+                  colorLevels={colorLevels}
+                  ditherStrength={ditherStrength}
+                  monoTint={monoTint}
+                  paletteMode={paletteMode}
+                  phosphorStrength={phosphorStrength}
+                  previewName={previewName}
+                  scanlineStrength={scanlineStrength}
+                  targetHeight={targetHeight}
+                  targetWidth={targetWidth}
+                  vignetteStrength={vignetteStrength}
+                  onApplyPreset={applyPreset}
+                  onSetColorLevels={setColorLevels}
+                  onSetDitherStrength={setDitherStrength}
+                  onSetMonoTint={setMonoTint}
+                  onSetPaletteMode={setPaletteMode}
+                  onSetPhosphorStrength={setPhosphorStrength}
+                  onSetScanlineStrength={setScanlineStrength}
+                  onSetTargetHeight={setTargetHeight}
+                  onSetTargetWidth={setTargetWidth}
+                  onSetVignetteStrength={setVignetteStrength}
+                />
+
                 {videoRef.current && (
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max={Math.max(duration, 0)}
-                        step="0.01"
-                        value={Math.min(currentTime, duration || 0)}
-                        onChange={(ev) => {
-                          seekTo(Number(ev.currentTarget.value));
-                        }}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void togglePlayback();
-                        }}
-                        className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-slate-100 hover:bg-emerald-500/20"
-                      >
-                        {isPlaying ? "Pause" : "Play"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          seekTo(0);
-                          void playVideoWithAudio();
-                        }}
-                        className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-slate-100 hover:bg-sky-500/20"
-                      >
-                        Restart
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          seekTo(Math.max(currentTime - 5, 0));
-                        }}
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-                      >
-                        -5s
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          seekTo(Math.min(currentTime + 5, duration || currentTime + 5));
-                        }}
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-                      >
-                        +5s
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          stepFrame(-1);
-                        }}
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-                      >
-                        Prev frame
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          stepFrame(1);
-                        }}
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-                      >
-                        Next frame
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={toggleMute}
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-                      >
-                        {isMuted ? "Unmute" : "Mute"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={toggleLoop}
-                        className={[
-                          "rounded-lg border px-3 py-1.5 text-slate-100",
-                          isLooping
-                            ? "border-sky-400 bg-sky-500/20"
-                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                        ].join(" ")}
-                      >
-                        {isLooping ? "Loop on" : "Loop off"}
-                      </button>
-                    </div>
-                    <div>
-                      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Volume</span>
-                        <span>{Math.round(volume * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={volume}
-                        onChange={(ev) => {
-                          changeVolume(Number(ev.currentTarget.value));
-                        }}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] text-slate-400">Speed</span>
-                      {[0.5, 1, 2].map((rate) => (
-                        <button
-                          key={rate}
-                          type="button"
-                          onClick={() => {
-                            changePlaybackRate(rate);
-                          }}
-                          className={[
-                            "rounded-lg border px-3 py-1.5 text-slate-100",
-                            playbackRate === rate
-                              ? "border-sky-400 bg-sky-500/20"
-                              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-                          ].join(" ")}
-                        >
-                          {rate}x
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
-                    </p>
-                  </div>
+                  <VideoControls
+                    currentTime={currentTime}
+                    duration={duration}
+                    isLooping={isLooping}
+                    isMuted={isMuted}
+                    isPlaying={isPlaying}
+                    playbackRate={playbackRate}
+                    volume={volume}
+                    onChangePlaybackRate={changePlaybackRate}
+                    onChangeVolume={changeVolume}
+                    onRestart={() => {
+                      seekTo(0);
+                      void playVideoWithAudio();
+                    }}
+                    onSeek={seekTo}
+                    onStepFrame={stepFrame}
+                    onToggleLoop={toggleLoop}
+                    onToggleMute={toggleMute}
+                    onTogglePlayback={() => {
+                      void togglePlayback();
+                    }}
+                  />
                 )}
+
                 {needsUserPlay && (
                   <p className="mt-2 text-amber-300">
-                    自動再生が止められたので、Play with audio を押すと音が出ます。
+                    自動再生が止められたので、Play ボタンを押すと音が出ます。
                   </p>
                 )}
+
                 {previewError && (
                   <p className="mt-2 text-rose-400">{previewError}</p>
                 )}
@@ -1149,7 +632,9 @@ function App() {
             className="hidden"
             onChange={(ev) => {
               const files = ev.currentTarget.files;
-              if (files && files.length > 0) void previewFile(files[0]);
+              if (files && files.length > 0) {
+                void previewFile(files[0]);
+              }
 
               ev.currentTarget.value = "";
             }}
