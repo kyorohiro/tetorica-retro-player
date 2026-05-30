@@ -21,11 +21,16 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const filterRef = useRef<Filter | null>(null);
   const previewRequestIdRef = useRef<number>(0);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const mediaSourceRef = useRef<
+    MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null
+  >(null);
+  const isAudioGraphActiveRef = useRef<boolean>(false);
   const masterGainRef = useRef<GainNode | null>(null);
   const lofiLowpassRef = useRef<BiquadFilterNode | null>(null);
   const lofiHighshelfRef = useRef<BiquadFilterNode | null>(null);
   const lofiDriveRef = useRef<WaveShaperNode | null>(null);
+  const lofiWetGainRef = useRef<GainNode | null>(null);
+  const capturedMediaStreamRef = useRef<MediaStream | null>(null);
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const noiseFilterRef = useRef<BiquadFilterNode | null>(null);
   const noisePannerRef = useRef<StereoPannerNode | null>(null);
@@ -269,15 +274,18 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       const lowpass = context.createBiquadFilter();
       const highshelf = context.createBiquadFilter();
       const drive = context.createWaveShaper();
+      const wetGain = context.createGain();
 
       lowpass.type = "lowpass";
       highshelf.type = "highshelf";
       highshelf.frequency.value = 2800;
       drive.oversample = "4x";
+      wetGain.gain.value = 0.75;
 
       lowpass.connect(highshelf);
       highshelf.connect(drive);
-      drive.connect(masterGain);
+      drive.connect(wetGain);
+      wetGain.connect(masterGain);
       masterGain.connect(context.destination);
 
       const noiseSource = context.createBufferSource();
@@ -319,6 +327,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       lofiLowpassRef.current = lowpass;
       lofiHighshelfRef.current = highshelf;
       lofiDriveRef.current = drive;
+      lofiWetGainRef.current = wetGain;
       noiseSourceRef.current = noiseSource;
       noiseFilterRef.current = noiseFilter;
       noisePannerRef.current = noisePanner;
@@ -343,6 +352,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const lowpass = lofiLowpassRef.current;
     const highshelf = lofiHighshelfRef.current;
     const drive = lofiDriveRef.current;
+    const wetGain = lofiWetGainRef.current;
     const noiseGainNode = noiseGainRef.current;
     const media = mediaRef.current;
 
@@ -350,7 +360,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       masterGain.gain.value = isMuted ? 0 : volume;
     }
 
-    if (media) {
+    if (media && !isAudioGraphActiveRef.current) {
       media.muted = isMuted;
       media.volume = isMuted ? 0 : volume;
     }
@@ -362,6 +372,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       highshelf.frequency.value = 2200 - amount * 1000;
       highshelf.gain.value = -amount * 24;
       drive.curve = createDriveCurve(amount);
+      if (wetGain) {
+        wetGain.gain.value = isAudioFxEnabled ? 0.25 + amount * 1.25 : 0;
+      }
     }
 
     if (noiseGainNode) {
@@ -378,11 +391,27 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       mediaSourceRef.current = null;
     }
 
-    const mediaSource = context.createMediaElementSource(media);
+    capturedMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    capturedMediaStreamRef.current = null;
+
+    let mediaSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode;
+    const captureStream =
+      "captureStream" in media && typeof media.captureStream === "function"
+        ? media.captureStream()
+        : null;
+
+    if (captureStream && captureStream.getAudioTracks().length > 0) {
+      capturedMediaStreamRef.current = captureStream;
+      mediaSource = context.createMediaStreamSource(captureStream);
+    } else {
+      mediaSource = context.createMediaElementSource(media);
+    }
+
     mediaSource.connect(lofiLowpassRef.current!);
     mediaSourceRef.current = mediaSource;
-    media.muted = isMuted;
-    media.volume = isMuted ? 0 : volume;
+    isAudioGraphActiveRef.current = true;
+    media.muted = false;
+    media.volume = 0;
 
     updateAudioNodes();
   };
@@ -403,6 +432,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     textureRef.current = null;
     mediaSourceRef.current?.disconnect();
     mediaSourceRef.current = null;
+    isAudioGraphActiveRef.current = false;
+    capturedMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    capturedMediaStreamRef.current = null;
     mediaRef.current = null;
     previewElementRef.current = null;
     if (streamOwnedRef.current) {
