@@ -4,15 +4,23 @@ type VideoControlsProps = {
   isLooping: boolean;
   isMuted: boolean;
   isPlaying: boolean;
+  isAudioFxEnabled: boolean;
+  isNoiseEnabled: boolean;
+  lofiAmount: number;
+  noiseLevel: number;
   playbackRate: number;
   volume: number;
+  onChangeLofiAmount: (amount: number) => void;
+  onChangeNoiseLevel: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
   onChangeVolume: (volume: number) => void;
   onRestart: () => void;
   onSeek: (time: number) => void;
   onStepFrame: (direction: -1 | 1) => void;
   onToggleLoop: () => void;
+  onToggleAudioFx: () => void;
   onToggleMute: () => void;
+  onToggleNoise: () => void;
   onTogglePlayback: () => void;
 };
 
@@ -34,15 +42,23 @@ export function VideoControls({
   isLooping,
   isMuted,
   isPlaying,
+  isAudioFxEnabled,
+  isNoiseEnabled,
+  lofiAmount,
+  noiseLevel,
   playbackRate,
   volume,
+  onChangeLofiAmount,
+  onChangeNoiseLevel,
   onChangePlaybackRate,
   onChangeVolume,
   onRestart,
   onSeek,
   onStepFrame,
   onToggleLoop,
+  onToggleAudioFx,
   onToggleMute,
+  onToggleNoise,
   onTogglePlayback,
 }: VideoControlsProps) {
   return (
@@ -138,6 +154,30 @@ export function VideoControls({
         >
           {isLooping ? "Loop on" : "Loop off"}
         </button>
+        <button
+          type="button"
+          onClick={onToggleAudioFx}
+          className={[
+            "rounded-lg border px-3 py-1.5 text-slate-100",
+            isAudioFxEnabled
+              ? "border-amber-400 bg-amber-500/20"
+              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+          ].join(" ")}
+        >
+          {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
+        </button>
+        <button
+          type="button"
+          onClick={onToggleNoise}
+          className={[
+            "rounded-lg border px-3 py-1.5 text-slate-100",
+            isNoiseEnabled
+              ? "border-fuchsia-400 bg-fuchsia-500/20"
+              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+          ].join(" ")}
+        >
+          {isNoiseEnabled ? "Noise on" : "Noise off"}
+        </button>
       </div>
 
       <div>
@@ -153,6 +193,42 @@ export function VideoControls({
           value={volume}
           onChange={(ev) => {
             onChangeVolume(Number(ev.currentTarget.value));
+          }}
+          className="w-full"
+        />
+      </div>
+
+      <div>
+        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Lo-Fi amount</span>
+          <span>{Math.round(lofiAmount * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={lofiAmount}
+          onChange={(ev) => {
+            onChangeLofiAmount(Number(ev.currentTarget.value));
+          }}
+          className="w-full"
+        />
+      </div>
+
+      <div>
+        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Spatial noise</span>
+          <span>{Math.round(noiseLevel * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="0.4"
+          step="0.01"
+          value={noiseLevel}
+          onChange={(ev) => {
+            onChangeNoiseLevel(Number(ev.currentTarget.value));
           }}
           className="w-full"
         />

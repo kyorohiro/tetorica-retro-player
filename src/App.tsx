@@ -157,11 +157,17 @@ function App() {
                   <VideoControls
                     currentTime={player.currentTime}
                     duration={player.duration}
+                    isAudioFxEnabled={player.isAudioFxEnabled}
                     isLooping={player.isLooping}
                     isMuted={player.isMuted}
+                    isNoiseEnabled={player.isNoiseEnabled}
                     isPlaying={player.isPlaying}
+                    lofiAmount={player.lofiAmount}
+                    noiseLevel={player.noiseLevel}
                     playbackRate={player.playbackRate}
                     volume={player.volume}
+                    onChangeLofiAmount={player.setLofiAmount}
+                    onChangeNoiseLevel={player.setNoiseLevel}
                     onChangePlaybackRate={player.changePlaybackRate}
                     onChangeVolume={player.changeVolume}
                     onRestart={() => {
@@ -170,8 +176,10 @@ function App() {
                     }}
                     onSeek={player.seekTo}
                     onStepFrame={player.stepFrame}
+                    onToggleAudioFx={player.toggleAudioFx}
                     onToggleLoop={player.toggleLoop}
                     onToggleMute={player.toggleMute}
+                    onToggleNoise={player.toggleNoise}
                     onTogglePlayback={() => {
                       void player.togglePlayback();
                     }}
