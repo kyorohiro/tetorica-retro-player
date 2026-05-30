@@ -139,6 +139,7 @@ function App() {
                   phosphorStrength={filterState.phosphorStrength}
                   previewName={player.previewName}
                   scanlineStrength={filterState.scanlineStrength}
+                  scanline2Strength={filterState.scanline2Strength}
                   targetHeight={filterState.targetHeight}
                   targetWidth={filterState.targetWidth}
                   vignetteStrength={filterState.vignetteStrength}
@@ -150,6 +151,7 @@ function App() {
                   onSetPaletteMode={filterState.setPaletteMode}
                   onSetPhosphorStrength={filterState.setPhosphorStrength}
                   onSetScanlineStrength={filterState.setScanlineStrength}
+                  onSetScanline2Strength={filterState.setScanline2Strength}
                   onSetTargetHeight={filterState.setTargetHeight}
                   onSetTargetWidth={filterState.setTargetWidth}
                   onSetVignetteStrength={filterState.setVignetteStrength}

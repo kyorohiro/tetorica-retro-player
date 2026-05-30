@@ -15,6 +15,7 @@ export function useRetroFilterState() {
   const [ditherStrength, setDitherStrength] = useState<number>(DEFAULT_PRESET.dither);
   const [paletteMode, setPaletteMode] = useState<PaletteMode>(DEFAULT_PRESET.palette);
   const [scanlineStrength, setScanlineStrength] = useState<number>(DEFAULT_PRESET.scanline);
+  const [scanline2Strength, setScanline2Strength] = useState<number>(DEFAULT_PRESET.scanline2);
   const [vignetteStrength, setVignetteStrength] = useState<number>(DEFAULT_PRESET.vignette);
   const [phosphorStrength, setPhosphorStrength] = useState<number>(DEFAULT_PRESET.phosphor);
   const [monoTint, setMonoTint] = useState<MonoTintMode>(DEFAULT_PRESET.monoTint);
@@ -29,6 +30,7 @@ export function useRetroFilterState() {
     setDitherStrength(settings.dither);
     setPaletteMode(settings.palette);
     setScanlineStrength(settings.scanline);
+    setScanline2Strength(settings.scanline2);
     setVignetteStrength(settings.vignette);
     setPhosphorStrength(settings.phosphor);
     setMonoTint(settings.monoTint);
@@ -41,6 +43,7 @@ export function useRetroFilterState() {
     ditherStrength,
     paletteMode,
     scanlineStrength,
+    scanline2Strength,
     vignetteStrength,
     phosphorStrength,
     monoTint,
@@ -51,6 +54,7 @@ export function useRetroFilterState() {
     setDitherStrength,
     setPaletteMode,
     setScanlineStrength,
+    setScanline2Strength,
     setVignetteStrength,
     setPhosphorStrength,
     setMonoTint,

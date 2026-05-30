@@ -40,9 +40,11 @@ uniform float uColorLevels;
 uniform float uDitherStrength;
 uniform float uPaletteMode;
 uniform float uScanlineStrength;
+uniform float uScanline2Strength;
 uniform float uVignetteStrength;
 uniform float uPhosphorStrength;
 uniform vec3 uMonoTint;
+uniform float uTime;
 
 float bayer4x4(vec2 pos)
 {
@@ -166,6 +168,9 @@ void main(void)
 
   float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
   color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);
+
+  float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength;
+  color.rgb += scanline2;
 
   float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
   color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);

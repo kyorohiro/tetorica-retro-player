@@ -59,6 +59,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     filter.resources.pixelUniforms.uniforms.uDitherStrength = filterState.ditherStrength;
     filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
     filter.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
+    filter.resources.pixelUniforms.uniforms.uScanline2Strength = filterState.scanline2Strength;
     filter.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
     filter.resources.pixelUniforms.uniforms.uPhosphorStrength = filterState.phosphorStrength;
     filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
@@ -780,16 +781,21 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             uDitherStrength: { value: RETRO_PRESETS.pc98.dither, type: "f32" },
             uPaletteMode: { value: 1, type: "f32" },
             uScanlineStrength: { value: RETRO_PRESETS.pc98.scanline, type: "f32" },
+            uScanline2Strength: { value: RETRO_PRESETS.pc98.scanline2, type: "f32" },
             uVignetteStrength: { value: RETRO_PRESETS.pc98.vignette, type: "f32" },
             uPhosphorStrength: { value: RETRO_PRESETS.pc98.phosphor, type: "f32" },
             uMonoTint: {
               value: new Float32Array(MONO_TINTS.green.rgb),
               type: "vec3<f32>",
             },
+            uTime: { value: 0, type: "f32" },
           },
         },
       });
 
+      app.ticker.add((ticker) => {
+        filter.resources.pixelUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
+      });
       app.renderer.on("resize", fitCurrentSprite);
       appRef.current = app;
       filterRef.current = filter;
@@ -823,6 +829,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     filterState.paletteMode,
     filterState.phosphorStrength,
     filterState.scanlineStrength,
+    filterState.scanline2Strength,
     filterState.targetHeight,
     filterState.targetWidth,
     filterState.vignetteStrength,

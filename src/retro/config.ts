@@ -20,6 +20,7 @@ export const RETRO_PRESETS = {
     dither: 0.2,
     palette: "free",
     scanline: 0.08,
+    scanline2: 0.0,
     vignette: 0.04,
     phosphor: 0.03,
     monoTint: "gray",
@@ -32,6 +33,7 @@ export const RETRO_PRESETS = {
     dither: 0.28,
     palette: "free",
     scanline: 0.14,
+    scanline2: 0.0,
     vignette: 0.08,
     phosphor: 0.05,
     monoTint: "gray",
@@ -44,6 +46,7 @@ export const RETRO_PRESETS = {
     dither: 0.35,
     palette: "pc98",
     scanline: 0.09,
+    scanline2: 0.0,
     vignette: 0.06,
     phosphor: 0.04,
     monoTint: "gray",
@@ -56,6 +59,7 @@ export const RETRO_PRESETS = {
     dither: 0.24,
     palette: "color32",
     scanline: 0.08,
+    scanline2: 0.0,
     vignette: 0.05,
     phosphor: 0.03,
     monoTint: "gray",
@@ -68,6 +72,7 @@ export const RETRO_PRESETS = {
     dither: 0.18,
     palette: "mono",
     scanline: 0.1,
+    scanline2: 0.0,
     vignette: 0.08,
     phosphor: 0.02,
     monoTint: "gray",
@@ -80,6 +85,7 @@ export const RETRO_PRESETS = {
     dither: 0.14,
     palette: "mono",
     scanline: 0.12,
+    scanline2: 0.0,
     vignette: 0.1,
     phosphor: 0.06,
     monoTint: "green",
@@ -92,6 +98,7 @@ export const RETRO_PRESETS = {
     dither: 0.16,
     palette: "mono",
     scanline: 0.14,
+    scanline2: 0.0,
     vignette: 0.11,
     phosphor: 0.05,
     monoTint: "amber",
@@ -104,6 +111,7 @@ export const RETRO_PRESETS = {
     dither: 0.1,
     palette: "mono",
     scanline: 0.03,
+    scanline2: 0.0,
     vignette: 0.03,
     phosphor: 0.01,
     monoTint: "ice",
@@ -118,6 +126,7 @@ export const RETRO_PRESETS = {
     dither: number;
     palette: PaletteMode;
     scanline: number;
+    scanline2: number;
     vignette: number;
     phosphor: number;
     monoTint: MonoTintMode;

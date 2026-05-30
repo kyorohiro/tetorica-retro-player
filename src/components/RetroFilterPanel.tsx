@@ -15,6 +15,7 @@ type RetroFilterPanelProps = {
   phosphorStrength: number;
   previewName: string;
   scanlineStrength: number;
+  scanline2Strength: number;
   targetHeight: number;
   targetWidth: number;
   vignetteStrength: number;
@@ -26,6 +27,7 @@ type RetroFilterPanelProps = {
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
+  onSetScanline2Strength: (value: number) => void;
   onSetTargetHeight: (value: number) => void;
   onSetTargetWidth: (value: number) => void;
   onSetVignetteStrength: (value: number) => void;
@@ -40,6 +42,7 @@ export function RetroFilterPanel({
   phosphorStrength,
   previewName,
   scanlineStrength,
+  scanline2Strength,
   targetHeight,
   targetWidth,
   vignetteStrength,
@@ -51,6 +54,7 @@ export function RetroFilterPanel({
   onSetPaletteMode,
   onSetPhosphorStrength,
   onSetScanlineStrength,
+  onSetScanline2Strength,
   onSetTargetHeight,
   onSetTargetWidth,
   onSetVignetteStrength,
@@ -220,6 +224,23 @@ export function RetroFilterPanel({
             value={scanlineStrength}
             onChange={(ev) => {
               onSetScanlineStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            Scanline2: {scanline2Strength.toFixed(2)}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="0.2"
+            step="0.01"
+            value={scanline2Strength}
+            onChange={(ev) => {
+              onSetScanline2Strength(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />
