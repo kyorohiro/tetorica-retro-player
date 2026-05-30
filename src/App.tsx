@@ -133,6 +133,7 @@ function App() {
                 <RetroFilterPanel
                   colorLevels={filterState.colorLevels}
                   ditherStrength={filterState.ditherStrength}
+                  isFilterEnabled={filterState.isFilterEnabled}
                   monoTint={filterState.monoTint}
                   paletteMode={filterState.paletteMode}
                   phosphorStrength={filterState.phosphorStrength}
@@ -144,6 +145,7 @@ function App() {
                   onApplyPreset={filterState.applyPreset}
                   onSetColorLevels={filterState.setColorLevels}
                   onSetDitherStrength={filterState.setDitherStrength}
+                  onSetIsFilterEnabled={filterState.setIsFilterEnabled}
                   onSetMonoTint={filterState.setMonoTint}
                   onSetPaletteMode={filterState.setPaletteMode}
                   onSetPhosphorStrength={filterState.setPhosphorStrength}

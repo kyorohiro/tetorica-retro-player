@@ -18,6 +18,7 @@ export function useRetroFilterState() {
   const [vignetteStrength, setVignetteStrength] = useState<number>(DEFAULT_PRESET.vignette);
   const [phosphorStrength, setPhosphorStrength] = useState<number>(DEFAULT_PRESET.phosphor);
   const [monoTint, setMonoTint] = useState<MonoTintMode>(DEFAULT_PRESET.monoTint);
+  const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(true);
 
   const applyPreset = (preset: RetroPresetKey) => {
     const settings = RETRO_PRESETS[preset];
@@ -43,6 +44,7 @@ export function useRetroFilterState() {
     vignetteStrength,
     phosphorStrength,
     monoTint,
+    isFilterEnabled,
     setTargetWidth,
     setTargetHeight,
     setColorLevels,
@@ -52,6 +54,7 @@ export function useRetroFilterState() {
     setVignetteStrength,
     setPhosphorStrength,
     setMonoTint,
+    setIsFilterEnabled,
     applyPreset,
   };
 }

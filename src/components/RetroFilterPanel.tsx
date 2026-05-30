@@ -9,6 +9,7 @@ import {
 type RetroFilterPanelProps = {
   colorLevels: number;
   ditherStrength: number;
+  isFilterEnabled: boolean;
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
   phosphorStrength: number;
@@ -18,6 +19,7 @@ type RetroFilterPanelProps = {
   targetWidth: number;
   vignetteStrength: number;
   onApplyPreset: (preset: RetroPresetKey) => void;
+  onSetIsFilterEnabled: (value: boolean) => void;
   onSetColorLevels: (value: number) => void;
   onSetDitherStrength: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
@@ -32,6 +34,7 @@ type RetroFilterPanelProps = {
 export function RetroFilterPanel({
   colorLevels,
   ditherStrength,
+  isFilterEnabled,
   monoTint,
   paletteMode,
   phosphorStrength,
@@ -41,6 +44,7 @@ export function RetroFilterPanel({
   targetWidth,
   vignetteStrength,
   onApplyPreset,
+  onSetIsFilterEnabled,
   onSetColorLevels,
   onSetDitherStrength,
   onSetMonoTint,
@@ -58,6 +62,20 @@ export function RetroFilterPanel({
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            onSetIsFilterEnabled(!isFilterEnabled);
+          }}
+          className={[
+            "rounded-lg border px-3 py-1.5 text-slate-100",
+            isFilterEnabled
+              ? "border-emerald-400 bg-emerald-500/20"
+              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+          ].join(" ")}
+        >
+          {isFilterEnabled ? "Filter on" : "Filter off"}
+        </button>
         {Object.entries(RETRO_PRESETS).map(([key, preset]) => (
           <button
             key={key}

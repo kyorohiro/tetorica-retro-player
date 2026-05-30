@@ -70,6 +70,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     applyFilterStateTo(filterRef.current);
   };
 
+  const syncSpriteFilter = () => {
+    if (!spriteRef.current) return;
+
+    spriteRef.current.filters =
+      filterState.isFilterEnabled && filterRef.current ? [filterRef.current] : [];
+  };
+
   const releaseDetachedMedia = (media: HTMLMediaElement, url?: string) => {
     media.pause();
     if (media.srcObject instanceof MediaStream) {
@@ -557,7 +564,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           }
 
           const sprite = new Sprite(texture);
-          sprite.filters = [filter];
+          sprite.filters = filterState.isFilterEnabled ? [filter] : [];
 
           fitSprite(appRef.current, sprite, media);
           appRef.current.stage.removeChildren();
@@ -603,7 +610,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       }
 
       const sprite = new Sprite(texture);
-      sprite.filters = [filter];
+      sprite.filters = filterState.isFilterEnabled ? [filter] : [];
 
       fitSprite(appRef.current, sprite, image);
       appRef.current.stage.removeChildren();
@@ -645,7 +652,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     texture.source.scaleMode = "nearest";
 
     const sprite = new Sprite(texture);
-    sprite.filters = [filter];
+    sprite.filters = filterState.isFilterEnabled ? [filter] : [];
 
     fitSprite(appRef.current, sprite, video);
     appRef.current?.stage.removeChildren();
@@ -807,9 +814,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   useEffect(() => {
     applyFilterState();
+    syncSpriteFilter();
   }, [
     filterState.colorLevels,
     filterState.ditherStrength,
+    filterState.isFilterEnabled,
     filterState.monoTint,
     filterState.paletteMode,
     filterState.phosphorStrength,
