@@ -231,6 +231,8 @@ function App() {
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
   const [targetWidth, setTargetWidth] = useState<number>(RETRO_PRESETS.pc98.width);
   const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
   const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
@@ -249,6 +251,18 @@ function App() {
     if (url) {
       URL.revokeObjectURL(url);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return "00:00";
+    }
+
+    const totalSeconds = Math.floor(seconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainSeconds = totalSeconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
   };
 
   const waitForVideoFrame = (video: HTMLVideoElement) =>
@@ -373,6 +387,8 @@ function App() {
     setNeedsUserPlay(false);
     setIsPlaying(false);
     setIsMuted(false);
+    setCurrentTime(0);
+    setDuration(0);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -403,11 +419,15 @@ function App() {
     if (!videoRef.current) {
       setIsPlaying(false);
       setIsMuted(false);
+      setCurrentTime(0);
+      setDuration(0);
       return;
     }
 
     setIsPlaying(!videoRef.current.paused);
     setIsMuted(videoRef.current.muted || videoRef.current.volume === 0);
+    setCurrentTime(videoRef.current.currentTime);
+    setDuration(videoRef.current.duration || 0);
   };
 
   const playVideoWithAudio = async () => {
@@ -442,6 +462,25 @@ function App() {
       videoRef.current.volume = 1;
     }
     syncVideoState();
+  };
+
+  const togglePlayback = async () => {
+    if (!videoRef.current) return;
+
+    if (videoRef.current.paused) {
+      await playVideoWithAudio();
+      return;
+    }
+
+    videoRef.current.pause();
+    syncVideoState();
+  };
+
+  const seekTo = (nextTime: number) => {
+    if (!videoRef.current) return;
+
+    videoRef.current.currentTime = nextTime;
+    setCurrentTime(nextTime);
   };
 
   const paletteModeToUniform = (mode: PaletteMode) => {
@@ -499,6 +538,10 @@ function App() {
     video.addEventListener("play", syncVideoState);
     video.addEventListener("pause", syncVideoState);
     video.addEventListener("volumechange", syncVideoState);
+    video.addEventListener("timeupdate", syncVideoState);
+    video.addEventListener("durationchange", syncVideoState);
+    video.addEventListener("seeked", syncVideoState);
+    video.addEventListener("ended", syncVideoState);
 
     try {
       await waitForVideoFrame(video);
@@ -825,23 +868,72 @@ function App() {
                   </label>
                 </div>
                 {videoRef.current && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void playVideoWithAudio();
-                      }}
-                      className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-slate-100 hover:bg-sky-500/20"
-                    >
-                      {isPlaying ? "Replay audio" : "Play with audio"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleMute}
-                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-                    >
-                      {isMuted ? "Unmute" : "Mute"}
-                    </button>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(duration)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max={Math.max(duration, 0)}
+                        step="0.01"
+                        value={Math.min(currentTime, duration || 0)}
+                        onChange={(ev) => {
+                          seekTo(Number(ev.currentTarget.value));
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void togglePlayback();
+                        }}
+                        className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-slate-100 hover:bg-emerald-500/20"
+                      >
+                        {isPlaying ? "Pause" : "Play"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          seekTo(0);
+                          void playVideoWithAudio();
+                        }}
+                        className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-slate-100 hover:bg-sky-500/20"
+                      >
+                        Restart
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          seekTo(Math.max(currentTime - 5, 0));
+                        }}
+                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+                      >
+                        -5s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          seekTo(Math.min(currentTime + 5, duration || currentTime + 5));
+                        }}
+                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+                      >
+                        +5s
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={toggleMute}
+                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+                      >
+                        {isMuted ? "Unmute" : "Mute"}
+                      </button>
+                    </div>
                   </div>
                 )}
                 {needsUserPlay && (
