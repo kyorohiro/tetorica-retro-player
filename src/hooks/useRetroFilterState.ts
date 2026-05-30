@@ -8,18 +8,54 @@ import {
 
 const DEFAULT_PRESET = RETRO_PRESETS.pc98;
 
-export function useRetroFilterState() {
-  const [targetWidth, setTargetWidth] = useState<number>(DEFAULT_PRESET.width);
-  const [targetHeight, setTargetHeight] = useState<number>(DEFAULT_PRESET.height);
-  const [colorLevels, setColorLevels] = useState<number>(DEFAULT_PRESET.colors);
-  const [ditherStrength, setDitherStrength] = useState<number>(DEFAULT_PRESET.dither);
-  const [paletteMode, rawSetPaletteMode] = useState<PaletteMode>(DEFAULT_PRESET.palette);
-  const [scanlineStrength, setScanlineStrength] = useState<number>(DEFAULT_PRESET.scanline);
-  const [scanline2Strength, setScanline2Strength] = useState<number>(DEFAULT_PRESET.scanline2);
-  const [vignetteStrength, setVignetteStrength] = useState<number>(DEFAULT_PRESET.vignette);
-  const [phosphorStrength, setPhosphorStrength] = useState<number>(DEFAULT_PRESET.phosphor);
-  const [monoTint, setMonoTint] = useState<MonoTintMode>(DEFAULT_PRESET.monoTint);
-  const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(true);
+export type RetroFilterInitialState = Partial<{
+  targetWidth: number;
+  targetHeight: number;
+  colorLevels: number;
+  ditherStrength: number;
+  paletteMode: PaletteMode;
+  scanlineStrength: number;
+  scanline2Strength: number;
+  vignetteStrength: number;
+  phosphorStrength: number;
+  monoTint: MonoTintMode;
+  isFilterEnabled: boolean;
+}>;
+
+export function useRetroFilterState(initialState: RetroFilterInitialState = {}) {
+  const [targetWidth, setTargetWidth] = useState<number>(
+    initialState.targetWidth ?? DEFAULT_PRESET.width,
+  );
+  const [targetHeight, setTargetHeight] = useState<number>(
+    initialState.targetHeight ?? DEFAULT_PRESET.height,
+  );
+  const [colorLevels, setColorLevels] = useState<number>(
+    initialState.colorLevels ?? DEFAULT_PRESET.colors,
+  );
+  const [ditherStrength, setDitherStrength] = useState<number>(
+    initialState.ditherStrength ?? DEFAULT_PRESET.dither,
+  );
+  const [paletteMode, rawSetPaletteMode] = useState<PaletteMode>(
+    initialState.paletteMode ?? DEFAULT_PRESET.palette,
+  );
+  const [scanlineStrength, setScanlineStrength] = useState<number>(
+    initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
+  );
+  const [scanline2Strength, setScanline2Strength] = useState<number>(
+    initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+  );
+  const [vignetteStrength, setVignetteStrength] = useState<number>(
+    initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
+  );
+  const [phosphorStrength, setPhosphorStrength] = useState<number>(
+    initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+  );
+  const [monoTint, setMonoTint] = useState<MonoTintMode>(
+    initialState.monoTint ?? DEFAULT_PRESET.monoTint,
+  );
+  const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(
+    initialState.isFilterEnabled ?? true,
+  );
 
   const setPaletteMode = (nextPalette: PaletteMode) => {
     rawSetPaletteMode(nextPalette);

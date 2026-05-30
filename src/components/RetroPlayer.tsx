@@ -1,12 +1,18 @@
 import React from "react";
+import { RetroFilterPanel } from "./RetroFilterPanel";
+import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
-import { useRetroFilterState } from "../hooks/useRetroFilterState";
+import {
+  useRetroFilterState,
+  type RetroFilterInitialState,
+} from "../hooks/useRetroFilterState";
 
 type RetroPlayerProps = {
-  src: string;
+  src?: string;
   kind?: "video" | "image" | "audio";
   className?: string;
   onError?: (error: Error) => void;
+  initialFilterState?: RetroFilterInitialState;
 };
 
 export function RetroPlayer({
@@ -14,9 +20,26 @@ export function RetroPlayer({
   kind = "video",
   className,
   onError,
+  initialFilterState,
 }: RetroPlayerProps) {
-  const filterState = useRetroFilterState();
+  const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
+  const filterState = useRetroFilterState(initialFilterState);
   const player = usePixiVideoPlayer(filterState);
+
+  const syncTargetAspect = React.useCallback(() => {
+    if (!player.sourceDimensions) return;
+
+    const nextHeight = Math.max(
+      8,
+      Math.round(
+        (filterState.targetWidth / player.sourceDimensions.width) *
+          player.sourceDimensions.height /
+          8,
+      ) * 8,
+    );
+
+    filterState.setTargetHeight(nextHeight);
+  }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
 
   React.useEffect(() => {
     if (!src) return;
@@ -33,11 +56,184 @@ export function RetroPlayer({
         onError?.(new Error(String(error)));
       }
     })();
-
-    return undefined;
   }, [src, kind, onError]);
 
-  return <div className={className ?? "h-full w-full"} ref={player.canvasHostRef} />;
+  React.useEffect(() => {
+    if (!isPreviewMaximized) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Escape") {
+        setIsPreviewMaximized(false);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPreviewMaximized]);
+
+  React.useEffect(() => {
+    const frameA = window.requestAnimationFrame(() => {
+      player.refreshLayout();
+      window.requestAnimationFrame(() => {
+        player.refreshLayout();
+      });
+    });
+
+    const timeoutId = window.setTimeout(() => {
+      player.refreshLayout();
+    }, 120);
+
+    return () => {
+      window.cancelAnimationFrame(frameA);
+      window.clearTimeout(timeoutId);
+    };
+  }, [isPreviewMaximized]);
+
+  return (
+    <section
+      className={
+        className ??
+        "rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg"
+      }
+    >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div
+          className={`space-y-3 ${
+            isPreviewMaximized ? "min-h-0 overflow-y-auto pr-1" : ""
+          }`}
+        >
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsPreviewMaximized((current) => !current);
+              }}
+              className="rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 p-4 text-center text-sm text-slate-100 transition hover:bg-sky-500/20"
+            >
+              {isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
+            <p className="font-semibold text-slate-100">Current preview</p>
+
+            <RetroFilterPanel
+              colorLevels={filterState.colorLevels}
+              ditherStrength={filterState.ditherStrength}
+              isFilterEnabled={filterState.isFilterEnabled}
+              monoTint={filterState.monoTint}
+              paletteMode={filterState.paletteMode}
+              phosphorStrength={filterState.phosphorStrength}
+              previewName={player.previewName}
+              scanlineStrength={filterState.scanlineStrength}
+              scanline2Strength={filterState.scanline2Strength}
+              sourceDimensions={player.sourceDimensions}
+              targetHeight={filterState.targetHeight}
+              targetWidth={filterState.targetWidth}
+              vignetteStrength={filterState.vignetteStrength}
+              onApplyPreset={filterState.applyPreset}
+              onSetColorLevels={filterState.setColorLevels}
+              onSetDitherStrength={filterState.setDitherStrength}
+              onSetIsFilterEnabled={filterState.setIsFilterEnabled}
+              onSetMonoTint={filterState.setMonoTint}
+              onSetPaletteMode={filterState.setPaletteMode}
+              onSetPhosphorStrength={filterState.setPhosphorStrength}
+              onSetScanlineStrength={filterState.setScanlineStrength}
+              onSetScanline2Strength={filterState.setScanline2Strength}
+              onSetTargetHeight={filterState.setTargetHeight}
+              onSetTargetWidth={filterState.setTargetWidth}
+              onSetVignetteStrength={filterState.setVignetteStrength}
+              onSyncTargetAspect={syncTargetAspect}
+            />
+
+            {player.hasPlayableMedia && (
+              <VideoControls
+                currentTime={player.currentTime}
+                duration={player.duration}
+                isAudioFxEnabled={player.isAudioFxEnabled}
+                isLooping={player.isLooping}
+                isMuted={player.isMuted}
+                isNoiseEnabled={player.isNoiseEnabled}
+                isPlaying={player.isPlaying}
+                lofiAmount={player.lofiAmount}
+                noiseLevel={player.noiseLevel}
+                playbackRate={player.playbackRate}
+                volume={player.volume}
+                onChangeLofiAmount={player.setLofiAmount}
+                onChangeNoiseLevel={player.setNoiseLevel}
+                onChangePlaybackRate={player.changePlaybackRate}
+                onChangeVolume={player.changeVolume}
+                onRestart={() => {
+                  player.seekTo(0);
+                  void player.playVideoWithAudio();
+                }}
+                onSeek={player.seekTo}
+                onStepFrame={player.stepFrame}
+                onToggleAudioFx={player.toggleAudioFx}
+                onToggleLoop={player.toggleLoop}
+                onToggleMute={player.toggleMute}
+                onToggleNoise={player.toggleNoise}
+                onTogglePlayback={() => {
+                  void player.togglePlayback();
+                }}
+              />
+            )}
+
+            {player.needsUserPlay && (
+              <p className="mt-2 text-amber-300">
+                自動再生が止められたので、Play ボタンを押すと音が出ます。
+              </p>
+            )}
+
+            {player.previewError && (
+              <p className="mt-2 text-rose-400">{player.previewError}</p>
+            )}
+          </div>
+        </div>
+
+        <div
+          className={`rounded-2xl border border-slate-700 bg-slate-950 p-3 ${
+            isPreviewMaximized
+              ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-6"
+              : "min-w-0"
+          }`}
+        >
+          {isPreviewMaximized && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsPreviewMaximized(false);
+              }}
+              className="absolute right-6 top-6 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+            >
+              Exit maximize
+            </button>
+          )}
+
+          <div
+            className={`relative overflow-hidden rounded-xl bg-slate-950 ${
+              isPreviewMaximized
+                ? "h-full min-h-0 w-full"
+                : "h-[60vh] min-h-[360px] w-full min-w-0"
+            }`}
+          >
+            <div ref={player.canvasHostRef} className="h-full w-full" />
+            {player.hasAudioOnly && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
+                Audio preview is playing through the retro audio chain.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export default RetroPlayer;
