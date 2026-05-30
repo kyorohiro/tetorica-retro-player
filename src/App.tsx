@@ -39,21 +39,57 @@ in vec2 vTextureCoord;
 out vec4 finalColor;
 
 uniform sampler2D uTexture;
-uniform float uTime;
+uniform vec2 uTargetSize;
+uniform float uColorLevels;
+uniform float uDitherStrength;
+
+float bayer4x4(vec2 pos)
+{
+  int x = int(mod(pos.x, 4.0));
+  int y = int(mod(pos.y, 4.0));
+  int index = x + y * 4;
+
+  float matrix[16];
+  matrix[0] = 0.0 / 16.0;
+  matrix[1] = 8.0 / 16.0;
+  matrix[2] = 2.0 / 16.0;
+  matrix[3] = 10.0 / 16.0;
+  matrix[4] = 12.0 / 16.0;
+  matrix[5] = 4.0 / 16.0;
+  matrix[6] = 14.0 / 16.0;
+  matrix[7] = 6.0 / 16.0;
+  matrix[8] = 3.0 / 16.0;
+  matrix[9] = 11.0 / 16.0;
+  matrix[10] = 1.0 / 16.0;
+  matrix[11] = 9.0 / 16.0;
+  matrix[12] = 15.0 / 16.0;
+  matrix[13] = 7.0 / 16.0;
+  matrix[14] = 13.0 / 16.0;
+  matrix[15] = 5.0 / 16.0;
+
+  return matrix[index];
+}
 
 void main(void)
 {
-  vec2 uv = vTextureCoord;
-  vec4 color = texture(uTexture, uv);
+  vec2 cell = floor(vTextureCoord * uTargetSize);
+  vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
+  pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
 
-  float line = sin((uv.y + uTime * 0.05) * 720.0) * 0.08;
-  float vignette = smoothstep(0.95, 0.2, distance(uv, vec2(0.5)));
-  color.rgb += line;
-  color.rgb *= vignette;
+  vec4 color = texture(uTexture, pixelatedUv);
+  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
+  color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
+  color.rgb = floor(color.rgb * (uColorLevels - 1.0) + 0.5) / max(uColorLevels - 1.0, 1.0);
 
   finalColor = color;
 }
 `;
+
+const RETRO_PRESETS = {
+  chunky: { label: "Chunky", width: 256, height: 192, colors: 8, dither: 0.2 },
+  arcade: { label: "Arcade", width: 320, height: 224, colors: 12, dither: 0.28 },
+  pc98: { label: "PC-98", width: 640, height: 400, colors: 16, dither: 0.35 },
+} as const;
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,6 +108,10 @@ function App() {
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [targetWidth, setTargetWidth] = useState<number>(RETRO_PRESETS.pc98.width);
+  const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
+  const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
+  const [ditherStrength, setDitherStrength] = useState<number>(RETRO_PRESETS.pc98.dither);
 
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
     video.pause();
@@ -145,15 +185,17 @@ function App() {
           fragment: FILTER_FRAGMENT,
         },
         resources: {
-          timeUniforms: {
-            uTime: { value: 0, type: "f32" },
+          pixelUniforms: {
+            uTargetSize: { value: new Float32Array([RETRO_PRESETS.pc98.width, RETRO_PRESETS.pc98.height]), type: "vec2<f32>" },
+            uColorLevels: { value: RETRO_PRESETS.pc98.colors, type: "f32" },
+            uDitherStrength: { value: RETRO_PRESETS.pc98.dither, type: "f32" },
           },
         },
       });
-
-      app.ticker.add((ticker) => {
-        filter.resources.timeUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
-      });
+      filter.resources.pixelUniforms.uniforms.uTargetSize[0] = targetWidth;
+      filter.resources.pixelUniforms.uniforms.uTargetSize[1] = targetHeight;
+      filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
+      filter.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
       app.renderer.on("resize", fitCurrentSprite);
 
       appRef.current = app;
@@ -260,6 +302,15 @@ function App() {
     syncVideoState();
   };
 
+  useEffect(() => {
+    if (!filterRef.current) return;
+
+    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(targetWidth, 1);
+    filterRef.current.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(targetHeight, 1);
+    filterRef.current.resources.pixelUniforms.uniforms.uColorLevels = Math.max(colorLevels, 2);
+    filterRef.current.resources.pixelUniforms.uniforms.uDitherStrength = ditherStrength;
+  }, [colorLevels, ditherStrength, targetHeight, targetWidth]);
+
   const previewFile = async (file: File) => {
     if (!file.type.startsWith("video/")) {
       setPreviewError("動画ファイルを選んでください。");
@@ -302,6 +353,7 @@ function App() {
 
       const texture = Texture.from(video);
       texture.source.update();
+      texture.source.scaleMode = "nearest";
       const sprite = new Sprite(texture);
       sprite.filters = [filterRef.current];
 
@@ -356,6 +408,14 @@ function App() {
     folderInputRef.current?.click();
   }
 
+  const applyPreset = (preset: keyof typeof RETRO_PRESETS) => {
+    const settings = RETRO_PRESETS[preset];
+    setTargetWidth(settings.width);
+    setTargetHeight(settings.height);
+    setColorLevels(settings.colors);
+    setDitherStrength(settings.dither);
+  };
+
   return (
     <main
       className="h-screen overflow-y-auto bg-slate-200 text-slate-800"
@@ -394,6 +454,80 @@ function App() {
                 <p className="mt-2 break-all">
                   {previewName || "動画がまだ選択されていません"}
                 </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {Object.entries(RETRO_PRESETS).map(([key, preset]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        applyPreset(key as keyof typeof RETRO_PRESETS);
+                      }}
+                      className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-slate-100 hover:bg-amber-500/20"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 space-y-3">
+                  <label className="block">
+                    <span className="text-slate-100">Target width: {targetWidth}px</span>
+                    <input
+                      type="range"
+                      min="160"
+                      max="640"
+                      step="16"
+                      value={targetWidth}
+                      onChange={(ev) => {
+                        setTargetWidth(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-slate-100">Target height: {targetHeight}px</span>
+                    <input
+                      type="range"
+                      min="100"
+                      max="400"
+                      step="8"
+                      value={targetHeight}
+                      onChange={(ev) => {
+                        setTargetHeight(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-slate-100">Color levels: {colorLevels}</span>
+                    <input
+                      type="range"
+                      min="2"
+                      max="16"
+                      step="1"
+                      value={colorLevels}
+                      onChange={(ev) => {
+                        setColorLevels(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-slate-100">
+                      Bayer dither: {ditherStrength.toFixed(2)}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={ditherStrength}
+                      onChange={(ev) => {
+                        setDitherStrength(Number(ev.currentTarget.value));
+                      }}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                </div>
                 {videoRef.current && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
