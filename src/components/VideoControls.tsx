@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 type VideoControlsProps = {
   currentTime: number;
   duration: number;
@@ -61,6 +63,8 @@ export function VideoControls({
   onToggleNoise,
   onTogglePlayback,
 }: VideoControlsProps) {
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+
   return (
     <div className="mt-3 space-y-3">
       <div>
@@ -81,18 +85,18 @@ export function VideoControls({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onTogglePlayback}
-          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-slate-100 hover:bg-emerald-500/20"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20"
         >
           {isPlaying ? "Pause" : "Play"}
         </button>
         <button
           type="button"
           onClick={onRestart}
-          className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-slate-100 hover:bg-sky-500/20"
+          className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
         >
           Restart
         </button>
@@ -101,7 +105,7 @@ export function VideoControls({
           onClick={() => {
             onSeek(Math.max(currentTime - 5, 0));
           }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
           -5s
         </button>
@@ -110,128 +114,26 @@ export function VideoControls({
           onClick={() => {
             onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
           }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
           +5s
         </button>
         <button
           type="button"
-          onClick={() => {
-            onStepFrame(-1);
-          }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-        >
-          Prev frame
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onStepFrame(1);
-          }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
-        >
-          Next frame
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
           onClick={onToggleMute}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
           {isMuted ? "Unmute" : "Mute"}
         </button>
         <button
           type="button"
-          onClick={onToggleLoop}
-          className={[
-            "rounded-lg border px-3 py-1.5 text-slate-100",
-            isLooping
-              ? "border-sky-400 bg-sky-500/20"
-              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-          ].join(" ")}
-        >
-          {isLooping ? "Loop on" : "Loop off"}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleAudioFx}
-          className={[
-            "rounded-lg border px-3 py-1.5 text-slate-100",
-            isAudioFxEnabled
-              ? "border-amber-400 bg-amber-500/20"
-              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-          ].join(" ")}
-        >
-          {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleNoise}
-          className={[
-            "rounded-lg border px-3 py-1.5 text-slate-100",
-            isNoiseEnabled
-              ? "border-fuchsia-400 bg-fuchsia-500/20"
-              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-          ].join(" ")}
-        >
-          {isNoiseEnabled ? "Noise on" : "Noise off"}
-        </button>
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Volume</span>
-          <span>{Math.round(volume * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volume}
-          onChange={(ev) => {
-            onChangeVolume(Number(ev.currentTarget.value));
+          onClick={() => {
+            setIsAdvancedOpen((current) => !current);
           }}
-          className="w-full"
-        />
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Lo-Fi amount</span>
-          <span>{Math.round(lofiAmount * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={lofiAmount}
-          onChange={(ev) => {
-            onChangeLofiAmount(Number(ev.currentTarget.value));
-          }}
-          className="w-full"
-        />
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Spatial noise</span>
-          <span>{Math.round(noiseLevel * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="0.4"
-          step="0.01"
-          value={noiseLevel}
-          onChange={(ev) => {
-            onChangeNoiseLevel(Number(ev.currentTarget.value));
-          }}
-          className="w-full"
-        />
+          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+        >
+          {isAdvancedOpen ? "Hide details" : "More controls"}
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -244,7 +146,7 @@ export function VideoControls({
               onChangePlaybackRate(rate);
             }}
             className={[
-              "rounded-lg border px-3 py-1.5 text-slate-100",
+              "rounded-lg border px-3 py-2 text-slate-100",
               playbackRate === rate
                 ? "border-sky-400 bg-sky-500/20"
                 : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -254,6 +156,121 @@ export function VideoControls({
           </button>
         ))}
       </div>
+
+      {isAdvancedOpen && (
+        <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/50 p-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onStepFrame(-1);
+              }}
+              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              Prev frame
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onStepFrame(1);
+              }}
+              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              Next frame
+            </button>
+            <button
+              type="button"
+              onClick={onToggleLoop}
+              className={[
+                "rounded-lg border px-3 py-2 text-slate-100",
+                isLooping
+                  ? "border-sky-400 bg-sky-500/20"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              {isLooping ? "Loop on" : "Loop off"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleAudioFx}
+              className={[
+                "rounded-lg border px-3 py-2 text-slate-100",
+                isAudioFxEnabled
+                  ? "border-amber-400 bg-amber-500/20"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleNoise}
+              className={[
+                "rounded-lg border px-3 py-2 text-slate-100",
+                isNoiseEnabled
+                  ? "border-fuchsia-400 bg-fuchsia-500/20"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              {isNoiseEnabled ? "Noise on" : "Noise off"}
+            </button>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Volume</span>
+              <span>{Math.round(volume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={(ev) => {
+                onChangeVolume(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Lo-Fi amount</span>
+              <span>{Math.round(lofiAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={lofiAmount}
+              onChange={(ev) => {
+                onChangeLofiAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Spatial noise</span>
+              <span>{Math.round(noiseLevel * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="0.4"
+              step="0.01"
+              value={noiseLevel}
+              onChange={(ev) => {
+                onChangeNoiseLevel(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+        </div>
+      )}
 
       <p className="text-[11px] text-slate-500">
         Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
