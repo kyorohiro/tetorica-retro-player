@@ -28,6 +28,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [volume, setVolume] = useState<number>(1);
   const [isLooping, setIsLooping] = useState<boolean>(true);
+  const [previewKind, setPreviewKind] = useState<"video" | "image" | null>(null);
 
   const applyFilterState = () => {
     if (!filterRef.current) return;
@@ -84,21 +85,55 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       video.load();
     });
 
-  const fitSprite = (sprite: Sprite, video: HTMLVideoElement) => {
+  const waitForImageFrame = (image: HTMLImageElement) =>
+    new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        image.removeEventListener("load", handleReady);
+        image.removeEventListener("error", handleError);
+      };
+
+      const handleReady = () => {
+        cleanup();
+        resolve();
+      };
+
+      const handleError = () => {
+        cleanup();
+        reject(new Error("画像の読み込みに失敗しました。"));
+      };
+
+      if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        resolve();
+        return;
+      }
+
+      image.addEventListener("load", handleReady, { once: true });
+      image.addEventListener("error", handleError, { once: true });
+    });
+
+  const fitSprite = (
+    sprite: Sprite,
+    source: HTMLVideoElement | HTMLImageElement,
+  ) => {
     const app = appRef.current;
     if (!app) return;
+
+    const sourceWidth =
+      source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth;
+    const sourceHeight =
+      source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight;
 
     const screenWidth = app.screen.width;
     const screenHeight = app.screen.height;
     const scale = Math.min(
-      screenWidth / video.videoWidth,
-      screenHeight / video.videoHeight,
+      screenWidth / sourceWidth,
+      screenHeight / sourceHeight,
     );
     const integerScale = Math.max(1, Math.floor(scale));
     const appliedScale = scale >= 1 ? integerScale : scale;
 
-    sprite.width = video.videoWidth * appliedScale;
-    sprite.height = video.videoHeight * appliedScale;
+    sprite.width = sourceWidth * appliedScale;
+    sprite.height = sourceHeight * appliedScale;
     sprite.x = (screenWidth - sprite.width) / 2;
     sprite.y = (screenHeight - sprite.height) / 2;
   };
@@ -151,6 +186,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     setPlaybackRate(1);
     setVolume(1);
     setIsLooping(true);
+    setPreviewKind(null);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -252,8 +288,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const previewFile = async (file: File) => {
-    if (!file.type.startsWith("video/")) {
-      setPreviewError("動画ファイルを選んでください。");
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+
+    if (!isVideo && !isImage) {
+      setPreviewError("動画または画像ファイルを選んでください。");
       return;
     }
 
@@ -270,52 +309,83 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
 
-    const video = document.createElement("video");
-    video.src = url;
-    video.crossOrigin = "anonymous";
-    video.loop = true;
-    video.muted = false;
-    video.volume = 1;
-    video.playsInline = true;
-    video.autoplay = false;
-    video.preload = "auto";
-    video.addEventListener("play", syncVideoState);
-    video.addEventListener("pause", syncVideoState);
-    video.addEventListener("volumechange", syncVideoState);
-    video.addEventListener("timeupdate", syncVideoState);
-    video.addEventListener("durationchange", syncVideoState);
-    video.addEventListener("seeked", syncVideoState);
-    video.addEventListener("ended", syncVideoState);
-    video.addEventListener("ratechange", syncVideoState);
-
     try {
-      await waitForVideoFrame(video);
+      if (isVideo) {
+        const video = document.createElement("video");
+        video.src = url;
+        video.crossOrigin = "anonymous";
+        video.loop = true;
+        video.muted = false;
+        video.volume = 1;
+        video.playsInline = true;
+        video.autoplay = false;
+        video.preload = "auto";
+        video.addEventListener("play", syncVideoState);
+        video.addEventListener("pause", syncVideoState);
+        video.addEventListener("volumechange", syncVideoState);
+        video.addEventListener("timeupdate", syncVideoState);
+        video.addEventListener("durationchange", syncVideoState);
+        video.addEventListener("seeked", syncVideoState);
+        video.addEventListener("ended", syncVideoState);
+        video.addEventListener("ratechange", syncVideoState);
 
-      if (requestId !== previewRequestIdRef.current) {
-        releaseDetachedVideo(video, url);
+        await waitForVideoFrame(video);
+
+        if (requestId !== previewRequestIdRef.current) {
+          releaseDetachedVideo(video, url);
+          return;
+        }
+
+        const texture = Texture.from(video);
+        texture.source.update();
+        texture.source.scaleMode = "nearest";
+
+        const sprite = new Sprite(texture);
+        sprite.filters = [filterRef.current];
+
+        fitSprite(sprite, video);
+        appRef.current.stage.removeChildren();
+        appRef.current.stage.addChild(sprite);
+
+        textureRef.current = texture;
+        spriteRef.current = sprite;
+        videoRef.current = video;
+        setPreviewKind("video");
+        syncVideoState();
+
+        await playVideoWithAudio();
         return;
       }
 
-      const texture = Texture.from(video);
+      const image = new Image();
+      image.src = url;
+      image.crossOrigin = "anonymous";
+      await waitForImageFrame(image);
+
+      if (requestId !== previewRequestIdRef.current) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const texture = Texture.from(image);
       texture.source.update();
       texture.source.scaleMode = "nearest";
 
       const sprite = new Sprite(texture);
       sprite.filters = [filterRef.current];
 
-      fitSprite(sprite, video);
+      fitSprite(sprite, image);
       appRef.current.stage.removeChildren();
       appRef.current.stage.addChild(sprite);
 
       textureRef.current = texture;
       spriteRef.current = sprite;
-      videoRef.current = video;
+      videoRef.current = null;
+      setPreviewKind("image");
       syncVideoState();
-
-      await playVideoWithAudio();
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
-        releaseDetachedVideo(video, url);
+        URL.revokeObjectURL(url);
         return;
       }
 
@@ -481,7 +551,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     playbackRate,
     volume,
     isLooping,
-    hasVideo: videoRef.current !== null,
+    hasVideo: previewKind === "video",
+    hasImage: previewKind === "image",
     previewFile,
     togglePlayback,
     toggleMute,

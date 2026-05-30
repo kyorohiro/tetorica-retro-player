@@ -44,7 +44,7 @@ function App() {
                 }}
                 className="w-full rounded-xl border border-dashed border-slate-600 bg-slate-950 p-6 text-center text-sm text-slate-300 transition hover:border-sky-400 hover:bg-slate-900"
               >
-                Drop video here, or click to add file
+                Drop image/video here, or click to add file
               </button>
 
               <button
@@ -131,7 +131,7 @@ function App() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="video/*"
+            accept="image/*,video/*"
             multiple
             className="hidden"
             onChange={(ev) => {
