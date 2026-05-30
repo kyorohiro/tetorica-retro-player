@@ -1,4 +1,5 @@
 import React from "react";
+import { Maximize2, Minimize2, SlidersHorizontal, Sparkles } from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
@@ -166,8 +167,11 @@ export function RetroPlayer({
 
         <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="font-semibold text-slate-100">Current preview</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-slate-100">
+                <Sparkles size={14} />
+                <p className="font-semibold">Retro Player</p>
+              </div>
               <p className="mt-1 break-all text-slate-400">
                 {player.previewName || "動画、音声、画像がまだ選択されていません"}
               </p>
@@ -178,8 +182,9 @@ export function RetroPlayer({
                 onClick={() => {
                   setIsPreviewMaximized((current) => !current);
                 }}
-                className="rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-slate-100 transition hover:bg-sky-500/20"
+                className="inline-flex items-center gap-2 rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-slate-100 transition hover:bg-sky-500/20"
               >
+                {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 {isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
               </button>
               <button
@@ -187,8 +192,9 @@ export function RetroPlayer({
                 onClick={() => {
                   setIsSettingsOpen((current) => !current);
                 }}
-                className="rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
               >
+                <SlidersHorizontal size={16} />
                 {isSettingsOpen ? "Hide settings" : "Show settings"}
               </button>
             </div>

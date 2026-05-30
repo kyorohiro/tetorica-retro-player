@@ -1,4 +1,19 @@
 import { useState } from "react";
+import {
+  Gauge,
+  ListFilter,
+  Mic2,
+  Pause,
+  Play,
+  RotateCcw,
+  SkipBack,
+  SkipForward,
+  StepBack,
+  StepForward,
+  Volume2,
+  VolumeX,
+  Waves,
+} from "lucide-react";
 
 type VideoControlsProps = {
   currentTime: number;
@@ -89,15 +104,17 @@ export function VideoControls({
         <button
           type="button"
           onClick={onTogglePlayback}
-          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20"
+          className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20"
         >
+          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
           {isPlaying ? "Pause" : "Play"}
         </button>
         <button
           type="button"
           onClick={onRestart}
-          className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
+          className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
         >
+          <RotateCcw size={16} />
           Restart
         </button>
         <button
@@ -105,8 +122,9 @@ export function VideoControls({
           onClick={() => {
             onSeek(Math.max(currentTime - 5, 0));
           }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
+          <SkipBack size={16} />
           -5s
         </button>
         <button
@@ -114,15 +132,17 @@ export function VideoControls({
           onClick={() => {
             onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
           }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
+          <SkipForward size={16} />
           +5s
         </button>
         <button
           type="button"
           onClick={onToggleMute}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
+          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           {isMuted ? "Unmute" : "Mute"}
         </button>
         <button
@@ -130,8 +150,9 @@ export function VideoControls({
           onClick={() => {
             setIsAdvancedOpen((current) => !current);
           }}
-          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
+          <ListFilter size={16} />
           {isAdvancedOpen ? "Hide details" : "More controls"}
         </button>
       </div>
@@ -152,6 +173,7 @@ export function VideoControls({
                 : "border-slate-600 bg-slate-900 hover:bg-slate-800",
             ].join(" ")}
           >
+            <Gauge size={14} />
             {rate}x
           </button>
         ))}
@@ -165,8 +187,9 @@ export function VideoControls({
               onClick={() => {
                 onStepFrame(-1);
               }}
-              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
             >
+              <StepBack size={16} />
               Prev frame
             </button>
             <button
@@ -174,44 +197,48 @@ export function VideoControls({
               onClick={() => {
                 onStepFrame(1);
               }}
-              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
             >
+              <StepForward size={16} />
               Next frame
             </button>
             <button
               type="button"
               onClick={onToggleLoop}
               className={[
-                "rounded-lg border px-3 py-2 text-slate-100",
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
                 isLooping
                   ? "border-sky-400 bg-sky-500/20"
                   : "border-slate-600 bg-slate-900 hover:bg-slate-800",
               ].join(" ")}
             >
+              <RotateCcw size={16} />
               {isLooping ? "Loop on" : "Loop off"}
             </button>
             <button
               type="button"
               onClick={onToggleAudioFx}
               className={[
-                "rounded-lg border px-3 py-2 text-slate-100",
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
                 isAudioFxEnabled
                   ? "border-amber-400 bg-amber-500/20"
                   : "border-slate-600 bg-slate-900 hover:bg-slate-800",
               ].join(" ")}
             >
+              <Waves size={16} />
               {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
             </button>
             <button
               type="button"
               onClick={onToggleNoise}
               className={[
-                "rounded-lg border px-3 py-2 text-slate-100",
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
                 isNoiseEnabled
                   ? "border-fuchsia-400 bg-fuchsia-500/20"
                   : "border-slate-600 bg-slate-900 hover:bg-slate-800",
               ].join(" ")}
             >
+              <Mic2 size={16} />
               {isNoiseEnabled ? "Noise on" : "Noise off"}
             </button>
           </div>
