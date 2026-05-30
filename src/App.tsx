@@ -234,6 +234,8 @@ function App() {
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [volume, setVolume] = useState<number>(1);
+  const [isLooping, setIsLooping] = useState<boolean>(true);
   const [targetWidth, setTargetWidth] = useState<number>(RETRO_PRESETS.pc98.width);
   const [targetHeight, setTargetHeight] = useState<number>(RETRO_PRESETS.pc98.height);
   const [colorLevels, setColorLevels] = useState<number>(RETRO_PRESETS.pc98.colors);
@@ -391,6 +393,8 @@ function App() {
     setCurrentTime(0);
     setDuration(0);
     setPlaybackRate(1);
+    setVolume(1);
+    setIsLooping(true);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -431,6 +435,8 @@ function App() {
     setCurrentTime(videoRef.current.currentTime);
     setDuration(videoRef.current.duration || 0);
     setPlaybackRate(videoRef.current.playbackRate || 1);
+    setVolume(videoRef.current.volume);
+    setIsLooping(videoRef.current.loop);
   };
 
   const playVideoWithAudio = async () => {
@@ -486,11 +492,45 @@ function App() {
     setCurrentTime(nextTime);
   };
 
+  const stepFrame = (direction: -1 | 1) => {
+    if (!videoRef.current) return;
+
+    const fps = 30;
+    const frameTime = 1 / fps;
+    const nextTime = Math.max(
+      0,
+      Math.min(
+        videoRef.current.currentTime + frameTime * direction,
+        videoRef.current.duration || videoRef.current.currentTime + frameTime,
+      ),
+    );
+
+    videoRef.current.pause();
+    videoRef.current.currentTime = nextTime;
+    syncVideoState();
+  };
+
   const changePlaybackRate = (nextRate: number) => {
     if (!videoRef.current) return;
 
     videoRef.current.playbackRate = nextRate;
     setPlaybackRate(nextRate);
+  };
+
+  const changeVolume = (nextVolume: number) => {
+    if (!videoRef.current) return;
+
+    videoRef.current.volume = nextVolume;
+    videoRef.current.muted = nextVolume === 0;
+    setVolume(nextVolume);
+    syncVideoState();
+  };
+
+  const toggleLoop = () => {
+    if (!videoRef.current) return;
+
+    videoRef.current.loop = !videoRef.current.loop;
+    setIsLooping(videoRef.current.loop);
   };
 
   const paletteModeToUniform = (mode: PaletteMode) => {
@@ -532,6 +572,29 @@ function App() {
       if (event.code === "Space") {
         event.preventDefault();
         void togglePlayback();
+        return;
+      }
+
+      if (event.code === "KeyK") {
+        event.preventDefault();
+        void togglePlayback();
+        return;
+      }
+
+      if (event.code === "KeyJ") {
+        event.preventDefault();
+        seekTo(Math.max(videoRef.current.currentTime - 10, 0));
+        return;
+      }
+
+      if (event.code === "KeyL") {
+        event.preventDefault();
+        seekTo(
+          Math.min(
+            videoRef.current.currentTime + 10,
+            videoRef.current.duration || videoRef.current.currentTime + 10,
+          ),
+        );
         return;
       }
 
@@ -977,6 +1040,24 @@ function App() {
                       >
                         +5s
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stepFrame(-1);
+                        }}
+                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+                      >
+                        Prev frame
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stepFrame(1);
+                        }}
+                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-100 hover:bg-slate-800"
+                      >
+                        Next frame
+                      </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -986,6 +1067,35 @@ function App() {
                       >
                         {isMuted ? "Unmute" : "Mute"}
                       </button>
+                      <button
+                        type="button"
+                        onClick={toggleLoop}
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-slate-100",
+                          isLooping
+                            ? "border-sky-400 bg-sky-500/20"
+                            : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                        ].join(" ")}
+                      >
+                        {isLooping ? "Loop on" : "Loop off"}
+                      </button>
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Volume</span>
+                        <span>{Math.round(volume * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={volume}
+                        onChange={(ev) => {
+                          changeVolume(Number(ev.currentTarget.value));
+                        }}
+                        className="w-full"
+                      />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-slate-400">Speed</span>
@@ -1008,7 +1118,7 @@ function App() {
                       ))}
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Shortcuts: `Space` play/pause, `Left/Right` seek 5 seconds
+                      Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
                     </p>
                   </div>
                 )}
