@@ -14,7 +14,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const appRef = useRef<Application | null>(null);
   const spriteRef = useRef<Sprite | null>(null);
   const textureRef = useRef<Texture | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
   const filterRef = useRef<Filter | null>(null);
   const previewRequestIdRef = useRef<number>(0);
 
@@ -28,7 +30,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [volume, setVolume] = useState<number>(1);
   const [isLooping, setIsLooping] = useState<boolean>(true);
-  const [previewKind, setPreviewKind] = useState<"video" | "image" | null>(null);
+  const [previewKind, setPreviewKind] = useState<"video" | "image" | "capture" | null>(null);
 
   const applyFilterState = () => {
     if (!filterRef.current) return;
@@ -48,6 +50,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const releaseDetachedVideo = (video: HTMLVideoElement, url?: string) => {
     video.pause();
+    if (video.srcObject instanceof MediaStream) {
+      video.srcObject.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+    }
     video.src = "";
     video.load();
 
@@ -139,8 +145,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const fitCurrentSprite = () => {
-    if (spriteRef.current && videoRef.current) {
-      fitSprite(spriteRef.current, videoRef.current);
+    if (spriteRef.current && previewElementRef.current) {
+      fitSprite(spriteRef.current, previewElementRef.current);
     }
   };
 
@@ -177,6 +183,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     currentTexture?.destroy(true);
     textureRef.current = null;
     videoRef.current = null;
+    previewElementRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
 
     setNeedsUserPlay(false);
     setIsPlaying(false);
@@ -336,12 +345,17 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           return;
         }
 
-        const texture = Texture.from(video);
-        texture.source.update();
-        texture.source.scaleMode = "nearest";
+      const texture = Texture.from(video);
+      texture.source.update();
+      texture.source.scaleMode = "nearest";
 
-        const sprite = new Sprite(texture);
-        sprite.filters = [filterRef.current];
+      const filter = filterRef.current;
+      if (!filter) {
+        throw new Error("Pixi filter is not ready.");
+      }
+
+      const sprite = new Sprite(texture);
+      sprite.filters = [filter];
 
         fitSprite(sprite, video);
         appRef.current.stage.removeChildren();
@@ -350,6 +364,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         textureRef.current = texture;
         spriteRef.current = sprite;
         videoRef.current = video;
+        previewElementRef.current = video;
         setPreviewKind("video");
         syncVideoState();
 
@@ -371,8 +386,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       texture.source.update();
       texture.source.scaleMode = "nearest";
 
+      const filter = filterRef.current;
+      if (!filter) {
+        throw new Error("Pixi filter is not ready.");
+      }
+
       const sprite = new Sprite(texture);
-      sprite.filters = [filterRef.current];
+      sprite.filters = [filter];
 
       fitSprite(sprite, image);
       appRef.current.stage.removeChildren();
@@ -381,6 +401,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       textureRef.current = texture;
       spriteRef.current = sprite;
       videoRef.current = null;
+      previewElementRef.current = image;
       setPreviewKind("image");
       syncVideoState();
     } catch (error) {
@@ -397,6 +418,108 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         error instanceof DOMException && error.name === "NotAllowedError",
       );
     }
+  };
+
+  const attachVideoPreview = async (
+    video: HTMLVideoElement,
+    kind: "video" | "capture",
+  ) => {
+    const filter = filterRef.current;
+    if (!filter) {
+      throw new Error("Pixi filter is not ready.");
+    }
+
+    const texture = Texture.from(video);
+    texture.source.update();
+    texture.source.scaleMode = "nearest";
+
+    const sprite = new Sprite(texture);
+    sprite.filters = [filter];
+
+    fitSprite(sprite, video);
+    appRef.current?.stage.removeChildren();
+    appRef.current?.stage.addChild(sprite);
+
+    textureRef.current = texture;
+    spriteRef.current = sprite;
+    videoRef.current = video;
+    previewElementRef.current = video;
+    setPreviewKind(kind);
+    syncVideoState();
+  };
+
+  const startDisplayCapture = async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setPreviewError("このブラウザでは画面キャプチャーに対応していません。");
+      return;
+    }
+
+    if (!appRef.current || !filterRef.current) {
+      setPreviewError("Pixi の初期化がまだ終わっていません。");
+      return;
+    }
+
+    cleanupPreview();
+    const requestId = previewRequestIdRef.current;
+    setPreviewError("");
+    setPreviewName("Display Capture");
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+
+      if (requestId !== previewRequestIdRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.loop = false;
+      video.muted = true;
+      video.volume = 1;
+      video.playsInline = true;
+      video.autoplay = true;
+      video.addEventListener("play", syncVideoState);
+      video.addEventListener("pause", syncVideoState);
+      video.addEventListener("volumechange", syncVideoState);
+      video.addEventListener("timeupdate", syncVideoState);
+      video.addEventListener("durationchange", syncVideoState);
+      video.addEventListener("seeked", syncVideoState);
+      video.addEventListener("ended", syncVideoState);
+      video.addEventListener("ratechange", syncVideoState);
+
+      stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+        stopDisplayCapture();
+      });
+
+      await waitForVideoFrame(video);
+      await video.play();
+
+      streamRef.current = stream;
+      await attachVideoPreview(video, "capture");
+      setNeedsUserPlay(false);
+    } catch (error) {
+      if (requestId !== previewRequestIdRef.current) {
+        return;
+      }
+
+      cleanupPreview();
+      setPreviewError(
+        error instanceof Error
+          ? error.message
+          : "画面キャプチャーを開始できませんでした。",
+      );
+    }
+  };
+
+  const stopDisplayCapture = () => {
+    if (previewKind !== "capture") return;
+    cleanupPreview();
+    setPreviewName("");
+    setPreviewError("");
   };
 
   useEffect(() => {
@@ -551,9 +674,12 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     playbackRate,
     volume,
     isLooping,
-    hasVideo: previewKind === "video",
+    hasVideo: previewKind === "video" || previewKind === "capture",
     hasImage: previewKind === "image",
+    isCaptureActive: previewKind === "capture",
     previewFile,
+    startDisplayCapture,
+    stopDisplayCapture,
     togglePlayback,
     toggleMute,
     seekTo,

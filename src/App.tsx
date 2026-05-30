@@ -47,6 +47,27 @@ function App() {
                 Drop image/video here, or click to add file
               </button>
 
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void player.startDisplayCapture();
+                  }}
+                  className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 p-4 text-center text-sm text-slate-100 transition hover:bg-emerald-500/20"
+                >
+                  Capture screen or window
+                </button>
+                {player.isCaptureActive && (
+                  <button
+                    type="button"
+                    onClick={player.stopDisplayCapture}
+                    className="rounded-xl border border-dashed border-rose-500/40 bg-rose-500/10 p-4 text-center text-sm text-slate-100 transition hover:bg-rose-500/20"
+                  >
+                    Stop capture
+                  </button>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
