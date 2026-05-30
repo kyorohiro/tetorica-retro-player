@@ -27,6 +27,7 @@ export function RetroPlayer({
   initialFilterState,
 }: RetroPlayerProps) {
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const filterState = useRetroFilterState(initialFilterState);
   const player = usePixiVideoPlayer(filterState);
 
@@ -127,106 +128,12 @@ export function RetroPlayer({
         "rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg"
       }
     >
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div
-          className={`space-y-3 ${
-            isPreviewMaximized ? "min-h-0 overflow-y-auto pr-1" : ""
-          }`}
-        >
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsPreviewMaximized((current) => !current);
-              }}
-              className="rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 p-4 text-center text-sm text-slate-100 transition hover:bg-sky-500/20"
-            >
-              {isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
-            </button>
-          </div>
-
-          <div className="rounded-xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
-            <p className="font-semibold text-slate-100">Current preview</p>
-
-            <RetroFilterPanel
-              colorLevels={filterState.colorLevels}
-              ditherStrength={filterState.ditherStrength}
-              isFilterEnabled={filterState.isFilterEnabled}
-              monoTint={filterState.monoTint}
-              paletteMode={filterState.paletteMode}
-              phosphorStrength={filterState.phosphorStrength}
-              previewName={player.previewName}
-              scanlineStrength={filterState.scanlineStrength}
-              scanline2Strength={filterState.scanline2Strength}
-              sourceDimensions={player.sourceDimensions}
-              targetHeight={filterState.targetHeight}
-              targetWidth={filterState.targetWidth}
-              vignetteStrength={filterState.vignetteStrength}
-              onApplyPreset={filterState.applyPreset}
-              onSetColorLevels={filterState.setColorLevels}
-              onSetDitherStrength={filterState.setDitherStrength}
-              onSetIsFilterEnabled={filterState.setIsFilterEnabled}
-              onSetMonoTint={filterState.setMonoTint}
-              onSetPaletteMode={filterState.setPaletteMode}
-              onSetPhosphorStrength={filterState.setPhosphorStrength}
-              onSetScanlineStrength={filterState.setScanlineStrength}
-              onSetScanline2Strength={filterState.setScanline2Strength}
-              onSetTargetHeight={filterState.setTargetHeight}
-              onSetTargetWidth={filterState.setTargetWidth}
-              onSetVignetteStrength={filterState.setVignetteStrength}
-              onSyncTargetAspect={syncTargetAspect}
-            />
-
-            {player.hasPlayableMedia && (
-              <VideoControls
-                currentTime={player.currentTime}
-                duration={player.duration}
-                isAudioFxEnabled={player.isAudioFxEnabled}
-                isLooping={player.isLooping}
-                isMuted={player.isMuted}
-                isNoiseEnabled={player.isNoiseEnabled}
-                isPlaying={player.isPlaying}
-                lofiAmount={player.lofiAmount}
-                noiseLevel={player.noiseLevel}
-                playbackRate={player.playbackRate}
-                volume={player.volume}
-                onChangeLofiAmount={player.setLofiAmount}
-                onChangeNoiseLevel={player.setNoiseLevel}
-                onChangePlaybackRate={player.changePlaybackRate}
-                onChangeVolume={player.changeVolume}
-                onRestart={() => {
-                  player.seekTo(0);
-                  void player.playVideoWithAudio();
-                }}
-                onSeek={player.seekTo}
-                onStepFrame={player.stepFrame}
-                onToggleAudioFx={player.toggleAudioFx}
-                onToggleLoop={player.toggleLoop}
-                onToggleMute={player.toggleMute}
-                onToggleNoise={player.toggleNoise}
-                onTogglePlayback={() => {
-                  void player.togglePlayback();
-                }}
-              />
-            )}
-
-            {player.needsUserPlay && (
-              <p className="mt-2 text-amber-300">
-                自動再生が止められたので、Play ボタンを押すと音が出ます。
-              </p>
-            )}
-
-            {player.previewError && (
-              <p className="mt-2 text-rose-400">{player.previewError}</p>
-            )}
-          </div>
-        </div>
-
+      <div className="space-y-4">
         <div
           className={`rounded-2xl border border-slate-700 bg-slate-950 p-3 ${
             isPreviewMaximized
               ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-6"
-              : "min-w-0"
+              : ""
           }`}
         >
           {isPreviewMaximized && (
@@ -255,6 +162,113 @@ export function RetroPlayer({
               </div>
             )}
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold text-slate-100">Current preview</p>
+              <p className="mt-1 break-all text-slate-400">
+                {player.previewName || "動画、音声、画像がまだ選択されていません"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPreviewMaximized((current) => !current);
+                }}
+                className="rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-slate-100 transition hover:bg-sky-500/20"
+              >
+                {isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSettingsOpen((current) => !current);
+                }}
+                className="rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+              >
+                {isSettingsOpen ? "Hide settings" : "Show settings"}
+              </button>
+            </div>
+          </div>
+
+          {player.hasPlayableMedia && (
+            <VideoControls
+              currentTime={player.currentTime}
+              duration={player.duration}
+              isAudioFxEnabled={player.isAudioFxEnabled}
+              isLooping={player.isLooping}
+              isMuted={player.isMuted}
+              isNoiseEnabled={player.isNoiseEnabled}
+              isPlaying={player.isPlaying}
+              lofiAmount={player.lofiAmount}
+              noiseLevel={player.noiseLevel}
+              playbackRate={player.playbackRate}
+              volume={player.volume}
+              onChangeLofiAmount={player.setLofiAmount}
+              onChangeNoiseLevel={player.setNoiseLevel}
+              onChangePlaybackRate={player.changePlaybackRate}
+              onChangeVolume={player.changeVolume}
+              onRestart={() => {
+                player.seekTo(0);
+                void player.playVideoWithAudio();
+              }}
+              onSeek={player.seekTo}
+              onStepFrame={player.stepFrame}
+              onToggleAudioFx={player.toggleAudioFx}
+              onToggleLoop={player.toggleLoop}
+              onToggleMute={player.toggleMute}
+              onToggleNoise={player.toggleNoise}
+              onTogglePlayback={() => {
+                void player.togglePlayback();
+              }}
+            />
+          )}
+
+          {player.needsUserPlay && (
+            <p className="mt-3 text-amber-300">
+              自動再生が止められたので、Play ボタンを押すと音が出ます。
+            </p>
+          )}
+
+          {player.previewError && (
+            <p className="mt-3 text-rose-400">{player.previewError}</p>
+          )}
+
+          {isSettingsOpen && (
+            <div className="mt-4 border-t border-slate-700 pt-4">
+              <RetroFilterPanel
+                colorLevels={filterState.colorLevels}
+                ditherStrength={filterState.ditherStrength}
+                isFilterEnabled={filterState.isFilterEnabled}
+                monoTint={filterState.monoTint}
+                paletteMode={filterState.paletteMode}
+                phosphorStrength={filterState.phosphorStrength}
+                previewName={player.previewName}
+                scanlineStrength={filterState.scanlineStrength}
+                scanline2Strength={filterState.scanline2Strength}
+                sourceDimensions={player.sourceDimensions}
+                targetHeight={filterState.targetHeight}
+                targetWidth={filterState.targetWidth}
+                vignetteStrength={filterState.vignetteStrength}
+                onApplyPreset={filterState.applyPreset}
+                onSetColorLevels={filterState.setColorLevels}
+                onSetDitherStrength={filterState.setDitherStrength}
+                onSetIsFilterEnabled={filterState.setIsFilterEnabled}
+                onSetMonoTint={filterState.setMonoTint}
+                onSetPaletteMode={filterState.setPaletteMode}
+                onSetPhosphorStrength={filterState.setPhosphorStrength}
+                onSetScanlineStrength={filterState.setScanlineStrength}
+                onSetScanline2Strength={filterState.setScanline2Strength}
+                onSetTargetHeight={filterState.setTargetHeight}
+                onSetTargetWidth={filterState.setTargetWidth}
+                onSetVignetteStrength={filterState.setVignetteStrength}
+                onSyncTargetAspect={syncTargetAspect}
+              />
+            </div>
+          )}
         </div>
       </div>
     </section>
