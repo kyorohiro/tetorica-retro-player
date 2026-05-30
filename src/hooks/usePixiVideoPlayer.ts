@@ -941,27 +941,43 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     isCaptureActive: previewKind === "capture",
     previewFile,
     previewUrl: async (url: string, kind: "video" | "image" | "audio" = "video") => {
-      const requestId = previewRequestIdRef.current;
+      let requestId = 0;
 
       try {
         cleanupPreview();
+        requestId = previewRequestIdRef.current;
 
         if (!appRef.current || !filterRef.current) {
           throw new Error("Pixi の初期化がまだ終わっていません。");
         }
 
+        setPreviewError("");
+        setPreviewName(url);
+
         if (kind === "video") {
           const media = document.createElement("video");
           media.src = url;
           media.crossOrigin = "anonymous";
+          media.loop = true;
+          media.muted = false;
+          media.volume = 1;
           media.playsInline = true;
-          media.autoplay = true;
+          media.autoplay = false;
+          media.preload = "auto";
+          media.addEventListener("play", syncVideoState);
+          media.addEventListener("pause", syncVideoState);
+          media.addEventListener("volumechange", syncVideoState);
+          media.addEventListener("timeupdate", syncVideoState);
+          media.addEventListener("durationchange", syncVideoState);
+          media.addEventListener("seeked", syncVideoState);
+          media.addEventListener("ended", syncVideoState);
+          media.addEventListener("ratechange", syncVideoState);
 
           await waitForVideoFrame(media);
-          try {
-            await media.play();
-          } catch {
-            // ignore play errors (autoplay policy); playback can be started by user
+
+          if (requestId !== previewRequestIdRef.current) {
+            releaseDetachedMedia(media, url);
+            return;
           }
 
           const texture = Texture.from(media as HTMLVideoElement);
@@ -980,6 +996,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
           textureRef.current = texture;
           spriteRef.current = sprite;
+          mediaRef.current = media;
           previewElementRef.current = media;
           setPreviewKind("video");
           setSourceDimensions({
@@ -991,6 +1008,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           image.src = url;
           image.crossOrigin = "anonymous";
           await waitForImageFrame(image);
+
+          if (requestId !== previewRequestIdRef.current) {
+            return;
+          }
 
           const texture = Texture.from(image as HTMLImageElement);
           texture.source.update();
@@ -1019,7 +1040,24 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           const audio = document.createElement("audio");
           audio.src = url;
           audio.crossOrigin = "anonymous";
+          audio.loop = true;
+          audio.muted = false;
+          audio.volume = 1;
+          audio.preload = "auto";
+          audio.addEventListener("play", syncVideoState);
+          audio.addEventListener("pause", syncVideoState);
+          audio.addEventListener("volumechange", syncVideoState);
+          audio.addEventListener("timeupdate", syncVideoState);
+          audio.addEventListener("durationchange", syncVideoState);
+          audio.addEventListener("seeked", syncVideoState);
+          audio.addEventListener("ended", syncVideoState);
+          audio.addEventListener("ratechange", syncVideoState);
           await waitForAudioReady(audio);
+
+          if (requestId !== previewRequestIdRef.current) {
+            releaseDetachedMedia(audio, url);
+            return;
+          }
 
           appRef.current.stage.removeChildren();
           spriteRef.current = null;
@@ -1031,11 +1069,6 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           mediaRef.current = audio;
           await connectMediaAudio(audio);
           syncVideoState();
-          try {
-            await audio.play();
-          } catch {
-            // ignore
-          }
         }
 
         if (requestId !== previewRequestIdRef.current) {
