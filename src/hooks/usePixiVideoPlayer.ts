@@ -8,8 +8,9 @@ import {
 import type { RetroFilterState } from "./useRetroFilterState";
 import { FILTER_FRAGMENT, FILTER_VERTEX } from "../retro/filterShader";
 
-export function usePixiVideoPlayer(filterState: RetroFilterState) {
-  const canvasHostRef = useRef<HTMLDivElement>(null);
+export function usePixiVideoPlayer(filterState: RetroFilterState, externalHostRef?: React.RefObject<HTMLDivElement | null>) {
+  const internalHostRef = useRef<HTMLDivElement | null>(null);
+  const canvasHostRef = externalHostRef ?? internalHostRef;
   const objectUrlRef = useRef<string | null>(null);
   const appRef = useRef<Application | null>(null);
   const spriteRef = useRef<Sprite | null>(null);

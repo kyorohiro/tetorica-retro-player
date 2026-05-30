@@ -1,37 +1,40 @@
-import React from "react";
-import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
-import { useRetroFilterState } from "../hooks/useRetroFilterState";
+import { useDialog } from "../useDialog";
+import { showRetroPlayerSetting } from "./showRetroPlayerSetting";
+import type { RetroFilterState as RetroFilterStateType } from "../hooks/useRetroFilterState";
+import type { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
 
 type RetroPlayerProps = {
-  src: string;
-  kind?: "video" | "image" | "audio";
+  player: ReturnType<typeof usePixiVideoPlayer>;
   className?: string;
+  externalFilterState: RetroFilterStateType;
 };
 
-export function RetroPlayer({ src, kind = "video", className }: RetroPlayerProps) {
-  const filterState = useRetroFilterState();
-  const player = usePixiVideoPlayer(filterState);
+export function RetroPlayer({ player, className, externalFilterState }: RetroPlayerProps) {
+  const filterState = externalFilterState;
+  const { showDialog } = useDialog();
 
-  React.useEffect(() => {
-    if (!src) return;
-
-    let mounted = true;
-
-    void (async () => {
-      try {
-        await player.previewUrl(src, kind);
-      } catch (e) {
-        // ignore here; parent can handle errors if needed
-      }
-    })();
-
-    return () => {
-      mounted = false;
-      player.stopDisplayCapture();
-    };
-  }, [src, kind]);
-
-  return <div className={className ?? "h-full w-full"} ref={player.canvasHostRef} />;
+  return (
+    <div className={className ?? "h-full w-full relative"}>
+      <div ref={player.canvasHostRef} className="h-full w-full" />
+      <button
+        type="button"
+        onClick={() => {
+          void showRetroPlayerSetting(
+            showDialog,
+            filterState,
+            player.previewName,
+            player.sourceDimensions,
+            () => {
+              player.refreshLayout();
+            },
+          );
+        }}
+        className="absolute right-3 top-3 z-10 rounded-md bg-slate-800/60 px-2 py-1 text-xs text-slate-100 hover:bg-slate-800"
+      >
+        Settings
+      </button>
+    </div>
+  );
 }
 
 export default RetroPlayer;

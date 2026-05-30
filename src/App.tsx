@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
-import { RetroFilterPanel } from "./components/RetroFilterPanel";
 import { VideoControls } from "./components/VideoControls";
 import { usePixiVideoPlayer } from "./hooks/usePixiVideoPlayer";
 import { useRetroFilterState } from "./hooks/useRetroFilterState";
+import RetroPlayer from "./components/RetroPlayer";
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -11,21 +11,6 @@ function App() {
   const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
   const filterState = useRetroFilterState();
   const player = usePixiVideoPlayer(filterState);
-
-  const syncTargetAspect = () => {
-    if (!player.sourceDimensions) return;
-
-    const nextHeight = Math.max(
-      8,
-      Math.round(
-        (filterState.targetWidth / player.sourceDimensions.width) *
-          player.sourceDimensions.height /
-          8,
-      ) * 8,
-    );
-
-    filterState.setTargetHeight(nextHeight);
-  };
 
   useEffect(() => {
     if (!isPreviewMaximized) return;
@@ -144,35 +129,7 @@ function App() {
 
               <div className="rounded-xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
                 <p className="font-semibold text-slate-100">Current preview</p>
-
-                <RetroFilterPanel
-                  colorLevels={filterState.colorLevels}
-                  ditherStrength={filterState.ditherStrength}
-                  isFilterEnabled={filterState.isFilterEnabled}
-                  monoTint={filterState.monoTint}
-                  paletteMode={filterState.paletteMode}
-                  phosphorStrength={filterState.phosphorStrength}
-                  previewName={player.previewName}
-                  scanlineStrength={filterState.scanlineStrength}
-                  scanline2Strength={filterState.scanline2Strength}
-                  sourceDimensions={player.sourceDimensions}
-                  targetHeight={filterState.targetHeight}
-                  targetWidth={filterState.targetWidth}
-                  vignetteStrength={filterState.vignetteStrength}
-                  onApplyPreset={filterState.applyPreset}
-                  onSetColorLevels={filterState.setColorLevels}
-                  onSetDitherStrength={filterState.setDitherStrength}
-                  onSetIsFilterEnabled={filterState.setIsFilterEnabled}
-                  onSetMonoTint={filterState.setMonoTint}
-                  onSetPaletteMode={filterState.setPaletteMode}
-                  onSetPhosphorStrength={filterState.setPhosphorStrength}
-                  onSetScanlineStrength={filterState.setScanlineStrength}
-                  onSetScanline2Strength={filterState.setScanline2Strength}
-                  onSetTargetHeight={filterState.setTargetHeight}
-                  onSetTargetWidth={filterState.setTargetWidth}
-                  onSetVignetteStrength={filterState.setVignetteStrength}
-                  onSyncTargetAspect={syncTargetAspect}
-                />
+                <p className="mt-2 text-slate-400">Use the Settings button on the player to adjust retro filter options.</p>
 
                 {player.hasPlayableMedia && (
                   <VideoControls
@@ -244,7 +201,7 @@ function App() {
                     : "h-[60vh] min-h-[360px] w-full min-w-0"
                 }`}
               >
-                <div ref={player.canvasHostRef} className="h-full w-full" />
+                <RetroPlayer player={player} externalFilterState={filterState} className="h-full w-full" />
                 {player.hasAudioOnly && (
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
                     Audio preview is playing through the retro audio chain.
