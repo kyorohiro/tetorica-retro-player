@@ -154,6 +154,18 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
   };
 
+  const refreshLayout = () => {
+    const app = appRef.current;
+    const host = canvasHostRef.current;
+    if (!app || !host) return;
+
+    const nextWidth = Math.max(1, Math.round(host.clientWidth));
+    const nextHeight = Math.max(1, Math.round(host.clientHeight));
+
+    app.renderer.resize(nextWidth, nextHeight);
+    fitCurrentSprite();
+  };
+
   const syncVideoState = () => {
     if (!videoRef.current) {
       setIsPlaying(false);
@@ -579,6 +591,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       appRef.current = app;
       filterRef.current = filter;
       applyFilterState();
+      refreshLayout();
     };
 
     void setupPixi();
@@ -692,5 +705,6 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     changeVolume,
     toggleLoop,
     playVideoWithAudio,
+    refreshLayout,
   };
 }

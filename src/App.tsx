@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { RetroFilterPanel } from "./components/RetroFilterPanel";
 import { VideoControls } from "./components/VideoControls";
@@ -8,12 +8,52 @@ import { useRetroFilterState } from "./hooks/useRetroFilterState";
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
   const filterState = useRetroFilterState();
   const player = usePixiVideoPlayer(filterState);
 
+  useEffect(() => {
+    if (!isPreviewMaximized) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Escape") {
+        setIsPreviewMaximized(false);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPreviewMaximized]);
+
+  useEffect(() => {
+    const frameA = window.requestAnimationFrame(() => {
+      player.refreshLayout();
+      window.requestAnimationFrame(() => {
+        player.refreshLayout();
+      });
+    });
+
+    const timeoutId = window.setTimeout(() => {
+      player.refreshLayout();
+    }, 120);
+
+    return () => {
+      window.cancelAnimationFrame(frameA);
+      window.clearTimeout(timeoutId);
+    };
+  }, [isPreviewMaximized]);
+
   return (
     <main
-      className="h-screen overflow-y-auto bg-slate-200 text-slate-800"
+      className={`bg-slate-200 text-slate-800 ${
+        isPreviewMaximized ? "h-screen overflow-hidden" : "h-screen overflow-y-auto"
+      }`}
       onDrop={(ev) => {
         ev.preventDefault();
         const files = ev.dataTransfer.files;
@@ -35,8 +75,8 @@ function App() {
         </header>
 
         <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
-            <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div className={`space-y-3 ${isPreviewMaximized ? "min-h-0 overflow-y-auto pr-1" : ""}`}>
               <button
                 type="button"
                 onClick={() => {
@@ -66,6 +106,15 @@ function App() {
                     Stop capture
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreviewMaximized((current) => !current);
+                  }}
+                  className="rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 p-4 text-center text-sm text-slate-100 transition hover:bg-sky-500/20"
+                >
+                  {isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
+                </button>
               </div>
 
               <button
@@ -141,10 +190,31 @@ function App() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3">
+            <div
+              className={`rounded-2xl border border-slate-700 bg-slate-950 p-3 ${
+                isPreviewMaximized
+                  ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-6"
+                  : "min-w-0"
+              }`}
+            >
+              {isPreviewMaximized && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreviewMaximized(false);
+                  }}
+                  className="absolute right-6 top-6 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+                >
+                  Exit maximize
+                </button>
+              )}
               <div
                 ref={player.canvasHostRef}
-                className="h-[60vh] min-h-[360px] overflow-hidden rounded-xl bg-slate-950"
+                className={`overflow-hidden rounded-xl bg-slate-950 ${
+                  isPreviewMaximized
+                    ? "h-full min-h-0 w-full"
+                    : "h-[60vh] min-h-[360px] w-full min-w-0"
+                }`}
               />
             </div>
           </div>
