@@ -6,11 +6,13 @@ The app uses a Pixi.js shader pipeline to push local media through palette reduc
 
 ## Demo
 
-- GitHub Pages landing page: `
-https://kyorohiro.github.io/tetorica-retro-player/
+- GitHub Pages landing page:
+  `https://kyorohiro.github.io/tetorica-retro-player/`
 
-- Demo app: 
-https://kyorohiro.github.io/tetorica-retro-player/demo/
+- Demo app:
+  `https://kyorohiro.github.io/tetorica-retro-player/demo/`
+
+![Demo](docs/demo.gif)
 
 
 ## Features
@@ -65,16 +67,19 @@ When updating the public demo, rebuild the app and copy the latest build output 
 ```
 sh deploy_mac.sh
 % ~/bin/butler login
-% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.3.3_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.3.3
+% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.3.4_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.3.4
 
-% ~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.6.3_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.3.3
+% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.3.4_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.3.4
 
-% ~/bin/butler push "tetorica-retro-player_0.3.3_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.3.3
+% ~/bin/butler push "tetorica-retro-player_0.3.4_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.3.4
+
+% ~/bin/butler push "tetorica-retro-player_0.3.4_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.3.4
+% ~/bin/butler push "tetorica-retro-player_0.3.4_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.3.4
 
 ```
 
 ```
 npm run build
 cd dist
-zip -r ../web-build_0.3.3_gh.zip .
+zip -r ../web-build_0.3.4_gh.zip .
 ```
