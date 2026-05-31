@@ -1052,6 +1052,22 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   ]);
 
   useEffect(() => {
+    if (previewError || needsUserPlay) {
+      finishLoading();
+      return;
+    }
+
+    if (previewKind === "image" || previewKind === "audio") {
+      finishLoading();
+      return;
+    }
+
+    if (isPlaying) {
+      finishLoading();
+    }
+  }, [previewError, needsUserPlay, previewKind, isPlaying]);
+
+  useEffect(() => {
     isMutedRef.current = isMuted;
     volumeRef.current = volume;
     isPlayingRef.current = isPlaying;

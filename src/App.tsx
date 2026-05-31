@@ -31,7 +31,17 @@ function App() {
     console.log(">confirmed: ", confirmed);
     if (confirmed) {
       console.log(">confirmed: move");
-      window.location.href = "https://kyorohiro.github.io/tetorica-retro-player/demo/";
+      const url = "https://kyorohiro.github.io/tetorica-retro-player/demo/";
+
+      try {
+        if (window.top && window.top !== window.self) {
+          window.top.location.href = url;
+        } else {
+          window.location.href = url;
+        }
+      } catch {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
       return;
     }
   }, [previewSource, showConfirmDialog]);
@@ -56,7 +66,7 @@ function App() {
         <header className="mb-8">
           <p className="text-sm text-slate-400">video preview via pixi.js</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">
-            Tetorica Retro Player 
+            Tetorica Retro Player
           </h1>
         </header>
         <div className="mb-4">
