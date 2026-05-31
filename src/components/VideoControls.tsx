@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Gauge,
-  ListFilter,
   Mic2,
   Pause,
   Play,
@@ -10,6 +9,7 @@ import {
   SkipForward,
   StepBack,
   StepForward,
+  SlidersHorizontal,
   Volume2,
   VolumeX,
   Waves,
@@ -23,6 +23,8 @@ type VideoControlsProps = {
   isPlaying: boolean;
   isAudioFxEnabled: boolean;
   isNoiseEnabled: boolean;
+  hasVideo: boolean;
+  isSettingsOpen: boolean;
   lofiAmount: number;
   noiseLevel: number;
   playbackRate: number;
@@ -39,6 +41,7 @@ type VideoControlsProps = {
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
+  onToggleSettings: () => void;
 };
 
 const formatTime = (seconds: number) => {
@@ -61,6 +64,8 @@ export function VideoControls({
   isPlaying,
   isAudioFxEnabled,
   isNoiseEnabled,
+  hasVideo,
+  isSettingsOpen,
   lofiAmount,
   noiseLevel,
   playbackRate,
@@ -77,6 +82,7 @@ export function VideoControls({
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
+  onToggleSettings,
 }: VideoControlsProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
@@ -147,12 +153,56 @@ export function VideoControls({
         </button>
         <button
           type="button"
+          onClick={onToggleLoop}
+          className={[
+            "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+            isLooping
+              ? "border-sky-400 bg-sky-500/20"
+              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+          ].join(" ")}
+        >
+          <RotateCcw size={16} />
+          {isLooping ? "Loop on" : "Loop off"}
+        </button>
+        {hasVideo && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                onStepFrame(-1);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              <StepBack size={16} />
+              Prev frame
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onStepFrame(1);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              <StepForward size={16} />
+              Next frame
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onToggleSettings}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+        >
+          <SlidersHorizontal size={16} />
+          {isSettingsOpen ? "Hide settings" : "Show settings"}
+        </button>
+        <button
+          type="button"
           onClick={() => {
             setIsAdvancedOpen((current) => !current);
           }}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
-          <ListFilter size={16} />
           {isAdvancedOpen ? "Hide details" : "More controls"}
         </button>
       </div>
@@ -182,39 +232,6 @@ export function VideoControls({
       {isAdvancedOpen && (
         <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/50 p-3">
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onStepFrame(-1);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <StepBack size={16} />
-              Prev frame
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onStepFrame(1);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <StepForward size={16} />
-              Next frame
-            </button>
-            <button
-              type="button"
-              onClick={onToggleLoop}
-              className={[
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
-                isLooping
-                  ? "border-sky-400 bg-sky-500/20"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-              ].join(" ")}
-            >
-              <RotateCcw size={16} />
-              {isLooping ? "Loop on" : "Loop off"}
-            </button>
             <button
               type="button"
               onClick={onToggleAudioFx}
