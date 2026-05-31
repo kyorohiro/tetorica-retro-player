@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 type VideoControlsProps = {
+  mode: "playback" | "audio-settings";
   currentTime: number;
   duration: number;
   isLooping: boolean;
@@ -24,7 +25,7 @@ type VideoControlsProps = {
   isAudioFxEnabled: boolean;
   isNoiseEnabled: boolean;
   hasVideo: boolean;
-  isSettingsOpen: boolean;
+  isVideoSettingsOpen: boolean;
   lofiAmount: number;
   noiseLevel: number;
   playbackRate: number;
@@ -41,7 +42,9 @@ type VideoControlsProps = {
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
-  onToggleSettings: () => void;
+  onBackToPlayback: () => void;
+  onToggleVideoSettings: () => void;
+  onToggleAudioSettings: () => void;
 };
 
 const formatTime = (seconds: number) => {
@@ -57,6 +60,7 @@ const formatTime = (seconds: number) => {
 };
 
 export function VideoControls({
+  mode,
   currentTime,
   duration,
   isLooping,
@@ -65,7 +69,7 @@ export function VideoControls({
   isAudioFxEnabled,
   isNoiseEnabled,
   hasVideo,
-  isSettingsOpen,
+  isVideoSettingsOpen,
   lofiAmount,
   noiseLevel,
   playbackRate,
@@ -82,10 +86,110 @@ export function VideoControls({
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
-  onToggleSettings,
+  onBackToPlayback,
+  onToggleVideoSettings,
+  onToggleAudioSettings,
 }: VideoControlsProps) {
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
+
+  if (mode === "audio-settings") {
+    return (
+      <div className="mt-3 space-y-3 rounded-xl border border-slate-700 bg-slate-900/50 p-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onBackToPlayback}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          >
+            Back to Playback
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onToggleAudioFx}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+              isAudioFxEnabled
+                ? "border-amber-400 bg-amber-500/20"
+                : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+            ].join(" ")}
+          >
+            <Waves size={16} />
+            {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
+          </button>
+          <button
+            type="button"
+            onClick={onToggleNoise}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+              isNoiseEnabled
+                ? "border-fuchsia-400 bg-fuchsia-500/20"
+                : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+            ].join(" ")}
+          >
+            <Mic2 size={16} />
+            {isNoiseEnabled ? "Noise on" : "Noise off"}
+          </button>
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Volume</span>
+            <span>{Math.round(volume * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volume}
+            onChange={(ev) => {
+              onChangeVolume(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Lo-Fi amount</span>
+            <span>{Math.round(lofiAmount * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={lofiAmount}
+            onChange={(ev) => {
+              onChangeLofiAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Spatial noise</span>
+            <span>{Math.round(noiseLevel * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="0.4"
+            step="0.01"
+            value={noiseLevel}
+            onChange={(ev) => {
+              onChangeNoiseLevel(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 space-y-3">
@@ -191,20 +295,19 @@ export function VideoControls({
         )}
         <button
           type="button"
-          onClick={onToggleSettings}
+          onClick={onToggleVideoSettings}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
           <SlidersHorizontal size={16} />
-          {isSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
+          {isVideoSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
         </button>
         <button
           type="button"
-          onClick={() => {
-            setIsAdvancedOpen((current) => !current);
-          }}
+          onClick={onToggleAudioSettings}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
-          {isAdvancedOpen ? "Hide Audio Setting" : "Show Audio Setting"}
+          <Mic2 size={16} />
+          Show Audio Setting
         </button>
       </div>
 
@@ -240,93 +343,6 @@ export function VideoControls({
           </div>
         )}
       </div>
-
-      {isAdvancedOpen && (
-        <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/50 p-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onToggleAudioFx}
-              className={[
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
-                isAudioFxEnabled
-                  ? "border-amber-400 bg-amber-500/20"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-              ].join(" ")}
-            >
-              <Waves size={16} />
-              {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
-            </button>
-            <button
-              type="button"
-              onClick={onToggleNoise}
-              className={[
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
-                isNoiseEnabled
-                  ? "border-fuchsia-400 bg-fuchsia-500/20"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-              ].join(" ")}
-            >
-              <Mic2 size={16} />
-              {isNoiseEnabled ? "Noise on" : "Noise off"}
-            </button>
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Volume</span>
-              <span>{Math.round(volume * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={volume}
-              onChange={(ev) => {
-                onChangeVolume(Number(ev.currentTarget.value));
-              }}
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Lo-Fi amount</span>
-              <span>{Math.round(lofiAmount * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={lofiAmount}
-              onChange={(ev) => {
-                onChangeLofiAmount(Number(ev.currentTarget.value));
-              }}
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Spatial noise</span>
-              <span>{Math.round(noiseLevel * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="0.4"
-              step="0.01"
-              value={noiseLevel}
-              onChange={(ev) => {
-                onChangeNoiseLevel(Number(ev.currentTarget.value));
-              }}
-              className="w-full"
-            />
-          </div>
-        </div>
-      )}
 
       <p className="text-[11px] text-slate-500">
         Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s

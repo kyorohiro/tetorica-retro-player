@@ -28,7 +28,9 @@ export function RetroPlayer({
   initialFilterState,
 }: RetroPlayerProps) {
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+  const [controlPanelMode, setControlPanelMode] = React.useState<
+    "playback" | "audio-settings" | "video-settings"
+  >("playback");
   const filterState = useRetroFilterState(initialFilterState);
   const player = usePixiVideoPlayer(filterState);
 
@@ -181,17 +183,18 @@ export function RetroPlayer({
             </div>
           </div>
 
-          {player.hasPlayableMedia && (
+          {player.hasPlayableMedia && controlPanelMode !== "video-settings" && (
             <VideoControls
               currentTime={player.currentTime}
               duration={player.duration}
+              mode={controlPanelMode === "audio-settings" ? "audio-settings" : "playback"}
               isAudioFxEnabled={player.isAudioFxEnabled}
               isLooping={player.isLooping}
               isMuted={player.isMuted}
               isNoiseEnabled={player.isNoiseEnabled}
               isPlaying={player.isPlaying}
               hasVideo={player.hasVideo}
-              isSettingsOpen={isSettingsOpen}
+              isVideoSettingsOpen={false}
               lofiAmount={player.lofiAmount}
               noiseLevel={player.noiseLevel}
               playbackRate={player.playbackRate}
@@ -213,8 +216,18 @@ export function RetroPlayer({
               onTogglePlayback={() => {
                 void player.togglePlayback();
               }}
-              onToggleSettings={() => {
-                setIsSettingsOpen((current) => !current);
+              onBackToPlayback={() => {
+                setControlPanelMode("playback");
+              }}
+              onToggleVideoSettings={() => {
+                setControlPanelMode((current) =>
+                  current === "video-settings" ? "playback" : "video-settings",
+                );
+              }}
+              onToggleAudioSettings={() => {
+                setControlPanelMode((current) =>
+                  current === "audio-settings" ? "playback" : "audio-settings",
+                );
               }}
             />
           )}
@@ -223,8 +236,19 @@ export function RetroPlayer({
             <p className="mt-3 text-rose-400">{player.previewError}</p>
           )}
 
-          {isSettingsOpen && (
+          {controlPanelMode === "video-settings" && (
             <div className="mt-4 border-t border-slate-700 pt-4">
+              <div className="mb-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setControlPanelMode("playback");
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  Back to Playback
+                </button>
+              </div>
               <RetroFilterPanel
                 colorLevels={filterState.colorLevels}
                 ditherStrength={filterState.ditherStrength}
