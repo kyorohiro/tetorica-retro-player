@@ -4,6 +4,8 @@ Retro-style preview player for images, videos, and live screen capture.
 
 The app uses a Pixi.js shader pipeline to push local media through palette reduction, monochrome tints, dithering, scanlines, and CRT-style finishing. The same filter flow works for still images, movie files, and captured windows or screens.
 
+https://kyorohiro.itch.io/tetorica-retro-player
+
 ## Demo
 
 - GitHub Pages landing page:
