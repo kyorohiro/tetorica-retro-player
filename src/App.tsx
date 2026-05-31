@@ -1,11 +1,38 @@
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
+import { useDialog } from "./useDialog";
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
+  const { showConfirmDialog } = useDialog();
+
+  const handleDisplayCapture = useCallback(async () => {
+    const errorMessage = await previewSource.startDisplayCapture();
+    const isItchDisplayCaptureError =
+      typeof errorMessage === "string" &&
+      (errorMessage.includes("DisplayCapture") ||
+        errorMessage.includes("display capture") ||
+        window.location.origin === "https://html-classic.itch.zone");
+
+    if (!isItchDisplayCaptureError) {
+      return;
+    }
+
+    const confirmed = await showConfirmDialog({
+      title: "Capture unavailable",
+      body: "Screen capture is not available on this site. Would you like to open the PWA version instead?",
+      okText: "Open PWA page",
+      cancelText: "Cancel",
+    });
+
+    if (confirmed) {
+      window.location.href = "https://kyorohiro.github.io/tetorica-retro-player/demo/";
+    }
+  }, [previewSource, showConfirmDialog]);
+
   const onDrop = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
     const files = event.dataTransfer.files;
@@ -44,7 +71,7 @@ function App() {
             <button
               type="button"
               onClick={() => {
-                void previewSource.startDisplayCapture();
+                void handleDisplayCapture();
               }}
               className="w-full rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 p-5 text-center text-sm text-slate-700 transition hover:bg-emerald-500/20"
             >

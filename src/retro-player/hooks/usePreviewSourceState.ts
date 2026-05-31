@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export type PreviewSourceKind = "video" | "image" | "audio";
+export type DisplayCaptureResult = string | null;
 
 export function usePreviewSourceState() {
   const [previewSrc, setPreviewSrc] = useState<string>();
@@ -55,10 +56,11 @@ export function usePreviewSourceState() {
     setPreviewKind(isVideo ? "video" : isAudio ? "audio" : "image");
   }, [revokePreviewSrc, stopPreviewStream]);
 
-  const startDisplayCapture = useCallback(async () => {
+  const startDisplayCapture = useCallback(async (): Promise<DisplayCaptureResult> => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      setCaptureError("このブラウザでは画面キャプチャーに対応していません。");
-      return;
+      const message = "このブラウザでは画面キャプチャーに対応していません。";
+      setCaptureError(message);
+      return message;
     }
 
     try {
@@ -82,12 +84,14 @@ export function usePreviewSourceState() {
           return null;
         });
       });
+      return null;
     } catch (error) {
-      setCaptureError(
+      const message =
         error instanceof Error
           ? error.message
-          : "画面キャプチャーを開始できませんでした。",
-      );
+          : "画面キャプチャーを開始できませんでした。";
+      setCaptureError(message);
+      return message;
     }
   }, [clearPreviewSrc]);
 
