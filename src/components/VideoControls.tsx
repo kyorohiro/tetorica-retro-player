@@ -194,7 +194,7 @@ export function VideoControls({
           className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
           <SlidersHorizontal size={16} />
-          {isSettingsOpen ? "Hide settings" : "Show settings"}
+          {isSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
         </button>
         <button
           type="button"
@@ -203,7 +203,7 @@ export function VideoControls({
           }}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
         >
-          {isAdvancedOpen ? "Hide details" : "More controls"}
+          {isAdvancedOpen ? "Hide Audio Setting" : "Show Audio Setting"}
         </button>
       </div>
 
