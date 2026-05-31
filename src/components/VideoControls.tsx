@@ -85,6 +85,7 @@ export function VideoControls({
   onToggleSettings,
 }: VideoControlsProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isSpeedOpen, setIsSpeedOpen] = useState(false);
 
   return (
     <div className="mt-3 space-y-3">
@@ -207,26 +208,37 @@ export function VideoControls({
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] text-slate-400">Speed</span>
-        {[0.5, 1, 2].map((rate) => (
-          <button
-            key={rate}
-            type="button"
-            onClick={() => {
-              onChangePlaybackRate(rate);
-            }}
-            className={[
-              "rounded-lg border px-3 py-2 text-slate-100",
-              playbackRate === rate
-                ? "border-sky-400 bg-sky-500/20"
-                : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-            ].join(" ")}
-          >
-            <Gauge size={14} />
-            {rate}x
-          </button>
-        ))}
+      <div className="relative flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setIsSpeedOpen((current) => !current);
+          }}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+        >
+          <Gauge size={14} />
+          Speed {playbackRate}x
+        </button>
+        {isSpeedOpen && (
+          <div className="absolute top-full z-10 mt-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
+            {[0.5, 1, 2].map((rate) => (
+              <button
+                key={rate}
+                type="button"
+                onClick={() => {
+                  onChangePlaybackRate(rate);
+                  setIsSpeedOpen(false);
+                }}
+                className={[
+                  "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
+                  playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
+                ].join(" ")}
+              >
+                {rate}x
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {isAdvancedOpen && (
