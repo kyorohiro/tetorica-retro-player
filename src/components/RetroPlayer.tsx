@@ -166,8 +166,8 @@ export function RetroPlayer({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="relative rounded-2xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
+          <div className="absolute top-0.5 right-0.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
