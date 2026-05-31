@@ -70,5 +70,11 @@ sh deploy_mac.sh
 % ~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.6.3_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.3.3
 
 % ~/bin/butler push "tetorica-retro-player_0.3.3_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.3.3
-f
+
+```
+
+```
+npm run build
+cd dist
+zip -r ../web-build_0.3.3_gh.zip .
 ```
