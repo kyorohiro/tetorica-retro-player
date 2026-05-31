@@ -265,11 +265,11 @@ void main(void)
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
 
-  float screenMask = roundedScreenMask(vMaskCoord, 0.05);
-  color.rgb *= screenMask;
+  //float screenMask = roundedScreenMask(vMaskCoord, 0.05);
+  //color.rgb *= screenMask;
 
-  float highlight = glassHighlight(vMaskCoord, uCurvature) * screenMask;
-  color.rgb += vec3(highlight);
+  //float highlight = glassHighlight(vMaskCoord, uCurvature) * screenMask;
+  //color.rgb += vec3(highlight);
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
