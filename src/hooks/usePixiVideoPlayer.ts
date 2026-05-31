@@ -55,6 +55,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(true);
   const [noiseLevel, setNoiseLevel] = useState<number>(0.08);
 
+  const debugAudio = (label: string, payload?: Record<string, unknown>) => {
+    console.log(`[retro-player audio] ${label}`, payload ?? {});
+  };
+
   const applyFilterStateTo = (filter: Filter | null) => {
     if (!filter) return;
 
@@ -343,9 +347,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const highshelf = lofiHighshelfRef.current;
     const drive = lofiDriveRef.current;
     const noiseGainNode = noiseGainRef.current;
+    const media = mediaRef.current;
 
     if (masterGain) {
       masterGain.gain.value = isMuted ? 0 : volume;
+    }
+
+    if (media) {
+      media.muted = isMuted;
+      media.volume = isMuted ? 0 : volume;
     }
 
     if (lowpass && highshelf && drive) {
@@ -363,19 +373,46 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
     const context = await ensureAudioContext();
-    if (!context) return;
+    if (!context) {
+      debugAudio("connectMediaAudio:no-context", {
+        mediaTag: media.tagName,
+      });
+      return;
+    }
 
     if (mediaSourceRef.current) {
+      debugAudio("connectMediaAudio:disconnect-previous", {
+        mediaTag: media.tagName,
+      });
       mediaSourceRef.current.disconnect();
       mediaSourceRef.current = null;
     }
 
-    const mediaSource = context.createMediaElementSource(media);
-    mediaSource.connect(lofiLowpassRef.current!);
-    mediaSourceRef.current = mediaSource;
-    media.muted = false;
-    media.volume = 1;
-    updateAudioNodes();
+    try {
+      const mediaSource = context.createMediaElementSource(media);
+      mediaSource.connect(lofiLowpassRef.current!);
+      mediaSourceRef.current = mediaSource;
+      media.muted = false;
+      media.volume = 1;
+      debugAudio("connectMediaAudio:connected", {
+        audioContextState: context.state,
+        lofiAmount,
+        isAudioFxEnabled,
+        isMuted,
+        volume,
+        mediaTag: media.tagName,
+        previewKind,
+      });
+      updateAudioNodes();
+    } catch (error) {
+      debugAudio("connectMediaAudio:error", {
+        audioContextState: context.state,
+        mediaTag: media.tagName,
+        message: error instanceof Error ? error.message : String(error),
+        previewKind,
+      });
+      throw error;
+    }
   };
 
   const cleanupPreview = () => {
@@ -430,6 +467,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       await mediaRef.current.play();
       setPreviewError("");
       setNeedsUserPlay(false);
+      debugAudio("playVideoWithAudio", {
+        audioContextState: audioContextRef.current?.state,
+        currentTime: mediaRef.current.currentTime,
+        isAudioFxEnabled,
+        lofiAmount,
+        isMuted,
+        volume,
+      });
       updateAudioNodes();
       syncVideoState();
     } catch (error) {
@@ -869,6 +914,17 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   ]);
 
   useEffect(() => {
+    debugAudio("audioStateChanged", {
+      isMuted,
+      volume,
+      isAudioFxEnabled,
+      lofiAmount,
+      isNoiseEnabled,
+      noiseLevel,
+      audioContextState: audioContextRef.current?.state ?? "none",
+      hasMediaSource: Boolean(mediaSourceRef.current),
+      mediaTag: mediaRef.current?.tagName ?? null,
+    });
     updateAudioNodes();
   }, [isMuted, volume, isAudioFxEnabled, lofiAmount, isNoiseEnabled, noiseLevel]);
 
@@ -1115,6 +1171,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             width: media.videoWidth,
             height: media.videoHeight,
           });
+          await connectMediaAudio(media);
+          syncVideoState();
         } else if (kind === "image") {
           const image = new Image();
           image.src = url;
