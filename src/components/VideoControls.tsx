@@ -17,6 +17,7 @@ import {
 
 type VideoControlsProps = {
   mode: "playback" | "audio-settings";
+  hasPlayback: boolean;
   currentTime: number;
   duration: number;
   isLooping: boolean;
@@ -61,6 +62,7 @@ const formatTime = (seconds: number) => {
 
 export function VideoControls({
   mode,
+  hasPlayback,
   currentTime,
   duration,
   isLooping,
@@ -193,106 +195,113 @@ export function VideoControls({
 
   return (
     <div className="mt-3 space-y-3">
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max={Math.max(duration, 0)}
-          step="0.01"
-          value={Math.min(currentTime, duration || 0)}
-          onChange={(ev) => {
-            onSeek(Number(ev.currentTarget.value));
-          }}
-          className="w-full"
-        />
-      </div>
+      {hasPlayback && (
+        <>
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max={Math.max(duration, 0)}
+              step="0.01"
+              value={Math.min(currentTime, duration || 0)}
+              onChange={(ev) => {
+                onSeek(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onTogglePlayback}
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20"
+            >
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              {isPlaying ? "Pause" : "Play"}
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
+            >
+              <RotateCcw size={16} />
+              Restart
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSeek(Math.max(currentTime - 5, 0));
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              <SkipBack size={16} />
+              -5s
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              <SkipForward size={16} />
+              +5s
+            </button>
+            <button
+              type="button"
+              onClick={onToggleMute}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              {isMuted ? "Unmute" : "Mute"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleLoop}
+              className={[
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+                isLooping
+                  ? "border-sky-400 bg-sky-500/20"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              <RotateCcw size={16} />
+              {isLooping ? "Loop on" : "Loop off"}
+            </button>
+            {hasVideo && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStepFrame(-1);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <StepBack size={16} />
+                  Prev frame
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStepFrame(1);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <StepForward size={16} />
+                  Next frame
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={onTogglePlayback}
-          className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20"
-        >
-          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-          {isPlaying ? "Pause" : "Play"}
-        </button>
-        <button
-          type="button"
-          onClick={onRestart}
-          className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
-        >
-          <RotateCcw size={16} />
-          Restart
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onSeek(Math.max(currentTime - 5, 0));
-          }}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-        >
-          <SkipBack size={16} />
-          -5s
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
-          }}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-        >
-          <SkipForward size={16} />
-          +5s
-        </button>
-        <button
-          type="button"
-          onClick={onToggleMute}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-        >
-          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          {isMuted ? "Unmute" : "Mute"}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleLoop}
-          className={[
-            "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
-            isLooping
-              ? "border-sky-400 bg-sky-500/20"
-              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-          ].join(" ")}
-        >
-          <RotateCcw size={16} />
-          {isLooping ? "Loop on" : "Loop off"}
-        </button>
-        {hasVideo && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                onStepFrame(-1);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <StepBack size={16} />
-              Prev frame
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onStepFrame(1);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <StepForward size={16} />
-              Next frame
-            </button>
-          </>
-        )}
         <button
           type="button"
           onClick={onToggleVideoSettings}
@@ -301,52 +310,58 @@ export function VideoControls({
           <SlidersHorizontal size={16} />
           {isVideoSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
         </button>
-        <button
-          type="button"
-          onClick={onToggleAudioSettings}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-        >
-          <Mic2 size={16} />
-          Show Audio Setting
-        </button>
-      </div>
-
-      <div className="relative flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setIsSpeedOpen((current) => !current);
-          }}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-        >
-          <Gauge size={14} />
-          Speed {playbackRate}x
-        </button>
-        {isSpeedOpen && (
-          <div className="absolute bottom-full z-10 mb-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
-            {[0.5, 1, 2].map((rate) => (
-              <button
-                key={rate}
-                type="button"
-                onClick={() => {
-                  onChangePlaybackRate(rate);
-                  setIsSpeedOpen(false);
-                }}
-                className={[
-                  "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
-                  playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
-                ].join(" ")}
-              >
-                {rate}x
-              </button>
-            ))}
-          </div>
+        {hasPlayback && (
+          <button
+            type="button"
+            onClick={onToggleAudioSettings}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          >
+            <Mic2 size={16} />
+            Show Audio Setting
+          </button>
         )}
       </div>
 
-      <p className="text-[11px] text-slate-500">
-        Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
-      </p>
+      {hasPlayback && (
+        <>
+          <div className="relative flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSpeedOpen((current) => !current);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              <Gauge size={14} />
+              Speed {playbackRate}x
+            </button>
+            {isSpeedOpen && (
+              <div className="absolute bottom-full z-10 mb-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
+                {[0.5, 1, 2].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => {
+                      onChangePlaybackRate(rate);
+                      setIsSpeedOpen(false);
+                    }}
+                    className={[
+                      "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
+                      playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
+                    ].join(" ")}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
+          </p>
+        </>
+      )}
     </div>
   );
 }

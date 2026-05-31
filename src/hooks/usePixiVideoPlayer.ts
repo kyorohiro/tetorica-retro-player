@@ -32,6 +32,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const noiseGainRef = useRef<GainNode | null>(null);
   const noiseLfoRef = useRef<OscillatorNode | null>(null);
   const noiseLfoGainRef = useRef<GainNode | null>(null);
+  const isMutedRef = useRef<boolean>(false);
+  const volumeRef = useRef<number>(1);
+  const isPlayingRef = useRef<boolean>(false);
+  const isAudioFxEnabledRef = useRef<boolean>(true);
+  const lofiAmountRef = useRef<number>(0.55);
+  const isNoiseEnabledRef = useRef<boolean>(true);
+  const noiseLevelRef = useRef<number>(0.08);
+  const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
@@ -57,6 +65,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
     console.log(`[retro-player audio] ${label}`, payload ?? {});
+  };
+
+  const setPreviewKindState = (
+    nextKind: "video" | "audio" | "image" | "capture" | null,
+  ) => {
+    previewKindRef.current = nextKind;
+    setPreviewKind(nextKind);
   };
 
   const applyFilterStateTo = (filter: Filter | null) => {
@@ -238,17 +253,21 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const syncVideoState = () => {
     if (!mediaRef.current) {
+      isPlayingRef.current = false;
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
+      updateAudioNodes();
       return;
     }
 
+    isPlayingRef.current = !mediaRef.current.paused;
     setIsPlaying(!mediaRef.current.paused);
     setCurrentTime(mediaRef.current.currentTime);
     setDuration(mediaRef.current.duration || 0);
     setPlaybackRate(mediaRef.current.playbackRate || 1);
     setIsLooping(mediaRef.current.loop);
+    updateAudioNodes();
   };
 
   const createDriveCurve = (amount: number) => {
@@ -348,18 +367,29 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const drive = lofiDriveRef.current;
     const noiseGainNode = noiseGainRef.current;
     const media = mediaRef.current;
+    const hasPlayablePreview =
+      previewKindRef.current === "video" ||
+      previewKindRef.current === "audio" ||
+      previewKindRef.current === "capture";
+    const isMediaPlaying = media ? !media.paused : isPlayingRef.current;
+    const nextMuted = isMutedRef.current;
+    const nextVolume = volumeRef.current;
+    const nextAudioFxEnabled = isAudioFxEnabledRef.current;
+    const nextLofiAmount = lofiAmountRef.current;
+    const nextNoiseEnabled = isNoiseEnabledRef.current;
+    const nextNoiseLevel = noiseLevelRef.current;
 
     if (masterGain) {
-      masterGain.gain.value = isMuted ? 0 : volume;
+      masterGain.gain.value = nextMuted ? 0 : nextVolume;
     }
 
     if (media) {
-      media.muted = isMuted;
-      media.volume = isMuted ? 0 : volume;
+      media.muted = nextMuted;
+      media.volume = nextMuted ? 0 : nextVolume;
     }
 
     if (lowpass && highshelf && drive) {
-      const amount = isAudioFxEnabled ? lofiAmount : 0;
+      const amount = nextAudioFxEnabled ? nextLofiAmount : 0;
       lowpass.frequency.value = 16000 - amount * 14200;
       lowpass.Q.value = 0.3 + amount * 1.8;
       highshelf.gain.value = -amount * 18;
@@ -367,7 +397,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
 
     if (noiseGainNode) {
-      noiseGainNode.gain.value = isNoiseEnabled && !isMuted ? noiseLevel : 0;
+      noiseGainNode.gain.value =
+        nextNoiseEnabled && !nextMuted && hasPlayablePreview && isMediaPlaying
+          ? nextNoiseLevel
+          : 0;
     }
   };
 
@@ -440,6 +473,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     streamOwnedRef.current = false;
 
     setNeedsUserPlay(false);
+    isPlayingRef.current = false;
+    isMutedRef.current = false;
+    volumeRef.current = 1;
     setIsPlaying(false);
     setIsMuted(false);
     setCurrentTime(0);
@@ -447,7 +483,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     setPlaybackRate(1);
     setVolume(1);
     setIsLooping(true);
-    setPreviewKind(null);
+    setPreviewKindState(null);
     setSourceDimensions(null);
 
     if (objectUrlRef.current) {
@@ -461,6 +497,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     try {
       await ensureAudioContext();
+      isMutedRef.current = false;
       mediaRef.current.muted = false;
       mediaRef.current.volume = 1;
       setIsMuted(false);
@@ -477,6 +514,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       });
       updateAudioNodes();
       syncVideoState();
+      window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
       setNeedsUserPlay(
         error instanceof DOMException && error.name === "NotAllowedError",
@@ -508,6 +546,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     setIsMuted((current) => {
       const nextValue = !current;
+      isMutedRef.current = nextValue;
       window.requestAnimationFrame(updateAudioNodes);
       return nextValue;
     });
@@ -547,6 +586,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const changeVolume = (nextVolume: number) => {
     if (!mediaRef.current) return;
 
+    volumeRef.current = nextVolume;
+    isMutedRef.current = nextVolume === 0;
     setVolume(nextVolume);
     setIsMuted(nextVolume === 0);
     window.requestAnimationFrame(updateAudioNodes);
@@ -638,7 +679,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           textureRef.current = texture;
           spriteRef.current = sprite;
           previewElementRef.current = media;
-          setPreviewKind("video");
+          setPreviewKindState("video");
           setSourceDimensions({
             width: media.videoWidth,
             height: media.videoHeight,
@@ -648,7 +689,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           spriteRef.current = null;
           textureRef.current = null;
           previewElementRef.current = null;
-          setPreviewKind("audio");
+          setPreviewKindState("audio");
           setSourceDimensions(null);
         }
 
@@ -690,7 +731,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       spriteRef.current = sprite;
       mediaRef.current = null;
       previewElementRef.current = image;
-      setPreviewKind("image");
+      setPreviewKindState("image");
       setSourceDimensions({
         width: image.naturalWidth,
         height: image.naturalHeight,
@@ -736,7 +777,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     spriteRef.current = sprite;
     mediaRef.current = video;
     previewElementRef.current = video;
-    setPreviewKind(kind);
+    setPreviewKindState(kind);
     setSourceDimensions({
       width: video.videoWidth,
       height: video.videoHeight,
@@ -914,6 +955,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   ]);
 
   useEffect(() => {
+    isMutedRef.current = isMuted;
+    volumeRef.current = volume;
+    isPlayingRef.current = isPlaying;
+    isAudioFxEnabledRef.current = isAudioFxEnabled;
+    lofiAmountRef.current = lofiAmount;
+    isNoiseEnabledRef.current = isNoiseEnabled;
+    noiseLevelRef.current = noiseLevel;
+    previewKindRef.current = previewKind;
+
     debugAudio("audioStateChanged", {
       isMuted,
       volume,
@@ -921,12 +971,23 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       lofiAmount,
       isNoiseEnabled,
       noiseLevel,
+      isPlaying,
+      previewKind,
       audioContextState: audioContextRef.current?.state ?? "none",
       hasMediaSource: Boolean(mediaSourceRef.current),
       mediaTag: mediaRef.current?.tagName ?? null,
     });
     updateAudioNodes();
-  }, [isMuted, volume, isAudioFxEnabled, lofiAmount, isNoiseEnabled, noiseLevel]);
+  }, [
+    isMuted,
+    volume,
+    isAudioFxEnabled,
+    lofiAmount,
+    isNoiseEnabled,
+    noiseLevel,
+    isPlaying,
+    previewKind,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1086,7 +1147,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           spriteRef.current = null;
           textureRef.current = null;
           previewElementRef.current = null;
-          setPreviewKind("audio");
+          setPreviewKindState("audio");
           setSourceDimensions(null);
 
           streamRef.current = stream;
@@ -1166,7 +1227,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           spriteRef.current = sprite;
           mediaRef.current = media;
           previewElementRef.current = media;
-          setPreviewKind("video");
+          setPreviewKindState("video");
           setSourceDimensions({
             width: media.videoWidth,
             height: media.videoHeight,
@@ -1200,7 +1261,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           textureRef.current = texture;
           spriteRef.current = sprite;
           previewElementRef.current = image;
-          setPreviewKind("image");
+          setPreviewKindState("image");
           setSourceDimensions({
             width: image.naturalWidth,
             height: image.naturalHeight,

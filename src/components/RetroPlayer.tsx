@@ -183,8 +183,10 @@ export function RetroPlayer({
             </div>
           </div>
 
-          {player.hasPlayableMedia && controlPanelMode !== "video-settings" && (
+          {(player.hasPlayableMedia || player.hasImage) &&
+            controlPanelMode !== "video-settings" && (
             <VideoControls
+              hasPlayback={player.hasPlayableMedia}
               currentTime={player.currentTime}
               duration={player.duration}
               mode={controlPanelMode === "audio-settings" ? "audio-settings" : "playback"}
