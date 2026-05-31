@@ -18,9 +18,9 @@ const DEFAULT_AUDIO_SETTINGS = {
   playbackRate: 1,
   isLooping: true,
   isAudioFxEnabled: true,
-  lofiAmount: 0.55,
+  lofiAmount: 0.80,
   isNoiseEnabled: true,
-  noiseLevel: 0.08,
+  noiseLevel: 0.02,
 } as const;
 
 export function usePixiVideoPlayer(filterState: RetroFilterState) {
