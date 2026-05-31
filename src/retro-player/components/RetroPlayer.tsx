@@ -180,6 +180,30 @@ export function RetroPlayer({
                 </div>
               </div>
             )}
+            {player.needsUserPlay && !player.isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/46">
+                <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
+                  <p className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/80">
+                    Preview Ready
+                  </p>
+                  <p className="mt-3 text-lg font-semibold text-slate-100">
+                    Press Play to start
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Safari may require a direct user action before video and audio can begin.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void player.playVideoWithAudio();
+                    }}
+                    className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
+                  >
+                    Play
+                  </button>
+                </div>
+              </div>
+            )}
             {player.hasAudioOnly && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
                 Audio preview is playing through the retro audio chain.
