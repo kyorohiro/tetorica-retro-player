@@ -111,6 +111,16 @@ vec3 nearestPc98(vec3 color)
   return best;
 }
 
+vec3 quantizePc98_4096(vec3 color)
+{
+  return floor(color * 15.0 + 0.5) / 15.0;
+}
+
+vec3 quantizePc98_512(vec3 color)
+{
+  return floor(color * 7.0 + 0.5) / 7.0;
+}
+
 vec3 color32Palette(float index)
 {
   float r = mod(index, 4.0);
@@ -188,10 +198,16 @@ void main(void)
   } else if (uPaletteMode < 1.5) {
     color.rgb = nearestPc98(color.rgb);
   } else if (uPaletteMode < 2.5) {
-    color.rgb = nearestColor32(color.rgb);
+    color.rgb = quantizePc98_512(color.rgb);
   } else if (uPaletteMode < 3.5) {
+    color.rgb = quantizePc98_4096(color.rgb);
+  } else if (uPaletteMode < 4.5) {
+    color.rgb = nearestColor32(color.rgb);
+  } else if (uPaletteMode < 5.5) {
     color.rgb = nearestColor64(color.rgb);
-  } else {
+  }
+
+  if (uPaletteMode > 5.5) {
     color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0), uMonoTint);
   }
 

@@ -1,4 +1,11 @@
-export type PaletteMode = "free" | "pc98" | "color32" | "color64" | "mono";
+export type PaletteMode =
+  | "free"
+  | "pc98"
+  | "pc98_512"
+  | "pc98_4096"
+  | "color32"
+  | "color64"
+  | "mono";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 
 export const MONO_TINTS: Record<
@@ -39,7 +46,7 @@ export const RETRO_PRESETS = {
     monoTint: "gray",
   },
   pc98: {
-    label: "PC-98",
+    label: "Color 16",
     width: 640,
     height: 400,
     colors: 16,
@@ -49,6 +56,32 @@ export const RETRO_PRESETS = {
     scanline2: 0.0,
     vignette: 0.06,
     phosphor: 0.04,
+    monoTint: "gray",
+  },
+  pc98_512: {
+    label: "PC-98 512-color",
+    width: 640,
+    height: 400,
+    colors: 8,
+    dither: 0.12,
+    palette: "pc98_512",
+    scanline: 0.08,
+    scanline2: 0.0,
+    vignette: 0.05,
+    phosphor: 0.03,
+    monoTint: "gray",
+  },
+  pc98_4096: {
+    label: "PC-98 4096-color",
+    width: 640,
+    height: 400,
+    colors: 16,
+    dither: 0.08,
+    palette: "pc98_4096",
+    scanline: 0.08,
+    scanline2: 0.0,
+    vignette: 0.05,
+    phosphor: 0.03,
     monoTint: "gray",
   },
   color32: {
@@ -150,9 +183,11 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
-  if (mode === "color32") return 2;
-  if (mode === "color64") return 3;
-  if (mode === "mono") return 4;
+  if (mode === "pc98_512") return 2;
+  if (mode === "pc98_4096") return 3;
+  if (mode === "color32") return 4;
+  if (mode === "color64") return 5;
+  if (mode === "mono") return 6;
 
   return 0;
 };

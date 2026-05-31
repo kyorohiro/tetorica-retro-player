@@ -102,7 +102,10 @@ export function RetroFilterPanel({
         <label className="block">
           <span className="text-slate-100">Palette</span>
           <div className="mt-2 flex flex-wrap gap-2">
-            {(["free", "pc98", "color32", "color64", "mono"] as const).map((mode) => (
+            {(
+              ["free", "pc98", "pc98_512", "pc98_4096", "color32", "color64", "mono"] as const
+            ).map(
+              (mode) => (
               <button
                 key={mode}
                 type="button"
@@ -119,14 +122,19 @@ export function RetroFilterPanel({
                 {mode === "free"
                   ? "Free"
                   : mode === "pc98"
-                    ? "PC-98 16-color"
+                    ? "Color 16"
+                    : mode === "pc98_512"
+                      ? "PC-98 512-color"
+                    : mode === "pc98_4096"
+                      ? "PC-98 4096-color"
                     : mode === "color32"
                       ? "Color 32"
                       : mode === "color64"
                         ? "Color 64"
                       : "Monochrome"}
               </button>
-            ))}
+            ),
+            )}
           </div>
         </label>
 
@@ -219,6 +227,8 @@ export function RetroFilterPanel({
             }}
             disabled={
               paletteMode === "pc98" ||
+              paletteMode === "pc98_512" ||
+              paletteMode === "pc98_4096" ||
               paletteMode === "color32" ||
               paletteMode === "color64"
             }

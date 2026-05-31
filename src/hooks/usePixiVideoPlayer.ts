@@ -955,18 +955,18 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           pixelUniforms: {
             uTargetSize: {
               value: new Float32Array([
-                RETRO_PRESETS.pc98.width,
-                RETRO_PRESETS.pc98.height,
+                RETRO_PRESETS.pc98_512.width,
+                RETRO_PRESETS.pc98_512.height,
               ]),
               type: "vec2<f32>",
             },
-            uColorLevels: { value: RETRO_PRESETS.pc98.colors, type: "f32" },
-            uDitherStrength: { value: RETRO_PRESETS.pc98.dither, type: "f32" },
-            uPaletteMode: { value: 1, type: "f32" },
-            uScanlineStrength: { value: RETRO_PRESETS.pc98.scanline, type: "f32" },
-            uScanline2Strength: { value: RETRO_PRESETS.pc98.scanline2, type: "f32" },
-            uVignetteStrength: { value: RETRO_PRESETS.pc98.vignette, type: "f32" },
-            uPhosphorStrength: { value: RETRO_PRESETS.pc98.phosphor, type: "f32" },
+            uColorLevels: { value: RETRO_PRESETS.pc98_512.colors, type: "f32" },
+            uDitherStrength: { value: RETRO_PRESETS.pc98_512.dither, type: "f32" },
+            uPaletteMode: { value: 2, type: "f32" },
+            uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
+            uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
+            uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
+            uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },
             uMonoTint: {
               value: new Float32Array(MONO_TINTS.green.rgb),
               type: "vec3<f32>",

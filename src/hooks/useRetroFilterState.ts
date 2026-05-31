@@ -10,7 +10,7 @@ import {
   savePersistedRetroFilterSettings,
 } from "./persistedRetroSettings";
 
-const DEFAULT_PRESET = RETRO_PRESETS.pc98;
+const DEFAULT_PRESET = RETRO_PRESETS.pc98_512;
 
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;
@@ -86,6 +86,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
 
     if (nextPalette === "pc98") {
       setColorLevels(16);
+      return;
+    }
+
+    if (nextPalette === "pc98_4096") {
+      setColorLevels(16);
+      return;
+    }
+
+    if (nextPalette === "pc98_512") {
+      setColorLevels(8);
       return;
     }
 
