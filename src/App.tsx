@@ -6,30 +6,31 @@ import { usePreviewSourceState } from "./hooks/usePreviewSourceState";
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
-
+  const onDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      previewSource.previewFile(files[0]);
+    }
+  };
+  const onDragOver = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
   return (
     <main
       className="h-screen overflow-y-auto bg-slate-200 text-slate-800"
-      onDrop={(event) => {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        if (files.length > 0) {
-          previewSource.previewFile(files[0]);
-        }
-      }}
-      onDragOver={(event) => {
-        event.preventDefault();
-      }}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
     >
       <div className="mx-auto max-w-5xl px-6 py-8">
         <header className="mb-8">
           <p className="text-sm text-slate-400">video preview via pixi.js</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">
-            Tetorica Retro Player
+            Tetorica Retro Player 
           </h1>
         </header>
-
         <div className="mb-4">
+
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <button
               type="button"
