@@ -21,9 +21,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const filterRef = useRef<Filter | null>(null);
   const previewRequestIdRef = useRef<number>(0);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const mediaSourceRef = useRef<
-    MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null
-  >(null);
+  const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const isAudioGraphActiveRef = useRef<boolean>(false);
   const masterGainRef = useRef<GainNode | null>(null);
   const lofiLowpassRef = useRef<BiquadFilterNode | null>(null);
@@ -394,7 +392,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     capturedMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     capturedMediaStreamRef.current = null;
 
-    let mediaSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode;
+    let mediaSource: MediaStreamAudioSourceNode | null = null;
     const captureStream =
       "captureStream" in media && typeof media.captureStream === "function"
         ? media.captureStream()
@@ -403,15 +401,19 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     if (captureStream && captureStream.getAudioTracks().length > 0) {
       capturedMediaStreamRef.current = captureStream;
       mediaSource = context.createMediaStreamSource(captureStream);
-    } else {
-      mediaSource = context.createMediaElementSource(media);
     }
 
-    mediaSource.connect(lofiLowpassRef.current!);
-    mediaSourceRef.current = mediaSource;
-    isAudioGraphActiveRef.current = true;
-    media.muted = false;
-    media.volume = 0;
+    if (mediaSource) {
+      mediaSource.connect(lofiLowpassRef.current!);
+      mediaSourceRef.current = mediaSource;
+      isAudioGraphActiveRef.current = true;
+      media.muted = false;
+      media.volume = 0;
+    } else {
+      isAudioGraphActiveRef.current = false;
+      media.muted = isMuted;
+      media.volume = isMuted ? 0 : volume;
+    }
 
     updateAudioNodes();
   };
