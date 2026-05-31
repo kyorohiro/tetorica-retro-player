@@ -220,7 +220,7 @@ export function VideoControls({
           Speed {playbackRate}x
         </button>
         {isSpeedOpen && (
-          <div className="absolute top-full z-10 mt-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
+          <div className="absolute bottom-full z-10 mb-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
             {[0.5, 1, 2].map((rate) => (
               <button
                 key={rate}
