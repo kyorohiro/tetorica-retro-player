@@ -153,6 +153,15 @@
           );
       }
 
+      .preview img {
+        position: relative;
+        z-index: 1;
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 18px;
+      }
+
       .preview::before {
         content: "";
         position: absolute;
@@ -162,6 +171,7 @@
           radial-gradient(circle at center, rgba(56, 189, 248, 0.12), transparent 48%),
           linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(245, 158, 11, 0.12));
         border: 1px solid rgba(148, 163, 184, 0.18);
+        z-index: 0;
       }
 
       .preview-grid {
@@ -169,6 +179,7 @@
         inset: 0;
         display: grid;
         place-items: center;
+        z-index: 2;
       }
 
       .preview-grid span {
@@ -302,9 +313,7 @@
 
         <div class="panel hero-card">
           <div class="preview">
-            <div class="preview-grid">
-              <span>Retro preview for local media and live capture</span>
-            </div>
+            <img src="./demo.gif" alt="Retro player demo preview" />
           </div>
           <div class="meta">
             <div class="chip">
