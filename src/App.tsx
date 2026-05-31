@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import "./App.css";
-import RetroPlayer from "./components/RetroPlayer";
-import { usePreviewSourceState } from "./hooks/usePreviewSourceState";
+import RetroPlayer from "./retro-player/components/RetroPlayer";
+import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
