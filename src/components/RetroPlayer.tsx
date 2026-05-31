@@ -7,6 +7,7 @@ import {
   useRetroFilterState,
   type RetroFilterInitialState,
 } from "../hooks/useRetroFilterState";
+import { clearPersistedRetroSettings } from "../hooks/persistedRetroSettings";
 
 type RetroPlayerProps = {
   src?: string;
@@ -33,6 +34,12 @@ export function RetroPlayer({
   >("playback");
   const filterState = useRetroFilterState(initialFilterState);
   const player = usePixiVideoPlayer(filterState);
+
+  const resetAllSettings = React.useCallback(() => {
+    clearPersistedRetroSettings();
+    filterState.resetSettings();
+    player.resetAudioSettings();
+  }, [filterState, player]);
 
   const syncTargetAspect = React.useCallback(() => {
     if (!player.sourceDimensions) return;
@@ -221,6 +228,7 @@ export function RetroPlayer({
               onBackToPlayback={() => {
                 setControlPanelMode("playback");
               }}
+              onResetSettings={resetAllSettings}
               onToggleVideoSettings={() => {
                 setControlPanelMode((current) =>
                   current === "video-settings" ? "playback" : "video-settings",

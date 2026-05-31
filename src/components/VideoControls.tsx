@@ -44,6 +44,7 @@ type VideoControlsProps = {
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
   onBackToPlayback: () => void;
+  onResetSettings: () => void;
   onToggleVideoSettings: () => void;
   onToggleAudioSettings: () => void;
 };
@@ -89,6 +90,7 @@ export function VideoControls({
   onToggleNoise,
   onTogglePlayback,
   onBackToPlayback,
+  onResetSettings,
   onToggleVideoSettings,
   onToggleAudioSettings,
 }: VideoControlsProps) {
@@ -273,6 +275,38 @@ export function VideoControls({
               <RotateCcw size={16} />
               {isLooping ? "Loop on" : "Loop off"}
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSpeedOpen((current) => !current);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              >
+                <Gauge size={14} />
+                Speed {playbackRate}x
+              </button>
+              {isSpeedOpen && (
+                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
+                  {[0.5, 1, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      onClick={() => {
+                        onChangePlaybackRate(rate);
+                        setIsSpeedOpen(false);
+                      }}
+                      className={[
+                        "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
+                        playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
+                      ].join(" ")}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {hasVideo && (
               <>
                 <button
@@ -305,7 +339,7 @@ export function VideoControls({
         <button
           type="button"
           onClick={onToggleVideoSettings}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 text-cyan-50 hover:bg-cyan-500/30"
         >
           <SlidersHorizontal size={16} />
           {isVideoSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
@@ -314,53 +348,24 @@ export function VideoControls({
           <button
             type="button"
             onClick={onToggleAudioSettings}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-3 py-2 text-fuchsia-50 hover:bg-fuchsia-500/30"
           >
             <Mic2 size={16} />
             Show Audio Setting
           </button>
         )}
+        <button
+          type="button"
+          onClick={onResetSettings}
+          className="inline-flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-slate-100 hover:bg-rose-500/20"
+        >
+          Reset Settings
+        </button>
       </div>
-
       {hasPlayback && (
-        <>
-          <div className="relative flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSpeedOpen((current) => !current);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <Gauge size={14} />
-              Speed {playbackRate}x
-            </button>
-            {isSpeedOpen && (
-              <div className="absolute bottom-full z-10 mb-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
-                {[0.5, 1, 2].map((rate) => (
-                  <button
-                    key={rate}
-                    type="button"
-                    onClick={() => {
-                      onChangePlaybackRate(rate);
-                      setIsSpeedOpen(false);
-                    }}
-                    className={[
-                      "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
-                      playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
-                    ].join(" ")}
-                  >
-                    {rate}x
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <p className="text-[11px] text-slate-500">
-            Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
-          </p>
-        </>
+        <p className="text-[11px] text-slate-500">
+          Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
+        </p>
       )}
     </div>
   );

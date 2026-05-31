@@ -85,3 +85,13 @@ export const savePersistedRetroAudioSettings = (
     filter: current?.filter,
   });
 };
+
+export const clearPersistedRetroSettings = () => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage errors and keep runtime behavior.
+  }
+};

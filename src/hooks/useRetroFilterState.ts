@@ -27,7 +27,22 @@ export type RetroFilterInitialState = Partial<{
 }>;
 
 export function useRetroFilterState(initialState: RetroFilterInitialState = {}) {
+  const [baseInitialState] = useState<Required<RetroFilterInitialState>>(() => ({
+    targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
+    targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
+    colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
+    ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
+    paletteMode: initialState.paletteMode ?? DEFAULT_PRESET.palette,
+    scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
+    scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+    vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
+    phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+    monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
+    isFilterEnabled: initialState.isFilterEnabled ?? true,
+  }));
+
   const [resolvedInitialState] = useState<RetroFilterInitialState>(() => ({
+    ...baseInitialState,
     ...loadPersistedRetroSettings()?.filter,
     ...initialState,
   }));
@@ -99,6 +114,20 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setMonoTint(settings.monoTint);
   };
 
+  const resetSettings = () => {
+    setTargetWidth(baseInitialState.targetWidth);
+    setTargetHeight(baseInitialState.targetHeight);
+    setColorLevels(baseInitialState.colorLevels);
+    setDitherStrength(baseInitialState.ditherStrength);
+    rawSetPaletteMode(baseInitialState.paletteMode);
+    setScanlineStrength(baseInitialState.scanlineStrength);
+    setScanline2Strength(baseInitialState.scanline2Strength);
+    setVignetteStrength(baseInitialState.vignetteStrength);
+    setPhosphorStrength(baseInitialState.phosphorStrength);
+    setMonoTint(baseInitialState.monoTint);
+    setIsFilterEnabled(baseInitialState.isFilterEnabled);
+  };
+
   useEffect(() => {
     savePersistedRetroFilterSettings({
       targetWidth,
@@ -151,6 +180,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setMonoTint,
     setIsFilterEnabled,
     applyPreset,
+    resetSettings,
   };
 }
 
