@@ -167,6 +167,19 @@ export function RetroPlayer({
             }`}
           >
             <div ref={player.canvasHostRef} className="h-full w-full" />
+            {player.isLoading && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
+                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+                  <p className="font-medium">
+                    {player.loadingLabel || "Loading preview..."}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Please wait while the preview is prepared.
+                  </p>
+                </div>
+              </div>
+            )}
             {player.hasAudioOnly && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
                 Audio preview is playing through the retro audio chain.

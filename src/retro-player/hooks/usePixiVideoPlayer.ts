@@ -76,6 +76,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
+  const [loadingLabel, setLoadingLabel] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
@@ -109,6 +111,16 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   ) => {
     previewKindRef.current = nextKind;
     setPreviewKind(nextKind);
+  };
+
+  const beginLoading = (label: string) => {
+    setLoadingLabel(label);
+    setIsLoading(true);
+  };
+
+  const finishLoading = () => {
+    setIsLoading(false);
+    setLoadingLabel("");
   };
 
   const applyFilterStateTo = (filter: Filter | null) => {
@@ -488,6 +500,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const cleanupPreview = () => {
     previewRequestIdRef.current += 1;
+    finishLoading();
     appRef.current?.stage.removeChildren();
     spriteRef.current?.destroy();
     spriteRef.current = null;
@@ -682,6 +695,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const requestId = previewRequestIdRef.current;
     setPreviewError("");
     setPreviewName(file.name);
+    beginLoading(
+      isVideo ? "Loading video preview..." : isAudio ? "Loading audio preview..." : "Loading image preview...",
+    );
 
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
@@ -762,6 +778,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         syncVideoState();
 
         await playVideoWithAudio();
+        if (requestId === previewRequestIdRef.current) {
+          finishLoading();
+        }
         return;
       }
 
@@ -801,6 +820,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         height: image.naturalHeight,
       });
       syncVideoState();
+      if (requestId === previewRequestIdRef.current) {
+        finishLoading();
+      }
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
         URL.revokeObjectURL(url);
@@ -864,6 +886,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const requestId = previewRequestIdRef.current;
     setPreviewError("");
     setPreviewName("Display Capture");
+    beginLoading("Preparing display capture...");
 
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -905,6 +928,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       await attachVideoPreview(video, "capture");
       await connectMediaAudio(video);
       setNeedsUserPlay(false);
+      if (requestId === previewRequestIdRef.current) {
+        finishLoading();
+      }
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
         return;
@@ -1147,6 +1173,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     canvasHostRef,
     previewName,
     previewError,
+    loadingLabel,
+    isLoading,
     needsUserPlay,
     isPlaying,
     isMuted,
@@ -1184,6 +1212,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
         setPreviewError("");
         setPreviewName(name);
+        beginLoading(kind === "video" ? "Loading stream preview..." : "Loading stream audio...");
 
         if (kind === "video") {
           const media = document.createElement("video");
@@ -1259,6 +1288,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         }
 
         await playVideoWithAudio();
+        if (requestId === previewRequestIdRef.current) {
+          finishLoading();
+        }
       } catch (error) {
         if (requestId !== previewRequestIdRef.current) return;
 
@@ -1279,6 +1311,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
         setPreviewError("");
         setPreviewName(url);
+        beginLoading(
+          kind === "video"
+            ? "Loading video preview..."
+            : kind === "image"
+              ? "Loading image preview..."
+              : "Loading audio preview...",
+        );
 
         if (kind === "video") {
           const media = document.createElement("video");
@@ -1406,6 +1445,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         }
 
         await playVideoWithAudio();
+        if (requestId === previewRequestIdRef.current) {
+          finishLoading();
+        }
       } catch (error) {
         if (requestId !== previewRequestIdRef.current) return;
 
