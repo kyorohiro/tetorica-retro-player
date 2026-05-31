@@ -530,6 +530,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     currentTexture?.destroy(true);
     textureRef.current = null;
+    if (mediaRef.current) {
+      releaseDetachedMedia(mediaRef.current, undefined, streamOwnedRef.current);
+    }
     mediaSourceRef.current?.disconnect();
     mediaSourceRef.current = null;
     mediaRef.current = null;
@@ -1047,6 +1050,20 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       appRef.current?.destroy(true);
       filterRef.current = null;
       appRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      cleanupPreview();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("beforeunload", handlePageHide);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("beforeunload", handlePageHide);
     };
   }, []);
 
