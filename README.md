@@ -9,10 +9,10 @@ https://kyorohiro.itch.io/tetorica-retro-player
 ## Demo
 
 - GitHub Pages landing page:
-  [](https://kyorohiro.github.io/tetorica-retro-player/)
+  [https://kyorohiro.github.io/tetorica-retro-player/](https://kyorohiro.github.io/tetorica-retro-player/)
 
 - Demo app:
-  [](https://kyorohiro.github.io/tetorica-retro-player/demo/)
+  [https://kyorohiro.github.io/tetorica-retro-player/demo/](https://kyorohiro.github.io/tetorica-retro-player/demo/)
 
 ![Demo](docs/demo.gif)
 
