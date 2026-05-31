@@ -197,24 +197,22 @@ vec2 curveUv(vec2 uv, float strength)
   return centered * 0.5 + 0.5;
 }
 
-float roundedScreenMask(vec2 uv, float curvature)
+float edgeShadow(vec2 uv, float curvature)
 {
   vec2 centered = abs(uv - vec2(0.5)) * 2.0;
+  float horizontal = pow(centered.x, 2.6);
+  float vertical = pow(centered.y, 2.1);
+  float edge = horizontal * 0.45 + vertical * 0.8 + horizontal * vertical * 0.35;
 
-  vec2 radius = vec2(0.92);
-  vec2 corner = max(centered - radius, 0.0);
-  float edge = length(corner);
-
-  return 1.0 - smoothstep(0.0, 0.08, edge);
+  return 1.0 - edge * (0.08 + curvature * 0.45);
 }
 
-float glassHighlight(vec2 uv, float curvature)
+float horizontalUnevenness(vec2 uv, float time)
 {
-  vec2 glareUv = uv - vec2(0.24, 0.18);
-  float streak = exp(-dot(glareUv, glareUv * vec2(5.0, 28.0)));
-  float sweep = exp(-pow((uv.x + uv.y * 0.55) - 0.34, 2.0) * 24.0);
+  float broad = sin(uv.y * 17.0 + time * 0.35) * 0.5 + 0.5;
+  float fine = sin(uv.y * 61.0 + time * 0.12) * 0.5 + 0.5;
 
-  return (streak * 0.75 + sweep * 0.25) * (0.03 + curvature * 0.22);
+  return 1.0 - (broad * 0.03 + fine * 0.012);
 }
 
 void main(void)
@@ -231,7 +229,15 @@ void main(void)
   vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
   pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
 
+  vec2 maskCentered = warpedMask - vec2(0.5);
+  float edgeAmount = smoothstep(0.2, 0.95, length(maskCentered) * 1.35);
+  vec2 chromaOffset = maskCentered * (0.0015 + uCurvature * 0.01) * edgeAmount;
+  vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
+  vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
+
   vec4 color = texture(uTexture, pixelatedUv);
+  color.r = texture(uTexture, redUv).r;
+  color.b = texture(uTexture, blueUv).b;
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
 
@@ -264,12 +270,8 @@ void main(void)
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-
-  //float screenMask = roundedScreenMask(vMaskCoord, 0.05);
-  //color.rgb *= screenMask;
-
-  //float highlight = glassHighlight(vMaskCoord, uCurvature) * screenMask;
-  //color.rgb += vec3(highlight);
+  color.rgb *= edgeShadow(warpedMask, uCurvature);
+  color.rgb *= horizontalUnevenness(warpedMask, uTime);
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
