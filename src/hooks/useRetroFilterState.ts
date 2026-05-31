@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   RETRO_PRESETS,
   type MonoTintMode,
   type PaletteMode,
   type RetroPresetKey,
 } from "../retro/config";
+import {
+  loadPersistedRetroSettings,
+  savePersistedRetroFilterSettings,
+} from "./persistedRetroSettings";
 
 const DEFAULT_PRESET = RETRO_PRESETS.pc98;
 
@@ -23,38 +27,43 @@ export type RetroFilterInitialState = Partial<{
 }>;
 
 export function useRetroFilterState(initialState: RetroFilterInitialState = {}) {
+  const [resolvedInitialState] = useState<RetroFilterInitialState>(() => ({
+    ...loadPersistedRetroSettings()?.filter,
+    ...initialState,
+  }));
+
   const [targetWidth, setTargetWidth] = useState<number>(
-    initialState.targetWidth ?? DEFAULT_PRESET.width,
+    resolvedInitialState.targetWidth ?? DEFAULT_PRESET.width,
   );
   const [targetHeight, setTargetHeight] = useState<number>(
-    initialState.targetHeight ?? DEFAULT_PRESET.height,
+    resolvedInitialState.targetHeight ?? DEFAULT_PRESET.height,
   );
   const [colorLevels, setColorLevels] = useState<number>(
-    initialState.colorLevels ?? DEFAULT_PRESET.colors,
+    resolvedInitialState.colorLevels ?? DEFAULT_PRESET.colors,
   );
   const [ditherStrength, setDitherStrength] = useState<number>(
-    initialState.ditherStrength ?? DEFAULT_PRESET.dither,
+    resolvedInitialState.ditherStrength ?? DEFAULT_PRESET.dither,
   );
   const [paletteMode, rawSetPaletteMode] = useState<PaletteMode>(
-    initialState.paletteMode ?? DEFAULT_PRESET.palette,
+    resolvedInitialState.paletteMode ?? DEFAULT_PRESET.palette,
   );
   const [scanlineStrength, setScanlineStrength] = useState<number>(
-    initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
+    resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
   );
   const [scanline2Strength, setScanline2Strength] = useState<number>(
-    initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+    resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
   );
   const [vignetteStrength, setVignetteStrength] = useState<number>(
-    initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
+    resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
   );
   const [phosphorStrength, setPhosphorStrength] = useState<number>(
-    initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+    resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
   );
   const [monoTint, setMonoTint] = useState<MonoTintMode>(
-    initialState.monoTint ?? DEFAULT_PRESET.monoTint,
+    resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
   );
   const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(
-    initialState.isFilterEnabled ?? true,
+    resolvedInitialState.isFilterEnabled ?? true,
   );
 
   const setPaletteMode = (nextPalette: PaletteMode) => {
@@ -89,6 +98,34 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorStrength(settings.phosphor);
     setMonoTint(settings.monoTint);
   };
+
+  useEffect(() => {
+    savePersistedRetroFilterSettings({
+      targetWidth,
+      targetHeight,
+      colorLevels,
+      ditherStrength,
+      paletteMode,
+      scanlineStrength,
+      scanline2Strength,
+      vignetteStrength,
+      phosphorStrength,
+      monoTint,
+      isFilterEnabled,
+    });
+  }, [
+    colorLevels,
+    ditherStrength,
+    isFilterEnabled,
+    monoTint,
+    paletteMode,
+    phosphorStrength,
+    scanlineStrength,
+    scanline2Strength,
+    targetHeight,
+    targetWidth,
+    vignetteStrength,
+  ]);
 
   return {
     targetWidth,

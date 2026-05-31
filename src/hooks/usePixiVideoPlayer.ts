@@ -7,8 +7,26 @@ import {
 } from "../retro/config";
 import type { RetroFilterState } from "./useRetroFilterState";
 import { FILTER_FRAGMENT, FILTER_VERTEX } from "../retro/filterShader";
+import {
+  loadPersistedRetroSettings,
+  savePersistedRetroAudioSettings,
+} from "./persistedRetroSettings";
 
 export function usePixiVideoPlayer(filterState: RetroFilterState) {
+  const [initialAudioSettings] = useState(() => {
+    const persisted = loadPersistedRetroSettings()?.audio;
+
+    return {
+      isMuted: persisted?.isMuted ?? false,
+      volume: persisted?.volume ?? 1,
+      playbackRate: persisted?.playbackRate ?? 1,
+      isLooping: persisted?.isLooping ?? true,
+      isAudioFxEnabled: persisted?.isAudioFxEnabled ?? true,
+      lofiAmount: persisted?.lofiAmount ?? 0.55,
+      isNoiseEnabled: persisted?.isNoiseEnabled ?? true,
+      noiseLevel: persisted?.noiseLevel ?? 0.08,
+    };
+  });
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const appRef = useRef<Application | null>(null);
@@ -32,25 +50,27 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const noiseGainRef = useRef<GainNode | null>(null);
   const noiseLfoRef = useRef<OscillatorNode | null>(null);
   const noiseLfoGainRef = useRef<GainNode | null>(null);
-  const isMutedRef = useRef<boolean>(false);
-  const volumeRef = useRef<number>(1);
+  const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
+  const volumeRef = useRef<number>(initialAudioSettings.volume);
   const isPlayingRef = useRef<boolean>(false);
-  const isAudioFxEnabledRef = useRef<boolean>(true);
-  const lofiAmountRef = useRef<number>(0.55);
-  const isNoiseEnabledRef = useRef<boolean>(true);
-  const noiseLevelRef = useRef<number>(0.08);
+  const playbackRateRef = useRef<number>(initialAudioSettings.playbackRate);
+  const isLoopingRef = useRef<boolean>(initialAudioSettings.isLooping);
+  const isAudioFxEnabledRef = useRef<boolean>(initialAudioSettings.isAudioFxEnabled);
+  const lofiAmountRef = useRef<number>(initialAudioSettings.lofiAmount);
+  const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
+  const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
-  const [playbackRate, setPlaybackRate] = useState<number>(1);
-  const [volume, setVolume] = useState<number>(1);
-  const [isLooping, setIsLooping] = useState<boolean>(true);
+  const [playbackRate, setPlaybackRate] = useState<number>(initialAudioSettings.playbackRate);
+  const [volume, setVolume] = useState<number>(initialAudioSettings.volume);
+  const [isLooping, setIsLooping] = useState<boolean>(initialAudioSettings.isLooping);
   const [previewKind, setPreviewKind] = useState<
     "video" | "audio" | "image" | "capture" | null
   >(null);
@@ -58,10 +78,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     width: number;
     height: number;
   } | null>(null);
-  const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(true);
-  const [lofiAmount, setLofiAmount] = useState<number>(0.55);
-  const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(true);
-  const [noiseLevel, setNoiseLevel] = useState<number>(0.08);
+  const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(
+    initialAudioSettings.isAudioFxEnabled,
+  );
+  const [lofiAmount, setLofiAmount] = useState<number>(initialAudioSettings.lofiAmount);
+  const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(
+    initialAudioSettings.isNoiseEnabled,
+  );
+  const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
     console.log(`[retro-player audio] ${label}`, payload ?? {});
@@ -425,8 +449,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       const mediaSource = context.createMediaElementSource(media);
       mediaSource.connect(lofiLowpassRef.current!);
       mediaSourceRef.current = mediaSource;
-      media.muted = false;
-      media.volume = 1;
+      media.muted = isMutedRef.current;
+      media.volume = isMutedRef.current ? 0 : volumeRef.current;
       debugAudio("connectMediaAudio:connected", {
         audioContextState: context.state,
         lofiAmount,
@@ -474,15 +498,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     setNeedsUserPlay(false);
     isPlayingRef.current = false;
-    isMutedRef.current = false;
-    volumeRef.current = 1;
     setIsPlaying(false);
-    setIsMuted(false);
     setCurrentTime(0);
     setDuration(0);
-    setPlaybackRate(1);
-    setVolume(1);
-    setIsLooping(true);
     setPreviewKindState(null);
     setSourceDimensions(null);
 
@@ -497,10 +515,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     try {
       await ensureAudioContext();
-      isMutedRef.current = false;
-      mediaRef.current.muted = false;
-      mediaRef.current.volume = 1;
-      setIsMuted(false);
+      mediaRef.current.muted = isMutedRef.current;
+      mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
       await mediaRef.current.play();
       setPreviewError("");
       setNeedsUserPlay(false);
@@ -580,6 +596,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     if (!mediaRef.current) return;
 
     mediaRef.current.playbackRate = nextRate;
+    playbackRateRef.current = nextRate;
     setPlaybackRate(nextRate);
   };
 
@@ -597,6 +614,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     if (!mediaRef.current) return;
 
     mediaRef.current.loop = !mediaRef.current.loop;
+    isLoopingRef.current = mediaRef.current.loop;
     setIsLooping(mediaRef.current.loop);
   };
 
@@ -630,9 +648,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           : document.createElement("audio");
         media.src = url;
         media.crossOrigin = "anonymous";
-        media.loop = true;
-        media.muted = false;
-        media.volume = 1;
+        media.loop = isLoopingRef.current;
+        media.muted = isMutedRef.current;
+        media.volume = isMutedRef.current ? 0 : volumeRef.current;
+        media.playbackRate = playbackRateRef.current;
         media.autoplay = false;
         media.preload = "auto";
         media.addEventListener("play", syncVideoState);
@@ -814,9 +833,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       const video = document.createElement("video");
       video.srcObject = stream;
-      video.loop = false;
-      video.muted = true;
-      video.volume = 1;
+      video.loop = isLoopingRef.current;
+      video.muted = isMutedRef.current;
+      video.volume = isMutedRef.current ? 0 : volumeRef.current;
+      video.playbackRate = playbackRateRef.current;
       video.playsInline = true;
       video.autoplay = true;
       video.addEventListener("play", syncVideoState);
@@ -958,6 +978,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     isMutedRef.current = isMuted;
     volumeRef.current = volume;
     isPlayingRef.current = isPlaying;
+    playbackRateRef.current = playbackRate;
+    isLoopingRef.current = isLooping;
     isAudioFxEnabledRef.current = isAudioFxEnabled;
     lofiAmountRef.current = lofiAmount;
     isNoiseEnabledRef.current = isNoiseEnabled;
@@ -972,6 +994,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       isNoiseEnabled,
       noiseLevel,
       isPlaying,
+      playbackRate,
+      isLooping,
       previewKind,
       audioContextState: audioContextRef.current?.state ?? "none",
       hasMediaSource: Boolean(mediaSourceRef.current),
@@ -986,7 +1010,31 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     isNoiseEnabled,
     noiseLevel,
     isPlaying,
+    playbackRate,
+    isLooping,
     previewKind,
+  ]);
+
+  useEffect(() => {
+    savePersistedRetroAudioSettings({
+      isMuted,
+      volume,
+      playbackRate,
+      isLooping,
+      isAudioFxEnabled,
+      lofiAmount,
+      isNoiseEnabled,
+      noiseLevel,
+    });
+  }, [
+    isMuted,
+    volume,
+    playbackRate,
+    isLooping,
+    isAudioFxEnabled,
+    lofiAmount,
+    isNoiseEnabled,
+    noiseLevel,
   ]);
 
   useEffect(() => {
@@ -1094,9 +1142,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           const media = document.createElement("video");
           media.srcObject = stream;
           media.crossOrigin = "anonymous";
-          media.loop = false;
-          media.muted = false;
-          media.volume = 1;
+          media.loop = isLoopingRef.current;
+          media.muted = isMutedRef.current;
+          media.volume = isMutedRef.current ? 0 : volumeRef.current;
+          media.playbackRate = playbackRateRef.current;
           media.playsInline = true;
           media.autoplay = false;
           media.preload = "auto";
@@ -1124,9 +1173,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           const media = document.createElement("audio");
           media.srcObject = stream;
           media.crossOrigin = "anonymous";
-          media.loop = false;
-          media.muted = false;
-          media.volume = 1;
+          media.loop = isLoopingRef.current;
+          media.muted = isMutedRef.current;
+          media.volume = isMutedRef.current ? 0 : volumeRef.current;
+          media.playbackRate = playbackRateRef.current;
           media.preload = "auto";
           media.addEventListener("play", syncVideoState);
           media.addEventListener("pause", syncVideoState);
@@ -1187,9 +1237,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           const media = document.createElement("video");
           media.src = url;
           media.crossOrigin = "anonymous";
-          media.loop = true;
-          media.muted = false;
-          media.volume = 1;
+          media.loop = isLoopingRef.current;
+          media.muted = isMutedRef.current;
+          media.volume = isMutedRef.current ? 0 : volumeRef.current;
+          media.playbackRate = playbackRateRef.current;
           media.playsInline = true;
           media.autoplay = false;
           media.preload = "auto";
@@ -1271,9 +1322,10 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           const audio = document.createElement("audio");
           audio.src = url;
           audio.crossOrigin = "anonymous";
-          audio.loop = true;
-          audio.muted = false;
-          audio.volume = 1;
+          audio.loop = isLoopingRef.current;
+          audio.muted = isMutedRef.current;
+          audio.volume = isMutedRef.current ? 0 : volumeRef.current;
+          audio.playbackRate = playbackRateRef.current;
           audio.preload = "auto";
           audio.addEventListener("play", syncVideoState);
           audio.addEventListener("pause", syncVideoState);
@@ -1294,7 +1346,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           spriteRef.current = null;
           textureRef.current = null;
           previewElementRef.current = null;
-          setPreviewKind("audio");
+          setPreviewKindState("audio");
           setSourceDimensions(null);
 
           mediaRef.current = audio;
