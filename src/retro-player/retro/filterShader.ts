@@ -1,6 +1,7 @@
 export const FILTER_VERTEX = `#version 300 es
 in vec2 aPosition;
 out vec2 vTextureCoord;
+out vec2 vMaskCoord;
 
 uniform vec4 uInputSize;
 uniform vec4 uOutputFrame;
@@ -25,6 +26,7 @@ void main(void)
 {
   gl_Position = filterVertexPosition();
   vTextureCoord = filterTextureCoord();
+  vMaskCoord = aPosition;
 }
 `;
 
@@ -32,6 +34,7 @@ export const FILTER_FRAGMENT = `#version 300 es
 precision mediump float;
 
 in vec2 vTextureCoord;
+in vec2 vMaskCoord;
 out vec4 finalColor;
 
 uniform sampler2D uTexture;
@@ -194,9 +197,31 @@ vec2 curveUv(vec2 uv, float strength)
   return centered * 0.5 + 0.5;
 }
 
+float roundedScreenMask(vec2 uv, float curvature)
+{
+  vec2 centered = abs(uv - vec2(0.5)) * 2.0;
+
+  vec2 radius = vec2(0.92);
+  vec2 corner = max(centered - radius, 0.0);
+  float edge = length(corner);
+
+  return 1.0 - smoothstep(0.0, 0.08, edge);
+}
+
+float glassHighlight(vec2 uv, float curvature)
+{
+  vec2 glareUv = uv - vec2(0.24, 0.18);
+  float streak = exp(-dot(glareUv, glareUv * vec2(5.0, 28.0)));
+  float sweep = exp(-pow((uv.x + uv.y * 0.55) - 0.34, 2.0) * 24.0);
+
+  return (streak * 0.75 + sweep * 0.25) * (0.03 + curvature * 0.22);
+}
+
 void main(void)
 {
-  vec2 curvedUv = curveUv(vTextureCoord, uCurvature);
+  vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
+  vec2 delta = warpedMask - vMaskCoord;
+  vec2 curvedUv = vTextureCoord + delta;
   if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
     finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
@@ -237,8 +262,15 @@ void main(void)
   float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
   color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);
 
-  float vignette = distance(vTextureCoord, vec2(0.5));
+  float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
+
+  float screenMask = roundedScreenMask(vMaskCoord, 0.05);
+  color.rgb *= screenMask;
+
+  float highlight = glassHighlight(vMaskCoord, uCurvature) * screenMask;
+  color.rgb += vec3(highlight);
+
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   finalColor = color;
