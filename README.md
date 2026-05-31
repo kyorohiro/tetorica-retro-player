@@ -58,3 +58,17 @@ When updating the public demo, rebuild the app and copy the latest build output 
 
 - Screen capture availability depends on browser support and permission prompts.
 - The GitHub Pages demo is best experienced on a desktop Chromium-based browser.
+
+
+## Release Memo
+
+```
+sh deploy_mac.sh
+% ~/bin/butler login
+% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.3.3_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.3.3
+
+% ~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.6.3_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.3.3
+
+% ~/bin/butler push "tetorica-retro-player_0.3.3_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.3.3
+f
+```
