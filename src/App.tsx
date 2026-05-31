@@ -30,6 +30,7 @@ function App() {
 
     if (confirmed) {
       window.location.href = "https://kyorohiro.github.io/tetorica-retro-player/demo/";
+      return;
     }
   }, [previewSource, showConfirmDialog]);
 

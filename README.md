@@ -69,19 +69,19 @@ When updating the public demo, rebuild the app and copy the latest build output 
 ```
 sh deploy_mac.sh
 % ~/bin/butler login
-% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.4.2_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.4.2
+% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.4.4_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.4.4
 
-% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.4.2_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.4.2
+% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.4.4_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.4.4
 
-% ~/bin/butler push "tetorica-retro-player_0.4.2_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.4.2
+% ~/bin/butler push "tetorica-retro-player_0.4.4_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.4.4
 
-% ~/bin/butler push "tetorica-retro-player_0.4.2_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.4.2
-% ~/bin/butler push "tetorica-retro-player_0.4.2_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.4.2
+% ~/bin/butler push "tetorica-retro-player_0.4.4_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.4.4
+% ~/bin/butler push "tetorica-retro-player_0.4.4_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.4.4
 
 ```
 
 ```
 npm run build
 cd dist
-zip -r ../web-build_0.4.2_gh.zip .
+zip -r ../web-build_0.4.4_gh.zip .
 ```

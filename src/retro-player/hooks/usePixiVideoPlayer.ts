@@ -313,6 +313,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     isPlayingRef.current = !mediaRef.current.paused;
     setIsPlaying(!mediaRef.current.paused);
+    if (!mediaRef.current.paused) {
+      finishLoading();
+    }
     setCurrentTime(mediaRef.current.currentTime);
     setDuration(mediaRef.current.duration || 0);
     setPlaybackRate(mediaRef.current.playbackRate || 1);
@@ -559,6 +562,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       syncVideoState();
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
+      finishLoading();
       setNeedsUserPlay(
         error instanceof DOMException && error.name === "NotAllowedError",
       );
