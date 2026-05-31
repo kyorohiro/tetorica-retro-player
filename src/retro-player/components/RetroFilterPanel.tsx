@@ -8,6 +8,7 @@ import {
 
 type RetroFilterPanelProps = {
   colorLevels: number;
+  curvature: number;
   ditherStrength: number;
   isFilterEnabled: boolean;
   monoTint: MonoTintMode;
@@ -23,6 +24,7 @@ type RetroFilterPanelProps = {
   onApplyPreset: (preset: RetroPresetKey) => void;
   onSetIsFilterEnabled: (value: boolean) => void;
   onSetColorLevels: (value: number) => void;
+  onSetCurvature: (value: number) => void;
   onSetDitherStrength: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
@@ -37,6 +39,7 @@ type RetroFilterPanelProps = {
 
 export function RetroFilterPanel({
   colorLevels,
+  curvature,
   ditherStrength,
   isFilterEnabled,
   monoTint,
@@ -52,6 +55,7 @@ export function RetroFilterPanel({
   onApplyPreset,
   onSetIsFilterEnabled,
   onSetColorLevels,
+  onSetCurvature,
   onSetDitherStrength,
   onSetMonoTint,
   onSetPaletteMode,
@@ -232,6 +236,23 @@ export function RetroFilterPanel({
               paletteMode === "color32" ||
               paletteMode === "color64"
             }
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            Curvature: {curvature.toFixed(2)}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="0.2"
+            step="0.01"
+            value={curvature}
+            onChange={(ev) => {
+              onSetCurvature(Number(ev.currentTarget.value));
+            }}
             className="mt-2 w-full"
           />
         </label>

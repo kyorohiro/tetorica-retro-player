@@ -119,6 +119,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
     filter.resources.pixelUniforms.uniforms.uDitherStrength = filterState.ditherStrength;
     filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
+    filter.resources.pixelUniforms.uniforms.uCurvature = filterState.curvature;
     filter.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
     filter.resources.pixelUniforms.uniforms.uScanline2Strength = filterState.scanline2Strength;
     filter.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
@@ -963,6 +964,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             uColorLevels: { value: RETRO_PRESETS.pc98_512.colors, type: "f32" },
             uDitherStrength: { value: RETRO_PRESETS.pc98_512.dither, type: "f32" },
             uPaletteMode: { value: 2, type: "f32" },
+            uCurvature: { value: RETRO_PRESETS.pc98_512.curvature, type: "f32" },
             uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
             uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
             uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
@@ -1006,6 +1008,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     syncSpriteFilter();
   }, [
     filterState.colorLevels,
+    filterState.curvature,
     filterState.ditherStrength,
     filterState.isFilterEnabled,
     filterState.monoTint,

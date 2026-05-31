@@ -18,6 +18,7 @@ export type RetroFilterInitialState = Partial<{
   colorLevels: number;
   ditherStrength: number;
   paletteMode: PaletteMode;
+  curvature: number;
   scanlineStrength: number;
   scanline2Strength: number;
   vignetteStrength: number;
@@ -33,6 +34,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
     paletteMode: initialState.paletteMode ?? DEFAULT_PRESET.palette,
+    curvature: initialState.curvature ?? DEFAULT_PRESET.curvature,
     scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
     scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
@@ -61,6 +63,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   );
   const [paletteMode, rawSetPaletteMode] = useState<PaletteMode>(
     resolvedInitialState.paletteMode ?? DEFAULT_PRESET.palette,
+  );
+  const [curvature, setCurvature] = useState<number>(
+    resolvedInitialState.curvature ?? DEFAULT_PRESET.curvature,
   );
   const [scanlineStrength, setScanlineStrength] = useState<number>(
     resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
@@ -117,6 +122,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setColorLevels(settings.colors);
     setDitherStrength(settings.dither);
     setPaletteMode(settings.palette);
+    setCurvature(settings.curvature);
     setScanlineStrength(settings.scanline);
     setScanline2Strength(settings.scanline2);
     setVignetteStrength(settings.vignette);
@@ -130,6 +136,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setColorLevels(baseInitialState.colorLevels);
     setDitherStrength(baseInitialState.ditherStrength);
     rawSetPaletteMode(baseInitialState.paletteMode);
+    setCurvature(baseInitialState.curvature);
     setScanlineStrength(baseInitialState.scanlineStrength);
     setScanline2Strength(baseInitialState.scanline2Strength);
     setVignetteStrength(baseInitialState.vignetteStrength);
@@ -145,6 +152,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       colorLevels,
       ditherStrength,
       paletteMode,
+      curvature,
       scanlineStrength,
       scanline2Strength,
       vignetteStrength,
@@ -154,6 +162,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     });
   }, [
     colorLevels,
+    curvature,
     ditherStrength,
     isFilterEnabled,
     monoTint,
@@ -172,6 +181,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     colorLevels,
     ditherStrength,
     paletteMode,
+    curvature,
     scanlineStrength,
     scanline2Strength,
     vignetteStrength,
@@ -183,6 +193,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setColorLevels,
     setDitherStrength,
     setPaletteMode,
+    setCurvature,
     setScanlineStrength,
     setScanline2Strength,
     setVignetteStrength,

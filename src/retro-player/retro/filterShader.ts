@@ -39,6 +39,7 @@ uniform vec2 uTargetSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
 uniform float uPaletteMode;
+uniform float uCurvature;
 uniform float uScanlineStrength;
 uniform float uScanline2Strength;
 uniform float uVignetteStrength;
@@ -183,9 +184,25 @@ vec3 monochromePalette(vec3 color, float levels, vec3 tint)
   return mix(vec3(0.0), tint, stepped);
 }
 
+vec2 curveUv(vec2 uv, float strength)
+{
+  vec2 centered = uv * 2.0 - 1.0;
+  vec2 offset = centered.yx * centered.yx;
+
+  centered += centered * offset * strength;
+
+  return centered * 0.5 + 0.5;
+}
+
 void main(void)
 {
-  vec2 cell = floor(vTextureCoord * uTargetSize);
+  vec2 curvedUv = curveUv(vTextureCoord, uCurvature);
+  if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
+    finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  vec2 cell = floor(curvedUv * uTargetSize);
   vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
   pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
 

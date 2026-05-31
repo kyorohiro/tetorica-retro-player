@@ -9,6 +9,7 @@ export type PersistedRetroFilterSettings = {
   colorLevels: number;
   ditherStrength: number;
   paletteMode: PaletteMode;
+  curvature: number;
   scanlineStrength: number;
   scanline2Strength: number;
   vignetteStrength: number;

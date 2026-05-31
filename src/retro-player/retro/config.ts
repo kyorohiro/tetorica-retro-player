@@ -26,6 +26,7 @@ export const RETRO_PRESETS = {
     colors: 8,
     dither: 0.2,
     palette: "free",
+    curvature: 0.0,
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.04,
@@ -39,6 +40,7 @@ export const RETRO_PRESETS = {
     colors: 12,
     dither: 0.28,
     palette: "free",
+    curvature: 0.04,
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.08,
@@ -52,6 +54,7 @@ export const RETRO_PRESETS = {
     colors: 16,
     dither: 0.35,
     palette: "pc98",
+    curvature: 0.02,
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.06,
@@ -65,6 +68,7 @@ export const RETRO_PRESETS = {
     colors: 8,
     dither: 0.12,
     palette: "pc98_512",
+    curvature: 0.03,
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.05,
@@ -78,6 +82,7 @@ export const RETRO_PRESETS = {
     colors: 16,
     dither: 0.08,
     palette: "pc98_4096",
+    curvature: 0.03,
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.05,
@@ -91,6 +96,7 @@ export const RETRO_PRESETS = {
     colors: 32,
     dither: 0.24,
     palette: "color32",
+    curvature: 0.03,
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.05,
@@ -104,6 +110,7 @@ export const RETRO_PRESETS = {
     colors: 64,
     dither: 0.2,
     palette: "color64",
+    curvature: 0.03,
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.04,
@@ -117,6 +124,7 @@ export const RETRO_PRESETS = {
     colors: 4,
     dither: 0.18,
     palette: "mono",
+    curvature: 0.05,
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.08,
@@ -130,6 +138,7 @@ export const RETRO_PRESETS = {
     colors: 16,
     dither: 0.14,
     palette: "mono",
+    curvature: 0.07,
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.1,
@@ -143,6 +152,7 @@ export const RETRO_PRESETS = {
     colors: 16,
     dither: 0.16,
     palette: "mono",
+    curvature: 0.08,
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.11,
@@ -156,6 +166,7 @@ export const RETRO_PRESETS = {
     colors: 16,
     dither: 0.1,
     palette: "mono",
+    curvature: 0.0,
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.03,
@@ -171,6 +182,7 @@ export const RETRO_PRESETS = {
     colors: number;
     dither: number;
     palette: PaletteMode;
+    curvature: number;
     scanline: number;
     scanline2: number;
     vignette: number;

@@ -261,6 +261,7 @@ export function RetroPlayer({
               </div>
               <RetroFilterPanel
                 colorLevels={filterState.colorLevels}
+                curvature={filterState.curvature}
                 ditherStrength={filterState.ditherStrength}
                 isFilterEnabled={filterState.isFilterEnabled}
                 monoTint={filterState.monoTint}
@@ -275,6 +276,7 @@ export function RetroPlayer({
                 vignetteStrength={filterState.vignetteStrength}
                 onApplyPreset={filterState.applyPreset}
                 onSetColorLevels={filterState.setColorLevels}
+                onSetCurvature={filterState.setCurvature}
                 onSetDitherStrength={filterState.setDitherStrength}
                 onSetIsFilterEnabled={filterState.setIsFilterEnabled}
                 onSetMonoTint={filterState.setMonoTint}
