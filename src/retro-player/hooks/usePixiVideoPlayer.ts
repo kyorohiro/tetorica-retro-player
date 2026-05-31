@@ -1107,6 +1107,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       hasMediaSource: Boolean(mediaSourceRef.current),
       mediaTag: mediaRef.current?.tagName ?? null,
     });
+
+    if (
+      (previewKind === "video" || previewKind === "capture") &&
+      mediaRef.current?.tagName === "VIDEO"
+    ) {
+      finishLoading();
+    }
+
     updateAudioNodes();
   }, [
     isMuted,
