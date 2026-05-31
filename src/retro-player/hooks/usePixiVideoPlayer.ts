@@ -135,6 +135,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     filter.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
     filter.resources.pixelUniforms.uniforms.uScanline2Strength = filterState.scanline2Strength;
     filter.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
+    filter.resources.pixelUniforms.uniforms.uGlowStrength = filterState.glowStrength;
     filter.resources.pixelUniforms.uniforms.uPhosphorStrength = filterState.phosphorStrength;
     filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
     filter.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
@@ -1011,6 +1012,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
             uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
             uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
+            uGlowStrength: { value: RETRO_PRESETS.pc98_512.glow, type: "f32" },
             uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },
             uMonoTint: {
               value: new Float32Array(MONO_TINTS.green.rgb),
@@ -1062,6 +1064,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     filterState.targetHeight,
     filterState.targetWidth,
     filterState.vignetteStrength,
+    filterState.glowStrength,
   ]);
 
   useEffect(() => {

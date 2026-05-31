@@ -46,6 +46,7 @@ uniform float uCurvature;
 uniform float uScanlineStrength;
 uniform float uScanline2Strength;
 uniform float uVignetteStrength;
+uniform float uGlowStrength;
 uniform float uPhosphorStrength;
 uniform vec3 uMonoTint;
 uniform float uTime;
@@ -215,6 +216,35 @@ float horizontalUnevenness(vec2 uv, float time)
   return 1.0 - (broad * 0.03 + fine * 0.012);
 }
 
+vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint)
+{
+  if (paletteMode < 0.5) {
+    return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+  }
+
+  if (paletteMode < 1.5) {
+    return nearestPc98(color);
+  }
+
+  if (paletteMode < 2.5) {
+    return quantizePc98_512(color);
+  }
+
+  if (paletteMode < 3.5) {
+    return quantizePc98_4096(color);
+  }
+
+  if (paletteMode < 4.5) {
+    return nearestColor32(color);
+  }
+
+  if (paletteMode < 5.5) {
+    return nearestColor64(color);
+  }
+
+  return monochromePalette(color, max(levels, 2.0), monoTint);
+}
+
 void main(void)
 {
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
@@ -234,30 +264,26 @@ void main(void)
   vec2 chromaOffset = maskCentered * (0.0015 + uCurvature * 0.01) * edgeAmount;
   vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
   vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
+  vec2 texel = 1.0 / uTargetSize;
 
   vec4 color = texture(uTexture, pixelatedUv);
   color.r = texture(uTexture, redUv).r;
   color.b = texture(uTexture, blueUv).b;
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
+  color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint);
 
-  if (uPaletteMode < 0.5) {
-    color.rgb = floor(color.rgb * (uColorLevels - 1.0) + 0.5) / max(uColorLevels - 1.0, 1.0);
-  } else if (uPaletteMode < 1.5) {
-    color.rgb = nearestPc98(color.rgb);
-  } else if (uPaletteMode < 2.5) {
-    color.rgb = quantizePc98_512(color.rgb);
-  } else if (uPaletteMode < 3.5) {
-    color.rgb = quantizePc98_4096(color.rgb);
-  } else if (uPaletteMode < 4.5) {
-    color.rgb = nearestColor32(color.rgb);
-  } else if (uPaletteMode < 5.5) {
-    color.rgb = nearestColor64(color.rgb);
-  }
+  vec3 glow = vec3(0.0);
+  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
+  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
+  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
+  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
+  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
+  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
 
-  if (uPaletteMode > 5.5) {
-    color.rgb = monochromePalette(color.rgb, max(uColorLevels, 2.0), uMonoTint);
-  }
+  float brightness = max(max(color.r, color.g), color.b);
+  float glowMask = smoothstep(0.45, 1.0, brightness);
+  color.rgb += glow * glowMask * uGlowStrength;
 
   float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
   color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);

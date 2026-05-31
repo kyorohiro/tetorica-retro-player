@@ -13,6 +13,7 @@ export type PersistedRetroFilterSettings = {
   scanlineStrength: number;
   scanline2Strength: number;
   vignetteStrength: number;
+  glowStrength: number;
   phosphorStrength: number;
   monoTint: MonoTintMode;
   isFilterEnabled: boolean;

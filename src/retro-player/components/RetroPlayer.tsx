@@ -276,6 +276,7 @@ export function RetroPlayer({
                 colorLevels={filterState.colorLevels}
                 curvature={filterState.curvature}
                 ditherStrength={filterState.ditherStrength}
+                glowStrength={filterState.glowStrength}
                 isFilterEnabled={filterState.isFilterEnabled}
                 monoTint={filterState.monoTint}
                 paletteMode={filterState.paletteMode}
@@ -291,6 +292,7 @@ export function RetroPlayer({
                 onSetColorLevels={filterState.setColorLevels}
                 onSetCurvature={filterState.setCurvature}
                 onSetDitherStrength={filterState.setDitherStrength}
+                onSetGlowStrength={filterState.setGlowStrength}
                 onSetIsFilterEnabled={filterState.setIsFilterEnabled}
                 onSetMonoTint={filterState.setMonoTint}
                 onSetPaletteMode={filterState.setPaletteMode}

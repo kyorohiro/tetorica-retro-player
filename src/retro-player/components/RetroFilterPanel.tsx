@@ -10,6 +10,7 @@ type RetroFilterPanelProps = {
   colorLevels: number;
   curvature: number;
   ditherStrength: number;
+  glowStrength: number;
   isFilterEnabled: boolean;
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
@@ -26,6 +27,7 @@ type RetroFilterPanelProps = {
   onSetColorLevels: (value: number) => void;
   onSetCurvature: (value: number) => void;
   onSetDitherStrength: (value: number) => void;
+  onSetGlowStrength: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
@@ -41,6 +43,7 @@ export function RetroFilterPanel({
   colorLevels,
   curvature,
   ditherStrength,
+  glowStrength,
   isFilterEnabled,
   monoTint,
   paletteMode,
@@ -57,6 +60,7 @@ export function RetroFilterPanel({
   onSetColorLevels,
   onSetCurvature,
   onSetDitherStrength,
+  onSetGlowStrength,
   onSetMonoTint,
   onSetPaletteMode,
   onSetPhosphorStrength,
@@ -320,6 +324,23 @@ export function RetroFilterPanel({
             value={vignetteStrength}
             onChange={(ev) => {
               onSetVignetteStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            Glow: {glowStrength.toFixed(2)}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="0.2"
+            step="0.01"
+            value={glowStrength}
+            onChange={(ev) => {
+              onSetGlowStrength(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />

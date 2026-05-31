@@ -22,6 +22,7 @@ export type RetroFilterInitialState = Partial<{
   scanlineStrength: number;
   scanline2Strength: number;
   vignetteStrength: number;
+  glowStrength: number;
   phosphorStrength: number;
   monoTint: MonoTintMode;
   isFilterEnabled: boolean;
@@ -38,6 +39,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
     scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
+    glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     isFilterEnabled: initialState.isFilterEnabled ?? true,
@@ -75,6 +77,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   );
   const [vignetteStrength, setVignetteStrength] = useState<number>(
     resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
+  );
+  const [glowStrength, setGlowStrength] = useState<number>(
+    resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
   );
   const [phosphorStrength, setPhosphorStrength] = useState<number>(
     resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
@@ -126,6 +131,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineStrength(settings.scanline);
     setScanline2Strength(settings.scanline2);
     setVignetteStrength(settings.vignette);
+    setGlowStrength(settings.glow);
     setPhosphorStrength(settings.phosphor);
     setMonoTint(settings.monoTint);
   };
@@ -140,6 +146,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineStrength(baseInitialState.scanlineStrength);
     setScanline2Strength(baseInitialState.scanline2Strength);
     setVignetteStrength(baseInitialState.vignetteStrength);
+    setGlowStrength(baseInitialState.glowStrength);
     setPhosphorStrength(baseInitialState.phosphorStrength);
     setMonoTint(baseInitialState.monoTint);
     setIsFilterEnabled(baseInitialState.isFilterEnabled);
@@ -156,6 +163,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       scanlineStrength,
       scanline2Strength,
       vignetteStrength,
+      glowStrength,
       phosphorStrength,
       monoTint,
       isFilterEnabled,
@@ -173,6 +181,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     targetHeight,
     targetWidth,
     vignetteStrength,
+    glowStrength,
   ]);
 
   return {
@@ -185,6 +194,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     scanlineStrength,
     scanline2Strength,
     vignetteStrength,
+    glowStrength,
     phosphorStrength,
     monoTint,
     isFilterEnabled,
@@ -197,6 +207,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineStrength,
     setScanline2Strength,
     setVignetteStrength,
+    setGlowStrength,
     setPhosphorStrength,
     setMonoTint,
     setIsFilterEnabled,

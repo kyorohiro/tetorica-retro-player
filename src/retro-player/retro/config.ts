@@ -30,6 +30,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.04,
+    glow: 0.03,
     phosphor: 0.03,
     monoTint: "gray",
   },
@@ -44,6 +45,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.08,
+    glow: 0.06,
     phosphor: 0.05,
     monoTint: "gray",
   },
@@ -58,6 +60,7 @@ export const RETRO_PRESETS = {
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.06,
+    glow: 0.05,
     phosphor: 0.04,
     monoTint: "gray",
   },
@@ -72,6 +75,7 @@ export const RETRO_PRESETS = {
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.05,
+    glow: 0.06,
     phosphor: 0.03,
     monoTint: "gray",
   },
@@ -86,6 +90,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.05,
+    glow: 0.05,
     phosphor: 0.03,
     monoTint: "gray",
   },
@@ -100,6 +105,7 @@ export const RETRO_PRESETS = {
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.05,
+    glow: 0.04,
     phosphor: 0.03,
     monoTint: "gray",
   },
@@ -114,6 +120,7 @@ export const RETRO_PRESETS = {
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.04,
+    glow: 0.03,
     phosphor: 0.03,
     monoTint: "gray",
   },
@@ -128,6 +135,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.08,
+    glow: 0.07,
     phosphor: 0.02,
     monoTint: "gray",
   },
@@ -142,6 +150,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.1,
+    glow: 0.09,
     phosphor: 0.06,
     monoTint: "green",
   },
@@ -156,6 +165,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.02,
     vignette: 0.11,
+    glow: 0.10,
     phosphor: 0.05,
     monoTint: "amber",
   },
@@ -170,6 +180,7 @@ export const RETRO_PRESETS = {
     scanline: 0.00,
     scanline2: 0.02,
     vignette: 0.03,
+    glow: 0.01,
     phosphor: 0.01,
     monoTint: "ice",
   },
@@ -186,6 +197,7 @@ export const RETRO_PRESETS = {
     scanline: number;
     scanline2: number;
     vignette: number;
+    glow: number;
     phosphor: number;
     monoTint: MonoTintMode;
   }
