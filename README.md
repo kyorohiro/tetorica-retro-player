@@ -6,8 +6,12 @@ The app uses a Pixi.js shader pipeline to push local media through palette reduc
 
 ## Demo
 
-- GitHub Pages landing page: `https://kyorohiro.github.io/tetorica-retro-player/`
-- Demo app: `https://kyorohiro.github.io/tetorica-retro-player/demo/`
+- GitHub Pages landing page: `
+https://kyorohiro.github.io/tetorica-retro-player/
+
+- Demo app: 
+https://kyorohiro.github.io/tetorica-retro-player/demo/
+
 
 ## Features
 
