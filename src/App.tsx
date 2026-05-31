@@ -28,7 +28,9 @@ function App() {
       cancelText: "Cancel",
     });
 
+    console.log(">confirmed: ", confirmed);
     if (confirmed) {
+      console.log(">confirmed: move");
       window.location.href = "https://kyorohiro.github.io/tetorica-retro-player/demo/";
       return;
     }
