@@ -63,6 +63,12 @@ When updating the public demo, rebuild the app and copy the latest build output 
 - Screen capture availability depends on browser support and permission prompts.
 - The GitHub Pages demo is best experienced on a desktop Chromium-based browser.
 
+## License
+
+This project is licensed under the MIT License.
+
+Third-party libraries and bundled dependencies remain under their respective licenses.
+
 
 ## Release Memo
 
