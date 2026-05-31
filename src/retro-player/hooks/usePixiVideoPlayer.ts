@@ -577,15 +577,17 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
       finishLoading();
-      setNeedsUserPlay(
-        error instanceof DOMException && error.name === "NotAllowedError",
-      );
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
+        setNeedsUserPlay(true);
+        setPreviewError("");
+        return;
+      }
+
+      setNeedsUserPlay(false);
       setPreviewError(
-        error instanceof DOMException && error.name === "NotAllowedError"
-          ? "音付き再生は自動開始できませんでした。下の Play ボタンを押してください。"
-          : error instanceof Error
-            ? error.message
-            : "音声付き再生を開始できませんでした。",
+        error instanceof Error
+          ? error.message
+          : "音声付き再生を開始できませんでした。",
       );
     }
   };
@@ -1111,11 +1113,16 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       mediaTag: mediaRef.current?.tagName ?? null,
     });
 
-    if (
+    const isVideoReady =
       (previewKind === "video" || previewKind === "capture") &&
-      mediaRef.current?.tagName === "VIDEO"
-    ) {
+      mediaRef.current?.tagName === "VIDEO";
+
+    if (isVideoReady) {
       finishLoading();
+    }
+
+    if (isVideoReady && !isPlaying && audioContextRef.current?.state === "suspended") {
+      setNeedsUserPlay(true);
     }
 
     updateAudioNodes();
