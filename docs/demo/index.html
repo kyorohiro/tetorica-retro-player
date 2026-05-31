@@ -7,11 +7,14 @@
     <title>Tetorica Retro Player</title>
      <link rel="manifest" href="./manifest.webmanifest">
     <script>
-      if ("serviceWorker" in navigator) {
+      const isLoopbackHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+      //const isSecureRemoteHost = window.location.protocol === "https:" && !/\.local$/i.test(window.location.hostname);
+
+      if ("serviceWorker" in navigator && (isLoopbackHost)){//} || isSecureRemoteHost)) {
         navigator.serviceWorker.register("./sw.js");
       }
     </script>
-    <script type="module" crossorigin src="./assets/index-BEDehbe1.js"></script>
+    <script type="module" crossorigin src="./assets/index-BxYu7VLw.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DOA-ucQi.css">
   </head>
 

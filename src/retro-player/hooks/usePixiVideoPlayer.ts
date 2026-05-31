@@ -283,6 +283,19 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     sprite.y = (screenHeight - sprite.height) / 2;
   };
 
+  const createVideoTexture = (video: HTMLVideoElement) => {
+    const source = new VideoSource({
+      resource: video,
+      autoPlay: false,
+    });
+    const texture = new Texture({ source });
+
+    source.resource.autoplay = false;
+    source.update();
+
+    return texture;
+  };
+
   const fitCurrentSprite = () => {
     if (spriteRef.current && previewElementRef.current) {
       fitSprite(appRef.current, spriteRef.current, previewElementRef.current);
@@ -744,7 +757,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         }
 
         if (media instanceof HTMLVideoElement) {
-          const texture = Texture.from(media);
+          const texture = createVideoTexture(media);
           texture.source.update();
           texture.source.scaleMode = "nearest";
 
@@ -852,7 +865,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       throw new Error("Pixi filter is not ready.");
     }
 
-    const texture = Texture.from(video);
+    const texture = createVideoTexture(video);
     texture.source.update();
     texture.source.scaleMode = "nearest";
 
@@ -910,7 +923,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       video.volume = isMutedRef.current ? 0 : volumeRef.current;
       video.playbackRate = playbackRateRef.current;
       video.playsInline = true;
-      video.autoplay = true;
+      video.autoplay = false;
       video.addEventListener("play", syncVideoState);
       video.addEventListener("pause", syncVideoState);
       video.addEventListener("volumechange", syncVideoState);
@@ -1366,7 +1379,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             return;
           }
 
-          const texture = Texture.from(media as HTMLVideoElement);
+          const texture = createVideoTexture(media as HTMLVideoElement);
           texture.source.update();
           texture.source.scaleMode = "nearest";
 
