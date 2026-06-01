@@ -1078,11 +1078,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       cleanupForPageLeave();
     };
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        cleanupForPageLeave();
-      }
-    };
+    //const handleVisibilityChange = () => {
+    //  if (document.hidden) {
+    //    cleanupForPageLeave();
+    //  }
+    //};
 
     //window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("beforeunload", handlePageHide);
