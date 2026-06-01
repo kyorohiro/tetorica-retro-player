@@ -3,15 +3,74 @@ import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useDialog } from "./useDialog";
+import { FileTargetFile } from "./web/api";
+import { useBrowserFileListDialog } from "./web/useBrowserFileListDialog";
+import {
+  getDroppedFiles,
+  isAudio,
+  isImage,
+  isVideo,
+  type FileWithRelativePath,
+} from "./utils";
 
 function App() {
   const defaultPreviewSrc = "./test_colorbars.png";
   const defaultPreviewKind = "image";
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const { showConfirmDialog } = useDialog();
+  const { showBrowserFileListDialog } = useBrowserFileListDialog();
+
+  const filesToTargets = useCallback((files: FileList | File[]) => {
+    const targets: FileTargetFile[] = [];
+
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index] as FileWithRelativePath;
+
+      targets.push({
+        id: "",
+        entry: file,
+        isDir: false,
+        isFile: true,
+        path: file.webkitRelativePath || file.name,
+        createdAt: 0,
+        modifiedAt: file.lastModified ?? 0,
+        size: file.size ?? 0,
+        isRoot: true,
+      });
+    }
+
+    return targets;
+  }, []);
+
+  const isDirectRetroFile = useCallback((file: File) => {
+    return isImage(file.name) || isVideo(file.name) || isAudio(file.name);
+  }, []);
+
+  const openPortableTargets = useCallback(async (files: FileList | File[]) => {
+    const targets = filesToTargets(files);
+    if (targets.length === 0) return;
+
+    await showBrowserFileListDialog({
+      files: targets,
+      initialPath: "/",
+      title: "",
+    });
+  }, [filesToTargets, showBrowserFileListDialog]);
+
+  const openFiles = useCallback(async (files: FileList | File[]) => {
+    if (files.length === 0) return;
+
+    if (files.length === 1 && isDirectRetroFile(files[0])) {
+      previewSource.previewFile(files[0]);
+      return;
+    }
+
+    await openPortableTargets(files);
+  }, [isDirectRetroFile, openPortableTargets, previewSource]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -50,12 +109,18 @@ function App() {
     }
   }, [previewSource, showConfirmDialog]);
 
-  const onDrop = (event: React.DragEvent<HTMLElement>) => {
+  const onDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
-    const files = event.dataTransfer.files;
-    if (files.length > 0) {
-      previewSource.previewFile(files[0]);
+    const droppedFiles = await getDroppedFiles(event);
+    const uniqueMap = new Map<string, FileWithRelativePath>();
+
+    for (const file of droppedFiles) {
+      const key = file.webkitRelativePath || file.name;
+      uniqueMap.set(key, file);
     }
+
+    const targets = Array.from(uniqueMap.values());
+    await openFiles(targets);
   };
   const onDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -75,7 +140,7 @@ function App() {
         </header>
         <div className="mb-4">
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <button
               type="button"
               onClick={() => {
@@ -84,6 +149,15 @@ function App() {
               className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-5 text-center text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white"
             >
               Drop image/video/audio here, or click to add file
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                folderInputRef.current?.click();
+              }}
+              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-5 text-center text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white"
+            >
+              Drop folders/archives here, or click to add folders
             </button>
             <button
               type="button"
@@ -122,12 +196,29 @@ function App() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*,audio/*"
+          accept="image/*,video/*,audio/*,.zip,.cbz,.rar,.cbr,.pdf,.epub,.txt,.md"
+          multiple
           className="hidden"
-          onChange={(event) => {
+          onChange={async (event) => {
             const files = event.currentTarget.files;
             if (files && files.length > 0) {
-              previewSource.previewFile(files[0]);
+              await openFiles(files);
+            }
+
+            event.currentTarget.value = "";
+          }}
+        />
+
+        <input
+          ref={folderInputRef}
+          type="file"
+          multiple
+          {...({ webkitdirectory: "true" } as any)}
+          className="hidden"
+          onChange={async (event) => {
+            const files = event.currentTarget.files;
+            if (files && files.length > 0) {
+              await openPortableTargets(files);
             }
 
             event.currentTarget.value = "";
