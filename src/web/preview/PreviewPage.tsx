@@ -153,17 +153,19 @@ export function PreviewPage({
 
     if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
         return (
-            <RetroPlayer
-                src={src}
-                kind={
-                    isVideo(file.path)
-                        ? "video"
-                        : isAudio(file.path)
-                            ? "audio"
-                            : "image"
-                }
-                className="h-full w-full border-0 bg-transparent p-0 shadow-none"
-            />
+            <div className="mx-auto w-full max-w-6xl">
+                <RetroPlayer
+                    src={src}
+                    kind={
+                        isVideo(file.path)
+                            ? "video"
+                            : isAudio(file.path)
+                                ? "audio"
+                                : "image"
+                    }
+                    className="border-0 bg-transparent p-0 shadow-none"
+                />
+            </div>
         );
     }
 

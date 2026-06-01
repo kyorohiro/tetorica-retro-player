@@ -204,7 +204,12 @@ function PreviewDialog({
             </div>
 
             <div
-                className="flex min-h-0 flex-1 items-center justify-center bg-black"
+                className={[
+                    "min-h-0 flex-1 bg-black",
+                    isRetro
+                        ? "overflow-y-auto p-4"
+                        : "flex items-center justify-center",
+                ].join(" ")}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
