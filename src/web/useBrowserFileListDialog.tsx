@@ -317,6 +317,7 @@ function BrowserFileListDialog({
                         await showPreviewDialog({
                           files: sortedFiles,
                           initialIndex: index,
+                          isRetro: true,
                           apiServer: ".",
                           getObjectUrl,
                           download,

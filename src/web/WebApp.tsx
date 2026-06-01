@@ -64,6 +64,7 @@ function WebApp({ active }: { active?: boolean }) {
         showPreviewDialog({
             files: targets,
             initialIndex: 0,
+            isRetro: true,
             apiServer,
             getObjectUrl: async (file: TargetFile): Promise<string> => {
                 return URL.createObjectURL((file as FileTargetFile).entry!);
@@ -154,6 +155,7 @@ function WebApp({ active }: { active?: boolean }) {
                                                             await showPreviewDialog({
                                                                 files: [{ ...file, createdAt: 0, modifiedAt: 0, size: 0, isRoot: true }],
                                                                 initialIndex: 0,
+                                                                isRetro: true,
                                                                 apiServer,
                                                             });
                                                             return false;

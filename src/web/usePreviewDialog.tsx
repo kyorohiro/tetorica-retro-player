@@ -7,6 +7,7 @@ import { preivewGlobalSetting } from "./preview/preivewSetting";
 type PreviewDialogOptions = {
     files: TargetFile[];
     initialIndex: number;
+    isRetro?: boolean;
     apiServer?: string;
     coverSrc?: string;
     getObjectUrl?: (
@@ -57,6 +58,7 @@ export function usePreviewDialog() {
 function PreviewDialog({
     files,
     initialIndex,
+    isRetro = false,
     apiServer = "",
     coverSrc,
     getObjectUrl,
@@ -209,6 +211,7 @@ function PreviewDialog({
                 <PreviewPage
                     key={`${file.id}:${file.path}`}
                     file={file}
+                    isRetro={isRetro}
                     apiServer={apiServer}
                     getObjectUrl={getObjectUrl}
                     onLoadingMessage={setLoadingMessage}

@@ -332,6 +332,7 @@ function ZipFileListDialog({
                                                     await showPreviewDialog({
                                                         files: previewFiles,
                                                         initialIndex: previewIndex,
+                                                        isRetro: true,
                                                         apiServer: "",
                                                         getObjectUrl: async (target, onProgress) => {
                                                             const entryBlob = await readArchiveFile(

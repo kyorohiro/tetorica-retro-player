@@ -227,6 +227,7 @@ function FileListDialog({
                                                 await showPreviewDialog({
                                                     files: sortedFiles,
                                                     initialIndex: index,
+                                                    isRetro: true,
                                                     apiServer,
                                                 });
                                             } else {

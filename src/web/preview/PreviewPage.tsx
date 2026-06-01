@@ -1,5 +1,6 @@
 import React from "react";
 import { ReactReader } from "react-reader";
+import RetroPlayer from "../../retro-player/components/RetroPlayer";
 import type { TargetFile } from "../api";
 import {
     heicToObjectUrl,
@@ -20,6 +21,7 @@ type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
 
 export type PreviewPageProps = {
     file: TargetFile;
+    isRetro?: boolean;
     apiServer?: string;
     coverSrc?: string;
     getObjectUrl?: (
@@ -31,6 +33,7 @@ export type PreviewPageProps = {
 
 export function PreviewPage({
     file,
+    isRetro = false,
     apiServer = "",
     getObjectUrl,
     onLoadingMessage,
@@ -145,6 +148,22 @@ export function PreviewPage({
                     {error}
                 </div>
             </div>
+        );
+    }
+
+    if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+        return (
+            <RetroPlayer
+                src={src}
+                kind={
+                    isVideo(file.path)
+                        ? "video"
+                        : isAudio(file.path)
+                            ? "audio"
+                            : "image"
+                }
+                className="h-full w-full border-0 bg-transparent p-0 shadow-none"
+            />
         );
     }
 
