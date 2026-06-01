@@ -721,6 +721,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     setIsLooping(mediaRef.current.loop);
   };
 
+  const setLoopingEnabled = (nextLooping: boolean) => {
+    isLoopingRef.current = nextLooping;
+    setIsLooping(nextLooping);
+
+    if (mediaRef.current) {
+      mediaRef.current.loop = nextLooping;
+    }
+  };
+
   const resetAudioSettings = () => {
     const nextSettings = { ...DEFAULT_AUDIO_SETTINGS };
 
@@ -1600,6 +1609,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     changePlaybackRate,
     changeVolume,
     toggleLoop,
+    setLoopingEnabled,
     resetAudioSettings,
     playVideoWithAudio,
     refreshLayout,

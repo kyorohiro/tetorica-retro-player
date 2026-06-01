@@ -5,9 +5,11 @@ import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceStat
 import { useDialog } from "./useDialog";
 
 function App() {
-  const defaultPreviewSrc = "./test_colorbars.png";
+  const defaultPreviewSrc = "./test_colorbars.mp4";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
+  const isUsingDefaultPreview =
+    !previewSource.previewSrc && !previewSource.previewStream;
   const { showConfirmDialog } = useDialog();
 
   const handleDisplayCapture = useCallback(async () => {
@@ -112,20 +114,9 @@ function App() {
           src={previewSource.previewSrc ?? defaultPreviewSrc}
           stream={previewSource.previewStream}
           streamName={previewSource.previewLabel}
-          kind={previewSource.previewKind ?? "image"}
+          kind={previewSource.previewKind ?? "video"}
+          looping={!isUsingDefaultPreview}
         />
-
-        <div className="mt-3 rounded-xl border border-slate-300 bg-white/70 px-4 py-3 text-xs text-slate-600">
-          <p>
-            debug src: <span className="font-mono">{previewSource.previewSrc ?? defaultPreviewSrc}</span>
-          </p>
-          <p>
-            debug kind: <span className="font-mono">{previewSource.previewKind ?? "image"}</span>
-          </p>
-          <p>
-            debug label: <span className="font-mono">{previewSource.previewLabel || "(empty)"}</span>
-          </p>
-        </div>
 
         <input
           ref={fileInputRef}

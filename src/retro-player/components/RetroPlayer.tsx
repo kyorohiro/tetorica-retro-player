@@ -14,6 +14,7 @@ type RetroPlayerProps = {
   stream?: MediaStream | null;
   streamName?: string;
   kind?: "video" | "image" | "audio";
+  looping?: boolean;
   className?: string;
   onError?: (error: Error) => void;
   initialFilterState?: RetroFilterInitialState;
@@ -24,6 +25,7 @@ export function RetroPlayer({
   stream,
   streamName,
   kind = "video",
+  looping,
   className,
   onError,
   initialFilterState,
@@ -148,6 +150,12 @@ export function RetroPlayer({
       window.clearTimeout(timeoutId);
     };
   }, [isPreviewMaximized]);
+
+  React.useEffect(() => {
+    if (typeof looping !== "boolean") return;
+
+    player.setLoopingEnabled(looping);
+  }, [looping, player]);
 
   return (
     <section
