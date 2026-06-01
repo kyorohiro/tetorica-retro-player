@@ -1,5 +1,5 @@
 import React from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Power } from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
@@ -193,6 +193,16 @@ export function RetroPlayer({
             }`}
           >
             <div ref={player.canvasHostRef} className="h-full w-full" />
+            {!player.isPoweredOn && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/72">
+                <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
+                  <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
+                    Power Off
+                  </p>
+                  <p className="mt-2">Press power to wake the screen.</p>
+                </div>
+              </div>
+            )}
             {player.isLoading && !player.needsUserPlay && !player.previewError && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72">
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
@@ -241,6 +251,26 @@ export function RetroPlayer({
         <div className="relative rounded-2xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
           <div className="absolute top-0.5 right-0.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (player.isPoweredOn) {
+                    player.powerOff();
+                    return;
+                  }
+
+                  player.powerOn();
+                }}
+                className={[
+                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
+                  player.isPoweredOn
+                    ? "border-amber-500/40 bg-amber-500/10 text-slate-100 hover:bg-amber-500/20"
+                    : "border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800",
+                ].join(" ")}
+              >
+                <Power size={16} />
+                {player.isPoweredOn ? "Power Off" : "Power On"}
+              </button>
               <button
                 type="button"
                 onClick={() => {

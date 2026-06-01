@@ -77,6 +77,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
   const [isRendererReady, setIsRendererReady] = useState<boolean>(false);
+  const [isPoweredOn, setIsPoweredOn] = useState<boolean>(true);
   const [loadingLabel, setLoadingLabel] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
@@ -122,6 +123,31 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const finishLoading = () => {
     setIsLoading(false);
     setLoadingLabel("");
+  };
+
+  const powerOn = () => {
+    setIsPoweredOn(true);
+    appRef.current?.ticker.start();
+  };
+
+  const powerOff = () => {
+    if (mediaRef.current) {
+      mediaRef.current.pause();
+    }
+
+    if (noiseGainRef.current) {
+      noiseGainRef.current.gain.value = 0;
+    }
+
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.value = 0;
+    }
+
+    finishLoading();
+    setNeedsUserPlay(false);
+    setIsPoweredOn(false);
+    appRef.current?.ticker.stop();
+    syncVideoState();
   };
 
   const applyFilterStateTo = (filter: Filter | null) => {
@@ -649,6 +675,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const togglePlayback = async () => {
+    if (!isPoweredOn) return;
     if (!mediaRef.current) return;
 
     if (mediaRef.current.paused) {
@@ -770,6 +797,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       setPreviewError("動画、音声、または画像ファイルを選んでください。");
       return;
     }
+
+    powerOn();
 
     if (!appRef.current || !filterRef.current) {
       setPreviewError("Pixi の初期化がまだ終わっていません。");
@@ -957,6 +986,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const startDisplayCapture = async () => {
+    powerOn();
+
     if (!navigator.mediaDevices?.getDisplayMedia) {
       setPreviewError("このブラウザでは画面キャプチャーに対応していません。");
       return;
@@ -1104,6 +1135,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       appRef.current = app;
       filterRef.current = filter;
       setIsRendererReady(true);
+      if (!isPoweredOn) {
+        app.ticker.stop();
+      }
       applyFilterState();
       refreshLayout();
     };
@@ -1351,6 +1385,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       let requestId = 0;
 
       try {
+        powerOn();
         cleanupPreview();
         requestId = previewRequestIdRef.current;
 
@@ -1450,6 +1485,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       let requestId = 0;
 
       try {
+        powerOn();
         cleanupPreview();
         requestId = previewRequestIdRef.current;
 
@@ -1619,6 +1655,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     setLoopingEnabled,
     resetAudioSettings,
     playVideoWithAudio,
+    isPoweredOn,
+    powerOn,
+    powerOff,
     refreshLayout,
     toggleAudioFx: () => {
       setIsAudioFxEnabled((current) => !current);
