@@ -21,6 +21,11 @@ function App() {
   const previewSource = usePreviewSourceState();
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
+  const retroPlayerKey = previewSource.previewStream
+    ? `stream:${previewSource.previewStream.id}:${previewSource.previewLabel ?? ""}`
+    : previewSource.previewSrc
+      ? `src:${previewSource.previewSrc}:${previewSource.previewKind ?? "unknown"}`
+      : `default:${defaultPreviewSrc}:${defaultPreviewKind}`;
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
 
@@ -186,6 +191,7 @@ function App() {
         </div>
 
         <RetroPlayer
+          key={retroPlayerKey}
           src={previewSource.previewSrc ?? defaultPreviewSrc}
           stream={previewSource.previewStream}
           streamName={previewSource.previewLabel}
@@ -200,12 +206,13 @@ function App() {
           multiple
           className="hidden"
           onChange={async (event) => {
-            const files = event.currentTarget.files;
+            const input = event.currentTarget;
+            const files = input.files;
             if (files && files.length > 0) {
               await openFiles(files);
             }
 
-            event.currentTarget.value = "";
+            input.value = "";
           }}
         />
 
@@ -216,12 +223,13 @@ function App() {
           {...({ webkitdirectory: "true" } as any)}
           className="hidden"
           onChange={async (event) => {
-            const files = event.currentTarget.files;
+            const input = event.currentTarget;
+            const files = input.files;
             if (files && files.length > 0) {
               await openPortableTargets(files);
             }
 
-            event.currentTarget.value = "";
+            input.value = "";
           }}
         />
       </div>

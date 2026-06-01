@@ -23,7 +23,10 @@ const DEFAULT_AUDIO_SETTINGS = {
   noiseLevel: 0.02,
 } as const;
 
+let retroPlayerInstanceSeed = 0;
+
 export function usePixiVideoPlayer(filterState: RetroFilterState) {
+  const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
 
@@ -105,7 +108,17 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
-    console.log(`[retro-player audio] ${label}`, payload ?? {});
+    console.log(
+      `[retro-player audio][${instanceLabelRef.current}] ${label}`,
+      payload ?? {},
+    );
+  };
+
+  const debugVideo = (label: string, payload?: Record<string, unknown>) => {
+    console.log(
+      `[retro-player video][${instanceLabelRef.current}] ${label}`,
+      payload ?? {},
+    );
   };
 
   const setPreviewKindState = (
@@ -171,6 +184,55 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const applyFilterState = () => {
     applyFilterStateTo(filterRef.current);
+  };
+
+  const createRetroFilter = () => {
+    const filter = Filter.from({
+      gl: {
+        vertex: FILTER_VERTEX,
+        fragment: FILTER_FRAGMENT,
+      },
+      resources: {
+        pixelUniforms: {
+          uTargetSize: {
+            value: new Float32Array([
+              RETRO_PRESETS.pc98_512.width,
+              RETRO_PRESETS.pc98_512.height,
+            ]),
+            type: "vec2<f32>",
+          },
+          uColorLevels: { value: RETRO_PRESETS.pc98_512.colors, type: "f32" },
+          uDitherStrength: { value: RETRO_PRESETS.pc98_512.dither, type: "f32" },
+          uPaletteMode: { value: 2, type: "f32" },
+          uCurvature: { value: RETRO_PRESETS.pc98_512.curvature, type: "f32" },
+          uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
+          uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
+          uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
+          uGlowStrength: { value: RETRO_PRESETS.pc98_512.glow, type: "f32" },
+          uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },
+          uMonoTint: {
+            value: new Float32Array(MONO_TINTS.green.rgb),
+            type: "vec3<f32>",
+          },
+          uTime: { value: 0, type: "f32" },
+        },
+      },
+    });
+
+    applyFilterStateTo(filter);
+
+    return filter;
+  };
+
+  const resetFilterInstance = () => {
+    const previousFilter = filterRef.current;
+    const nextFilter = createRetroFilter();
+
+    filterRef.current = nextFilter;
+    syncSpriteFilter();
+    previousFilter?.destroy();
+
+    return nextFilter;
   };
 
   const syncSpriteFilter = () => {
@@ -337,6 +399,16 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const integerScale = Math.max(1, Math.floor(scale));
     const appliedScale = scale >= 1 ? integerScale : scale;
 
+    debugVideo("fitSprite", {
+      sourceTag: source.tagName,
+      sourceWidth,
+      sourceHeight,
+      screenWidth,
+      screenHeight,
+      scale,
+      appliedScale,
+    });
+
     sprite.width = sourceWidth * appliedScale;
     sprite.height = sourceHeight * appliedScale;
     sprite.x = (screenWidth - sprite.width) / 2;
@@ -370,12 +442,63 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     const nextWidth = Math.max(1, Math.round(host.clientWidth));
     const nextHeight = Math.max(1, Math.round(host.clientHeight));
 
+    debugVideo("refreshLayout", {
+      hostWidth: host.clientWidth,
+      hostHeight: host.clientHeight,
+      nextWidth,
+      nextHeight,
+      previewKind: previewKindRef.current,
+      hasSprite: Boolean(spriteRef.current),
+      hasPreviewElement: Boolean(previewElementRef.current),
+      isPoweredOn,
+    });
+
     app.renderer.resize(nextWidth, nextHeight);
     fitCurrentSprite();
+    app.render();
+  };
+
+  const scheduleRefreshLayout = () => {
+    if (typeof window === "undefined") {
+      refreshLayout();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      refreshLayout();
+      window.requestAnimationFrame(() => {
+        refreshLayout();
+      });
+    });
+
+    window.setTimeout(() => {
+      refreshLayout();
+    }, 120);
+  };
+
+  const safeRender = () => {
+    const app = appRef.current;
+
+    if (!app) return;
+    if (!canvasHostRef.current?.isConnected) return;
+    if (!app.canvas?.isConnected) return;
+
+    try {
+      app.render();
+    } catch (error) {
+      debugVideo("safeRender:skipped", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   const syncVideoState = () => {
     if (!mediaRef.current) {
+      debugVideo("syncVideoState:no-media", {
+        previewKind: previewKindRef.current,
+        hasSprite: Boolean(spriteRef.current),
+        hasPreviewElement: Boolean(previewElementRef.current),
+      });
       isPlayingRef.current = false;
       setIsPlaying(false);
       setCurrentTime(0);
@@ -385,6 +508,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
 
     isPlayingRef.current = !mediaRef.current.paused;
+    debugVideo("syncVideoState", {
+      previewKind: previewKindRef.current,
+      paused: mediaRef.current.paused,
+      currentTime: mediaRef.current.currentTime,
+      duration: mediaRef.current.duration || 0,
+      readyState: mediaRef.current.readyState,
+      hasSprite: Boolean(spriteRef.current),
+      hasPreviewElement: Boolean(previewElementRef.current),
+    });
     setIsPlaying(!mediaRef.current.paused);
     if (!mediaRef.current.paused) {
       finishLoading();
@@ -575,32 +707,41 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   };
 
   const cleanupPreview = () => {
+    debugVideo("cleanupPreview:start", {
+      previewKind: previewKindRef.current,
+      hasSprite: Boolean(spriteRef.current),
+      hasTexture: Boolean(textureRef.current),
+      hasMedia: Boolean(mediaRef.current),
+      hasPreviewElement: Boolean(previewElementRef.current),
+    });
     previewRequestIdRef.current += 1;
     finishLoading();
-    appRef.current?.stage.removeChildren();
-    spriteRef.current?.destroy();
-    spriteRef.current = null;
-
+    const app = appRef.current;
+    const currentSprite = spriteRef.current;
     const currentTexture = textureRef.current;
+    const currentMedia = mediaRef.current;
+    const currentStream = streamRef.current;
+    const shouldStopCurrentStream = streamOwnedRef.current;
+
+    if (currentSprite) {
+      // Detach the filter before disposing its source texture to avoid
+      // Pixi touching a destroyed bind resource during resize / re-render.
+      currentSprite.filters = [];
+      app?.stage.removeChild(currentSprite);
+    }
+
+    spriteRef.current = null;
+    textureRef.current = null;
+    mediaRef.current = null;
+    previewElementRef.current = null;
+    streamRef.current = null;
+    streamOwnedRef.current = false;
 
     if (currentTexture?.source instanceof VideoSource) {
       currentTexture.source.autoUpdate = false;
     }
-
-    currentTexture?.destroy(true);
-    textureRef.current = null;
-    if (mediaRef.current) {
-      releaseDetachedMedia(mediaRef.current, undefined, streamOwnedRef.current);
-    }
     mediaSourceRef.current?.disconnect();
     mediaSourceRef.current = null;
-    mediaRef.current = null;
-    previewElementRef.current = null;
-    if (streamOwnedRef.current) {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-    }
-    streamRef.current = null;
-    streamOwnedRef.current = false;
 
     setNeedsUserPlay(false);
     isPlayingRef.current = false;
@@ -614,6 +755,31 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+
+    const finalizeDisposal = () => {
+      debugVideo("cleanupPreview:finalize", {
+        hadSprite: Boolean(currentSprite),
+        hadTexture: Boolean(currentTexture),
+        hadMedia: Boolean(currentMedia),
+      });
+      currentSprite?.destroy();
+      currentTexture?.destroy(true);
+
+      if (currentMedia) {
+        releaseDetachedMedia(currentMedia, undefined, shouldStopCurrentStream);
+      } else if (shouldStopCurrentStream) {
+        currentStream?.getTracks().forEach((track) => track.stop());
+      }
+    };
+
+    if (typeof window === "undefined") {
+      finalizeDisposal();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      finalizeDisposal();
+    });
   };
 
   const cleanupForPageLeave = () => {
@@ -806,7 +972,16 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
 
     cleanupPreview();
+    resetFilterInstance();
     const requestId = previewRequestIdRef.current;
+    debugVideo("previewFile:start", {
+      name: file.name,
+      type: file.type,
+      isVideo,
+      isAudio,
+      isImage,
+      requestId,
+    });
     setPreviewError("");
     setPreviewName(file.name);
     beginLoading(
@@ -869,6 +1044,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           fitSprite(appRef.current, sprite, media);
           appRef.current.stage.removeChildren();
           appRef.current.stage.addChild(sprite);
+          window.requestAnimationFrame(safeRender);
 
           textureRef.current = texture;
           spriteRef.current = sprite;
@@ -878,6 +1054,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             width: media.videoWidth,
             height: media.videoHeight,
           });
+          debugVideo("previewFile:video-attached", {
+            name: file.name,
+            requestId,
+            videoWidth: media.videoWidth,
+            videoHeight: media.videoHeight,
+            screenWidth: appRef.current?.screen.width ?? null,
+            screenHeight: appRef.current?.screen.height ?? null,
+          });
+          scheduleRefreshLayout();
         } else {
           appRef.current.stage.removeChildren();
           spriteRef.current = null;
@@ -923,6 +1108,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       fitSprite(appRef.current, sprite, image);
       appRef.current.stage.removeChildren();
       appRef.current.stage.addChild(sprite);
+      window.requestAnimationFrame(safeRender);
 
       textureRef.current = texture;
       spriteRef.current = sprite;
@@ -933,6 +1119,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         width: image.naturalWidth,
         height: image.naturalHeight,
       });
+      debugVideo("previewFile:image-attached", {
+        name: file.name,
+        requestId,
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        screenWidth: appRef.current?.screen.width ?? null,
+        screenHeight: appRef.current?.screen.height ?? null,
+      });
+      scheduleRefreshLayout();
       syncVideoState();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -972,6 +1167,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     fitSprite(appRef.current, sprite, video);
     appRef.current?.stage.removeChildren();
     appRef.current?.stage.addChild(sprite);
+    window.requestAnimationFrame(safeRender);
 
     textureRef.current = texture;
     spriteRef.current = sprite;
@@ -982,6 +1178,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       width: video.videoWidth,
       height: video.videoHeight,
     });
+    debugVideo("attachVideoPreview", {
+      kind,
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+      screenWidth: appRef.current?.screen.width ?? null,
+      screenHeight: appRef.current?.screen.height ?? null,
+    });
+    scheduleRefreshLayout();
     syncVideoState();
   };
 
@@ -1089,37 +1293,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       canvasHostRef.current.appendChild(app.canvas);
 
-      const filter = Filter.from({
-        gl: {
-          vertex: FILTER_VERTEX,
-          fragment: FILTER_FRAGMENT,
-        },
-        resources: {
-          pixelUniforms: {
-            uTargetSize: {
-              value: new Float32Array([
-                RETRO_PRESETS.pc98_512.width,
-                RETRO_PRESETS.pc98_512.height,
-              ]),
-              type: "vec2<f32>",
-            },
-            uColorLevels: { value: RETRO_PRESETS.pc98_512.colors, type: "f32" },
-            uDitherStrength: { value: RETRO_PRESETS.pc98_512.dither, type: "f32" },
-            uPaletteMode: { value: 2, type: "f32" },
-            uCurvature: { value: RETRO_PRESETS.pc98_512.curvature, type: "f32" },
-            uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
-            uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
-            uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
-            uGlowStrength: { value: RETRO_PRESETS.pc98_512.glow, type: "f32" },
-            uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },
-            uMonoTint: {
-              value: new Float32Array(MONO_TINTS.green.rgb),
-              type: "vec3<f32>",
-            },
-            uTime: { value: 0, type: "f32" },
-          },
-        },
-      });
+      const filter = createRetroFilter();
 
       app.ticker.add((ticker) => {
         const shouldAnimate =
@@ -1129,7 +1303,12 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           return;
         }
 
-        filter.resources.pixelUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
+        const activeFilter = filterRef.current;
+        if (!activeFilter) {
+          return;
+        }
+
+        activeFilter.resources.pixelUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
       });
       app.renderer.on("resize", fitCurrentSprite);
       appRef.current = app;
@@ -1146,12 +1325,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     return () => {
       cancelled = true;
+      appRef.current?.renderer.off("resize", fitCurrentSprite);
       cleanupPreview();
       noiseSourceRef.current?.stop();
       noiseLfoRef.current?.stop();
       void audioContextRef.current?.close();
-      filterRef.current?.destroy();
       appRef.current?.destroy(true);
+      filterRef.current?.destroy();
       filterRef.current = null;
       appRef.current = null;
       setIsRendererReady(false);
@@ -1387,6 +1567,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       try {
         powerOn();
         cleanupPreview();
+        resetFilterInstance();
         requestId = previewRequestIdRef.current;
 
         if (!appRef.current || !filterRef.current) {
@@ -1487,6 +1668,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       try {
         powerOn();
         cleanupPreview();
+        resetFilterInstance();
         requestId = previewRequestIdRef.current;
 
         if (!appRef.current || !filterRef.current) {
@@ -1543,6 +1725,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           fitSprite(appRef.current, sprite, media);
           appRef.current.stage.removeChildren();
           appRef.current.stage.addChild(sprite);
+          window.requestAnimationFrame(safeRender);
 
           textureRef.current = texture;
           spriteRef.current = sprite;
@@ -1553,6 +1736,15 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             width: media.videoWidth,
             height: media.videoHeight,
           });
+          debugVideo("previewUrl:video-attached", {
+            url,
+            requestId,
+            videoWidth: media.videoWidth,
+            videoHeight: media.videoHeight,
+            screenWidth: appRef.current?.screen.width ?? null,
+            screenHeight: appRef.current?.screen.height ?? null,
+          });
+          scheduleRefreshLayout();
           await connectMediaAudio(media);
           syncVideoState();
         } else if (kind === "image") {
@@ -1578,6 +1770,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           fitSprite(appRef.current, sprite, image);
           appRef.current.stage.removeChildren();
           appRef.current.stage.addChild(sprite);
+          window.requestAnimationFrame(safeRender);
 
           textureRef.current = texture;
           spriteRef.current = sprite;
@@ -1588,6 +1781,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
             width: image.naturalWidth,
             height: image.naturalHeight,
           });
+          scheduleRefreshLayout();
           syncVideoState();
         } else {
           // audio-only
