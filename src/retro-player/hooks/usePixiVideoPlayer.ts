@@ -1091,6 +1091,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       });
 
       app.ticker.add((ticker) => {
+        const shouldAnimate =
+          isPlayingRef.current || previewKindRef.current === "image";
+
+        if (!shouldAnimate) {
+          return;
+        }
+
         filter.resources.pixelUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
       });
       app.renderer.on("resize", fitCurrentSprite);

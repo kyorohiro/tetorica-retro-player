@@ -5,7 +5,8 @@ import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceStat
 import { useDialog } from "./useDialog";
 
 function App() {
-  const defaultPreviewSrc = "./test_colorbars.mp4";
+  const defaultPreviewSrc = "./test_colorbars.png";
+  const defaultPreviewKind = "image";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
   const isUsingDefaultPreview =
@@ -114,7 +115,7 @@ function App() {
           src={previewSource.previewSrc ?? defaultPreviewSrc}
           stream={previewSource.previewStream}
           streamName={previewSource.previewLabel}
-          kind={previewSource.previewKind ?? "video"}
+          kind={previewSource.previewKind ?? defaultPreviewKind}
           looping={!isUsingDefaultPreview}
         />
 
