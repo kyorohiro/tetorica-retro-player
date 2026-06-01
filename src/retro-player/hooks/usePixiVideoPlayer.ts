@@ -1084,14 +1084,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       }
     };
 
-    window.addEventListener("pagehide", handlePageHide);
+    //window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("beforeunload", handlePageHide);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    //document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.removeEventListener("pagehide", handlePageHide);
+      //window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("beforeunload", handlePageHide);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      //document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
