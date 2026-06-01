@@ -10,7 +10,7 @@
       const isLoopbackHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
       //const isSecureRemoteHost = window.location.protocol === "https:" && !/\.local$/i.test(window.location.hostname);
 
-      if ("serviceWorker" in navigator && (isLoopbackHost)){//} || isSecureRemoteHost)) {
+      if ("serviceWorker" in navigator && (!isLoopbackHost)){//} || isSecureRemoteHost)) {
         navigator.serviceWorker.register("./sw.js");
       }
     </script>

@@ -5,6 +5,7 @@ import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceStat
 import { useDialog } from "./useDialog";
 
 function App() {
+  const defaultPreviewSrc = "./test_colorbars.png";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
   const { showConfirmDialog } = useDialog();
@@ -108,11 +109,23 @@ function App() {
         </div>
 
         <RetroPlayer
-          src={previewSource.previewSrc}
+          src={previewSource.previewSrc ?? defaultPreviewSrc}
           stream={previewSource.previewStream}
           streamName={previewSource.previewLabel}
-          kind={previewSource.previewKind}
+          kind={previewSource.previewKind ?? "image"}
         />
+
+        <div className="mt-3 rounded-xl border border-slate-300 bg-white/70 px-4 py-3 text-xs text-slate-600">
+          <p>
+            debug src: <span className="font-mono">{previewSource.previewSrc ?? defaultPreviewSrc}</span>
+          </p>
+          <p>
+            debug kind: <span className="font-mono">{previewSource.previewKind ?? "image"}</span>
+          </p>
+          <p>
+            debug label: <span className="font-mono">{previewSource.previewLabel || "(empty)"}</span>
+          </p>
+        </div>
 
         <input
           ref={fileInputRef}

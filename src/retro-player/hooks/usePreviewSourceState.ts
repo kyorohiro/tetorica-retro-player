@@ -8,7 +8,7 @@ export function usePreviewSourceState() {
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [previewLabel, setPreviewLabel] = useState<string>();
   const [captureError, setCaptureError] = useState<string>("");
-  const [previewKind, setPreviewKind] = useState<PreviewSourceKind>("video");
+  const [previewKind, setPreviewKind] = useState<PreviewSourceKind | undefined>(undefined);
 
   const stopPreviewStream = useCallback(() => {
     setPreviewStream((current) => {

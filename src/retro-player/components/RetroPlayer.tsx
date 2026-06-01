@@ -29,6 +29,7 @@ export function RetroPlayer({
   initialFilterState,
 }: RetroPlayerProps) {
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
+  const lastPreviewRequestRef = React.useRef<string>("");
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
@@ -57,7 +58,15 @@ export function RetroPlayer({
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
 
   React.useEffect(() => {
+    if (!player.isRendererReady) return;
+
     if (stream) {
+      const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}`;
+      if (lastPreviewRequestRef.current === streamKey) {
+        return;
+      }
+      lastPreviewRequestRef.current = streamKey;
+
       void (async () => {
         try {
           await player.previewStream(
@@ -78,7 +87,16 @@ export function RetroPlayer({
       return;
     }
 
-    if (!src) return;
+    if (!src) {
+      lastPreviewRequestRef.current = "";
+      return;
+    }
+
+    const srcKey = `src:${src}:${kind}`;
+    if (lastPreviewRequestRef.current === srcKey) {
+      return;
+    }
+    lastPreviewRequestRef.current = srcKey;
 
     void (async () => {
       try {
@@ -92,7 +110,7 @@ export function RetroPlayer({
         onError?.(new Error(String(error)));
       }
     })();
-  }, [src, stream, streamName, kind, onError]);
+  }, [src, stream, streamName, kind, onError, player, player.isRendererReady]);
 
   React.useEffect(() => {
     if (!isPreviewMaximized) return;

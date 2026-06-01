@@ -76,6 +76,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
+  const [isRendererReady, setIsRendererReady] = useState<boolean>(false);
   const [loadingLabel, setLoadingLabel] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
@@ -175,6 +176,18 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const waitForVideoFrame = (video: HTMLVideoElement) =>
     new Promise<void>((resolve, reject) => {
+      const describeMediaError = (mediaError: MediaError | null) => {
+        if (!mediaError) return "unknown";
+        if (mediaError.code === MediaError.MEDIA_ERR_ABORTED) return "aborted";
+        if (mediaError.code === MediaError.MEDIA_ERR_NETWORK) return "network";
+        if (mediaError.code === MediaError.MEDIA_ERR_DECODE) return "decode";
+        if (mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+          return "src-not-supported";
+        }
+
+        return `code-${mediaError.code}`;
+      };
+
       const cleanup = () => {
         video.removeEventListener("loadeddata", handleReady);
         video.removeEventListener("canplay", handleReady);
@@ -188,7 +201,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       const handleError = () => {
         cleanup();
-        reject(new Error("動画の読み込みに失敗しました。"));
+        reject(
+          new Error(
+            `動画の読み込みに失敗しました。 src=${video.currentSrc || video.src || "(empty)"} reason=${describeMediaError(video.error)}`,
+          ),
+        );
       };
 
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -204,6 +221,18 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   const waitForAudioReady = (audio: HTMLAudioElement) =>
     new Promise<void>((resolve, reject) => {
+      const describeMediaError = (mediaError: MediaError | null) => {
+        if (!mediaError) return "unknown";
+        if (mediaError.code === MediaError.MEDIA_ERR_ABORTED) return "aborted";
+        if (mediaError.code === MediaError.MEDIA_ERR_NETWORK) return "network";
+        if (mediaError.code === MediaError.MEDIA_ERR_DECODE) return "decode";
+        if (mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+          return "src-not-supported";
+        }
+
+        return `code-${mediaError.code}`;
+      };
+
       const cleanup = () => {
         audio.removeEventListener("loadedmetadata", handleReady);
         audio.removeEventListener("canplay", handleReady);
@@ -217,7 +246,11 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       const handleError = () => {
         cleanup();
-        reject(new Error("音声の読み込みに失敗しました。"));
+        reject(
+          new Error(
+            `音声の読み込みに失敗しました。 src=${audio.currentSrc || audio.src || "(empty)"} reason=${describeMediaError(audio.error)}`,
+          ),
+        );
       };
 
       if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
@@ -1054,6 +1087,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       app.renderer.on("resize", fitCurrentSprite);
       appRef.current = app;
       filterRef.current = filter;
+      setIsRendererReady(true);
       applyFilterState();
       refreshLayout();
     };
@@ -1070,6 +1104,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       appRef.current?.destroy(true);
       filterRef.current = null;
       appRef.current = null;
+      setIsRendererReady(false);
     };
   }, []);
 
@@ -1269,6 +1304,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     canvasHostRef,
     previewName,
     previewError,
+    isRendererReady,
     loadingLabel,
     isLoading,
     needsUserPlay,
@@ -1493,12 +1529,14 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
           textureRef.current = texture;
           spriteRef.current = sprite;
+          mediaRef.current = null;
           previewElementRef.current = image;
           setPreviewKindState("image");
           setSourceDimensions({
             width: image.naturalWidth,
             height: image.naturalHeight,
           });
+          syncVideoState();
         } else {
           // audio-only
           const audio = document.createElement("audio");
@@ -1540,7 +1578,9 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
           return;
         }
 
-        await playVideoWithAudio();
+        if (kind === "video" || kind === "audio") {
+          await playVideoWithAudio();
+        }
         if (requestId === previewRequestIdRef.current) {
           finishLoading();
         }

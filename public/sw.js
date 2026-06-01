@@ -1,4 +1,4 @@
-const APP_VERSION = "0.5.4";
+const APP_VERSION = "0.5.6";
 const CACHE_PREFIX = "tetorica-retro-player-";
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 
@@ -52,6 +52,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (event.request.headers.has("range")) return;
 
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
@@ -67,7 +68,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          if (response?.ok) {
+          if (response?.ok && response.status === 200) {
             const cloned = response.clone();
             event.waitUntil(
               caches.open(CACHE_NAME).then((cache) => {
@@ -87,7 +88,7 @@ self.addEventListener("fetch", (event) => {
       if (cached) return cached;
 
       return fetch(event.request).then((response) => {
-        if (response?.ok) {
+        if (response?.ok && response.status === 200) {
           const cloned = response.clone();
           event.waitUntil(
             caches.open(CACHE_NAME).then((cache) => {
