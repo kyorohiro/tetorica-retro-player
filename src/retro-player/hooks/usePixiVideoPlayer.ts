@@ -557,6 +557,26 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
     }
   };
 
+  const cleanupForPageLeave = () => {
+    if (mediaRef.current) {
+      mediaRef.current.pause();
+    }
+
+    if (noiseGainRef.current) {
+      noiseGainRef.current.gain.value = 0;
+    }
+
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.value = 0;
+    }
+
+    cleanupPreview();
+
+    if (audioContextRef.current?.state === "running") {
+      void audioContextRef.current.suspend();
+    }
+  };
+
   const playVideoWithAudio = async () => {
     if (!mediaRef.current) return;
 
@@ -1055,15 +1075,23 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
   useEffect(() => {
     const handlePageHide = () => {
-      cleanupPreview();
+      cleanupForPageLeave();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cleanupForPageLeave();
+      }
     };
 
     window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("beforeunload", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("beforeunload", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
