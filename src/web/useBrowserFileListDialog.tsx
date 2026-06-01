@@ -5,7 +5,6 @@ import { TargetFile, FileTargetFile } from "./api";
 import { usePreviewDialog } from "./usePreviewDialog";
 import { isAudio, isEpub, isImage, isPdf, isText, isVideo } from "../utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
-import { buildPortablePackage, getPortableHtmlText, getReadmeEn, getReadmeJp, getUnrarWasm } from "./buildPortablePackage";
 
 type SortMode = "name" | "modifiedAt" | "comic";
 
@@ -116,7 +115,6 @@ function BrowserFileListDialog({
   const [sort, setSort] = useState<SortMode>("comic");
   const [loading, setLoading] = useState(false);
 
-  const { showConfirmDialog } = useDialog();
   const { showPreviewDialog } = usePreviewDialog();
   const { showZipFileListDialog } = useZipFileListDialog();
 
@@ -194,57 +192,6 @@ function BrowserFileListDialog({
     }
   };
 
-  const onClone = async () => {
-    let url;
-    try {
-      setLoading(true);
-      console.log(">> clone")
-      const r = await showConfirmDialog({
-        title: "Create Portable Clone",
-        body: (
-          <div className="space-y-2">
-            <p>
-              Create a portable ZIP package that includes this viewer and the selected files.
-            </p>
-            <p>
-              The generated ZIP can be opened locally in a browser and shared as a self-contained viewer package.
-            </p>
-            <p className="text-amber-300">
-              Please include only files that you have the right to copy or distribute.
-            </p>
-            <p className="text-slate-400">
-              Files: {allFiles.length.toLocaleString()}
-            </p>
-          </div>
-        ),
-        okText: "Create ZIP",
-        cancelText: "Cancel",
-      });
-      if (!r) {
-        return;
-      }
-      let zip = await buildPortablePackage(//
-        allFiles,
-        await getPortableHtmlText(),
-        await getUnrarWasm(),
-        await getReadmeEn(),
-        await getReadmeJp()
-      );
-      url = URL.createObjectURL(zip);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `mdrop_clone_${Date.now()}.zip`;
-      //a.target = "_blank";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } finally {
-      setLoading(false);
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
-    }
-  }
   return (
     <div className="flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-slate-950 sm:h-[calc(100dvh-2rem)] sm:w-[calc(100dvw-2rem)] sm:rounded-2xl sm:border sm:border-slate-700 sm:shadow-xl">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
@@ -253,13 +200,6 @@ function BrowserFileListDialog({
           <div className="break-all text-xs text-slate-400">{path}</div>
         </div>
 
-        <button
-          type="button"
-          onClick={onClone}
-          className="rounded-lg border border-rose-600 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-        >
-          Clone
-        </button>
         <button
           type="button"
           onClick={onClose}
