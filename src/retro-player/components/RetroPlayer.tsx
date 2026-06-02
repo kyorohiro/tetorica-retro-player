@@ -1,5 +1,5 @@
 import React from "react";
-import { Maximize2, Minimize2, Power } from "lucide-react";
+import { Aperture, Maximize2, Minimize2, Power } from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
@@ -197,7 +197,7 @@ export function RetroPlayer({
           )}
 
           <div
-            className={`relative overflow-hidden rounded-xl bg-slate-950 ${
+            className={`relative ${
               isPreviewMaximized
                 ? "h-full min-h-0 w-full"
                 : "w-full min-w-0"
@@ -213,67 +213,66 @@ export function RetroPlayer({
                   }
             }
           >
-            <div ref={player.canvasHostRef} className="h-full w-full" />
-            {!player.isPoweredOn && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/72">
-                <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
-                  <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
-                    Power Off
-                  </p>
-                  <p className="mt-2">Press power to wake the screen.</p>
+            <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
+              <div ref={player.canvasHostRef} className="h-full w-full" />
+              {!player.isPoweredOn && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/72">
+                  <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
+                    <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
+                      Power Off
+                    </p>
+                    <p className="mt-2">Press power to wake the screen.</p>
+                  </div>
                 </div>
-              </div>
-            )}
-            {player.isLoading && !player.needsUserPlay && !player.previewError && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72">
-                <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
-                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
-                  <p className="font-medium">
-                    {player.loadingLabel || "Loading preview..."}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Please wait while the preview is prepared.
-                  </p>
+              )}
+              {player.isLoading && !player.needsUserPlay && !player.previewError && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72">
+                  <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
+                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+                    <p className="font-medium">
+                      {player.loadingLabel || "Loading preview..."}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Please wait while the preview is prepared.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-            {player.needsUserPlay && !player.isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/46">
-                <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
-                  <p className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/80">
-                    Preview Ready
-                  </p>
-                  <p className="mt-3 text-lg font-semibold text-slate-100">
-                    Press Play to start
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Safari may require a direct user action before video and audio can begin.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void player.playVideoWithAudio();
-                    }}
-                    className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
-                  >
-                    Play
-                  </button>
+              )}
+              {player.needsUserPlay && !player.isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-950/46">
+                  <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
+                    <p className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/80">
+                      Preview Ready
+                    </p>
+                    <p className="mt-3 text-lg font-semibold text-slate-100">
+                      Press Play to start
+                    </p>
+                    <p className="mt-2 text-sm text-slate-400">
+                      Safari may require a direct user action before video and audio can begin.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void player.playVideoWithAudio();
+                      }}
+                      className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
+                    >
+                      Play
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-            {player.hasAudioOnly && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
-                Audio preview is playing through the retro audio chain.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300 sm:p-4">
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              )}
+              {player.hasAudioOnly && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
+                  Audio preview is playing through the retro audio chain.
+                </div>
+              )}
+            </div>
+            <div className="absolute -bottom-5 right-3 z-20 flex items-center gap-2 sm:-bottom-6 sm:right-4">
               <button
                 type="button"
+                aria-label={player.isPoweredOn ? "Power off" : "Power on"}
+                title={player.isPoweredOn ? "Power off" : "Power on"}
                 onClick={() => {
                   if (player.isPoweredOn) {
                     player.powerOff();
@@ -283,41 +282,51 @@ export function RetroPlayer({
                   player.powerOn();
                 }}
                 className={[
-                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm transition sm:px-4",
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
                   player.isPoweredOn
-                    ? "border-amber-500/40 bg-amber-500/10 text-slate-100 hover:bg-amber-500/20"
-                    : "border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800",
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
+                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
                 ].join(" ")}
               >
-                <Power size={16} />
-                {player.isPoweredOn ? "Power Off" : "Power On"}
+                <Power size={18} />
               </button>
               <button
                 type="button"
+                aria-label={isHighResolution ? "Disable high resolution" : "Enable high resolution"}
+                title={isHighResolution ? "Disable high resolution" : "Enable high resolution"}
                 onClick={() => {
                   setIsHighResolution((current) => !current);
                 }}
                 className={[
-                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm transition sm:px-4",
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
                   isHighResolution
-                    ? "border-sky-500/40 bg-sky-500/10 text-slate-100 hover:bg-sky-500/20"
-                    : "border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800",
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
+                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
                 ].join(" ")}
               >
-                {isHighResolution ? "Hi-Res On" : "Hi-Res Off"}
+                <Aperture size={18} />
               </button>
               <button
                 type="button"
+                aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
+                title={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
                 onClick={() => {
                   setIsPreviewMaximized((current) => !current);
                 }}
-                className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-slate-100 transition hover:bg-sky-500/20 sm:col-span-1 sm:px-4"
+                className={[
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  isPreviewMaximized
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
+                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                ].join(" ")}
               >
-                {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                {isPreviewMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
             </div>
           </div>
+        </div>
 
+        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300 sm:p-4">
           {(player.hasPlayableMedia || player.hasImage) &&
             controlPanelMode !== "video-settings" && (
             <VideoControls
