@@ -33,6 +33,7 @@ export function RetroPlayer({
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
   const [isHighResolution, setIsHighResolution] = React.useState(false);
   const lastPreviewRequestRef = React.useRef<string>("");
+  const lastLoopingPresetRef = React.useRef<string>("");
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
@@ -158,8 +159,25 @@ export function RetroPlayer({
   React.useEffect(() => {
     if (typeof looping !== "boolean") return;
 
+    const mediaKey = stream
+      ? `stream:${stream.id}:${kind}`
+      : src
+        ? `src:${src}:${kind}`
+        : "";
+
+    if (!mediaKey) {
+      lastLoopingPresetRef.current = "";
+      return;
+    }
+
+    const presetKey = `${mediaKey}:${looping}`;
+    if (lastLoopingPresetRef.current === presetKey) {
+      return;
+    }
+
+    lastLoopingPresetRef.current = presetKey;
     player.setLoopingEnabled(looping);
-  }, [looping, player]);
+  }, [kind, looping, player, src, stream]);
 
   const previewFrameHeight =
     !isPreviewMaximized &&
