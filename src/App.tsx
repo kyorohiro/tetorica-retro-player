@@ -1,10 +1,11 @@
-import { useCallback, useRef } from "react";
+import React, { useCallback, useRef } from "react";
 import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useDialog } from "./useDialog";
 import { FileTargetFile } from "./web/api";
 import { useBrowserFileListDialog } from "./web/useBrowserFileListDialog";
+import { RETRO_PREVIEW_DIALOG_EVENT } from "./web/usePreviewDialog";
 import {
   getDroppedFiles,
   isAudio,
@@ -19,6 +20,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
+  const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = previewSource.previewStream
@@ -130,6 +132,26 @@ function App() {
   const onDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
   };
+
+  React.useEffect(() => {
+    const handleRetroPreviewDialog = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      setIsRetroPreviewDialogActive(Boolean(detail?.active));
+    };
+
+    window.addEventListener(
+      RETRO_PREVIEW_DIALOG_EVENT,
+      handleRetroPreviewDialog as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        RETRO_PREVIEW_DIALOG_EVENT,
+        handleRetroPreviewDialog as EventListener,
+      );
+    };
+  }, []);
+
   return (
     <main
       className="h-screen overflow-y-auto bg-slate-200 text-slate-800"
@@ -190,14 +212,20 @@ function App() {
           )}
         </div>
 
-        <RetroPlayer
-          key={retroPlayerKey}
-          src={previewSource.previewSrc ?? defaultPreviewSrc}
-          stream={previewSource.previewStream}
-          streamName={previewSource.previewLabel}
-          kind={previewSource.previewKind ?? defaultPreviewKind}
-          looping={!isUsingDefaultPreview}
-        />
+        {isRetroPreviewDialogActive ? (
+          <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-8 text-center text-sm text-slate-500">
+            Retro preview is active in the dialog.
+          </section>
+        ) : (
+          <RetroPlayer
+            key={retroPlayerKey}
+            src={previewSource.previewSrc ?? defaultPreviewSrc}
+            stream={previewSource.previewStream}
+            streamName={previewSource.previewLabel}
+            kind={previewSource.previewKind ?? defaultPreviewKind}
+            looping={!isUsingDefaultPreview}
+          />
+        )}
 
         <input
           ref={fileInputRef}

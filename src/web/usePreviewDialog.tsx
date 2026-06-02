@@ -4,6 +4,8 @@ import type { TargetFile } from "./api";
 import { PreviewPage } from "./preview/PreviewPage";
 import { preivewGlobalSetting } from "./preview/preivewSetting";
 
+const RETRO_PREVIEW_DIALOG_EVENT = "tetorica-retro-preview-dialog-active";
+
 type PreviewDialogOptions = {
     files: TargetFile[];
     initialIndex: number;
@@ -123,6 +125,24 @@ function PreviewDialog({
         },
         [move]
     );
+
+    React.useEffect(() => {
+        if (!isRetro) return;
+
+        window.dispatchEvent(
+            new CustomEvent(RETRO_PREVIEW_DIALOG_EVENT, {
+                detail: { active: true },
+            })
+        );
+
+        return () => {
+            window.dispatchEvent(
+                new CustomEvent(RETRO_PREVIEW_DIALOG_EVENT, {
+                    detail: { active: false },
+                })
+            );
+        };
+    }, [isRetro]);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -246,3 +266,5 @@ function PreviewDialog({
         </div>
     );
 }
+
+export { RETRO_PREVIEW_DIALOG_EVENT };
