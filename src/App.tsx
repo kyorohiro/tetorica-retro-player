@@ -3,16 +3,16 @@ import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useDialog } from "./useDialog";
-import { FileTargetFile } from "./web/api";
-import { useBrowserFileListDialog } from "./web/useBrowserFileListDialog";
-import { RETRO_PREVIEW_DIALOG_EVENT } from "./web/usePreviewDialog";
+import { FileTargetFile } from "./mdrop-web/api";
+import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
+import { RETRO_PREVIEW_DIALOG_EVENT } from "./mdrop-web/usePreviewDialog";
 import {
   getDroppedFiles,
   isAudio,
   isImage,
   isVideo,
   type FileWithRelativePath,
-} from "./utils";
+} from "./mdrop-web/utils";
 
 function App() {
   const defaultPreviewSrc = "./test_colorbars.png";

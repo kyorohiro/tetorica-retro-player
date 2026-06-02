@@ -13,7 +13,7 @@ import {
     isText,
     isVideo,
     makeBlobFromUrl,
-} from "../../utils";
+} from "../utils";
 import { useZipFileListDialog } from "../useZipFileListDialog";
 import { downloadUrl } from "../usePreviewDialog";
 

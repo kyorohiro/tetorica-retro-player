@@ -3,7 +3,7 @@ import { File, Folder, Loader } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, FileTargetFile } from "./api";
 import { usePreviewDialog } from "./usePreviewDialog";
-import { isAudio, isEpub, isImage, isPdf, isText, isVideo } from "../utils";
+import { isAudio, isEpub, isImage, isPdf, isText, isVideo } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
 type SortMode = "name" | "modifiedAt" | "comic";
