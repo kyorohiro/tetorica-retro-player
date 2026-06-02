@@ -358,7 +358,7 @@ export function VideoControls({
         </>
       )}
 
-      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-4" : "grid-cols-2"} sm:flex sm:flex-wrap sm:items-center`}>
+      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-3" : "grid-cols-2"} sm:flex sm:flex-wrap sm:items-center`}>
         <button
           type="button"
           onClick={onToggleVideoSettings}
