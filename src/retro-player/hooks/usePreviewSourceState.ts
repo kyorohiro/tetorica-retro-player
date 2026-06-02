@@ -11,6 +11,9 @@ export function usePreviewSourceState() {
   const [previewKind, setPreviewKind] = useState<PreviewSourceKind | undefined>(undefined);
 
   const stopPreviewStream = useCallback(() => {
+    setPreviewKind(undefined);
+    setPreviewLabel(undefined);
+    setCaptureError("");
     setPreviewStream((current) => {
       current?.getTracks().forEach((track) => track.stop());
       return null;
@@ -79,6 +82,9 @@ export function usePreviewSourceState() {
       });
 
       stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+        setPreviewKind((current) => (current === "video" ? undefined : current));
+        setPreviewLabel((current) => (current === "Display Capture" ? undefined : current));
+        setCaptureError("");
         setPreviewStream((current) => {
           if (current !== stream) return current;
           return null;
