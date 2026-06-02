@@ -21,13 +21,14 @@ function App() {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const previewSource = usePreviewSourceState();
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
+  const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = previewSource.previewStream
-    ? `stream:${previewSource.previewStream.id}:${previewSource.previewLabel ?? ""}`
+    ? `stream:${previewSource.previewStream.id}:${previewSource.previewLabel ?? ""}:${retroPlayerEpoch}`
     : previewSource.previewSrc
-      ? `src:${previewSource.previewSrc}:${previewSource.previewKind ?? "unknown"}`
-      : `default:${defaultPreviewSrc}:${defaultPreviewKind}`;
+      ? `src:${previewSource.previewSrc}:${previewSource.previewKind ?? "unknown"}:${retroPlayerEpoch}`
+      : `default:${defaultPreviewSrc}:${defaultPreviewKind}:${retroPlayerEpoch}`;
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
 
@@ -136,7 +137,11 @@ function App() {
   React.useEffect(() => {
     const handleRetroPreviewDialog = (event: Event) => {
       const detail = (event as CustomEvent<{ active?: boolean }>).detail;
-      setIsRetroPreviewDialogActive(Boolean(detail?.active));
+      const isActive = Boolean(detail?.active);
+      setIsRetroPreviewDialogActive(isActive);
+      if (!isActive) {
+        setRetroPlayerEpoch((current) => current + 1);
+      }
     };
 
     window.addEventListener(

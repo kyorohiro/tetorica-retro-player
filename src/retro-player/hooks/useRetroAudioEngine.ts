@@ -15,6 +15,10 @@ const DEFAULT_AUDIO_SETTINGS = {
   noiseLevel: 0.02,
 } as const;
 
+const isRetroPlayerDebugEnabled = () =>
+  typeof window !== "undefined" &&
+  Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__);
+
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 type UseRetroAudioEngineParams = {
@@ -86,6 +90,10 @@ export function useRetroAudioEngine({
   const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
+    if (!isRetroPlayerDebugEnabled()) {
+      return;
+    }
+
     console.log(
       `[retro-player audio][${instanceLabel}] ${label}`,
       payload ?? {},
@@ -149,6 +157,21 @@ export function useRetroAudioEngine({
 
   const ensureAudioContext = async () => {
     if (typeof window === "undefined") return null;
+
+    if (audioContextRef.current?.state === "closed") {
+      audioContextRef.current = null;
+      mediaSourceRef.current = null;
+      masterGainRef.current = null;
+      lofiLowpassRef.current = null;
+      lofiHighshelfRef.current = null;
+      lofiDriveRef.current = null;
+      noiseSourceRef.current = null;
+      noiseFilterRef.current = null;
+      noisePannerRef.current = null;
+      noiseGainRef.current = null;
+      noiseLfoRef.current = null;
+      noiseLfoGainRef.current = null;
+    }
 
     if (!audioContextRef.current) {
       const context = new window.AudioContext();
@@ -222,6 +245,46 @@ export function useRetroAudioEngine({
     }
 
     return audioContextRef.current;
+  };
+
+  const disposeAudioEngine = async () => {
+    mediaSourceRef.current?.disconnect();
+    mediaSourceRef.current = null;
+
+    try {
+      noiseSourceRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      noiseLfoRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+
+    const context = audioContextRef.current;
+    audioContextRef.current = null;
+    masterGainRef.current = null;
+    lofiLowpassRef.current = null;
+    lofiHighshelfRef.current = null;
+    lofiDriveRef.current = null;
+    noiseSourceRef.current = null;
+    noiseFilterRef.current = null;
+    noisePannerRef.current = null;
+    noiseGainRef.current = null;
+    noiseLfoRef.current = null;
+    noiseLfoGainRef.current = null;
+
+    if (!context || context.state === "closed") {
+      return;
+    }
+
+    try {
+      await context.close();
+    } catch {
+      // ignore double-close races
+    }
   };
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
@@ -309,22 +372,6 @@ export function useRetroAudioEngine({
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
 
-    debugAudio("audioStateChanged", {
-      isMuted,
-      volume,
-      isAudioFxEnabled,
-      lofiAmount,
-      isNoiseEnabled,
-      noiseLevel,
-      isPlaying,
-      playbackRate,
-      isLooping,
-      previewKind,
-      audioContextState: audioContextRef.current?.state ?? "none",
-      hasMediaSource: Boolean(mediaSourceRef.current),
-      mediaTag: mediaRef.current?.tagName ?? null,
-    });
-
     updateAudioNodes();
   }, [
     isMuted,
@@ -403,5 +450,6 @@ export function useRetroAudioEngine({
     updateAudioNodes,
     connectMediaAudio,
     resetAudioSettings,
+    disposeAudioEngine,
   };
 }
