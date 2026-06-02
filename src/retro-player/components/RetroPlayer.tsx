@@ -66,10 +66,8 @@ export function RetroPlayer({
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
 
   React.useEffect(() => {
-    if (!player.isRendererReady) return;
-
     if (stream) {
-      const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}`;
+      const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}:${renderResolutionScale}`;
       if (lastPreviewRequestRef.current === streamKey) {
         return;
       }
@@ -100,7 +98,7 @@ export function RetroPlayer({
       return;
     }
 
-    const srcKey = `src:${src}:${kind}`;
+    const srcKey = `src:${src}:${kind}:${renderResolutionScale}`;
     if (lastPreviewRequestRef.current === srcKey) {
       return;
     }
@@ -118,11 +116,7 @@ export function RetroPlayer({
         onError?.(new Error(String(error)));
       }
     })();
-  }, [src, stream, streamName, kind, onError, player, player.isRendererReady]);
-
-  React.useEffect(() => {
-    lastPreviewRequestRef.current = "";
-  }, [isHighResolution]);
+  }, [src, stream, streamName, kind, onError, player, renderResolutionScale]);
 
   React.useEffect(() => {
     if (!isPreviewMaximized) return;
