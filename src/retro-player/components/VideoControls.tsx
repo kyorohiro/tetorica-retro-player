@@ -81,7 +81,7 @@ export function VideoControls({
   onChangeNoiseLevel,
   onChangePlaybackRate,
   onChangeVolume,
-  onRestart,
+  onRestart: _onRestart,
   onSeek,
   onStepFrame,
   onToggleLoop,
@@ -95,6 +95,8 @@ export function VideoControls({
   onToggleAudioSettings,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
+  // Keep the restart callback in the surface area for future UI revival.
+  void _onRestart;
 
   if (mode === "audio-settings") {
     return (
@@ -217,7 +219,7 @@ export function VideoControls({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={onTogglePlayback}
@@ -229,15 +231,62 @@ export function VideoControls({
             </button>
             <button
               type="button"
-              onClick={onRestart}
-              aria-label="Restart"
-              title="Restart"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
+              onClick={onToggleMute}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+              title={isMuted ? "Unmute" : "Mute"}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            >
+              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleLoop}
+              aria-label={isLooping ? "Loop on" : "Loop off"}
+              title={isLooping ? "Loop on" : "Loop off"}
+              className={[
+                  "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-slate-100",
+                  isLooping
+                    ? "border-sky-400 bg-sky-500/20"
+                    : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
             >
               <RotateCcw size={16} />
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSpeedOpen((current) => !current);
+                }}
+                aria-label={`Speed ${playbackRate}x`}
+                title={`Speed ${playbackRate}x`}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 sm:w-auto"
+              >
+                <Gauge size={14} />
+              </button>
+              {isSpeedOpen && (
+                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg sm:min-w-28">
+                  {[0.5, 1, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      onClick={() => {
+                        onChangePlaybackRate(rate);
+                        setIsSpeedOpen(false);
+                      }}
+                      className={[
+                        "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
+                        playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
+                      ].join(" ")}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {hasVideo ? (
-              <div className="col-span-3 grid grid-cols-6 gap-2 sm:contents">
+              <div className="col-span-4 grid grid-cols-6 gap-2 sm:contents">
                 <button
                   type="button"
                   onClick={() => {
@@ -305,67 +354,11 @@ export function VideoControls({
                 </button>
               </>
             )}
-            <button
-              type="button"
-              onClick={onToggleMute}
-              aria-label={isMuted ? "Unmute" : "Mute"}
-              title={isMuted ? "Unmute" : "Mute"}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
-            <button
-              type="button"
-              onClick={onToggleLoop}
-              aria-label={isLooping ? "Loop on" : "Loop off"}
-              title={isLooping ? "Loop on" : "Loop off"}
-              className={[
-                  "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-slate-100",
-                  isLooping
-                    ? "border-sky-400 bg-sky-500/20"
-                    : "border-slate-600 bg-slate-900 hover:bg-slate-800",
-              ].join(" ")}
-            >
-              <RotateCcw size={16} />
-            </button>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSpeedOpen((current) => !current);
-                }}
-                aria-label={`Speed ${playbackRate}x`}
-                title={`Speed ${playbackRate}x`}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 sm:w-auto"
-              >
-                <Gauge size={14} />
-              </button>
-              {isSpeedOpen && (
-                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg sm:min-w-28">
-                  {[0.5, 1, 2].map((rate) => (
-                    <button
-                      key={rate}
-                      type="button"
-                      onClick={() => {
-                        onChangePlaybackRate(rate);
-                        setIsSpeedOpen(false);
-                      }}
-                      className={[
-                        "rounded-md px-3 py-2 text-left text-slate-100 hover:bg-slate-800",
-                        playbackRate === rate ? "bg-sky-500/20 text-sky-100" : "",
-                      ].join(" ")}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </>
       )}
 
-      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-3" : "grid-cols-2"} sm:flex sm:flex-wrap sm:items-center`}>
+      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-4" : "grid-cols-2"} sm:flex sm:flex-wrap sm:items-center`}>
         <button
           type="button"
           onClick={onToggleVideoSettings}
@@ -384,6 +377,7 @@ export function VideoControls({
             Audio
           </button>
         )}
+        {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
         <button
           type="button"
           onClick={onResetSettings}
