@@ -15,7 +15,6 @@ type RetroFilterPanelProps = {
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
   phosphorStrength: number;
-  previewName: string;
   scanlineStrength: number;
   scanline2Strength: number;
   sourceDimensions: { width: number; height: number } | null;
@@ -48,7 +47,6 @@ export function RetroFilterPanel({
   monoTint,
   paletteMode,
   phosphorStrength,
-  previewName,
   scanlineStrength,
   scanline2Strength,
   sourceDimensions,
@@ -73,18 +71,14 @@ export function RetroFilterPanel({
 }: RetroFilterPanelProps) {
   return (
     <>
-      <p className="mt-2 break-all text-sm leading-6">
-        {previewName || "動画、音声、画像がまだ選択されていません"}
-      </p>
-
-      <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         <button
           type="button"
           onClick={() => {
             onSetIsFilterEnabled(!isFilterEnabled);
           }}
           className={[
-            "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
+            "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100 sm:min-h-11 sm:px-3 sm:text-sm",
             isFilterEnabled
               ? "border-emerald-400 bg-emerald-500/20"
               : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -99,7 +93,7 @@ export function RetroFilterPanel({
             onClick={() => {
               onApplyPreset(key as RetroPresetKey);
             }}
-            className="min-h-11 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-slate-100 hover:bg-amber-500/20"
+            className="min-h-10 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-[11px] leading-tight text-slate-100 hover:bg-amber-500/20 sm:min-h-11 sm:px-3 sm:text-sm"
           >
             {preset.label}
           </button>
@@ -109,7 +103,7 @@ export function RetroFilterPanel({
       <div className="mt-4 space-y-3">
         <label className="block">
           <span className="text-slate-100">Palette</span>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
             {(
               ["free", "pc98", "pc98_512", "pc98_4096", "color32", "color64", "mono"] as const
             ).map(
@@ -121,7 +115,7 @@ export function RetroFilterPanel({
                   onSetPaletteMode(mode);
                 }}
                 className={[
-                  "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
+                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100 sm:min-h-11 sm:px-3 sm:text-sm",
                   paletteMode === mode
                     ? "border-sky-400 bg-sky-500/20"
                     : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -149,7 +143,7 @@ export function RetroFilterPanel({
         {paletteMode === "mono" && (
           <label className="block">
             <span className="text-slate-100">Mono tint</span>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {Object.entries(MONO_TINTS).map(([key, tint]) => (
                 <button
                   key={key}
@@ -158,7 +152,7 @@ export function RetroFilterPanel({
                     onSetMonoTint(key as MonoTintMode);
                   }}
                   className={[
-                    "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100 sm:min-h-11 sm:px-3 sm:text-sm",
                     monoTint === key
                       ? "border-sky-400 bg-sky-500/20"
                       : "border-slate-600 bg-slate-900 hover:bg-slate-800",

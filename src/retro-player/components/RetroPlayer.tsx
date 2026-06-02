@@ -405,7 +405,6 @@ export function RetroPlayer({
                 monoTint={filterState.monoTint}
                 paletteMode={filterState.paletteMode}
                 phosphorStrength={filterState.phosphorStrength}
-                previewName={player.previewName}
                 scanlineStrength={filterState.scanlineStrength}
                 scanline2Strength={filterState.scanline2Strength}
                 sourceDimensions={player.sourceDimensions}
