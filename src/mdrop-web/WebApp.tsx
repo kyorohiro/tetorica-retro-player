@@ -4,7 +4,7 @@ import { Loader } from "lucide-react";
 import { FileTargetFile, getDownloadList, getMeta, Target, TargetFile } from "./api";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import { usePreviewDialog } from "./usePreviewDialog";
-import { sleep, isAudio, isEpub, isImage, isPdf, isText, isVideo, isArchive } from "../utils";
+import { sleep, isAudio, isEpub, isImage, isPdf, isText, isVideo, isArchive } from "./utils";
 
 
 function WebApp({ active }: { active?: boolean }) {

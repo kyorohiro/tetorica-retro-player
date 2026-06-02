@@ -12,7 +12,7 @@ import {
   type ZipSource,
 } from "./extractor";
 
-import { mimeFromPath } from "../utils";
+import { mimeFromPath } from "./utils";
 
 type UnrarExtractor = Extractor<Uint8Array>;
 

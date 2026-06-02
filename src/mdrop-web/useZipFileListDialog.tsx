@@ -10,7 +10,7 @@ import {
     isText,
     isVideo,
     isArchive,
-} from "../utils";
+} from "./utils";
 import {
     ZipExtractor,
     type ZipSource,

@@ -8,7 +8,7 @@ import {
   type Entry,
   type FileEntry,
 } from "@zip.js/zip.js";
-import { isCover, mimeFromPath } from "../utils";
+import { isCover, mimeFromPath } from "./utils";
 
 export type ZipSource =
   | { type: "blob"; blob: Blob }
