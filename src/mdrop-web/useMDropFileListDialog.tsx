@@ -169,7 +169,7 @@ function FileListDialog({
     }, [files, sort, path]);
 
     return (
-        <div className="flex h-[calc(100vh-2rem)] w-[min(96vw,900px)] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 shadow-xl">
+        <div className="safe-dialog-card flex w-[min(96vw,900px)] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 shadow-xl">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
                 <div className="min-w-0">
                     <h2 className="truncate text-lg font-semibold">{title ?? "Files"}</h2>

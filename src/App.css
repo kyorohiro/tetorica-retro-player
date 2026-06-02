@@ -41,6 +41,35 @@ button {
   top: calc(max(0.0rem, env(safe-area-inset-top)) + 3.25rem);
 }
 
+.safe-dialog-overlay {
+  padding-top: max(0.0rem, env(safe-area-inset-top));
+  padding-right: max(0.0rem, env(safe-area-inset-right));
+  padding-bottom: max(0.0rem, env(safe-area-inset-bottom));
+  padding-left: max(0.0rem, env(safe-area-inset-left));
+}
+
+.safe-dialog-card {
+  max-height: calc(
+    100dvh
+    - max(0.0rem, env(safe-area-inset-top))
+    - max(0.0rem, env(safe-area-inset-bottom))
+    - 1rem
+  );
+}
+
+.safe-dialog-fullscreen {
+  height: calc(
+    100dvh
+    - max(0.0rem, env(safe-area-inset-top))
+    - max(0.0rem, env(safe-area-inset-bottom))
+  );
+  width: calc(
+    100dvw
+    - max(0.0rem, env(safe-area-inset-left))
+    - max(0.0rem, env(safe-area-inset-right))
+  );
+}
+
 @media (orientation: landscape) {
   .safe-top-pad {
     padding-top: 0;
