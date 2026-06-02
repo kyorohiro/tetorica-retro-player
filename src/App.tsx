@@ -24,6 +24,12 @@ function App() {
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const isIosOrAndroid = React.useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+
+    const userAgent = navigator.userAgent || "";
+    return /Android|iPhone|iPad|iPod/i.test(userAgent);
+  }, []);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = previewSource.previewStream
@@ -165,14 +171,16 @@ function App() {
   }, []);
 
   const handleOpenFolderPicker = useCallback(() => {
+    if (isIosOrAndroid) return;
     folderInputRef.current?.click();
     setIsMobileMenuOpen(false);
-  }, []);
+  }, [isIosOrAndroid]);
 
   const handleOpenDisplayCapture = useCallback(() => {
+    if (isIosOrAndroid) return;
     setIsMobileMenuOpen(false);
     void handleDisplayCapture();
-  }, [handleDisplayCapture]);
+  }, [handleDisplayCapture, isIosOrAndroid]);
 
   return (
     <main
@@ -204,20 +212,24 @@ function App() {
                   >
                     Drop image/video/audio here, or click to add file
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenFolderPicker}
-                    className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
-                  >
-                    Drop folders/archives here, or click to add folders
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenDisplayCapture}
-                    className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
-                  >
-                    Capture screen or window
-                  </button>
+                  {!isIosOrAndroid && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleOpenFolderPicker}
+                        className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                      >
+                        Drop folders/archives here, or click to add folders
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenDisplayCapture}
+                        className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
+                      >
+                        Capture screen or window
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -271,22 +283,24 @@ function App() {
           }}
         />
 
-        <input
-          ref={folderInputRef}
-          type="file"
-          multiple
-          {...({ webkitdirectory: "true" } as any)}
-          className="hidden"
-          onChange={async (event) => {
-            const input = event.currentTarget;
-            const files = input.files;
-            if (files && files.length > 0) {
-              await openPortableTargets(files);
-            }
+        {!isIosOrAndroid && (
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            {...({ webkitdirectory: "true" } as any)}
+            className="hidden"
+            onChange={async (event) => {
+              const input = event.currentTarget;
+              const files = input.files;
+              if (files && files.length > 0) {
+                await openPortableTargets(files);
+              }
 
-            input.value = "";
-          }}
-        />
+              input.value = "";
+            }}
+          />
+        )}
       </div>
     </main>
   );
