@@ -221,18 +221,20 @@ export function VideoControls({
             <button
               type="button"
               onClick={onTogglePlayback}
-              className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20 sm:col-span-1"
+              aria-label={isPlaying ? "Pause" : "Play"}
+              title={isPlaying ? "Pause" : "Play"}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-slate-100 hover:bg-emerald-500/20"
             >
               {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-              {isPlaying ? "Pause" : "Play"}
             </button>
             <button
               type="button"
               onClick={onRestart}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
+              aria-label="Restart"
+              title="Restart"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
             >
               <RotateCcw size={16} />
-              Restart
             </button>
             <button
               type="button"
@@ -257,23 +259,25 @@ export function VideoControls({
             <button
               type="button"
               onClick={onToggleMute}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+              title={isMuted ? "Unmute" : "Mute"}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
             >
               {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              {isMuted ? "Unmute" : "Mute"}
             </button>
             <button
               type="button"
               onClick={onToggleLoop}
+              aria-label={isLooping ? "Loop on" : "Loop off"}
+              title={isLooping ? "Loop on" : "Loop off"}
               className={[
-                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+                  "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-slate-100",
                   isLooping
                     ? "border-sky-400 bg-sky-500/20"
                     : "border-slate-600 bg-slate-900 hover:bg-slate-800",
               ].join(" ")}
             >
               <RotateCcw size={16} />
-              {isLooping ? "Loop on" : "Loop off"}
             </button>
             <div className="relative">
               <button
@@ -281,10 +285,11 @@ export function VideoControls({
                 onClick={() => {
                   setIsSpeedOpen((current) => !current);
                 }}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 sm:w-auto"
+                aria-label={`Speed ${playbackRate}x`}
+                title={`Speed ${playbackRate}x`}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 sm:w-auto"
               >
                 <Gauge size={14} />
-                Speed {playbackRate}x
               </button>
               {isSpeedOpen && (
                 <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg sm:min-w-28">
@@ -314,20 +319,22 @@ export function VideoControls({
                   onClick={() => {
                     onStepFrame(-1);
                   }}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                  aria-label="Previous frame"
+                  title="Previous frame"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
                 >
                   <StepBack size={16} />
-                  Prev frame
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     onStepFrame(1);
                   }}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                  aria-label="Next frame"
+                  title="Next frame"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
                 >
                   <StepForward size={16} />
-                  Next frame
                 </button>
               </>
             )}
