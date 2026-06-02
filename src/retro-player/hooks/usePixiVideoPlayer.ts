@@ -242,6 +242,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       filterState.isFilterEnabled && filterRef.current ? [filterRef.current] : [];
   };
 
+  const syncTexturePresentation = () => {
+    const texture = textureRef.current;
+    if (!texture?.source) return;
+
+    texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
+  };
+
   const releaseDetachedMedia = (
     media: HTMLMediaElement,
     url?: string,
@@ -397,7 +404,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       screenHeight / sourceHeight,
     );
     const integerScale = Math.max(1, Math.floor(scale));
-    const appliedScale = scale >= 1 ? integerScale : scale;
+    const appliedScale =
+      filterState.isFilterEnabled && scale >= 1 ? integerScale : scale;
 
     debugVideo("fitSprite", {
       sourceTag: source.tagName,
@@ -1031,7 +1039,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
         if (media instanceof HTMLVideoElement) {
           const texture = createVideoTexture(media);
           texture.source.update();
-          texture.source.scaleMode = "nearest";
+          texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
 
           const filter = filterRef.current;
           if (!filter) {
@@ -1095,7 +1103,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
       const texture = Texture.from(image);
       texture.source.update();
-      texture.source.scaleMode = "nearest";
+      texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
 
       const filter = filterRef.current;
       if (!filter) {
@@ -1159,7 +1167,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
     const texture = createVideoTexture(video);
     texture.source.update();
-    texture.source.scaleMode = "nearest";
+    texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
 
     const sprite = new Sprite(texture);
     sprite.filters = filterState.isFilterEnabled ? [filter] : [];
@@ -1279,11 +1287,17 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       if (!canvasHostRef.current || appRef.current) return;
 
       const app = new Application();
+      const deviceResolution =
+        typeof window !== "undefined"
+          ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))
+          : 1;
       await app.init({
         resizeTo: canvasHostRef.current,
         background: "#020617",
         antialias: true,
         preference: "webgl",
+        autoDensity: true,
+        resolution: deviceResolution,
       });
 
       if (cancelled) {
@@ -1363,6 +1377,8 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
   useEffect(() => {
     applyFilterState();
     syncSpriteFilter();
+    syncTexturePresentation();
+    fitCurrentSprite();
   }, [
     filterState.colorLevels,
     filterState.curvature,
@@ -1714,7 +1730,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
           const texture = createVideoTexture(media as HTMLVideoElement);
           texture.source.update();
-          texture.source.scaleMode = "nearest";
+          texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
 
           const filter = filterRef.current;
           if (!filter) throw new Error("Pixi filter is not ready.");
@@ -1759,7 +1775,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
 
           const texture = Texture.from(image as HTMLImageElement);
           texture.source.update();
-          texture.source.scaleMode = "nearest";
+          texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
 
           const filter = filterRef.current;
           if (!filter) throw new Error("Pixi filter is not ready.");
