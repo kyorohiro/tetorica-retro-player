@@ -232,7 +232,10 @@ export function RetroPlayer({
             }
           >
             <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
-              <div ref={player.canvasHostRef} className="h-full w-full" />
+              <div
+                ref={player.canvasHostRef}
+                className="pointer-events-none h-full w-full touch-pan-y"
+              />
               {!player.isPoweredOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/72">
                   <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
