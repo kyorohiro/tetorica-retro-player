@@ -70,7 +70,7 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
                         <div
                             key={item.id}
                             className={[
-                                "fixed inset-0 z-50 overflow-hidden bg-black/60 p-0 sm:p-4",
+                                "safe-dialog-overlay fixed inset-0 z-50 overflow-hidden bg-black/60",
                                 isTop ? "block" : "hidden",
                             ].join(" ")}
                         >
@@ -129,7 +129,7 @@ const TextInputDialog: React.FC<{
     const handleCancel = () => onCancel();
 
     return (
-        <div className="w-full max-w-sm rounded-2xl bg-slate-900 p-6 shadow-xl border border-slate-700 text-white">
+        <div className="safe-dialog-card w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 text-white shadow-xl">
             <h2 className="text-lg font-semibold mb-3">
                 {options.title ?? "入力"}
             </h2>
@@ -189,7 +189,7 @@ const ProgressDialog: React.FC<{
     const { title, message, cancellable, cancelText } = options;
 
     return (
-        <div className="w-full max-w-sm rounded-2xl bg-slate-900 p-6 shadow-xl border border-slate-700 text-slate-100">
+        <div className="safe-dialog-card w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-xl">
             <h2 className="text-lg font-semibold mb-3">
                 {title ?? "処理中…"}
             </h2>
@@ -241,7 +241,7 @@ const SelectDialog: React.FC<{
     onCancel: () => void;
 }> = ({ options, onSelect, onCancel }) => {
     return (
-        <div className="w-full max-w-sm rounded-2xl bg-slate-900 p-6 shadow-xl border border-slate-700 text-slate-100">
+        <div className="safe-dialog-card w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-xl">
             <h2 className="text-lg font-semibold mb-3">
                 {options.title ?? "選択してください"}
             </h2>
@@ -363,7 +363,7 @@ const FileDialog: React.FC<{
     };
 
     return (
-        <div className="w-full max-w-lg rounded-2xl bg-slate-900 p-6 shadow-xl border border-slate-700 text-slate-100">
+        <div className="safe-dialog-card w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-xl">
             <h2 className="text-lg font-semibold mb-3">
                 {options.title ?? "Select File"}
             </h2>
@@ -547,7 +547,7 @@ export function useDialog() {
     const showConfirmDialog = useCallback(
         (opts: SimpleDialogOptions): Promise<boolean | null> => {
             return showDialog<boolean>(({ resolve, close }) => (
-                <div className="w-full max-w-sm rounded-2xl bg-slate-900 p-6 shadow-xl border border-slate-700">
+                <div className="safe-dialog-card w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl">
                     <h2 className="text-lg font-semibold mb-3 text-slate-300">{opts.title}</h2>
                     <div className="text-xs text-slate-300">{opts.body}</div>
 
@@ -585,7 +585,7 @@ export function useDialog() {
     const showImageConfirmDialog = useCallback(
         (opts: ImageConfirmDialogOptions): Promise<boolean | null> => {
             return showDialog<boolean>(({ resolve, close }) => (
-                <div className="flex w-[min(96vw,1200px)] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
+                <div className="safe-dialog-card flex w-[min(96vw,1200px)] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
                     <div className="shrink-0 border-b border-slate-700 px-4 py-3">
                         <h2 className="text-lg font-semibold text-slate-100">
                             {opts.title ?? "画像を確認"}
