@@ -407,6 +407,7 @@ export function RetroPlayer({
                 phosphorStrength={filterState.phosphorStrength}
                 scanlineStrength={filterState.scanlineStrength}
                 scanline2Strength={filterState.scanline2Strength}
+                selectedPreset={filterState.selectedPreset}
                 sourceDimensions={player.sourceDimensions}
                 targetHeight={filterState.targetHeight}
                 targetWidth={filterState.targetWidth}

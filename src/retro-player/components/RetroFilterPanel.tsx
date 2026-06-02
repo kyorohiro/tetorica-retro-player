@@ -17,6 +17,7 @@ type RetroFilterPanelProps = {
   phosphorStrength: number;
   scanlineStrength: number;
   scanline2Strength: number;
+  selectedPreset: RetroPresetKey | null;
   sourceDimensions: { width: number; height: number } | null;
   targetHeight: number;
   targetWidth: number;
@@ -49,6 +50,7 @@ export function RetroFilterPanel({
   phosphorStrength,
   scanlineStrength,
   scanline2Strength,
+  selectedPreset,
   sourceDimensions,
   targetHeight,
   targetWidth,
@@ -93,7 +95,12 @@ export function RetroFilterPanel({
             onClick={() => {
               onApplyPreset(key as RetroPresetKey);
             }}
-            className="min-h-10 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-[11px] leading-tight text-slate-100 hover:bg-amber-500/20 sm:min-h-11 sm:px-3 sm:text-sm"
+            className={[
+              "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100 sm:min-h-11 sm:px-3 sm:text-sm",
+              selectedPreset === key
+                ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50 shadow-[0_0_14px_rgba(74,222,128,0.45)]"
+                : "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20",
+            ].join(" ")}
           >
             {preset.label}
           </button>
