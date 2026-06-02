@@ -335,31 +335,32 @@ export function VideoControls({
         </>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-3" : "grid-cols-2"} sm:flex sm:flex-wrap sm:items-center`}>
         <button
           type="button"
           onClick={onToggleVideoSettings}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 text-cyan-50 hover:bg-cyan-500/30"
+          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-2 py-2 text-xs text-cyan-50 hover:bg-cyan-500/30 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
         >
           <SlidersHorizontal size={16} />
-          {isVideoSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
+          {isVideoSettingsOpen ? "Close Video" : "Video"}
         </button>
         {hasPlayback && (
           <button
             type="button"
             onClick={onToggleAudioSettings}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-3 py-2 text-fuchsia-50 hover:bg-fuchsia-500/30"
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
           >
             <Mic2 size={16} />
-            Show Audio Setting
+            Audio
           </button>
         )}
         <button
           type="button"
           onClick={onResetSettings}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-slate-100 hover:bg-rose-500/20"
+          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-slate-100 hover:bg-rose-500/20 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
         >
-          Reset Settings
+          <RotateCcw size={15} />
+          Reset
         </button>
       </div>
       {hasPlayback && (
