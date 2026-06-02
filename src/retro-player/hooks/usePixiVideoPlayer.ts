@@ -7,21 +7,7 @@ import {
 } from "../retro/config";
 import type { RetroFilterState } from "./useRetroFilterState";
 import { FILTER_FRAGMENT, FILTER_VERTEX } from "../retro/filterShader";
-import {
-  loadPersistedRetroSettings,
-  savePersistedRetroAudioSettings,
-} from "./persistedRetroSettings";
-
-const DEFAULT_AUDIO_SETTINGS = {
-  isMuted: false,
-  volume: 1,
-  playbackRate: 1,
-  isLooping: true,
-  isAudioFxEnabled: true,
-  lofiAmount: 0.80,
-  isNoiseEnabled: true,
-  noiseLevel: 0.02,
-} as const;
+import { useRetroAudioEngine } from "./useRetroAudioEngine";
 
 let retroPlayerInstanceSeed = 0;
 
@@ -30,22 +16,6 @@ export function usePixiVideoPlayer(
   renderResolutionScale = 1,
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
-  const [initialAudioSettings] = useState(() => {
-    const persisted = loadPersistedRetroSettings()?.audio;
-
-    return {
-      isMuted: persisted?.isMuted ?? DEFAULT_AUDIO_SETTINGS.isMuted,
-      volume: persisted?.volume ?? DEFAULT_AUDIO_SETTINGS.volume,
-      playbackRate: persisted?.playbackRate ?? DEFAULT_AUDIO_SETTINGS.playbackRate,
-      isLooping: persisted?.isLooping ?? DEFAULT_AUDIO_SETTINGS.isLooping,
-      isAudioFxEnabled:
-        persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_SETTINGS.isAudioFxEnabled,
-      lofiAmount: persisted?.lofiAmount ?? DEFAULT_AUDIO_SETTINGS.lofiAmount,
-      isNoiseEnabled:
-        persisted?.isNoiseEnabled ?? DEFAULT_AUDIO_SETTINGS.isNoiseEnabled,
-      noiseLevel: persisted?.noiseLevel ?? DEFAULT_AUDIO_SETTINGS.noiseLevel,
-    };
-  });
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const appRef = useRef<Application | null>(null);
@@ -57,27 +27,7 @@ export function usePixiVideoPlayer(
   const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
   const filterRef = useRef<Filter | null>(null);
   const previewRequestIdRef = useRef<number>(0);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
-  const lofiLowpassRef = useRef<BiquadFilterNode | null>(null);
-  const lofiHighshelfRef = useRef<BiquadFilterNode | null>(null);
-  const lofiDriveRef = useRef<WaveShaperNode | null>(null);
-  const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const noiseFilterRef = useRef<BiquadFilterNode | null>(null);
-  const noisePannerRef = useRef<StereoPannerNode | null>(null);
-  const noiseGainRef = useRef<GainNode | null>(null);
-  const noiseLfoRef = useRef<OscillatorNode | null>(null);
-  const noiseLfoGainRef = useRef<GainNode | null>(null);
-  const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
-  const volumeRef = useRef<number>(initialAudioSettings.volume);
   const isPlayingRef = useRef<boolean>(false);
-  const playbackRateRef = useRef<number>(initialAudioSettings.playbackRate);
-  const isLoopingRef = useRef<boolean>(initialAudioSettings.isLooping);
-  const isAudioFxEnabledRef = useRef<boolean>(initialAudioSettings.isAudioFxEnabled);
-  const lofiAmountRef = useRef<number>(initialAudioSettings.lofiAmount);
-  const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
-  const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
 
   const [previewName, setPreviewName] = useState<string>("");
@@ -88,12 +38,8 @@ export function usePixiVideoPlayer(
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
-  const [playbackRate, setPlaybackRate] = useState<number>(initialAudioSettings.playbackRate);
-  const [volume, setVolume] = useState<number>(initialAudioSettings.volume);
-  const [isLooping, setIsLooping] = useState<boolean>(initialAudioSettings.isLooping);
   const [previewKind, setPreviewKind] = useState<
     "video" | "audio" | "image" | "capture" | null
   >(null);
@@ -107,21 +53,6 @@ export function usePixiVideoPlayer(
     x: number;
     y: number;
   } | null>(null);
-  const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(
-    initialAudioSettings.isAudioFxEnabled,
-  );
-  const [lofiAmount, setLofiAmount] = useState<number>(initialAudioSettings.lofiAmount);
-  const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(
-    initialAudioSettings.isNoiseEnabled,
-  );
-  const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
-
-  const debugAudio = (label: string, payload?: Record<string, unknown>) => {
-    console.log(
-      `[retro-player audio][${instanceLabelRef.current}] ${label}`,
-      payload ?? {},
-    );
-  };
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     console.log(
@@ -129,6 +60,47 @@ export function usePixiVideoPlayer(
       payload ?? {},
     );
   };
+
+  const audio = useRetroAudioEngine({
+    instanceLabel: instanceLabelRef.current,
+    previewKind,
+    mediaRef,
+    isPlaying,
+  });
+
+  const {
+    audioContextRef,
+    mediaSourceRef,
+    masterGainRef,
+    noiseSourceRef,
+    noiseGainRef,
+    noiseLfoRef,
+    isMutedRef,
+    volumeRef,
+    playbackRateRef,
+    isLoopingRef,
+    isMuted,
+    setIsMuted,
+    playbackRate,
+    setPlaybackRate,
+    volume,
+    setVolume,
+    isLooping,
+    setIsLooping,
+    isAudioFxEnabled,
+    setIsAudioFxEnabled,
+    lofiAmount,
+    setLofiAmount,
+    isNoiseEnabled,
+    setIsNoiseEnabled,
+    noiseLevel,
+    setNoiseLevel,
+    debugAudio,
+    ensureAudioContext,
+    updateAudioNodes,
+    connectMediaAudio,
+    resetAudioSettings,
+  } = audio;
 
   const setPreviewKindState = (
     nextKind: "video" | "audio" | "image" | "capture" | null,
@@ -571,183 +543,6 @@ export function usePixiVideoPlayer(
     updateAudioNodes();
   };
 
-  const createDriveCurve = (amount: number) => {
-    const samples = 256;
-    const curve = new Float32Array(samples);
-    const drive = 1 + amount * 5;
-
-    for (let index = 0; index < samples; index += 1) {
-      const x = (index * 2) / (samples - 1) - 1;
-      curve[index] = Math.tanh(x * drive);
-    }
-
-    return curve;
-  };
-
-  const ensureAudioContext = async () => {
-    if (typeof window === "undefined") return null;
-
-    if (!audioContextRef.current) {
-      const context = new window.AudioContext();
-      const masterGain = context.createGain();
-      const lowpass = context.createBiquadFilter();
-      const highshelf = context.createBiquadFilter();
-      const drive = context.createWaveShaper();
-      lowpass.type = "lowpass";
-      highshelf.type = "highshelf";
-      highshelf.frequency.value = 2800;
-      drive.oversample = "4x";
-
-      lowpass.connect(highshelf);
-      highshelf.connect(drive);
-      drive.connect(masterGain);
-      masterGain.connect(context.destination);
-
-      const noiseSource = context.createBufferSource();
-      const noiseBuffer = context.createBuffer(2, context.sampleRate * 2, context.sampleRate);
-      for (let channel = 0; channel < noiseBuffer.numberOfChannels; channel += 1) {
-        const channelData = noiseBuffer.getChannelData(channel);
-        for (let index = 0; index < channelData.length; index += 1) {
-          channelData[index] = Math.random() * 2 - 1;
-        }
-      }
-      noiseSource.buffer = noiseBuffer;
-      noiseSource.loop = true;
-
-      const noiseFilter = context.createBiquadFilter();
-      noiseFilter.type = "bandpass";
-      noiseFilter.frequency.value = 4200;
-      noiseFilter.Q.value = 0.8;
-
-      const noisePanner = context.createStereoPanner();
-      const noiseGain = context.createGain();
-      const noiseLfo = context.createOscillator();
-      const noiseLfoGain = context.createGain();
-
-      noiseLfo.type = "sine";
-      noiseLfo.frequency.value = 0.065;
-      noiseLfoGain.gain.value = 0.45;
-
-      noiseSource.connect(noiseFilter);
-      noiseFilter.connect(noisePanner);
-      noisePanner.connect(noiseGain);
-      noiseGain.connect(masterGain);
-      noiseLfo.connect(noiseLfoGain);
-      noiseLfoGain.connect(noisePanner.pan);
-      noiseSource.start();
-      noiseLfo.start();
-
-      audioContextRef.current = context;
-      masterGainRef.current = masterGain;
-      lofiLowpassRef.current = lowpass;
-      lofiHighshelfRef.current = highshelf;
-      lofiDriveRef.current = drive;
-      noiseSourceRef.current = noiseSource;
-      noiseFilterRef.current = noiseFilter;
-      noisePannerRef.current = noisePanner;
-      noiseGainRef.current = noiseGain;
-      noiseLfoRef.current = noiseLfo;
-      noiseLfoGainRef.current = noiseLfoGain;
-    }
-
-    if (audioContextRef.current.state === "suspended") {
-      try {
-        await audioContextRef.current.resume();
-      } catch {
-        // Resume can be blocked until the next user gesture.
-      }
-    }
-
-    return audioContextRef.current;
-  };
-
-  const updateAudioNodes = () => {
-    const masterGain = masterGainRef.current;
-    const lowpass = lofiLowpassRef.current;
-    const highshelf = lofiHighshelfRef.current;
-    const drive = lofiDriveRef.current;
-    const noiseGainNode = noiseGainRef.current;
-    const media = mediaRef.current;
-    const hasPlayablePreview =
-      previewKindRef.current === "video" ||
-      previewKindRef.current === "audio" ||
-      previewKindRef.current === "capture";
-    const isMediaPlaying = media ? !media.paused : isPlayingRef.current;
-    const nextMuted = isMutedRef.current;
-    const nextVolume = volumeRef.current;
-    const nextAudioFxEnabled = isAudioFxEnabledRef.current;
-    const nextLofiAmount = lofiAmountRef.current;
-    const nextNoiseEnabled = isNoiseEnabledRef.current;
-    const nextNoiseLevel = noiseLevelRef.current;
-
-    if (masterGain) {
-      masterGain.gain.value = nextMuted ? 0 : nextVolume;
-    }
-
-    if (media) {
-      media.muted = nextMuted;
-      media.volume = nextMuted ? 0 : nextVolume;
-    }
-
-    if (lowpass && highshelf && drive) {
-      const amount = nextAudioFxEnabled ? nextLofiAmount : 0;
-      lowpass.frequency.value = 16000 - amount * 14200;
-      lowpass.Q.value = 0.3 + amount * 1.8;
-      highshelf.gain.value = -amount * 18;
-      drive.curve = createDriveCurve(amount * 0.6);
-    }
-
-    if (noiseGainNode) {
-      noiseGainNode.gain.value =
-        nextNoiseEnabled && !nextMuted && hasPlayablePreview && isMediaPlaying
-          ? nextNoiseLevel
-          : 0;
-    }
-  };
-
-  const connectMediaAudio = async (media: HTMLMediaElement) => {
-    const context = await ensureAudioContext();
-    if (!context) {
-      debugAudio("connectMediaAudio:no-context", {
-        mediaTag: media.tagName,
-      });
-      return;
-    }
-
-    if (mediaSourceRef.current) {
-      debugAudio("connectMediaAudio:disconnect-previous", {
-        mediaTag: media.tagName,
-      });
-      mediaSourceRef.current.disconnect();
-      mediaSourceRef.current = null;
-    }
-
-    try {
-      const mediaSource = context.createMediaElementSource(media);
-      mediaSource.connect(lofiLowpassRef.current!);
-      mediaSourceRef.current = mediaSource;
-      media.muted = isMutedRef.current;
-      media.volume = isMutedRef.current ? 0 : volumeRef.current;
-      debugAudio("connectMediaAudio:connected", {
-        audioContextState: context.state,
-        lofiAmount,
-        isAudioFxEnabled,
-        isMuted,
-        volume,
-        mediaTag: media.tagName,
-        previewKind,
-      });
-      updateAudioNodes();
-    } catch (error) {
-      debugAudio("connectMediaAudio:error", {
-        audioContextState: context.state,
-        mediaTag: media.tagName,
-        message: error instanceof Error ? error.message : String(error),
-        previewKind,
-      });
-      throw error;
-    }
-  };
 
   const cleanupPreview = () => {
     debugVideo("cleanupPreview:start", {
@@ -967,36 +762,6 @@ export function usePixiVideoPlayer(
     }
   };
 
-  const resetAudioSettings = () => {
-    const nextSettings = { ...DEFAULT_AUDIO_SETTINGS };
-
-    isMutedRef.current = nextSettings.isMuted;
-    volumeRef.current = nextSettings.volume;
-    playbackRateRef.current = nextSettings.playbackRate;
-    isLoopingRef.current = nextSettings.isLooping;
-    isAudioFxEnabledRef.current = nextSettings.isAudioFxEnabled;
-    lofiAmountRef.current = nextSettings.lofiAmount;
-    isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
-    noiseLevelRef.current = nextSettings.noiseLevel;
-
-    setIsMuted(nextSettings.isMuted);
-    setVolume(nextSettings.volume);
-    setPlaybackRate(nextSettings.playbackRate);
-    setIsLooping(nextSettings.isLooping);
-    setIsAudioFxEnabled(nextSettings.isAudioFxEnabled);
-    setLofiAmount(nextSettings.lofiAmount);
-    setIsNoiseEnabled(nextSettings.isNoiseEnabled);
-    setNoiseLevel(nextSettings.noiseLevel);
-
-    if (mediaRef.current) {
-      mediaRef.current.muted = nextSettings.isMuted;
-      mediaRef.current.volume = nextSettings.volume;
-      mediaRef.current.playbackRate = nextSettings.playbackRate;
-      mediaRef.current.loop = nextSettings.isLooping;
-    }
-
-    window.requestAnimationFrame(updateAudioNodes);
-  };
 
   const previewFile = async (file: File) => {
     const isVideo = file.type.startsWith("video/");
@@ -1444,32 +1209,7 @@ export function usePixiVideoPlayer(
   }, [previewError, needsUserPlay, previewKind, isPlaying]);
 
   useEffect(() => {
-    isMutedRef.current = isMuted;
-    volumeRef.current = volume;
     isPlayingRef.current = isPlaying;
-    playbackRateRef.current = playbackRate;
-    isLoopingRef.current = isLooping;
-    isAudioFxEnabledRef.current = isAudioFxEnabled;
-    lofiAmountRef.current = lofiAmount;
-    isNoiseEnabledRef.current = isNoiseEnabled;
-    noiseLevelRef.current = noiseLevel;
-    previewKindRef.current = previewKind;
-
-    debugAudio("audioStateChanged", {
-      isMuted,
-      volume,
-      isAudioFxEnabled,
-      lofiAmount,
-      isNoiseEnabled,
-      noiseLevel,
-      isPlaying,
-      playbackRate,
-      isLooping,
-      previewKind,
-      audioContextState: audioContextRef.current?.state ?? "none",
-      hasMediaSource: Boolean(mediaSourceRef.current),
-      mediaTag: mediaRef.current?.tagName ?? null,
-    });
 
     const isVideoReady =
       (previewKind === "video" || previewKind === "capture") &&
@@ -1482,42 +1222,7 @@ export function usePixiVideoPlayer(
     if (isVideoReady && !isPlaying && audioContextRef.current?.state === "suspended") {
       setNeedsUserPlay(true);
     }
-
-    updateAudioNodes();
-  }, [
-    isMuted,
-    volume,
-    isAudioFxEnabled,
-    lofiAmount,
-    isNoiseEnabled,
-    noiseLevel,
-    isPlaying,
-    playbackRate,
-    isLooping,
-    previewKind,
-  ]);
-
-  useEffect(() => {
-    savePersistedRetroAudioSettings({
-      isMuted,
-      volume,
-      playbackRate,
-      isLooping,
-      isAudioFxEnabled,
-      lofiAmount,
-      isNoiseEnabled,
-      noiseLevel,
-    });
-  }, [
-    isMuted,
-    volume,
-    playbackRate,
-    isLooping,
-    isAudioFxEnabled,
-    lofiAmount,
-    isNoiseEnabled,
-    noiseLevel,
-  ]);
+  }, [audioContextRef, isPlaying, previewKind]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
