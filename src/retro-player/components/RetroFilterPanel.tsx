@@ -73,18 +73,18 @@ export function RetroFilterPanel({
 }: RetroFilterPanelProps) {
   return (
     <>
-      <p className="mt-2 break-all">
+      <p className="mt-2 break-all text-sm leading-6">
         {previewName || "動画、音声、画像がまだ選択されていません"}
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
         <button
           type="button"
           onClick={() => {
             onSetIsFilterEnabled(!isFilterEnabled);
           }}
           className={[
-            "rounded-lg border px-3 py-1.5 text-slate-100",
+            "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
             isFilterEnabled
               ? "border-emerald-400 bg-emerald-500/20"
               : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -99,7 +99,7 @@ export function RetroFilterPanel({
             onClick={() => {
               onApplyPreset(key as RetroPresetKey);
             }}
-            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-slate-100 hover:bg-amber-500/20"
+            className="min-h-11 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-slate-100 hover:bg-amber-500/20"
           >
             {preset.label}
           </button>
@@ -109,7 +109,7 @@ export function RetroFilterPanel({
       <div className="mt-4 space-y-3">
         <label className="block">
           <span className="text-slate-100">Palette</span>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             {(
               ["free", "pc98", "pc98_512", "pc98_4096", "color32", "color64", "mono"] as const
             ).map(
@@ -121,7 +121,7 @@ export function RetroFilterPanel({
                   onSetPaletteMode(mode);
                 }}
                 className={[
-                  "rounded-lg border px-3 py-1.5 text-slate-100",
+                  "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
                   paletteMode === mode
                     ? "border-sky-400 bg-sky-500/20"
                     : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -149,7 +149,7 @@ export function RetroFilterPanel({
         {paletteMode === "mono" && (
           <label className="block">
             <span className="text-slate-100">Mono tint</span>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {Object.entries(MONO_TINTS).map(([key, tint]) => (
                 <button
                   key={key}
@@ -158,7 +158,7 @@ export function RetroFilterPanel({
                     onSetMonoTint(key as MonoTintMode);
                   }}
                   className={[
-                    "rounded-lg border px-3 py-1.5 text-slate-100",
+                    "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
                     monoTint === key
                       ? "border-sky-400 bg-sky-500/20"
                       : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -201,8 +201,8 @@ export function RetroFilterPanel({
           />
         </label>
 
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-          <div className="text-[11px] text-slate-400">
+        <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-[11px] leading-5 text-slate-400">
             {sourceDimensions
               ? `Source aspect: ${sourceDimensions.width} x ${sourceDimensions.height}`
               : "Source aspect: unavailable for audio-only preview"}
@@ -212,7 +212,7 @@ export function RetroFilterPanel({
             onClick={onSyncTargetAspect}
             disabled={!sourceDimensions}
             className={[
-              "rounded-lg border px-3 py-1.5 text-slate-100",
+              "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
               sourceDimensions
                 ? "border-sky-400/50 bg-sky-500/10 hover:bg-sky-500/20"
                 : "cursor-not-allowed border-slate-700 bg-slate-900 text-slate-500",

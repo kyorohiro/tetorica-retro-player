@@ -1,4 +1,5 @@
 import React, { useCallback, useRef } from "react";
+import { Menu, X } from "lucide-react";
 import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
@@ -22,6 +23,7 @@ function App() {
   const previewSource = usePreviewSourceState();
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = previewSource.previewStream
@@ -157,68 +159,123 @@ function App() {
     };
   }, []);
 
+  const handleOpenFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+    setIsMobileMenuOpen(false);
+  }, []);
+
+  const handleOpenFolderPicker = useCallback(() => {
+    folderInputRef.current?.click();
+    setIsMobileMenuOpen(false);
+  }, []);
+
+  const handleOpenDisplayCapture = useCallback(() => {
+    setIsMobileMenuOpen(false);
+    void handleDisplayCapture();
+  }, [handleDisplayCapture]);
+
   return (
     <main
-      className="h-screen overflow-y-auto bg-slate-200 text-slate-800"
+      className="min-h-screen overflow-x-hidden overflow-y-auto bg-slate-200 text-slate-800"
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <header className="mb-8">
-          <p className="text-sm text-slate-400">video preview via pixi.js</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">
-            Tetorica Retro Player
-          </h1>
+      <div className="relative mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-8">
+        <header className="mb-3 sm:mb-8">
+          <div className="flex items-start justify-between gap-3">
+            <div className="hidden sm:block">
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-400 sm:text-sm">
+                video preview via pixi.js
+              </p>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                Tetorica Retro Player
+              </h1>
+            </div>
+            <div className="relative sm:hidden">
+              <button
+                type="button"
+                aria-expanded={isMobileMenuOpen}
+                aria-label="Open menu"
+                onClick={() => {
+                  setIsMobileMenuOpen((current) => !current);
+                }}
+                className="fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+              >
+                {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
+              {isMobileMenuOpen && (
+                <div className="fixed left-3 top-16 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenFilePicker}
+                      className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                    >
+                      Drop image/video/audio here, or click to add file
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenFolderPicker}
+                      className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                    >
+                      Drop folders/archives here, or click to add folders
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenDisplayCapture}
+                      className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
+                    >
+                      Capture screen or window
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </header>
-        <div className="mb-4">
-
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div className="mb-4 hidden sm:block">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <button
               type="button"
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
-              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-5 text-center text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white"
+              onClick={handleOpenFilePicker}
+              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-4 text-left text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white sm:p-5 sm:text-center"
             >
               Drop image/video/audio here, or click to add file
             </button>
             <button
               type="button"
-              onClick={() => {
-                folderInputRef.current?.click();
-              }}
-              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-5 text-center text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white"
+              onClick={handleOpenFolderPicker}
+              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-4 text-left text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white sm:p-5 sm:text-center"
             >
               Drop folders/archives here, or click to add folders
             </button>
             <button
               type="button"
-              onClick={() => {
-                void handleDisplayCapture();
-              }}
-              className="w-full rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 p-5 text-center text-sm text-slate-700 transition hover:bg-emerald-500/20"
+              onClick={handleOpenDisplayCapture}
+              className="w-full rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 p-4 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20 sm:p-5 sm:text-center"
             >
               Capture screen or window
             </button>
           </div>
-          {previewSource.previewStream && (
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={previewSource.stopPreviewStream}
-                className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-sm text-slate-700 transition hover:bg-rose-500/20"
-              >
-                Stop capture
-              </button>
-            </div>
-          )}
-          {previewSource.captureError && (
-            <p className="mt-2 text-sm text-rose-500">{previewSource.captureError}</p>
-          )}
         </div>
 
+        {previewSource.previewStream && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={previewSource.stopPreviewStream}
+              className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-sm text-slate-700 transition hover:bg-rose-500/20"
+            >
+              Stop capture
+            </button>
+          </div>
+        )}
+        {previewSource.captureError && (
+          <p className="mb-4 text-sm text-rose-500">{previewSource.captureError}</p>
+        )}
+
         {isRetroPreviewDialogActive ? (
-          <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-8 text-center text-sm text-slate-500">
+          <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500 sm:p-8">
             Retro preview is active in the dialog.
           </section>
         ) : (
