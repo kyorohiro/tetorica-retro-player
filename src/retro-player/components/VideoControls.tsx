@@ -217,7 +217,7 @@ export function VideoControls({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={onTogglePlayback}
@@ -236,26 +236,75 @@ export function VideoControls({
             >
               <RotateCcw size={16} />
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSeek(Math.max(currentTime - 5, 0));
-              }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <SkipBack size={16} />
-              -5s
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
-              }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              <SkipForward size={16} />
-              +5s
-            </button>
+            {hasVideo ? (
+              <div className="col-span-3 grid grid-cols-6 gap-2 sm:contents">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStepFrame(-1);
+                  }}
+                  aria-label="Previous frame"
+                  title="Previous frame"
+                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-2 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <StepBack size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeek(Math.max(currentTime - 5, 0));
+                  }}
+                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <SkipBack size={16} />
+                  -5s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
+                  }}
+                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <SkipForward size={16} />
+                  +5s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStepFrame(1);
+                  }}
+                  aria-label="Next frame"
+                  title="Next frame"
+                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-2 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <StepForward size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeek(Math.max(currentTime - 5, 0));
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <SkipBack size={16} />
+                  -5s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                >
+                  <SkipForward size={16} />
+                  +5s
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={onToggleMute}
@@ -312,32 +361,6 @@ export function VideoControls({
                 </div>
               )}
             </div>
-            {hasVideo && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onStepFrame(-1);
-                  }}
-                  aria-label="Previous frame"
-                  title="Previous frame"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-                >
-                  <StepBack size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onStepFrame(1);
-                  }}
-                  aria-label="Next frame"
-                  title="Next frame"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-                >
-                  <StepForward size={16} />
-                </button>
-              </>
-            )}
           </div>
         </>
       )}
