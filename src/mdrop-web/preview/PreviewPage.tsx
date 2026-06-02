@@ -153,7 +153,7 @@ export function PreviewPage({
 
     if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
         return (
-            <div className="mx-auto w-full max-w-6xl">
+            <div className="mx-auto w-full max-w-6xl touch-pan-y">
                 <RetroPlayer
                     src={src}
                     kind={
@@ -161,9 +161,9 @@ export function PreviewPage({
                             ? "video"
                             : isAudio(file.path)
                                 ? "audio"
-                                : "image"
+                            : "image"
                     }
-                    className="border-0 bg-transparent p-0 shadow-none"
+                    className="touch-pan-y border-0 bg-transparent p-0 shadow-none"
                 />
             </div>
         );
