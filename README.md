@@ -78,19 +78,19 @@ Third-party libraries and bundled dependencies remain under their respective lic
 ```
 sh deploy_mac.sh
 % ~/bin/butler login
-% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.6.4_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.6.4
+% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.7.1_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.7.1
 
-% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.6.4_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.6.4
+% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.7.1_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.7.1
 
-% ~/bin/butler push "tetorica-retro-player_0.6.4_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.6.4
+% ~/bin/butler push "tetorica-retro-player_0.7.1_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.7.1
 
-% ~/bin/butler push "tetorica-retro-player_0.6.4_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.6.4
-% ~/bin/butler push "tetorica-retro-player_0.6.4_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.6.4
+% ~/bin/butler push "tetorica-retro-player_0.7.1_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.7.1
+% ~/bin/butler push "tetorica-retro-player_0.7.1_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.7.1
 
 ```
 
 ```
 npm run build
 cd dist
-zip -r ../web-build_0.6.4_gh.zip .
+zip -r ../web-build_0.7.1_gh.zip .
 ```
