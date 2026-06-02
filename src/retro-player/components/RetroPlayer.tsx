@@ -167,6 +167,14 @@ export function RetroPlayer({
     player.setLoopingEnabled(looping);
   }, [looping, player]);
 
+  const previewFrameHeight =
+    !isPreviewMaximized &&
+    player.viewportRect &&
+    player.sourceDimensions &&
+    player.sourceDimensions.width > player.sourceDimensions.height
+      ? Math.max(280, Math.ceil(player.viewportRect.height + 24))
+      : null;
+
   return (
     <section
       className={
@@ -199,8 +207,18 @@ export function RetroPlayer({
             className={`relative overflow-hidden rounded-xl bg-slate-950 ${
               isPreviewMaximized
                 ? "h-full min-h-0 w-full"
-                : "h-[60vh] min-h-[360px] w-full min-w-0"
+                : "w-full min-w-0"
             }`}
+            style={
+              isPreviewMaximized
+                ? undefined
+                : {
+                    height: previewFrameHeight
+                      ? `${previewFrameHeight}px`
+                      : "60vh",
+                    minHeight: "280px",
+                  }
+            }
           >
             <div ref={player.canvasHostRef} className="h-full w-full" />
             {!player.isPoweredOn && (

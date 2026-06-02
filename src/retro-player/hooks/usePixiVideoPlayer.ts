@@ -101,6 +101,12 @@ export function usePixiVideoPlayer(
     width: number;
     height: number;
   } | null>(null);
+  const [viewportRect, setViewportRect] = useState<{
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(
     initialAudioSettings.isAudioFxEnabled,
   );
@@ -420,10 +426,36 @@ export function usePixiVideoPlayer(
       appliedScale,
     });
 
-    sprite.width = sourceWidth * appliedScale;
-    sprite.height = sourceHeight * appliedScale;
-    sprite.x = (screenWidth - sprite.width) / 2;
-    sprite.y = (screenHeight - sprite.height) / 2;
+    const nextWidth = sourceWidth * appliedScale;
+    const nextHeight = sourceHeight * appliedScale;
+    const nextX = (screenWidth - nextWidth) / 2;
+    const nextY = (screenHeight - nextHeight) / 2;
+
+    sprite.width = nextWidth;
+    sprite.height = nextHeight;
+    sprite.x = nextX;
+    sprite.y = nextY;
+
+    setViewportRect((current) => {
+      const next = {
+        width: nextWidth,
+        height: nextHeight,
+        x: nextX,
+        y: nextY,
+      };
+
+      if (
+        current &&
+        current.width === next.width &&
+        current.height === next.height &&
+        current.x === next.x &&
+        current.y === next.y
+      ) {
+        return current;
+      }
+
+      return next;
+    });
   };
 
   const createVideoTexture = (video: HTMLVideoElement) => {
@@ -761,6 +793,7 @@ export function usePixiVideoPlayer(
     setDuration(0);
     setPreviewKindState(null);
     setSourceDimensions(null);
+    setViewportRect(null);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -1561,6 +1594,7 @@ export function usePixiVideoPlayer(
     volume,
     isLooping,
     sourceDimensions,
+    viewportRect,
     isAudioFxEnabled,
     lofiAmount,
     isNoiseEnabled,
