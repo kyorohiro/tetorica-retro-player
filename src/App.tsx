@@ -176,7 +176,7 @@ function App() {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden overflow-y-auto bg-slate-200 text-slate-800"
+      className="safe-top-pad min-h-screen overflow-x-hidden overflow-y-auto bg-slate-200 text-slate-800"
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
@@ -186,16 +186,16 @@ function App() {
             <button
               type="button"
               aria-expanded={isMobileMenuOpen}
-              aria-label="Open menu"
-              onClick={() => {
-                setIsMobileMenuOpen((current) => !current);
-              }}
-              className="fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-            >
-              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
+                aria-label="Open menu"
+                onClick={() => {
+                  setIsMobileMenuOpen((current) => !current);
+                }}
+                className="safe-top-offset fixed left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+              >
+                {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
             {isMobileMenuOpen && (
-              <div className="fixed left-3 top-16 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+              <div className="safe-top-menu fixed left-3 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"
