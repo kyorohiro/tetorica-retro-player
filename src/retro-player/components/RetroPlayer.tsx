@@ -191,14 +191,14 @@ export function RetroPlayer({
     <section
       className={
         className ??
-        "rounded-2xl border border-slate-800 bg-slate-900/70 p-3 shadow-lg md:p-5"
+        "rounded-2xl border border-slate-800 bg-slate-900/70 p-3 shadow-lg"
       }
     >
       <div className="space-y-4">
         <div
-          className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 md:p-3 ${
+          className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
             isPreviewMaximized
-              ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-3 md:p-6"
+              ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-3"
               : ""
           }`}
         >
@@ -208,7 +208,7 @@ export function RetroPlayer({
               onClick={() => {
                 setIsPreviewMaximized(false);
               }}
-              className="absolute right-3 top-3 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 transition hover:bg-slate-800 md:right-6 md:top-6 md:px-4"
+              className="absolute right-3 top-3 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
             >
               Exit maximize
             </button>
@@ -286,7 +286,7 @@ export function RetroPlayer({
                 </div>
               )}
             </div>
-            <div className="absolute -bottom-5 right-3 z-20 flex items-center gap-2 md:-bottom-6 md:right-4">
+            <div className="absolute -bottom-5 right-3 z-20 flex items-center gap-2">
               <button
                 type="button"
                 aria-label={player.isPoweredOn ? "Power off" : "Power on"}
@@ -344,7 +344,7 @@ export function RetroPlayer({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300 md:p-4">
+        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300">
           {(player.hasPlayableMedia || player.hasImage) &&
             controlPanelMode !== "video-settings" && (
             <VideoControls

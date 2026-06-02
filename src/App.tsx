@@ -180,84 +180,49 @@ function App() {
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
-      <div className="relative mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-8">
-        <header className="mb-3 md:mb-8">
-          <div className="flex items-start justify-between gap-3">
-            <div className="hidden md:block">
-              <p className="text-xs uppercase tracking-[0.25em] text-slate-400 md:text-sm">
-                video preview via pixi.js
-              </p>
-              <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-3xl">
-                Tetorica Retro Player
-              </h1>
-            </div>
-            <div className="relative md:hidden">
-              <button
-                type="button"
-                aria-expanded={isMobileMenuOpen}
-                aria-label="Open menu"
-                onClick={() => {
-                  setIsMobileMenuOpen((current) => !current);
-                }}
-                className="fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-              >
-                {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-              {isMobileMenuOpen && (
-                <div className="fixed left-3 top-16 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
-                  <div className="grid grid-cols-1 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleOpenFilePicker}
-                      className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
-                    >
-                      Drop image/video/audio here, or click to add file
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenFolderPicker}
-                      className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
-                    >
-                      Drop folders/archives here, or click to add folders
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenDisplayCapture}
-                      className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
-                    >
-                      Capture screen or window
-                    </button>
-                  </div>
+      <div className="relative mx-auto max-w-5xl px-4 py-4">
+        <header className="mb-3">
+          <div className="relative">
+            <button
+              type="button"
+              aria-expanded={isMobileMenuOpen}
+              aria-label="Open menu"
+              onClick={() => {
+                setIsMobileMenuOpen((current) => !current);
+              }}
+              className="fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+            >
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+            {isMobileMenuOpen && (
+              <div className="fixed left-3 top-16 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenFilePicker}
+                    className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                  >
+                    Drop image/video/audio here, or click to add file
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenFolderPicker}
+                    className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                  >
+                    Drop folders/archives here, or click to add folders
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenDisplayCapture}
+                    className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
+                  >
+                    Capture screen or window
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </header>
-        <div className="mb-4 hidden md:block">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <button
-              type="button"
-              onClick={handleOpenFilePicker}
-              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-4 text-left text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white md:p-5 md:text-center"
-            >
-              Drop image/video/audio here, or click to add file
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenFolderPicker}
-              className="w-full rounded-xl border border-dashed border-slate-500 bg-slate-50 p-4 text-left text-sm text-slate-600 transition hover:border-sky-500 hover:bg-white md:p-5 md:text-center"
-            >
-              Drop folders/archives here, or click to add folders
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenDisplayCapture}
-              className="w-full rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 p-4 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20 md:p-5 md:text-center"
-            >
-              Capture screen or window
-            </button>
-          </div>
-        </div>
 
         {previewSource.previewStream && (
           <div className="mb-4">
@@ -275,7 +240,7 @@ function App() {
         )}
 
         {isRetroPreviewDialogActive ? (
-          <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500 md:p-8">
+          <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500">
             Retro preview is active in the dialog.
           </section>
         ) : (
