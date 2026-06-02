@@ -31,12 +31,18 @@ export function RetroPlayer({
   initialFilterState,
 }: RetroPlayerProps) {
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
+  const [isHighResolution, setIsHighResolution] = React.useState(false);
   const lastPreviewRequestRef = React.useRef<string>("");
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
   const filterState = useRetroFilterState(initialFilterState);
-  const player = usePixiVideoPlayer(filterState);
+  const renderResolutionScale = isHighResolution
+    ? typeof window !== "undefined"
+      ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))
+      : 1
+    : 1;
+  const player = usePixiVideoPlayer(filterState, renderResolutionScale);
 
   const resetAllSettings = React.useCallback(() => {
     clearPersistedRetroSettings();
@@ -113,6 +119,10 @@ export function RetroPlayer({
       }
     })();
   }, [src, stream, streamName, kind, onError, player, player.isRendererReady]);
+
+  React.useEffect(() => {
+    lastPreviewRequestRef.current = "";
+  }, [isHighResolution]);
 
   React.useEffect(() => {
     if (!isPreviewMaximized) return;
@@ -270,6 +280,20 @@ export function RetroPlayer({
               >
                 <Power size={16} />
                 {player.isPoweredOn ? "Power Off" : "Power On"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHighResolution((current) => !current);
+                }}
+                className={[
+                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
+                  isHighResolution
+                    ? "border-sky-500/40 bg-sky-500/10 text-slate-100 hover:bg-sky-500/20"
+                    : "border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800",
+                ].join(" ")}
+              >
+                {isHighResolution ? "Hi-Res On" : "Hi-Res Off"}
               </button>
               <button
                 type="button"

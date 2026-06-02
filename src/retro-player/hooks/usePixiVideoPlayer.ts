@@ -25,7 +25,10 @@ const DEFAULT_AUDIO_SETTINGS = {
 
 let retroPlayerInstanceSeed = 0;
 
-export function usePixiVideoPlayer(filterState: RetroFilterState) {
+export function usePixiVideoPlayer(
+  filterState: RetroFilterState,
+  renderResolutionScale = 1,
+) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
@@ -1287,17 +1290,13 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       if (!canvasHostRef.current || appRef.current) return;
 
       const app = new Application();
-      const deviceResolution =
-        typeof window !== "undefined"
-          ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))
-          : 1;
       await app.init({
         resizeTo: canvasHostRef.current,
         background: "#020617",
         antialias: true,
         preference: "webgl",
         autoDensity: true,
-        resolution: deviceResolution,
+        resolution: Math.max(1, renderResolutionScale),
       });
 
       if (cancelled) {
@@ -1350,7 +1349,7 @@ export function usePixiVideoPlayer(filterState: RetroFilterState) {
       appRef.current = null;
       setIsRendererReady(false);
     };
-  }, []);
+  }, [renderResolutionScale]);
 
   useEffect(() => {
     const handlePageHide = () => {
