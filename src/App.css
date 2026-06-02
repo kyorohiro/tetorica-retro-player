@@ -28,3 +28,33 @@ body {
 button {
   cursor: pointer;
 }
+
+.safe-top-pad {
+  padding-top: max(0.0rem, env(safe-area-inset-top));
+}
+
+.safe-top-offset {
+  top: max(0.0rem, env(safe-area-inset-top));
+}
+
+.safe-top-menu {
+  top: calc(max(0.0rem, env(safe-area-inset-top)) + 3.25rem);
+}
+
+@media (orientation: landscape) {
+  .safe-top-pad {
+    padding-top: 0;
+    padding-left: max(0.0rem, env(safe-area-inset-left));
+    padding-right: max(0.0rem, env(safe-area-inset-right));
+  }
+
+  .safe-top-offset {
+    top: 0.75rem;
+    left: calc(env(safe-area-inset-left) + 0.75rem);
+  }
+
+  .safe-top-menu {
+    top: 0.75rem;
+    left: calc(env(safe-area-inset-left) + 3.75rem);
+  }
+}
