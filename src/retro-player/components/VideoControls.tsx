@@ -103,18 +103,18 @@ export function VideoControls({
           <button
             type="button"
             onClick={onBackToPlayback}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
           >
             Back to Playback
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
           <button
             type="button"
             onClick={onToggleAudioFx}
             className={[
-              "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
               isAudioFxEnabled
                 ? "border-amber-400 bg-amber-500/20"
                 : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -127,7 +127,7 @@ export function VideoControls({
             type="button"
             onClick={onToggleNoise}
             className={[
-              "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
               isNoiseEnabled
                 ? "border-fuchsia-400 bg-fuchsia-500/20"
                 : "border-slate-600 bg-slate-900 hover:bg-slate-800",
@@ -217,11 +217,11 @@ export function VideoControls({
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={onTogglePlayback}
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20"
+              className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-slate-100 hover:bg-emerald-500/20 sm:col-span-1"
             >
               {isPlaying ? <Pause size={16} /> : <Play size={16} />}
               {isPlaying ? "Pause" : "Play"}
@@ -229,7 +229,7 @@ export function VideoControls({
             <button
               type="button"
               onClick={onRestart}
-              className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-slate-100 hover:bg-sky-500/20"
             >
               <RotateCcw size={16} />
               Restart
@@ -239,7 +239,7 @@ export function VideoControls({
               onClick={() => {
                 onSeek(Math.max(currentTime - 5, 0));
               }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
             >
               <SkipBack size={16} />
               -5s
@@ -249,7 +249,7 @@ export function VideoControls({
               onClick={() => {
                 onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
               }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
             >
               <SkipForward size={16} />
               +5s
@@ -257,7 +257,7 @@ export function VideoControls({
             <button
               type="button"
               onClick={onToggleMute}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
             >
               {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               {isMuted ? "Unmute" : "Mute"}
@@ -266,10 +266,10 @@ export function VideoControls({
               type="button"
               onClick={onToggleLoop}
               className={[
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
-                isLooping
-                  ? "border-sky-400 bg-sky-500/20"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-slate-100",
+                  isLooping
+                    ? "border-sky-400 bg-sky-500/20"
+                    : "border-slate-600 bg-slate-900 hover:bg-slate-800",
               ].join(" ")}
             >
               <RotateCcw size={16} />
@@ -281,13 +281,13 @@ export function VideoControls({
                 onClick={() => {
                   setIsSpeedOpen((current) => !current);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 sm:w-auto"
               >
                 <Gauge size={14} />
                 Speed {playbackRate}x
               </button>
               {isSpeedOpen && (
-                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-28 flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
+                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg sm:min-w-28">
                   {[0.5, 1, 2].map((rate) => (
                     <button
                       key={rate}
@@ -314,7 +314,7 @@ export function VideoControls({
                   onClick={() => {
                     onStepFrame(-1);
                   }}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
                 >
                   <StepBack size={16} />
                   Prev frame
@@ -324,7 +324,7 @@ export function VideoControls({
                   onClick={() => {
                     onStepFrame(1);
                   }}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
                 >
                   <StepForward size={16} />
                   Next frame
@@ -335,11 +335,11 @@ export function VideoControls({
         </>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <button
           type="button"
           onClick={onToggleVideoSettings}
-          className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 text-cyan-50 hover:bg-cyan-500/30"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 text-cyan-50 hover:bg-cyan-500/30"
         >
           <SlidersHorizontal size={16} />
           {isVideoSettingsOpen ? "Hide Video Setting" : "Show Video Setting"}
@@ -348,7 +348,7 @@ export function VideoControls({
           <button
             type="button"
             onClick={onToggleAudioSettings}
-            className="inline-flex items-center gap-2 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-3 py-2 text-fuchsia-50 hover:bg-fuchsia-500/30"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-3 py-2 text-fuchsia-50 hover:bg-fuchsia-500/30"
           >
             <Mic2 size={16} />
             Show Audio Setting
@@ -357,13 +357,13 @@ export function VideoControls({
         <button
           type="button"
           onClick={onResetSettings}
-          className="inline-flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-slate-100 hover:bg-rose-500/20"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-slate-100 hover:bg-rose-500/20"
         >
           Reset Settings
         </button>
       </div>
       {hasPlayback && (
-        <p className="text-[11px] text-slate-500">
+        <p className="hidden text-[11px] text-slate-500 sm:block">
           Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
         </p>
       )}

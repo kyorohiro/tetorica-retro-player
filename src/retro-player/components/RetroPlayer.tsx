@@ -173,15 +173,14 @@ export function RetroPlayer({
     <section
       className={
         className ??
-        "rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg"
+        "rounded-2xl border border-slate-800 bg-slate-900/70 p-3 shadow-lg sm:p-5"
       }
     >
       <div className="space-y-4">
-
         <div
-          className={`rounded-2xl border border-slate-700 bg-slate-950 p-3 ${
+          className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 sm:p-3 ${
             isPreviewMaximized
-              ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-6"
+              ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-3 sm:p-6"
               : ""
           }`}
         >
@@ -191,7 +190,7 @@ export function RetroPlayer({
               onClick={() => {
                 setIsPreviewMaximized(false);
               }}
-              className="absolute right-6 top-6 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+              className="absolute right-3 top-3 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 transition hover:bg-slate-800 sm:right-6 sm:top-6 sm:px-4"
             >
               Exit maximize
             </button>
@@ -210,7 +209,7 @@ export function RetroPlayer({
                     height: previewFrameHeight
                       ? `${previewFrameHeight}px`
                       : "60vh",
-                    minHeight: "280px",
+                    minHeight: "220px",
                   }
             }
           >
@@ -270,9 +269,9 @@ export function RetroPlayer({
           </div>
         </div>
 
-        <div className="relative rounded-2xl border border-slate-700 bg-slate-950/80 p-4 text-xs text-slate-300">
-          <div className="absolute top-0.5 right-0.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-2">
+        <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300 sm:p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <button
                 type="button"
                 onClick={() => {
@@ -284,7 +283,7 @@ export function RetroPlayer({
                   player.powerOn();
                 }}
                 className={[
-                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
+                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm transition sm:px-4",
                   player.isPoweredOn
                     ? "border-amber-500/40 bg-amber-500/10 text-slate-100 hover:bg-amber-500/20"
                     : "border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800",
@@ -299,7 +298,7 @@ export function RetroPlayer({
                   setIsHighResolution((current) => !current);
                 }}
                 className={[
-                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
+                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm transition sm:px-4",
                   isHighResolution
                     ? "border-sky-500/40 bg-sky-500/10 text-slate-100 hover:bg-sky-500/20"
                     : "border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800",
@@ -312,7 +311,7 @@ export function RetroPlayer({
                 onClick={() => {
                   setIsPreviewMaximized((current) => !current);
                 }}
-                className="inline-flex items-center gap-2 rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-slate-100 transition hover:bg-sky-500/20"
+                className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-slate-100 transition hover:bg-sky-500/20 sm:col-span-1 sm:px-4"
               >
                 {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
