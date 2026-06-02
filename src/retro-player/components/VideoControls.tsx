@@ -111,7 +111,7 @@ export function VideoControls({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+        <div className="grid grid-cols-1 gap-2 md:flex md:flex-wrap">
           <button
             type="button"
             onClick={onToggleAudioFx}
@@ -219,7 +219,7 @@ export function VideoControls({
             />
           </div>
 
-          <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="grid grid-cols-4 gap-2 md:flex md:flex-wrap md:items-center">
             <button
               type="button"
               onClick={onTogglePlayback}
@@ -260,12 +260,12 @@ export function VideoControls({
                 }}
                 aria-label={`Speed ${playbackRate}x`}
                 title={`Speed ${playbackRate}x`}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 sm:w-auto"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800 md:w-auto"
               >
                 <Gauge size={14} />
               </button>
               {isSpeedOpen && (
-                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg sm:min-w-28">
+                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg md:min-w-28">
                   {[0.5, 1, 2].map((rate) => (
                     <button
                       key={rate}
@@ -286,7 +286,7 @@ export function VideoControls({
               )}
             </div>
             {hasVideo ? (
-              <div className="col-span-4 grid grid-cols-6 gap-2 sm:contents">
+              <div className="col-span-4 grid grid-cols-6 gap-2 md:contents">
                 <button
                   type="button"
                   onClick={() => {
@@ -358,11 +358,11 @@ export function VideoControls({
         </>
       )}
 
-      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-3" : "grid-cols-2"} sm:flex sm:flex-wrap sm:items-center`}>
+      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-3" : "grid-cols-2"} md:flex md:flex-wrap md:items-center`}>
         <button
           type="button"
           onClick={onToggleVideoSettings}
-          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-2 py-2 text-xs text-cyan-50 hover:bg-cyan-500/30 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
+          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-2 py-2 text-xs text-cyan-50 hover:bg-cyan-500/30 md:min-h-11 md:gap-2 md:px-3 md:text-sm"
         >
           <SlidersHorizontal size={16} />
           {isVideoSettingsOpen ? "Close Video" : "Video"}
@@ -371,7 +371,7 @@ export function VideoControls({
           <button
             type="button"
             onClick={onToggleAudioSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30 md:min-h-11 md:gap-2 md:px-3 md:text-sm"
           >
             <Mic2 size={16} />
             Audio
@@ -381,14 +381,14 @@ export function VideoControls({
         <button
           type="button"
           onClick={onResetSettings}
-          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-slate-100 hover:bg-rose-500/20 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
+          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-slate-100 hover:bg-rose-500/20 md:min-h-11 md:gap-2 md:px-3 md:text-sm"
         >
           <RotateCcw size={15} />
           Reset
         </button>
       </div>
       {hasPlayback && (
-        <p className="hidden text-[11px] text-slate-500 sm:block">
+        <p className="hidden text-[11px] text-slate-500 md:block">
           Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
         </p>
       )}
