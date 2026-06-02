@@ -71,7 +71,6 @@ export function usePixiVideoPlayer(
     viewportRect,
     setViewportRect,
     applyFilterState,
-    activateVideoTexture,
     createVideoTexture,
     destroyPixi,
     fitCurrentSprite,
@@ -662,7 +661,6 @@ export function usePixiVideoPlayer(
           fitSprite(app, sprite, media);
           app.stage.removeChildren();
           app.stage.addChild(sprite);
-          activateVideoTexture(texture);
           window.requestAnimationFrame(safeRender);
 
           textureRef.current = texture;
@@ -770,7 +768,10 @@ export function usePixiVideoPlayer(
     video: HTMLVideoElement,
     kind: "video" | "capture",
   ) => {
-    const { app, filter } = await ensurePixiReady();
+    const filter = filterRef.current;
+    if (!filter) {
+      throw new Error("Pixi filter is not ready.");
+    }
 
     const texture = createVideoTexture(video);
     texture.source.update();
@@ -779,10 +780,9 @@ export function usePixiVideoPlayer(
     const sprite = new Sprite(texture);
     sprite.filters = filterState.isFilterEnabled ? [filter] : [];
 
-    fitSprite(app, sprite, video);
-    app.stage.removeChildren();
-    app.stage.addChild(sprite);
-    activateVideoTexture(texture);
+    fitSprite(appRef.current, sprite, video);
+    appRef.current?.stage.removeChildren();
+    appRef.current?.stage.addChild(sprite);
     window.requestAnimationFrame(safeRender);
 
     textureRef.current = texture;
@@ -798,10 +798,9 @@ export function usePixiVideoPlayer(
       kind,
       videoWidth: video.videoWidth,
       videoHeight: video.videoHeight,
-      screenWidth: app.screen.width ?? null,
-      screenHeight: app.screen.height ?? null,
+      screenWidth: appRef.current?.screen.width ?? null,
+      screenHeight: appRef.current?.screen.height ?? null,
     });
-    refreshLayout();
     scheduleRefreshLayout();
     syncVideoState();
   };
@@ -821,7 +820,10 @@ export function usePixiVideoPlayer(
     beginLoading("Preparing display capture...");
 
     try {
-      await ensurePixiReady();
+      if (!appRef.current || !filterRef.current) {
+        setPreviewError("Pixi の初期化がまだ終わっていません。");
+        return;
+      }
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
@@ -1228,7 +1230,6 @@ export function usePixiVideoPlayer(
           fitSprite(app, sprite, media);
           app.stage.removeChildren();
           app.stage.addChild(sprite);
-          activateVideoTexture(texture);
           window.requestAnimationFrame(safeRender);
 
           textureRef.current = texture;
@@ -1248,7 +1249,6 @@ export function usePixiVideoPlayer(
             screenWidth: app.screen.width ?? null,
             screenHeight: app.screen.height ?? null,
           });
-          refreshLayout();
           scheduleRefreshLayout();
           await connectMediaAudio(media);
           syncVideoState();

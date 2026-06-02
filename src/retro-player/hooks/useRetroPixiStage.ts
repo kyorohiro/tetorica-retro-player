@@ -200,10 +200,6 @@ export function useRetroPixiStage({
     const texture = new Texture({ source });
 
     source.resource.autoplay = false;
-    source.autoUpdate = false;
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      source.resize(video.videoWidth, video.videoHeight);
-    }
     source.update();
 
     return texture;
@@ -214,20 +210,6 @@ export function useRetroPixiStage({
       fitSprite(appRef.current, spriteRef.current, previewElementRef.current);
     }
   }, [fitSprite]);
-
-  const activateVideoTexture = useCallback((texture: Texture) => {
-    if (!(texture.source instanceof VideoSource)) return;
-
-    const source = texture.source;
-    const video = source.resource;
-
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      source.resize(video.videoWidth, video.videoHeight);
-    }
-
-    source.update();
-    source.autoUpdate = true;
-  }, []);
 
   const safeRender = useCallback(() => {
     const app = appRef.current;
@@ -392,7 +374,6 @@ export function useRetroPixiStage({
     setViewportRect,
     applyFilterState,
     createVideoTexture,
-    activateVideoTexture,
     destroyPixi,
     fitCurrentSprite,
     fitSprite,
