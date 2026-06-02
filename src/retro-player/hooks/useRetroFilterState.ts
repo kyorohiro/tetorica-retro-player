@@ -28,6 +28,31 @@ export type RetroFilterInitialState = Partial<{
   isFilterEnabled: boolean;
 }>;
 
+const resolvePresetKeyFromState = (
+  state: Required<RetroFilterInitialState>,
+): RetroPresetKey | null => {
+  for (const [key, preset] of Object.entries(RETRO_PRESETS)) {
+    if (
+      preset.width === state.targetWidth &&
+      preset.height === state.targetHeight &&
+      preset.colors === state.colorLevels &&
+      preset.dither === state.ditherStrength &&
+      preset.palette === state.paletteMode &&
+      preset.curvature === state.curvature &&
+      preset.scanline === state.scanlineStrength &&
+      preset.scanline2 === state.scanline2Strength &&
+      preset.vignette === state.vignetteStrength &&
+      preset.glow === state.glowStrength &&
+      preset.phosphor === state.phosphorStrength &&
+      preset.monoTint === state.monoTint
+    ) {
+      return key as RetroPresetKey;
+    }
+  }
+
+  return null;
+};
+
 export function useRetroFilterState(initialState: RetroFilterInitialState = {}) {
   const [baseInitialState] = useState<Required<RetroFilterInitialState>>(() => ({
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
@@ -90,6 +115,23 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(
     resolvedInitialState.isFilterEnabled ?? true,
   );
+  const [selectedPreset, setSelectedPreset] = useState<RetroPresetKey | null>(
+    resolvePresetKeyFromState({
+      targetWidth: resolvedInitialState.targetWidth ?? DEFAULT_PRESET.width,
+      targetHeight: resolvedInitialState.targetHeight ?? DEFAULT_PRESET.height,
+      colorLevels: resolvedInitialState.colorLevels ?? DEFAULT_PRESET.colors,
+      ditherStrength: resolvedInitialState.ditherStrength ?? DEFAULT_PRESET.dither,
+      paletteMode: resolvedInitialState.paletteMode ?? DEFAULT_PRESET.palette,
+      curvature: resolvedInitialState.curvature ?? DEFAULT_PRESET.curvature,
+      scanlineStrength: resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
+      scanline2Strength: resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+      vignetteStrength: resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
+      glowStrength: resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
+      phosphorStrength: resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+      monoTint: resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
+      isFilterEnabled: resolvedInitialState.isFilterEnabled ?? true,
+    }),
+  );
 
   const setPaletteMode = (nextPalette: PaletteMode) => {
     rawSetPaletteMode(nextPalette);
@@ -122,6 +164,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const applyPreset = (preset: RetroPresetKey) => {
     const settings = RETRO_PRESETS[preset];
 
+    setSelectedPreset(preset);
     setTargetWidth(settings.width);
     setTargetHeight(settings.height);
     setColorLevels(settings.colors);
@@ -137,6 +180,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   };
 
   const resetSettings = () => {
+    setSelectedPreset(resolvePresetKeyFromState(baseInitialState));
     setTargetWidth(baseInitialState.targetWidth);
     setTargetHeight(baseInitialState.targetHeight);
     setColorLevels(baseInitialState.colorLevels);
@@ -198,6 +242,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     phosphorStrength,
     monoTint,
     isFilterEnabled,
+    selectedPreset,
     setTargetWidth,
     setTargetHeight,
     setColorLevels,
