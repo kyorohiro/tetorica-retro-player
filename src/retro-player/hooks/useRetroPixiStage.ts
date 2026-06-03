@@ -46,7 +46,6 @@ export function useRetroPixiStage({
 
   const applyFilterStateTo = useCallback((filter: Filter | null) => {
     if (!filter) return;
-
     filter.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
     filter.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
     filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
@@ -73,6 +72,7 @@ export function useRetroPixiStage({
         vertex: FILTER_VERTEX,
         fragment: FILTER_FRAGMENT,
       },
+      resolution: "inherit",
       resources: {
         pixelUniforms: {
           uTargetSize: {
@@ -116,8 +116,8 @@ export function useRetroPixiStage({
     const texture = textureRef.current;
     if (!texture?.source) return;
 
-    texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
-  }, [filterState.isFilterEnabled]);
+    texture.source.scaleMode = "linear";
+  }, []);
 
   const resetFilterInstance = useCallback(() => {
     const previousFilter = filterRef.current;

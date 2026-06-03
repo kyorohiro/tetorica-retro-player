@@ -205,15 +205,19 @@ float edgeShadow(vec2 uv, float curvature)
   float vertical = pow(centered.y, 2.1);
   float edge = horizontal * 0.45 + vertical * 0.8 + horizontal * vertical * 0.35;
 
-  return 1.0 - edge * (0.08 + curvature * 0.45);
+  return 1.0 - edge * (curvature * 0.45);
 }
 
-float horizontalUnevenness(vec2 uv, float time)
+float horizontalUnevenness(vec2 uv, float time, float strength)
 {
+  if (strength <= 0.0) {
+    return 1.0;
+  }
+
   float broad = sin(uv.y * 17.0 + time * 0.35) * 0.5 + 0.5;
   float fine = sin(uv.y * 61.0 + time * 0.12) * 0.5 + 0.5;
 
-  return 1.0 - (broad * 0.03 + fine * 0.012);
+  return 1.0 - (broad * 0.03 + fine * 0.012) * strength;
 }
 
 vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint)
@@ -261,7 +265,7 @@ void main(void)
 
   vec2 maskCentered = warpedMask - vec2(0.5);
   float edgeAmount = smoothstep(0.2, 0.95, length(maskCentered) * 1.35);
-  vec2 chromaOffset = maskCentered * (0.0015 + uCurvature * 0.01) * edgeAmount;
+  vec2 chromaOffset = maskCentered * (uCurvature * 0.01) * edgeAmount;
   vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
   vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
   vec2 texel = 1.0 / uTargetSize;
@@ -297,7 +301,11 @@ void main(void)
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
   color.rgb *= edgeShadow(warpedMask, uCurvature);
-  color.rgb *= horizontalUnevenness(warpedMask, uTime);
+  color.rgb *= horizontalUnevenness(
+    warpedMask,
+    uTime,
+    max(max(uScanlineStrength, uScanline2Strength), max(uGlowStrength, uPhosphorStrength))
+  );
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
