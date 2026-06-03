@@ -205,12 +205,14 @@ export function RetroPlayer({
           {isPreviewMaximized && (
             <button
               type="button"
+              aria-label="Exit maximize"
+              title="Exit maximize"
               onClick={() => {
                 setIsPreviewMaximized(false);
               }}
-              className="absolute right-3 top-3 z-10 rounded-xl border border-slate-500/50 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+              className="safe-top-right-offset absolute z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
             >
-              Exit maximize
+              <Minimize2 size={18} />
             </button>
           )}
 
