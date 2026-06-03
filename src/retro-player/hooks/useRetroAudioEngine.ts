@@ -24,15 +24,19 @@ type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type UseRetroAudioEngineParams = {
   instanceLabel: string;
   previewKind: PreviewKind;
+  previewKindRef: MutableRefObject<PreviewKind>;
   mediaRef: MutableRefObject<HTMLMediaElement | null>;
   isPlaying: boolean;
+  isPlayingRef: MutableRefObject<boolean>;
 };
 
 export function useRetroAudioEngine({
   instanceLabel,
   previewKind,
+  previewKindRef,
   mediaRef,
   isPlaying,
+  isPlayingRef,
 }: UseRetroAudioEngineParams) {
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
@@ -120,9 +124,12 @@ export function useRetroAudioEngine({
     const drive = lofiDriveRef.current;
     const noiseGainNode = noiseGainRef.current;
     const media = mediaRef.current;
+    const currentPreviewKind = previewKindRef.current;
     const hasPlayablePreview =
-      previewKind === "video" || previewKind === "audio" || previewKind === "capture";
-    const isMediaPlaying = media ? !media.paused : isPlaying;
+      currentPreviewKind === "video" ||
+      currentPreviewKind === "audio" ||
+      currentPreviewKind === "capture";
+    const isMediaPlaying = media ? !media.paused : isPlayingRef.current;
     const nextMuted = isMutedRef.current;
     const nextVolume = volumeRef.current;
     const nextAudioFxEnabled = isAudioFxEnabledRef.current;
@@ -289,6 +296,7 @@ export function useRetroAudioEngine({
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
     const context = await ensureAudioContext();
+    const currentPreviewKind = previewKindRef.current;
     if (!context) {
       debugAudio("connectMediaAudio:no-context", {
         mediaTag: media.tagName,
@@ -317,7 +325,7 @@ export function useRetroAudioEngine({
         isMuted,
         volume,
         mediaTag: media.tagName,
-        previewKind,
+        previewKind: currentPreviewKind,
       });
       updateAudioNodes();
     } catch (error) {
@@ -325,7 +333,7 @@ export function useRetroAudioEngine({
         audioContextState: context.state,
         mediaTag: media.tagName,
         message: error instanceof Error ? error.message : String(error),
-        previewKind,
+        previewKind: currentPreviewKind,
       });
       throw error;
     }

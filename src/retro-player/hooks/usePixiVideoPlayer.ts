@@ -91,8 +91,10 @@ export function usePixiVideoPlayer(
   const audio = useRetroAudioEngine({
     instanceLabel: instanceLabelRef.current,
     previewKind,
+    previewKindRef,
     mediaRef,
     isPlaying,
+    isPlayingRef,
   });
 
   const {
