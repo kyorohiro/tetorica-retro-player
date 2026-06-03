@@ -1,5 +1,5 @@
 import React from "react";
-import { Aperture, ArrowLeftRight, Maximize2, Minimize2, Power } from "lucide-react";
+import { Aperture, ArrowLeftRight, Maximize2, Minimize2, Pin, Power } from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
@@ -33,6 +33,13 @@ export function RetroPlayer({
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
   const [isHighResolution, setIsHighResolution] = React.useState(false);
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
+  const [isPreviewPinned, setIsPreviewPinned] = React.useState(false);
+  const previewShellRef = React.useRef<HTMLDivElement | null>(null);
+  const [pinnedPreviewMetrics, setPinnedPreviewMetrics] = React.useState<{
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
   const [controlPanelMode, setControlPanelMode] = React.useState<
@@ -144,6 +151,41 @@ export function RetroPlayer({
   }, [isPreviewMaximized]);
 
   React.useEffect(() => {
+    if (!isPreviewMaximized) return;
+
+    setIsPreviewPinned(false);
+  }, [isPreviewMaximized]);
+
+  React.useEffect(() => {
+    if (!isPreviewPinned || isPreviewMaximized) {
+      setPinnedPreviewMetrics(null);
+      return;
+    }
+
+    const updatePinnedMetrics = () => {
+      const element = previewShellRef.current;
+      if (!element) return;
+
+      const rect = element.getBoundingClientRect();
+      setPinnedPreviewMetrics({
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    updatePinnedMetrics();
+
+    window.addEventListener("resize", updatePinnedMetrics);
+    window.addEventListener("scroll", updatePinnedMetrics, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", updatePinnedMetrics);
+      window.removeEventListener("scroll", updatePinnedMetrics);
+    };
+  }, [isPreviewMaximized, isPreviewPinned, isFitWidthEnabled, player.sourceDimensions]);
+
+  React.useEffect(() => {
     const frameA = window.requestAnimationFrame(() => {
       player.refreshLayout();
       window.requestAnimationFrame(() => {
@@ -161,6 +203,7 @@ export function RetroPlayer({
     };
   }, [
     isFitWidthEnabled,
+    isPreviewPinned,
     isPreviewMaximized,
     player,
     player.sourceDimensions?.height,
@@ -207,6 +250,9 @@ export function RetroPlayer({
     return `${player.sourceDimensions.width} / ${player.sourceDimensions.height}`;
   }, [isFitWidthEnabled, player.sourceDimensions]);
 
+  const isPinnedPreview = isPreviewPinned && !isPreviewMaximized;
+  const pinnedPreviewHeight = "min(50vh, 26rem)";
+
   return (
     <section
       className={
@@ -216,13 +262,24 @@ export function RetroPlayer({
     >
       <div className="space-y-4">
         <div
+          ref={previewShellRef}
           className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
             isPreviewMaximized
               ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 ${
                   isFitWidthEnabled ? "overflow-y-auto" : "flex items-stretch justify-stretch"
                 }`
+              : isPinnedPreview
+                ? "safe-sticky-top fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
               : ""
           }`}
+          style={
+            isPinnedPreview && pinnedPreviewMetrics
+              ? {
+                  left: `${pinnedPreviewMetrics.left}px`,
+                  width: `${pinnedPreviewMetrics.width}px`,
+                }
+              : undefined
+          }
         >
           {isPreviewMaximized && (
             <button
@@ -255,9 +312,13 @@ export function RetroPlayer({
                     }
                   : undefined
                 : {
-                    aspectRatio: fitWidthAspectRatio,
+                    aspectRatio: isPinnedPreview ? undefined : fitWidthAspectRatio,
                     height: fitWidthAspectRatio
-                      ? undefined
+                      ? isPinnedPreview
+                        ? pinnedPreviewHeight
+                        : undefined
+                      : isPinnedPreview
+                        ? pinnedPreviewHeight
                       : previewFrameHeight
                         ? `${previewFrameHeight}px`
                         : "60vh",
@@ -379,6 +440,22 @@ export function RetroPlayer({
               </button>
               <button
                 type="button"
+                aria-label={isPreviewPinned ? "Unpin preview" : "Pin preview"}
+                title={isPreviewPinned ? "Unpin preview" : "Pin preview"}
+                onClick={() => {
+                  setIsPreviewPinned((current) => !current);
+                }}
+                className={[
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  isPreviewPinned
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
+                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                ].join(" ")}
+              >
+                <Pin size={18} />
+              </button>
+              <button
+                type="button"
                 aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
                 title={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
                 onClick={() => {
@@ -396,6 +473,10 @@ export function RetroPlayer({
             </div>
           </div>
         </div>
+
+        {isPinnedPreview && pinnedPreviewMetrics && (
+          <div style={{ height: `${pinnedPreviewMetrics.height}px` }} />
+        )}
 
         <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300">
           {(player.hasPlayableMedia || player.hasImage) &&
