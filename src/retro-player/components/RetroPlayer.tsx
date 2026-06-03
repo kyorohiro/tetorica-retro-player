@@ -18,6 +18,10 @@ type RetroPlayerProps = {
   className?: string;
   onError?: (error: Error) => void;
   initialFilterState?: RetroFilterInitialState;
+  forcedHighResolution?: boolean;
+  forcedPreviewMaximized?: boolean;
+  onHighResolutionChange?: (value: boolean) => void;
+  onPreviewMaximizedChange?: (value: boolean) => void;
 };
 
 export function RetroPlayer({
@@ -29,9 +33,13 @@ export function RetroPlayer({
   className,
   onError,
   initialFilterState,
+  forcedHighResolution,
+  forcedPreviewMaximized,
+  onHighResolutionChange,
+  onPreviewMaximizedChange,
 }: RetroPlayerProps) {
-  const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
-  const [isHighResolution, setIsHighResolution] = React.useState(false);
+  const [isPreviewMaximizedInternal, setIsPreviewMaximizedInternal] = React.useState(false);
+  const [isHighResolutionInternal, setIsHighResolutionInternal] = React.useState(false);
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
   const [isPreviewPinned, setIsPreviewPinned] = React.useState(false);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
@@ -46,6 +54,37 @@ export function RetroPlayer({
     "playback" | "audio-settings" | "video-settings"
   >("playback");
   const filterState = useRetroFilterState(initialFilterState);
+  const isPreviewMaximized =
+    forcedPreviewMaximized ?? isPreviewMaximizedInternal;
+  const isHighResolution = forcedHighResolution ?? isHighResolutionInternal;
+  const setIsPreviewMaximized = React.useCallback(
+    (nextValue: boolean | ((current: boolean) => boolean)) => {
+      const resolvedValue =
+        typeof nextValue === "function"
+          ? nextValue(isPreviewMaximized)
+          : nextValue;
+
+      if (forcedPreviewMaximized === undefined) {
+        setIsPreviewMaximizedInternal(resolvedValue);
+      }
+      onPreviewMaximizedChange?.(resolvedValue);
+    },
+    [forcedPreviewMaximized, isPreviewMaximized, onPreviewMaximizedChange],
+  );
+  const setIsHighResolution = React.useCallback(
+    (nextValue: boolean | ((current: boolean) => boolean)) => {
+      const resolvedValue =
+        typeof nextValue === "function"
+          ? nextValue(isHighResolution)
+          : nextValue;
+
+      if (forcedHighResolution === undefined) {
+        setIsHighResolutionInternal(resolvedValue);
+      }
+      onHighResolutionChange?.(resolvedValue);
+    },
+    [forcedHighResolution, isHighResolution, onHighResolutionChange],
+  );
   const renderResolutionScale = isHighResolution
     ? typeof window !== "undefined"
       ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))

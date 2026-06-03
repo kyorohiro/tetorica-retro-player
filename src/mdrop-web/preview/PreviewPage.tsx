@@ -15,7 +15,10 @@ import {
     makeBlobFromUrl,
 } from "../utils";
 import { useZipFileListDialog } from "../useZipFileListDialog";
-import { downloadUrl } from "../usePreviewDialog";
+import {
+    downloadUrl,
+    type PreviewRetroViewState,
+} from "../usePreviewDialog";
 
 type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
 
@@ -29,6 +32,10 @@ export type PreviewPageProps = {
         onProgress?: (loaded: number, total: number) => void
     ) => Promise<string>;
     onLoadingMessage?: (message: string) => void;
+    retroViewState?: PreviewRetroViewState;
+    onRetroViewStateChange?: React.Dispatch<
+        React.SetStateAction<PreviewRetroViewState>
+    >;
 };
 
 export function PreviewPage({
@@ -38,6 +45,8 @@ export function PreviewPage({
     getObjectUrl,
     onLoadingMessage,
     coverSrc,
+    retroViewState,
+    onRetroViewStateChange,
 }: PreviewPageProps) {
     const [status, setStatus] = React.useState<PreviewPageStatus>("none");
     const [src, setSrc] = React.useState("");
@@ -164,6 +173,20 @@ export function PreviewPage({
                             : "image"
                     }
                     className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
+                    forcedHighResolution={retroViewState?.isHighResolution}
+                    forcedPreviewMaximized={retroViewState?.isPreviewMaximized}
+                    onHighResolutionChange={(nextValue) => {
+                        onRetroViewStateChange?.((current) => ({
+                            ...current,
+                            isHighResolution: nextValue,
+                        }));
+                    }}
+                    onPreviewMaximizedChange={(nextValue) => {
+                        onRetroViewStateChange?.((current) => ({
+                            ...current,
+                            isPreviewMaximized: nextValue,
+                        }));
+                    }}
                 />
             </div>
         );

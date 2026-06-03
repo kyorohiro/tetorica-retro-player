@@ -23,6 +23,11 @@ type PreviewDialogOptions = {
     isClose?: boolean;
 };
 
+export type PreviewRetroViewState = {
+    isHighResolution: boolean;
+    isPreviewMaximized: boolean;
+};
+
 export const downloadUrl = (apiServer: string, file: TargetFile): string => {
     const encodePath = (path: string) =>
         path
@@ -70,6 +75,11 @@ function PreviewDialog({
     console.log(">> coverSrc", !!coverSrc);
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
+    const [retroViewState, setRetroViewState] =
+        React.useState<PreviewRetroViewState>({
+            isHighResolution: false,
+            isPreviewMaximized: false,
+        });
 
     const file = files[index];
 
@@ -241,6 +251,8 @@ function PreviewDialog({
                     getObjectUrl={getObjectUrl}
                     onLoadingMessage={setLoadingMessage}
                     coverSrc={coverSrc}
+                    retroViewState={retroViewState}
+                    onRetroViewStateChange={setRetroViewState}
                 />
             </div>
 
