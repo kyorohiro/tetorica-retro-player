@@ -1,5 +1,5 @@
 import React from "react";
-import { Aperture, Maximize2, Minimize2, Power } from "lucide-react";
+import { Aperture, ArrowLeftRight, Maximize2, Minimize2, Power } from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
@@ -32,6 +32,7 @@ export function RetroPlayer({
 }: RetroPlayerProps) {
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
   const [isHighResolution, setIsHighResolution] = React.useState(false);
+  const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
   const [controlPanelMode, setControlPanelMode] = React.useState<
@@ -43,7 +44,11 @@ export function RetroPlayer({
       ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))
       : 1
     : 1;
-  const player = usePixiVideoPlayer(filterState, renderResolutionScale);
+  const player = usePixiVideoPlayer(
+    filterState,
+    isFitWidthEnabled ? "width" : "contain",
+    renderResolutionScale,
+  );
 
   const resetAllSettings = React.useCallback(() => {
     clearPersistedRetroSettings();
@@ -154,7 +159,13 @@ export function RetroPlayer({
       window.cancelAnimationFrame(frameA);
       window.clearTimeout(timeoutId);
     };
-  }, [isPreviewMaximized]);
+  }, [
+    isFitWidthEnabled,
+    isPreviewMaximized,
+    player,
+    player.sourceDimensions?.height,
+    player.sourceDimensions?.width,
+  ]);
 
   React.useEffect(() => {
     if (typeof looping !== "boolean") return;
@@ -183,9 +194,18 @@ export function RetroPlayer({
     !isPreviewMaximized &&
     player.viewportRect &&
     player.sourceDimensions &&
-    player.sourceDimensions.width > player.sourceDimensions.height
+    (isFitWidthEnabled ||
+      player.sourceDimensions.width > player.sourceDimensions.height)
       ? Math.max(280, Math.ceil(player.viewportRect.height + 24))
       : null;
+
+  const fitWidthAspectRatio = React.useMemo(() => {
+    if (!isFitWidthEnabled || !player.sourceDimensions) {
+      return undefined;
+    }
+
+    return `${player.sourceDimensions.width} / ${player.sourceDimensions.height}`;
+  }, [isFitWidthEnabled, player.sourceDimensions]);
 
   return (
     <section
@@ -198,7 +218,9 @@ export function RetroPlayer({
         <div
           className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
             isPreviewMaximized
-              ? "fixed inset-0 z-50 flex items-stretch justify-stretch border-0 bg-slate-950/95 p-3"
+              ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 ${
+                  isFitWidthEnabled ? "overflow-y-auto" : "flex items-stretch justify-stretch"
+                }`
               : ""
           }`}
         >
@@ -219,16 +241,26 @@ export function RetroPlayer({
           <div
             className={`relative ${
               isPreviewMaximized
-                ? "h-full min-h-0 w-full"
+                ? isFitWidthEnabled
+                  ? "w-full"
+                  : "h-full min-h-0 w-full"
                 : "w-full min-w-0"
             }`}
             style={
               isPreviewMaximized
-                ? undefined
+                ? isFitWidthEnabled && fitWidthAspectRatio
+                  ? {
+                      aspectRatio: fitWidthAspectRatio,
+                      minHeight: "220px",
+                    }
+                  : undefined
                 : {
-                    height: previewFrameHeight
-                      ? `${previewFrameHeight}px`
-                      : "60vh",
+                    aspectRatio: fitWidthAspectRatio,
+                    height: fitWidthAspectRatio
+                      ? undefined
+                      : previewFrameHeight
+                        ? `${previewFrameHeight}px`
+                        : "60vh",
                     minHeight: "220px",
                   }
             }
@@ -328,6 +360,22 @@ export function RetroPlayer({
                 ].join(" ")}
               >
                 <Aperture size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
+                title={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
+                onClick={() => {
+                  setIsFitWidthEnabled((current) => !current);
+                }}
+                className={[
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  isFitWidthEnabled
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
+                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                ].join(" ")}
+              >
+                <ArrowLeftRight size={18} />
               </button>
               <button
                 type="button"
