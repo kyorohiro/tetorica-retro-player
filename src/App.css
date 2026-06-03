@@ -46,6 +46,10 @@ button {
   right: max(0.0rem, env(safe-area-inset-right));
 }
 
+.safe-sticky-top {
+  top: calc(max(0.0rem, env(safe-area-inset-top)) + 0.5rem);
+}
+
 .safe-dialog-overlay {
   padding-top: max(0.0rem, env(safe-area-inset-top));
   padding-right: max(0.0rem, env(safe-area-inset-right));
@@ -95,5 +99,9 @@ button {
   .safe-top-right-offset {
     top: 0.75rem;
     right: calc(env(safe-area-inset-right) + 0.75rem);
+  }
+
+  .safe-sticky-top {
+    top: 0.75rem;
   }
 }
