@@ -225,7 +225,7 @@ function PreviewDialog({
 
             <div
                 className={[
-                    "min-h-0 flex-1 touch-pan-y bg-black",
+                    "min-h-0 flex-1 touch-manipulation bg-black",
                     isRetro
                         ? "overflow-y-auto p-4"
                         : "flex items-center justify-center",
