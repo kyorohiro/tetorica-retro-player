@@ -177,7 +177,7 @@ export function RetroFilterPanel({
           <input
             type="range"
             min="160"
-            max="1280"
+            max="2560"
             step="16"
             value={targetWidth}
             onChange={(ev) => {
@@ -192,7 +192,7 @@ export function RetroFilterPanel({
           <input
             type="range"
             min="100"
-            max="960"
+            max="2560"
             step="8"
             value={targetHeight}
             onChange={(ev) => {

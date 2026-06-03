@@ -442,7 +442,7 @@ export function useRetroPreviewMedia({
 
     const texture = createVideoTexture(video);
     texture.source.update();
-    texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
+    texture.source.scaleMode = "linear";
 
     const sprite = new Sprite(texture);
     sprite.filters = filterState.isFilterEnabled ? [filter] : [];
@@ -552,7 +552,7 @@ export function useRetroPreviewMedia({
         if (media instanceof HTMLVideoElement) {
           const texture = createVideoTexture(media);
           texture.source.update();
-          texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
+          texture.source.scaleMode = "linear";
 
           const sprite = new Sprite(texture);
           sprite.filters = filterState.isFilterEnabled ? [filter] : [];
@@ -612,7 +612,7 @@ export function useRetroPreviewMedia({
 
       const texture = Texture.from(image);
       texture.source.update();
-      texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
+      texture.source.scaleMode = "linear";
 
       const sprite = new Sprite(texture);
       sprite.filters = filterState.isFilterEnabled ? [filter] : [];
@@ -898,7 +898,7 @@ export function useRetroPreviewMedia({
 
         const texture = createVideoTexture(media as HTMLVideoElement);
         texture.source.update();
-        texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
+        texture.source.scaleMode = "linear";
 
         const sprite = new Sprite(texture);
         sprite.filters = filterState.isFilterEnabled ? [filter] : [];
@@ -940,7 +940,7 @@ export function useRetroPreviewMedia({
 
         const texture = Texture.from(image as HTMLImageElement);
         texture.source.update();
-        texture.source.scaleMode = filterState.isFilterEnabled ? "nearest" : "linear";
+        texture.source.scaleMode = "linear";
 
         const sprite = new Sprite(texture);
         sprite.filters = filterState.isFilterEnabled ? [filter] : [];
