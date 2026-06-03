@@ -205,15 +205,19 @@ float edgeShadow(vec2 uv, float curvature)
   float vertical = pow(centered.y, 2.1);
   float edge = horizontal * 0.45 + vertical * 0.8 + horizontal * vertical * 0.35;
 
-  return 1.0 - edge * (0.08 + curvature * 0.45);
+  return 1.0 - edge * (curvature * 0.45);
 }
 
-float horizontalUnevenness(vec2 uv, float time)
+float horizontalUnevenness(vec2 uv, float time, float strength)
 {
+  if (strength <= 0.0) {
+    return 1.0;
+  }
+
   float broad = sin(uv.y * 17.0 + time * 0.35) * 0.5 + 0.5;
   float fine = sin(uv.y * 61.0 + time * 0.12) * 0.5 + 0.5;
 
-  return 1.0 - (broad * 0.03 + fine * 0.012);
+  return 1.0 - (broad * 0.03 + fine * 0.012) * strength;
 }
 
 vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint)
@@ -247,60 +251,6 @@ vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint)
 
 void main(void)
 {
-  vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
-  vec2 delta = warpedMask - vMaskCoord;
-  vec2 curvedUv = vTextureCoord + delta;
-  if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
-    finalColor = vec4(0.0, 0.0, 0.0, 1.0);
-    return;
-  }
-
-  vec2 cell = floor(curvedUv * uTargetSize);
-  vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
-  pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
-
-  vec2 maskCentered = warpedMask - vec2(0.5);
-  float edgeAmount = smoothstep(0.2, 0.95, length(maskCentered) * 1.35);
-  vec2 chromaOffset = maskCentered * (0.0015 + uCurvature * 0.01) * edgeAmount;
-  vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
-  vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
-  vec2 texel = 1.0 / uTargetSize;
-
-  vec4 color = texture(uTexture, pixelatedUv);
-  color.r = texture(uTexture, redUv).r;
-  color.b = texture(uTexture, blueUv).b;
-  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
-  color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-  color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint);
-
-  vec3 glow = vec3(0.0);
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
-
-  float brightness = max(max(color.r, color.g), color.b);
-  float glowMask = smoothstep(0.45, 1.0, brightness);
-  color.rgb += glow * glowMask * uGlowStrength;
-
-  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);
-
-  float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength;
-  color.rgb += scanline2;
-
-  float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
-  color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);
-
-  float vignette = distance(vMaskCoord, vec2(0.5));
-  color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-  color.rgb *= edgeShadow(warpedMask, uCurvature);
-  color.rgb *= horizontalUnevenness(warpedMask, uTime);
-
-  color.rgb = clamp(color.rgb, 0.0, 1.0);
-
-  finalColor = color;
+  finalColor = texture(uTexture, vTextureCoord);
 }
 `;
