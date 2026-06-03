@@ -87,7 +87,13 @@ sh deploy_mac.sh
 % ~/bin/butler push "tetorica-retro-player_0.8.4_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.8.4
 % ~/bin/butler push "tetorica-retro-player_0.8.4_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.8.4
 
+~/bin/butler push \
+  "app-release-signed_0.8.4.apk" \
+  kyorohiro/tetorica-retro-player:android \
+  --userversion 0.8.4
+
 ```
+
 
 ```
 npm run build
