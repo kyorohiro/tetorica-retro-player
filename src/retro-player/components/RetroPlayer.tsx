@@ -236,7 +236,7 @@ export function RetroPlayer({
             <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
               <div
                 ref={player.canvasHostRef}
-                className="pointer-events-none h-full w-full touch-pan-y"
+                className="pointer-events-none h-full w-full touch-manipulation"
               />
               {!player.isPoweredOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/72">

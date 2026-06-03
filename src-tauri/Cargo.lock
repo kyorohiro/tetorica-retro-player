@@ -3581,7 +3581,7 @@ dependencies = [
 
 [[package]]
 name = "tetorica-retro-player"
-version = "0.8.1"
+version = "0.8.3"
 dependencies = [
  "serde",
  "serde_json",
