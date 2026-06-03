@@ -12,6 +12,7 @@ type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 type UseRetroPixiStageParams = {
   filterState: RetroFilterState;
+  fitMode: "contain" | "width";
   renderResolutionScale: number;
   isPoweredOn: boolean;
   isPlayingRef: MutableRefObject<boolean>;
@@ -21,6 +22,7 @@ type UseRetroPixiStageParams = {
 
 export function useRetroPixiStage({
   filterState,
+  fitMode,
   renderResolutionScale,
   isPoweredOn,
   isPlayingRef,
@@ -142,13 +144,17 @@ export function useRetroPixiStage({
 
     const screenWidth = app.screen.width;
     const screenHeight = app.screen.height;
-    const scale = Math.min(
-      screenWidth / sourceWidth,
-      screenHeight / sourceHeight,
-    );
+    const scale =
+      fitMode === "width"
+        ? screenWidth / sourceWidth
+        : Math.min(screenWidth / sourceWidth, screenHeight / sourceHeight);
     const integerScale = Math.max(1, Math.floor(scale));
     const appliedScale =
-      filterState.isFilterEnabled && scale >= 1 ? integerScale : scale;
+      fitMode === "width"
+        ? scale
+        : filterState.isFilterEnabled && scale >= 1
+          ? integerScale
+          : scale;
 
     debugVideo("fitSprite", {
       sourceTag: source.tagName,
@@ -156,6 +162,7 @@ export function useRetroPixiStage({
       sourceHeight,
       screenWidth,
       screenHeight,
+      fitMode,
       scale,
       appliedScale,
     });
@@ -190,7 +197,7 @@ export function useRetroPixiStage({
 
       return next;
     });
-  }, [debugVideo, filterState.isFilterEnabled]);
+  }, [debugVideo, filterState.isFilterEnabled, fitMode]);
 
   const createVideoTexture = useCallback((video: HTMLVideoElement) => {
     const source = new VideoSource({

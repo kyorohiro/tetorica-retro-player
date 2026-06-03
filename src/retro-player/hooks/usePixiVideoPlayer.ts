@@ -12,6 +12,7 @@ const isRetroPlayerDebugEnabled = () =>
 
 export function usePixiVideoPlayer(
   filterState: RetroFilterState,
+  fitMode: "contain" | "width",
   renderResolutionScale = 1,
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
@@ -53,6 +54,7 @@ export function usePixiVideoPlayer(
 
   const stage = useRetroPixiStage({
     filterState,
+    fitMode,
     renderResolutionScale,
     isPoweredOn,
     isPlayingRef,
