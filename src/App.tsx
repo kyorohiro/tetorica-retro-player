@@ -200,6 +200,15 @@ function App() {
           <div className="relative">
             <button
               type="button"
+              aria-label="Reload app"
+              title="Reload app"
+              onClick={handleReloadApp}
+              className="safe-top-offset fixed left-[3.85rem] z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+            >
+              <RefreshCw size={18} />
+            </button>
+            <button
+              type="button"
               aria-expanded={isMobileMenuOpen}
                 aria-label="Open menu"
                 onClick={() => {
@@ -212,14 +221,6 @@ function App() {
             {isMobileMenuOpen && (
               <div className="safe-top-menu fixed left-3 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    onClick={handleReloadApp}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-slate-50"
-                  >
-                    <RefreshCw size={16} />
-                    Reload app
-                  </button>
                   <button
                     type="button"
                     onClick={handleOpenFilePicker}

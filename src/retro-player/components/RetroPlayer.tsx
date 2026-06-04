@@ -1,5 +1,13 @@
 import React from "react";
-import { Aperture, ArrowLeftRight, Maximize2, Minimize2, Pin, Power } from "lucide-react";
+import {
+  Aperture,
+  ArrowLeftRight,
+  Maximize2,
+  Minimize2,
+  Pin,
+  Power,
+  RotateCcw,
+} from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
@@ -77,6 +85,33 @@ export function RetroPlayer({
 
     filterState.setTargetHeight(nextHeight);
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
+
+  const refitPreview = React.useCallback(() => {
+    if (stream && player.isCaptureActive) {
+      window.setTimeout(() => {
+        void player.previewStream(
+          stream,
+          kind === "audio" ? "audio" : "video",
+          streamName,
+        );
+      }, 120);
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      player.refreshLayout();
+      window.requestAnimationFrame(() => {
+        player.refreshLayout();
+      });
+    });
+  }, [kind, player, stream, streamName]);
+
+  const floatingButtonClass =
+    "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm";
+  const glowingFloatingButtonClass =
+    "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_16px_rgba(74,222,128,0.68)] hover:bg-emerald-400/28";
+  const idleFloatingButtonClass =
+    "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90";
 
   React.useEffect(() => {
     if (stream) {
@@ -384,7 +419,7 @@ export function RetroPlayer({
                 </div>
               )}
             </div>
-            <div className="absolute -bottom-5 right-3 z-20 flex items-center gap-2">
+            <div className="absolute -bottom-8 right-3 z-20 flex items-center gap-2">
               <button
                 type="button"
                 aria-label={player.isPoweredOn ? "Power off" : "Power on"}
@@ -398,13 +433,13 @@ export function RetroPlayer({
                   player.powerOn();
                 }}
                 className={[
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  floatingButtonClass,
                   player.isPoweredOn
-                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
-                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                    ? glowingFloatingButtonClass
+                    : idleFloatingButtonClass,
                 ].join(" ")}
               >
-                <Power size={18} />
+                <Power size={16} />
               </button>
               <button
                 type="button"
@@ -414,13 +449,13 @@ export function RetroPlayer({
                   setIsHighResolution((current) => !current);
                 }}
                 className={[
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  floatingButtonClass,
                   isHighResolution
-                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
-                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                    ? glowingFloatingButtonClass
+                    : idleFloatingButtonClass,
                 ].join(" ")}
               >
-                <Aperture size={18} />
+                <Aperture size={16} />
               </button>
               <button
                 type="button"
@@ -428,15 +463,25 @@ export function RetroPlayer({
                 title={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
                 onClick={() => {
                   setIsFitWidthEnabled((current) => !current);
+                  refitPreview();
                 }}
                 className={[
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  floatingButtonClass,
                   isFitWidthEnabled
-                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
-                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                    ? glowingFloatingButtonClass
+                    : idleFloatingButtonClass,
                 ].join(" ")}
               >
-                <ArrowLeftRight size={18} />
+                <ArrowLeftRight size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label="Refit preview"
+                title="Refit preview"
+                onClick={refitPreview}
+                className={[floatingButtonClass, idleFloatingButtonClass].join(" ")}
+              >
+                <RotateCcw size={16} />
               </button>
               <button
                 type="button"
@@ -446,13 +491,13 @@ export function RetroPlayer({
                   setIsPreviewPinned((current) => !current);
                 }}
                 className={[
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  floatingButtonClass,
                   isPreviewPinned
-                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
-                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                    ? glowingFloatingButtonClass
+                    : idleFloatingButtonClass,
                 ].join(" ")}
               >
-                <Pin size={18} />
+                <Pin size={16} />
               </button>
               <button
                 type="button"
@@ -462,13 +507,13 @@ export function RetroPlayer({
                   setIsPreviewMaximized((current) => !current);
                 }}
                 className={[
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm",
+                  floatingButtonClass,
                   isPreviewMaximized
-                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.7)] hover:bg-emerald-400/28"
-                    : "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90",
+                    ? glowingFloatingButtonClass
+                    : idleFloatingButtonClass,
                 ].join(" ")}
               >
-                {isPreviewMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
             </div>
           </div>
