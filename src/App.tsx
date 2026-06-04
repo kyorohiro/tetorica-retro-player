@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, RefreshCw, X } from "lucide-react";
 import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
@@ -182,6 +182,13 @@ function App() {
     void handleDisplayCapture();
   }, [handleDisplayCapture, isIosOrAndroid]);
 
+  const handleReloadApp = useCallback(() => {
+    setIsMobileMenuOpen(false);
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 80);
+  }, []);
+
   return (
     <main
       className="safe-top-pad min-h-screen overflow-x-hidden overflow-y-auto bg-slate-200 text-slate-800"
@@ -205,6 +212,14 @@ function App() {
             {isMobileMenuOpen && (
               <div className="safe-top-menu fixed left-3 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleReloadApp}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-slate-50"
+                  >
+                    <RefreshCw size={16} />
+                    Reload app
+                  </button>
                   <button
                     type="button"
                     onClick={handleOpenFilePicker}
