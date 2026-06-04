@@ -78,19 +78,19 @@ Third-party libraries and bundled dependencies remain under their respective lic
 ```
 sh deploy_mac.sh
 % ~/bin/butler login
-% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.8.7_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.8.7
+% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.8.8_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.8.8
 
-% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.8.7_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.8.7
+% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.8.8_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.8.8
 
-% ~/bin/butler push "tetorica-retro-player_0.8.7_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.8.7
+% ~/bin/butler push "tetorica-retro-player_0.8.8_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.8.8
 
-% ~/bin/butler push "tetorica-retro-player_0.8.7_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.8.7
-% ~/bin/butler push "tetorica-retro-player_0.8.7_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.8.7
+% ~/bin/butler push "tetorica-retro-player_0.8.8_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.8.8
+% ~/bin/butler push "tetorica-retro-player_0.8.8_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.8.8
 
 ~/bin/butler push \
-  "app-release-signed_0.8.7.apk" \
+  "app-release-signed_0.8.8.apk" \
   kyorohiro/tetorica-retro-player:android \
-  --userversion 0.8.7
+  --userversion 0.8.8
 
 ```
 
@@ -98,7 +98,7 @@ sh deploy_mac.sh
 ```
 npm run build
 cd dist
-zip -r ../web-build_0.8.7_gh.zip .
+zip -r ../web-build_0.8.8_gh.zip .
 ```
 
 ```
@@ -107,6 +107,6 @@ npm run tauri android build -- --apk
 
 ~/Library/Android/sdk/build-tools/35.0.0/apksigner sign \
   --ks my-release-key.jks \
-  --out app-release-signed_0.8.7.apk \
+  --out app-release-signed_0.8.8.apk \
   src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
 ```
