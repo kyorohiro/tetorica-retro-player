@@ -1,9 +1,11 @@
 import { FILTER_FRAGMENT } from "./shared/filterShader.js";
 import {
+  CUSTOM_PRESET_KEY,
   DEFAULT_SETTINGS,
   PRESETS,
   SETTINGS_STORAGE_KEY,
   normalizeSettings,
+  toShaderMonoTint,
 } from "./shared/settings.js";
 
 const statusText = document.getElementById("statusText");
@@ -73,7 +75,7 @@ async function init() {
   }
 
   await startCapture(session.streamId);
-  setStatus(`Rendering tab ${session.sourceTabId} with ${PRESETS[currentSettings.presetKey].label}.`);
+  applyCurrentSettings();
 }
 
 async function getCaptureSession() {
@@ -157,19 +159,18 @@ function resizeCanvas() {
 function applyPreset(presetKey) {
   if (!gl || !uniformLocations) return;
 
-  const preset = PRESETS[presetKey] ?? PRESETS.greenTerminal;
   gl.useProgram(program);
-  gl.uniform2f(uniformLocations.uTargetSize, preset.targetWidth, preset.targetHeight);
-  gl.uniform1f(uniformLocations.uColorLevels, preset.colorLevels);
-  gl.uniform1f(uniformLocations.uDitherStrength, preset.ditherStrength);
-  gl.uniform1f(uniformLocations.uPaletteMode, preset.paletteMode);
-  gl.uniform1f(uniformLocations.uCurvature, preset.curvature);
-  gl.uniform1f(uniformLocations.uScanlineStrength, preset.scanlineStrength);
-  gl.uniform1f(uniformLocations.uScanline2Strength, preset.scanline2Strength);
-  gl.uniform1f(uniformLocations.uVignetteStrength, preset.vignetteStrength);
-  gl.uniform1f(uniformLocations.uGlowStrength, preset.glowStrength);
-  gl.uniform1f(uniformLocations.uPhosphorStrength, preset.phosphorStrength);
-  gl.uniform3f(uniformLocations.uMonoTint, ...preset.monoTint);
+  gl.uniform2f(uniformLocations.uTargetSize, currentSettings.targetWidth, currentSettings.targetHeight);
+  gl.uniform1f(uniformLocations.uColorLevels, currentSettings.colorLevels);
+  gl.uniform1f(uniformLocations.uDitherStrength, currentSettings.ditherStrength);
+  gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(currentSettings.paletteMode));
+  gl.uniform1f(uniformLocations.uCurvature, currentSettings.curvature);
+  gl.uniform1f(uniformLocations.uScanlineStrength, currentSettings.scanlineStrength);
+  gl.uniform1f(uniformLocations.uScanline2Strength, currentSettings.scanline2Strength);
+  gl.uniform1f(uniformLocations.uVignetteStrength, currentSettings.vignetteStrength);
+  gl.uniform1f(uniformLocations.uGlowStrength, currentSettings.glowStrength);
+  gl.uniform1f(uniformLocations.uPhosphorStrength, currentSettings.phosphorStrength);
+  gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(currentSettings.monoTint));
 }
 
 function createDriveCurve(amount) {
@@ -448,4 +449,20 @@ function handleStorageChanged(changes, areaName) {
 function applyCurrentSettings() {
   applyPreset(currentSettings.presetKey);
   updateAudioNodes();
+  if (currentSettings.presetKey === CUSTOM_PRESET_KEY) {
+    setStatus("Rendering with custom settings.");
+    return;
+  }
+
+  setStatus(`Rendering with ${PRESETS[currentSettings.presetKey].label}.`);
+}
+
+function paletteModeToUniform(mode) {
+  if (mode === "pc98") return 1;
+  if (mode === "pc98_512") return 2;
+  if (mode === "pc98_4096") return 3;
+  if (mode === "color32") return 4;
+  if (mode === "color64") return 5;
+  if (mode === "mono") return 6;
+  return 0;
 }

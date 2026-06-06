@@ -1,12 +1,9 @@
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_STORAGE_KEY,
+} from "./shared/settings.js";
+
 const VIEWER_URL = chrome.runtime.getURL("viewer.html");
-const SETTINGS_STORAGE_KEY = "retroPluginSettings";
-const DEFAULT_SETTINGS = {
-  presetKey: "greenTerminal",
-  isAudioFxEnabled: true,
-  lofiAmount: 0.8,
-  isNoiseEnabled: true,
-  noiseLevel: 0.02,
-};
 
 let currentSession = null;
 
