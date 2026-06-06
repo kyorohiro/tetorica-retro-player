@@ -394,6 +394,11 @@ export function useRetroPreviewMedia({
       mediaRef.current.muted = isMutedRef.current;
       mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
       await mediaRef.current.play();
+      const activeTexture = textureRef.current;
+      if (activeTexture?.source instanceof VideoSource) {
+        activeTexture.source.autoUpdate = true;
+        activeTexture.source.update();
+      }
       isPlayingRef.current = true;
       setIsPlaying(true);
       setPreviewError("");
@@ -408,6 +413,8 @@ export function useRetroPreviewMedia({
       });
       updateAudioNodes();
       syncVideoState();
+      safeRender();
+      scheduleRefreshLayout();
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
       finishLoading();
