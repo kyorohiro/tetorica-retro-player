@@ -24,6 +24,8 @@ const curvatureInput = document.getElementById("curvature");
 const curvatureValue = document.getElementById("curvatureValue");
 const scanlineStrengthInput = document.getElementById("scanlineStrength");
 const scanlineStrengthValue = document.getElementById("scanlineStrengthValue");
+const scanline2StrengthInput = document.getElementById("scanline2Strength");
+const scanline2StrengthValue = document.getElementById("scanline2StrengthValue");
 const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
@@ -115,6 +117,13 @@ scanlineStrengthInput.addEventListener("input", () => {
   });
 });
 
+scanline2StrengthInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    scanline2Strength: Number(scanline2StrengthInput.value),
+  });
+});
+
 glowStrengthInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
@@ -189,6 +198,8 @@ function renderSettings(settings) {
   curvatureValue.textContent = settings.curvature.toFixed(2);
   scanlineStrengthInput.value = String(settings.scanlineStrength);
   scanlineStrengthValue.textContent = settings.scanlineStrength.toFixed(2);
+  scanline2StrengthInput.value = String(settings.scanline2Strength);
+  scanline2StrengthValue.textContent = settings.scanline2Strength.toFixed(3);
   glowStrengthInput.value = String(settings.glowStrength);
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
