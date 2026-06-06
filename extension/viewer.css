@@ -74,8 +74,18 @@ body.fit-mode {
   cursor: pointer;
 }
 
+.status-row .fit-button + .fit-button {
+  margin-left: 0;
+}
+
 .fit-button:hover {
   background: rgba(202, 216, 161, 0.16);
+}
+
+.fit-button.is-recording {
+  border-color: rgba(255, 157, 157, 0.35);
+  background: rgba(128, 24, 24, 0.38);
+  color: #fff2f2;
 }
 
 .canvas-frame {

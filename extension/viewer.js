@@ -12,6 +12,7 @@ const statusText = document.getElementById("statusText");
 const canvas = document.getElementById("glCanvas");
 const video = document.getElementById("sourceVideo");
 const fitButton = document.getElementById("fitButton");
+const recordButton = document.getElementById("recordButton");
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
@@ -49,6 +50,8 @@ let currentSettings = { ...DEFAULT_SETTINGS };
 let captureSizePollTimer = 0;
 let currentSession = null;
 let isFitModeEnabled = false;
+let mediaRecorder = null;
+let recordedChunks = [];
 
 init().catch((error) => {
   console.error(error);
@@ -85,6 +88,7 @@ async function init() {
   resizeCanvas();
   window.addEventListener("resize", handleWindowResize);
   fitButton?.addEventListener("click", toggleFitMode);
+  recordButton?.addEventListener("click", handleRecordButtonClick);
   currentSettings = await loadSettings();
   applyCurrentSettings();
   if (chrome.storage?.onChanged) {
@@ -137,6 +141,7 @@ async function startCapture(streamId) {
 }
 
 function stopCapture() {
+  stopRecording({ save: true });
   detachCaptureSizeListeners();
 
   if (animationFrameId) {
@@ -259,6 +264,115 @@ function resetCanvasInlineSize() {
     canvasFrame.style.removeProperty("width");
     canvasFrame.style.removeProperty("height");
   }
+}
+
+function handleRecordButtonClick() {
+  if (mediaRecorder?.state === "recording") {
+    stopRecording({ save: true });
+    return;
+  }
+
+  startRecording();
+}
+
+function startRecording() {
+  if (!mediaStream) {
+    setStatus("Start a capture session before recording.");
+    return;
+  }
+
+  const canvasStream = canvas.captureStream(30);
+  const recordingStream = new MediaStream();
+
+  canvasStream.getVideoTracks().forEach((track) => recordingStream.addTrack(track));
+  mediaStream.getAudioTracks().forEach((track) => recordingStream.addTrack(track.clone()));
+
+  const mimeType = getRecordingMimeType();
+
+  try {
+    mediaRecorder = mimeType
+      ? new MediaRecorder(recordingStream, { mimeType })
+      : new MediaRecorder(recordingStream);
+  } catch (error) {
+    setStatus(`Recording is not available: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
+  recordedChunks = [];
+  mediaRecorder.addEventListener("dataavailable", (event) => {
+    if (event.data?.size) {
+      recordedChunks.push(event.data);
+    }
+  });
+  mediaRecorder.addEventListener("stop", () => {
+    const tracks = recordingStream.getTracks();
+    tracks.forEach((track) => track.stop());
+    saveRecording();
+    mediaRecorder = null;
+    updateRecordButton();
+  }, { once: true });
+
+  mediaRecorder.start();
+  updateRecordButton();
+  setStatus("Recording current tab...");
+}
+
+function stopRecording({ save }) {
+  if (!mediaRecorder) {
+    return;
+  }
+
+  if (!save) {
+    recordedChunks = [];
+  }
+
+  if (mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    return;
+  }
+
+  mediaRecorder = null;
+  updateRecordButton();
+}
+
+function saveRecording() {
+  if (recordedChunks.length === 0) {
+    setStatus("Recording stopped, but no video data was captured.");
+    return;
+  }
+
+  const blob = new Blob(recordedChunks, {
+    type: mediaRecorder?.mimeType || "video/webm",
+  });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const url = URL.createObjectURL(blob);
+  const downloadLink = document.createElement("a");
+  downloadLink.href = url;
+  downloadLink.download = `tetorica-retro-player-${timestamp}.webm`;
+  downloadLink.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  recordedChunks = [];
+  setStatus("Saved recording as .webm.");
+}
+
+function updateRecordButton() {
+  if (!recordButton) {
+    return;
+  }
+
+  const isRecording = mediaRecorder?.state === "recording";
+  recordButton.textContent = isRecording ? "Stop" : "Record";
+  recordButton.classList.toggle("is-recording", isRecording);
+}
+
+function getRecordingMimeType() {
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+  ];
+
+  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
 function getCaptureAspectRatio() {
