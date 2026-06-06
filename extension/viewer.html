@@ -33,6 +33,42 @@
               <option value="pc98_512">PC-98 512-color</option>
             </select>
           </label>
+
+          <label class="control control-toggle">
+            <span>Lo-fi FX</span>
+            <input id="audioFxEnabled" type="checkbox" checked />
+          </label>
+
+          <label class="control">
+            <span>Lo-fi amount</span>
+            <input
+              id="lofiAmount"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0.8"
+            />
+            <output id="lofiAmountValue">80%</output>
+          </label>
+
+          <label class="control control-toggle">
+            <span>Spatial noise</span>
+            <input id="noiseEnabled" type="checkbox" checked />
+          </label>
+
+          <label class="control">
+            <span>Noise level</span>
+            <input
+              id="noiseLevel"
+              type="range"
+              min="0"
+              max="0.12"
+              step="0.001"
+              value="0.02"
+            />
+            <output id="noiseLevelValue">2%</output>
+          </label>
         </div>
 
         <div class="canvas-frame">

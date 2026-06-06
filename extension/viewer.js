@@ -3,6 +3,12 @@ import { FILTER_FRAGMENT } from "./shared/filterShader.js";
 const statusText = document.getElementById("statusText");
 const refreshButton = document.getElementById("refreshButton");
 const presetSelect = document.getElementById("presetSelect");
+const audioFxEnabledInput = document.getElementById("audioFxEnabled");
+const lofiAmountInput = document.getElementById("lofiAmount");
+const lofiAmountValue = document.getElementById("lofiAmountValue");
+const noiseEnabledInput = document.getElementById("noiseEnabled");
+const noiseLevelInput = document.getElementById("noiseLevel");
+const noiseLevelValue = document.getElementById("noiseLevelValue");
 const canvas = document.getElementById("glCanvas");
 const video = document.getElementById("sourceVideo");
 
@@ -103,9 +109,25 @@ let texture = null;
 let animationFrameId = 0;
 let mediaStream = null;
 let audioContext = null;
-let audioSourceNode = null;
+let mediaSourceNode = null;
+let masterGainNode = null;
+let lofiLowpassNode = null;
+let lofiHighshelfNode = null;
+let lofiDriveNode = null;
+let noiseSourceNode = null;
+let noiseFilterNode = null;
+let noisePannerNode = null;
+let noiseGainNode = null;
+let noiseLfoNode = null;
+let noiseLfoGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
+const audioState = {
+  isAudioFxEnabled: true,
+  lofiAmount: 0.8,
+  isNoiseEnabled: true,
+  noiseLevel: 0.02,
+};
 
 init().catch((error) => {
   console.error(error);
@@ -118,6 +140,28 @@ refreshButton.addEventListener("click", () => {
 
 presetSelect.addEventListener("change", () => {
   applyPreset(presetSelect.value);
+});
+
+audioFxEnabledInput.addEventListener("change", () => {
+  audioState.isAudioFxEnabled = audioFxEnabledInput.checked;
+  updateAudioNodes();
+});
+
+lofiAmountInput.addEventListener("input", () => {
+  audioState.lofiAmount = Number(lofiAmountInput.value);
+  lofiAmountValue.textContent = `${Math.round(audioState.lofiAmount * 100)}%`;
+  updateAudioNodes();
+});
+
+noiseEnabledInput.addEventListener("change", () => {
+  audioState.isNoiseEnabled = noiseEnabledInput.checked;
+  updateAudioNodes();
+});
+
+noiseLevelInput.addEventListener("input", () => {
+  audioState.noiseLevel = Number(noiseLevelInput.value);
+  noiseLevelValue.textContent = `${Math.round(audioState.noiseLevel * 100)}%`;
+  updateAudioNodes();
 });
 
 async function init() {
@@ -139,6 +183,7 @@ async function init() {
     return;
   }
 
+  syncAudioControls();
   await startCapture(session.streamId);
   setStatus(`Rendering tab ${session.sourceTabId} with ${PRESETS[presetSelect.value].label}.`);
 }
@@ -168,19 +213,9 @@ async function startCapture(streamId) {
 
   video.srcObject = mediaStream;
   await video.play();
-  replayAudio(mediaStream);
+  await connectStreamAudio(mediaStream);
   startedAt = performance.now();
   drawFrame();
-}
-
-function replayAudio(stream) {
-  const audioTracks = stream.getAudioTracks();
-  if (audioTracks.length === 0) return;
-
-  audioContext?.close().catch(() => {});
-  audioContext = new AudioContext();
-  audioSourceNode = audioContext.createMediaStreamSource(stream);
-  audioSourceNode.connect(audioContext.destination);
 }
 
 function stopCapture() {
@@ -189,15 +224,7 @@ function stopCapture() {
     animationFrameId = 0;
   }
 
-  if (audioSourceNode) {
-    audioSourceNode.disconnect();
-    audioSourceNode = null;
-  }
-
-  if (audioContext) {
-    audioContext.close().catch(() => {});
-    audioContext = null;
-  }
+  void disposeAudioEngine();
 
   if (mediaStream) {
     mediaStream.getTracks().forEach((track) => track.stop());
@@ -256,6 +283,184 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uPhosphorStrength, preset.phosphorStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...preset.monoTint);
   setStatus(`Preset switched to ${preset.label}.`);
+}
+
+function syncAudioControls() {
+  audioFxEnabledInput.checked = audioState.isAudioFxEnabled;
+  lofiAmountInput.value = String(audioState.lofiAmount);
+  lofiAmountValue.textContent = `${Math.round(audioState.lofiAmount * 100)}%`;
+  noiseEnabledInput.checked = audioState.isNoiseEnabled;
+  noiseLevelInput.value = String(audioState.noiseLevel);
+  noiseLevelValue.textContent = `${Math.round(audioState.noiseLevel * 100)}%`;
+}
+
+function createDriveCurve(amount) {
+  const samples = 256;
+  const curve = new Float32Array(samples);
+  const drive = 1 + amount * 5;
+
+  for (let index = 0; index < samples; index += 1) {
+    const x = (index * 2) / (samples - 1) - 1;
+    curve[index] = Math.tanh(x * drive);
+  }
+
+  return curve;
+}
+
+function updateAudioNodes() {
+  if (lofiLowpassNode && lofiHighshelfNode && lofiDriveNode) {
+    const amount = audioState.isAudioFxEnabled ? audioState.lofiAmount : 0;
+    lofiLowpassNode.frequency.value = 16000 - amount * 14200;
+    lofiLowpassNode.Q.value = 0.3 + amount * 1.8;
+    lofiHighshelfNode.gain.value = -amount * 18;
+    lofiDriveNode.curve = createDriveCurve(amount * 0.6);
+  }
+
+  if (noiseGainNode) {
+    noiseGainNode.gain.value = audioState.isNoiseEnabled ? audioState.noiseLevel : 0;
+  }
+}
+
+async function ensureAudioContext() {
+  if (audioContext?.state === "closed") {
+    audioContext = null;
+    mediaSourceNode = null;
+    masterGainNode = null;
+    lofiLowpassNode = null;
+    lofiHighshelfNode = null;
+    lofiDriveNode = null;
+    noiseSourceNode = null;
+    noiseFilterNode = null;
+    noisePannerNode = null;
+    noiseGainNode = null;
+    noiseLfoNode = null;
+    noiseLfoGainNode = null;
+  }
+
+  if (!audioContext) {
+    audioContext = new AudioContext();
+    masterGainNode = audioContext.createGain();
+    lofiLowpassNode = audioContext.createBiquadFilter();
+    lofiHighshelfNode = audioContext.createBiquadFilter();
+    lofiDriveNode = audioContext.createWaveShaper();
+
+    lofiLowpassNode.type = "lowpass";
+    lofiHighshelfNode.type = "highshelf";
+    lofiHighshelfNode.frequency.value = 2800;
+    lofiDriveNode.oversample = "4x";
+
+    lofiLowpassNode.connect(lofiHighshelfNode);
+    lofiHighshelfNode.connect(lofiDriveNode);
+    lofiDriveNode.connect(masterGainNode);
+    masterGainNode.connect(audioContext.destination);
+
+    noiseSourceNode = audioContext.createBufferSource();
+    const noiseBuffer = audioContext.createBuffer(
+      2,
+      audioContext.sampleRate * 2,
+      audioContext.sampleRate,
+    );
+    for (let channel = 0; channel < noiseBuffer.numberOfChannels; channel += 1) {
+      const channelData = noiseBuffer.getChannelData(channel);
+      for (let index = 0; index < channelData.length; index += 1) {
+        channelData[index] = Math.random() * 2 - 1;
+      }
+    }
+    noiseSourceNode.buffer = noiseBuffer;
+    noiseSourceNode.loop = true;
+
+    noiseFilterNode = audioContext.createBiquadFilter();
+    noiseFilterNode.type = "bandpass";
+    noiseFilterNode.frequency.value = 4200;
+    noiseFilterNode.Q.value = 0.8;
+
+    noisePannerNode = audioContext.createStereoPanner();
+    noiseGainNode = audioContext.createGain();
+    noiseLfoNode = audioContext.createOscillator();
+    noiseLfoGainNode = audioContext.createGain();
+
+    noiseLfoNode.type = "sine";
+    noiseLfoNode.frequency.value = 0.065;
+    noiseLfoGainNode.gain.value = 0.45;
+
+    noiseSourceNode.connect(noiseFilterNode);
+    noiseFilterNode.connect(noisePannerNode);
+    noisePannerNode.connect(noiseGainNode);
+    noiseGainNode.connect(masterGainNode);
+    noiseLfoNode.connect(noiseLfoGainNode);
+    noiseLfoGainNode.connect(noisePannerNode.pan);
+    noiseSourceNode.start();
+    noiseLfoNode.start();
+
+    updateAudioNodes();
+  }
+
+  if (audioContext.state === "suspended") {
+    try {
+      await audioContext.resume();
+    } catch {
+      // Resume can still be blocked until the next user gesture.
+    }
+  }
+
+  return audioContext;
+}
+
+async function connectStreamAudio(stream) {
+  const audioTracks = stream.getAudioTracks();
+  if (audioTracks.length === 0) return;
+
+  const context = await ensureAudioContext();
+  if (!context || !lofiLowpassNode) return;
+
+  if (mediaSourceNode) {
+    mediaSourceNode.disconnect();
+    mediaSourceNode = null;
+  }
+
+  mediaSourceNode = context.createMediaStreamSource(stream);
+  mediaSourceNode.connect(lofiLowpassNode);
+  updateAudioNodes();
+}
+
+async function disposeAudioEngine() {
+  mediaSourceNode?.disconnect();
+  mediaSourceNode = null;
+
+  try {
+    noiseSourceNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
+  try {
+    noiseLfoNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
+  const context = audioContext;
+  audioContext = null;
+  masterGainNode = null;
+  lofiLowpassNode = null;
+  lofiHighshelfNode = null;
+  lofiDriveNode = null;
+  noiseSourceNode = null;
+  noiseFilterNode = null;
+  noisePannerNode = null;
+  noiseGainNode = null;
+  noiseLfoNode = null;
+  noiseLfoGainNode = null;
+
+  if (!context || context.state === "closed") {
+    return;
+  }
+
+  try {
+    await context.close();
+  } catch {
+    // ignore double-close races
+  }
 }
 
 function setupRenderer(webgl) {
