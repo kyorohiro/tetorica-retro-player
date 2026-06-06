@@ -228,7 +228,7 @@ export function RetroFilterPanel({
           <input
             type="range"
             min="2"
-            max="64"
+            max="256"
             step="1"
             value={colorLevels}
             onChange={(ev) => {
