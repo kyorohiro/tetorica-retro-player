@@ -12,6 +12,10 @@ body {
   color: #f2f1dc;
 }
 
+body.fit-mode {
+  overflow: hidden;
+}
+
 .shell {
   width: min(1200px, calc(100vw - 32px));
   margin: 0 auto;
@@ -47,6 +51,7 @@ body {
   align-items: center;
   margin-bottom: 16px;
   color: #cad8a1;
+  flex-wrap: wrap;
 }
 
 .status-label {
@@ -58,6 +63,21 @@ body {
   text-transform: uppercase;
 }
 
+.fit-button {
+  margin-left: auto;
+  border: 1px solid rgba(202, 216, 161, 0.24);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(202, 216, 161, 0.08);
+  color: #eff7ca;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fit-button:hover {
+  background: rgba(202, 216, 161, 0.16);
+}
+
 .canvas-frame {
   overflow: hidden;
   border-radius: 18px;
@@ -65,6 +85,46 @@ body {
   background:
     linear-gradient(180deg, rgba(191, 255, 138, 0.06), transparent),
     #050604;
+}
+
+body.fit-mode .header,
+body.fit-mode .status-label,
+body.fit-mode #statusText {
+  display: none;
+}
+
+body.fit-mode .status-row {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  margin: 0;
+}
+
+body.fit-mode .fit-button {
+  margin-left: 0;
+  background: rgba(8, 10, 6, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+body.fit-mode .shell {
+  width: 100vw;
+  max-width: none;
+  padding: 0;
+}
+
+body.fit-mode .panel {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.fit-mode .canvas-frame {
+  border: 0;
+  border-radius: 0;
+  background: #050604;
 }
 
 canvas {
