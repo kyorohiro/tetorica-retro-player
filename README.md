@@ -67,6 +67,14 @@ To try it:
 
 The PoC opens `viewer.html` in an extension tab and renders the captured tab through the shared retro shader while audio settings are controlled from the extension popup. It is intentionally small and separate from the main app so the capture path can be verified before porting more of the player UI.
 
+To create a release ZIP for the Chrome Web Store upload flow:
+
+```bash
+npm run build:extension
+```
+
+The packaged archive is written to `release/`.
+
 ## Build
 
 ```bash
