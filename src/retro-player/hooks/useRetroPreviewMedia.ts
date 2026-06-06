@@ -394,6 +394,8 @@ export function useRetroPreviewMedia({
       mediaRef.current.muted = isMutedRef.current;
       mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
       await mediaRef.current.play();
+      isPlayingRef.current = true;
+      setIsPlaying(true);
       setPreviewError("");
       setNeedsUserPlay(false);
       debugAudio("playVideoWithAudio", {
