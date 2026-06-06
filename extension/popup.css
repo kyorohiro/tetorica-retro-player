@@ -104,10 +104,14 @@ output {
 }
 
 .footer {
-  margin-top: 14px;
+  margin-top: 22px;
+  text-align: center;
 }
 
 .store-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #c7d89b;
   font-size: 12px;
   text-decoration: none;
@@ -115,4 +119,46 @@ output {
 
 .store-link:hover {
   color: #eff7ca;
+}
+
+.store-link-footer {
+  display: block;
+  width: 100%;
+  position: relative;
+  padding: 8px 0 12px;
+  color: #dbe8ae;
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: 0 0 10px rgba(203, 235, 136, 0.18);
+}
+
+.store-link-footer::before,
+.store-link-footer::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(208, 235, 145, 0.55) 20%,
+    rgba(236, 251, 197, 0.9) 50%,
+    rgba(208, 235, 145, 0.55) 80%,
+    transparent
+  );
+  box-shadow: 0 0 10px rgba(208, 235, 145, 0.22);
+}
+
+.store-link-footer::before {
+  top: 0;
+}
+
+.store-link-footer::after {
+  bottom: 0;
+}
+
+.store-link-footer:hover {
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(234, 252, 186, 0.28);
 }
