@@ -85,11 +85,18 @@ async function startCaptureForActiveTab() {
     createdAt: Date.now(),
   };
 
-  await openViewerTab();
+  await chrome.runtime.sendMessage({
+    type: "CAPTURE_SESSION_UPDATED",
+    session: currentSession,
+  }).catch(() => {
+    // Ignore when no viewer is currently listening.
+  });
+
+  await openViewerTab(currentSession);
   return currentSession;
 }
 
-async function openViewerTab() {
+async function openViewerTab(session = currentSession) {
   const tabs = await chrome.tabs.query({ url: VIEWER_URL });
   const existing = tabs[0];
 

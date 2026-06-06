@@ -51,6 +51,23 @@ init().catch((error) => {
   setStatus(`Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
 });
 
+if (chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type !== "CAPTURE_SESSION_UPDATED" || !message.session?.streamId) {
+      return;
+    }
+
+    void startCapture(message.session.streamId)
+      .then(() => {
+        applyCurrentSettings();
+        setStatus(`Rendering tab ${message.session.sourceTabId}.`);
+      })
+      .catch((error) => {
+        setStatus(error instanceof Error ? error.message : String(error));
+      });
+  });
+}
+
 async function init() {
   gl = canvas.getContext("webgl2");
 
