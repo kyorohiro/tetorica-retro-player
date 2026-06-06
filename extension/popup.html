@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Retro Tab Filter Controls</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <p class="eyebrow">Plugin UI</p>
+        <h1>Retro Tab Filter</h1>
+      </header>
+
+      <div class="actions">
+        <button id="captureButton" type="button">Capture current tab</button>
+        <button id="viewerButton" type="button" class="secondary">Open viewer</button>
+      </div>
+
+      <p id="statusText" class="status">Ready.</p>
+
+      <section class="controls">
+        <label class="control">
+          <span>Preset</span>
+          <select id="presetSelect"></select>
+        </label>
+
+        <label class="control control-toggle">
+          <span>Lo-fi FX</span>
+          <input id="audioFxEnabled" type="checkbox" />
+        </label>
+
+        <label class="control">
+          <span>Lo-fi amount</span>
+          <input id="lofiAmount" type="range" min="0" max="1" step="0.01" />
+          <output id="lofiAmountValue"></output>
+        </label>
+
+        <label class="control control-toggle">
+          <span>Spatial noise</span>
+          <input id="noiseEnabled" type="checkbox" />
+        </label>
+
+        <label class="control">
+          <span>Noise level</span>
+          <input id="noiseLevel" type="range" min="0" max="0.12" step="0.001" />
+          <output id="noiseLevelValue"></output>
+        </label>
+      </section>
+    </main>
+
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

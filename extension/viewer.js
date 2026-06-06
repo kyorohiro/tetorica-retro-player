@@ -1,94 +1,14 @@
 import { FILTER_FRAGMENT } from "./shared/filterShader.js";
+import {
+  DEFAULT_SETTINGS,
+  PRESETS,
+  SETTINGS_STORAGE_KEY,
+  normalizeSettings,
+} from "./shared/settings.js";
 
 const statusText = document.getElementById("statusText");
-const refreshButton = document.getElementById("refreshButton");
-const presetSelect = document.getElementById("presetSelect");
-const audioFxEnabledInput = document.getElementById("audioFxEnabled");
-const lofiAmountInput = document.getElementById("lofiAmount");
-const lofiAmountValue = document.getElementById("lofiAmountValue");
-const noiseEnabledInput = document.getElementById("noiseEnabled");
-const noiseLevelInput = document.getElementById("noiseLevel");
-const noiseLevelValue = document.getElementById("noiseLevelValue");
 const canvas = document.getElementById("glCanvas");
 const video = document.getElementById("sourceVideo");
-
-const PRESETS = {
-  greenTerminal: {
-    label: "Green Terminal",
-    targetWidth: 640,
-    targetHeight: 400,
-    colorLevels: 16,
-    ditherStrength: 0.14,
-    paletteMode: 6,
-    curvature: 0.07,
-    scanlineStrength: 0.16,
-    scanline2Strength: 0.0,
-    vignetteStrength: 0.1,
-    glowStrength: 0.09,
-    phosphorStrength: 0.06,
-    monoTint: [0.72, 1.0, 0.58],
-  },
-  amberCrt: {
-    label: "Amber CRT",
-    targetWidth: 640,
-    targetHeight: 400,
-    colorLevels: 16,
-    ditherStrength: 0.16,
-    paletteMode: 6,
-    curvature: 0.08,
-    scanlineStrength: 0.0,
-    scanline2Strength: 0.02,
-    vignetteStrength: 0.11,
-    glowStrength: 0.1,
-    phosphorStrength: 0.05,
-    monoTint: [1.0, 0.82, 0.45],
-  },
-  monochrome: {
-    label: "Mono",
-    targetWidth: 640,
-    targetHeight: 400,
-    colorLevels: 16,
-    ditherStrength: 0.18,
-    paletteMode: 6,
-    curvature: 0.05,
-    scanlineStrength: 0.1,
-    scanline2Strength: 0.0,
-    vignetteStrength: 0.08,
-    glowStrength: 0.07,
-    phosphorStrength: 0.02,
-    monoTint: [1.0, 1.0, 1.0],
-  },
-  lcdIce: {
-    label: "LCD Ice",
-    targetWidth: 480,
-    targetHeight: 300,
-    colorLevels: 16,
-    ditherStrength: 0.06,
-    paletteMode: 6,
-    curvature: 0.0,
-    scanlineStrength: 0.0,
-    scanline2Strength: 0.0,
-    vignetteStrength: 0.015,
-    glowStrength: 0.0,
-    phosphorStrength: 0.0,
-    monoTint: [0.7, 0.9, 1.0],
-  },
-  pc98_512: {
-    label: "PC-98 512-color",
-    targetWidth: 640,
-    targetHeight: 400,
-    colorLevels: 8,
-    ditherStrength: 0.12,
-    paletteMode: 2,
-    curvature: 0.03,
-    scanlineStrength: 0.0,
-    scanline2Strength: 0.02,
-    vignetteStrength: 0.05,
-    glowStrength: 0.06,
-    phosphorStrength: 0.03,
-    monoTint: [1.0, 1.0, 1.0],
-  },
-};
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
@@ -122,46 +42,11 @@ let noiseLfoNode = null;
 let noiseLfoGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
-const audioState = {
-  isAudioFxEnabled: true,
-  lofiAmount: 0.8,
-  isNoiseEnabled: true,
-  noiseLevel: 0.02,
-};
+let currentSettings = { ...DEFAULT_SETTINGS };
 
 init().catch((error) => {
   console.error(error);
   setStatus(`Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
-});
-
-refreshButton.addEventListener("click", () => {
-  setStatus("Click the extension button again on the tab you want to capture.");
-});
-
-presetSelect.addEventListener("change", () => {
-  applyPreset(presetSelect.value);
-});
-
-audioFxEnabledInput.addEventListener("change", () => {
-  audioState.isAudioFxEnabled = audioFxEnabledInput.checked;
-  updateAudioNodes();
-});
-
-lofiAmountInput.addEventListener("input", () => {
-  audioState.lofiAmount = Number(lofiAmountInput.value);
-  lofiAmountValue.textContent = `${Math.round(audioState.lofiAmount * 100)}%`;
-  updateAudioNodes();
-});
-
-noiseEnabledInput.addEventListener("change", () => {
-  audioState.isNoiseEnabled = noiseEnabledInput.checked;
-  updateAudioNodes();
-});
-
-noiseLevelInput.addEventListener("input", () => {
-  audioState.noiseLevel = Number(noiseLevelInput.value);
-  noiseLevelValue.textContent = `${Math.round(audioState.noiseLevel * 100)}%`;
-  updateAudioNodes();
 });
 
 async function init() {
@@ -174,7 +59,11 @@ async function init() {
   setupRenderer(gl);
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
-  applyPreset(presetSelect.value);
+  currentSettings = await loadSettings();
+  applyCurrentSettings();
+  if (chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener(handleStorageChanged);
+  }
 
   const session = await getCaptureSession();
 
@@ -183,9 +72,8 @@ async function init() {
     return;
   }
 
-  syncAudioControls();
   await startCapture(session.streamId);
-  setStatus(`Rendering tab ${session.sourceTabId} with ${PRESETS[presetSelect.value].label}.`);
+  setStatus(`Rendering tab ${session.sourceTabId} with ${PRESETS[currentSettings.presetKey].label}.`);
 }
 
 async function getCaptureSession() {
@@ -282,16 +170,6 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uGlowStrength, preset.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, preset.phosphorStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...preset.monoTint);
-  setStatus(`Preset switched to ${preset.label}.`);
-}
-
-function syncAudioControls() {
-  audioFxEnabledInput.checked = audioState.isAudioFxEnabled;
-  lofiAmountInput.value = String(audioState.lofiAmount);
-  lofiAmountValue.textContent = `${Math.round(audioState.lofiAmount * 100)}%`;
-  noiseEnabledInput.checked = audioState.isNoiseEnabled;
-  noiseLevelInput.value = String(audioState.noiseLevel);
-  noiseLevelValue.textContent = `${Math.round(audioState.noiseLevel * 100)}%`;
 }
 
 function createDriveCurve(amount) {
@@ -309,7 +187,7 @@ function createDriveCurve(amount) {
 
 function updateAudioNodes() {
   if (lofiLowpassNode && lofiHighshelfNode && lofiDriveNode) {
-    const amount = audioState.isAudioFxEnabled ? audioState.lofiAmount : 0;
+    const amount = currentSettings.isAudioFxEnabled ? currentSettings.lofiAmount : 0;
     lofiLowpassNode.frequency.value = 16000 - amount * 14200;
     lofiLowpassNode.Q.value = 0.3 + amount * 1.8;
     lofiHighshelfNode.gain.value = -amount * 18;
@@ -317,7 +195,7 @@ function updateAudioNodes() {
   }
 
   if (noiseGainNode) {
-    noiseGainNode.gain.value = audioState.isNoiseEnabled ? audioState.noiseLevel : 0;
+    noiseGainNode.gain.value = currentSettings.isNoiseEnabled ? currentSettings.noiseLevel : 0;
   }
 }
 
@@ -547,4 +425,27 @@ function compileShader(webgl, type, source) {
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+async function loadSettings() {
+  const response = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
+  if (!response?.ok) {
+    return { ...DEFAULT_SETTINGS };
+  }
+
+  return normalizeSettings(response.settings);
+}
+
+function handleStorageChanged(changes, areaName) {
+  if (areaName !== "local" || !changes[SETTINGS_STORAGE_KEY]) {
+    return;
+  }
+
+  currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
+  applyCurrentSettings();
+}
+
+function applyCurrentSettings() {
+  applyPreset(currentSettings.presetKey);
+  updateAudioNodes();
 }

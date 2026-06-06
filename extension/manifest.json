@@ -3,17 +3,18 @@
   "name": "Tetorica Retro Tab Filter",
   "version": "0.1.0",
   "description": "Capture the current tab and preview it through a grayscale WebGL shader.",
-  "permissions": ["activeTab", "tabCapture", "tabs"],
+  "permissions": ["activeTab", "storage", "tabCapture", "tabs"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "action": {
+    "default_popup": "popup.html",
     "default_title": "Open Retro Tab Filter"
   },
   "web_accessible_resources": [
     {
-      "resources": ["viewer.css", "viewer.js"],
+      "resources": ["viewer.css", "viewer.js", "shared/filterShader.js"],
       "matches": ["<all_urls>"]
     }
   ]
