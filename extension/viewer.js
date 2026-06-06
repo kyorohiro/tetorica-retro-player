@@ -128,6 +128,7 @@ async function startCapture(streamId) {
 
   video.srcObject = mediaStream;
   await video.play();
+  logCaptureAspect("startCapture");
   attachCaptureSizeListeners();
   resizeCanvas();
   await connectStreamAudio(mediaStream);
@@ -217,6 +218,7 @@ function handleWindowResize() {
 }
 
 function handleCaptureResize() {
+  logCaptureAspect("handleCaptureResize");
   applyCanvasLayout();
 }
 
@@ -260,6 +262,16 @@ function resetCanvasInlineSize() {
 }
 
 function getCaptureAspectRatio() {
+  if (isFitModeEnabled) {
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      return video.videoWidth / video.videoHeight;
+    }
+
+    if (canvas.width > 0 && canvas.height > 0) {
+      return canvas.width / canvas.height;
+    }
+  }
+
   const sessionAspectRatio = getSessionAspectRatio();
   if (sessionAspectRatio) {
     return sessionAspectRatio;
@@ -286,6 +298,34 @@ function getSessionAspectRatio() {
 
 function updateCanvasAspectRatio() {
   canvas.style.setProperty("--canvas-aspect-ratio", `${getCaptureAspectRatio()}`);
+}
+
+function logCaptureAspect(reason) {
+  const videoAspect =
+    video.videoWidth > 0 && video.videoHeight > 0
+      ? video.videoWidth / video.videoHeight
+      : null;
+  const sessionAspect = getSessionAspectRatio();
+  const canvasAspect =
+    canvas.width > 0 && canvas.height > 0
+      ? canvas.width / canvas.height
+      : null;
+
+  console.log("capture-aspect", {
+    reason,
+    isFitModeEnabled,
+    sessionAspect,
+    videoAspect,
+    canvasAspect,
+    sourceViewportWidth: currentSession?.sourceViewportWidth ?? null,
+    sourceViewportHeight: currentSession?.sourceViewportHeight ?? null,
+    sourceOuterWidth: currentSession?.sourceOuterWidth ?? null,
+    sourceOuterHeight: currentSession?.sourceOuterHeight ?? null,
+    videoWidth: video.videoWidth,
+    videoHeight: video.videoHeight,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+  });
 }
 
 function applyPreset(presetKey) {
