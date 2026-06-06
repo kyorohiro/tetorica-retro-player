@@ -11,6 +11,7 @@ import {
 const statusText = document.getElementById("statusText");
 const canvas = document.getElementById("glCanvas");
 const video = document.getElementById("sourceVideo");
+const fitButton = document.getElementById("fitButton");
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
@@ -47,6 +48,7 @@ let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
 let captureSizePollTimer = 0;
 let currentSession = null;
+let isFitModeEnabled = false;
 
 init().catch((error) => {
   console.error(error);
@@ -81,7 +83,8 @@ async function init() {
 
   setupRenderer(gl);
   resizeCanvas();
-  window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("resize", handleWindowResize);
+  fitButton?.addEventListener("click", toggleFitMode);
   currentSettings = await loadSettings();
   applyCurrentSettings();
   if (chrome.storage?.onChanged) {
@@ -152,14 +155,14 @@ function stopCapture() {
 
 function attachCaptureSizeListeners() {
   detachCaptureSizeListeners();
-  video.addEventListener("resize", resizeCanvas);
+  video.addEventListener("resize", handleCaptureResize);
   captureSizePollTimer = window.setInterval(() => {
-    resizeCanvas();
+    handleCaptureResize();
   }, 500);
 }
 
 function detachCaptureSizeListeners() {
-  video.removeEventListener("resize", resizeCanvas);
+  video.removeEventListener("resize", handleCaptureResize);
   if (captureSizePollTimer) {
     window.clearInterval(captureSizePollTimer);
     captureSizePollTimer = 0;
@@ -200,6 +203,62 @@ function resizeCanvas() {
   canvas.height = height;
 }
 
+function toggleFitMode() {
+  isFitModeEnabled = !isFitModeEnabled;
+  document.body.classList.toggle("fit-mode", isFitModeEnabled);
+  if (fitButton) {
+    fitButton.textContent = isFitModeEnabled ? "Unfit" : "Fit";
+  }
+  applyCanvasLayout();
+}
+
+function handleWindowResize() {
+  applyCanvasLayout();
+}
+
+function handleCaptureResize() {
+  applyCanvasLayout();
+}
+
+function applyCanvasLayout() {
+  if (isFitModeEnabled) {
+    fitCanvasToWindow();
+    return;
+  }
+
+  resetCanvasInlineSize();
+  resizeCanvas();
+}
+
+function fitCanvasToWindow() {
+  const aspectRatio = getCaptureAspectRatio();
+  const canvasFrame = canvas.parentElement;
+
+  if (!canvasFrame) {
+    resizeCanvas();
+    return;
+  }
+
+  const fittedWidth = Math.max(1, window.innerWidth);
+  const fittedHeight = Math.max(1, fittedWidth / aspectRatio);
+
+  canvas.style.width = `${Math.floor(fittedWidth)}px`;
+  canvas.style.height = `${Math.floor(fittedHeight)}px`;
+  canvasFrame.style.width = canvas.style.width;
+  canvasFrame.style.height = canvas.style.height;
+  resizeCanvas();
+}
+
+function resetCanvasInlineSize() {
+  const canvasFrame = canvas.parentElement;
+  canvas.style.removeProperty("width");
+  canvas.style.removeProperty("height");
+  if (canvasFrame) {
+    canvasFrame.style.removeProperty("width");
+    canvasFrame.style.removeProperty("height");
+  }
+}
+
 function getCaptureAspectRatio() {
   const sessionAspectRatio = getSessionAspectRatio();
   if (sessionAspectRatio) {
@@ -208,6 +267,10 @@ function getCaptureAspectRatio() {
 
   if (video.videoWidth > 0 && video.videoHeight > 0) {
     return video.videoWidth / video.videoHeight;
+  }
+
+  if (canvas.width > 0 && canvas.height > 0) {
+    return canvas.width / canvas.height;
   }
 
   return 16 / 9;
