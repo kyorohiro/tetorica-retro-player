@@ -1,0 +1,118 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top, rgba(110, 147, 58, 0.22), transparent 42%),
+    linear-gradient(180deg, #171912 0%, #0a0b08 100%);
+  color: #f0efd8;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+.shell {
+  padding: 16px;
+}
+
+.header {
+  margin-bottom: 14px;
+}
+
+.brand-link {
+  color: #eff7ca;
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.brand-link:hover {
+  color: #ffffff;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+button {
+  border: 1px solid rgba(196, 230, 125, 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(160, 194, 95, 0.18);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.status {
+  min-height: 18px;
+  margin: 0 0 14px;
+  color: #c7d89b;
+  font-size: 13px;
+}
+
+.controls {
+  display: grid;
+  gap: 12px;
+}
+
+.control {
+  display: grid;
+  gap: 6px;
+}
+
+.control-toggle {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.control span {
+  font-size: 13px;
+}
+
+select,
+input[type="range"] {
+  width: 100%;
+}
+
+select {
+  border: 1px solid rgba(196, 230, 125, 0.2);
+  border-radius: 10px;
+  background: rgba(9, 10, 8, 0.95);
+  color: inherit;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+input[type="checkbox"] {
+  inline-size: 22px;
+  block-size: 22px;
+  accent-color: #a6c56d;
+}
+
+output {
+  font-size: 12px;
+  color: #c7d89b;
+}
+
+.footer {
+  margin-top: 14px;
+}
+
+.store-link {
+  color: #c7d89b;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.store-link:hover {
+  color: #eff7ca;
+}

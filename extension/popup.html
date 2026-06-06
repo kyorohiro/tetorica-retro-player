@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Retro Tab Filter Controls</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <a
+          class="brand-link"
+          href="https://kyorohiro.itch.io/tetorica-retro-player"
+          target="_blank"
+          rel="noreferrer"
+        >
+          tetorica-retro-player
+        </a>
+      </header>
+
+      <div class="actions">
+        <button id="captureButton" type="button">Capture current tab</button>
+        <button id="viewerButton" type="button" class="secondary">Show viewer</button>
+      </div>
+
+      <p id="statusText" class="status">Ready.</p>
+
+      <section class="controls">
+        <label class="control">
+          <span>Preset</span>
+          <select id="presetSelect"></select>
+        </label>
+
+        <label class="control">
+          <span>Palette</span>
+          <select id="paletteMode"></select>
+        </label>
+
+        <label class="control">
+          <span>Mono tint</span>
+          <select id="monoTint"></select>
+        </label>
+
+        <label class="control">
+          <span>Target width</span>
+          <input id="targetWidth" type="range" min="160" max="2560" step="16" />
+          <output id="targetWidthValue"></output>
+        </label>
+
+        <label class="control">
+          <span>Target height</span>
+          <input id="targetHeight" type="range" min="100" max="2560" step="8" />
+          <output id="targetHeightValue"></output>
+        </label>
+
+        <label class="control">
+          <span>Dither</span>
+          <input id="ditherStrength" type="range" min="0" max="0.5" step="0.01" />
+          <output id="ditherStrengthValue"></output>
+        </label>
+
+        <label class="control">
+          <span>Curvature</span>
+          <input id="curvature" type="range" min="0" max="0.2" step="0.01" />
+          <output id="curvatureValue"></output>
+        </label>
+
+        <label class="control">
+          <span>Scanline</span>
+          <input id="scanlineStrength" type="range" min="0" max="0.3" step="0.01" />
+          <output id="scanlineStrengthValue"></output>
+        </label>
+
+        <label class="control">
+          <span>Glow</span>
+          <input id="glowStrength" type="range" min="0" max="0.2" step="0.01" />
+          <output id="glowStrengthValue"></output>
+        </label>
+
+        <label class="control control-toggle">
+          <span>Lo-fi FX</span>
+          <input id="audioFxEnabled" type="checkbox" />
+        </label>
+
+        <label class="control">
+          <span>Lo-fi amount</span>
+          <input id="lofiAmount" type="range" min="0" max="1" step="0.01" />
+          <output id="lofiAmountValue"></output>
+        </label>
+
+        <label class="control control-toggle">
+          <span>Spatial noise</span>
+          <input id="noiseEnabled" type="checkbox" />
+        </label>
+
+        <label class="control">
+          <span>Noise level</span>
+          <input id="noiseLevel" type="range" min="0" max="0.12" step="0.001" />
+          <output id="noiseLevelValue"></output>
+        </label>
+      </section>
+
+      <footer class="footer">
+        <a
+          class="store-link"
+          href="https://kyorohiro.itch.io/tetorica-retro-player"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open itch.io page
+        </a>
+      </footer>
+    </main>
+
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

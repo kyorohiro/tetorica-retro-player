@@ -33,3 +33,7 @@ adb install app-release-signed.apk
 
 npm run tauri android dev
 ```
+
+
+
+https://chrome.google.com/webstore/devconsole/
