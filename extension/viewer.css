@@ -71,7 +71,7 @@ canvas {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: var(--canvas-aspect-ratio, 16 / 9);
 }
 
 @media (max-width: 720px) {
