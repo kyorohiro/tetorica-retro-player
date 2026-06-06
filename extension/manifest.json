@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Tetorica Retro Tab Filter",
+  "name": "Tetorica Retro Player",
   "version": "0.9.1",
   "description": "Capture the current tab and preview it with retro CRT video and lo-fi audio effects.",
   "homepage_url": "https://kyorohiro.itch.io/tetorica-retro-player",
@@ -10,7 +10,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["activeTab", "storage", "tabCapture", "tabs"],
+  "permissions": ["activeTab", "storage", "tabCapture"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -22,7 +22,7 @@
       "48": "icons/icon48.png"
     },
     "default_popup": "popup.html",
-    "default_title": "Open Retro Tab Filter"
+    "default_title": "Open Tetorica Retro Player"
   },
   "web_accessible_resources": [
     {
