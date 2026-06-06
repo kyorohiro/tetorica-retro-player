@@ -237,6 +237,7 @@ function isMonoTint(value) {
 }
 
 function resolveColorLevels(paletteMode, requestedLevels) {
+  if (paletteMode === "free") return 64;
   if (paletteMode === "pc98") return 16;
   if (paletteMode === "pc98_4096") return 16;
   if (paletteMode === "pc98_512") return 8;
