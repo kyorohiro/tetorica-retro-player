@@ -113,6 +113,12 @@ export function useRetroPreviewMedia({
   debugVideo,
   debugAudio,
 }: UseRetroPreviewMediaParams) {
+  const muteNoiseImmediately = () => {
+    if (noiseGainRef.current) {
+      noiseGainRef.current.gain.value = 0;
+    }
+  };
+
   const releaseDetachedMedia = (
     media: HTMLMediaElement,
     url?: string,
@@ -627,6 +633,8 @@ export function useRetroPreviewMedia({
       mediaRef.current = null;
       previewElementRef.current = image;
       setPreviewKindState("image");
+      muteNoiseImmediately();
+      updateAudioNodes();
       setSourceDimensions({
         width: image.naturalWidth,
         height: image.naturalHeight,
@@ -955,6 +963,8 @@ export function useRetroPreviewMedia({
         mediaRef.current = null;
         previewElementRef.current = image;
         setPreviewKindState("image");
+        muteNoiseImmediately();
+        updateAudioNodes();
         setSourceDimensions({
           width: image.naturalWidth,
           height: image.naturalHeight,
