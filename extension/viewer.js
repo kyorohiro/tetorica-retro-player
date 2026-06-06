@@ -45,6 +45,8 @@ let noiseLfoGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
+let captureSizePollTimer = 0;
+let currentSession = null;
 
 init().catch((error) => {
   console.error(error);
@@ -56,6 +58,8 @@ if (chrome.runtime?.onMessage) {
     if (message?.type !== "CAPTURE_SESSION_UPDATED" || !message.session?.streamId) {
       return;
     }
+
+    currentSession = message.session;
 
     void startCapture(message.session.streamId)
       .then(() => {
@@ -85,6 +89,7 @@ async function init() {
   }
 
   const session = await getCaptureSession();
+  currentSession = session;
 
   if (!session?.streamId) {
     setStatus("No active capture session. Open a tab and click the extension button.");
@@ -120,12 +125,16 @@ async function startCapture(streamId) {
 
   video.srcObject = mediaStream;
   await video.play();
+  attachCaptureSizeListeners();
+  resizeCanvas();
   await connectStreamAudio(mediaStream);
   startedAt = performance.now();
   drawFrame();
 }
 
 function stopCapture() {
+  detachCaptureSizeListeners();
+
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
@@ -139,6 +148,21 @@ function stopCapture() {
   }
 
   video.srcObject = null;
+}
+
+function attachCaptureSizeListeners() {
+  video.addEventListener("resize", resizeCanvas);
+  captureSizePollTimer = window.setInterval(() => {
+    resizeCanvas();
+  }, 500);
+}
+
+function detachCaptureSizeListeners() {
+  video.removeEventListener("resize", resizeCanvas);
+  if (captureSizePollTimer) {
+    window.clearInterval(captureSizePollTimer);
+    captureSizePollTimer = 0;
+  }
 }
 
 function drawFrame() {
@@ -162,8 +186,10 @@ function drawFrame() {
 }
 
 function resizeCanvas() {
+  updateCanvasAspectRatio();
   const width = Math.max(640, Math.floor(canvas.clientWidth * window.devicePixelRatio));
-  const height = Math.max(360, Math.floor((width * 9) / 16));
+  const aspectRatio = getCaptureAspectRatio();
+  const height = Math.max(1, Math.floor(width / aspectRatio));
 
   if (canvas.width === width && canvas.height === height) {
     return;
@@ -171,6 +197,31 @@ function resizeCanvas() {
 
   canvas.width = width;
   canvas.height = height;
+}
+
+function getCaptureAspectRatio() {
+  const sessionAspectRatio = getSessionAspectRatio();
+  if (sessionAspectRatio) {
+    return sessionAspectRatio;
+  }
+
+  if (video.videoWidth > 0 && video.videoHeight > 0) {
+    return video.videoWidth / video.videoHeight;
+  }
+
+  return 16 / 9;
+}
+
+function getSessionAspectRatio() {
+  if (!currentSession?.sourceViewportWidth || !currentSession?.sourceViewportHeight) {
+    return null;
+  }
+
+  return currentSession.sourceViewportWidth / currentSession.sourceViewportHeight;
+}
+
+function updateCanvasAspectRatio() {
+  canvas.style.setProperty("--canvas-aspect-ratio", `${getCaptureAspectRatio()}`);
 }
 
 function applyPreset(presetKey) {
