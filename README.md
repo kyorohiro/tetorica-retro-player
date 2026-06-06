@@ -44,6 +44,29 @@ npm install
 npm run dev
 ```
 
+## Chrome Extension PoC
+
+`extension/` contains a minimal Manifest V3 proof of concept for:
+
+- clicking the Chrome action button
+- capturing the current tab with `chrome.tabCapture`
+- feeding the resulting `MediaStream` into a hidden `<video>`
+- uploading that video into a WebGL texture
+- converting it to grayscale in a fragment shader
+- drawing the result into a `<canvas>`
+
+To try it:
+
+1. Open `chrome://extensions`
+2. Enable Developer mode
+3. Choose Load unpacked
+4. Select this repository's `extension/` directory
+5. Open a tab you want to capture
+6. Click the extension button
+7. In the popup, press `Capture current tab`
+
+The PoC opens `viewer.html` in an extension tab and renders the captured tab through the shared retro shader while audio settings are controlled from the extension popup. It is intentionally small and separate from the main app so the capture path can be verified before porting more of the player UI.
+
 ## Build
 
 ```bash

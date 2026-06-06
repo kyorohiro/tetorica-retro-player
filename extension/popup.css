@@ -20,17 +20,15 @@ body {
   margin-bottom: 14px;
 }
 
-.eyebrow {
-  margin: 0 0 4px;
-  color: #a6c56d;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.brand-link {
+  color: #eff7ca;
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
-h1 {
-  margin: 0;
-  font-size: 24px;
+.brand-link:hover {
+  color: #ffffff;
 }
 
 .actions {
@@ -103,4 +101,18 @@ input[type="checkbox"] {
 output {
   font-size: 12px;
   color: #c7d89b;
+}
+
+.footer {
+  margin-top: 14px;
+}
+
+.store-link {
+  color: #c7d89b;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.store-link:hover {
+  color: #eff7ca;
 }
