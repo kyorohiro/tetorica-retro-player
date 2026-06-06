@@ -376,30 +376,39 @@ function getRecordingMimeType() {
 }
 
 function getCaptureAspectRatio() {
+  const crtAspect = typeof currentSettings?.crtAspect === "number"
+    ? currentSettings.crtAspect
+    : 1;
+  const videoAspectRatio =
+    video.videoWidth > 0 && video.videoHeight > 0
+      ? video.videoWidth / video.videoHeight
+      : null;
+  let baseAspectRatio = null;
+
   if (isFitModeEnabled) {
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      return video.videoWidth / video.videoHeight;
-    }
-
-    if (canvas.width > 0 && canvas.height > 0) {
-      return canvas.width / canvas.height;
+    if (videoAspectRatio) {
+      baseAspectRatio = videoAspectRatio;
+    } else if (canvas.width > 0 && canvas.height > 0) {
+      baseAspectRatio = canvas.width / canvas.height;
     }
   }
 
-  const sessionAspectRatio = getSessionAspectRatio();
-  if (sessionAspectRatio) {
-    return sessionAspectRatio;
+  if (!baseAspectRatio) {
+    const sessionAspectRatio = getSessionAspectRatio();
+    if (sessionAspectRatio && videoAspectRatio) {
+      baseAspectRatio = Math.max(sessionAspectRatio, videoAspectRatio);
+    } else if (sessionAspectRatio) {
+      baseAspectRatio = sessionAspectRatio;
+    } else if (videoAspectRatio) {
+      baseAspectRatio = videoAspectRatio;
+    } else if (canvas.width > 0 && canvas.height > 0) {
+      baseAspectRatio = canvas.width / canvas.height;
+    } else {
+      baseAspectRatio = 16 / 9;
+    }
   }
 
-  if (video.videoWidth > 0 && video.videoHeight > 0) {
-    return video.videoWidth / video.videoHeight;
-  }
-
-  if (canvas.width > 0 && canvas.height > 0) {
-    return canvas.width / canvas.height;
-  }
-
-  return 16 / 9;
+  return baseAspectRatio * crtAspect;
 }
 
 function getSessionAspectRatio() {
@@ -407,7 +416,13 @@ function getSessionAspectRatio() {
     return null;
   }
 
-  return currentSession.sourceViewportWidth / currentSession.sourceViewportHeight;
+  const viewportAspect =
+    currentSession.sourceViewportWidth / currentSession.sourceViewportHeight;
+  const widthAdjustedAspect = currentSession?.sourceOuterWidth
+    ? currentSession.sourceOuterWidth / currentSession.sourceViewportHeight
+    : null;
+
+  return Math.max(viewportAspect, widthAdjustedAspect ?? 0);
 }
 
 function updateCanvasAspectRatio() {

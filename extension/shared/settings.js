@@ -175,6 +175,7 @@ export const PRESETS = {
 
 export const DEFAULT_SETTINGS = {
   presetKey: "greenTerminal",
+  crtAspect: 1.0,
   paletteMode: "mono",
   monoTint: "green",
   targetWidth: 640,
@@ -218,6 +219,10 @@ export function normalizeSettings(candidate) {
 
   return {
     presetKey,
+    crtAspect:
+      typeof candidate?.crtAspect === "number"
+        ? clamp(candidate.crtAspect, 0.9, 1.1)
+        : basePresetSettings.crtAspect,
     paletteMode,
     monoTint,
     targetWidth:
@@ -282,6 +287,10 @@ export function applyPresetToSettings(presetKey) {
   return {
     ...DEFAULT_SETTINGS,
     presetKey,
+    crtAspect:
+      typeof preset.crtAspect === "number"
+        ? preset.crtAspect
+        : DEFAULT_SETTINGS.crtAspect,
     targetWidth: preset.targetWidth,
     targetHeight: preset.targetHeight,
     colorLevels: preset.colorLevels,

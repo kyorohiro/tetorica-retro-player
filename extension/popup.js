@@ -22,6 +22,8 @@ const ditherStrengthInput = document.getElementById("ditherStrength");
 const ditherStrengthValue = document.getElementById("ditherStrengthValue");
 const curvatureInput = document.getElementById("curvature");
 const curvatureValue = document.getElementById("curvatureValue");
+const crtAspectInput = document.getElementById("crtAspect");
+const crtAspectValue = document.getElementById("crtAspectValue");
 const scanlineStrengthInput = document.getElementById("scanlineStrength");
 const scanlineStrengthValue = document.getElementById("scanlineStrengthValue");
 const scanline2StrengthInput = document.getElementById("scanline2Strength");
@@ -107,6 +109,13 @@ curvatureInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     curvature: Number(curvatureInput.value),
+  });
+});
+
+crtAspectInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    crtAspect: Number(crtAspectInput.value),
   });
 });
 
@@ -196,6 +205,8 @@ function renderSettings(settings) {
   ditherStrengthValue.textContent = settings.ditherStrength.toFixed(2);
   curvatureInput.value = String(settings.curvature);
   curvatureValue.textContent = settings.curvature.toFixed(2);
+  crtAspectInput.value = String(settings.crtAspect);
+  crtAspectValue.textContent = settings.crtAspect.toFixed(3);
   scanlineStrengthInput.value = String(settings.scanlineStrength);
   scanlineStrengthValue.textContent = settings.scanlineStrength.toFixed(2);
   scanline2StrengthInput.value = String(settings.scanline2Strength);
