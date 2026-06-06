@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetorica Retro Tab Filter</title>
+    <link rel="stylesheet" href="./viewer.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <a
+          class="brand-link"
+          href="https://kyorohiro.itch.io/tetorica-retro-player"
+          target="_blank"
+          rel="noreferrer"
+        >
+          tetorica-retro-player
+        </a>
+      </header>
+
+      <section class="panel">
+        <div class="status-row">
+          <span class="status-label">Status</span>
+          <span id="statusText">Waiting for capture session...</span>
+        </div>
+
+        <div class="canvas-frame">
+          <canvas id="glCanvas" width="1280" height="720"></canvas>
+        </div>
+
+        <video id="sourceVideo" autoplay muted playsinline hidden></video>
+      </section>
+    </main>
+
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>
