@@ -137,9 +137,11 @@ export function useRetroAudioEngine({
     const nextLofiAmount = lofiAmountRef.current;
     const nextNoiseEnabled = isNoiseEnabledRef.current;
     const nextNoiseLevel = noiseLevelRef.current;
+    const audibleMasterGain =
+      nextMuted || !hasPlayablePreview ? 0 : nextVolume;
 
     if (masterGain) {
-      masterGain.gain.value = nextMuted ? 0 : nextVolume;
+      masterGain.gain.value = audibleMasterGain;
     }
 
     if (media) {
@@ -219,6 +221,9 @@ export function useRetroAudioEngine({
       const noiseGain = context.createGain();
       const noiseLfo = context.createOscillator();
       const noiseLfoGain = context.createGain();
+
+      masterGain.gain.value = 0;
+      noiseGain.gain.value = 0;
 
       noiseLfo.type = "sine";
       noiseLfo.frequency.value = 0.065;
