@@ -85,6 +85,8 @@ async function startCaptureForActiveTab() {
     sourceTabId: activeTab.id,
     sourceViewportWidth: sourceViewport?.width ?? null,
     sourceViewportHeight: sourceViewport?.height ?? null,
+    sourceOuterWidth: sourceViewport?.outerWidth ?? null,
+    sourceOuterHeight: sourceViewport?.outerHeight ?? null,
     createdAt: Date.now(),
   };
 
@@ -106,6 +108,8 @@ async function getTabViewportSize(tabId) {
       func: () => ({
         width: Math.round(window.innerWidth),
         height: Math.round(window.innerHeight),
+        outerWidth: Math.round(window.outerWidth),
+        outerHeight: Math.round(window.outerHeight),
       }),
     });
 
