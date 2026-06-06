@@ -20,6 +20,9 @@ export function usePixiVideoPlayer(
   const streamRef = useRef<MediaStream | null>(null);
   const streamOwnedRef = useRef<boolean>(false);
   const mediaRef = useRef<HTMLMediaElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
   const previewRequestIdRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
@@ -40,6 +43,7 @@ export function usePixiVideoPlayer(
     width: number;
     height: number;
   } | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -101,6 +105,7 @@ export function usePixiVideoPlayer(
     audioContextRef,
     mediaSourceRef,
     masterGainRef,
+    recordingDestinationRef,
     noiseGainRef,
     isMutedRef,
     volumeRef,
@@ -326,6 +331,96 @@ export function usePixiVideoPlayer(
     }
   };
 
+  const saveRecording = (chunks: Blob[], mimeType: string) => {
+    if (typeof window === "undefined" || chunks.length === 0) {
+      return;
+    }
+
+    const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tetorica-retro-player-${timestamp}.webm`;
+    link.click();
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 1000);
+  };
+
+  const getRecordingMimeType = () => {
+    const candidates = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ];
+
+    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
+  };
+
+  const startRecording = async () => {
+    const canvas = appRef.current?.canvas;
+
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("Preview canvas is not ready yet.");
+    }
+
+    await ensureAudioContext();
+
+    const recordingStream = new MediaStream();
+    const canvasStream = canvas.captureStream(30);
+    canvasStream.getVideoTracks().forEach((track) => recordingStream.addTrack(track));
+    recordingDestinationRef.current?.stream
+      .getAudioTracks()
+      .forEach((track) => recordingStream.addTrack(track.clone()));
+
+    const mimeType = getRecordingMimeType();
+    const recorder = mimeType
+      ? new MediaRecorder(recordingStream, { mimeType })
+      : new MediaRecorder(recordingStream);
+
+    recordedChunksRef.current = [];
+    recordingStreamRef.current = recordingStream;
+    mediaRecorderRef.current = recorder;
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) {
+        recordedChunksRef.current.push(event.data);
+      }
+    });
+    recorder.addEventListener("stop", () => {
+      saveRecording(recordedChunksRef.current, recorder.mimeType);
+      recordedChunksRef.current = [];
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+    }, { once: true });
+    recorder.start();
+    setIsRecording(true);
+  };
+
+  const stopRecording = (shouldSave = true) => {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      return;
+    }
+
+    if (!shouldSave) {
+      recordedChunksRef.current = [];
+    }
+
+    if (recorder.state !== "inactive") {
+      recorder.stop();
+      return;
+    }
+
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  };
+
 
   useEffect(() => {
     let cancelled = false;
@@ -341,6 +436,7 @@ export function usePixiVideoPlayer(
     void setupPixi();
 
     return () => {
+      stopRecording(false);
       cancelled = true;
       cleanupPreview();
       void disposeAudioEngine();
@@ -508,7 +604,13 @@ export function usePixiVideoPlayer(
     hasVideo: previewKind === "video" || previewKind === "capture",
     hasAudioOnly: previewKind === "audio",
     hasImage: previewKind === "image",
+    isRecording,
     isCaptureActive: previewKind === "capture",
+    canRecord:
+      previewKind === "video" ||
+      previewKind === "capture" ||
+      previewKind === "image" ||
+      previewKind === "audio",
     previewFile,
     previewStream,
     previewUrl,
@@ -527,6 +629,8 @@ export function usePixiVideoPlayer(
     isPoweredOn,
     powerOn,
     powerOff,
+    startRecording,
+    stopRecording,
     refreshLayout,
     toggleAudioFx: () => {
       setIsAudioFxEnabled((current) => !current);
