@@ -1,0 +1,112 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(86, 124, 33, 0.22), transparent 42%),
+    linear-gradient(180deg, #161712 0%, #090a08 100%);
+  color: #f2f1dc;
+}
+
+.shell {
+  width: min(1200px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a6c56d;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 600;
+}
+
+button {
+  border: 1px solid rgba(196, 230, 125, 0.55);
+  border-radius: 999px;
+  background: rgba(159, 193, 94, 0.12);
+  color: #eff7ca;
+  padding: 10px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: rgba(159, 193, 94, 0.22);
+}
+
+.panel {
+  border: 1px solid rgba(196, 230, 125, 0.18);
+  border-radius: 24px;
+  padding: 20px;
+  background: rgba(17, 20, 12, 0.82);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.status-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  color: #cad8a1;
+}
+
+.status-label {
+  border: 1px solid rgba(202, 216, 161, 0.18);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.canvas-frame {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(196, 230, 125, 0.12);
+  background:
+    linear-gradient(180deg, rgba(191, 255, 138, 0.06), transparent),
+    #050604;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    width: min(100vw - 20px, 1200px);
+    padding-top: 18px;
+  }
+
+  .header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+}
