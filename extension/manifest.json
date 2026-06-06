@@ -10,7 +10,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["activeTab", "storage", "tabCapture"],
+  "permissions": ["activeTab", "storage", "tabCapture", "scripting"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

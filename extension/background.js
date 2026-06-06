@@ -78,10 +78,13 @@ async function startCaptureForActiveTab() {
   const streamId = await chrome.tabCapture.getMediaStreamId({
     targetTabId: activeTab.id,
   });
+  const sourceViewport = await getTabViewportSize(activeTab.id);
 
   currentSession = {
     streamId,
     sourceTabId: activeTab.id,
+    sourceViewportWidth: sourceViewport?.width ?? null,
+    sourceViewportHeight: sourceViewport?.height ?? null,
     createdAt: Date.now(),
   };
 
@@ -94,6 +97,23 @@ async function startCaptureForActiveTab() {
 
   await openViewerTab(currentSession);
   return currentSession;
+}
+
+async function getTabViewportSize(tabId) {
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => ({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }),
+    });
+
+    return result?.result ?? null;
+  } catch (error) {
+    console.warn("Failed to read tab viewport size", error);
+    return null;
+  }
 }
 
 async function openViewerTab(session = currentSession) {

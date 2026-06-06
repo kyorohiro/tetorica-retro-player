@@ -11,6 +11,8 @@ import {
 const statusText = document.getElementById("statusText");
 const canvas = document.getElementById("glCanvas");
 const video = document.getElementById("sourceVideo");
+const viewerShell = document.querySelector(".viewer-shell");
+const canvasFrame = canvas.parentElement;
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
@@ -45,6 +47,11 @@ let noiseLfoGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
+let currentSession = null;
+let lastResizeLog = "";
+let captureSizePollTimer = 0;
+let lastTrackedContentSize = "";
+let lastRenderedVideoSize = "";
 
 init().catch((error) => {
   console.error(error);
@@ -56,6 +63,8 @@ if (chrome.runtime?.onMessage) {
     if (message?.type !== "CAPTURE_SESSION_UPDATED" || !message.session?.streamId) {
       return;
     }
+
+    currentSession = message.session;
 
     void startCapture(message.session.streamId)
       .then(() => {
@@ -85,6 +94,7 @@ async function init() {
   }
 
   const session = await getCaptureSession();
+  currentSession = session;
 
   if (!session?.streamId) {
     setStatus("No active capture session. Open a tab and click the extension button.");
@@ -120,7 +130,8 @@ async function startCapture(streamId) {
 
   video.srcObject = mediaStream;
   await video.play();
-  updateCanvasAspectRatio();
+  await waitForVideoDimensions();
+  attachCaptureSizeListeners();
   resizeCanvas();
   await connectStreamAudio(mediaStream);
   startedAt = performance.now();
@@ -128,6 +139,8 @@ async function startCapture(streamId) {
 }
 
 function stopCapture() {
+  detachCaptureSizeListeners();
+
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
@@ -143,10 +156,75 @@ function stopCapture() {
   video.srcObject = null;
 }
 
+function attachCaptureSizeListeners() {
+  video.addEventListener("resize", handleCaptureSizeChanged);
+  lastTrackedContentSize = getContentSizeKey();
+  captureSizePollTimer = window.setInterval(() => {
+    const nextSize = getContentSizeKey();
+    if (nextSize === lastTrackedContentSize) {
+      return;
+    }
+
+    lastTrackedContentSize = nextSize;
+    handleCaptureSizeChanged();
+  }, 500);
+}
+
+function detachCaptureSizeListeners() {
+  video.removeEventListener("resize", handleCaptureSizeChanged);
+  if (captureSizePollTimer) {
+    window.clearInterval(captureSizePollTimer);
+    captureSizePollTimer = 0;
+  }
+  lastTrackedContentSize = "";
+}
+
+function handleCaptureSizeChanged() {
+  lastTrackedContentSize = getContentSizeKey();
+  lastRenderedVideoSize = `${video.videoWidth}x${video.videoHeight}`;
+  resizeCanvas();
+}
+
+function waitForVideoDimensions() {
+  if (video.videoWidth > 0 && video.videoHeight > 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const finish = () => {
+      if (resolved) {
+        return;
+      }
+
+      resolved = true;
+      video.removeEventListener("loadedmetadata", finish);
+      video.removeEventListener("resize", finish);
+      resolve();
+    };
+
+    video.addEventListener("loadedmetadata", finish, { once: true });
+    video.addEventListener("resize", finish, { once: true });
+
+    window.setTimeout(finish, 250);
+  });
+}
+
 function drawFrame() {
   if (!gl || !program || !texture || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
     animationFrameId = requestAnimationFrame(drawFrame);
     return;
+  }
+
+  const nextRenderedVideoSize = `${video.videoWidth}x${video.videoHeight}`;
+  if (
+    video.videoWidth > 0 &&
+    video.videoHeight > 0 &&
+    nextRenderedVideoSize !== lastRenderedVideoSize
+  ) {
+    lastRenderedVideoSize = nextRenderedVideoSize;
+    resizeCanvas();
   }
 
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -164,29 +242,118 @@ function drawFrame() {
 }
 
 function resizeCanvas() {
-  updateCanvasAspectRatio();
-  const width = Math.max(640, Math.floor(canvas.clientWidth * window.devicePixelRatio));
-  const aspectRatio = getCaptureAspectRatio();
-  const height = Math.max(360, Math.floor(width / aspectRatio));
+  const { sourceWidth, sourceHeight } = getContentSize();
+  const { displayWidth, displayHeight } = getFittedDisplaySize(sourceWidth, sourceHeight);
 
-  if (canvas.width === width && canvas.height === height) {
-    return;
+  if (canvas.width !== sourceWidth || canvas.height !== sourceHeight) {
+    canvas.width = sourceWidth;
+    canvas.height = sourceHeight;
   }
 
-  canvas.width = width;
-  canvas.height = height;
+  canvas.style.width = `${displayWidth}px`;
+  canvas.style.height = `${displayHeight}px`;
+
+  if (canvasFrame) {
+    canvasFrame.style.width = `${displayWidth}px`;
+    canvasFrame.style.height = `${displayHeight}px`;
+  }
+
+  const resizeLog = JSON.stringify({
+    sourceWidth,
+    sourceHeight,
+    displayWidth,
+    displayHeight,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+    videoWidth: video.videoWidth,
+    videoHeight: video.videoHeight,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+  });
+
+  if (resizeLog !== lastResizeLog) {
+    lastResizeLog = resizeLog;
+    console.log("[viewer] resizeCanvas", JSON.parse(resizeLog));
+  }
 }
 
-function getCaptureAspectRatio() {
+function getContentSize() {
+  const sessionWindowSize = getSessionWindowSize();
   if (video.videoWidth > 0 && video.videoHeight > 0) {
-    return video.videoWidth / video.videoHeight;
+    if (sessionWindowSize && shouldPreferSessionAspect(video.videoWidth, video.videoHeight)) {
+      return sessionWindowSize;
+    }
+
+    return {
+      sourceWidth: video.videoWidth,
+      sourceHeight: video.videoHeight,
+    };
   }
 
-  return 16 / 9;
+  const videoTrack = mediaStream?.getVideoTracks?.()[0];
+  const trackSettings = videoTrack?.getSettings?.();
+  if (trackSettings?.width && trackSettings?.height) {
+    if (sessionWindowSize && shouldPreferSessionAspect(trackSettings.width, trackSettings.height)) {
+      return sessionWindowSize;
+    }
+
+    return {
+      sourceWidth: trackSettings.width,
+      sourceHeight: trackSettings.height,
+    };
+  }
+
+  if (sessionWindowSize) {
+    return sessionWindowSize;
+  }
+
+  return {
+    sourceWidth: 1280,
+    sourceHeight: 720,
+  };
 }
 
-function updateCanvasAspectRatio() {
-  canvas.style.setProperty("--canvas-aspect-ratio", `${getCaptureAspectRatio()}`);
+function getSessionWindowSize() {
+  if (!currentSession?.sourceViewportWidth || !currentSession?.sourceViewportHeight) {
+    return null;
+  }
+
+  return {
+    sourceWidth: currentSession.sourceViewportWidth,
+    sourceHeight: currentSession.sourceViewportHeight,
+  };
+}
+
+function shouldPreferSessionAspect(width, height) {
+  const sessionWindowSize = getSessionWindowSize();
+  if (!sessionWindowSize) {
+    return false;
+  }
+
+  const streamAspect = width / Math.max(height, 1);
+  const sessionAspect =
+    sessionWindowSize.sourceWidth / Math.max(sessionWindowSize.sourceHeight, 1);
+
+  return Math.abs(streamAspect - sessionAspect) > 0.2;
+}
+
+function getContentSizeKey() {
+  const { sourceWidth, sourceHeight } = getContentSize();
+  return `${sourceWidth}x${sourceHeight}`;
+}
+
+function getFittedDisplaySize(sourceWidth, sourceHeight) {
+  const shellStyle = window.getComputedStyle(viewerShell ?? document.body);
+  const horizontalPadding = parseFloat(shellStyle.paddingLeft || "0") + parseFloat(shellStyle.paddingRight || "0");
+  const verticalPadding = parseFloat(shellStyle.paddingTop || "0") + parseFloat(shellStyle.paddingBottom || "0");
+  const availableWidth = Math.max(1, window.innerWidth - horizontalPadding);
+  const availableHeight = Math.max(1, window.innerHeight - verticalPadding);
+  const scale = Math.min(availableWidth / sourceWidth, availableHeight / sourceHeight);
+
+  return {
+    displayWidth: Math.max(1, Math.floor(sourceWidth * scale)),
+    displayHeight: Math.max(1, Math.floor(sourceHeight * scale)),
+  };
 }
 
 function applyPreset(presetKey) {
@@ -458,7 +625,16 @@ function compileShader(webgl, type, source) {
 }
 
 function setStatus(message) {
-  statusText.textContent = message;
+  if (!statusText) {
+    return;
+  }
+
+  const shouldHide = !message || message.startsWith("Rendering ");
+  statusText.hidden = shouldHide;
+
+  if (!shouldHide) {
+    statusText.textContent = message;
+  }
 }
 
 async function loadSettings() {
