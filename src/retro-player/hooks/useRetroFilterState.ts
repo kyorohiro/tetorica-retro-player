@@ -164,6 +164,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const applyPreset = (preset: RetroPresetKey) => {
     const settings = RETRO_PRESETS[preset];
 
+    setIsFilterEnabled(true);
     setSelectedPreset(preset);
     setTargetWidth(settings.width);
     setTargetHeight(settings.height);

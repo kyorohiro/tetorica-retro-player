@@ -184,6 +184,21 @@ export const RETRO_PRESETS = {
     phosphor: 0.00,
     monoTint: "ice",
   },
+  crtOnly: {
+    label: "CRT Only",
+    width: 1280,
+    height: 800,
+    colors: 256,
+    dither: 0.12,
+    palette: "free",
+    curvature: 0.03,
+    scanline: 0.00,
+    scanline2: 0.02,
+    vignette: 0.05,
+    glow: 0.06,
+    phosphor: 0.03,
+    monoTint: "gray",
+  },
 } as const satisfies Record<
   string,
   {
