@@ -263,11 +263,14 @@ export function usePixiVideoPlayer(
   } = media;
 
   const togglePlayback = async () => {
-    if (!isPoweredOn) return;
     if (!mediaRef.current) return;
 
     if (mediaRef.current.paused) {
+      if (!isPoweredOn) {
+        powerOn();
+      }
       await playVideoWithAudio();
+      syncVideoState();
       return;
     }
 
