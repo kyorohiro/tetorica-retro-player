@@ -137,7 +137,7 @@ audioFxEnabledInput.addEventListener("change", () => {
 
 lofiAmountInput.addEventListener("input", () => {
   const lofiAmount = Number(lofiAmountInput.value);
-  lofiAmountValue.textContent = `${Math.round(lofiAmount * 100)}%`;
+  lofiAmountValue.textContent = lofiAmount.toFixed(2);
   updateSettings({ lofiAmount });
 });
 
@@ -147,7 +147,7 @@ noiseEnabledInput.addEventListener("change", () => {
 
 noiseLevelInput.addEventListener("input", () => {
   const noiseLevel = Number(noiseLevelInput.value);
-  noiseLevelValue.textContent = `${Math.round(noiseLevel * 100)}%`;
+  noiseLevelValue.textContent = noiseLevel.toFixed(3);
   updateSettings({ noiseLevel });
 });
 
@@ -204,10 +204,10 @@ function renderSettings(settings) {
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);
-  lofiAmountValue.textContent = `${Math.round(settings.lofiAmount * 100)}%`;
+  lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
   noiseLevelInput.value = String(settings.noiseLevel);
-  noiseLevelValue.textContent = `${Math.round(settings.noiseLevel * 100)}%`;
+  noiseLevelValue.textContent = settings.noiseLevel.toFixed(3);
 }
 
 async function updateSettings(patch) {
