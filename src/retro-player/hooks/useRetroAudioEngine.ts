@@ -67,6 +67,7 @@ export function useRetroAudioEngine({
   const noiseGainRef = useRef<GainNode | null>(null);
   const noiseLfoRef = useRef<OscillatorNode | null>(null);
   const noiseLfoGainRef = useRef<GainNode | null>(null);
+  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
   const volumeRef = useRef<number>(initialAudioSettings.volume);
   const playbackRateRef = useRef<number>(initialAudioSettings.playbackRate);
@@ -183,6 +184,7 @@ export function useRetroAudioEngine({
     if (!audioContextRef.current) {
       const context = new window.AudioContext();
       const masterGain = context.createGain();
+      const recordingDestination = context.createMediaStreamDestination();
       const lowpass = context.createBiquadFilter();
       const highshelf = context.createBiquadFilter();
       const drive = context.createWaveShaper();
@@ -195,6 +197,7 @@ export function useRetroAudioEngine({
       highshelf.connect(drive);
       drive.connect(masterGain);
       masterGain.connect(context.destination);
+      masterGain.connect(recordingDestination);
 
       const noiseSource = context.createBufferSource();
       const noiseBuffer = context.createBuffer(2, context.sampleRate * 2, context.sampleRate);
@@ -241,6 +244,7 @@ export function useRetroAudioEngine({
       noiseGainRef.current = noiseGain;
       noiseLfoRef.current = noiseLfo;
       noiseLfoGainRef.current = noiseLfoGain;
+      recordingDestinationRef.current = recordingDestination;
     }
 
     if (audioContextRef.current.state === "suspended") {
@@ -273,6 +277,7 @@ export function useRetroAudioEngine({
     const context = audioContextRef.current;
     audioContextRef.current = null;
     masterGainRef.current = null;
+    recordingDestinationRef.current = null;
     lofiLowpassRef.current = null;
     lofiHighshelfRef.current = null;
     lofiDriveRef.current = null;
@@ -420,6 +425,7 @@ export function useRetroAudioEngine({
     audioContextRef,
     mediaSourceRef,
     masterGainRef,
+    recordingDestinationRef,
     lofiLowpassRef,
     lofiHighshelfRef,
     lofiDriveRef,
