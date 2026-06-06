@@ -1,3 +1,5 @@
+import { FILTER_FRAGMENT } from "./shared/filterShader.js";
+
 const statusText = document.getElementById("statusText");
 const refreshButton = document.getElementById("refreshButton");
 const presetSelect = document.getElementById("presetSelect");
@@ -11,6 +13,7 @@ const PRESETS = {
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.14,
+    paletteMode: 6,
     curvature: 0.07,
     scanlineStrength: 0.16,
     scanline2Strength: 0.0,
@@ -25,6 +28,7 @@ const PRESETS = {
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.16,
+    paletteMode: 6,
     curvature: 0.08,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -39,6 +43,7 @@ const PRESETS = {
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.18,
+    paletteMode: 6,
     curvature: 0.05,
     scanlineStrength: 0.1,
     scanline2Strength: 0.0,
@@ -53,6 +58,7 @@ const PRESETS = {
     targetHeight: 300,
     colorLevels: 16,
     ditherStrength: 0.06,
+    paletteMode: 6,
     curvature: 0.0,
     scanlineStrength: 0.0,
     scanline2Strength: 0.0,
@@ -61,146 +67,33 @@ const PRESETS = {
     phosphorStrength: 0.0,
     monoTint: [0.7, 0.9, 1.0],
   },
+  pc98_512: {
+    label: "PC-98 512-color",
+    targetWidth: 640,
+    targetHeight: 400,
+    colorLevels: 8,
+    ditherStrength: 0.12,
+    paletteMode: 2,
+    curvature: 0.03,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.02,
+    vignetteStrength: 0.05,
+    glowStrength: 0.06,
+    phosphorStrength: 0.03,
+    monoTint: [1.0, 1.0, 1.0],
+  },
 };
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
-out vec2 vUv;
+out vec2 vTextureCoord;
 out vec2 vMaskCoord;
 
 void main() {
-  vUv = (aPosition + 1.0) * 0.5;
-  vMaskCoord = vUv;
+  vec2 uv = (aPosition + 1.0) * 0.5;
+  vTextureCoord = uv;
+  vMaskCoord = uv;
   gl_Position = vec4(aPosition, 0.0, 1.0);
-}
-`;
-
-const fragmentShaderSource = `#version 300 es
-precision mediump float;
-
-uniform sampler2D uTexture;
-uniform vec2 uTargetSize;
-uniform float uColorLevels;
-uniform float uDitherStrength;
-uniform float uCurvature;
-uniform float uScanlineStrength;
-uniform float uScanline2Strength;
-uniform float uVignetteStrength;
-uniform float uGlowStrength;
-uniform float uPhosphorStrength;
-uniform vec3 uMonoTint;
-uniform float uTime;
-
-in vec2 vUv;
-in vec2 vMaskCoord;
-out vec4 outColor;
-
-float bayer4x4(vec2 pos) {
-  int x = int(mod(pos.x, 4.0));
-  int y = int(mod(pos.y, 4.0));
-  int index = x + y * 4;
-
-  float matrix[16];
-  matrix[0] = 0.0 / 16.0;
-  matrix[1] = 8.0 / 16.0;
-  matrix[2] = 2.0 / 16.0;
-  matrix[3] = 10.0 / 16.0;
-  matrix[4] = 12.0 / 16.0;
-  matrix[5] = 4.0 / 16.0;
-  matrix[6] = 14.0 / 16.0;
-  matrix[7] = 6.0 / 16.0;
-  matrix[8] = 3.0 / 16.0;
-  matrix[9] = 11.0 / 16.0;
-  matrix[10] = 1.0 / 16.0;
-  matrix[11] = 9.0 / 16.0;
-  matrix[12] = 15.0 / 16.0;
-  matrix[13] = 7.0 / 16.0;
-  matrix[14] = 13.0 / 16.0;
-  matrix[15] = 5.0 / 16.0;
-
-  return matrix[index];
-}
-
-vec2 curveUv(vec2 uv, float strength) {
-  vec2 centered = uv * 2.0 - 1.0;
-  vec2 offset = centered.yx * centered.yx;
-  centered += centered * offset * strength;
-  return centered * 0.5 + 0.5;
-}
-
-float edgeShadow(vec2 uv, float curvature) {
-  vec2 centered = abs(uv - vec2(0.5)) * 2.0;
-  float horizontal = pow(centered.x, 2.6);
-  float vertical = pow(centered.y, 2.1);
-  float edge = horizontal * 0.45 + vertical * 0.8 + horizontal * vertical * 0.35;
-  return 1.0 - edge * (curvature * 0.45);
-}
-
-float horizontalUnevenness(vec2 uv, float time, float strength) {
-  if (strength <= 0.0) {
-    return 1.0;
-  }
-
-  float broad = sin(uv.y * 17.0 + time * 0.35) * 0.5 + 0.5;
-  float fine = sin(uv.y * 61.0 + time * 0.12) * 0.5 + 0.5;
-  return 1.0 - (broad * 0.03 + fine * 0.012) * strength;
-}
-
-vec3 monochromePalette(vec3 color, float levels, vec3 tint) {
-  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-  float stepped = floor(luminance * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
-  return mix(vec3(0.0), tint, stepped);
-}
-
-void main() {
-  vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
-  vec2 delta = warpedMask - vMaskCoord;
-  vec2 curvedUv = vUv + delta;
-
-  if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
-    outColor = vec4(0.0, 0.0, 0.0, 1.0);
-    return;
-  }
-
-  vec2 cell = floor(curvedUv * uTargetSize);
-  vec2 pixelatedUv = clamp((cell + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-  vec2 sampledUv = vec2(pixelatedUv.x, 1.0 - pixelatedUv.y);
-  vec2 texel = 1.0 / uTargetSize;
-
-  vec4 color = texture(uTexture, sampledUv);
-  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
-  color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-  color.rgb = monochromePalette(color.rgb, uColorLevels, uMonoTint);
-
-  vec3 glow = vec3(0.0);
-  glow += monochromePalette(texture(uTexture, clamp(sampledUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uMonoTint) * 0.34;
-  glow += monochromePalette(texture(uTexture, clamp(sampledUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uMonoTint) * 0.34;
-  glow += monochromePalette(texture(uTexture, clamp(sampledUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uMonoTint) * 0.18;
-  glow += monochromePalette(texture(uTexture, clamp(sampledUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uMonoTint) * 0.18;
-
-  float brightness = max(max(color.r, color.g), color.b);
-  float glowMask = smoothstep(0.45, 1.0, brightness);
-  color.rgb += glow * glowMask * uGlowStrength;
-
-  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);
-
-  float scanline2 = sin((vUv.y + uTime * 0.05) * 720.0) * uScanline2Strength;
-  color.rgb += scanline2;
-
-  float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
-  color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);
-
-  float vignette = distance(vMaskCoord, vec2(0.5));
-  color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-  color.rgb *= edgeShadow(warpedMask, uCurvature);
-  color.rgb *= horizontalUnevenness(
-    warpedMask,
-    uTime,
-    max(max(uScanlineStrength, uScanline2Strength), max(uGlowStrength, uPhosphorStrength))
-  );
-
-  outColor = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
 }
 `;
 
@@ -354,6 +247,7 @@ function applyPreset(presetKey) {
   gl.uniform2f(uniformLocations.uTargetSize, preset.targetWidth, preset.targetHeight);
   gl.uniform1f(uniformLocations.uColorLevels, preset.colorLevels);
   gl.uniform1f(uniformLocations.uDitherStrength, preset.ditherStrength);
+  gl.uniform1f(uniformLocations.uPaletteMode, preset.paletteMode);
   gl.uniform1f(uniformLocations.uCurvature, preset.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, preset.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, preset.scanline2Strength);
@@ -366,7 +260,7 @@ function applyPreset(presetKey) {
 
 function setupRenderer(webgl) {
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const fragmentShader = compileShader(webgl, webgl.FRAGMENT_SHADER, fragmentShaderSource);
+  const fragmentShader = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT);
 
   program = webgl.createProgram();
   if (!program) {
@@ -403,6 +297,8 @@ function setupRenderer(webgl) {
 
   texture = webgl.createTexture();
   webgl.bindTexture(webgl.TEXTURE_2D, texture);
+  // DOM media uploads use a different vertical origin than the Pixi pipeline expects.
+  webgl.pixelStorei(webgl.UNPACK_FLIP_Y_WEBGL, true);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MIN_FILTER, webgl.LINEAR);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MAG_FILTER, webgl.LINEAR);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
@@ -415,6 +311,7 @@ function setupRenderer(webgl) {
     uTargetSize: webgl.getUniformLocation(program, "uTargetSize"),
     uColorLevels: webgl.getUniformLocation(program, "uColorLevels"),
     uDitherStrength: webgl.getUniformLocation(program, "uDitherStrength"),
+    uPaletteMode: webgl.getUniformLocation(program, "uPaletteMode"),
     uCurvature: webgl.getUniformLocation(program, "uCurvature"),
     uScanlineStrength: webgl.getUniformLocation(program, "uScanlineStrength"),
     uScanline2Strength: webgl.getUniformLocation(program, "uScanline2Strength"),
