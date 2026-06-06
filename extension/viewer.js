@@ -151,6 +151,7 @@ function stopCapture() {
 }
 
 function attachCaptureSizeListeners() {
+  detachCaptureSizeListeners();
   video.addEventListener("resize", resizeCanvas);
   captureSizePollTimer = window.setInterval(() => {
     resizeCanvas();
