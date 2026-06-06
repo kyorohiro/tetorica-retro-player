@@ -19,6 +19,25 @@ export const MONO_TINT_OPTIONS = [
 ];
 
 export const PRESETS = {
+  none: {
+    label: "None",
+    targetWidth: 1920,
+    targetHeight: 1080,
+    colorLevels: 64,
+    ditherStrength: 0.0,
+    paletteMode: 0,
+    curvature: 0.0,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.0,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    monoTint: "gray",
+    isAudioFxEnabled: false,
+    lofiAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
+  },
   greenTerminal: {
     label: "Green Terminal",
     targetWidth: 640,
@@ -33,6 +52,10 @@ export const PRESETS = {
     glowStrength: 0.09,
     phosphorStrength: 0.06,
     monoTint: "green",
+    isAudioFxEnabled: true,
+    lofiAmount: 1.0,
+    isNoiseEnabled: true,
+    noiseLevel: 0.018,
   },
   amberCrt: {
     label: "Amber CRT",
@@ -48,6 +71,10 @@ export const PRESETS = {
     glowStrength: 0.1,
     phosphorStrength: 0.05,
     monoTint: "amber",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.85,
+    isNoiseEnabled: true,
+    noiseLevel: 0.015,
   },
   monochrome: {
     label: "Mono",
@@ -63,6 +90,10 @@ export const PRESETS = {
     glowStrength: 0.07,
     phosphorStrength: 0.02,
     monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.7,
+    isNoiseEnabled: true,
+    noiseLevel: 0.012,
   },
   lcdIce: {
     label: "LCD Ice",
@@ -78,11 +109,53 @@ export const PRESETS = {
     glowStrength: 0.0,
     phosphorStrength: 0.0,
     monoTint: "ice",
+    isAudioFxEnabled: false,
+    lofiAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
   },
   pc98_512: {
     label: "PC-98 512-color",
     targetWidth: 640,
     targetHeight: 400,
+    colorLevels: 8,
+    ditherStrength: 0.12,
+    paletteMode: 2,
+    curvature: 0.08,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.02,
+    vignetteStrength: 0.05,
+    glowStrength: 0.06,
+    phosphorStrength: 0.03,
+    monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.5,
+    isNoiseEnabled: true,
+    noiseLevel: 0.006,
+  },
+  pc98_4096: {
+    label: "PC-98 4096-color",
+    targetWidth: 640,
+    targetHeight: 400,
+    colorLevels: 16,
+    ditherStrength: 0.08,
+    paletteMode: 3,
+    curvature: 0.06,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.02,
+    vignetteStrength: 0.05,
+    glowStrength: 0.06,
+    phosphorStrength: 0.03,
+    monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.6,
+    isNoiseEnabled: true,
+    noiseLevel: 0.005,
+  },
+  crtOnly: {
+    label: "CRT Only",
+    targetWidth: 1280,
+    targetHeight: 800,
     colorLevels: 8,
     ditherStrength: 0.12,
     paletteMode: 2,
@@ -93,6 +166,10 @@ export const PRESETS = {
     glowStrength: 0.06,
     phosphorStrength: 0.03,
     monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
+    isNoiseEnabled: true,
+    noiseLevel: 0.008,
   },
 };
 
@@ -191,11 +268,11 @@ export function normalizeSettings(candidate) {
     isNoiseEnabled:
       typeof candidate?.isNoiseEnabled === "boolean"
         ? candidate.isNoiseEnabled
-        : DEFAULT_SETTINGS.isNoiseEnabled,
+        : basePresetSettings.isNoiseEnabled,
     noiseLevel:
       typeof candidate?.noiseLevel === "number"
-        ? clamp(candidate.noiseLevel, 0, 0.12)
-        : DEFAULT_SETTINGS.noiseLevel,
+        ? clamp(candidate.noiseLevel, 0, 1.5)
+        : basePresetSettings.noiseLevel,
   };
 }
 
@@ -217,6 +294,22 @@ export function applyPresetToSettings(presetKey) {
     glowStrength: preset.glowStrength,
     phosphorStrength: preset.phosphorStrength,
     monoTint: preset.monoTint,
+    isAudioFxEnabled:
+      typeof preset.isAudioFxEnabled === "boolean"
+        ? preset.isAudioFxEnabled
+        : DEFAULT_SETTINGS.isAudioFxEnabled,
+    lofiAmount:
+      typeof preset.lofiAmount === "number"
+        ? preset.lofiAmount
+        : DEFAULT_SETTINGS.lofiAmount,
+    isNoiseEnabled:
+      typeof preset.isNoiseEnabled === "boolean"
+        ? preset.isNoiseEnabled
+        : DEFAULT_SETTINGS.isNoiseEnabled,
+    noiseLevel:
+      typeof preset.noiseLevel === "number"
+        ? preset.noiseLevel
+        : DEFAULT_SETTINGS.noiseLevel,
   };
 }
 
