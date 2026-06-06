@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
 import { useRetroAudioEngine } from "./useRetroAudioEngine";
 import { useRetroPixiStage } from "./useRetroPixiStage";
@@ -9,6 +11,13 @@ let retroPlayerInstanceSeed = 0;
 const isRetroPlayerDebugEnabled = () =>
   typeof window !== "undefined" &&
   Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__);
+
+const isTauriRuntime = () =>
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
+const isAndroidRuntime = () =>
+  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
 export function usePixiVideoPlayer(
   filterState: RetroFilterState,
@@ -23,6 +32,10 @@ export function usePixiVideoPlayer(
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const pendingDownloadUrlRef = useRef<string | null>(null);
+  const pendingRecordingBlobRef = useRef<Blob | null>(null);
+  const pendingRecordingFilenameRef = useRef<string | null>(null);
+  const stopRecordingResolverRef = useRef<((value: string | null) => void) | null>(null);
   const previewRequestIdRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
@@ -44,6 +57,7 @@ export function usePixiVideoPlayer(
     height: number;
   } | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [pendingRecordingFilename, setPendingRecordingFilename] = useState<string | null>(null);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -331,21 +345,115 @@ export function usePixiVideoPlayer(
     }
   };
 
-  const saveRecording = (chunks: Blob[], mimeType: string) => {
-    if (typeof window === "undefined" || chunks.length === 0) {
+  const revokePendingRecording = () => {
+    if (!pendingDownloadUrlRef.current || typeof window === "undefined") {
+      pendingRecordingBlobRef.current = null;
+      pendingRecordingFilenameRef.current = null;
       return;
     }
 
-    const blob = new Blob(chunks, { type: mimeType || "video/webm" });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const url = window.URL.createObjectURL(blob);
+    window.URL.revokeObjectURL(pendingDownloadUrlRef.current);
+    pendingDownloadUrlRef.current = null;
+    pendingRecordingBlobRef.current = null;
+    pendingRecordingFilenameRef.current = null;
+  };
+
+  const triggerDownload = (url: string, filename: string) => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tetorica-retro-player-${timestamp}.webm`;
+    link.download = filename;
+    link.rel = "noopener";
+    link.style.display = "none";
+    document.body.appendChild(link);
     link.click();
     window.setTimeout(() => {
-      window.URL.revokeObjectURL(url);
+      link.remove();
+    }, 0);
+  };
+
+  const saveRecording = (chunks: Blob[], mimeType: string) => {
+    if (typeof window === "undefined" || chunks.length === 0) {
+      return null;
+    }
+
+    revokePendingRecording();
+
+    const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `tetorica-retro-player-${timestamp}.webm`;
+    const url = window.URL.createObjectURL(blob);
+
+    pendingDownloadUrlRef.current = url;
+    pendingRecordingBlobRef.current = blob;
+    pendingRecordingFilenameRef.current = filename;
+    setPendingRecordingFilename(filename);
+    return filename;
+  };
+
+  const downloadPendingRecording = () => {
+    const url = pendingDownloadUrlRef.current;
+    const filename = pendingRecordingFilenameRef.current;
+
+    if (!url || !filename || typeof window === "undefined") {
+      return;
+    }
+
+    triggerDownload(url, filename);
+    window.setTimeout(() => {
+      revokePendingRecording();
     }, 1000);
+    setPendingRecordingFilename(null);
+  };
+
+  const sharePendingRecording = async () => {
+    const blob = pendingRecordingBlobRef.current;
+    const filename = pendingRecordingFilenameRef.current;
+
+    if (!blob || !filename || typeof window === "undefined") {
+      return false;
+    }
+
+    if (isTauriRuntime()) {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const fileUri = await invoke<string>("persist_recording_for_share", {
+        data: Array.from(bytes),
+        filename,
+      });
+
+      await shareFile(fileUri, {
+        mimeType: blob.type || "video/webm",
+        title: filename,
+      });
+      return true;
+    }
+
+    if (
+      typeof navigator === "undefined" ||
+      typeof navigator.share !== "function" ||
+      typeof File === "undefined"
+    ) {
+      return false;
+    }
+
+    const file = new File([blob], filename, {
+      type: blob.type || "video/webm",
+    });
+
+    const shareData = {
+      files: [file],
+      title: filename,
+    };
+
+    if (typeof navigator.canShare === "function" && !navigator.canShare(shareData)) {
+      return false;
+    }
+
+    await navigator.share(shareData);
+    return true;
   };
 
   const getRecordingMimeType = () => {
@@ -380,6 +488,8 @@ export function usePixiVideoPlayer(
       : new MediaRecorder(recordingStream);
 
     recordedChunksRef.current = [];
+    revokePendingRecording();
+    setPendingRecordingFilename(null);
     recordingStreamRef.current = recordingStream;
     mediaRecorderRef.current = recorder;
     recorder.addEventListener("dataavailable", (event) => {
@@ -388,12 +498,14 @@ export function usePixiVideoPlayer(
       }
     });
     recorder.addEventListener("stop", () => {
-      saveRecording(recordedChunksRef.current, recorder.mimeType);
+      const resolvedFilename = saveRecording(recordedChunksRef.current, recorder.mimeType);
       recordedChunksRef.current = [];
       recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
       setIsRecording(false);
+      stopRecordingResolverRef.current?.(resolvedFilename);
+      stopRecordingResolverRef.current = null;
     }, { once: true });
     recorder.start();
     setIsRecording(true);
@@ -403,22 +515,28 @@ export function usePixiVideoPlayer(
     const recorder = mediaRecorderRef.current;
 
     if (!recorder) {
-      return;
+      return Promise.resolve<string | null>(pendingRecordingFilenameRef.current);
     }
 
-    if (!shouldSave) {
-      recordedChunksRef.current = [];
-    }
+    return new Promise<string | null>((resolve) => {
+      stopRecordingResolverRef.current = resolve;
 
-    if (recorder.state !== "inactive") {
-      recorder.stop();
-      return;
-    }
+      if (!shouldSave) {
+        recordedChunksRef.current = [];
+      }
 
-    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
-    recordingStreamRef.current = null;
-    mediaRecorderRef.current = null;
-    setIsRecording(false);
+      if (recorder.state !== "inactive") {
+        recorder.stop();
+        return;
+      }
+
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      stopRecordingResolverRef.current?.(pendingRecordingFilenameRef.current);
+      stopRecordingResolverRef.current = null;
+    });
   };
 
 
@@ -436,6 +554,7 @@ export function usePixiVideoPlayer(
     void setupPixi();
 
     return () => {
+      revokePendingRecording();
       stopRecording(false);
       cancelled = true;
       cleanupPreview();
@@ -605,6 +724,8 @@ export function usePixiVideoPlayer(
     hasAudioOnly: previewKind === "audio",
     hasImage: previewKind === "image",
     isRecording,
+    pendingRecordingFilename,
+    prefersShareExport: isTauriRuntime() && isAndroidRuntime(),
     isCaptureActive: previewKind === "capture",
     canRecord:
       previewKind === "video" ||
@@ -629,6 +750,8 @@ export function usePixiVideoPlayer(
     isPoweredOn,
     powerOn,
     powerOff,
+    downloadPendingRecording,
+    sharePendingRecording,
     startRecording,
     stopRecording,
     refreshLayout,

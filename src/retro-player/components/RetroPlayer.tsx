@@ -2,12 +2,13 @@ import React from "react";
 import {
   Aperture,
   ArrowLeftRight,
-  Dot,
+  Circle,
   Maximize2,
   Minimize2,
   Pin,
   Power,
   RotateCcw,
+  Square,
 } from "lucide-react";
 import { RetroFilterPanel } from "./RetroFilterPanel";
 import { VideoControls } from "./VideoControls";
@@ -17,6 +18,7 @@ import {
   type RetroFilterInitialState,
 } from "../hooks/useRetroFilterState";
 import { clearPersistedRetroSettings } from "../hooks/persistedRetroSettings";
+import { useDialog } from "../../useDialog";
 
 type RetroPlayerProps = {
   src?: string;
@@ -54,6 +56,7 @@ export function RetroPlayer({
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
+  const { showConfirmDialog } = useDialog();
   const filterState = useRetroFilterState(initialFilterState);
   const renderResolutionScale = isHighResolution
     ? typeof window !== "undefined"
@@ -114,7 +117,7 @@ export function RetroPlayer({
   const idleFloatingButtonClass =
     "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90";
   const pillButtonClass =
-    "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition backdrop-blur-sm";
+    "inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium transition backdrop-blur-sm";
 
   React.useEffect(() => {
     if (stream) {
@@ -424,35 +427,81 @@ export function RetroPlayer({
             </div>
             <div className="absolute -bottom-8 right-3 z-20 flex items-center gap-2">
               {player.canRecord && (
-                <button
-                  type="button"
-                  aria-label={player.isRecording ? "Stop recording" : "Start recording"}
-                  title={player.isRecording ? "Stop recording" : "Start recording"}
-                  onClick={() => {
-                    if (player.isRecording) {
-                      player.stopRecording();
-                      return;
-                    }
+                <>
+                  <button
+                    type="button"
+                    aria-label={player.isRecording ? "Stop recording" : "Start recording"}
+                    title={player.isRecording ? "Stop recording" : "Start recording"}
+                    onClick={() => {
+                      void (async () => {
+                        if (player.isRecording) {
+                          try {
+                            const filename = await player.stopRecording();
+                            if (!filename) {
+                              return;
+                            }
 
-                    void player.startRecording().catch((error) => {
-                      if (error instanceof Error) {
-                        onError?.(error);
-                        return;
-                      }
+                            const prefersShareExport = player.prefersShareExport;
+                            const confirmed = await showConfirmDialog({
+                              title: "Recording ready",
+                              body: prefersShareExport
+                                ? "Share the recorded clip now?"
+                                : "Save the recorded clip now?",
+                              okText: prefersShareExport ? "Share" : "Save",
+                              cancelText: "Cancel",
+                            });
 
-                      onError?.(new Error(String(error)));
-                    });
-                  }}
-                  className={[
-                    pillButtonClass,
-                    player.isRecording
-                      ? "border-rose-300/80 bg-rose-500/20 text-rose-50 shadow-[0_0_18px_rgba(244,63,94,0.4)] hover:bg-rose-500/28"
-                      : idleFloatingButtonClass,
-                  ].join(" ")}
-                >
-                  <Dot size={18} className={player.isRecording ? "text-rose-200" : "text-rose-300"} />
-                  <span>{player.isRecording ? "Stop" : "Rec"}</span>
-                </button>
+                            if (!confirmed) {
+                              return;
+                            }
+
+                            if (prefersShareExport) {
+                              const shared = await player.sharePendingRecording();
+                              if (!shared) {
+                                player.downloadPendingRecording();
+                              }
+                              return;
+                            }
+
+                            player.downloadPendingRecording();
+                            return;
+                          } catch (error) {
+                            if (error instanceof Error) {
+                              onError?.(error);
+                              return;
+                            }
+
+                            onError?.(new Error(String(error)));
+                            return;
+                          }
+                        }
+
+                        try {
+                          await player.startRecording();
+                        } catch (error) {
+                          if (error instanceof Error) {
+                            onError?.(error);
+                            return;
+                          }
+
+                          onError?.(new Error(String(error)));
+                        }
+                      })();
+                    }}
+                    className={[
+                      pillButtonClass,
+                      player.isRecording
+                        ? "border-rose-300/80 bg-rose-500/20 text-rose-50 shadow-[0_0_18px_rgba(244,63,94,0.4)] hover:bg-rose-500/28"
+                        : "border-rose-400/55 bg-slate-900/78 text-rose-200 hover:bg-rose-500/12",
+                    ].join(" ")}
+                  >
+                    {player.isRecording ? (
+                      <Square size={14} className="fill-current animate-pulse" />
+                    ) : (
+                      <Circle size={16} className="text-rose-300" />
+                    )}
+                  </button>
+                </>
               )}
               <button
                 type="button"

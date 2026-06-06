@@ -11,6 +11,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@buildyourwebapp/tauri-plugin-sharesheet": "^0.0.1",
+    "@choochmeque/tauri-plugin-sharekit-api": "^0.3.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@zip.js/zip.js": "^2.8.26",
