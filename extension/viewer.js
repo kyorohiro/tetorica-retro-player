@@ -120,6 +120,8 @@ async function startCapture(streamId) {
 
   video.srcObject = mediaStream;
   await video.play();
+  updateCanvasAspectRatio();
+  resizeCanvas();
   await connectStreamAudio(mediaStream);
   startedAt = performance.now();
   drawFrame();
@@ -162,8 +164,10 @@ function drawFrame() {
 }
 
 function resizeCanvas() {
+  updateCanvasAspectRatio();
   const width = Math.max(640, Math.floor(canvas.clientWidth * window.devicePixelRatio));
-  const height = Math.max(360, Math.floor((width * 9) / 16));
+  const aspectRatio = getCaptureAspectRatio();
+  const height = Math.max(360, Math.floor(width / aspectRatio));
 
   if (canvas.width === width && canvas.height === height) {
     return;
@@ -171,6 +175,18 @@ function resizeCanvas() {
 
   canvas.width = width;
   canvas.height = height;
+}
+
+function getCaptureAspectRatio() {
+  if (video.videoWidth > 0 && video.videoHeight > 0) {
+    return video.videoWidth / video.videoHeight;
+  }
+
+  return 16 / 9;
+}
+
+function updateCanvasAspectRatio() {
+  canvas.style.setProperty("--canvas-aspect-ratio", `${getCaptureAspectRatio()}`);
 }
 
 function applyPreset(presetKey) {

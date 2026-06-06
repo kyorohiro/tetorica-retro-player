@@ -4,9 +4,11 @@
   "version": "0.9.1",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && vite",
-    "build": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && tsc && vite build",
-    "build:extension": "node scripts/sync-extension-shader.mjs && node scripts/package-extension.mjs",
+    "dev": "node scripts/build-sw.mjs && vite",
+    "build": "node scripts/build-sw.mjs && tsc && vite build",
+    "prepare:extension": "node scripts/sync-extension-shader.mjs",
+    "watch:extension": "node scripts/sync-extension-shader.mjs --watch",
+    "build:extension": "npm run prepare:extension && node scripts/package-extension.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
