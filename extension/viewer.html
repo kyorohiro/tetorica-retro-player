@@ -22,6 +22,18 @@
           <span id="statusText">Waiting for capture session...</span>
         </div>
 
+        <div class="controls">
+          <label class="control">
+            <span>Preset</span>
+            <select id="presetSelect">
+              <option value="greenTerminal">Green Terminal</option>
+              <option value="amberCrt">Amber CRT</option>
+              <option value="monochrome">Mono</option>
+              <option value="lcdIce">LCD Ice</option>
+            </select>
+          </label>
+        </div>
+
         <div class="canvas-frame">
           <canvas id="glCanvas" width="1280" height="720"></canvas>
         </div>
