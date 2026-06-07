@@ -23,8 +23,48 @@
         <div class="status-row">
           <span class="status-label">Status</span>
           <span id="statusText">Waiting for capture session...</span>
-          <button id="recordButton" class="fit-button" type="button">Record</button>
-          <button id="fitButton" class="fit-button" type="button">Fit</button>
+          <button
+            id="recordButton"
+            class="fit-button icon-button"
+            type="button"
+            aria-label="Start recording"
+            title="Start recording"
+          >
+            <svg class="icon icon-record" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="5.5" />
+            </svg>
+            <svg class="icon icon-stop" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="7" y="7" width="10" height="10" rx="1.5" />
+            </svg>
+          </button>
+          <button
+            id="fitButton"
+            class="fit-button icon-button"
+            type="button"
+            aria-label="Fit to window"
+            title="Fit to window"
+          >
+            <svg class="icon icon-fit" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9V4h5" />
+              <path d="M20 9V4h-5" />
+              <path d="M4 15v5h5" />
+              <path d="M20 15v5h-5" />
+              <path d="M9 4 4 9" />
+              <path d="M15 4l5 5" />
+              <path d="m9 20-5-5" />
+              <path d="m15 20 5-5" />
+            </svg>
+            <svg class="icon icon-unfit" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 4H4v5" />
+              <path d="M15 4h5v5" />
+              <path d="M9 20H4v-5" />
+              <path d="M15 20h5v-5" />
+              <path d="m4 4 5 5" />
+              <path d="m20 4-5 5" />
+              <path d="m4 20 5-5" />
+              <path d="m20 20-5-5" />
+            </svg>
+          </button>
         </div>
 
         <div class="canvas-frame">

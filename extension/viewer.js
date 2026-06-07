@@ -213,7 +213,9 @@ function toggleFitMode() {
   isFitModeEnabled = !isFitModeEnabled;
   document.body.classList.toggle("fit-mode", isFitModeEnabled);
   if (fitButton) {
-    fitButton.textContent = isFitModeEnabled ? "Unfit" : "Fit";
+    fitButton.classList.toggle("is-fit-active", isFitModeEnabled);
+    fitButton.setAttribute("aria-label", isFitModeEnabled ? "Exit fit mode" : "Fit to window");
+    fitButton.setAttribute("title", isFitModeEnabled ? "Exit fit mode" : "Fit to window");
   }
   applyCanvasLayout();
 }
@@ -371,8 +373,9 @@ function updateRecordButton() {
   }
 
   const isRecording = mediaRecorder?.state === "recording";
-  recordButton.textContent = isRecording ? "Stop" : "Record";
   recordButton.classList.toggle("is-recording", isRecording);
+  recordButton.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
+  recordButton.setAttribute("title", isRecording ? "Stop recording" : "Start recording");
 }
 
 function getRecordingMimeType() {

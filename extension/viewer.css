@@ -74,6 +74,35 @@ body.fit-mode {
   cursor: pointer;
 }
 
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-record {
+  fill: currentColor;
+  stroke: none;
+}
+
+.icon-stop,
+.icon-unfit {
+  display: none;
+}
+
 .status-row .fit-button + .fit-button {
   margin-left: 0;
 }
@@ -86,6 +115,24 @@ body.fit-mode {
   border-color: rgba(255, 157, 157, 0.35);
   background: rgba(128, 24, 24, 0.38);
   color: #fff2f2;
+}
+
+.fit-button.is-recording .icon-record {
+  display: none;
+}
+
+.fit-button.is-recording .icon-stop {
+  display: block;
+  fill: currentColor;
+  stroke: none;
+}
+
+.fit-button.is-fit-active .icon-fit {
+  display: none;
+}
+
+.fit-button.is-fit-active .icon-unfit {
+  display: block;
 }
 
 .canvas-frame {
