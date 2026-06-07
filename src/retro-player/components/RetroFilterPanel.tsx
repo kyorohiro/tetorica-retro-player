@@ -112,7 +112,7 @@ export function RetroFilterPanel({
           <span className="text-slate-100">Palette</span>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(
-              ["free", "pc98", "pc98_512", "pc98_4096", "color32", "color64", "mono"] as const
+              ["free", "pc98", "pc98_512", "pc98_4096", "color32", "color64", "mono", "neon"] as const
             ).map(
               (mode) => (
               <button
@@ -138,8 +138,10 @@ export function RetroFilterPanel({
                       ? "PC-98 4096-color"
                     : mode === "color32"
                       ? "Color 32"
-                      : mode === "color64"
+                    : mode === "color64"
                         ? "Color 64"
+                      : mode === "neon"
+                        ? "Neon"
                       : "Monochrome"}
               </button>
             ),
@@ -147,9 +149,11 @@ export function RetroFilterPanel({
           </div>
         </label>
 
-        {paletteMode === "mono" && (
+        {(paletteMode === "mono" || paletteMode === "neon") && (
           <label className="block">
-            <span className="text-slate-100">Mono tint</span>
+            <span className="text-slate-100">
+              {paletteMode === "neon" ? "Neon tint" : "Mono tint"}
+            </span>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {Object.entries(MONO_TINTS).map(([key, tint]) => (
                 <button
