@@ -355,7 +355,7 @@ export function getDefaultColorLevelsForPalette(paletteMode) {
 }
 
 function resolveColorLevels(paletteMode, requestedLevels) {
-  if (paletteMode !== "mono") {
+  if (paletteMode !== "mono" && paletteMode !== "free") {
     return getDefaultColorLevelsForPalette(paletteMode);
   }
 

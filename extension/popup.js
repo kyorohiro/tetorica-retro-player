@@ -110,7 +110,7 @@ paletteModeSelect.addEventListener("change", () => {
     presetKey: CUSTOM_PRESET_KEY,
     paletteMode,
     colorLevels:
-      paletteMode === "mono"
+      paletteMode === "mono" || paletteMode === "free"
         ? currentSettings.colorLevels
         : getDefaultColorLevelsForPalette(paletteMode),
   });
@@ -249,10 +249,10 @@ function renderSettings(settings) {
   targetHeightValue.textContent = `${settings.targetHeight}px`;
   colorLevelsInput.value = String(settings.colorLevels);
   colorLevelsValue.textContent = String(settings.colorLevels);
-  colorLevelsInput.disabled = settings.paletteMode !== "mono";
+  colorLevelsInput.disabled = settings.paletteMode !== "mono" && settings.paletteMode !== "free";
   colorLevelsInput.min = String(COLOR_LEVEL_LIMITS.min);
   colorLevelsInput.max = String(
-    settings.paletteMode === "mono"
+    settings.paletteMode === "mono" || settings.paletteMode === "free"
       ? COLOR_LEVEL_LIMITS.max
       : getDefaultColorLevelsForPalette(settings.paletteMode),
   );
