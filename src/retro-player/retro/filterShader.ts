@@ -188,6 +188,41 @@ vec3 monochromePalette(vec3 color, float levels, vec3 tint)
   return mix(vec3(0.0), tint, stepped);
 }
 
+vec3 applyNeonLinePalette(
+  sampler2D textureSampler,
+  vec2 uv,
+  vec2 texel,
+  float levels,
+  vec3 monoTint
+)
+{
+  vec3 center = texture(textureSampler, uv).rgb;
+  vec3 left = texture(textureSampler, clamp(uv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 right = texture(textureSampler, clamp(uv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 up = texture(textureSampler, clamp(uv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 down = texture(textureSampler, clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
+
+  float centerLum = dot(center, vec3(0.299, 0.587, 0.114));
+  float leftLum = dot(left, vec3(0.299, 0.587, 0.114));
+  float rightLum = dot(right, vec3(0.299, 0.587, 0.114));
+  float upLum = dot(up, vec3(0.299, 0.587, 0.114));
+  float downLum = dot(down, vec3(0.299, 0.587, 0.114));
+
+  float gradient = length(vec2(rightLum - leftLum, downLum - upLum));
+  float edge = pow(clamp(gradient * 2.8, 0.0, 1.0), 0.72);
+  float silhouette = smoothstep(0.18, 0.8, centerLum);
+  float line = clamp(edge + silhouette * 0.2, 0.0, 1.0);
+  float stepped = floor(line * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+
+  vec3 primary = mix(vec3(0.1, 0.95, 1.0), monoTint, 0.45);
+  vec3 accent = mix(vec3(1.0, 0.12, 0.78), primary.bgr, 0.25);
+  vec3 background = mix(vec3(0.008, 0.01, 0.03), vec3(0.02, 0.0, 0.05), silhouette * 0.12);
+  vec3 beam = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
+  vec3 halo = mix(primary, accent, 0.65) * pow(stepped, 2.1) * 0.55;
+
+  return background + beam * stepped + halo;
+}
+
 vec2 curveUv(vec2 uv, float strength)
 {
   vec2 centered = uv * 2.0 - 1.0;
@@ -275,19 +310,33 @@ void main(void)
   color.b = texture(uTexture, blueUv).b;
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-  color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint);
+  bool isNeon = uPaletteMode > 6.5;
 
-  vec3 glow = vec3(0.0);
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
-  glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
+  if (isNeon) {
+    color.rgb = applyNeonLinePalette(uTexture, pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
+    vec3 halo = applyNeonLinePalette(
+      uTexture,
+      clamp(pixelatedUv + vec2(texel.x * 0.5, texel.y * 0.5), vec2(0.0), vec2(1.0)),
+      texel,
+      max(uColorLevels, 2.0),
+      uMonoTint
+    );
+    color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * 0.55, 0.45);
+  } else {
+    color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint);
 
-  float brightness = max(max(color.r, color.g), color.b);
-  float glowMask = smoothstep(0.45, 1.0, brightness);
-  color.rgb += glow * glowMask * uGlowStrength;
+    vec3 glow = vec3(0.0);
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
+
+    float brightness = max(max(color.r, color.g), color.b);
+    float glowMask = smoothstep(0.45, 1.0, brightness);
+    color.rgb += glow * glowMask * uGlowStrength;
+  }
 
   float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
   color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);

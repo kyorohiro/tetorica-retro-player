@@ -5,7 +5,8 @@ export type PaletteMode =
   | "pc98_4096"
   | "color32"
   | "color64"
-  | "mono";
+  | "mono"
+  | "neon";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 
 export const MONO_TINTS: Record<
@@ -169,6 +170,21 @@ export const RETRO_PRESETS = {
     phosphor: 0.05,
     monoTint: "amber",
   },
+  neonLine: {
+    label: "Neon Line",
+    width: 960,
+    height: 540,
+    colors: 24,
+    dither: 0.0,
+    palette: "neon",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.04,
+    glow: 0.18,
+    phosphor: 0.0,
+    monoTint: "ice",
+  },
   lcdIce: {
     label: "LCD Ice",
     width: 480,
@@ -227,6 +243,7 @@ export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "color32") return 4;
   if (mode === "color64") return 5;
   if (mode === "mono") return 6;
+  if (mode === "neon") return 7;
 
   return 0;
 };
