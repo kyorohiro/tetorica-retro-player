@@ -17,7 +17,11 @@ import {
   useRetroFilterState,
   type RetroFilterInitialState,
 } from "../hooks/useRetroFilterState";
-import { clearPersistedRetroSettings } from "../hooks/persistedRetroSettings";
+import {
+  clearPersistedRetroSettings,
+  loadPersistedRetroSettings,
+  savePersistedRetroUiSettings,
+} from "../hooks/persistedRetroSettings";
 import { useDialog } from "../../useDialog";
 
 type RetroPlayerProps = {
@@ -41,8 +45,16 @@ export function RetroPlayer({
   onError,
   initialFilterState,
 }: RetroPlayerProps) {
-  const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(false);
-  const [isHighResolution, setIsHighResolution] = React.useState(false);
+  const persistedUiSettings = React.useMemo(
+    () => loadPersistedRetroSettings()?.ui,
+    [],
+  );
+  const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(
+    persistedUiSettings?.isPreviewMaximized ?? false,
+  );
+  const [isHighResolution, setIsHighResolution] = React.useState(
+    persistedUiSettings?.isHighResolution ?? false,
+  );
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
   const [isPreviewPinned, setIsPreviewPinned] = React.useState(false);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
@@ -73,6 +85,8 @@ export function RetroPlayer({
     clearPersistedRetroSettings();
     filterState.resetSettings();
     player.resetAudioSettings();
+    setIsPreviewMaximized(false);
+    setIsHighResolution(false);
   }, [filterState, player]);
 
   const syncTargetAspect = React.useCallback(() => {
@@ -171,6 +185,13 @@ export function RetroPlayer({
       }
     })();
   }, [src, stream, streamName, kind, onError, player, renderResolutionScale]);
+
+  React.useEffect(() => {
+    savePersistedRetroUiSettings({
+      isPreviewMaximized,
+      isHighResolution,
+    });
+  }, [isHighResolution, isPreviewMaximized]);
 
   React.useEffect(() => {
     if (!isPreviewMaximized) return;
