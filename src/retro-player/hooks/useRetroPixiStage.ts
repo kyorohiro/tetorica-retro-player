@@ -152,7 +152,7 @@ export function useRetroPixiStage({
     const appliedScale =
       fitMode === "width"
         ? scale
-        : filterState.isFilterEnabled && scale >= 1
+        : scale >= 1
           ? integerScale
           : scale;
 
@@ -197,7 +197,7 @@ export function useRetroPixiStage({
 
       return next;
     });
-  }, [debugVideo, filterState.isFilterEnabled, fitMode]);
+  }, [debugVideo, fitMode]);
 
   const createVideoTexture = useCallback((video: HTMLVideoElement) => {
     const source = new VideoSource({
