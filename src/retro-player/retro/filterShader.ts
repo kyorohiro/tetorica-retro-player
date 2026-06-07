@@ -191,6 +191,12 @@ vec3 monochromePalette(vec3 color, float levels, vec3 tint)
   return mix(vec3(0.0), tint, stepped);
 }
 
+vec3 adjustSaturation(vec3 color, float saturation)
+{
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  return mix(vec3(luminance), color, saturation);
+}
+
 vec3 applyNeonLinePalette(
   sampler2D textureSampler,
   vec2 uv,
@@ -222,12 +228,16 @@ vec3 applyNeonLinePalette(
   vec3 accent = mix(vec3(1.0, 0.12, 0.78), primary.bgr, 0.25);
   vec3 background = mix(vec3(0.008, 0.01, 0.03), vec3(0.02, 0.0, 0.05), silhouette * 0.12);
   vec3 beamBase = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
-  float saturationMix = clamp(uNeonSaturation - 1.0, -1.0, 1.5);
-  vec3 beam = mix(vec3(dot(beamBase, vec3(0.299, 0.587, 0.114))), beamBase, 1.0 + saturationMix);
+  float saturation = clamp(uNeonSaturation, 0.0, 2.5);
+  vec3 beam = adjustSaturation(beamBase, saturation);
   float boost = clamp(uNeonBoost, 0.0, 2.5);
-  vec3 halo = mix(primary, accent, 0.65) * pow(stepped, 1.8 + boost * 0.35) * (0.35 + boost * 0.22);
+  vec3 haloBase = mix(primary, accent, 0.65);
+  vec3 halo = adjustSaturation(haloBase, 0.65 + saturation * 0.8)
+    * pow(stepped, 1.8 + boost * 0.35)
+    * (0.35 + boost * 0.22);
 
-  return background + beam * stepped * (0.7 + boost * 0.45) + halo;
+  vec3 neon = background + beam * stepped * (0.7 + boost * 0.45) + halo;
+  return adjustSaturation(neon, 0.85 + saturation * 0.35);
 }
 
 vec2 curveUv(vec2 uv, float strength)
