@@ -1,5 +1,10 @@
 import { FILTER_FRAGMENT } from "./shared/filterShader.js";
-import { DEFAULT_SETTINGS, normalizeSettings, toShaderMonoTint } from "./shared/settings.js";
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_STORAGE_KEY,
+  normalizeSettings,
+  toShaderMonoTint,
+} from "./shared/settings.js";
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 
@@ -31,6 +36,7 @@ export async function toggleRetroOverlay(settingsInput) {
 }
 
 function createOverlay(settings) {
+  let currentSettings = settings;
   const canvas = document.createElement("canvas");
   canvas.style.position = "fixed";
   canvas.style.left = "0";
@@ -43,7 +49,7 @@ function createOverlay(settings) {
 
   const badge = document.createElement("button");
   badge.type = "button";
-  badge.textContent = "Tetorica";
+  badge.textContent = "Retro";
   badge.style.position = "fixed";
   badge.style.right = "16px";
   badge.style.top = "16px";
@@ -78,13 +84,19 @@ function createOverlay(settings) {
   let lastRectKey = "";
   let cleanupVideo = null;
 
-  badge.addEventListener("click", () => {
+  badge.addEventListener("click", async () => {
     isVisible = !isVisible;
+
+    if (isVisible) {
+      currentSettings = await loadLatestSettings(currentSettings);
+      applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
+    }
+
     canvas.style.display = isVisible ? "block" : "none";
     if (video) {
       setVideoVisibility(video, isVisible);
     }
-    badge.textContent = isVisible ? "Original" : "Tetorica";
+    badge.textContent = isVisible ? "Orig" : "Retro";
   });
 
   function start() {
@@ -191,7 +203,7 @@ function createOverlay(settings) {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  applySettings(gl, renderer.uniformLocations, settings);
+  applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
 
   return {
     start,
@@ -226,8 +238,8 @@ function setVideoVisibility(video, hidden) {
   video.style.opacity = hidden ? "0" : "1";
 }
 
-function applySettings(gl, uniformLocations, settings) {
-  gl.useProgram(gl.getParameter(gl.CURRENT_PROGRAM));
+function applySettings(gl, program, uniformLocations, settings) {
+  gl.useProgram(program);
   gl.uniform2f(uniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
   gl.uniform1f(uniformLocations.uColorLevels, settings.colorLevels);
   gl.uniform1f(uniformLocations.uDitherStrength, settings.ditherStrength);
@@ -239,6 +251,19 @@ function applySettings(gl, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uGlowStrength, settings.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(settings.monoTint));
+}
+
+async function loadLatestSettings(fallbackSettings) {
+  if (!chrome?.storage?.local) {
+    return fallbackSettings;
+  }
+
+  try {
+    const stored = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+    return normalizeSettings(stored?.[SETTINGS_STORAGE_KEY] ?? fallbackSettings);
+  } catch {
+    return fallbackSettings;
+  }
 }
 
 function paletteModeToUniform(mode) {
