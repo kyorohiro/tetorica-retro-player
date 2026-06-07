@@ -38,6 +38,10 @@ body {
   margin-bottom: 10px;
 }
 
+.action-wide {
+  grid-column: 1 / -1;
+}
+
 button {
   border: 1px solid rgba(196, 230, 125, 0.25);
   border-radius: 12px;

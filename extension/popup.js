@@ -13,6 +13,7 @@ import {
 
 const captureButton = document.getElementById("captureButton");
 const viewerButton = document.getElementById("viewerButton");
+const overlayButton = document.getElementById("overlayButton");
 const presetSelect = document.getElementById("presetSelect");
 const paletteModeSelect = document.getElementById("paletteMode");
 const monoTintSelect = document.getElementById("monoTint");
@@ -63,6 +64,35 @@ captureButton.addEventListener("click", async () => {
 viewerButton.addEventListener("click", async () => {
   await chrome.runtime.sendMessage({ type: "OPEN_VIEWER" });
   setStatus("Viewer opened.");
+});
+
+overlayButton.addEventListener("click", async () => {
+  setStatus("Starting experimental video overlay on the active tab...");
+
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (!activeTab?.id) {
+    setStatus("No active tab found.");
+    return;
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: activeTab.id },
+      args: [chrome.runtime.getURL("overlayRuntime.js"), currentSettings],
+      func: async (moduleUrl, settings) => {
+        const runtime = await import(moduleUrl);
+        await runtime.toggleRetroOverlay(settings);
+      },
+    });
+
+    setStatus("Experimental overlay toggled on the current page.");
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error));
+  }
 });
 
 presetSelect.addEventListener("change", () => {

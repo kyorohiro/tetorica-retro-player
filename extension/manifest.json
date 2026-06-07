@@ -26,7 +26,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["viewer.css", "viewer.js", "shared/filterShader.js"],
+      "resources": [
+        "viewer.css",
+        "viewer.js",
+        "overlayRuntime.js",
+        "shared/filterShader.js",
+        "shared/settings.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ]
