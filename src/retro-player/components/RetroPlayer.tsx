@@ -812,6 +812,9 @@ export function RetroPlayer({
                 glowStrength={filterState.glowStrength}
                 isFilterEnabled={filterState.isFilterEnabled}
                 monoTint={filterState.monoTint}
+                neonBoost={filterState.neonBoost}
+                neonDetail={filterState.neonDetail}
+                neonSaturation={filterState.neonSaturation}
                 paletteMode={filterState.paletteMode}
                 phosphorStrength={filterState.phosphorStrength}
                 scanlineStrength={filterState.scanlineStrength}
@@ -828,6 +831,9 @@ export function RetroPlayer({
                 onSetGlowStrength={filterState.setGlowStrength}
                 onSetIsFilterEnabled={filterState.setIsFilterEnabled}
                 onSetMonoTint={filterState.setMonoTint}
+                onSetNeonBoost={filterState.setNeonBoost}
+                onSetNeonDetail={filterState.setNeonDetail}
+                onSetNeonSaturation={filterState.setNeonSaturation}
                 onSetPaletteMode={filterState.setPaletteMode}
                 onSetPhosphorStrength={filterState.setPhosphorStrength}
                 onSetScanlineStrength={filterState.setScanlineStrength}

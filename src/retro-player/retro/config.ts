@@ -34,6 +34,9 @@ export const RETRO_PRESETS = {
     glow: 0.03,
     phosphor: 0.03,
     monoTint: "gray",
+    neonBoost: 0.8,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   arcade: {
     label: "Arcade",
@@ -49,6 +52,9 @@ export const RETRO_PRESETS = {
     glow: 0.06,
     phosphor: 0.05,
     monoTint: "gray",
+    neonBoost: 0.9,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   pc98_512: {
     label: "PC-98 512-color",
@@ -64,6 +70,9 @@ export const RETRO_PRESETS = {
     glow: 0.06,
     phosphor: 0.03,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   pc98_4096: {
     label: "PC-98 4096-color",
@@ -79,6 +88,9 @@ export const RETRO_PRESETS = {
     glow: 0.05,
     phosphor: 0.03,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   pc98: {
     label: "Color 16",
@@ -94,6 +106,9 @@ export const RETRO_PRESETS = {
     glow: 0.05,
     phosphor: 0.04,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   color32: {
     label: "Color 32",
@@ -109,6 +124,9 @@ export const RETRO_PRESETS = {
     glow: 0.04,
     phosphor: 0.03,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   color64: {
     label: "Color 64",
@@ -124,6 +142,9 @@ export const RETRO_PRESETS = {
     glow: 0.03,
     phosphor: 0.03,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   monochrome: {
     label: "Mono",
@@ -139,6 +160,9 @@ export const RETRO_PRESETS = {
     glow: 0.07,
     phosphor: 0.02,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   greenTerminal: {
     label: "Green Terminal",
@@ -154,6 +178,9 @@ export const RETRO_PRESETS = {
     glow: 0.09,
     phosphor: 0.06,
     monoTint: "green",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   amberCrt: {
     label: "Amber CRT",
@@ -169,6 +196,9 @@ export const RETRO_PRESETS = {
     glow: 0.10,
     phosphor: 0.05,
     monoTint: "amber",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   neonLine: {
     label: "Neon Line",
@@ -184,6 +214,9 @@ export const RETRO_PRESETS = {
     glow: 0.18,
     phosphor: 0.0,
     monoTint: "ice",
+    neonBoost: 1.15,
+    neonSaturation: 1.2,
+    neonDetail: 1.05,
   },
   lcdIce: {
     label: "LCD Ice",
@@ -199,6 +232,9 @@ export const RETRO_PRESETS = {
     glow: 0.00,
     phosphor: 0.00,
     monoTint: "ice",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
   crtOnly: {
     label: "CRT Only",
@@ -214,6 +250,9 @@ export const RETRO_PRESETS = {
     glow: 0.06,
     phosphor: 0.03,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
   },
 } as const satisfies Record<
   string,
@@ -231,6 +270,9 @@ export const RETRO_PRESETS = {
     glow: number;
     phosphor: number;
     monoTint: MonoTintMode;
+    neonBoost: number;
+    neonSaturation: number;
+    neonDetail: number;
   }
 >;
 

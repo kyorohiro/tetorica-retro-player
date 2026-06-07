@@ -25,6 +25,9 @@ export type RetroFilterInitialState = Partial<{
   glowStrength: number;
   phosphorStrength: number;
   monoTint: MonoTintMode;
+  neonBoost: number;
+  neonSaturation: number;
+  neonDetail: number;
   isFilterEnabled: boolean;
 }>;
 
@@ -44,7 +47,10 @@ const resolvePresetKeyFromState = (
       preset.vignette === state.vignetteStrength &&
       preset.glow === state.glowStrength &&
       preset.phosphor === state.phosphorStrength &&
-      preset.monoTint === state.monoTint
+      preset.monoTint === state.monoTint &&
+      preset.neonBoost === state.neonBoost &&
+      preset.neonSaturation === state.neonSaturation &&
+      preset.neonDetail === state.neonDetail
     ) {
       return key as RetroPresetKey;
     }
@@ -67,6 +73,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
+    neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
+    neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
+    neonDetail: initialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
     isFilterEnabled: initialState.isFilterEnabled ?? true,
   }));
 
@@ -112,6 +121,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [monoTint, setMonoTint] = useState<MonoTintMode>(
     resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
   );
+  const [neonBoost, setNeonBoost] = useState<number>(
+    resolvedInitialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
+  );
+  const [neonSaturation, setNeonSaturation] = useState<number>(
+    resolvedInitialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
+  );
+  const [neonDetail, setNeonDetail] = useState<number>(
+    resolvedInitialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
+  );
   const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(
     resolvedInitialState.isFilterEnabled ?? true,
   );
@@ -129,6 +147,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       glowStrength: resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
       phosphorStrength: resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
       monoTint: resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
+      neonBoost: resolvedInitialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
+      neonSaturation: resolvedInitialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
+      neonDetail: resolvedInitialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
       isFilterEnabled: resolvedInitialState.isFilterEnabled ?? true,
     }),
   );
@@ -178,6 +199,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setGlowStrength(settings.glow);
     setPhosphorStrength(settings.phosphor);
     setMonoTint(settings.monoTint);
+    setNeonBoost(settings.neonBoost);
+    setNeonSaturation(settings.neonSaturation);
+    setNeonDetail(settings.neonDetail);
   };
 
   const resetSettings = () => {
@@ -194,6 +218,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setGlowStrength(baseInitialState.glowStrength);
     setPhosphorStrength(baseInitialState.phosphorStrength);
     setMonoTint(baseInitialState.monoTint);
+    setNeonBoost(baseInitialState.neonBoost);
+    setNeonSaturation(baseInitialState.neonSaturation);
+    setNeonDetail(baseInitialState.neonDetail);
     setIsFilterEnabled(baseInitialState.isFilterEnabled);
   };
 
@@ -211,6 +238,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       glowStrength,
       phosphorStrength,
       monoTint,
+      neonBoost,
+      neonSaturation,
+      neonDetail,
       isFilterEnabled,
     });
   }, [
@@ -219,6 +249,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ditherStrength,
     isFilterEnabled,
     monoTint,
+    neonBoost,
+    neonSaturation,
+    neonDetail,
     paletteMode,
     phosphorStrength,
     scanlineStrength,
@@ -242,6 +275,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     glowStrength,
     phosphorStrength,
     monoTint,
+    neonBoost,
+    neonSaturation,
+    neonDetail,
     isFilterEnabled,
     selectedPreset,
     setTargetWidth,
@@ -256,6 +292,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setGlowStrength,
     setPhosphorStrength,
     setMonoTint,
+    setNeonBoost,
+    setNeonSaturation,
+    setNeonDetail,
     setIsFilterEnabled,
     applyPreset,
     resetSettings,
