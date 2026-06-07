@@ -19,6 +19,10 @@ https://kyorohiro.itch.io/tetorica-retro-player
 
 ![Demo](docs/demo.gif)
 
+## Chrome Plugin
+
+- [https://chromewebstore.google.com/detail/tetorica-retro-player/clnpmlgahomdkphcpcajbemodneoecna](https://chromewebstore.google.com/detail/tetorica-retro-player/clnpmlgahomdkphcpcajbemodneoecna)
+
 
 ## Features
 
