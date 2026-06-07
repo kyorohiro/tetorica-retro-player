@@ -82,7 +82,7 @@ function createOverlay(settings) {
     isVisible = !isVisible;
     canvas.style.display = isVisible ? "block" : "none";
     if (video) {
-      setVideoVisibility(video, !isVisible);
+      setVideoVisibility(video, isVisible);
     }
     badge.textContent = isVisible ? "Original" : "Tetorica";
   });
