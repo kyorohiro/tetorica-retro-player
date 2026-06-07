@@ -246,8 +246,18 @@ function fitCanvasToWindow() {
     return;
   }
 
-  const fittedWidth = Math.max(1, window.innerWidth);
-  const fittedHeight = Math.max(1, fittedWidth / aspectRatio);
+  const availableWidth = Math.max(1, window.innerWidth);
+  const availableHeight = Math.max(1, window.innerHeight);
+  const widthScale = availableWidth / aspectRatio;
+
+  const fittedWidth =
+    widthScale <= availableHeight
+      ? availableWidth
+      : Math.max(1, availableHeight * aspectRatio);
+  const fittedHeight =
+    widthScale <= availableHeight
+      ? Math.max(1, availableWidth / aspectRatio)
+      : availableHeight;
 
   canvas.style.width = `${Math.floor(fittedWidth)}px`;
   canvas.style.height = `${Math.floor(fittedHeight)}px`;
