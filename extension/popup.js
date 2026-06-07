@@ -1,7 +1,9 @@
 import {
   applyPresetToSettings,
+  COLOR_LEVEL_LIMITS,
   CUSTOM_PRESET_KEY,
   DEFAULT_SETTINGS,
+  getDefaultColorLevelsForPalette,
   MONO_TINT_OPTIONS,
   PALETTE_OPTIONS,
   PRESETS,
@@ -18,6 +20,8 @@ const targetWidthInput = document.getElementById("targetWidth");
 const targetWidthValue = document.getElementById("targetWidthValue");
 const targetHeightInput = document.getElementById("targetHeight");
 const targetHeightValue = document.getElementById("targetHeightValue");
+const colorLevelsInput = document.getElementById("colorLevels");
+const colorLevelsValue = document.getElementById("colorLevelsValue");
 const ditherStrengthInput = document.getElementById("ditherStrength");
 const ditherStrengthValue = document.getElementById("ditherStrengthValue");
 const curvatureInput = document.getElementById("curvature");
@@ -71,9 +75,14 @@ presetSelect.addEventListener("change", () => {
 });
 
 paletteModeSelect.addEventListener("change", () => {
+  const paletteMode = paletteModeSelect.value;
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
-    paletteMode: paletteModeSelect.value,
+    paletteMode,
+    colorLevels:
+      paletteMode === "mono"
+        ? currentSettings.colorLevels
+        : getDefaultColorLevelsForPalette(paletteMode),
   });
 });
 
@@ -95,6 +104,13 @@ targetHeightInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     targetHeight: Number(targetHeightInput.value),
+  });
+});
+
+colorLevelsInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    colorLevels: Number(colorLevelsInput.value),
   });
 });
 
@@ -201,6 +217,15 @@ function renderSettings(settings) {
   targetWidthValue.textContent = `${settings.targetWidth}px`;
   targetHeightInput.value = String(settings.targetHeight);
   targetHeightValue.textContent = `${settings.targetHeight}px`;
+  colorLevelsInput.value = String(settings.colorLevels);
+  colorLevelsValue.textContent = String(settings.colorLevels);
+  colorLevelsInput.disabled = settings.paletteMode !== "mono";
+  colorLevelsInput.min = String(COLOR_LEVEL_LIMITS.min);
+  colorLevelsInput.max = String(
+    settings.paletteMode === "mono"
+      ? COLOR_LEVEL_LIMITS.max
+      : getDefaultColorLevelsForPalette(settings.paletteMode),
+  );
   ditherStrengthInput.value = String(settings.ditherStrength);
   ditherStrengthValue.textContent = settings.ditherStrength.toFixed(2);
   curvatureInput.value = String(settings.curvature);

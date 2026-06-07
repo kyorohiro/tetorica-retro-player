@@ -194,6 +194,11 @@ export const DEFAULT_SETTINGS = {
   noiseLevel: 0.015,
 };
 
+export const COLOR_LEVEL_LIMITS = {
+  min: 2,
+  max: 256,
+};
+
 export function normalizeSettings(candidate) {
   const presetKey = typeof candidate?.presetKey === "string" && candidate.presetKey in PRESETS
     ? candidate.presetKey
@@ -338,15 +343,23 @@ function isMonoTint(value) {
   return MONO_TINT_OPTIONS.some((option) => option.value === value);
 }
 
-function resolveColorLevels(paletteMode, requestedLevels) {
-  if (paletteMode === "free") return 64;
+export function getDefaultColorLevelsForPalette(paletteMode) {
+  if (paletteMode === "free") return 256;
   if (paletteMode === "pc98") return 16;
   if (paletteMode === "pc98_4096") return 16;
   if (paletteMode === "pc98_512") return 8;
   if (paletteMode === "color32") return 32;
   if (paletteMode === "color64") return 64;
 
-  return clamp(requestedLevels, 2, 64);
+  return DEFAULT_SETTINGS.colorLevels;
+}
+
+function resolveColorLevels(paletteMode, requestedLevels) {
+  if (paletteMode !== "mono") {
+    return getDefaultColorLevelsForPalette(paletteMode);
+  }
+
+  return clamp(requestedLevels, COLOR_LEVEL_LIMITS.min, COLOR_LEVEL_LIMITS.max);
 }
 
 function paletteModeFromUniform(value) {
