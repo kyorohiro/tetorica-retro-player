@@ -60,6 +60,9 @@ export function useRetroPixiStage({
     filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
     filter.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
     filter.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
+    filter.resources.pixelUniforms.uniforms.uNeonBoost = filterState.neonBoost;
+    filter.resources.pixelUniforms.uniforms.uNeonSaturation = filterState.neonSaturation;
+    filter.resources.pixelUniforms.uniforms.uNeonDetail = filterState.neonDetail;
   }, [filterState]);
 
   const applyFilterState = useCallback(() => {
@@ -95,6 +98,9 @@ export function useRetroPixiStage({
             value: new Float32Array(MONO_TINTS.green.rgb),
             type: "vec3<f32>",
           },
+          uNeonBoost: { value: 1.0, type: "f32" },
+          uNeonSaturation: { value: 1.0, type: "f32" },
+          uNeonDetail: { value: 1.0, type: "f32" },
           uTime: { value: 0, type: "f32" },
         },
       },

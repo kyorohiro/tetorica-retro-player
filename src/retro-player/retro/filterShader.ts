@@ -49,6 +49,9 @@ uniform float uVignetteStrength;
 uniform float uGlowStrength;
 uniform float uPhosphorStrength;
 uniform vec3 uMonoTint;
+uniform float uNeonBoost;
+uniform float uNeonSaturation;
+uniform float uNeonDetail;
 uniform float uTime;
 
 float bayer4x4(vec2 pos)
@@ -209,7 +212,8 @@ vec3 applyNeonLinePalette(
   float downLum = dot(down, vec3(0.299, 0.587, 0.114));
 
   float gradient = length(vec2(rightLum - leftLum, downLum - upLum));
-  float edge = pow(clamp(gradient * 2.8, 0.0, 1.0), 0.72);
+  float detailScale = mix(2.0, 4.2, clamp(uNeonDetail - 0.5, 0.0, 1.5) / 1.5);
+  float edge = pow(clamp(gradient * detailScale, 0.0, 1.0), mix(0.95, 0.58, clamp(uNeonDetail, 0.0, 2.0) * 0.5));
   float silhouette = smoothstep(0.18, 0.8, centerLum);
   float line = clamp(edge + silhouette * 0.2, 0.0, 1.0);
   float stepped = floor(line * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
@@ -217,10 +221,13 @@ vec3 applyNeonLinePalette(
   vec3 primary = mix(vec3(0.1, 0.95, 1.0), monoTint, 0.45);
   vec3 accent = mix(vec3(1.0, 0.12, 0.78), primary.bgr, 0.25);
   vec3 background = mix(vec3(0.008, 0.01, 0.03), vec3(0.02, 0.0, 0.05), silhouette * 0.12);
-  vec3 beam = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
-  vec3 halo = mix(primary, accent, 0.65) * pow(stepped, 2.1) * 0.55;
+  vec3 beamBase = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
+  float saturationMix = clamp(uNeonSaturation - 1.0, -1.0, 1.5);
+  vec3 beam = mix(vec3(dot(beamBase, vec3(0.299, 0.587, 0.114))), beamBase, 1.0 + saturationMix);
+  float boost = clamp(uNeonBoost, 0.0, 2.5);
+  vec3 halo = mix(primary, accent, 0.65) * pow(stepped, 1.8 + boost * 0.35) * (0.35 + boost * 0.22);
 
-  return background + beam * stepped + halo;
+  return background + beam * stepped * (0.7 + boost * 0.45) + halo;
 }
 
 vec2 curveUv(vec2 uv, float strength)
@@ -321,7 +328,7 @@ void main(void)
       max(uColorLevels, 2.0),
       uMonoTint
     );
-    color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * 0.55, 0.45);
+    color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22), 0.45);
   } else {
     color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint);
 

@@ -17,6 +17,9 @@ type RetroFilterPanelProps = {
   phosphorStrength: number;
   scanlineStrength: number;
   scanline2Strength: number;
+  neonBoost: number;
+  neonSaturation: number;
+  neonDetail: number;
   selectedPreset: RetroPresetKey | null;
   sourceDimensions: { width: number; height: number } | null;
   targetHeight: number;
@@ -33,6 +36,9 @@ type RetroFilterPanelProps = {
   onSetPhosphorStrength: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
+  onSetNeonBoost: (value: number) => void;
+  onSetNeonSaturation: (value: number) => void;
+  onSetNeonDetail: (value: number) => void;
   onSetTargetHeight: (value: number) => void;
   onSetTargetWidth: (value: number) => void;
   onSetVignetteStrength: (value: number) => void;
@@ -50,6 +56,9 @@ export function RetroFilterPanel({
   phosphorStrength,
   scanlineStrength,
   scanline2Strength,
+  neonBoost,
+  neonSaturation,
+  neonDetail,
   selectedPreset,
   sourceDimensions,
   targetHeight,
@@ -66,6 +75,9 @@ export function RetroFilterPanel({
   onSetPhosphorStrength,
   onSetScanlineStrength,
   onSetScanline2Strength,
+  onSetNeonBoost,
+  onSetNeonSaturation,
+  onSetNeonDetail,
   onSetTargetHeight,
   onSetTargetWidth,
   onSetVignetteStrength,
@@ -174,6 +186,61 @@ export function RetroFilterPanel({
               ))}
             </div>
           </label>
+        )}
+
+        {paletteMode === "neon" && (
+          <>
+            <label className="block">
+              <span className="text-slate-100">
+                Neon Boost: {neonBoost.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2.5"
+                step="0.01"
+                value={neonBoost}
+                onChange={(ev) => {
+                  onSetNeonBoost(Number(ev.currentTarget.value));
+                }}
+                className="mt-2 w-full"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-slate-100">
+                Neon Saturation: {neonSaturation.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2.0"
+                step="0.01"
+                value={neonSaturation}
+                onChange={(ev) => {
+                  onSetNeonSaturation(Number(ev.currentTarget.value));
+                }}
+                className="mt-2 w-full"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-slate-100">
+                Neon Detail: {neonDetail.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0.2"
+                max="2.0"
+                step="0.01"
+                value={neonDetail}
+                onChange={(ev) => {
+                  onSetNeonDetail(Number(ev.currentTarget.value));
+                }}
+                className="mt-2 w-full"
+              />
+            </label>
+          </>
         )}
 
         <label className="block">
