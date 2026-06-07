@@ -30,10 +30,16 @@ export type PersistedRetroAudioSettings = {
   noiseLevel: number;
 };
 
+export type PersistedRetroUiSettings = {
+  isPreviewMaximized: boolean;
+  isHighResolution: boolean;
+};
+
 type PersistedRetroSettings = {
   version: number;
   filter?: PersistedRetroFilterSettings;
   audio?: PersistedRetroAudioSettings;
+  ui?: PersistedRetroUiSettings;
 };
 
 const readSettings = (): PersistedRetroSettings | null => {
@@ -73,6 +79,7 @@ export const savePersistedRetroFilterSettings = (
     version: STORAGE_VERSION,
     audio: current?.audio,
     filter,
+    ui: current?.ui,
   });
 };
 
@@ -85,6 +92,20 @@ export const savePersistedRetroAudioSettings = (
     version: STORAGE_VERSION,
     audio,
     filter: current?.filter,
+    ui: current?.ui,
+  });
+};
+
+export const savePersistedRetroUiSettings = (
+  ui: PersistedRetroUiSettings,
+) => {
+  const current = readSettings();
+
+  writeSettings({
+    version: STORAGE_VERSION,
+    audio: current?.audio,
+    filter: current?.filter,
+    ui,
   });
 };
 
