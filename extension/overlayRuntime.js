@@ -83,6 +83,7 @@ function createOverlay(settings) {
   let startedAt = performance.now();
   let lastRectKey = "";
   let cleanupVideo = null;
+  let detachStorageListener = null;
 
   badge.addEventListener("click", async () => {
     isVisible = !isVisible;
@@ -101,6 +102,7 @@ function createOverlay(settings) {
 
   function start() {
     document.body.append(canvas, badge);
+    attachSettingsSync();
     updateVideoTarget(findPrimaryVideo());
     draw();
   }
@@ -116,8 +118,33 @@ function createOverlay(settings) {
       cleanupVideo = null;
     }
 
+    if (detachStorageListener) {
+      detachStorageListener();
+      detachStorageListener = null;
+    }
+
     canvas.remove();
     badge.remove();
+  }
+
+  function attachSettingsSync() {
+    if (!chrome?.storage?.onChanged) {
+      return;
+    }
+
+    const handleStorageChanged = (changes, areaName) => {
+      if (areaName !== "local" || !changes[SETTINGS_STORAGE_KEY]?.newValue) {
+        return;
+      }
+
+      currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
+      applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChanged);
+    detachStorageListener = () => {
+      chrome.storage.onChanged.removeListener(handleStorageChanged);
+    };
   }
 
   function updateVideoTarget(nextVideo) {
