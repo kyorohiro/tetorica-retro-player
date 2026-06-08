@@ -23,6 +23,9 @@ uniform float uNeonSaturation;
 uniform float uNeonDetail;
 uniform float uTime;
 
+vec3 shapePc98_512SatColor(vec3 color);
+vec3 quantizePc98_512Sat(vec3 color);
+
 float bayer4x4(vec2 pos)
 {
   int x = int(mod(pos.x, 4.0));
@@ -94,6 +97,22 @@ float pc98WeightedDistance(vec3 a, vec3 b)
   return dot(delta, delta);
 }
 
+float pc98TileDistance(vec3 sourceColor, vec3 candidateColor)
+{
+  vec3 shapedSource = shapePc98_512SatColor(sourceColor);
+  vec3 shapedCandidate = shapePc98_512SatColor(candidateColor);
+  vec3 delta = (shapedSource - shapedCandidate) * vec3(0.94, 1.02, 0.98);
+
+  float sourceWarm = smoothstep(0.18, 0.62, sourceColor.r - sourceColor.b)
+    * smoothstep(0.12, 0.42, sourceColor.g - sourceColor.b);
+  float sourceSat = max(max(sourceColor.r, sourceColor.g), sourceColor.b)
+    - min(min(sourceColor.r, sourceColor.g), sourceColor.b);
+  float pastelBias = (1.0 - smoothstep(0.08, 0.26, sourceSat)) * sourceWarm;
+  float warmthMismatch = abs((sourceColor.r - sourceColor.b) - (candidateColor.r - candidateColor.b));
+
+  return dot(delta, delta) + warmthMismatch * pastelBias * 0.18;
+}
+
 void insertPc98Candidate(
   vec3 candidate,
   float candidateDistance,
@@ -156,12 +175,12 @@ void considerPc98TileMix(
 )
 {
   float pairContrast = distance(colorA, colorB);
-  if (pairContrast < 0.18) {
+  if (pairContrast < 0.08) {
     return;
   }
 
   vec3 mix50 = mix(colorA, colorB, 0.5);
-  float mix50Error = pc98WeightedDistance(sourceColor, mix50);
+  float mix50Error = pc98TileDistance(sourceColor, mix50);
   if (mix50Error + 0.006 < bestError) {
     bestError = mix50Error;
     bestApproximation = mix50;
@@ -169,7 +188,7 @@ void considerPc98TileMix(
   }
 
   vec3 mix25 = mix(colorA, colorB, 0.25);
-  float mix25Error = pc98WeightedDistance(sourceColor, mix25);
+  float mix25Error = pc98TileDistance(sourceColor, mix25);
   if (mix25Error + 0.004 < bestError) {
     bestError = mix25Error;
     bestApproximation = mix25;
@@ -177,7 +196,7 @@ void considerPc98TileMix(
   }
 
   vec3 mix75 = mix(colorA, colorB, 0.75);
-  float mix75Error = pc98WeightedDistance(sourceColor, mix75);
+  float mix75Error = pc98TileDistance(sourceColor, mix75);
   if (mix75Error + 0.004 < bestError) {
     bestError = mix75Error;
     bestApproximation = mix75;
@@ -187,16 +206,24 @@ void considerPc98TileMix(
 
 vec3 pc98TilePalette(vec3 color, vec2 cell)
 {
-  vec3 best0 = pc98Palette(0.0);
+  vec3 shapedColor = shapePc98_512SatColor(color);
+  vec3 baseCell = shapedColor * 7.0;
+  vec3 low = floor(baseCell) / 7.0;
+  vec3 high = ceil(baseCell) / 7.0;
+  vec3 best0 = quantizePc98_512Sat(color);
   vec3 best1 = best0;
   vec3 best2 = best0;
-  float dist0 = 1e9;
+  float dist0 = pc98TileDistance(color, best0);
   float dist1 = 1e9;
   float dist2 = 1e9;
 
-  for (int i = 0; i < 16; i++) {
-    vec3 candidate = pc98Palette(float(i));
-    float candidateDistance = pc98WeightedDistance(color, candidate);
+  for (int i = 0; i < 8; i++) {
+    vec3 candidate = vec3(
+      (mod(float(i), 2.0) < 1.0) ? low.r : high.r,
+      (mod(floor(float(i) / 2.0), 2.0) < 1.0) ? low.g : high.g,
+      (mod(floor(float(i) / 4.0), 2.0) < 1.0) ? low.b : high.b
+    );
+    float candidateDistance = pc98TileDistance(color, candidate);
     insertPc98Candidate(candidate, candidateDistance, best0, best1, best2, dist0, dist1, dist2);
   }
 
@@ -232,7 +259,8 @@ vec3 samplePc98TileSource(sampler2D textureSampler, vec2 cell, vec2 targetSize)
     clamp((blockOrigin + vec2(0.0, 3.0) + 0.5) / targetSize, vec2(0.0), vec2(1.0))
   ).rgb;
 
-  return (center * 0.4) + (downRight * 0.2) + (upRight * 0.2) + (downLeft * 0.2);
+  vec3 averaged = (center * 0.4) + (downRight * 0.2) + (upRight * 0.2) + (downLeft * 0.2);
+  return shapePc98_512SatColor(averaged);
 }
 
 vec3 quantizePc98_4096(vec3 color)
@@ -313,7 +341,7 @@ vec3 adjustSaturation(vec3 color, float saturation)
   return mix(vec3(luminance), color, saturation);
 }
 
-vec3 quantizePc98_512Sat(vec3 color)
+vec3 shapePc98_512SatColor(vec3 color)
 {
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
   float maxChannel = max(max(color.r, color.g), color.b);
@@ -321,15 +349,30 @@ vec3 quantizePc98_512Sat(vec3 color)
   float saturation = maxChannel - minChannel;
   float satBias = smoothstep(0.09, 0.58, saturation);
   float lowSatBias = 1.0 - smoothstep(0.08, 0.26, saturation);
+  float warmBias = smoothstep(0.18, 0.62, color.r - color.b) * smoothstep(0.16, 0.48, color.g - color.b);
+  float pastelBias = lowSatBias * mix(0.55, 1.0, warmBias);
 
-  vec3 saturationShaped = adjustSaturation(color, mix(0.92, 1.24, satBias));
-  vec3 luminanceGuided = mix(vec3(luminance), saturationShaped, mix(0.30, 0.94, satBias));
-  vec3 highlightSoftened = mix(luminanceGuided, color, lowSatBias * 0.28);
-  vec3 quantized = quantizePc98_512(clamp(highlightSoftened, 0.0, 1.0));
+  vec3 saturationShaped = adjustSaturation(color, mix(1.02, 1.22, satBias));
+  vec3 huePreserved = mix(saturationShaped, color, 0.32 + pastelBias * 0.38);
+  vec3 luminanceGuided = mix(vec3(luminance), huePreserved, mix(0.72, 0.97, satBias));
+  vec3 warmLift = vec3(0.018, 0.008, -0.012) * pastelBias;
+
+  return clamp(luminanceGuided + warmLift, 0.0, 1.0);
+}
+
+vec3 quantizePc98_512Sat(vec3 color)
+{
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  float maxChannel = max(max(color.r, color.g), color.b);
+  float minChannel = min(min(color.r, color.g), color.b);
+  float saturation = maxChannel - minChannel;
+  float satBias = smoothstep(0.09, 0.58, saturation);
+  vec3 quantized = quantizePc98_512(shapePc98_512SatColor(color));
 
   float targetLuma = floor(luminance * 7.0 + 0.5) / 7.0;
   float quantizedLuma = dot(quantized, vec3(0.299, 0.587, 0.114));
-  float lumaCorrection = (targetLuma - quantizedLuma) * mix(0.65, 0.20, satBias);
+  float lowSatBias = 1.0 - smoothstep(0.08, 0.26, saturation);
+  float lumaCorrection = (targetLuma - quantizedLuma) * mix(0.24, 0.12, satBias) * (1.0 - lowSatBias * 0.35);
   vec3 lumaBalanced = clamp(quantized + vec3(lumaCorrection), 0.0, 1.0);
 
   return quantizePc98_512(lumaBalanced);
