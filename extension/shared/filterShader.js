@@ -193,17 +193,22 @@ vec3 applyNeonLinePalette(
   float line = clamp(edge + silhouette * 0.2, 0.0, 1.0);
   float stepped = floor(line * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
 
-  vec3 primary = mix(vec3(0.1, 0.95, 1.0), monoTint, 0.45);
-  vec3 accent = mix(vec3(1.0, 0.12, 0.78), primary.bgr, 0.25);
-  vec3 background = mix(vec3(0.008, 0.01, 0.03), vec3(0.02, 0.0, 0.05), silhouette * 0.12);
+  vec3 tintCore = adjustSaturation(monoTint, 1.14);
+  vec3 tintAccent = adjustSaturation(mix(monoTint.bgr, monoTint.grb, 0.38), 1.22);
+  vec3 neonCore = vec3(0.08, 0.94, 1.0);
+  vec3 neonAccent = vec3(1.0, 0.16, 0.82);
+  vec3 primary = mix(neonCore, tintCore, 0.56);
+  vec3 accent = mix(neonAccent, tintAccent, 0.42);
+  vec3 backgroundTint = mix(vec3(0.01, 0.012, 0.03), tintCore * vec3(0.09, 0.07, 0.13), 0.38);
+  vec3 background = mix(backgroundTint, backgroundTint + neonAccent * 0.06 + accent * 0.04, silhouette * 0.18);
   vec3 beamBase = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
   float saturation = clamp(uNeonSaturation, 0.0, 2.5);
   vec3 beam = adjustSaturation(beamBase, saturation);
   float boost = clamp(uNeonBoost, 0.0, 2.5);
-  vec3 haloBase = mix(primary, accent, 0.65);
+  vec3 haloBase = mix(primary, accent, 0.72);
   vec3 halo = adjustSaturation(haloBase, 0.65 + saturation * 0.8)
     * pow(stepped, 1.8 + boost * 0.35)
-    * (0.35 + boost * 0.22);
+    * (0.40 + boost * 0.23);
 
   vec3 neon = background + beam * stepped * (0.7 + boost * 0.45) + halo;
   return adjustSaturation(neon, 0.85 + saturation * 0.35);
