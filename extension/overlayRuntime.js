@@ -77,7 +77,7 @@ function createOverlay(settings) {
   }
 
   const renderer = setupRenderer(gl);
-  let video = null;
+  let targetElement = null;
   let rafId = 0;
   let isVisible = true;
   let startedAt = performance.now();
@@ -87,6 +87,7 @@ function createOverlay(settings) {
   let pointerClientX = null;
   let pointerClientY = null;
   let detachPointerTracking = null;
+  let rejectedHoverImage = null;
 
   badge.addEventListener("click", async () => {
     isVisible = !isVisible;
@@ -97,8 +98,8 @@ function createOverlay(settings) {
     }
 
     canvas.style.display = isVisible ? "block" : "none";
-    if (video) {
-      setVideoVisibility(video, isVisible);
+    if (targetElement) {
+      setElementVisibility(targetElement, isVisible);
     }
     badge.textContent = isVisible ? "Orig" : "Retro";
   });
@@ -107,7 +108,7 @@ function createOverlay(settings) {
     document.body.append(canvas, badge);
     attachSettingsSync();
     attachPointerTracking();
-    updateVideoTarget(findPreferredVideo());
+    updateTargetElement(findPreferredElement());
     draw();
   }
 
@@ -156,8 +157,8 @@ function createOverlay(settings) {
     };
   }
 
-  function updateVideoTarget(nextVideo) {
-    if (video === nextVideo) {
+  function updateTargetElement(nextElement) {
+    if (targetElement === nextElement) {
       return;
     }
 
@@ -166,35 +167,38 @@ function createOverlay(settings) {
       cleanupVideo = null;
     }
 
-    video = nextVideo;
+    targetElement = nextElement;
 
-    if (!video) {
+    if (!targetElement) {
       return;
     }
 
-    cleanupVideo = rememberAndHideVideo(video);
+    cleanupVideo = rememberAndHideElement(targetElement);
     startedAt = performance.now();
   }
 
   function draw() {
-    const nextVideo = findPreferredVideo();
-    if (nextVideo) {
-      updateVideoTarget(nextVideo);
+    const nextElement = findPreferredElement();
+    if (nextElement) {
+      updateTargetElement(nextElement);
     }
 
-    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    if (!targetElement || !isDrawableElement(targetElement)) {
       rafId = requestAnimationFrame(draw);
       return;
     }
 
-    const rect = video.getBoundingClientRect();
+    const rect = targetElement.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) {
       rafId = requestAnimationFrame(draw);
       return;
     }
 
     syncCanvasRect(rect);
-    renderVideoFrame();
+    if (!renderVideoFrame()) {
+      rafId = requestAnimationFrame(draw);
+      return;
+    }
     rafId = requestAnimationFrame(draw);
   }
 
@@ -202,11 +206,15 @@ function createOverlay(settings) {
     const handlePointerMove = (event) => {
       pointerClientX = event.clientX;
       pointerClientY = event.clientY;
+      if (rejectedHoverImage && !isPointInsideElement(rejectedHoverImage, event.clientX, event.clientY)) {
+        rejectedHoverImage = null;
+      }
     };
 
     const clearPointerFocus = () => {
       pointerClientX = null;
       pointerClientY = null;
+      rejectedHoverImage = null;
     };
 
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
@@ -220,7 +228,12 @@ function createOverlay(settings) {
     };
   }
 
-  function findPreferredVideo() {
+  function findPreferredElement() {
+    const hoveredImage = findHoveredImage(pointerClientX, pointerClientY);
+    if (hoveredImage && hoveredImage !== rejectedHoverImage) {
+      return hoveredImage;
+    }
+
     const hoveredVideo = findHoveredVideo(pointerClientX, pointerClientY);
     if (hoveredVideo) {
       return hoveredVideo;
@@ -266,8 +279,20 @@ function createOverlay(settings) {
     gl.uniform1f(renderer.uniformLocations.uTime, (performance.now() - startedAt) / 1000);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, renderer.texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    try {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, targetElement);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      return true;
+    } catch (error) {
+      if (targetElement instanceof HTMLImageElement && error instanceof DOMException && error.name === "SecurityError") {
+        rejectedHoverImage = targetElement;
+        updateTargetElement(findPreferredElement());
+        return false;
+      }
+
+      console.warn("Failed to upload overlay source to WebGL texture.", error);
+      return false;
+    }
   }
 
   applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
@@ -303,6 +328,43 @@ function findHoveredVideo(clientX, clientY) {
   return null;
 }
 
+function findHoveredImage(clientX, clientY) {
+  if (typeof clientX !== "number" || typeof clientY !== "number") {
+    return null;
+  }
+
+  const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
+  for (const element of elementsAtPoint) {
+    if (element instanceof HTMLImageElement && isUsableImage(element)) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
+function isPointInsideElement(element, clientX, clientY) {
+  const rect = element.getBoundingClientRect();
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
+}
+
+function isDrawableElement(candidate) {
+  if (candidate instanceof HTMLVideoElement) {
+    return isUsableVideo(candidate);
+  }
+
+  if (candidate instanceof HTMLImageElement) {
+    return isUsableImage(candidate);
+  }
+
+  return false;
+}
+
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
   if (candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
@@ -310,16 +372,25 @@ function isUsableVideo(candidate) {
   return rect.width > 32 && rect.height > 32;
 }
 
-function rememberAndHideVideo(video) {
-  const previousOpacity = video.style.opacity;
-  setVideoVisibility(video, true);
+function isUsableImage(candidate) {
+  if (!(candidate instanceof HTMLImageElement)) return false;
+  if (!candidate.complete || candidate.naturalWidth < 1 || candidate.naturalHeight < 1) {
+    return false;
+  }
+  const rect = candidate.getBoundingClientRect();
+  return rect.width > 32 && rect.height > 32;
+}
+
+function rememberAndHideElement(element) {
+  const previousOpacity = element.style.opacity;
+  setElementVisibility(element, true);
   return () => {
-    video.style.opacity = previousOpacity;
+    element.style.opacity = previousOpacity;
   };
 }
 
-function setVideoVisibility(video, hidden) {
-  video.style.opacity = hidden ? "0" : "1";
+function setElementVisibility(element, hidden) {
+  element.style.opacity = hidden ? "0" : "1";
 }
 
 function applySettings(gl, program, uniformLocations, settings) {
