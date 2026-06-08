@@ -47,6 +47,34 @@ function createOverlay(settings) {
   canvas.style.transformOrigin = "top left";
   canvas.dataset.tetoricaOverlay = "true";
 
+  const failureOverlay = document.createElement("div");
+  failureOverlay.style.position = "fixed";
+  failureOverlay.style.left = "0";
+  failureOverlay.style.top = "0";
+  failureOverlay.style.zIndex = "2147483647";
+  failureOverlay.style.pointerEvents = "none";
+  failureOverlay.style.display = "none";
+  failureOverlay.style.alignItems = "center";
+  failureOverlay.style.justifyContent = "center";
+  failureOverlay.style.border = "1px solid rgba(255, 219, 138, 0.45)";
+  failureOverlay.style.background =
+    "linear-gradient(180deg, rgba(18, 12, 6, 0.10), rgba(18, 12, 6, 0.30))";
+  failureOverlay.style.boxShadow = "inset 0 0 0 1px rgba(255, 246, 214, 0.12)";
+  failureOverlay.style.backdropFilter = "blur(1px)";
+
+  const failureOverlayLabel = document.createElement("div");
+  failureOverlayLabel.textContent = "Cross-origin image";
+  failureOverlayLabel.style.padding = "8px 12px";
+  failureOverlayLabel.style.border = "1px solid rgba(255, 219, 138, 0.35)";
+  failureOverlayLabel.style.borderRadius = "999px";
+  failureOverlayLabel.style.background = "rgba(22, 14, 8, 0.72)";
+  failureOverlayLabel.style.color = "#ffe0a6";
+  failureOverlayLabel.style.font = '11px "IBM Plex Sans", "Segoe UI", sans-serif';
+  failureOverlayLabel.style.letterSpacing = "0.08em";
+  failureOverlayLabel.style.textTransform = "uppercase";
+  failureOverlayLabel.style.boxShadow = "0 0 18px rgba(255, 180, 82, 0.16)";
+  failureOverlay.append(failureOverlayLabel);
+
   const badge = document.createElement("button");
   badge.type = "button";
   badge.textContent = "Retro";
@@ -82,7 +110,6 @@ function createOverlay(settings) {
   let isVisible = true;
   let startedAt = performance.now();
   let lastRectKey = "";
-  let cleanupVideo = null;
   let detachStorageListener = null;
   let pointerClientX = null;
   let pointerClientY = null;
@@ -98,14 +125,12 @@ function createOverlay(settings) {
     }
 
     canvas.style.display = isVisible ? "block" : "none";
-    if (targetElement) {
-      setElementVisibility(targetElement, isVisible);
-    }
+    hideFailureOverlay();
     badge.textContent = isVisible ? "Orig" : "Retro";
   });
 
   function start() {
-    document.body.append(canvas, badge);
+    document.body.append(canvas, failureOverlay, badge);
     attachSettingsSync();
     attachPointerTracking();
     updateTargetElement(findPreferredElement());
@@ -116,11 +141,6 @@ function createOverlay(settings) {
     if (rafId) {
       cancelAnimationFrame(rafId);
       rafId = 0;
-    }
-
-    if (cleanupVideo) {
-      cleanupVideo();
-      cleanupVideo = null;
     }
 
     if (detachStorageListener) {
@@ -134,6 +154,7 @@ function createOverlay(settings) {
     }
 
     canvas.remove();
+    failureOverlay.remove();
     badge.remove();
   }
 
@@ -162,34 +183,41 @@ function createOverlay(settings) {
       return;
     }
 
-    if (cleanupVideo) {
-      cleanupVideo();
-      cleanupVideo = null;
-    }
-
     targetElement = nextElement;
+    hideFailureOverlay();
 
     if (!targetElement) {
       return;
     }
 
-    cleanupVideo = rememberAndHideElement(targetElement);
     startedAt = performance.now();
   }
 
   function draw() {
-    const nextElement = findPreferredElement();
-    if (nextElement) {
-      updateTargetElement(nextElement);
-    }
+    const hoveredImage = findHoveredImage(pointerClientX, pointerClientY);
+    const isRejectedImageHovered =
+      hoveredImage instanceof HTMLImageElement && hoveredImage === rejectedHoverImage;
+    const nextElement = findPreferredElement(hoveredImage);
+    updateTargetElement(nextElement);
 
     if (!targetElement || !isDrawableElement(targetElement)) {
+      canvas.style.display = "none";
+      hideFailureOverlay();
       rafId = requestAnimationFrame(draw);
       return;
     }
 
     const rect = targetElement.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) {
+      canvas.style.display = "none";
+      hideFailureOverlay();
+      rafId = requestAnimationFrame(draw);
+      return;
+    }
+
+    if (isRejectedImageHovered && hoveredImage) {
+      canvas.style.display = "none";
+      showFailureOverlay(hoveredImage.getBoundingClientRect());
       rafId = requestAnimationFrame(draw);
       return;
     }
@@ -228,8 +256,7 @@ function createOverlay(settings) {
     };
   }
 
-  function findPreferredElement() {
-    const hoveredImage = findHoveredImage(pointerClientX, pointerClientY);
+  function findPreferredElement(hoveredImage = findHoveredImage(pointerClientX, pointerClientY)) {
     if (hoveredImage && hoveredImage !== rejectedHoverImage) {
       return hoveredImage;
     }
@@ -272,8 +299,10 @@ function createOverlay(settings) {
   }
 
   function renderVideoFrame() {
+    canvas.style.display = isVisible ? "block" : "none";
+    hideFailureOverlay();
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(renderer.program);
     gl.uniform1f(renderer.uniformLocations.uTime, (performance.now() - startedAt) / 1000);
@@ -286,13 +315,30 @@ function createOverlay(settings) {
     } catch (error) {
       if (targetElement instanceof HTMLImageElement && error instanceof DOMException && error.name === "SecurityError") {
         rejectedHoverImage = targetElement;
-        updateTargetElement(findPreferredElement());
+        showFailureOverlay(targetElement.getBoundingClientRect());
         return false;
       }
 
       console.warn("Failed to upload overlay source to WebGL texture.", error);
       return false;
     }
+  }
+
+  function showFailureOverlay(rect) {
+    if (!isVisible) {
+      failureOverlay.style.display = "none";
+      return;
+    }
+
+    failureOverlay.style.display = "flex";
+    failureOverlay.style.left = `${rect.left}px`;
+    failureOverlay.style.top = `${rect.top}px`;
+    failureOverlay.style.width = `${rect.width}px`;
+    failureOverlay.style.height = `${rect.height}px`;
+  }
+
+  function hideFailureOverlay() {
+    failureOverlay.style.display = "none";
   }
 
   applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
@@ -318,14 +364,12 @@ function findHoveredVideo(clientX, clientY) {
     return null;
   }
 
-  const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
-  for (const element of elementsAtPoint) {
-    if (element instanceof HTMLVideoElement && isUsableVideo(element)) {
-      return element;
-    }
-  }
-
-  return null;
+  return findHoveredMediaElement(
+    clientX,
+    clientY,
+    "video",
+    (element) => element instanceof HTMLVideoElement && isUsableVideo(element),
+  );
 }
 
 function findHoveredImage(clientX, clientY) {
@@ -333,10 +377,32 @@ function findHoveredImage(clientX, clientY) {
     return null;
   }
 
+  return findHoveredMediaElement(
+    clientX,
+    clientY,
+    "img",
+    (element) => element instanceof HTMLImageElement && isUsableImage(element),
+  );
+}
+
+function findHoveredMediaElement(clientX, clientY, selector, isUsable) {
   const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
   for (const element of elementsAtPoint) {
-    if (element instanceof HTMLImageElement && isUsableImage(element)) {
+    if (isUsable(element)) {
       return element;
+    }
+  }
+
+  // `elementsFromPoint()` can skip opacity:0 media after we hide the source element.
+  const candidates = [...document.querySelectorAll(selector)];
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const candidate = candidates[index];
+    if (!isUsable(candidate)) {
+      continue;
+    }
+
+    if (isPointInsideElement(candidate, clientX, clientY)) {
+      return candidate;
     }
   }
 
@@ -379,18 +445,6 @@ function isUsableImage(candidate) {
   }
   const rect = candidate.getBoundingClientRect();
   return rect.width > 32 && rect.height > 32;
-}
-
-function rememberAndHideElement(element) {
-  const previousOpacity = element.style.opacity;
-  setElementVisibility(element, true);
-  return () => {
-    element.style.opacity = previousOpacity;
-  };
-}
-
-function setElementVisibility(element, hidden) {
-  element.style.opacity = hidden ? "0" : "1";
 }
 
 function applySettings(gl, program, uniformLocations, settings) {
