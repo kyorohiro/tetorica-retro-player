@@ -225,11 +225,26 @@ vec3 applyNeonLinePalette(
   float stepped = floor(line * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
 
   vec3 tintCore = adjustSaturation(monoTint, 1.14);
-  vec3 tintAccent = adjustSaturation(mix(monoTint.bgr, monoTint.grb, 0.38), 1.22);
+  vec3 tintWarm = vec3(
+    monoTint.r,
+    max(monoTint.g * 0.62, 0.04),
+    max(monoTint.b * 0.28, 0.02)
+  );
+  vec3 tintCool = vec3(
+    max(monoTint.r * 0.34, 0.03),
+    monoTint.g * 0.82,
+    monoTint.b
+  );
+  float tintVariance = max(max(monoTint.r, monoTint.g), monoTint.b)
+    - min(min(monoTint.r, monoTint.g), monoTint.b);
+  vec3 tintAccent = adjustSaturation(
+    mix(tintCool, tintWarm, smoothstep(0.52, 0.9, monoTint.r)),
+    1.28
+  );
   vec3 neonCore = vec3(0.08, 0.94, 1.0);
   vec3 neonAccent = vec3(1.0, 0.16, 0.82);
   vec3 primary = mix(neonCore, tintCore, 0.56);
-  vec3 accent = mix(neonAccent, tintAccent, 0.42);
+  vec3 accent = mix(neonAccent, tintAccent, clamp(tintVariance * 1.85, 0.18, 0.82));
   vec3 backgroundTint = mix(vec3(0.01, 0.012, 0.03), tintCore * vec3(0.09, 0.07, 0.13), 0.38);
   vec3 background = mix(backgroundTint, backgroundTint + neonAccent * 0.06 + accent * 0.04, silhouette * 0.18);
   vec3 beamBase = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
