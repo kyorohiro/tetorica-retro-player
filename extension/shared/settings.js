@@ -180,7 +180,7 @@ export const PRESETS = {
     colorLevels: 16,
     ditherStrength: 0.0,
     paletteMode: 2,
-    curvature: 0.4,
+    curvature: 0.03,
     scanlineStrength: 0.0,
     scanline2Strength: 0.0,
     vignetteStrength: 0.02,
