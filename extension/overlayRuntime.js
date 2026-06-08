@@ -84,6 +84,9 @@ function createOverlay(settings) {
   let lastRectKey = "";
   let cleanupVideo = null;
   let detachStorageListener = null;
+  let pointerClientX = null;
+  let pointerClientY = null;
+  let detachPointerTracking = null;
 
   badge.addEventListener("click", async () => {
     isVisible = !isVisible;
@@ -103,7 +106,8 @@ function createOverlay(settings) {
   function start() {
     document.body.append(canvas, badge);
     attachSettingsSync();
-    updateVideoTarget(findPrimaryVideo());
+    attachPointerTracking();
+    updateVideoTarget(findPreferredVideo());
     draw();
   }
 
@@ -121,6 +125,11 @@ function createOverlay(settings) {
     if (detachStorageListener) {
       detachStorageListener();
       detachStorageListener = null;
+    }
+
+    if (detachPointerTracking) {
+      detachPointerTracking();
+      detachPointerTracking = null;
     }
 
     canvas.remove();
@@ -168,7 +177,7 @@ function createOverlay(settings) {
   }
 
   function draw() {
-    const nextVideo = findPrimaryVideo();
+    const nextVideo = findPreferredVideo();
     if (nextVideo) {
       updateVideoTarget(nextVideo);
     }
@@ -187,6 +196,37 @@ function createOverlay(settings) {
     syncCanvasRect(rect);
     renderVideoFrame();
     rafId = requestAnimationFrame(draw);
+  }
+
+  function attachPointerTracking() {
+    const handlePointerMove = (event) => {
+      pointerClientX = event.clientX;
+      pointerClientY = event.clientY;
+    };
+
+    const clearPointerFocus = () => {
+      pointerClientX = null;
+      pointerClientY = null;
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("blur", clearPointerFocus);
+    document.addEventListener("pointerleave", clearPointerFocus);
+
+    detachPointerTracking = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("blur", clearPointerFocus);
+      document.removeEventListener("pointerleave", clearPointerFocus);
+    };
+  }
+
+  function findPreferredVideo() {
+    const hoveredVideo = findHoveredVideo(pointerClientX, pointerClientY);
+    if (hoveredVideo) {
+      return hoveredVideo;
+    }
+
+    return findPrimaryVideo();
   }
 
   function syncCanvasRect(rect) {
@@ -240,17 +280,34 @@ function createOverlay(settings) {
 
 function findPrimaryVideo() {
   return [...document.querySelectorAll("video")]
-    .filter((candidate) => {
-      if (!(candidate instanceof HTMLVideoElement)) return false;
-      if (candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
-      const rect = candidate.getBoundingClientRect();
-      return rect.width > 32 && rect.height > 32;
-    })
+    .filter(isUsableVideo)
     .sort((left, right) => {
       const leftRect = left.getBoundingClientRect();
       const rightRect = right.getBoundingClientRect();
       return rightRect.width * rightRect.height - leftRect.width * leftRect.height;
     })[0] ?? null;
+}
+
+function findHoveredVideo(clientX, clientY) {
+  if (typeof clientX !== "number" || typeof clientY !== "number") {
+    return null;
+  }
+
+  const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
+  for (const element of elementsAtPoint) {
+    if (element instanceof HTMLVideoElement && isUsableVideo(element)) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
+function isUsableVideo(candidate) {
+  if (!(candidate instanceof HTMLVideoElement)) return false;
+  if (candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+  const rect = candidate.getBoundingClientRect();
+  return rect.width > 32 && rect.height > 32;
 }
 
 function rememberAndHideVideo(video) {
