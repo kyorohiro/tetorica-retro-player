@@ -773,10 +773,13 @@ function applyCurrentSettings() {
 
 function paletteModeToUniform(mode) {
   if (mode === "pc98") return 1;
-  if (mode === "pc98_512") return 2;
-  if (mode === "pc98_4096") return 3;
-  if (mode === "color32") return 4;
-  if (mode === "color64") return 5;
-  if (mode === "mono") return 6;
+  if (mode === "pc98_tile") return 2;
+  if (mode === "pc98_512") return 3;
+  if (mode === "pc98_512_sat") return 4;
+  if (mode === "pc98_4096") return 5;
+  if (mode === "color32") return 6;
+  if (mode === "color64") return 7;
+  if (mode === "mono") return 8;
+  if (mode === "neon") return 9;
   return 0;
 }

@@ -124,7 +124,7 @@ export function RetroFilterPanel({
           <span className="text-slate-100">Palette</span>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(
-              ["free", "pc98", "pc98_512", "pc98_4096", "color32", "color64", "mono", "neon"] as const
+              ["free", "pc98", "pc98_tile", "pc98_512", "pc98_512_sat", "pc98_4096", "color32", "color64", "mono", "neon"] as const
             ).map(
               (mode) => (
               <button
@@ -144,8 +144,12 @@ export function RetroFilterPanel({
                   ? "Free"
                   : mode === "pc98"
                     ? "Color 16"
+                    : mode === "pc98_tile"
+                      ? "PC-98 Tile"
                     : mode === "pc98_512"
                       ? "PC-98 512-color"
+                    : mode === "pc98_512_sat"
+                      ? "PC-98 512 Sat"
                     : mode === "pc98_4096"
                       ? "PC-98 4096-color"
                     : mode === "color32"
@@ -307,7 +311,9 @@ export function RetroFilterPanel({
             }}
             disabled={
               paletteMode === "pc98" ||
+              paletteMode === "pc98_tile" ||
               paletteMode === "pc98_512" ||
+              paletteMode === "pc98_512_sat" ||
               paletteMode === "pc98_4096" ||
               paletteMode === "color32" ||
               paletteMode === "color64"

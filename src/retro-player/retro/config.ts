@@ -1,7 +1,9 @@
 export type PaletteMode =
   | "free"
   | "pc98"
+  | "pc98_tile"
   | "pc98_512"
+  | "pc98_512_sat"
   | "pc98_4096"
   | "color32"
   | "color64"
@@ -74,6 +76,24 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
   },
+  pc98_512_sat: {
+    label: "PC-98 512 Sat",
+    width: 640,
+    height: 400,
+    colors: 8,
+    dither: 0.08,
+    palette: "pc98_512_sat",
+    curvature: 0.03,
+    scanline: 0.00,
+    scanline2: 0.02,
+    vignette: 0.05,
+    glow: 0.05,
+    phosphor: 0.03,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
   pc98_4096: {
     label: "PC-98 4096-color",
     width: 640,
@@ -105,6 +125,24 @@ export const RETRO_PRESETS = {
     vignette: 0.06,
     glow: 0.05,
     phosphor: 0.04,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
+  pc98_tile: {
+    label: "PC-98 Tile",
+    width: 1280,
+    height: 800,
+    colors: 32,
+    dither: 0.0,
+    palette: "pc98_tile",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.02,
+    glow: 0.0,
+    phosphor: 0.0,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -280,12 +318,14 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
-  if (mode === "pc98_512") return 2;
-  if (mode === "pc98_4096") return 3;
-  if (mode === "color32") return 4;
-  if (mode === "color64") return 5;
-  if (mode === "mono") return 6;
-  if (mode === "neon") return 7;
+  if (mode === "pc98_tile") return 2;
+  if (mode === "pc98_512") return 3;
+  if (mode === "pc98_512_sat") return 4;
+  if (mode === "pc98_4096") return 5;
+  if (mode === "color32") return 6;
+  if (mode === "color64") return 7;
+  if (mode === "mono") return 8;
+  if (mode === "neon") return 9;
 
   return 0;
 };

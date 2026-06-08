@@ -119,6 +119,153 @@ vec3 nearestPc98(vec3 color)
   return best;
 }
 
+float pc98WeightedDistance(vec3 a, vec3 b)
+{
+  vec3 delta = (a - b) * vec3(0.92, 1.06, 1.0);
+  return dot(delta, delta);
+}
+
+void insertPc98Candidate(
+  vec3 candidate,
+  float candidateDistance,
+  inout vec3 best0,
+  inout vec3 best1,
+  inout vec3 best2,
+  inout float dist0,
+  inout float dist1,
+  inout float dist2
+)
+{
+  if (candidateDistance < dist0) {
+    best2 = best1;
+    dist2 = dist1;
+    best1 = best0;
+    dist1 = dist0;
+    best0 = candidate;
+    dist0 = candidateDistance;
+    return;
+  }
+
+  if (candidateDistance < dist1) {
+    best2 = best1;
+    dist2 = dist1;
+    best1 = candidate;
+    dist1 = candidateDistance;
+    return;
+  }
+
+  if (candidateDistance < dist2) {
+    best2 = candidate;
+    dist2 = candidateDistance;
+  }
+}
+
+vec3 checkerMix(vec3 colorA, vec3 colorB, vec2 cell)
+{
+  return mod(cell.x + cell.y, 2.0) < 1.0 ? colorA : colorB;
+}
+
+vec3 quarterMix(vec3 majorColor, vec3 accentColor, vec2 cell)
+{
+  vec2 local = mod(cell, 4.0);
+  bool accent =
+    (local.x < 1.0 && local.y < 1.0) ||
+    (local.x >= 2.0 && local.x < 3.0 && local.y >= 1.0 && local.y < 2.0) ||
+    (local.x >= 1.0 && local.x < 2.0 && local.y >= 2.0 && local.y < 3.0) ||
+    (local.x >= 3.0 && local.y >= 3.0);
+  return accent ? accentColor : majorColor;
+}
+
+void considerPc98TileMix(
+  vec3 sourceColor,
+  vec2 cell,
+  vec3 colorA,
+  vec3 colorB,
+  inout vec3 bestApproximation,
+  inout vec3 bestOutput,
+  inout float bestError
+)
+{
+  float pairContrast = distance(colorA, colorB);
+  if (pairContrast < 0.18) {
+    return;
+  }
+
+  vec3 mix50 = mix(colorA, colorB, 0.5);
+  float mix50Error = pc98WeightedDistance(sourceColor, mix50);
+  if (mix50Error + 0.006 < bestError) {
+    bestError = mix50Error;
+    bestApproximation = mix50;
+    bestOutput = checkerMix(colorA, colorB, cell);
+  }
+
+  vec3 mix25 = mix(colorA, colorB, 0.25);
+  float mix25Error = pc98WeightedDistance(sourceColor, mix25);
+  if (mix25Error + 0.004 < bestError) {
+    bestError = mix25Error;
+    bestApproximation = mix25;
+    bestOutput = quarterMix(colorA, colorB, cell);
+  }
+
+  vec3 mix75 = mix(colorA, colorB, 0.75);
+  float mix75Error = pc98WeightedDistance(sourceColor, mix75);
+  if (mix75Error + 0.004 < bestError) {
+    bestError = mix75Error;
+    bestApproximation = mix75;
+    bestOutput = quarterMix(colorB, colorA, cell);
+  }
+}
+
+vec3 pc98TilePalette(vec3 color, vec2 cell)
+{
+  vec3 best0 = pc98Palette(0.0);
+  vec3 best1 = best0;
+  vec3 best2 = best0;
+  float dist0 = 1e9;
+  float dist1 = 1e9;
+  float dist2 = 1e9;
+
+  for (int i = 0; i < 16; i++) {
+    vec3 candidate = pc98Palette(float(i));
+    float candidateDistance = pc98WeightedDistance(color, candidate);
+    insertPc98Candidate(candidate, candidateDistance, best0, best1, best2, dist0, dist1, dist2);
+  }
+
+  vec3 bestApproximation = best0;
+  vec3 bestOutput = best0;
+  float bestError = dist0;
+
+  considerPc98TileMix(color, cell, best0, best1, bestApproximation, bestOutput, bestError);
+  considerPc98TileMix(color, cell, best0, best2, bestApproximation, bestOutput, bestError);
+  considerPc98TileMix(color, cell, best1, best2, bestApproximation, bestOutput, bestError);
+
+  return bestOutput;
+}
+
+vec3 samplePc98TileSource(sampler2D textureSampler, vec2 cell, vec2 targetSize)
+{
+  vec2 blockSize = vec2(4.0, 4.0);
+  vec2 blockOrigin = floor(cell / blockSize) * blockSize;
+  vec2 blockCenter = blockOrigin + blockSize * 0.5;
+  vec2 blockUv = clamp(blockCenter / targetSize, vec2(0.0), vec2(1.0));
+
+  vec3 center = texture(textureSampler, blockUv).rgb;
+  vec3 downRight = texture(
+    textureSampler,
+    clamp((blockOrigin + vec2(3.0, 3.0) + 0.5) / targetSize, vec2(0.0), vec2(1.0))
+  ).rgb;
+  vec3 upRight = texture(
+    textureSampler,
+    clamp((blockOrigin + vec2(3.0, 0.0) + 0.5) / targetSize, vec2(0.0), vec2(1.0))
+  ).rgb;
+  vec3 downLeft = texture(
+    textureSampler,
+    clamp((blockOrigin + vec2(0.0, 3.0) + 0.5) / targetSize, vec2(0.0), vec2(1.0))
+  ).rgb;
+
+  return (center * 0.4) + (downRight * 0.2) + (upRight * 0.2) + (downLeft * 0.2);
+}
+
 vec3 quantizePc98_4096(vec3 color)
 {
   return floor(color * 15.0 + 0.5) / 15.0;
@@ -195,6 +342,28 @@ vec3 adjustSaturation(vec3 color, float saturation)
 {
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
   return mix(vec3(luminance), color, saturation);
+}
+
+vec3 quantizePc98_512Sat(vec3 color)
+{
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  float maxChannel = max(max(color.r, color.g), color.b);
+  float minChannel = min(min(color.r, color.g), color.b);
+  float saturation = maxChannel - minChannel;
+  float satBias = smoothstep(0.09, 0.58, saturation);
+  float lowSatBias = 1.0 - smoothstep(0.08, 0.26, saturation);
+
+  vec3 saturationShaped = adjustSaturation(color, mix(0.92, 1.24, satBias));
+  vec3 luminanceGuided = mix(vec3(luminance), saturationShaped, mix(0.30, 0.94, satBias));
+  vec3 highlightSoftened = mix(luminanceGuided, color, lowSatBias * 0.28);
+  vec3 quantized = quantizePc98_512(clamp(highlightSoftened, 0.0, 1.0));
+
+  float targetLuma = floor(luminance * 7.0 + 0.5) / 7.0;
+  float quantizedLuma = dot(quantized, vec3(0.299, 0.587, 0.114));
+  float lumaCorrection = (targetLuma - quantizedLuma) * mix(0.65, 0.20, satBias);
+  vec3 lumaBalanced = clamp(quantized + vec3(lumaCorrection), 0.0, 1.0);
+
+  return quantizePc98_512(lumaBalanced);
 }
 
 vec3 applyNeonLinePalette(
@@ -292,7 +461,7 @@ float horizontalUnevenness(vec2 uv, float time, float strength)
   return 1.0 - (broad * 0.03 + fine * 0.012) * strength;
 }
 
-vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint)
+vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint, vec2 cell)
 {
   if (paletteMode < 0.5) {
     return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
@@ -303,18 +472,26 @@ vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint)
   }
 
   if (paletteMode < 2.5) {
-    return quantizePc98_512(color);
+    return pc98TilePalette(color, cell);
   }
 
   if (paletteMode < 3.5) {
-    return quantizePc98_4096(color);
+    return quantizePc98_512(color);
   }
 
   if (paletteMode < 4.5) {
-    return nearestColor32(color);
+    return quantizePc98_512Sat(color);
   }
 
   if (paletteMode < 5.5) {
+    return quantizePc98_4096(color);
+  }
+
+  if (paletteMode < 6.5) {
+    return nearestColor32(color);
+  }
+
+  if (paletteMode < 7.5) {
     return nearestColor64(color);
   }
 
@@ -345,9 +522,13 @@ void main(void)
   vec4 color = texture(uTexture, pixelatedUv);
   color.r = texture(uTexture, redUv).r;
   color.b = texture(uTexture, blueUv).b;
+  bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
+  if (isPc98Tile) {
+    color.rgb = samplePc98TileSource(uTexture, cell, uTargetSize);
+  }
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-  bool isNeon = uPaletteMode > 6.5;
+  bool isNeon = uPaletteMode > 8.5;
 
   if (isNeon) {
     color.rgb = applyNeonLinePalette(uTexture, pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
@@ -360,15 +541,15 @@ void main(void)
     );
     color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22), 0.45);
   } else {
-    color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint);
+    color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint, cell);
 
     vec3 glow = vec3(0.0);
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.34;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.18;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint) * 0.10;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(1.0, 0.0)) * 0.34;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(1.0, 0.0)) * 0.34;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(2.0, 0.0)) * 0.18;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(2.0, 0.0)) * 0.18;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(0.0, 1.0)) * 0.10;
+    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(0.0, 1.0)) * 0.10;
 
     float brightness = max(max(color.r, color.g), color.b);
     float glowMask = smoothstep(0.45, 1.0, brightness);

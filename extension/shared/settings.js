@@ -4,7 +4,9 @@ export const CUSTOM_PRESET_KEY = "custom";
 export const PALETTE_OPTIONS = [
   { value: "free", label: "Free" },
   { value: "pc98", label: "Color 16" },
+  { value: "pc98_tile", label: "PC-98 Tile" },
   { value: "pc98_512", label: "PC-98 512-color" },
+  { value: "pc98_512_sat", label: "PC-98 512 Sat" },
   { value: "pc98_4096", label: "PC-98 4096-color" },
   { value: "color32", label: "Color 32" },
   { value: "color64", label: "Color 64" },
@@ -44,7 +46,7 @@ export const PRESETS = {
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.14,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.07,
     scanlineStrength: 0.16,
     scanline2Strength: 0.0,
@@ -63,7 +65,7 @@ export const PRESETS = {
     targetHeight: 600,
     colorLevels: 32,
     ditherStrength: 0.16,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.08,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -82,7 +84,7 @@ export const PRESETS = {
     targetHeight: 600,
     colorLevels: 32,
     ditherStrength: 0.18,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.05,
     scanlineStrength: 0.1,
     scanline2Strength: 0.0,
@@ -101,7 +103,7 @@ export const PRESETS = {
     targetHeight: 300,
     colorLevels: 16,
     ditherStrength: 0.06,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.0,
     scanlineStrength: 0.0,
     scanline2Strength: 0.0,
@@ -120,7 +122,7 @@ export const PRESETS = {
     targetHeight: 400,
     colorLevels: 8,
     ditherStrength: 0.12,
-    paletteMode: 2,
+    paletteMode: 3,
     curvature: 0.08,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -133,13 +135,51 @@ export const PRESETS = {
     isNoiseEnabled: true,
     noiseLevel: 0.006,
   },
+  pc98_512_sat: {
+    label: "PC-98 512 Sat",
+    targetWidth: 640,
+    targetHeight: 400,
+    colorLevels: 8,
+    ditherStrength: 0.08,
+    paletteMode: 4,
+    curvature: 0.08,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.02,
+    vignetteStrength: 0.05,
+    glowStrength: 0.05,
+    phosphorStrength: 0.03,
+    monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.5,
+    isNoiseEnabled: true,
+    noiseLevel: 0.006,
+  },
+  pc98_tile: {
+    label: "PC-98 Tile",
+    targetWidth: 640,
+    targetHeight: 400,
+    colorLevels: 16,
+    ditherStrength: 0.0,
+    paletteMode: 2,
+    curvature: 0.0,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.02,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.55,
+    isNoiseEnabled: true,
+    noiseLevel: 0.007,
+  },
   pc98_4096: {
     label: "PC-98 4096-color",
     targetWidth: 640,
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.08,
-    paletteMode: 3,
+    paletteMode: 5,
     curvature: 0.06,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -346,8 +386,10 @@ function isMonoTint(value) {
 export function getDefaultColorLevelsForPalette(paletteMode) {
   if (paletteMode === "free") return 256;
   if (paletteMode === "pc98") return 16;
+  if (paletteMode === "pc98_tile") return 16;
   if (paletteMode === "pc98_4096") return 16;
   if (paletteMode === "pc98_512") return 8;
+  if (paletteMode === "pc98_512_sat") return 8;
   if (paletteMode === "color32") return 32;
   if (paletteMode === "color64") return 64;
 
@@ -364,10 +406,12 @@ function resolveColorLevels(paletteMode, requestedLevels) {
 
 function paletteModeFromUniform(value) {
   if (value === 1) return "pc98";
-  if (value === 2) return "pc98_512";
-  if (value === 3) return "pc98_4096";
-  if (value === 4) return "color32";
-  if (value === 5) return "color64";
-  if (value === 6) return "mono";
+  if (value === 2) return "pc98_tile";
+  if (value === 3) return "pc98_512";
+  if (value === 4) return "pc98_512_sat";
+  if (value === 5) return "pc98_4096";
+  if (value === 6) return "color32";
+  if (value === 7) return "color64";
+  if (value === 8) return "mono";
   return "free";
 }

@@ -162,12 +162,22 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       return;
     }
 
+    if (nextPalette === "pc98_tile") {
+      setColorLevels(16);
+      return;
+    }
+
     if (nextPalette === "pc98_4096") {
       setColorLevels(16);
       return;
     }
 
     if (nextPalette === "pc98_512") {
+      setColorLevels(8);
+      return;
+    }
+
+    if (nextPalette === "pc98_512_sat") {
       setColorLevels(8);
       return;
     }
