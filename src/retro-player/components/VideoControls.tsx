@@ -28,10 +28,12 @@ type VideoControlsProps = {
   hasVideo: boolean;
   isVideoSettingsOpen: boolean;
   lofiAmount: number;
+  wowFlutterAmount: number;
   noiseLevel: number;
   playbackRate: number;
   volume: number;
   onChangeLofiAmount: (amount: number) => void;
+  onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
   onChangeVolume: (volume: number) => void;
@@ -74,10 +76,12 @@ export function VideoControls({
   hasVideo,
   isVideoSettingsOpen,
   lofiAmount,
+  wowFlutterAmount,
   noiseLevel,
   playbackRate,
   volume,
   onChangeLofiAmount,
+  onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangePlaybackRate,
   onChangeVolume,
@@ -171,6 +175,24 @@ export function VideoControls({
             value={lofiAmount}
             onChange={(ev) => {
               onChangeLofiAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Wow & Flutter</span>
+            <span>{Math.round(wowFlutterAmount * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={wowFlutterAmount}
+            onChange={(ev) => {
+              onChangeWowFlutterAmount(Number(ev.currentTarget.value));
             }}
             className="w-full"
           />

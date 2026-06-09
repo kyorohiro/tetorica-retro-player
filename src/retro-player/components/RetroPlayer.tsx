@@ -751,10 +751,12 @@ export function RetroPlayer({
               hasVideo={player.hasVideo}
               isVideoSettingsOpen={false}
               lofiAmount={player.lofiAmount}
+              wowFlutterAmount={player.wowFlutterAmount}
               noiseLevel={player.noiseLevel}
               playbackRate={player.playbackRate}
               volume={player.volume}
               onChangeLofiAmount={player.setLofiAmount}
+              onChangeWowFlutterAmount={player.setWowFlutterAmount}
               onChangeNoiseLevel={player.setNoiseLevel}
               onChangePlaybackRate={player.changePlaybackRate}
               onChangeVolume={player.changeVolume}
@@ -817,6 +819,8 @@ export function RetroPlayer({
                 neonSaturation={filterState.neonSaturation}
                 paletteMode={filterState.paletteMode}
                 phosphorStrength={filterState.phosphorStrength}
+                closeUpNoiseStrength={filterState.closeUpNoiseStrength}
+                scanlineBrightnessFade={filterState.scanlineBrightnessFade}
                 scanlineStrength={filterState.scanlineStrength}
                 scanline2Strength={filterState.scanline2Strength}
                 selectedPreset={filterState.selectedPreset}
@@ -836,6 +840,8 @@ export function RetroPlayer({
                 onSetNeonSaturation={filterState.setNeonSaturation}
                 onSetPaletteMode={filterState.setPaletteMode}
                 onSetPhosphorStrength={filterState.setPhosphorStrength}
+                onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
+                onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
                 onSetScanlineStrength={filterState.setScanlineStrength}
                 onSetScanline2Strength={filterState.setScanline2Strength}
                 onSetTargetHeight={filterState.setTargetHeight}

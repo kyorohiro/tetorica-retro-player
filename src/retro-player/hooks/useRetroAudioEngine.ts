@@ -11,6 +11,7 @@ const DEFAULT_AUDIO_SETTINGS = {
   isLooping: true,
   isAudioFxEnabled: true,
   lofiAmount: 0.80,
+  wowFlutterAmount: 0,
   isNoiseEnabled: true,
   noiseLevel: 0.02,
 } as const;
@@ -49,6 +50,8 @@ export function useRetroAudioEngine({
       isAudioFxEnabled:
         persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_SETTINGS.isAudioFxEnabled,
       lofiAmount: persisted?.lofiAmount ?? DEFAULT_AUDIO_SETTINGS.lofiAmount,
+      wowFlutterAmount:
+        persisted?.wowFlutterAmount ?? DEFAULT_AUDIO_SETTINGS.wowFlutterAmount,
       isNoiseEnabled:
         persisted?.isNoiseEnabled ?? DEFAULT_AUDIO_SETTINGS.isNoiseEnabled,
       noiseLevel: persisted?.noiseLevel ?? DEFAULT_AUDIO_SETTINGS.noiseLevel,
@@ -61,6 +64,11 @@ export function useRetroAudioEngine({
   const lofiLowpassRef = useRef<BiquadFilterNode | null>(null);
   const lofiHighshelfRef = useRef<BiquadFilterNode | null>(null);
   const lofiDriveRef = useRef<WaveShaperNode | null>(null);
+  const wowFlutterDelayRef = useRef<DelayNode | null>(null);
+  const wowLfoRef = useRef<OscillatorNode | null>(null);
+  const wowLfoGainRef = useRef<GainNode | null>(null);
+  const flutterLfoRef = useRef<OscillatorNode | null>(null);
+  const flutterLfoGainRef = useRef<GainNode | null>(null);
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const noiseFilterRef = useRef<BiquadFilterNode | null>(null);
   const noisePannerRef = useRef<StereoPannerNode | null>(null);
@@ -74,6 +82,7 @@ export function useRetroAudioEngine({
   const isLoopingRef = useRef<boolean>(initialAudioSettings.isLooping);
   const isAudioFxEnabledRef = useRef<boolean>(initialAudioSettings.isAudioFxEnabled);
   const lofiAmountRef = useRef<number>(initialAudioSettings.lofiAmount);
+  const wowFlutterAmountRef = useRef<number>(initialAudioSettings.wowFlutterAmount);
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
 
@@ -88,6 +97,9 @@ export function useRetroAudioEngine({
   );
   const [lofiAmount, setLofiAmount] = useState<number>(
     initialAudioSettings.lofiAmount,
+  );
+  const [wowFlutterAmount, setWowFlutterAmount] = useState<number>(
+    initialAudioSettings.wowFlutterAmount,
   );
   const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(
     initialAudioSettings.isNoiseEnabled,
@@ -123,6 +135,11 @@ export function useRetroAudioEngine({
     const lowpass = lofiLowpassRef.current;
     const highshelf = lofiHighshelfRef.current;
     const drive = lofiDriveRef.current;
+    const wowFlutterDelay = wowFlutterDelayRef.current;
+    const wowLfo = wowLfoRef.current;
+    const wowLfoGain = wowLfoGainRef.current;
+    const flutterLfo = flutterLfoRef.current;
+    const flutterLfoGain = flutterLfoGainRef.current;
     const noiseGainNode = noiseGainRef.current;
     const media = mediaRef.current;
     const currentPreviewKind = previewKindRef.current;
@@ -135,6 +152,7 @@ export function useRetroAudioEngine({
     const nextVolume = volumeRef.current;
     const nextAudioFxEnabled = isAudioFxEnabledRef.current;
     const nextLofiAmount = lofiAmountRef.current;
+    const nextWowFlutterAmount = wowFlutterAmountRef.current;
     const nextNoiseEnabled = isNoiseEnabledRef.current;
     const nextNoiseLevel = noiseLevelRef.current;
     const audibleMasterGain =
@@ -157,6 +175,15 @@ export function useRetroAudioEngine({
       drive.curve = createDriveCurve(amount * 0.6);
     }
 
+    if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
+      const amount = nextAudioFxEnabled ? nextWowFlutterAmount : 0;
+      wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
+      wowLfo.frequency.value = 0.18 + amount * 0.42;
+      wowLfoGain.gain.value = amount * 0.0035;
+      flutterLfo.frequency.value = 5.2 + amount * 6.5;
+      flutterLfoGain.gain.value = amount * 0.0009;
+    }
+
     if (noiseGainNode) {
       noiseGainNode.gain.value =
         nextNoiseEnabled && !nextMuted && hasPlayablePreview && isMediaPlaying
@@ -175,6 +202,11 @@ export function useRetroAudioEngine({
       lofiLowpassRef.current = null;
       lofiHighshelfRef.current = null;
       lofiDriveRef.current = null;
+      wowFlutterDelayRef.current = null;
+      wowLfoRef.current = null;
+      wowLfoGainRef.current = null;
+      flutterLfoRef.current = null;
+      flutterLfoGainRef.current = null;
       noiseSourceRef.current = null;
       noiseFilterRef.current = null;
       noisePannerRef.current = null;
@@ -190,11 +222,25 @@ export function useRetroAudioEngine({
       const lowpass = context.createBiquadFilter();
       const highshelf = context.createBiquadFilter();
       const drive = context.createWaveShaper();
+      const wowFlutterDelay = context.createDelay(0.05);
+      const wowLfo = context.createOscillator();
+      const wowLfoGain = context.createGain();
+      const flutterLfo = context.createOscillator();
+      const flutterLfoGain = context.createGain();
       lowpass.type = "lowpass";
       highshelf.type = "highshelf";
       highshelf.frequency.value = 2800;
       drive.oversample = "4x";
+      wowFlutterDelay.delayTime.value = 0.006;
+      wowLfo.type = "sine";
+      flutterLfo.type = "sine";
 
+      wowLfo.connect(wowLfoGain);
+      wowLfoGain.connect(wowFlutterDelay.delayTime);
+      flutterLfo.connect(flutterLfoGain);
+      flutterLfoGain.connect(wowFlutterDelay.delayTime);
+
+      wowFlutterDelay.connect(lowpass);
       lowpass.connect(highshelf);
       highshelf.connect(drive);
       drive.connect(masterGain);
@@ -237,12 +283,19 @@ export function useRetroAudioEngine({
       noiseLfoGain.connect(noisePanner.pan);
       noiseSource.start();
       noiseLfo.start();
+      wowLfo.start();
+      flutterLfo.start();
 
       audioContextRef.current = context;
       masterGainRef.current = masterGain;
       lofiLowpassRef.current = lowpass;
       lofiHighshelfRef.current = highshelf;
       lofiDriveRef.current = drive;
+      wowFlutterDelayRef.current = wowFlutterDelay;
+      wowLfoRef.current = wowLfo;
+      wowLfoGainRef.current = wowLfoGain;
+      flutterLfoRef.current = flutterLfo;
+      flutterLfoGainRef.current = flutterLfoGain;
       noiseSourceRef.current = noiseSource;
       noiseFilterRef.current = noiseFilter;
       noisePannerRef.current = noisePanner;
@@ -279,6 +332,18 @@ export function useRetroAudioEngine({
       // already stopped
     }
 
+    try {
+      wowLfoRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      flutterLfoRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+
     const context = audioContextRef.current;
     audioContextRef.current = null;
     masterGainRef.current = null;
@@ -286,6 +351,11 @@ export function useRetroAudioEngine({
     lofiLowpassRef.current = null;
     lofiHighshelfRef.current = null;
     lofiDriveRef.current = null;
+    wowFlutterDelayRef.current = null;
+    wowLfoRef.current = null;
+    wowLfoGainRef.current = null;
+    flutterLfoRef.current = null;
+    flutterLfoGainRef.current = null;
     noiseSourceRef.current = null;
     noiseFilterRef.current = null;
     noisePannerRef.current = null;
@@ -324,13 +394,14 @@ export function useRetroAudioEngine({
 
     try {
       const mediaSource = context.createMediaElementSource(media);
-      mediaSource.connect(lofiLowpassRef.current!);
+      mediaSource.connect(wowFlutterDelayRef.current ?? lofiLowpassRef.current!);
       mediaSourceRef.current = mediaSource;
       media.muted = isMutedRef.current;
       media.volume = isMutedRef.current ? 0 : volumeRef.current;
       debugAudio("connectMediaAudio:connected", {
         audioContextState: context.state,
         lofiAmount,
+        wowFlutterAmount,
         isAudioFxEnabled,
         isMuted,
         volume,
@@ -358,6 +429,7 @@ export function useRetroAudioEngine({
     isLoopingRef.current = nextSettings.isLooping;
     isAudioFxEnabledRef.current = nextSettings.isAudioFxEnabled;
     lofiAmountRef.current = nextSettings.lofiAmount;
+    wowFlutterAmountRef.current = nextSettings.wowFlutterAmount;
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
 
@@ -367,6 +439,7 @@ export function useRetroAudioEngine({
     setIsLooping(nextSettings.isLooping);
     setIsAudioFxEnabled(nextSettings.isAudioFxEnabled);
     setLofiAmount(nextSettings.lofiAmount);
+    setWowFlutterAmount(nextSettings.wowFlutterAmount);
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
 
@@ -387,6 +460,7 @@ export function useRetroAudioEngine({
     isLoopingRef.current = isLooping;
     isAudioFxEnabledRef.current = isAudioFxEnabled;
     lofiAmountRef.current = lofiAmount;
+    wowFlutterAmountRef.current = wowFlutterAmount;
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
 
@@ -396,6 +470,7 @@ export function useRetroAudioEngine({
     volume,
     isAudioFxEnabled,
     lofiAmount,
+    wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
     isPlaying,
@@ -412,6 +487,7 @@ export function useRetroAudioEngine({
       isLooping,
       isAudioFxEnabled,
       lofiAmount,
+      wowFlutterAmount,
       isNoiseEnabled,
       noiseLevel,
     });
@@ -422,6 +498,7 @@ export function useRetroAudioEngine({
     isLooping,
     isAudioFxEnabled,
     lofiAmount,
+    wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
   ]);
@@ -434,6 +511,11 @@ export function useRetroAudioEngine({
     lofiLowpassRef,
     lofiHighshelfRef,
     lofiDriveRef,
+    wowFlutterDelayRef,
+    wowLfoRef,
+    wowLfoGainRef,
+    flutterLfoRef,
+    flutterLfoGainRef,
     noiseSourceRef,
     noiseFilterRef,
     noisePannerRef,
@@ -446,6 +528,7 @@ export function useRetroAudioEngine({
     isLoopingRef,
     isAudioFxEnabledRef,
     lofiAmountRef,
+    wowFlutterAmountRef,
     isNoiseEnabledRef,
     noiseLevelRef,
     isMuted,
@@ -460,6 +543,8 @@ export function useRetroAudioEngine({
     setIsAudioFxEnabled,
     lofiAmount,
     setLofiAmount,
+    wowFlutterAmount,
+    setWowFlutterAmount,
     isNoiseEnabled,
     setIsNoiseEnabled,
     noiseLevel,

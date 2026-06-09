@@ -12,9 +12,11 @@ export type PersistedRetroFilterSettings = {
   curvature: number;
   scanlineStrength: number;
   scanline2Strength: number;
+  scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -29,6 +31,7 @@ export type PersistedRetroAudioSettings = {
   isLooping: boolean;
   isAudioFxEnabled: boolean;
   lofiAmount: number;
+  wowFlutterAmount: number;
   isNoiseEnabled: boolean;
   noiseLevel: number;
 };

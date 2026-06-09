@@ -38,6 +38,11 @@ let masterGainNode = null;
 let lofiLowpassNode = null;
 let lofiHighshelfNode = null;
 let lofiDriveNode = null;
+let wowFlutterDelayNode = null;
+let wowLfoNode = null;
+let wowLfoGainNode = null;
+let flutterLfoNode = null;
+let flutterLfoGainNode = null;
 let noiseSourceNode = null;
 let noiseFilterNode = null;
 let noisePannerNode = null;
@@ -47,7 +52,6 @@ let noiseLfoGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
-let captureSizePollTimer = 0;
 let currentSession = null;
 let isFitModeEnabled = false;
 let mediaRecorder = null;
@@ -162,17 +166,10 @@ function stopCapture() {
 function attachCaptureSizeListeners() {
   detachCaptureSizeListeners();
   video.addEventListener("resize", handleCaptureResize);
-  captureSizePollTimer = window.setInterval(() => {
-    handleCaptureResize();
-  }, 500);
 }
 
 function detachCaptureSizeListeners() {
   video.removeEventListener("resize", handleCaptureResize);
-  if (captureSizePollTimer) {
-    window.clearInterval(captureSizePollTimer);
-    captureSizePollTimer = 0;
-  }
 }
 
 function drawFrame() {
@@ -443,31 +440,7 @@ function updateCanvasAspectRatio() {
 }
 
 function logCaptureAspect(reason) {
-  const videoAspect =
-    video.videoWidth > 0 && video.videoHeight > 0
-      ? video.videoWidth / video.videoHeight
-      : null;
-  const sessionAspect = getSessionAspectRatio();
-  const canvasAspect =
-    canvas.width > 0 && canvas.height > 0
-      ? canvas.width / canvas.height
-      : null;
-
-  console.log("capture-aspect", {
-    reason,
-    isFitModeEnabled,
-    sessionAspect,
-    videoAspect,
-    canvasAspect,
-    sourceViewportWidth: currentSession?.sourceViewportWidth ?? null,
-    sourceViewportHeight: currentSession?.sourceViewportHeight ?? null,
-    sourceOuterWidth: currentSession?.sourceOuterWidth ?? null,
-    sourceOuterHeight: currentSession?.sourceOuterHeight ?? null,
-    videoWidth: video.videoWidth,
-    videoHeight: video.videoHeight,
-    canvasWidth: canvas.width,
-    canvasHeight: canvas.height,
-  });
+  void reason;
 }
 
 function applyPreset(presetKey) {
@@ -481,9 +454,11 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uCurvature, currentSettings.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, currentSettings.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, currentSettings.scanline2Strength);
+  gl.uniform1f(uniformLocations.uScanlineBrightnessFade, currentSettings.scanlineBrightnessFade);
   gl.uniform1f(uniformLocations.uVignetteStrength, currentSettings.vignetteStrength);
   gl.uniform1f(uniformLocations.uGlowStrength, currentSettings.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, currentSettings.phosphorStrength);
+  gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, currentSettings.closeUpNoiseStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(currentSettings.monoTint));
 }
 
@@ -509,6 +484,21 @@ function updateAudioNodes() {
     lofiDriveNode.curve = createDriveCurve(amount * 0.6);
   }
 
+  if (
+    wowFlutterDelayNode &&
+    wowLfoNode &&
+    wowLfoGainNode &&
+    flutterLfoNode &&
+    flutterLfoGainNode
+  ) {
+    const amount = currentSettings.isAudioFxEnabled ? currentSettings.wowFlutterAmount : 0;
+    wowFlutterDelayNode.delayTime.value = 0.006 + amount * 0.004;
+    wowLfoNode.frequency.value = 0.18 + amount * 0.42;
+    wowLfoGainNode.gain.value = amount * 0.0035;
+    flutterLfoNode.frequency.value = 5.2 + amount * 6.5;
+    flutterLfoGainNode.gain.value = amount * 0.0009;
+  }
+
   if (noiseGainNode) {
     noiseGainNode.gain.value = currentSettings.isNoiseEnabled ? currentSettings.noiseLevel : 0;
   }
@@ -522,6 +512,11 @@ async function ensureAudioContext() {
     lofiLowpassNode = null;
     lofiHighshelfNode = null;
     lofiDriveNode = null;
+    wowFlutterDelayNode = null;
+    wowLfoNode = null;
+    wowLfoGainNode = null;
+    flutterLfoNode = null;
+    flutterLfoGainNode = null;
     noiseSourceNode = null;
     noiseFilterNode = null;
     noisePannerNode = null;
@@ -536,12 +531,26 @@ async function ensureAudioContext() {
     lofiLowpassNode = audioContext.createBiquadFilter();
     lofiHighshelfNode = audioContext.createBiquadFilter();
     lofiDriveNode = audioContext.createWaveShaper();
+    wowFlutterDelayNode = audioContext.createDelay(0.05);
+    wowLfoNode = audioContext.createOscillator();
+    wowLfoGainNode = audioContext.createGain();
+    flutterLfoNode = audioContext.createOscillator();
+    flutterLfoGainNode = audioContext.createGain();
 
     lofiLowpassNode.type = "lowpass";
     lofiHighshelfNode.type = "highshelf";
     lofiHighshelfNode.frequency.value = 2800;
     lofiDriveNode.oversample = "4x";
+    wowFlutterDelayNode.delayTime.value = 0.006;
+    wowLfoNode.type = "sine";
+    flutterLfoNode.type = "sine";
 
+    wowLfoNode.connect(wowLfoGainNode);
+    wowLfoGainNode.connect(wowFlutterDelayNode.delayTime);
+    flutterLfoNode.connect(flutterLfoGainNode);
+    flutterLfoGainNode.connect(wowFlutterDelayNode.delayTime);
+
+    wowFlutterDelayNode.connect(lofiLowpassNode);
     lofiLowpassNode.connect(lofiHighshelfNode);
     lofiHighshelfNode.connect(lofiDriveNode);
     lofiDriveNode.connect(masterGainNode);
@@ -584,6 +593,8 @@ async function ensureAudioContext() {
     noiseLfoGainNode.connect(noisePannerNode.pan);
     noiseSourceNode.start();
     noiseLfoNode.start();
+    wowLfoNode.start();
+    flutterLfoNode.start();
 
     updateAudioNodes();
   }
@@ -612,7 +623,7 @@ async function connectStreamAudio(stream) {
   }
 
   mediaSourceNode = context.createMediaStreamSource(stream);
-  mediaSourceNode.connect(lofiLowpassNode);
+  mediaSourceNode.connect(wowFlutterDelayNode ?? lofiLowpassNode);
   updateAudioNodes();
 }
 
@@ -632,12 +643,29 @@ async function disposeAudioEngine() {
     // ignore repeated stop
   }
 
+  try {
+    wowLfoNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
+  try {
+    flutterLfoNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
   const context = audioContext;
   audioContext = null;
   masterGainNode = null;
   lofiLowpassNode = null;
   lofiHighshelfNode = null;
   lofiDriveNode = null;
+  wowFlutterDelayNode = null;
+  wowLfoNode = null;
+  wowLfoGainNode = null;
+  flutterLfoNode = null;
+  flutterLfoGainNode = null;
   noiseSourceNode = null;
   noiseFilterNode = null;
   noisePannerNode = null;
@@ -713,9 +741,11 @@ function setupRenderer(webgl) {
     uCurvature: webgl.getUniformLocation(program, "uCurvature"),
     uScanlineStrength: webgl.getUniformLocation(program, "uScanlineStrength"),
     uScanline2Strength: webgl.getUniformLocation(program, "uScanline2Strength"),
+    uScanlineBrightnessFade: webgl.getUniformLocation(program, "uScanlineBrightnessFade"),
     uVignetteStrength: webgl.getUniformLocation(program, "uVignetteStrength"),
     uGlowStrength: webgl.getUniformLocation(program, "uGlowStrength"),
     uPhosphorStrength: webgl.getUniformLocation(program, "uPhosphorStrength"),
+    uCloseUpNoiseStrength: webgl.getUniformLocation(program, "uCloseUpNoiseStrength"),
     uMonoTint: webgl.getUniformLocation(program, "uMonoTint"),
     uTime: webgl.getUniformLocation(program, "uTime"),
   };
@@ -773,10 +803,13 @@ function applyCurrentSettings() {
 
 function paletteModeToUniform(mode) {
   if (mode === "pc98") return 1;
-  if (mode === "pc98_512") return 2;
-  if (mode === "pc98_4096") return 3;
-  if (mode === "color32") return 4;
-  if (mode === "color64") return 5;
-  if (mode === "mono") return 6;
+  if (mode === "pc98_tile") return 2;
+  if (mode === "pc98_512") return 3;
+  if (mode === "pc98_512_sat") return 4;
+  if (mode === "pc98_4096") return 5;
+  if (mode === "color32") return 6;
+  if (mode === "color64") return 7;
+  if (mode === "mono") return 8;
+  if (mode === "neon") return 9;
   return 0;
 }
