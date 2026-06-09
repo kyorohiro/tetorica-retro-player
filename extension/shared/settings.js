@@ -4,7 +4,9 @@ export const CUSTOM_PRESET_KEY = "custom";
 export const PALETTE_OPTIONS = [
   { value: "free", label: "Free" },
   { value: "pc98", label: "Color 16" },
+  { value: "pc98_tile", label: "PC-98 Tile" },
   { value: "pc98_512", label: "PC-98 512-color" },
+  { value: "pc98_512_sat", label: "PC-98 512 Sat" },
   { value: "pc98_4096", label: "PC-98 4096-color" },
   { value: "color32", label: "Color 32" },
   { value: "color64", label: "Color 64" },
@@ -35,6 +37,7 @@ export const PRESETS = {
     monoTint: "amber",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
@@ -44,7 +47,7 @@ export const PRESETS = {
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.14,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.07,
     scanlineStrength: 0.16,
     scanline2Strength: 0.0,
@@ -54,8 +57,49 @@ export const PRESETS = {
     monoTint: "green",
     isAudioFxEnabled: true,
     lofiAmount: 1.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.018,
+  },
+  gb: {
+    label: "GB",
+    targetWidth: 160,
+    targetHeight: 144,
+    colorLevels: 4,
+    ditherStrength: 0.08,
+    paletteMode: 8,
+    curvature: 0.0,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.015,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    monoTint: "green",
+    isAudioFxEnabled: false,
+    lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
+  },
+  gba: {
+    label: "GBA",
+    targetWidth: 240,
+    targetHeight: 160,
+    colorLevels: 48,
+    ditherStrength: 0.06,
+    paletteMode: 0,
+    curvature: 0.0,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.02,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    monoTint: "gray",
+    isAudioFxEnabled: false,
+    lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
   },
   amberCrt: {
     label: "Amber CRT",
@@ -63,7 +107,7 @@ export const PRESETS = {
     targetHeight: 600,
     colorLevels: 32,
     ditherStrength: 0.16,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.08,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -73,6 +117,7 @@ export const PRESETS = {
     monoTint: "amber",
     isAudioFxEnabled: true,
     lofiAmount: 0.85,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.015,
   },
@@ -82,7 +127,7 @@ export const PRESETS = {
     targetHeight: 600,
     colorLevels: 32,
     ditherStrength: 0.18,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.05,
     scanlineStrength: 0.1,
     scanline2Strength: 0.0,
@@ -92,6 +137,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.7,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.012,
   },
@@ -101,7 +147,7 @@ export const PRESETS = {
     targetHeight: 300,
     colorLevels: 16,
     ditherStrength: 0.06,
-    paletteMode: 6,
+    paletteMode: 8,
     curvature: 0.0,
     scanlineStrength: 0.0,
     scanline2Strength: 0.0,
@@ -111,6 +157,7 @@ export const PRESETS = {
     monoTint: "ice",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
@@ -120,7 +167,7 @@ export const PRESETS = {
     targetHeight: 400,
     colorLevels: 8,
     ditherStrength: 0.12,
-    paletteMode: 2,
+    paletteMode: 3,
     curvature: 0.08,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -130,8 +177,29 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.5,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.006,
+  },
+  pc98_tile: {
+    label: "PC-98 Tile",
+    targetWidth: 640,
+    targetHeight: 400,
+    colorLevels: 16,
+    ditherStrength: 0.0,
+    paletteMode: 2,
+    curvature: 0.03,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.02,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    monoTint: "gray",
+    isAudioFxEnabled: true,
+    lofiAmount: 0.55,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: true,
+    noiseLevel: 0.007,
   },
   pc98_4096: {
     label: "PC-98 4096-color",
@@ -139,7 +207,7 @@ export const PRESETS = {
     targetHeight: 400,
     colorLevels: 16,
     ditherStrength: 0.08,
-    paletteMode: 3,
+    paletteMode: 5,
     curvature: 0.06,
     scanlineStrength: 0.0,
     scanline2Strength: 0.02,
@@ -149,6 +217,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.6,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.005,
   },
@@ -156,7 +225,7 @@ export const PRESETS = {
     label: "CRT Only",
     targetWidth: 1280,
     targetHeight: 800,
-    colorLevels: 8,
+    colorLevels: 256,
     ditherStrength: 0.12,
     paletteMode: 0,
     curvature: 0.03,
@@ -168,6 +237,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.2,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.008,
   },
@@ -184,12 +254,16 @@ export const DEFAULT_SETTINGS = {
   curvature: 0.08,
   scanlineStrength: 0.0,
   scanline2Strength: 0.02,
+  scanlineBrightnessFade: 0.6,
   vignetteStrength: 0.11,
   glowStrength: 0.1,
   phosphorStrength: 0.05,
+  closeUpNoiseStrength: 0.0,
   colorLevels: 32,
+  overlayTargetCount: 1,
   isAudioFxEnabled: true,
   lofiAmount: 0.85,
+  wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
 };
@@ -197,6 +271,11 @@ export const DEFAULT_SETTINGS = {
 export const COLOR_LEVEL_LIMITS = {
   min: 2,
   max: 256,
+};
+
+export const OVERLAY_TARGET_LIMITS = {
+  min: 1,
+  max: 6,
 };
 
 export function normalizeSettings(candidate) {
@@ -240,7 +319,7 @@ export function normalizeSettings(candidate) {
         : basePresetSettings.targetHeight,
     ditherStrength:
       typeof candidate?.ditherStrength === "number"
-        ? clamp(candidate.ditherStrength, 0, 0.5)
+        ? clamp(candidate.ditherStrength, 0, 1)
         : basePresetSettings.ditherStrength,
     curvature:
       typeof candidate?.curvature === "number"
@@ -254,19 +333,35 @@ export function normalizeSettings(candidate) {
       typeof candidate?.scanline2Strength === "number"
         ? clamp(candidate.scanline2Strength, 0, 0.1)
         : basePresetSettings.scanline2Strength,
+    scanlineBrightnessFade:
+      typeof candidate?.scanlineBrightnessFade === "number"
+        ? clamp(candidate.scanlineBrightnessFade, 0, 1)
+        : basePresetSettings.scanlineBrightnessFade ?? DEFAULT_SETTINGS.scanlineBrightnessFade,
     vignetteStrength:
       typeof candidate?.vignetteStrength === "number"
-        ? clamp(candidate.vignetteStrength, 0, 0.2)
+        ? clamp(candidate.vignetteStrength, 0, 0.6)
         : basePresetSettings.vignetteStrength,
     glowStrength:
       typeof candidate?.glowStrength === "number"
-        ? clamp(candidate.glowStrength, 0, 0.2)
+        ? clamp(candidate.glowStrength, 0, 0.5)
         : basePresetSettings.glowStrength,
     phosphorStrength:
       typeof candidate?.phosphorStrength === "number"
-        ? clamp(candidate.phosphorStrength, 0, 0.2)
+        ? clamp(candidate.phosphorStrength, 0, 0.5)
         : basePresetSettings.phosphorStrength,
+    closeUpNoiseStrength:
+      typeof candidate?.closeUpNoiseStrength === "number"
+        ? clamp(candidate.closeUpNoiseStrength, 0, 2)
+        : basePresetSettings.closeUpNoiseStrength ?? DEFAULT_SETTINGS.closeUpNoiseStrength,
     colorLevels: resolvedColorLevels,
+    overlayTargetCount:
+      typeof candidate?.overlayTargetCount === "number"
+        ? clamp(
+            Math.round(candidate.overlayTargetCount),
+            OVERLAY_TARGET_LIMITS.min,
+            OVERLAY_TARGET_LIMITS.max,
+          )
+        : DEFAULT_SETTINGS.overlayTargetCount,
     isAudioFxEnabled:
       typeof candidate?.isAudioFxEnabled === "boolean"
         ? candidate.isAudioFxEnabled
@@ -275,6 +370,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.lofiAmount === "number"
         ? clamp(candidate.lofiAmount, 0, 1)
         : DEFAULT_SETTINGS.lofiAmount,
+    wowFlutterAmount:
+      typeof candidate?.wowFlutterAmount === "number"
+        ? clamp(candidate.wowFlutterAmount, 0, 1)
+        : basePresetSettings.wowFlutterAmount ?? DEFAULT_SETTINGS.wowFlutterAmount,
     isNoiseEnabled:
       typeof candidate?.isNoiseEnabled === "boolean"
         ? candidate.isNoiseEnabled
@@ -304,6 +403,10 @@ export function applyPresetToSettings(presetKey) {
     curvature: preset.curvature,
     scanlineStrength: preset.scanlineStrength,
     scanline2Strength: preset.scanline2Strength,
+    scanlineBrightnessFade:
+      typeof preset.scanlineBrightnessFade === "number"
+        ? preset.scanlineBrightnessFade
+        : DEFAULT_SETTINGS.scanlineBrightnessFade,
     vignetteStrength: preset.vignetteStrength,
     glowStrength: preset.glowStrength,
     phosphorStrength: preset.phosphorStrength,
@@ -316,6 +419,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.lofiAmount === "number"
         ? preset.lofiAmount
         : DEFAULT_SETTINGS.lofiAmount,
+    wowFlutterAmount:
+      typeof preset.wowFlutterAmount === "number"
+        ? preset.wowFlutterAmount
+        : DEFAULT_SETTINGS.wowFlutterAmount,
     isNoiseEnabled:
       typeof preset.isNoiseEnabled === "boolean"
         ? preset.isNoiseEnabled
@@ -346,8 +453,10 @@ function isMonoTint(value) {
 export function getDefaultColorLevelsForPalette(paletteMode) {
   if (paletteMode === "free") return 256;
   if (paletteMode === "pc98") return 16;
+  if (paletteMode === "pc98_tile") return 16;
   if (paletteMode === "pc98_4096") return 16;
   if (paletteMode === "pc98_512") return 8;
+  if (paletteMode === "pc98_512_sat") return 8;
   if (paletteMode === "color32") return 32;
   if (paletteMode === "color64") return 64;
 
@@ -364,10 +473,12 @@ function resolveColorLevels(paletteMode, requestedLevels) {
 
 function paletteModeFromUniform(value) {
   if (value === 1) return "pc98";
-  if (value === 2) return "pc98_512";
-  if (value === 3) return "pc98_4096";
-  if (value === 4) return "color32";
-  if (value === 5) return "color64";
-  if (value === 6) return "mono";
+  if (value === 2) return "pc98_tile";
+  if (value === 3) return "pc98_512";
+  if (value === 4) return "pc98_512_sat";
+  if (value === 5) return "pc98_4096";
+  if (value === 6) return "color32";
+  if (value === 7) return "color64";
+  if (value === 8) return "mono";
   return "free";
 }

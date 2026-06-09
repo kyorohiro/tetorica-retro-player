@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   getDefaultColorLevelsForPalette,
   MONO_TINT_OPTIONS,
+  OVERLAY_TARGET_LIMITS,
   PALETTE_OPTIONS,
   PRESETS,
   SETTINGS_STORAGE_KEY,
@@ -33,11 +34,23 @@ const scanlineStrengthInput = document.getElementById("scanlineStrength");
 const scanlineStrengthValue = document.getElementById("scanlineStrengthValue");
 const scanline2StrengthInput = document.getElementById("scanline2Strength");
 const scanline2StrengthValue = document.getElementById("scanline2StrengthValue");
+const scanlineBrightnessFadeInput = document.getElementById("scanlineBrightnessFade");
+const scanlineBrightnessFadeValue = document.getElementById("scanlineBrightnessFadeValue");
+const vignetteStrengthInput = document.getElementById("vignetteStrength");
+const vignetteStrengthValue = document.getElementById("vignetteStrengthValue");
 const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
+const phosphorStrengthInput = document.getElementById("phosphorStrength");
+const phosphorStrengthValue = document.getElementById("phosphorStrengthValue");
+const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
+const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
+const overlayTargetCountInput = document.getElementById("overlayTargetCount");
+const overlayTargetCountValue = document.getElementById("overlayTargetCountValue");
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
 const lofiAmountInput = document.getElementById("lofiAmount");
 const lofiAmountValue = document.getElementById("lofiAmountValue");
+const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
+const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
 const noiseLevelInput = document.getElementById("noiseLevel");
 const noiseLevelValue = document.getElementById("noiseLevelValue");
@@ -100,7 +113,13 @@ presetSelect.addEventListener("change", () => {
     return;
   }
 
-  currentSettings = normalizeSettings(applyPresetToSettings(presetSelect.value));
+  currentSettings = normalizeSettings({
+    ...applyPresetToSettings(presetSelect.value),
+    scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
+    closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
+    overlayTargetCount: currentSettings.overlayTargetCount,
+    wowFlutterAmount: currentSettings.wowFlutterAmount,
+  });
   void persistSettings();
 });
 
@@ -179,10 +198,48 @@ scanline2StrengthInput.addEventListener("input", () => {
   });
 });
 
+scanlineBrightnessFadeInput.addEventListener("input", () => {
+  const scanlineBrightnessFade = Number(scanlineBrightnessFadeInput.value);
+  scanlineBrightnessFadeValue.textContent = scanlineBrightnessFade.toFixed(2);
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    scanlineBrightnessFade,
+  });
+});
+
+vignetteStrengthInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    vignetteStrength: Number(vignetteStrengthInput.value),
+  });
+});
+
 glowStrengthInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     glowStrength: Number(glowStrengthInput.value),
+  });
+});
+
+phosphorStrengthInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorStrength: Number(phosphorStrengthInput.value),
+  });
+});
+
+closeUpNoiseStrengthInput.addEventListener("input", () => {
+  const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
+  closeUpNoiseStrengthValue.textContent = closeUpNoiseStrength.toFixed(2);
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    closeUpNoiseStrength,
+  });
+});
+
+overlayTargetCountInput.addEventListener("input", () => {
+  updateSettings({
+    overlayTargetCount: Number(overlayTargetCountInput.value),
   });
 });
 
@@ -194,6 +251,12 @@ lofiAmountInput.addEventListener("input", () => {
   const lofiAmount = Number(lofiAmountInput.value);
   lofiAmountValue.textContent = lofiAmount.toFixed(2);
   updateSettings({ lofiAmount });
+});
+
+wowFlutterAmountInput.addEventListener("input", () => {
+  const wowFlutterAmount = Number(wowFlutterAmountInput.value);
+  wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
+  updateSettings({ wowFlutterAmount });
 });
 
 noiseEnabledInput.addEventListener("change", () => {
@@ -266,11 +329,25 @@ function renderSettings(settings) {
   scanlineStrengthValue.textContent = settings.scanlineStrength.toFixed(2);
   scanline2StrengthInput.value = String(settings.scanline2Strength);
   scanline2StrengthValue.textContent = settings.scanline2Strength.toFixed(3);
+  scanlineBrightnessFadeInput.value = String(settings.scanlineBrightnessFade);
+  scanlineBrightnessFadeValue.textContent = settings.scanlineBrightnessFade.toFixed(2);
+  vignetteStrengthInput.value = String(settings.vignetteStrength);
+  vignetteStrengthValue.textContent = settings.vignetteStrength.toFixed(2);
   glowStrengthInput.value = String(settings.glowStrength);
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
+  phosphorStrengthInput.value = String(settings.phosphorStrength);
+  phosphorStrengthValue.textContent = settings.phosphorStrength.toFixed(2);
+  closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
+  closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
+  overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);
+  overlayTargetCountInput.max = String(OVERLAY_TARGET_LIMITS.max);
+  overlayTargetCountInput.value = String(settings.overlayTargetCount);
+  overlayTargetCountValue.textContent = `${settings.overlayTargetCount} target${settings.overlayTargetCount === 1 ? "" : "s"}`;
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);
   lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);
+  wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
+  wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
   noiseLevelInput.value = String(settings.noiseLevel);
   noiseLevelValue.textContent = settings.noiseLevel.toFixed(3);

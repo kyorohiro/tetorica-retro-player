@@ -21,9 +21,11 @@ export type RetroFilterInitialState = Partial<{
   curvature: number;
   scanlineStrength: number;
   scanline2Strength: number;
+  scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -69,9 +71,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     curvature: initialState.curvature ?? DEFAULT_PRESET.curvature,
     scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
     scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+    scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+    closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -109,6 +113,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [scanline2Strength, setScanline2Strength] = useState<number>(
     resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
   );
+  const [scanlineBrightnessFade, setScanlineBrightnessFade] = useState<number>(
+    resolvedInitialState.scanlineBrightnessFade ?? 0.6,
+  );
   const [vignetteStrength, setVignetteStrength] = useState<number>(
     resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
   );
@@ -117,6 +124,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   );
   const [phosphorStrength, setPhosphorStrength] = useState<number>(
     resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+  );
+  const [closeUpNoiseStrength, setCloseUpNoiseStrength] = useState<number>(
+    resolvedInitialState.closeUpNoiseStrength ?? 0,
   );
   const [monoTint, setMonoTint] = useState<MonoTintMode>(
     resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
@@ -143,9 +153,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       curvature: resolvedInitialState.curvature ?? DEFAULT_PRESET.curvature,
       scanlineStrength: resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
       scanline2Strength: resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+      scanlineBrightnessFade: resolvedInitialState.scanlineBrightnessFade ?? 0.6,
       vignetteStrength: resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
       glowStrength: resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
       phosphorStrength: resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+      closeUpNoiseStrength: resolvedInitialState.closeUpNoiseStrength ?? 0,
       monoTint: resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
       neonBoost: resolvedInitialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
       neonSaturation: resolvedInitialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -162,12 +174,22 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       return;
     }
 
+    if (nextPalette === "pc98_tile") {
+      setColorLevels(16);
+      return;
+    }
+
     if (nextPalette === "pc98_4096") {
       setColorLevels(16);
       return;
     }
 
     if (nextPalette === "pc98_512") {
+      setColorLevels(8);
+      return;
+    }
+
+    if (nextPalette === "pc98_512_sat") {
       setColorLevels(8);
       return;
     }
@@ -214,9 +236,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setCurvature(baseInitialState.curvature);
     setScanlineStrength(baseInitialState.scanlineStrength);
     setScanline2Strength(baseInitialState.scanline2Strength);
+    setScanlineBrightnessFade(baseInitialState.scanlineBrightnessFade);
     setVignetteStrength(baseInitialState.vignetteStrength);
     setGlowStrength(baseInitialState.glowStrength);
     setPhosphorStrength(baseInitialState.phosphorStrength);
+    setCloseUpNoiseStrength(baseInitialState.closeUpNoiseStrength);
     setMonoTint(baseInitialState.monoTint);
     setNeonBoost(baseInitialState.neonBoost);
     setNeonSaturation(baseInitialState.neonSaturation);
@@ -234,9 +258,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       curvature,
       scanlineStrength,
       scanline2Strength,
+      scanlineBrightnessFade,
       vignetteStrength,
       glowStrength,
       phosphorStrength,
+      closeUpNoiseStrength,
       monoTint,
       neonBoost,
       neonSaturation,
@@ -254,6 +280,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     neonDetail,
     paletteMode,
     phosphorStrength,
+    closeUpNoiseStrength,
+    scanlineBrightnessFade,
     scanlineStrength,
     scanline2Strength,
     targetHeight,
@@ -271,9 +299,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     curvature,
     scanlineStrength,
     scanline2Strength,
+    scanlineBrightnessFade,
     vignetteStrength,
     glowStrength,
     phosphorStrength,
+    closeUpNoiseStrength,
     monoTint,
     neonBoost,
     neonSaturation,
@@ -288,9 +318,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setCurvature,
     setScanlineStrength,
     setScanline2Strength,
+    setScanlineBrightnessFade,
     setVignetteStrength,
     setGlowStrength,
     setPhosphorStrength,
+    setCloseUpNoiseStrength,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

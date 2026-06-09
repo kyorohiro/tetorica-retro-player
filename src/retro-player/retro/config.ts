@@ -1,7 +1,9 @@
 export type PaletteMode =
   | "free"
   | "pc98"
+  | "pc98_tile"
   | "pc98_512"
+  | "pc98_512_sat"
   | "pc98_4096"
   | "color32"
   | "color64"
@@ -56,6 +58,42 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
   },
+  gb: {
+    label: "GB",
+    width: 200, //GB is 160, // 160 or 144
+    height: 180,// GB is 144,
+    colors: 4,
+    dither: 0.08,
+    palette: "mono",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.015,
+    glow: 0.0,
+    phosphor: 0.0,
+    monoTint: "green",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
+  gba: {
+    label: "GBA",
+    width: 320, // GBA is 240,GBA's internal resolution is 240x160, but we scale it to 320x200 for better visibility
+    height: 200,// GBA is 160,
+    colors: 48,
+    dither: 0.06,
+    palette: "free",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.02,
+    glow: 0.0,
+    phosphor: 0.0,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
   pc98_512: {
     label: "PC-98 512-color",
     width: 640,
@@ -105,6 +143,24 @@ export const RETRO_PRESETS = {
     vignette: 0.06,
     glow: 0.05,
     phosphor: 0.04,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
+  pc98_tile: {
+    label: "PC-98 Tile",
+    width: 1280,
+    height: 800,
+    colors: 32,
+    dither: 0.0,
+    palette: "pc98_tile",
+    curvature: 0.05,
+    scanline: 0.0,
+    scanline2: 0.01,
+    vignette: 0.02,
+    glow: 0.0,
+    phosphor: 0.0,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -280,12 +336,14 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
-  if (mode === "pc98_512") return 2;
-  if (mode === "pc98_4096") return 3;
-  if (mode === "color32") return 4;
-  if (mode === "color64") return 5;
-  if (mode === "mono") return 6;
-  if (mode === "neon") return 7;
+  if (mode === "pc98_tile") return 2;
+  if (mode === "pc98_512") return 3;
+  if (mode === "pc98_512_sat") return 4;
+  if (mode === "pc98_4096") return 5;
+  if (mode === "color32") return 6;
+  if (mode === "color64") return 7;
+  if (mode === "mono") return 8;
+  if (mode === "neon") return 9;
 
   return 0;
 };
