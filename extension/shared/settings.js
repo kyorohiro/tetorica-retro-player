@@ -183,8 +183,8 @@ export const PRESETS = {
   },
   pc98_tile: {
     label: "PC-98 Tile",
-    targetWidth: 640,
-    targetHeight: 400,
+    targetWidth: 1280,
+    targetHeight: 800,
     colorLevels: 16,
     ditherStrength: 0.0,
     paletteMode: 2,

@@ -610,28 +610,32 @@ void main(void)
 
   if (isNeon) {
     color.rgb = applyNeonLinePalette(uTexture, pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
-    vec3 halo = applyNeonLinePalette(
-      uTexture,
-      clamp(pixelatedUv + vec2(texel.x * 0.5, texel.y * 0.5), vec2(0.0), vec2(1.0)),
-      texel,
-      max(uColorLevels, 2.0),
-      uMonoTint
-    );
-    color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22), 0.45);
+    if (uGlowStrength > 0.001) {
+      vec3 halo = applyNeonLinePalette(
+        uTexture,
+        clamp(pixelatedUv + vec2(texel.x * 0.5, texel.y * 0.5), vec2(0.0), vec2(1.0)),
+        texel,
+        max(uColorLevels, 2.0),
+        uMonoTint
+      );
+      color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22), 0.45);
+    }
   } else {
     color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint, cell);
 
-    vec3 glow = vec3(0.0);
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(1.0, 0.0)) * 0.34;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(1.0, 0.0)) * 0.34;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(2.0, 0.0)) * 0.18;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(2.0, 0.0)) * 0.18;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(0.0, 1.0)) * 0.10;
-    glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(0.0, 1.0)) * 0.10;
+    if (uGlowStrength > 0.001) {
+      vec3 glow = vec3(0.0);
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(1.0, 0.0)) * 0.34;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(1.0, 0.0)) * 0.34;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(2.0, 0.0)) * 0.18;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(2.0, 0.0)) * 0.18;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(0.0, 1.0)) * 0.10;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(0.0, 1.0)) * 0.10;
 
-    float brightness = max(max(color.r, color.g), color.b);
-    float glowMask = smoothstep(0.45, 1.0, brightness);
-    color.rgb += glow * glowMask * uGlowStrength;
+      float brightness = max(max(color.r, color.g), color.b);
+      float glowMask = smoothstep(0.45, 1.0, brightness);
+      color.rgb += glow * glowMask * uGlowStrength;
+    }
   }
 
   float scanlineBrightness = max(max(color.r, color.g), color.b);
@@ -643,17 +647,21 @@ void main(void)
   float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength * scanlineVisibility;
   color.rgb += scanline2;
 
-  float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
-  vec3 phosphorTriad = vec3(
-    sin(phosphorPhase) * 0.5 + 0.5,
-    sin(phosphorPhase + 2.0943951) * 0.5 + 0.5,
-    sin(phosphorPhase + 4.1887902) * 0.5 + 0.5
-  );
-  phosphorTriad = mix(vec3(0.5), phosphorTriad, 0.7);
-  color.rgb *= mix(vec3(1.0), 0.82 + phosphorTriad * 0.42, uPhosphorStrength);
+  if (uPhosphorStrength > 0.001) {
+    float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
+    vec3 phosphorTriad = vec3(
+      sin(phosphorPhase) * 0.5 + 0.5,
+      sin(phosphorPhase + 2.0943951) * 0.5 + 0.5,
+      sin(phosphorPhase + 4.1887902) * 0.5 + 0.5
+    );
+    phosphorTriad = mix(vec3(0.5), phosphorTriad, 0.7);
+    color.rgb *= mix(vec3(1.0), 0.82 + phosphorTriad * 0.42, uPhosphorStrength);
+  }
 
   float closeUpAmount = uCloseUpNoiseStrength;
-  color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
+  if (closeUpAmount > 0.001) {
+    color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
+  }
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
