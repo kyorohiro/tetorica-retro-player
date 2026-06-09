@@ -37,6 +37,7 @@ export const PRESETS = {
     monoTint: "amber",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
@@ -56,6 +57,7 @@ export const PRESETS = {
     monoTint: "green",
     isAudioFxEnabled: true,
     lofiAmount: 1.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.018,
   },
@@ -75,6 +77,7 @@ export const PRESETS = {
     monoTint: "green",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
@@ -94,6 +97,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
@@ -113,6 +117,7 @@ export const PRESETS = {
     monoTint: "amber",
     isAudioFxEnabled: true,
     lofiAmount: 0.85,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.015,
   },
@@ -132,6 +137,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.7,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.012,
   },
@@ -151,6 +157,7 @@ export const PRESETS = {
     monoTint: "ice",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
@@ -170,6 +177,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.5,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.006,
   },
@@ -189,6 +197,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.55,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.007,
   },
@@ -208,6 +217,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.6,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.005,
   },
@@ -227,6 +237,7 @@ export const PRESETS = {
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.2,
+    wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.008,
   },
@@ -252,6 +263,7 @@ export const DEFAULT_SETTINGS = {
   overlayTargetCount: 1,
   isAudioFxEnabled: true,
   lofiAmount: 0.85,
+  wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
 };
@@ -358,6 +370,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.lofiAmount === "number"
         ? clamp(candidate.lofiAmount, 0, 1)
         : DEFAULT_SETTINGS.lofiAmount,
+    wowFlutterAmount:
+      typeof candidate?.wowFlutterAmount === "number"
+        ? clamp(candidate.wowFlutterAmount, 0, 1)
+        : basePresetSettings.wowFlutterAmount ?? DEFAULT_SETTINGS.wowFlutterAmount,
     isNoiseEnabled:
       typeof candidate?.isNoiseEnabled === "boolean"
         ? candidate.isNoiseEnabled
@@ -403,6 +419,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.lofiAmount === "number"
         ? preset.lofiAmount
         : DEFAULT_SETTINGS.lofiAmount,
+    wowFlutterAmount:
+      typeof preset.wowFlutterAmount === "number"
+        ? preset.wowFlutterAmount
+        : DEFAULT_SETTINGS.wowFlutterAmount,
     isNoiseEnabled:
       typeof preset.isNoiseEnabled === "boolean"
         ? preset.isNoiseEnabled

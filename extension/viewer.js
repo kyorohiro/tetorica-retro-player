@@ -38,6 +38,11 @@ let masterGainNode = null;
 let lofiLowpassNode = null;
 let lofiHighshelfNode = null;
 let lofiDriveNode = null;
+let wowFlutterDelayNode = null;
+let wowLfoNode = null;
+let wowLfoGainNode = null;
+let flutterLfoNode = null;
+let flutterLfoGainNode = null;
 let noiseSourceNode = null;
 let noiseFilterNode = null;
 let noisePannerNode = null;
@@ -511,6 +516,21 @@ function updateAudioNodes() {
     lofiDriveNode.curve = createDriveCurve(amount * 0.6);
   }
 
+  if (
+    wowFlutterDelayNode &&
+    wowLfoNode &&
+    wowLfoGainNode &&
+    flutterLfoNode &&
+    flutterLfoGainNode
+  ) {
+    const amount = currentSettings.isAudioFxEnabled ? currentSettings.wowFlutterAmount : 0;
+    wowFlutterDelayNode.delayTime.value = 0.006 + amount * 0.004;
+    wowLfoNode.frequency.value = 0.18 + amount * 0.42;
+    wowLfoGainNode.gain.value = amount * 0.0035;
+    flutterLfoNode.frequency.value = 5.2 + amount * 6.5;
+    flutterLfoGainNode.gain.value = amount * 0.0009;
+  }
+
   if (noiseGainNode) {
     noiseGainNode.gain.value = currentSettings.isNoiseEnabled ? currentSettings.noiseLevel : 0;
   }
@@ -524,6 +544,11 @@ async function ensureAudioContext() {
     lofiLowpassNode = null;
     lofiHighshelfNode = null;
     lofiDriveNode = null;
+    wowFlutterDelayNode = null;
+    wowLfoNode = null;
+    wowLfoGainNode = null;
+    flutterLfoNode = null;
+    flutterLfoGainNode = null;
     noiseSourceNode = null;
     noiseFilterNode = null;
     noisePannerNode = null;
@@ -538,12 +563,26 @@ async function ensureAudioContext() {
     lofiLowpassNode = audioContext.createBiquadFilter();
     lofiHighshelfNode = audioContext.createBiquadFilter();
     lofiDriveNode = audioContext.createWaveShaper();
+    wowFlutterDelayNode = audioContext.createDelay(0.05);
+    wowLfoNode = audioContext.createOscillator();
+    wowLfoGainNode = audioContext.createGain();
+    flutterLfoNode = audioContext.createOscillator();
+    flutterLfoGainNode = audioContext.createGain();
 
     lofiLowpassNode.type = "lowpass";
     lofiHighshelfNode.type = "highshelf";
     lofiHighshelfNode.frequency.value = 2800;
     lofiDriveNode.oversample = "4x";
+    wowFlutterDelayNode.delayTime.value = 0.006;
+    wowLfoNode.type = "sine";
+    flutterLfoNode.type = "sine";
 
+    wowLfoNode.connect(wowLfoGainNode);
+    wowLfoGainNode.connect(wowFlutterDelayNode.delayTime);
+    flutterLfoNode.connect(flutterLfoGainNode);
+    flutterLfoGainNode.connect(wowFlutterDelayNode.delayTime);
+
+    wowFlutterDelayNode.connect(lofiLowpassNode);
     lofiLowpassNode.connect(lofiHighshelfNode);
     lofiHighshelfNode.connect(lofiDriveNode);
     lofiDriveNode.connect(masterGainNode);
@@ -586,6 +625,8 @@ async function ensureAudioContext() {
     noiseLfoGainNode.connect(noisePannerNode.pan);
     noiseSourceNode.start();
     noiseLfoNode.start();
+    wowLfoNode.start();
+    flutterLfoNode.start();
 
     updateAudioNodes();
   }
@@ -614,7 +655,7 @@ async function connectStreamAudio(stream) {
   }
 
   mediaSourceNode = context.createMediaStreamSource(stream);
-  mediaSourceNode.connect(lofiLowpassNode);
+  mediaSourceNode.connect(wowFlutterDelayNode ?? lofiLowpassNode);
   updateAudioNodes();
 }
 
@@ -634,12 +675,29 @@ async function disposeAudioEngine() {
     // ignore repeated stop
   }
 
+  try {
+    wowLfoNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
+  try {
+    flutterLfoNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
   const context = audioContext;
   audioContext = null;
   masterGainNode = null;
   lofiLowpassNode = null;
   lofiHighshelfNode = null;
   lofiDriveNode = null;
+  wowFlutterDelayNode = null;
+  wowLfoNode = null;
+  wowLfoGainNode = null;
+  flutterLfoNode = null;
+  flutterLfoGainNode = null;
   noiseSourceNode = null;
   noiseFilterNode = null;
   noisePannerNode = null;

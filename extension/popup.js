@@ -45,6 +45,8 @@ const overlayTargetCountValue = document.getElementById("overlayTargetCountValue
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
 const lofiAmountInput = document.getElementById("lofiAmount");
 const lofiAmountValue = document.getElementById("lofiAmountValue");
+const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
+const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
 const noiseLevelInput = document.getElementById("noiseLevel");
 const noiseLevelValue = document.getElementById("noiseLevelValue");
@@ -112,6 +114,7 @@ presetSelect.addEventListener("change", () => {
     scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
     closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
+    wowFlutterAmount: currentSettings.wowFlutterAmount,
   });
   void persistSettings();
 });
@@ -232,6 +235,12 @@ lofiAmountInput.addEventListener("input", () => {
   updateSettings({ lofiAmount });
 });
 
+wowFlutterAmountInput.addEventListener("input", () => {
+  const wowFlutterAmount = Number(wowFlutterAmountInput.value);
+  wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
+  updateSettings({ wowFlutterAmount });
+});
+
 noiseEnabledInput.addEventListener("change", () => {
   updateSettings({ isNoiseEnabled: noiseEnabledInput.checked });
 });
@@ -315,6 +324,8 @@ function renderSettings(settings) {
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);
   lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);
+  wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
+  wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
   noiseLevelInput.value = String(settings.noiseLevel);
   noiseLevelValue.textContent = settings.noiseLevel.toFixed(3);
