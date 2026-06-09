@@ -103,7 +103,10 @@ presetSelect.addEventListener("change", () => {
     return;
   }
 
-  currentSettings = normalizeSettings(applyPresetToSettings(presetSelect.value));
+  currentSettings = normalizeSettings({
+    ...applyPresetToSettings(presetSelect.value),
+    overlayTargetCount: currentSettings.overlayTargetCount,
+  });
   void persistSettings();
 });
 
