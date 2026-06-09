@@ -6,6 +6,35 @@ import {
   type RetroPresetKey,
 } from "../retro/config";
 
+function InfoTip({
+  label,
+  text,
+}: {
+  label: string;
+  text: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span>{label}</span>
+      <span className="relative inline-flex items-center group">
+        <button
+          type="button"
+          aria-label={`${label} help`}
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-500/80 bg-slate-900/90 text-[10px] font-bold leading-none text-slate-200 transition hover:border-sky-400 hover:text-sky-100 focus:outline-none focus:ring-1 focus:ring-sky-400"
+        >
+          ?
+        </button>
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-slate-600/80 bg-slate-950/95 px-3 py-2 text-[11px] leading-4 text-slate-100 opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+        >
+          {text}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 type RetroFilterPanelProps = {
   colorLevels: number;
   curvature: number;
@@ -328,7 +357,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Curvature: {curvature.toFixed(2)}
+            <InfoTip
+              label={`Curvature: ${curvature.toFixed(2)}`}
+              text="Bends the picture inward to mimic the curved glass of an old CRT. Higher values make the screen edges bow more."
+            />
           </span>
           <input
             type="range"
@@ -345,7 +377,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Bayer dither: {ditherStrength.toFixed(2)}
+            <InfoTip
+              label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
+              text="Adds a 4x4 dot pattern to smooth reduced colors. Higher values make the image feel more grid-like and gritty."
+            />
           </span>
           <input
             type="range"
@@ -362,7 +397,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Scanline: {scanlineStrength.toFixed(2)}
+            <InfoTip
+              label={`Scanline: ${scanlineStrength.toFixed(2)}`}
+              text="Adds broad horizontal dark bands like an old display. Higher values make the line gaps more obvious."
+            />
           </span>
           <input
             type="range"
@@ -379,7 +417,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Scanline2: {scanline2Strength.toFixed(2)}
+            <InfoTip
+              label={`Scanline2: ${scanline2Strength.toFixed(2)}`}
+              text="Adds a finer second layer of line texture. Useful when you want a denser CRT stripe feel."
+            />
           </span>
           <input
             type="range"
@@ -396,7 +437,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Vignette: {vignetteStrength.toFixed(2)}
+            <InfoTip
+              label={`Vignette: ${vignetteStrength.toFixed(2)}`}
+              text="Darkens the outer edges of the screen. Higher values pull more attention toward the center."
+            />
           </span>
           <input
             type="range"
@@ -413,7 +457,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Glow: {glowStrength.toFixed(2)}
+            <InfoTip
+              label={`Glow: ${glowStrength.toFixed(2)}`}
+              text="Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter."
+            />
           </span>
           <input
             type="range"
@@ -430,7 +477,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Phosphor: {phosphorStrength.toFixed(2)}
+            <InfoTip
+              label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
+              text="Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible."
+            />
           </span>
           <input
             type="range"
@@ -447,7 +497,10 @@ export function RetroFilterPanel({
 
         <label className="block">
           <span className="text-slate-100">
-            Close-up noise: {closeUpNoiseStrength.toFixed(2)}
+            <InfoTip
+              label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
+              text="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT."
+            />
           </span>
           <input
             type="range"
