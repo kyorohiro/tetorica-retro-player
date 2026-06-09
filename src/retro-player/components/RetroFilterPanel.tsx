@@ -439,13 +439,13 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Vignette: ${vignetteStrength.toFixed(2)}`}
-              text="Darkens the outer edges of the screen. Higher values pull more attention toward the center."
+              text="Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame."
             />
           </span>
           <input
             type="range"
             min="0"
-            max="0.3"
+            max="0.6"
             step="0.01"
             value={vignetteStrength}
             onChange={(ev) => {
@@ -459,13 +459,13 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Glow: ${glowStrength.toFixed(2)}`}
-              text="Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter."
+              text="Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look."
             />
           </span>
           <input
             type="range"
             min="0"
-            max="0.2"
+            max="0.5"
             step="0.01"
             value={glowStrength}
             onChange={(ev) => {
@@ -479,13 +479,13 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
-              text="Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible."
+              text="Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible and easier to inspect."
             />
           </span>
           <input
             type="range"
             min="0"
-            max="0.2"
+            max="0.5"
             step="0.01"
             value={phosphorStrength}
             onChange={(ev) => {
@@ -499,13 +499,13 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
-              text="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT."
+              text="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect."
             />
           </span>
           <input
             type="range"
             min="0"
-            max="1"
+            max="2"
             step="0.01"
             value={closeUpNoiseStrength}
             onChange={(ev) => {
