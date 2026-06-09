@@ -319,7 +319,7 @@ export function normalizeSettings(candidate) {
         : basePresetSettings.targetHeight,
     ditherStrength:
       typeof candidate?.ditherStrength === "number"
-        ? clamp(candidate.ditherStrength, 0, 0.5)
+        ? clamp(candidate.ditherStrength, 0, 1)
         : basePresetSettings.ditherStrength,
     curvature:
       typeof candidate?.curvature === "number"
@@ -339,19 +339,19 @@ export function normalizeSettings(candidate) {
         : basePresetSettings.scanlineBrightnessFade ?? DEFAULT_SETTINGS.scanlineBrightnessFade,
     vignetteStrength:
       typeof candidate?.vignetteStrength === "number"
-        ? clamp(candidate.vignetteStrength, 0, 0.2)
+        ? clamp(candidate.vignetteStrength, 0, 0.6)
         : basePresetSettings.vignetteStrength,
     glowStrength:
       typeof candidate?.glowStrength === "number"
-        ? clamp(candidate.glowStrength, 0, 0.2)
+        ? clamp(candidate.glowStrength, 0, 0.5)
         : basePresetSettings.glowStrength,
     phosphorStrength:
       typeof candidate?.phosphorStrength === "number"
-        ? clamp(candidate.phosphorStrength, 0, 0.2)
+        ? clamp(candidate.phosphorStrength, 0, 0.5)
         : basePresetSettings.phosphorStrength,
     closeUpNoiseStrength:
       typeof candidate?.closeUpNoiseStrength === "number"
-        ? clamp(candidate.closeUpNoiseStrength, 0, 1)
+        ? clamp(candidate.closeUpNoiseStrength, 0, 2)
         : basePresetSettings.closeUpNoiseStrength ?? DEFAULT_SETTINGS.closeUpNoiseStrength,
     colorLevels: resolvedColorLevels,
     overlayTargetCount:

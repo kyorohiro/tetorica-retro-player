@@ -106,6 +106,12 @@ button.secondary {
   gap: 6px;
 }
 
+.label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .control-toggle {
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -113,6 +119,54 @@ button.secondary {
 
 .control span {
   font-size: 13px;
+}
+
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 16px;
+  block-size: 16px;
+  border: 1px solid rgba(196, 230, 125, 0.42);
+  border-radius: 999px;
+  background: rgba(9, 10, 8, 0.88);
+  color: #dbe8ae;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  outline: none;
+}
+
+.info-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 10;
+  inline-size: 190px;
+  padding: 8px 10px;
+  border: 1px solid rgba(196, 230, 125, 0.22);
+  border-radius: 10px;
+  background: rgba(9, 10, 8, 0.96);
+  color: #f0efd8;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%) translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.info-tip:hover::after,
+.info-tip:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .control-hint {

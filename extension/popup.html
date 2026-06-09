@@ -68,50 +68,92 @@
           </label>
 
           <label class="control">
-            <span>Dither</span>
-            <input id="ditherStrength" type="range" min="0" max="0.5" step="0.01" />
+            <span class="label-with-tip">
+              <span>Bayer dither</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds a dot pattern to smooth reduced colors. Higher values feel more gritty and low-color.">?</span>
+            </span>
+            <input id="ditherStrength" type="range" min="0" max="1" step="0.01" />
             <output id="ditherStrengthValue"></output>
           </label>
 
           <label class="control">
-            <span>Curvature</span>
+            <span class="label-with-tip">
+              <span>Curvature</span>
+              <span class="info-tip" tabindex="0" data-tip="Bends the picture inward like curved CRT glass. Higher values make the edges bow more.">?</span>
+            </span>
             <input id="curvature" type="range" min="0" max="0.2" step="0.01" />
             <output id="curvatureValue"></output>
           </label>
 
           <label class="control">
-            <span>CRT aspect</span>
+            <span class="label-with-tip">
+              <span>CRT aspect</span>
+              <span class="info-tip" tabindex="0" data-tip="Tweaks the screen shape so the image feels more like a real CRT tube.">?</span>
+            </span>
             <input id="crtAspect" type="range" min="0.9" max="1.1" step="0.005" />
             <output id="crtAspectValue"></output>
           </label>
 
           <label class="control">
-            <span>Scanline</span>
+            <span class="label-with-tip">
+              <span>Scanline</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds broad horizontal dark bands like an old display. Higher values make the gaps more obvious.">?</span>
+            </span>
             <input id="scanlineStrength" type="range" min="0" max="0.3" step="0.01" />
             <output id="scanlineStrengthValue"></output>
           </label>
 
           <label class="control">
-            <span>Scanline 2</span>
+            <span class="label-with-tip">
+              <span>Scanline 2</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds a finer second layer of line texture for a denser CRT stripe feel.">?</span>
+            </span>
             <input id="scanline2Strength" type="range" min="0" max="0.1" step="0.005" />
             <output id="scanline2StrengthValue"></output>
           </label>
 
           <label class="control">
-            <span>Scanline bright fade</span>
+            <span class="label-with-tip">
+              <span>Scanline bright fade</span>
+              <span class="info-tip" tabindex="0" data-tip="Makes scanlines fade out in bright areas. Higher values keep dark parts striped while bright parts glow more naturally.">?</span>
+            </span>
             <input id="scanlineBrightnessFade" type="range" min="0" max="1" step="0.01" />
             <output id="scanlineBrightnessFadeValue"></output>
           </label>
 
           <label class="control">
-            <span>Glow</span>
-            <input id="glowStrength" type="range" min="0" max="0.2" step="0.01" />
+            <span class="label-with-tip">
+              <span>Vignette</span>
+              <span class="info-tip" tabindex="0" data-tip="Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.">?</span>
+            </span>
+            <input id="vignetteStrength" type="range" min="0" max="0.6" step="0.01" />
+            <output id="vignetteStrengthValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Glow</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds a soft bloom around bright areas. Higher values make highlights spread and feel hotter.">?</span>
+            </span>
+            <input id="glowStrength" type="range" min="0" max="0.5" step="0.01" />
             <output id="glowStrengthValue"></output>
           </label>
 
           <label class="control">
-            <span>Close-up noise</span>
-            <input id="closeUpNoiseStrength" type="range" min="0" max="1" step="0.01" />
+            <span class="label-with-tip">
+              <span>Phosphor</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible.">?</span>
+            </span>
+            <input id="phosphorStrength" type="range" min="0" max="0.5" step="0.01" />
+            <output id="phosphorStrengthValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Close-up noise</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT.">?</span>
+            </span>
+            <input id="closeUpNoiseStrength" type="range" min="0" max="2" step="0.01" />
             <output id="closeUpNoiseStrengthValue"></output>
           </label>
         </section>
@@ -128,13 +170,19 @@
           </label>
 
           <label class="control">
-            <span>Lo-fi amount</span>
+            <span class="label-with-tip">
+              <span>Lo-fi amount</span>
+              <span class="info-tip" tabindex="0" data-tip="Cuts highs and adds rougher character, like cheaper playback hardware.">?</span>
+            </span>
             <input id="lofiAmount" type="range" min="0" max="1" step="0.01" />
             <output id="lofiAmountValue"></output>
           </label>
 
           <label class="control">
-            <span>Wow & Flutter</span>
+            <span class="label-with-tip">
+              <span>Wow & Flutter</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds slow and fast pitch wobble like tape or unstable rotating hardware.">?</span>
+            </span>
             <input id="wowFlutterAmount" type="range" min="0" max="1" step="0.01" />
             <output id="wowFlutterAmountValue"></output>
           </label>
@@ -145,7 +193,10 @@
           </label>
 
           <label class="control">
-            <span>Noise level</span>
+            <span class="label-with-tip">
+              <span>Noise level</span>
+              <span class="info-tip" tabindex="0" data-tip="Controls the amount of added background hiss and room-like noise texture.">?</span>
+            </span>
             <input id="noiseLevel" type="range" min="0" max="1.5" step="0.001" />
             <output id="noiseLevelValue"></output>
           </label>
@@ -158,7 +209,10 @@
           </div>
 
           <label class="control">
-            <span>Simultaneous overlays</span>
+            <span class="label-with-tip">
+              <span>Simultaneous overlays</span>
+              <span class="info-tip" tabindex="0" data-tip="How many media targets to retro-process at once. More targets can be much heavier.">?</span>
+            </span>
             <input id="overlayTargetCount" type="range" min="1" max="6" step="1" />
             <output id="overlayTargetCountValue"></output>
             <small class="control-hint">

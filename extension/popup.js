@@ -36,8 +36,12 @@ const scanline2StrengthInput = document.getElementById("scanline2Strength");
 const scanline2StrengthValue = document.getElementById("scanline2StrengthValue");
 const scanlineBrightnessFadeInput = document.getElementById("scanlineBrightnessFade");
 const scanlineBrightnessFadeValue = document.getElementById("scanlineBrightnessFadeValue");
+const vignetteStrengthInput = document.getElementById("vignetteStrength");
+const vignetteStrengthValue = document.getElementById("vignetteStrengthValue");
 const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
+const phosphorStrengthInput = document.getElementById("phosphorStrength");
+const phosphorStrengthValue = document.getElementById("phosphorStrengthValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
@@ -203,10 +207,24 @@ scanlineBrightnessFadeInput.addEventListener("input", () => {
   });
 });
 
+vignetteStrengthInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    vignetteStrength: Number(vignetteStrengthInput.value),
+  });
+});
+
 glowStrengthInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     glowStrength: Number(glowStrengthInput.value),
+  });
+});
+
+phosphorStrengthInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorStrength: Number(phosphorStrengthInput.value),
   });
 });
 
@@ -313,8 +331,12 @@ function renderSettings(settings) {
   scanline2StrengthValue.textContent = settings.scanline2Strength.toFixed(3);
   scanlineBrightnessFadeInput.value = String(settings.scanlineBrightnessFade);
   scanlineBrightnessFadeValue.textContent = settings.scanlineBrightnessFade.toFixed(2);
+  vignetteStrengthInput.value = String(settings.vignetteStrength);
+  vignetteStrengthValue.textContent = settings.vignetteStrength.toFixed(2);
   glowStrengthInput.value = String(settings.glowStrength);
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
+  phosphorStrengthInput.value = String(settings.phosphorStrength);
+  phosphorStrengthValue.textContent = settings.phosphorStrength.toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);
