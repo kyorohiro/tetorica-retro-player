@@ -15,6 +15,7 @@ type RetroFilterPanelProps = {
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
   phosphorStrength: number;
+  closeUpNoiseStrength: number;
   scanlineStrength: number;
   scanline2Strength: number;
   neonBoost: number;
@@ -34,6 +35,7 @@ type RetroFilterPanelProps = {
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
+  onSetCloseUpNoiseStrength: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
   onSetNeonBoost: (value: number) => void;
@@ -54,6 +56,7 @@ export function RetroFilterPanel({
   monoTint,
   paletteMode,
   phosphorStrength,
+  closeUpNoiseStrength,
   scanlineStrength,
   scanline2Strength,
   neonBoost,
@@ -73,6 +76,7 @@ export function RetroFilterPanel({
   onSetMonoTint,
   onSetPaletteMode,
   onSetPhosphorStrength,
+  onSetCloseUpNoiseStrength,
   onSetScanlineStrength,
   onSetScanline2Strength,
   onSetNeonBoost,
@@ -436,6 +440,23 @@ export function RetroFilterPanel({
             value={phosphorStrength}
             onChange={(ev) => {
               onSetPhosphorStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            Close-up noise: {closeUpNoiseStrength.toFixed(2)}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={closeUpNoiseStrength}
+            onChange={(ev) => {
+              onSetCloseUpNoiseStrength(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />

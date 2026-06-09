@@ -24,6 +24,7 @@ export type RetroFilterInitialState = Partial<{
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -72,6 +73,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+    closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -118,6 +120,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [phosphorStrength, setPhosphorStrength] = useState<number>(
     resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
   );
+  const [closeUpNoiseStrength, setCloseUpNoiseStrength] = useState<number>(
+    resolvedInitialState.closeUpNoiseStrength ?? 0,
+  );
   const [monoTint, setMonoTint] = useState<MonoTintMode>(
     resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
   );
@@ -146,6 +151,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       vignetteStrength: resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
       glowStrength: resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
       phosphorStrength: resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+      closeUpNoiseStrength: resolvedInitialState.closeUpNoiseStrength ?? 0,
       monoTint: resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
       neonBoost: resolvedInitialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
       neonSaturation: resolvedInitialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -227,6 +233,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setVignetteStrength(baseInitialState.vignetteStrength);
     setGlowStrength(baseInitialState.glowStrength);
     setPhosphorStrength(baseInitialState.phosphorStrength);
+    setCloseUpNoiseStrength(baseInitialState.closeUpNoiseStrength);
     setMonoTint(baseInitialState.monoTint);
     setNeonBoost(baseInitialState.neonBoost);
     setNeonSaturation(baseInitialState.neonSaturation);
@@ -247,6 +254,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       vignetteStrength,
       glowStrength,
       phosphorStrength,
+      closeUpNoiseStrength,
       monoTint,
       neonBoost,
       neonSaturation,
@@ -264,6 +272,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     neonDetail,
     paletteMode,
     phosphorStrength,
+    closeUpNoiseStrength,
     scanlineStrength,
     scanline2Strength,
     targetHeight,
@@ -284,6 +293,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     vignetteStrength,
     glowStrength,
     phosphorStrength,
+    closeUpNoiseStrength,
     monoTint,
     neonBoost,
     neonSaturation,
@@ -301,6 +311,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setVignetteStrength,
     setGlowStrength,
     setPhosphorStrength,
+    setCloseUpNoiseStrength,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

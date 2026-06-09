@@ -36,6 +36,8 @@ const scanline2StrengthInput = document.getElementById("scanline2Strength");
 const scanline2StrengthValue = document.getElementById("scanline2StrengthValue");
 const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
+const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
+const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
 const overlayTargetCountValue = document.getElementById("overlayTargetCountValue");
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
@@ -105,6 +107,7 @@ presetSelect.addEventListener("change", () => {
 
   currentSettings = normalizeSettings({
     ...applyPresetToSettings(presetSelect.value),
+    closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
   });
   void persistSettings();
@@ -189,6 +192,15 @@ glowStrengthInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     glowStrength: Number(glowStrengthInput.value),
+  });
+});
+
+closeUpNoiseStrengthInput.addEventListener("input", () => {
+  const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
+  closeUpNoiseStrengthValue.textContent = closeUpNoiseStrength.toFixed(2);
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    closeUpNoiseStrength,
   });
 });
 
@@ -280,6 +292,8 @@ function renderSettings(settings) {
   scanline2StrengthValue.textContent = settings.scanline2Strength.toFixed(3);
   glowStrengthInput.value = String(settings.glowStrength);
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
+  closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
+  closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);
   overlayTargetCountInput.max = String(OVERLAY_TARGET_LIMITS.max);
   overlayTargetCountInput.value = String(settings.overlayTargetCount);

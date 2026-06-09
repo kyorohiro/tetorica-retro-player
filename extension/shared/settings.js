@@ -246,6 +246,7 @@ export const DEFAULT_SETTINGS = {
   vignetteStrength: 0.11,
   glowStrength: 0.1,
   phosphorStrength: 0.05,
+  closeUpNoiseStrength: 0.0,
   colorLevels: 32,
   overlayTargetCount: 1,
   isAudioFxEnabled: true,
@@ -331,6 +332,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.phosphorStrength === "number"
         ? clamp(candidate.phosphorStrength, 0, 0.2)
         : basePresetSettings.phosphorStrength,
+    closeUpNoiseStrength:
+      typeof candidate?.closeUpNoiseStrength === "number"
+        ? clamp(candidate.closeUpNoiseStrength, 0, 1)
+        : basePresetSettings.closeUpNoiseStrength ?? DEFAULT_SETTINGS.closeUpNoiseStrength,
     colorLevels: resolvedColorLevels,
     overlayTargetCount:
       typeof candidate?.overlayTargetCount === "number"

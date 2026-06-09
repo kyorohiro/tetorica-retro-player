@@ -15,6 +15,7 @@ export type PersistedRetroFilterSettings = {
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;

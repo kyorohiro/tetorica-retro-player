@@ -48,6 +48,7 @@ uniform float uScanline2Strength;
 uniform float uVignetteStrength;
 uniform float uGlowStrength;
 uniform float uPhosphorStrength;
+uniform float uCloseUpNoiseStrength;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
 uniform float uNeonSaturation;
@@ -504,6 +505,70 @@ float horizontalUnevenness(vec2 uv, float time, float strength)
   return 1.0 - (broad * 0.03 + fine * 0.012) * strength;
 }
 
+float hash12(vec2 p)
+{
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float hash13(vec3 p3)
+{
+  p3 = fract(p3 * 0.1031);
+  p3 += dot(p3, p3.zyx + 31.32);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float closeUpNoiseAmount(vec2 uv, vec2 targetSize)
+{
+  vec2 sourceDelta = fwidth(uv * targetSize);
+  float sourcePixelsPerScreenPixel = max(max(sourceDelta.x, sourceDelta.y), 0.0001);
+  float zoomFactor = 1.0 / sourcePixelsPerScreenPixel;
+  return smoothstep(1.02, 2.2, zoomFactor);
+}
+
+vec3 applyCloseUpTubeNoise(vec3 color, vec2 uv, vec2 cell, float time, float amount)
+{
+  if (amount <= 0.0) {
+    return color;
+  }
+
+  float flickerTime = time * 18.0;
+  float frameA = floor(flickerTime);
+  float frameB = frameA + 1.0;
+  float frameMix = smoothstep(0.0, 1.0, fract(flickerTime));
+  float frameFlicker = 0.82 + hash12(vec2(frameA, 17.0)) * 0.36;
+
+  vec2 fragA = floor(gl_FragCoord.xy);
+  vec2 fragB = floor(gl_FragCoord.xy * 0.5);
+  vec2 cellNoise = floor(cell * 1.37);
+
+  float grainA0 = hash13(vec3(fragA, frameA)) - 0.5;
+  float grainA1 = hash13(vec3(fragA, frameB)) - 0.5;
+  float grainB0 = hash13(vec3(fragB + vec2(31.0, 0.0), frameA + 11.0)) - 0.5;
+  float grainB1 = hash13(vec3(fragB + vec2(31.0, 0.0), frameB + 11.0)) - 0.5;
+  float grainC0 = hash13(vec3(cellNoise + vec2(59.0, 0.0), frameA + 23.0)) - 0.5;
+  float grainC1 = hash13(vec3(cellNoise + vec2(59.0, 0.0), frameB + 23.0)) - 0.5;
+
+  float grainA = mix(grainA0, grainA1, frameMix);
+  float grainB = mix(grainB0, grainB1, frameMix);
+  float grainC = mix(grainC0, grainC1, frameMix);
+  float grain = grainA * 0.5 + grainB * 0.3 + grainC * 0.2;
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float noiseStrength = amount * frameFlicker * (0.085 + (1.0 - luma) * 0.05);
+  float dust0 = hash13(vec3(floor(gl_FragCoord.xy * 0.35) + vec2(97.0, 0.0), frameA + 5.0));
+  float dust1 = hash13(vec3(floor(gl_FragCoord.xy * 0.35) + vec2(97.0, 0.0), frameB + 5.0));
+  float dust = mix(dust0, dust1, frameMix);
+  float sparkle = smoothstep(0.94, 0.995, dust) * amount * (frameFlicker - 0.7) * 0.05;
+  vec3 tintedNoise = vec3(
+    grain * 0.95,
+    grain,
+    grain * 1.05
+  );
+
+  return clamp(color + tintedNoise * noiseStrength + vec3(sparkle), 0.0, 1.0);
+}
+
 vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint, vec2 cell)
 {
   if (paletteMode < 0.5) {
@@ -605,8 +670,17 @@ void main(void)
   float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength;
   color.rgb += scanline2;
 
-  float phosphor = sin(pixelatedUv.x * uTargetSize.x * 6.2831853) * 0.5 + 0.5;
-  color.rgb *= 1.0 + ((phosphor - 0.5) * uPhosphorStrength);
+  float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
+  vec3 phosphorTriad = vec3(
+    sin(phosphorPhase) * 0.5 + 0.5,
+    sin(phosphorPhase + 2.0943951) * 0.5 + 0.5,
+    sin(phosphorPhase + 4.1887902) * 0.5 + 0.5
+  );
+  phosphorTriad = mix(vec3(0.5), phosphorTriad, 0.7);
+  color.rgb *= mix(vec3(1.0), 0.82 + phosphorTriad * 0.42, uPhosphorStrength);
+
+  float closeUpAmount = uCloseUpNoiseStrength;
+  color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;

@@ -817,6 +817,7 @@ export function RetroPlayer({
                 neonSaturation={filterState.neonSaturation}
                 paletteMode={filterState.paletteMode}
                 phosphorStrength={filterState.phosphorStrength}
+                closeUpNoiseStrength={filterState.closeUpNoiseStrength}
                 scanlineStrength={filterState.scanlineStrength}
                 scanline2Strength={filterState.scanline2Strength}
                 selectedPreset={filterState.selectedPreset}
@@ -836,6 +837,7 @@ export function RetroPlayer({
                 onSetNeonSaturation={filterState.setNeonSaturation}
                 onSetPaletteMode={filterState.setPaletteMode}
                 onSetPhosphorStrength={filterState.setPhosphorStrength}
+                onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
                 onSetScanlineStrength={filterState.setScanlineStrength}
                 onSetScanline2Strength={filterState.setScanline2Strength}
                 onSetTargetHeight={filterState.setTargetHeight}

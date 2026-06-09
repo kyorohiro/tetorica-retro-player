@@ -46,23 +46,35 @@ export function useRetroPixiStage({
 
   const applyFilterStateTo = useCallback((filter: Filter | null) => {
     if (!filter) return;
-    filter.resources.pixelUniforms.uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
-    filter.resources.pixelUniforms.uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
-    filter.resources.pixelUniforms.uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
-    filter.resources.pixelUniforms.uniforms.uDitherStrength = filterState.ditherStrength;
-    filter.resources.pixelUniforms.uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
-    filter.resources.pixelUniforms.uniforms.uCurvature = filterState.curvature;
-    filter.resources.pixelUniforms.uniforms.uScanlineStrength = filterState.scanlineStrength;
-    filter.resources.pixelUniforms.uniforms.uScanline2Strength = filterState.scanline2Strength;
-    filter.resources.pixelUniforms.uniforms.uVignetteStrength = filterState.vignetteStrength;
-    filter.resources.pixelUniforms.uniforms.uGlowStrength = filterState.glowStrength;
-    filter.resources.pixelUniforms.uniforms.uPhosphorStrength = filterState.phosphorStrength;
-    filter.resources.pixelUniforms.uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
-    filter.resources.pixelUniforms.uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
-    filter.resources.pixelUniforms.uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
-    filter.resources.pixelUniforms.uniforms.uNeonBoost = filterState.neonBoost;
-    filter.resources.pixelUniforms.uniforms.uNeonSaturation = filterState.neonSaturation;
-    filter.resources.pixelUniforms.uniforms.uNeonDetail = filterState.neonDetail;
+    const uniformGroup = filter.resources.pixelUniforms;
+    const uniforms = uniformGroup.uniforms;
+
+    uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
+    uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
+    uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
+    uniforms.uDitherStrength = filterState.ditherStrength;
+    uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
+    uniforms.uCurvature = filterState.curvature;
+    uniforms.uScanlineStrength = filterState.scanlineStrength;
+    uniforms.uScanline2Strength = filterState.scanline2Strength;
+    uniforms.uVignetteStrength = filterState.vignetteStrength;
+    uniforms.uGlowStrength = filterState.glowStrength;
+    uniforms.uPhosphorStrength = filterState.phosphorStrength;
+    uniforms.uCloseUpNoiseStrength = filterState.closeUpNoiseStrength;
+    uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
+    uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
+    uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
+    uniforms.uNeonBoost = filterState.neonBoost;
+    uniforms.uNeonSaturation = filterState.neonSaturation;
+    uniforms.uNeonDetail = filterState.neonDetail;
+    uniformGroup.update();
+    console.log("[retro-filter-debug] applyFilterState", {
+      ditherStrength: uniforms.uDitherStrength,
+      glowStrength: uniforms.uGlowStrength,
+      phosphorStrength: uniforms.uPhosphorStrength,
+      closeUpNoiseStrength: uniforms.uCloseUpNoiseStrength,
+      dirtyId: uniformGroup._dirtyId,
+    });
   }, [filterState]);
 
   const applyFilterState = useCallback(() => {
@@ -94,6 +106,7 @@ export function useRetroPixiStage({
           uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
           uGlowStrength: { value: RETRO_PRESETS.pc98_512.glow, type: "f32" },
           uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },
+          uCloseUpNoiseStrength: { value: 0.0, type: "f32" },
           uMonoTint: {
             value: new Float32Array(MONO_TINTS.green.rgb),
             type: "vec3<f32>",
@@ -315,7 +328,10 @@ export function useRetroPixiStage({
 
       app.ticker.add((ticker) => {
         const shouldAnimate =
-          isPlayingRef.current || previewKindRef.current === "image";
+          previewKindRef.current === "image" ||
+          previewKindRef.current === "video" ||
+          previewKindRef.current === "capture" ||
+          isPlayingRef.current;
 
         if (!shouldAnimate) {
           return;
@@ -327,6 +343,7 @@ export function useRetroPixiStage({
         }
 
         activeFilter.resources.pixelUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
+        activeFilter.resources.pixelUniforms.update();
       });
 
       app.renderer.on("resize", fitCurrentSprite);

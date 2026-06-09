@@ -484,6 +484,7 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uVignetteStrength, currentSettings.vignetteStrength);
   gl.uniform1f(uniformLocations.uGlowStrength, currentSettings.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, currentSettings.phosphorStrength);
+  gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, currentSettings.closeUpNoiseStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(currentSettings.monoTint));
 }
 
@@ -716,6 +717,7 @@ function setupRenderer(webgl) {
     uVignetteStrength: webgl.getUniformLocation(program, "uVignetteStrength"),
     uGlowStrength: webgl.getUniformLocation(program, "uGlowStrength"),
     uPhosphorStrength: webgl.getUniformLocation(program, "uPhosphorStrength"),
+    uCloseUpNoiseStrength: webgl.getUniformLocation(program, "uCloseUpNoiseStrength"),
     uMonoTint: webgl.getUniformLocation(program, "uMonoTint"),
     uTime: webgl.getUniformLocation(program, "uTime"),
   };
