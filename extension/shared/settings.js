@@ -215,7 +215,7 @@ export const PRESETS = {
     label: "CRT Only",
     targetWidth: 1280,
     targetHeight: 800,
-    colorLevels: 8,
+    colorLevels: 256,
     ditherStrength: 0.12,
     paletteMode: 0,
     curvature: 0.03,
