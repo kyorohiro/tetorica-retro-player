@@ -481,6 +481,7 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uCurvature, currentSettings.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, currentSettings.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, currentSettings.scanline2Strength);
+  gl.uniform1f(uniformLocations.uScanlineBrightnessFade, currentSettings.scanlineBrightnessFade);
   gl.uniform1f(uniformLocations.uVignetteStrength, currentSettings.vignetteStrength);
   gl.uniform1f(uniformLocations.uGlowStrength, currentSettings.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, currentSettings.phosphorStrength);
@@ -714,6 +715,7 @@ function setupRenderer(webgl) {
     uCurvature: webgl.getUniformLocation(program, "uCurvature"),
     uScanlineStrength: webgl.getUniformLocation(program, "uScanlineStrength"),
     uScanline2Strength: webgl.getUniformLocation(program, "uScanline2Strength"),
+    uScanlineBrightnessFade: webgl.getUniformLocation(program, "uScanlineBrightnessFade"),
     uVignetteStrength: webgl.getUniformLocation(program, "uVignetteStrength"),
     uGlowStrength: webgl.getUniformLocation(program, "uGlowStrength"),
     uPhosphorStrength: webgl.getUniformLocation(program, "uPhosphorStrength"),

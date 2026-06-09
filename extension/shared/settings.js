@@ -243,6 +243,7 @@ export const DEFAULT_SETTINGS = {
   curvature: 0.08,
   scanlineStrength: 0.0,
   scanline2Strength: 0.02,
+  scanlineBrightnessFade: 0.6,
   vignetteStrength: 0.11,
   glowStrength: 0.1,
   phosphorStrength: 0.05,
@@ -320,6 +321,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.scanline2Strength === "number"
         ? clamp(candidate.scanline2Strength, 0, 0.1)
         : basePresetSettings.scanline2Strength,
+    scanlineBrightnessFade:
+      typeof candidate?.scanlineBrightnessFade === "number"
+        ? clamp(candidate.scanlineBrightnessFade, 0, 1)
+        : basePresetSettings.scanlineBrightnessFade ?? DEFAULT_SETTINGS.scanlineBrightnessFade,
     vignetteStrength:
       typeof candidate?.vignetteStrength === "number"
         ? clamp(candidate.vignetteStrength, 0, 0.2)
@@ -382,6 +387,10 @@ export function applyPresetToSettings(presetKey) {
     curvature: preset.curvature,
     scanlineStrength: preset.scanlineStrength,
     scanline2Strength: preset.scanline2Strength,
+    scanlineBrightnessFade:
+      typeof preset.scanlineBrightnessFade === "number"
+        ? preset.scanlineBrightnessFade
+        : DEFAULT_SETTINGS.scanlineBrightnessFade,
     vignetteStrength: preset.vignetteStrength,
     glowStrength: preset.glowStrength,
     phosphorStrength: preset.phosphorStrength,

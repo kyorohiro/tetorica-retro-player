@@ -21,6 +21,7 @@ export type RetroFilterInitialState = Partial<{
   curvature: number;
   scanlineStrength: number;
   scanline2Strength: number;
+  scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
@@ -70,6 +71,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     curvature: initialState.curvature ?? DEFAULT_PRESET.curvature,
     scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
     scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+    scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
@@ -111,6 +113,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [scanline2Strength, setScanline2Strength] = useState<number>(
     resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
   );
+  const [scanlineBrightnessFade, setScanlineBrightnessFade] = useState<number>(
+    resolvedInitialState.scanlineBrightnessFade ?? 0.6,
+  );
   const [vignetteStrength, setVignetteStrength] = useState<number>(
     resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
   );
@@ -148,6 +153,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       curvature: resolvedInitialState.curvature ?? DEFAULT_PRESET.curvature,
       scanlineStrength: resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
       scanline2Strength: resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
+      scanlineBrightnessFade: resolvedInitialState.scanlineBrightnessFade ?? 0.6,
       vignetteStrength: resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
       glowStrength: resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
       phosphorStrength: resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
@@ -230,6 +236,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setCurvature(baseInitialState.curvature);
     setScanlineStrength(baseInitialState.scanlineStrength);
     setScanline2Strength(baseInitialState.scanline2Strength);
+    setScanlineBrightnessFade(baseInitialState.scanlineBrightnessFade);
     setVignetteStrength(baseInitialState.vignetteStrength);
     setGlowStrength(baseInitialState.glowStrength);
     setPhosphorStrength(baseInitialState.phosphorStrength);
@@ -251,6 +258,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       curvature,
       scanlineStrength,
       scanline2Strength,
+      scanlineBrightnessFade,
       vignetteStrength,
       glowStrength,
       phosphorStrength,
@@ -273,6 +281,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     paletteMode,
     phosphorStrength,
     closeUpNoiseStrength,
+    scanlineBrightnessFade,
     scanlineStrength,
     scanline2Strength,
     targetHeight,
@@ -290,6 +299,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     curvature,
     scanlineStrength,
     scanline2Strength,
+    scanlineBrightnessFade,
     vignetteStrength,
     glowStrength,
     phosphorStrength,
@@ -308,6 +318,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setCurvature,
     setScanlineStrength,
     setScanline2Strength,
+    setScanlineBrightnessFade,
     setVignetteStrength,
     setGlowStrength,
     setPhosphorStrength,

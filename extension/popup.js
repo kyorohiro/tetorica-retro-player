@@ -34,6 +34,8 @@ const scanlineStrengthInput = document.getElementById("scanlineStrength");
 const scanlineStrengthValue = document.getElementById("scanlineStrengthValue");
 const scanline2StrengthInput = document.getElementById("scanline2Strength");
 const scanline2StrengthValue = document.getElementById("scanline2StrengthValue");
+const scanlineBrightnessFadeInput = document.getElementById("scanlineBrightnessFade");
+const scanlineBrightnessFadeValue = document.getElementById("scanlineBrightnessFadeValue");
 const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
@@ -107,6 +109,7 @@ presetSelect.addEventListener("change", () => {
 
   currentSettings = normalizeSettings({
     ...applyPresetToSettings(presetSelect.value),
+    scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
     closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
   });
@@ -185,6 +188,15 @@ scanline2StrengthInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     scanline2Strength: Number(scanline2StrengthInput.value),
+  });
+});
+
+scanlineBrightnessFadeInput.addEventListener("input", () => {
+  const scanlineBrightnessFade = Number(scanlineBrightnessFadeInput.value);
+  scanlineBrightnessFadeValue.textContent = scanlineBrightnessFade.toFixed(2);
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    scanlineBrightnessFade,
   });
 });
 
@@ -290,6 +302,8 @@ function renderSettings(settings) {
   scanlineStrengthValue.textContent = settings.scanlineStrength.toFixed(2);
   scanline2StrengthInput.value = String(settings.scanline2Strength);
   scanline2StrengthValue.textContent = settings.scanline2Strength.toFixed(3);
+  scanlineBrightnessFadeInput.value = String(settings.scanlineBrightnessFade);
+  scanlineBrightnessFadeValue.textContent = settings.scanlineBrightnessFade.toFixed(2);
   glowStrengthInput.value = String(settings.glowStrength);
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);

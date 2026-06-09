@@ -605,6 +605,7 @@ export function usePixiVideoPlayer(
     filterState.paletteMode,
     filterState.phosphorStrength,
     filterState.closeUpNoiseStrength,
+    filterState.scanlineBrightnessFade,
     filterState.scanlineStrength,
     filterState.scanline2Strength,
     filterState.targetHeight,

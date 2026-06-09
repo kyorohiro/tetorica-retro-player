@@ -45,6 +45,7 @@ type RetroFilterPanelProps = {
   paletteMode: PaletteMode;
   phosphorStrength: number;
   closeUpNoiseStrength: number;
+  scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
   neonBoost: number;
@@ -65,6 +66,7 @@ type RetroFilterPanelProps = {
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
+  onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
   onSetNeonBoost: (value: number) => void;
@@ -86,6 +88,7 @@ export function RetroFilterPanel({
   paletteMode,
   phosphorStrength,
   closeUpNoiseStrength,
+  scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
   neonBoost,
@@ -106,6 +109,7 @@ export function RetroFilterPanel({
   onSetPaletteMode,
   onSetPhosphorStrength,
   onSetCloseUpNoiseStrength,
+  onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
   onSetNeonBoost,
@@ -430,6 +434,26 @@ export function RetroFilterPanel({
             value={scanline2Strength}
             onChange={(ev) => {
               onSetScanline2Strength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Scanline bright fade: ${scanlineBrightnessFade.toFixed(2)}`}
+              text="Makes scanlines fade out in bright areas. Higher values keep dark parts striped while bright parts look more naturally emissive."
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={scanlineBrightnessFade}
+            onChange={(ev) => {
+              onSetScanlineBrightnessFade(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />

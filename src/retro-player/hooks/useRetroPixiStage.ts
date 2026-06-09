@@ -57,6 +57,7 @@ export function useRetroPixiStage({
     uniforms.uCurvature = filterState.curvature;
     uniforms.uScanlineStrength = filterState.scanlineStrength;
     uniforms.uScanline2Strength = filterState.scanline2Strength;
+    uniforms.uScanlineBrightnessFade = filterState.scanlineBrightnessFade;
     uniforms.uVignetteStrength = filterState.vignetteStrength;
     uniforms.uGlowStrength = filterState.glowStrength;
     uniforms.uPhosphorStrength = filterState.phosphorStrength;
@@ -68,13 +69,6 @@ export function useRetroPixiStage({
     uniforms.uNeonSaturation = filterState.neonSaturation;
     uniforms.uNeonDetail = filterState.neonDetail;
     uniformGroup.update();
-    console.log("[retro-filter-debug] applyFilterState", {
-      ditherStrength: uniforms.uDitherStrength,
-      glowStrength: uniforms.uGlowStrength,
-      phosphorStrength: uniforms.uPhosphorStrength,
-      closeUpNoiseStrength: uniforms.uCloseUpNoiseStrength,
-      dirtyId: uniformGroup._dirtyId,
-    });
   }, [filterState]);
 
   const applyFilterState = useCallback(() => {
@@ -103,6 +97,7 @@ export function useRetroPixiStage({
           uCurvature: { value: RETRO_PRESETS.pc98_512.curvature, type: "f32" },
           uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
           uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
+          uScanlineBrightnessFade: { value: 0.6, type: "f32" },
           uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
           uGlowStrength: { value: RETRO_PRESETS.pc98_512.glow, type: "f32" },
           uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },

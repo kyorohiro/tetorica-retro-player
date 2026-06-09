@@ -45,6 +45,7 @@ uniform float uPaletteMode;
 uniform float uCurvature;
 uniform float uScanlineStrength;
 uniform float uScanline2Strength;
+uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uGlowStrength;
 uniform float uPhosphorStrength;
@@ -664,10 +665,13 @@ void main(void)
     color.rgb += glow * glowMask * uGlowStrength;
   }
 
-  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength);
+  float scanlineBrightness = max(max(color.r, color.g), color.b);
+  float scanlineVisibility = mix(1.0, 1.0 - scanlineBrightness, uScanlineBrightnessFade);
 
-  float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength;
+  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
+  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength * scanlineVisibility);
+
+  float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength * scanlineVisibility;
   color.rgb += scanline2;
 
   float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
