@@ -52,7 +52,6 @@ let noiseLfoGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
-let captureSizePollTimer = 0;
 let currentSession = null;
 let isFitModeEnabled = false;
 let mediaRecorder = null;
@@ -167,17 +166,10 @@ function stopCapture() {
 function attachCaptureSizeListeners() {
   detachCaptureSizeListeners();
   video.addEventListener("resize", handleCaptureResize);
-  captureSizePollTimer = window.setInterval(() => {
-    handleCaptureResize();
-  }, 500);
 }
 
 function detachCaptureSizeListeners() {
   video.removeEventListener("resize", handleCaptureResize);
-  if (captureSizePollTimer) {
-    window.clearInterval(captureSizePollTimer);
-    captureSizePollTimer = 0;
-  }
 }
 
 function drawFrame() {
@@ -448,31 +440,7 @@ function updateCanvasAspectRatio() {
 }
 
 function logCaptureAspect(reason) {
-  const videoAspect =
-    video.videoWidth > 0 && video.videoHeight > 0
-      ? video.videoWidth / video.videoHeight
-      : null;
-  const sessionAspect = getSessionAspectRatio();
-  const canvasAspect =
-    canvas.width > 0 && canvas.height > 0
-      ? canvas.width / canvas.height
-      : null;
-
-  console.log("capture-aspect", {
-    reason,
-    isFitModeEnabled,
-    sessionAspect,
-    videoAspect,
-    canvasAspect,
-    sourceViewportWidth: currentSession?.sourceViewportWidth ?? null,
-    sourceViewportHeight: currentSession?.sourceViewportHeight ?? null,
-    sourceOuterWidth: currentSession?.sourceOuterWidth ?? null,
-    sourceOuterHeight: currentSession?.sourceOuterHeight ?? null,
-    videoWidth: video.videoWidth,
-    videoHeight: video.videoHeight,
-    canvasWidth: canvas.width,
-    canvasHeight: canvas.height,
-  });
+  void reason;
 }
 
 function applyPreset(presetKey) {
