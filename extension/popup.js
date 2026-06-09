@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   getDefaultColorLevelsForPalette,
   MONO_TINT_OPTIONS,
+  OVERLAY_TARGET_LIMITS,
   PALETTE_OPTIONS,
   PRESETS,
   SETTINGS_STORAGE_KEY,
@@ -35,6 +36,8 @@ const scanline2StrengthInput = document.getElementById("scanline2Strength");
 const scanline2StrengthValue = document.getElementById("scanline2StrengthValue");
 const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
+const overlayTargetCountInput = document.getElementById("overlayTargetCount");
+const overlayTargetCountValue = document.getElementById("overlayTargetCountValue");
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
 const lofiAmountInput = document.getElementById("lofiAmount");
 const lofiAmountValue = document.getElementById("lofiAmountValue");
@@ -186,6 +189,12 @@ glowStrengthInput.addEventListener("input", () => {
   });
 });
 
+overlayTargetCountInput.addEventListener("input", () => {
+  updateSettings({
+    overlayTargetCount: Number(overlayTargetCountInput.value),
+  });
+});
+
 audioFxEnabledInput.addEventListener("change", () => {
   updateSettings({ isAudioFxEnabled: audioFxEnabledInput.checked });
 });
@@ -268,6 +277,10 @@ function renderSettings(settings) {
   scanline2StrengthValue.textContent = settings.scanline2Strength.toFixed(3);
   glowStrengthInput.value = String(settings.glowStrength);
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
+  overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);
+  overlayTargetCountInput.max = String(OVERLAY_TARGET_LIMITS.max);
+  overlayTargetCountInput.value = String(settings.overlayTargetCount);
+  overlayTargetCountValue.textContent = `${settings.overlayTargetCount} target${settings.overlayTargetCount === 1 ? "" : "s"}`;
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);
   lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);

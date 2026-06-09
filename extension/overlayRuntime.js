@@ -37,13 +37,354 @@ export async function toggleRetroOverlay(settingsInput) {
 
 function createOverlay(settings) {
   let currentSettings = settings;
+  const badge = document.createElement("button");
+  badge.type = "button";
+  badge.textContent = "Retro";
+  badge.style.position = "fixed";
+  badge.style.right = "16px";
+  badge.style.top = "16px";
+  badge.style.zIndex = "2147483647";
+  badge.style.padding = "8px 12px";
+  badge.style.border = "1px solid rgba(196, 230, 125, 0.35)";
+  badge.style.borderRadius = "999px";
+  badge.style.background = "rgba(9, 10, 8, 0.82)";
+  badge.style.color = "#eff7ca";
+  badge.style.font = '12px "IBM Plex Sans", "Segoe UI", sans-serif';
+  badge.style.cursor = "pointer";
+  badge.style.backdropFilter = "blur(8px)";
+  badge.style.boxShadow = "0 0 18px rgba(110, 147, 58, 0.22)";
+
+  const surfaces = [];
+  let rafId = 0;
+  let frameCount = 0;
+  let isVisible = true;
+  let detachStorageListener = null;
+  let pointerClientX = null;
+  let pointerClientY = null;
+  let detachPointerTracking = null;
+  let hoveredElement = null;
+  let previousHoveredElement = null;
+  const rejectedImages = new WeakSet();
+
+  badge.addEventListener("click", async () => {
+    isVisible = !isVisible;
+
+    if (isVisible) {
+      currentSettings = await loadLatestSettings(currentSettings);
+      applySettingsToSurfaces();
+    }
+
+    setSurfaceVisibility();
+    badge.textContent = isVisible ? "Orig" : "Retro";
+  });
+
+  function start() {
+    document.body.append(badge);
+    attachSettingsSync();
+    attachPointerTracking();
+    draw();
+  }
+
+  function destroy() {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+
+    if (detachStorageListener) {
+      detachStorageListener();
+      detachStorageListener = null;
+    }
+
+    if (detachPointerTracking) {
+      detachPointerTracking();
+      detachPointerTracking = null;
+    }
+
+    destroySurfaces();
+    badge.remove();
+  }
+
+  function attachSettingsSync() {
+    if (!chrome?.storage?.onChanged) {
+      return;
+    }
+
+    const handleStorageChanged = (changes, areaName) => {
+      if (areaName !== "local" || !changes[SETTINGS_STORAGE_KEY]?.newValue) {
+        return;
+      }
+
+      currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
+      applySettingsToSurfaces();
+      syncSurfaceCount(currentSettings.overlayTargetCount);
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChanged);
+    detachStorageListener = () => {
+      chrome.storage.onChanged.removeListener(handleStorageChanged);
+    };
+  }
+
+  function draw() {
+    frameCount += 1;
+    const targets = collectPreferredTargets();
+    syncSurfaceCount(currentSettings.overlayTargetCount);
+
+    for (let index = 0; index < surfaces.length; index += 1) {
+      const surface = surfaces[index];
+      const target = targets[index] ?? null;
+      renderSurface(surface, target, index);
+    }
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  function attachPointerTracking() {
+    const handlePointerMove = (event) => {
+      pointerClientX = event.clientX;
+      pointerClientY = event.clientY;
+    };
+
+    const clearPointerFocus = () => {
+      pointerClientX = null;
+      pointerClientY = null;
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("blur", clearPointerFocus);
+    document.addEventListener("pointerleave", clearPointerFocus);
+
+    detachPointerTracking = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("blur", clearPointerFocus);
+      document.removeEventListener("pointerleave", clearPointerFocus);
+    };
+  }
+
+  function collectPreferredTargets() {
+    const nextHoveredElement = findPreferredHoverElement(pointerClientX, pointerClientY);
+    updateHoverHistory(nextHoveredElement);
+
+    if (hoveredElement && !isDrawableElement(hoveredElement)) {
+      hoveredElement = null;
+    }
+
+    if (previousHoveredElement && !isDrawableElement(previousHoveredElement)) {
+      previousHoveredElement = null;
+    }
+
+    const targets = [];
+    appendUniqueDrawableTarget(targets, hoveredElement);
+    appendUniqueDrawableTarget(targets, findPrimaryDrawableElement());
+    appendUniqueDrawableTarget(targets, previousHoveredElement);
+
+    for (const candidate of findAutoDrawableTargets()) {
+      appendUniqueDrawableTarget(targets, candidate);
+      if (targets.length >= currentSettings.overlayTargetCount) {
+        break;
+      }
+    }
+
+    return targets.slice(0, currentSettings.overlayTargetCount);
+  }
+
+  function updateHoverHistory(nextHoveredElement) {
+    if (hoveredElement === nextHoveredElement) {
+      return;
+    }
+
+    if (
+      hoveredElement &&
+      hoveredElement !== nextHoveredElement &&
+      isDrawableElement(hoveredElement)
+    ) {
+      previousHoveredElement = hoveredElement;
+    }
+
+    hoveredElement = nextHoveredElement;
+    if (previousHoveredElement === hoveredElement) {
+      previousHoveredElement = null;
+    }
+  }
+
+  function syncSurfaceCount(count) {
+    while (surfaces.length < count) {
+      const surface = createOverlaySurface(surfaces.length);
+      surfaces.push(surface);
+      applySettings(surface.gl, surface.renderer.program, surface.renderer.uniformLocations, currentSettings);
+      if (document.body) {
+        document.body.append(surface.canvas, surface.failureOverlay);
+      }
+    }
+
+    while (surfaces.length > count) {
+      const surface = surfaces.pop();
+      surface?.destroy();
+    }
+  }
+
+  function destroySurfaces() {
+    while (surfaces.length > 0) {
+      surfaces.pop()?.destroy();
+    }
+  }
+
+  function applySettingsToSurfaces() {
+    for (const surface of surfaces) {
+      applySettings(surface.gl, surface.renderer.program, surface.renderer.uniformLocations, currentSettings);
+    }
+  }
+
+  function setSurfaceVisibility() {
+    for (const surface of surfaces) {
+      if (isVisible) {
+        surface.canvas.style.display = surface.targetElement ? "block" : "none";
+      } else {
+        surface.canvas.style.display = "none";
+      }
+
+      if (!isVisible) {
+        surface.hideFailureOverlay();
+      }
+    }
+  }
+
+  function renderSurface(surface, targetElement, priorityIndex) {
+    if (!targetElement || !isDrawableElement(targetElement)) {
+      surface.updateTarget(null);
+      surface.hide();
+      return;
+    }
+
+    const rect = targetElement.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) {
+      surface.updateTarget(null);
+      surface.hide();
+      return;
+    }
+
+    surface.updateTarget(targetElement);
+    surface.syncRect(rect);
+
+    if (!isVisible) {
+      surface.hide();
+      return;
+    }
+
+    if (targetElement instanceof HTMLImageElement && rejectedImages.has(targetElement)) {
+      surface.canvas.style.display = "none";
+      surface.showFailureOverlay(rect);
+      return;
+    }
+
+    const shouldRenderNow =
+      surface.didTargetChange || frameCount % getFrameIntervalForPriority(priorityIndex) === 0;
+
+    if (!shouldRenderNow) {
+      surface.canvas.style.display = "block";
+      surface.hideFailureOverlay();
+      return;
+    }
+
+    surface.canvas.style.display = "block";
+    surface.hideFailureOverlay();
+    surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+    surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
+    surface.gl.useProgram(surface.renderer.program);
+    surface.gl.uniform1f(
+      surface.renderer.uniformLocations.uTime,
+      (performance.now() - surface.startedAt) / 1000,
+    );
+    surface.gl.activeTexture(surface.gl.TEXTURE0);
+    surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
+
+    try {
+      surface.gl.texImage2D(
+        surface.gl.TEXTURE_2D,
+        0,
+        surface.gl.RGBA,
+        surface.gl.RGBA,
+        surface.gl.UNSIGNED_BYTE,
+        targetElement,
+      );
+      surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+      surface.didTargetChange = false;
+    } catch (error) {
+      if (
+        targetElement instanceof HTMLImageElement &&
+        error instanceof DOMException &&
+        error.name === "SecurityError"
+      ) {
+        rejectedImages.add(targetElement);
+        surface.canvas.style.display = "none";
+        surface.showFailureOverlay(rect);
+        return;
+      }
+
+      console.warn("Failed to upload overlay source to WebGL texture.", error);
+      surface.hide();
+    }
+  }
+
+  return {
+    start,
+    destroy,
+  };
+}
+
+function findPrimaryDrawableElement() {
+  return findAutoDrawableTargets()[0] ?? null;
+}
+
+function findPreferredHoverElement(clientX, clientY) {
+  const hoveredImage = findHoveredImage(clientX, clientY);
+  if (hoveredImage) {
+    return hoveredImage;
+  }
+
+  return findHoveredVideo(clientX, clientY);
+}
+
+function findAutoDrawableTargets() {
+  return [...document.querySelectorAll("video, img")]
+    .filter(isDrawableElement)
+    .sort((left, right) => {
+      const leftRect = left.getBoundingClientRect();
+      const rightRect = right.getBoundingClientRect();
+      return rightRect.width * rightRect.height - leftRect.width * leftRect.height;
+    });
+}
+
+function appendUniqueDrawableTarget(targets, candidate) {
+  if (!candidate || !isDrawableElement(candidate) || targets.includes(candidate)) {
+    return;
+  }
+
+  targets.push(candidate);
+}
+
+function getFrameIntervalForPriority(priorityIndex) {
+  if (priorityIndex <= 0) {
+    return 1;
+  }
+
+  if (priorityIndex === 1) {
+    return 2;
+  }
+
+  return 4;
+}
+
+function createOverlaySurface(index) {
   const canvas = document.createElement("canvas");
   canvas.style.position = "fixed";
   canvas.style.left = "0";
   canvas.style.top = "0";
-  canvas.style.zIndex = "2147483647";
+  canvas.style.zIndex = String(2147483500 - index * 2);
   canvas.style.pointerEvents = "none";
-  canvas.style.display = "block";
+  canvas.style.display = "none";
   canvas.style.transformOrigin = "top left";
   canvas.dataset.tetoricaOverlay = "true";
 
@@ -51,7 +392,7 @@ function createOverlay(settings) {
   failureOverlay.style.position = "fixed";
   failureOverlay.style.left = "0";
   failureOverlay.style.top = "0";
-  failureOverlay.style.zIndex = "2147483647";
+  failureOverlay.style.zIndex = String(2147483501 - index * 2);
   failureOverlay.style.pointerEvents = "none";
   failureOverlay.style.display = "none";
   failureOverlay.style.alignItems = "center";
@@ -75,23 +416,6 @@ function createOverlay(settings) {
   failureOverlayLabel.style.boxShadow = "0 0 18px rgba(255, 180, 82, 0.16)";
   failureOverlay.append(failureOverlayLabel);
 
-  const badge = document.createElement("button");
-  badge.type = "button";
-  badge.textContent = "Retro";
-  badge.style.position = "fixed";
-  badge.style.right = "16px";
-  badge.style.top = "16px";
-  badge.style.zIndex = "2147483647";
-  badge.style.padding = "8px 12px";
-  badge.style.border = "1px solid rgba(196, 230, 125, 0.35)";
-  badge.style.borderRadius = "999px";
-  badge.style.background = "rgba(9, 10, 8, 0.82)";
-  badge.style.color = "#eff7ca";
-  badge.style.font = '12px "IBM Plex Sans", "Segoe UI", sans-serif';
-  badge.style.cursor = "pointer";
-  badge.style.backdropFilter = "blur(8px)";
-  badge.style.boxShadow = "0 0 18px rgba(110, 147, 58, 0.22)";
-
   const gl = canvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
@@ -105,258 +429,74 @@ function createOverlay(settings) {
   }
 
   const renderer = setupRenderer(gl);
-  let targetElement = null;
-  let rafId = 0;
-  let isVisible = true;
-  let startedAt = performance.now();
-  let lastRectKey = "";
-  let detachStorageListener = null;
-  let pointerClientX = null;
-  let pointerClientY = null;
-  let detachPointerTracking = null;
-  let rejectedHoverImage = null;
 
-  badge.addEventListener("click", async () => {
-    isVisible = !isVisible;
-
-    if (isVisible) {
-      currentSettings = await loadLatestSettings(currentSettings);
-      applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
-    }
-
-    canvas.style.display = isVisible ? "block" : "none";
-    hideFailureOverlay();
-    badge.textContent = isVisible ? "Orig" : "Retro";
-  });
-
-  function start() {
-    document.body.append(canvas, failureOverlay, badge);
-    attachSettingsSync();
-    attachPointerTracking();
-    updateTargetElement(findPreferredElement());
-    draw();
-  }
-
-  function destroy() {
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = 0;
-    }
-
-    if (detachStorageListener) {
-      detachStorageListener();
-      detachStorageListener = null;
-    }
-
-    if (detachPointerTracking) {
-      detachPointerTracking();
-      detachPointerTracking = null;
-    }
-
-    canvas.remove();
-    failureOverlay.remove();
-    badge.remove();
-  }
-
-  function attachSettingsSync() {
-    if (!chrome?.storage?.onChanged) {
-      return;
-    }
-
-    const handleStorageChanged = (changes, areaName) => {
-      if (areaName !== "local" || !changes[SETTINGS_STORAGE_KEY]?.newValue) {
+  return {
+    canvas,
+    failureOverlay,
+    gl,
+    renderer,
+    targetElement: null,
+    startedAt: performance.now(),
+    lastRectKey: "",
+    didTargetChange: true,
+    destroy() {
+      canvas.remove();
+      failureOverlay.remove();
+    },
+    updateTarget(nextTarget) {
+      if (this.targetElement === nextTarget) {
         return;
       }
 
-      currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
-      applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
-    };
+      this.targetElement = nextTarget;
+      this.startedAt = performance.now();
+      this.lastRectKey = "";
+      this.didTargetChange = true;
+      this.hideFailureOverlay();
+    },
+    syncRect(rect) {
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.floor(rect.width * dpr));
+      const height = Math.max(1, Math.floor(rect.height * dpr));
+      const rectKey = [
+        Math.round(rect.left),
+        Math.round(rect.top),
+        Math.round(rect.width),
+        Math.round(rect.height),
+        width,
+        height,
+      ].join(":");
 
-    chrome.storage.onChanged.addListener(handleStorageChanged);
-    detachStorageListener = () => {
-      chrome.storage.onChanged.removeListener(handleStorageChanged);
-    };
-  }
-
-  function updateTargetElement(nextElement) {
-    if (targetElement === nextElement) {
-      return;
-    }
-
-    targetElement = nextElement;
-    hideFailureOverlay();
-
-    if (!targetElement) {
-      return;
-    }
-
-    startedAt = performance.now();
-  }
-
-  function draw() {
-    const hoveredImage = findHoveredImage(pointerClientX, pointerClientY);
-    const isRejectedImageHovered =
-      hoveredImage instanceof HTMLImageElement && hoveredImage === rejectedHoverImage;
-    const nextElement = findPreferredElement(hoveredImage);
-    updateTargetElement(nextElement);
-
-    if (!targetElement || !isDrawableElement(targetElement)) {
-      canvas.style.display = "none";
-      hideFailureOverlay();
-      rafId = requestAnimationFrame(draw);
-      return;
-    }
-
-    const rect = targetElement.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) {
-      canvas.style.display = "none";
-      hideFailureOverlay();
-      rafId = requestAnimationFrame(draw);
-      return;
-    }
-
-    if (isRejectedImageHovered && hoveredImage) {
-      canvas.style.display = "none";
-      showFailureOverlay(hoveredImage.getBoundingClientRect());
-      rafId = requestAnimationFrame(draw);
-      return;
-    }
-
-    syncCanvasRect(rect);
-    if (!renderVideoFrame()) {
-      rafId = requestAnimationFrame(draw);
-      return;
-    }
-    rafId = requestAnimationFrame(draw);
-  }
-
-  function attachPointerTracking() {
-    const handlePointerMove = (event) => {
-      pointerClientX = event.clientX;
-      pointerClientY = event.clientY;
-      if (rejectedHoverImage && !isPointInsideElement(rejectedHoverImage, event.clientX, event.clientY)) {
-        rejectedHoverImage = null;
-      }
-    };
-
-    const clearPointerFocus = () => {
-      pointerClientX = null;
-      pointerClientY = null;
-      rejectedHoverImage = null;
-    };
-
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    window.addEventListener("blur", clearPointerFocus);
-    document.addEventListener("pointerleave", clearPointerFocus);
-
-    detachPointerTracking = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("blur", clearPointerFocus);
-      document.removeEventListener("pointerleave", clearPointerFocus);
-    };
-  }
-
-  function findPreferredElement(hoveredImage = findHoveredImage(pointerClientX, pointerClientY)) {
-    if (hoveredImage && hoveredImage !== rejectedHoverImage) {
-      return hoveredImage;
-    }
-
-    const hoveredVideo = findHoveredVideo(pointerClientX, pointerClientY);
-    if (hoveredVideo) {
-      return hoveredVideo;
-    }
-
-    return findPrimaryVideo();
-  }
-
-  function syncCanvasRect(rect) {
-    const dpr = window.devicePixelRatio || 1;
-    const width = Math.max(1, Math.floor(rect.width * dpr));
-    const height = Math.max(1, Math.floor(rect.height * dpr));
-    const rectKey = [
-      Math.round(rect.left),
-      Math.round(rect.top),
-      Math.round(rect.width),
-      Math.round(rect.height),
-      width,
-      height,
-    ].join(":");
-
-    if (rectKey === lastRectKey) {
-      return;
-    }
-
-    lastRectKey = rectKey;
-    canvas.style.left = `${rect.left}px`;
-    canvas.style.top = `${rect.top}px`;
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
-
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
-  }
-
-  function renderVideoFrame() {
-    canvas.style.display = isVisible ? "block" : "none";
-    hideFailureOverlay();
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(0.0, 0.0, 0.0, 0.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(renderer.program);
-    gl.uniform1f(renderer.uniformLocations.uTime, (performance.now() - startedAt) / 1000);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, renderer.texture);
-    try {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, targetElement);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-      return true;
-    } catch (error) {
-      if (targetElement instanceof HTMLImageElement && error instanceof DOMException && error.name === "SecurityError") {
-        rejectedHoverImage = targetElement;
-        showFailureOverlay(targetElement.getBoundingClientRect());
-        return false;
+      if (rectKey === this.lastRectKey) {
+        return;
       }
 
-      console.warn("Failed to upload overlay source to WebGL texture.", error);
-      return false;
-    }
-  }
+      this.lastRectKey = rectKey;
+      canvas.style.left = `${rect.left}px`;
+      canvas.style.top = `${rect.top}px`;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
 
-  function showFailureOverlay(rect) {
-    if (!isVisible) {
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+    },
+    showFailureOverlay(rect) {
+      failureOverlay.style.display = "flex";
+      failureOverlay.style.left = `${rect.left}px`;
+      failureOverlay.style.top = `${rect.top}px`;
+      failureOverlay.style.width = `${rect.width}px`;
+      failureOverlay.style.height = `${rect.height}px`;
+    },
+    hideFailureOverlay() {
       failureOverlay.style.display = "none";
-      return;
-    }
-
-    failureOverlay.style.display = "flex";
-    failureOverlay.style.left = `${rect.left}px`;
-    failureOverlay.style.top = `${rect.top}px`;
-    failureOverlay.style.width = `${rect.width}px`;
-    failureOverlay.style.height = `${rect.height}px`;
-  }
-
-  function hideFailureOverlay() {
-    failureOverlay.style.display = "none";
-  }
-
-  applySettings(gl, renderer.program, renderer.uniformLocations, currentSettings);
-
-  return {
-    start,
-    destroy,
+    },
+    hide() {
+      canvas.style.display = "none";
+      this.hideFailureOverlay();
+    },
   };
-}
-
-function findPrimaryVideo() {
-  return [...document.querySelectorAll("video")]
-    .filter(isUsableVideo)
-    .sort((left, right) => {
-      const leftRect = left.getBoundingClientRect();
-      const rightRect = right.getBoundingClientRect();
-      return rightRect.width * rightRect.height - leftRect.width * leftRect.height;
-    })[0] ?? null;
 }
 
 function findHoveredVideo(clientX, clientY) {

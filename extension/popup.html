@@ -132,6 +132,22 @@
             <output id="noiseLevelValue"></output>
           </label>
         </section>
+
+        <section class="control-group" aria-labelledby="overlayControlsTitle">
+          <div class="control-group-header">
+            <p class="control-group-kicker">Overlay</p>
+            <h2 id="overlayControlsTitle">Multiple target behavior</h2>
+          </div>
+
+          <label class="control">
+            <span>Simultaneous overlays</span>
+            <input id="overlayTargetCount" type="range" min="1" max="6" step="1" />
+            <output id="overlayTargetCountValue"></output>
+            <small class="control-hint">
+              Order: current hover, default [0], previous hover, then auto-picked videos.
+            </small>
+          </label>
+        </section>
       </section>
 
       <footer class="footer">

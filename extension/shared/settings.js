@@ -247,6 +247,7 @@ export const DEFAULT_SETTINGS = {
   glowStrength: 0.1,
   phosphorStrength: 0.05,
   colorLevels: 32,
+  overlayTargetCount: 1,
   isAudioFxEnabled: true,
   lofiAmount: 0.85,
   isNoiseEnabled: true,
@@ -256,6 +257,11 @@ export const DEFAULT_SETTINGS = {
 export const COLOR_LEVEL_LIMITS = {
   min: 2,
   max: 256,
+};
+
+export const OVERLAY_TARGET_LIMITS = {
+  min: 1,
+  max: 6,
 };
 
 export function normalizeSettings(candidate) {
@@ -326,6 +332,14 @@ export function normalizeSettings(candidate) {
         ? clamp(candidate.phosphorStrength, 0, 0.2)
         : basePresetSettings.phosphorStrength,
     colorLevels: resolvedColorLevels,
+    overlayTargetCount:
+      typeof candidate?.overlayTargetCount === "number"
+        ? clamp(
+            Math.round(candidate.overlayTargetCount),
+            OVERLAY_TARGET_LIMITS.min,
+            OVERLAY_TARGET_LIMITS.max,
+          )
+        : DEFAULT_SETTINGS.overlayTargetCount,
     isAudioFxEnabled:
       typeof candidate?.isAudioFxEnabled === "boolean"
         ? candidate.isAudioFxEnabled
