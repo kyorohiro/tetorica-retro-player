@@ -45,6 +45,23 @@ export function RetroPlayer({
   onError,
   initialFilterState,
 }: RetroPlayerProps) {
+  const [isDebugMode, setIsDebugMode] = React.useState(() =>
+    typeof window !== "undefined" &&
+    (
+      import.meta.env.DEV ||
+      Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+    ),
+  );
+  const isMinimalRafMode =
+    typeof window !== "undefined" &&
+    Boolean(
+      (window as typeof window & { __RETRO_PLAYER_MINIMAL_RAF__?: boolean })
+        .__RETRO_PLAYER_MINIMAL_RAF__,
+    );
+  const [pageRafStats, setPageRafStats] = React.useState<{
+    fps: number;
+    rafMs: number;
+  } | null>(null);
   const persistedUiSettings = React.useMemo(
     () => loadPersistedRetroSettings()?.ui,
     [],
@@ -71,6 +88,28 @@ export function RetroPlayer({
     "playback" | "audio-settings" | "video-settings"
   >("playback");
   const { showConfirmDialog } = useDialog();
+
+  const formatPerfStat = (value: number | null | undefined, digits = 2) => {
+    const numericValue = value ?? NaN;
+    return Number.isFinite(numericValue) ? numericValue.toFixed(digits) : "--";
+  };
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateDebugMode = () => {
+      setIsDebugMode(
+        import.meta.env.DEV ||
+        Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__),
+      );
+    };
+
+    updateDebugMode();
+    const interval = window.setInterval(updateDebugMode, 500);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
   const filterState = useRetroFilterState(initialFilterState);
   const renderResolutionScale = isHighResolution
     ? typeof window !== "undefined"
@@ -173,6 +212,45 @@ export function RetroPlayer({
     ),
     [activeTooltipKey],
   );
+
+  React.useEffect(() => {
+    if (!isDebugMode || typeof window === "undefined") return;
+
+    let frameId = 0;
+    let lastAt = 0;
+    let frames = 0;
+    let totalRafMs = 0;
+    let windowStartedAt = 0;
+
+    const tick = (now: number) => {
+      if (windowStartedAt === 0) {
+        windowStartedAt = now;
+      }
+      if (lastAt > 0) {
+        totalRafMs += now - lastAt;
+      }
+      lastAt = now;
+      frames += 1;
+
+      const elapsedMs = now - windowStartedAt;
+      if (elapsedMs >= 500) {
+        setPageRafStats({
+          fps: frames / (elapsedMs / 1000),
+          rafMs: frames > 1 ? totalRafMs / Math.max(frames - 1, 1) : 0,
+        });
+        frames = 0;
+        totalRafMs = 0;
+        windowStartedAt = now;
+      }
+
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isDebugMode]);
 
   React.useEffect(() => {
     if (stream) {
@@ -428,6 +506,21 @@ export function RetroPlayer({
                 ref={player.canvasHostRef}
                 className="pointer-events-none h-full w-full touch-manipulation"
               />
+              {isDebugMode && (player.perfStats || pageRafStats) && (
+                <div className="pointer-events-none absolute left-3 top-3 z-10 rounded border border-slate-600 bg-black px-2 py-1 font-mono text-[10px] leading-4 text-slate-200">
+                  {isMinimalRafMode && <div>mode minimal-raf</div>}
+                  {pageRafStats && (
+                    <div>page-raf {pageRafStats.rafMs.toFixed(2)}ms ({pageRafStats.fps.toFixed(1)}fps)</div>
+                  )}
+                  <div>fps {formatPerfStat(player.perfStats?.fps, 1)}</div>
+                  <div>raf {formatPerfStat(player.perfStats?.rafMs)}ms</div>
+                  <div>tick {formatPerfStat(player.perfStats?.tickRafMs)}ms ({formatPerfStat(player.perfStats?.tickFps, 1)}fps)</div>
+                  <div>frame {formatPerfStat(player.perfStats?.frameMs)}ms</div>
+                  <div>upload {formatPerfStat(player.perfStats?.uploadMs)}ms</div>
+                  <div>draw {formatPerfStat(player.perfStats?.drawMs)}ms</div>
+                  <div>gpu {formatPerfStat(player.perfStats?.gpuMs)}ms</div>
+                </div>
+              )}
               {!player.isPoweredOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/72">
                   <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">

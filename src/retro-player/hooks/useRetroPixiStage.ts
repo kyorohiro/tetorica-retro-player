@@ -44,7 +44,7 @@ type RendererResources = {
   uniformLocations: RendererUniformLocations;
 };
 
-type CanvasStageApp = {
+export type CanvasStageApp = {
   canvas: HTMLCanvasElement;
   renderer: RendererResources;
   ticker: {
@@ -54,9 +54,17 @@ type CanvasStageApp = {
   startedAt: number;
 };
 
-type VideoFrameCallbackVideo = HTMLVideoElement & {
-  cancelVideoFrameCallback?: (handle: number) => void;
-  requestVideoFrameCallback?: (callback: () => void) => number;
+type UploadSource = HTMLVideoElement | HTMLImageElement | HTMLCanvasElement;
+
+export type RetroRenderPerfStats = {
+  fps: number;
+  rafMs: number;
+  tickFps: number;
+  tickRafMs: number;
+  frameMs: number;
+  uploadMs: number;
+  drawMs: number;
+  gpuMs: number;
 };
 
 type UseRetroPixiStageParams = {
@@ -67,6 +75,94 @@ type UseRetroPixiStageParams = {
   isPlayingRef: MutableRefObject<boolean>;
   previewKindRef: MutableRefObject<PreviewKind>;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
+};
+
+const isRetroPlayerDebugEnabled = () =>
+  typeof window !== "undefined" &&
+  (
+    import.meta.env.DEV ||
+    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+  );
+
+const isRetroPlayerMinimalRafModeEnabled = () =>
+  typeof window !== "undefined" &&
+  Boolean(
+    (window as typeof window & { __RETRO_PLAYER_MINIMAL_RAF__?: boolean })
+      .__RETRO_PLAYER_MINIMAL_RAF__,
+  );
+
+const safePerfAverage = (sum: number, count: number) =>
+  count > 0 ? sum / count : 0;
+
+const normalizeElapsedSeconds = (elapsedMs: number) =>
+  Math.max(elapsedMs / 1000, 0.001);
+
+const resolveTickPerf = (
+  current: RetroRenderPerfStats | null,
+  tickAccumulator: {
+    frames: number;
+    totalRafMs: number;
+    windowStartedAt: number;
+  },
+  nowMs: number,
+) => {
+  const hasTickData = tickAccumulator.frames > 0 && tickAccumulator.windowStartedAt > 0;
+  const tickElapsedSeconds = hasTickData
+    ? normalizeElapsedSeconds(nowMs - tickAccumulator.windowStartedAt)
+    : 0;
+
+  return {
+    tickFps:
+      hasTickData && tickAccumulator.frames > 0
+        ? tickAccumulator.frames / tickElapsedSeconds
+        : current?.tickFps ?? 0,
+    tickRafMs:
+      hasTickData && tickAccumulator.frames > 1
+        ? tickAccumulator.totalRafMs / Math.max(tickAccumulator.frames - 1, 1)
+        : current?.tickRafMs ?? 0,
+  };
+};
+
+const resolveFramePerf = (
+  current: RetroRenderPerfStats | null,
+  frameAccumulator: {
+    frames: number;
+    totalRafMs: number;
+    totalFrameMs: number;
+    totalUploadMs: number;
+    totalDrawMs: number;
+    totalGpuMs: number;
+    windowStartedAt: number;
+  },
+  nowMs: number,
+) => {
+  const hasFrameData = frameAccumulator.frames > 0 && frameAccumulator.windowStartedAt > 0;
+  const frameElapsedSeconds = hasFrameData
+    ? normalizeElapsedSeconds(nowMs - frameAccumulator.windowStartedAt)
+    : 0;
+
+  return {
+    fps:
+      hasFrameData && frameAccumulator.frames > 0
+        ? frameAccumulator.frames / frameElapsedSeconds
+        : current?.fps ?? 0,
+    rafMs:
+      hasFrameData && frameAccumulator.frames > 1
+        ? frameAccumulator.totalRafMs / Math.max(frameAccumulator.frames - 1, 1)
+        : current?.rafMs ?? 0,
+    frameMs: hasFrameData
+      ? safePerfAverage(frameAccumulator.totalFrameMs, frameAccumulator.frames)
+      : current?.frameMs ?? 0,
+    uploadMs: hasFrameData
+      ? safePerfAverage(frameAccumulator.totalUploadMs, frameAccumulator.frames)
+      : current?.uploadMs ?? 0,
+    drawMs: hasFrameData
+      ? safePerfAverage(frameAccumulator.totalDrawMs, frameAccumulator.frames)
+      : current?.drawMs ?? 0,
+    gpuMs: hasFrameData
+      ? safePerfAverage(frameAccumulator.totalGpuMs, frameAccumulator.frames)
+      : current?.gpuMs ?? 0,
+  };
 };
 
 const PASS_THROUGH_FRAGMENT = `#version 300 es
@@ -281,14 +377,31 @@ export function useRetroPixiStage({
   const filterRef = useRef<Record<string, never> | null>(null);
   const initPromiseRef = useRef<Promise<void> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const videoFrameRequestRef = useRef<number | null>(null);
-  const renderFrameRef = useRef<() => void>(() => {});
+  const renderFrameRef = useRef<(trackPerf?: boolean) => void>(() => {});
   const filterStateRef = useRef(filterState);
   const isPoweredOnRef = useRef(isPoweredOn);
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutNestedFrameRef = useRef<number | null>(null);
   const layoutTimeoutRef = useRef<number | null>(null);
+  const uploadCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const uploadContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const perfAccumulatorRef = useRef({
+    frames: 0,
+    totalRafMs: 0,
+    totalFrameMs: 0,
+    totalUploadMs: 0,
+    totalDrawMs: 0,
+    totalGpuMs: 0,
+    windowStartedAt: 0,
+  });
+  const lastFrameAtRef = useRef(0);
+  const tickPerfAccumulatorRef = useRef({
+    frames: 0,
+    totalRafMs: 0,
+    windowStartedAt: 0,
+  });
+  const lastTickAtRef = useRef(0);
   const viewportRectRef = useRef<{
     width: number;
     height: number;
@@ -302,6 +415,7 @@ export function useRetroPixiStage({
     x: number;
     y: number;
   } | null>(null);
+  const [perfStats, setPerfStats] = useState<RetroRenderPerfStats | null>(null);
 
   filterStateRef.current = filterState;
   isPoweredOnRef.current = isPoweredOn;
@@ -324,14 +438,115 @@ export function useRetroPixiStage({
     });
   }, []);
 
-  const renderFrame = useCallback(() => {
+  const getUploadSource = useCallback((
+    source: HTMLVideoElement | HTMLImageElement,
+    currentFilterState: RetroFilterState,
+  ): UploadSource => {
+    if (!currentFilterState.isFilterEnabled) {
+      return source;
+    }
+
+    const sourceSize = getSourceSize(source);
+    if (sourceSize.width <= 0 || sourceSize.height <= 0) {
+      return source;
+    }
+
+    const targetWidth = Math.max(1, Math.round(currentFilterState.targetWidth));
+    const targetHeight = Math.max(1, Math.round(currentFilterState.targetHeight));
+
+    let uploadCanvas = uploadCanvasRef.current;
+    let uploadContext = uploadContextRef.current;
+
+    if (!uploadCanvas || !uploadContext) {
+      uploadCanvas = document.createElement("canvas");
+      uploadContext = uploadCanvas.getContext("2d", {
+        alpha: false,
+        desynchronized: true,
+      });
+
+      if (!uploadContext) {
+        return source;
+      }
+
+      uploadCanvasRef.current = uploadCanvas;
+      uploadContextRef.current = uploadContext;
+    }
+
+    if (uploadCanvas.width !== targetWidth) uploadCanvas.width = targetWidth;
+    if (uploadCanvas.height !== targetHeight) uploadCanvas.height = targetHeight;
+
+    uploadContext.imageSmoothingEnabled = true;
+    uploadContext.imageSmoothingQuality = "high";
+    uploadContext.fillStyle = "#000";
+    uploadContext.fillRect(0, 0, targetWidth, targetHeight);
+
+    const sourceAspect = sourceSize.width / sourceSize.height;
+    const targetAspect = targetWidth / targetHeight;
+
+    let drawWidth = targetWidth;
+    let drawHeight = targetHeight;
+
+    if (sourceAspect > targetAspect) {
+      drawHeight = Math.max(1, Math.round(targetWidth / sourceAspect));
+    } else {
+      drawWidth = Math.max(1, Math.round(targetHeight * sourceAspect));
+    }
+
+    const drawX = Math.round((targetWidth - drawWidth) / 2);
+    const drawY = Math.round((targetHeight - drawHeight) / 2);
+
+    uploadContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+    return uploadCanvas;
+  }, []);
+
+  const renderFrame = useCallback((trackPerf = true) => {
+    const frameStartedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const debugEnabled = isRetroPlayerDebugEnabled();
     const app = appRef.current;
-    const host = canvasHostRef.current;
     const source = previewElementRef.current;
-    if (!app || !host) return;
+    if (!app) return;
+
+    const isMinimalRafMode = isRetroPlayerMinimalRafModeEnabled();
+    if (isMinimalRafMode) {
+      const frameEndedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      if (trackPerf) {
+        const accumulator = perfAccumulatorRef.current;
+        if (accumulator.windowStartedAt === 0) {
+          accumulator.windowStartedAt = frameStartedAt;
+        }
+        if (lastFrameAtRef.current > 0) {
+          accumulator.totalRafMs += frameStartedAt - lastFrameAtRef.current;
+        }
+        lastFrameAtRef.current = frameStartedAt;
+        accumulator.frames += 1;
+        accumulator.totalFrameMs += frameEndedAt - frameStartedAt;
+
+        const elapsedMs = frameEndedAt - accumulator.windowStartedAt;
+        if (debugEnabled && elapsedMs >= 500) {
+          setPerfStats((current) => {
+            const stats = resolveFramePerf(current, accumulator, frameEndedAt);
+            const tickStats = resolveTickPerf(current, tickPerfAccumulatorRef.current, frameEndedAt);
+            return {
+              ...current,
+              ...stats,
+              ...tickStats,
+            };
+          });
+          accumulator.frames = 0;
+          accumulator.totalRafMs = 0;
+          accumulator.totalFrameMs = 0;
+          accumulator.totalUploadMs = 0;
+          accumulator.totalDrawMs = 0;
+          accumulator.totalGpuMs = 0;
+          accumulator.windowStartedAt = frameEndedAt;
+        }
+      }
+      return;
+    }
 
     const { gl, texture, filterProgram, passthroughProgram, uniformLocations } = app.renderer;
-    const canvas = app.canvas;
 
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.clearColor(0.01, 0.02, 0.01, 1);
@@ -341,32 +556,17 @@ export function useRetroPixiStage({
       return;
     }
 
-    const viewRect = viewportRectRef.current ?? {
-      x: 0,
-      y: 0,
-      width: host.clientWidth,
-      height: host.clientHeight,
-    };
+    const currentFilterState = filterStateRef.current;
+    const uploadSource = getUploadSource(source, currentFilterState);
 
-    const scaleX = canvas.width / Math.max(host.clientWidth, 1);
-    const scaleY = canvas.height / Math.max(host.clientHeight, 1);
-    const viewportX = Math.round(viewRect.x * scaleX);
-    const viewportY = Math.round(viewRect.y * scaleY);
-    const viewportWidth = Math.max(1, Math.round(viewRect.width * scaleX));
-    const viewportHeight = Math.max(1, Math.round(viewRect.height * scaleY));
-
-    gl.viewport(
-      viewportX,
-      Math.max(0, canvas.height - viewportY - viewportHeight),
-      viewportWidth,
-      viewportHeight,
-    );
-
+    const uploadStartedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+    const uploadEndedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
 
-    const currentFilterState = filterStateRef.current;
     if (currentFilterState.isFilterEnabled) {
       applyFilterUniforms(
         gl,
@@ -380,7 +580,52 @@ export function useRetroPixiStage({
       gl.useProgram(passthroughProgram);
     }
 
+    const drawStartedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    const gpuStartedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (debugEnabled) {
+      gl.finish();
+    }
+    const frameEndedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+
+    if (trackPerf) {
+      const accumulator = perfAccumulatorRef.current;
+      if (accumulator.windowStartedAt === 0) {
+        accumulator.windowStartedAt = frameStartedAt;
+      }
+      if (lastFrameAtRef.current > 0) {
+        accumulator.totalRafMs += frameStartedAt - lastFrameAtRef.current;
+      }
+      lastFrameAtRef.current = frameStartedAt;
+      accumulator.frames += 1;
+      accumulator.totalFrameMs += frameEndedAt - frameStartedAt;
+      accumulator.totalUploadMs += uploadEndedAt - uploadStartedAt;
+      accumulator.totalDrawMs += frameEndedAt - drawStartedAt;
+      accumulator.totalGpuMs += frameEndedAt - gpuStartedAt;
+
+      const elapsedMs = frameEndedAt - accumulator.windowStartedAt;
+      if (debugEnabled && elapsedMs >= 500) {
+        setPerfStats((current) => {
+          const stats = resolveFramePerf(current, accumulator, frameEndedAt);
+          const tickStats = resolveTickPerf(current, tickPerfAccumulatorRef.current, frameEndedAt);
+          return {
+            ...current,
+            ...stats,
+            ...tickStats,
+          };
+        });
+        accumulator.frames = 0;
+        accumulator.totalRafMs = 0;
+        accumulator.totalFrameMs = 0;
+        accumulator.totalUploadMs = 0;
+        accumulator.totalDrawMs = 0;
+        accumulator.totalGpuMs = 0;
+        accumulator.windowStartedAt = frameEndedAt;
+      }
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -393,42 +638,39 @@ export function useRetroPixiStage({
       window.cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    const source = previewElementRef.current as VideoFrameCallbackVideo | null;
-    if (
-      videoFrameRequestRef.current !== null &&
-      source &&
-      typeof source.cancelVideoFrameCallback === "function"
-    ) {
-      source.cancelVideoFrameCallback(videoFrameRequestRef.current);
-    }
-    videoFrameRequestRef.current = null;
+    lastTickAtRef.current = 0;
+    tickPerfAccumulatorRef.current = {
+      frames: 0,
+      totalRafMs: 0,
+      windowStartedAt: 0,
+    };
   }, []);
 
   const startTicker = useCallback(() => {
     if (isTickerRunningRef.current) return;
     isTickerRunningRef.current = true;
-
-    const scheduleNext = () => {
-      const source = previewElementRef.current as VideoFrameCallbackVideo | null;
-      const useVideoFrameCallback =
-        (previewKindRef.current === "video" || previewKindRef.current === "capture") &&
-        source &&
-        typeof source.requestVideoFrameCallback === "function";
-
-      if (useVideoFrameCallback) {
-        videoFrameRequestRef.current = source.requestVideoFrameCallback?.(() => {
-          videoFrameRequestRef.current = null;
-          tick();
-        }) ?? null;
-        return;
-      }
-
-      animationFrameRef.current = window.requestAnimationFrame(tick);
+    lastTickAtRef.current = 0;
+    tickPerfAccumulatorRef.current = {
+      frames: 0,
+      totalRafMs: 0,
+      windowStartedAt: 0,
     };
 
     const tick = () => {
       if (!isTickerRunningRef.current) return;
-      renderFrameRef.current();
+      const debugEnabled = isRetroPlayerDebugEnabled();
+      const tickNow =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      const tickAccumulator = tickPerfAccumulatorRef.current;
+      if (tickAccumulator.windowStartedAt === 0) {
+        tickAccumulator.windowStartedAt = tickNow;
+      }
+      if (lastTickAtRef.current > 0) {
+        tickAccumulator.totalRafMs += tickNow - lastTickAtRef.current;
+      }
+      lastTickAtRef.current = tickNow;
+      tickAccumulator.frames += 1;
+      renderFrameRef.current(true);
 
       const shouldAnimate =
         previewKindRef.current === "video" ||
@@ -438,27 +680,42 @@ export function useRetroPixiStage({
 
       if (!shouldAnimate) {
         animationFrameRef.current = null;
-        videoFrameRequestRef.current = null;
         isTickerRunningRef.current = false;
         return;
       }
 
-      scheduleNext();
+      const tickElapsedMs = tickNow - tickAccumulator.windowStartedAt;
+      if (debugEnabled && tickElapsedMs >= 500) {
+        setPerfStats((current) => {
+          const stats = resolveTickPerf(current, tickAccumulator, tickNow);
+          const frameStats = resolveFramePerf(current, perfAccumulatorRef.current, tickNow);
+          return {
+            ...current,
+            ...frameStats,
+            ...stats,
+          };
+        });
+        tickAccumulator.frames = 0;
+        tickAccumulator.totalRafMs = 0;
+        tickAccumulator.windowStartedAt = tickNow;
+      }
+
+      animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
-    scheduleNext();
+    animationFrameRef.current = window.requestAnimationFrame(tick);
   }, [isPlayingRef, previewKindRef]);
 
   const applyFilterState = useCallback(() => {
-    renderFrame();
+    renderFrame(false);
   }, [renderFrame]);
 
   const syncSpriteFilter = useCallback(() => {
-    renderFrame();
+    renderFrame(false);
   }, [renderFrame]);
 
   const syncTexturePresentation = useCallback(() => {
-    renderFrame();
+    renderFrame(false);
   }, [renderFrame]);
 
   const resetFilterInstance = useCallback(() => {
@@ -467,7 +724,7 @@ export function useRetroPixiStage({
         typeof performance !== "undefined" ? performance.now() : Date.now();
     }
     filterRef.current = {};
-    renderFrame();
+    renderFrame(false);
     return filterRef.current;
   }, [renderFrame]);
 
@@ -541,35 +798,60 @@ export function useRetroPixiStage({
   }, [fitSprite]);
 
   const safeRender = useCallback(() => {
-    renderFrame();
+    renderFrame(false);
   }, [renderFrame]);
 
-  const refreshLayout = useCallback(() => {
+  const refreshLayout = useCallback(function refreshLayout() {
     const app = appRef.current;
     const host = canvasHostRef.current;
     if (!app || !host) return;
 
-    const nextWidth = Math.max(
-      1,
-      Math.round(host.clientWidth * Math.max(1, renderResolutionScale)),
-    );
-    const nextHeight = Math.max(
-      1,
-      Math.round(host.clientHeight * Math.max(1, renderResolutionScale)),
-    );
-    const styleWidth = Math.max(1, Math.round(host.clientWidth));
-    const styleHeight = Math.max(1, Math.round(host.clientHeight));
+    fitCurrentSprite();
+
+    const viewRect = viewportRectRef.current ?? {
+      x: 0,
+      y: 0,
+      width: host.clientWidth,
+      height: host.clientHeight,
+    };
+    const styleWidth = Math.max(1, Math.round(viewRect.width));
+    const styleHeight = Math.max(1, Math.round(viewRect.height));
+    const currentFilterState = filterStateRef.current;
+    const nextWidth = currentFilterState.isFilterEnabled
+      ? Math.max(
+          1,
+          Math.round(
+            Math.max(1, currentFilterState.targetWidth) * Math.max(1, renderResolutionScale),
+          ),
+        )
+      : Math.max(
+          1,
+          Math.round(styleWidth * Math.max(1, renderResolutionScale)),
+        );
+    const nextHeight = currentFilterState.isFilterEnabled
+      ? Math.max(
+          1,
+          Math.round(
+            Math.max(1, currentFilterState.targetHeight) * Math.max(1, renderResolutionScale),
+          ),
+        )
+      : Math.max(
+          1,
+          Math.round(styleHeight * Math.max(1, renderResolutionScale)),
+        );
 
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
+    app.canvas.style.position = "absolute";
+    app.canvas.style.left = `${Math.round(viewRect.x)}px`;
+    app.canvas.style.top = `${Math.round(viewRect.y)}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
+    app.canvas.style.imageRendering = currentFilterState.isFilterEnabled
+      ? "pixelated"
+      : "auto";
 
-    fitCurrentSprite();
-    renderFrame();
-  }, [fitCurrentSprite, renderFrame, renderResolutionScale]);
-
-  const scheduleRefreshLayout = useCallback(() => {
+    renderFrame(false);
     if (layoutFrameRef.current !== null) {
       window.cancelAnimationFrame(layoutFrameRef.current);
       layoutFrameRef.current = null;
@@ -592,6 +874,18 @@ export function useRetroPixiStage({
       });
     });
 
+    layoutTimeoutRef.current = window.setTimeout(() => {
+      layoutTimeoutRef.current = null;
+      refreshLayout();
+    }, 120);
+  }, [fitCurrentSprite, renderFrame, renderResolutionScale]);
+
+  const scheduleRefreshLayout = useCallback(() => {
+    if (layoutFrameRef.current !== null || layoutTimeoutRef.current !== null) return;
+    layoutFrameRef.current = window.requestAnimationFrame(() => {
+      layoutFrameRef.current = null;
+      refreshLayout();
+    });
     layoutTimeoutRef.current = window.setTimeout(() => {
       layoutTimeoutRef.current = null;
       refreshLayout();
@@ -637,6 +931,7 @@ export function useRetroPixiStage({
         return;
       }
 
+      nextHost.style.position = "relative";
       nextHost.appendChild(canvas);
       appRef.current = app;
       filterRef.current = {};
@@ -699,6 +994,25 @@ export function useRetroPixiStage({
     filterRef.current = null;
     previewElementRef.current = null;
     updateViewportRect(null);
+    uploadContextRef.current = null;
+    uploadCanvasRef.current = null;
+    perfAccumulatorRef.current = {
+      frames: 0,
+      totalRafMs: 0,
+      totalFrameMs: 0,
+      totalUploadMs: 0,
+      totalDrawMs: 0,
+      totalGpuMs: 0,
+      windowStartedAt: 0,
+    };
+    lastFrameAtRef.current = 0;
+    tickPerfAccumulatorRef.current = {
+      frames: 0,
+      totalRafMs: 0,
+      windowStartedAt: 0,
+    };
+    lastTickAtRef.current = 0;
+    setPerfStats(null);
     setIsRendererReady(false);
   }, [stopTicker, updateViewportRect]);
 
@@ -734,6 +1048,7 @@ export function useRetroPixiStage({
     previewElementRef,
     filterRef,
     isRendererReady,
+    perfStats,
     viewportRect,
     setViewportRect: updateViewportRect,
     applyFilterState,

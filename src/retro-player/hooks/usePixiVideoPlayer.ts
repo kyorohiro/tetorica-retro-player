@@ -10,7 +10,10 @@ let retroPlayerInstanceSeed = 0;
 
 const isRetroPlayerDebugEnabled = () =>
   typeof window !== "undefined" &&
-  Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__);
+  (
+    import.meta.env.DEV ||
+    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+  );
 
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
@@ -88,11 +91,11 @@ export function usePixiVideoPlayer(
     previewElementRef,
     filterRef,
     isRendererReady,
+    perfStats,
     viewportRect,
     setViewportRect,
     applyFilterState,
     destroyPixi,
-    fitCurrentSprite,
     fitSprite,
     initPixi,
     refreshLayout,
@@ -592,7 +595,7 @@ export function usePixiVideoPlayer(
     applyFilterState();
     syncSpriteFilter();
     syncTexturePresentation();
-    fitCurrentSprite();
+    refreshLayout();
   }, [
     filterState.colorLevels,
     filterState.curvature,
@@ -612,6 +615,7 @@ export function usePixiVideoPlayer(
     filterState.targetWidth,
     filterState.vignetteStrength,
     filterState.glowStrength,
+    refreshLayout,
   ]);
 
   useEffect(() => {
@@ -710,6 +714,7 @@ export function usePixiVideoPlayer(
     previewName,
     previewError,
     isRendererReady,
+    perfStats,
     loadingLabel,
     isLoading,
     needsUserPlay,

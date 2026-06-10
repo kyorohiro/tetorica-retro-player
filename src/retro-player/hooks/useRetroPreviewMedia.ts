@@ -1,15 +1,8 @@
+import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type CurrentRef<T> = { current: T };
-
-type CanvasStageApp = {
-  canvas: HTMLCanvasElement;
-  ticker: {
-    start: () => void;
-    stop: () => void;
-  };
-};
 
 type UseRetroPreviewMediaParams = {
   filterState: RetroFilterState;
@@ -55,7 +48,9 @@ type UseRetroPreviewMediaParams = {
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
   connectMediaAudio: (media: HTMLMediaElement) => Promise<void>;
-  fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) => void;
+  fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) =>
+    | { width: number; height: number; x: number; y: number }
+    | undefined;
   refreshLayout: () => void;
   scheduleRefreshLayout: () => void;
   safeRender: () => void;
