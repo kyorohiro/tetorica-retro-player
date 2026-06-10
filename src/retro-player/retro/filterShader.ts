@@ -671,15 +671,16 @@ vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   float lit = smoothstep(0.01, 0.28, perceivedLight);
   float gate = smoothstep(0.0, 0.12, perceivedLight);
   float radiusBias = pow(brightness, 0.7);
-  float dotRadius = mix(uBulbRadius * 0.18, uBulbRadius * 0.78, radiusBias);
-  float haloRadius = dotRadius + mix(0.02, 0.1, brightness);
+  float highlightBloom = smoothstep(0.68, 1.0, brightness);
+  float dotRadius = mix(uBulbRadius * 0.18, uBulbRadius * (0.78 + highlightBloom * 0.28), radiusBias);
+  float haloRadius = dotRadius + mix(0.02, 0.1 + highlightBloom * 0.08, brightness);
   float core = 1.0 - smoothstep(dotRadius - 0.018, dotRadius + 0.022, dist);
   float halo = 1.0 - smoothstep(haloRadius - 0.02, haloRadius + 0.06, dist);
   float emission =
     gate *
     lit *
     amount *
-    (core * (0.95 + brightness * 0.55) + halo * halo * (0.04 + brightness * 0.08));
+    (core * (0.95 + brightness * 0.55 + highlightBloom * 0.18) + halo * halo * (0.04 + brightness * 0.08 + highlightBloom * 0.08));
   float floorLight = gate * lit * uBlackFloor * amount;
   vec3 dotColor = color * emission;
   dotColor += color * floorLight;
