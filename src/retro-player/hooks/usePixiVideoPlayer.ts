@@ -73,7 +73,6 @@ export function usePixiVideoPlayer(
     );
   };
 
-  const debugEnabled = isRetroPlayerDebugEnabled();
   const stage = useRetroPixiStage({
     filterState,
     fitMode,
@@ -81,7 +80,6 @@ export function usePixiVideoPlayer(
     isPoweredOn,
     isPlayingRef,
     previewKindRef,
-    debugEnabled,
     debugVideo,
   });
 
@@ -93,7 +91,6 @@ export function usePixiVideoPlayer(
     previewElementRef,
     filterRef,
     isRendererReady,
-    perfStats,
     viewportRect,
     setViewportRect,
     applyFilterState,
@@ -106,7 +103,6 @@ export function usePixiVideoPlayer(
     scheduleRefreshLayout,
     syncSpriteFilter,
     syncTexturePresentation,
-    resetPerfAccumulators,
   } = stage;
   const initPixiRef = useRef(initPixi);
   const destroyPixiRef = useRef(destroyPixi);
@@ -252,7 +248,6 @@ export function usePixiVideoPlayer(
     safeRender,
     resetFilterInstance,
     initPixi,
-    resetPerfAccumulators,
     debugVideo,
     debugAudio,
   });
@@ -718,7 +713,6 @@ export function usePixiVideoPlayer(
     previewName,
     previewError,
     isRendererReady,
-    perfStats,
     loadingLabel,
     isLoading,
     needsUserPlay,
