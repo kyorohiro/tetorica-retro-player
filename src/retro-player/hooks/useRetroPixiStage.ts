@@ -54,6 +54,11 @@ type CanvasStageApp = {
   startedAt: number;
 };
 
+type VideoFrameCallbackVideo = HTMLVideoElement & {
+  cancelVideoFrameCallback?: (handle: number) => void;
+  requestVideoFrameCallback?: (callback: () => void) => number;
+};
+
 type UseRetroPixiStageParams = {
   filterState: RetroFilterState;
   fitMode: "contain" | "width";
@@ -276,6 +281,7 @@ export function useRetroPixiStage({
   const filterRef = useRef<Record<string, never> | null>(null);
   const initPromiseRef = useRef<Promise<void> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const videoFrameRequestRef = useRef<number | null>(null);
   const renderFrameRef = useRef<() => void>(() => {});
   const filterStateRef = useRef(filterState);
   const isPoweredOnRef = useRef(isPoweredOn);
@@ -387,11 +393,38 @@ export function useRetroPixiStage({
       window.cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
+    const source = previewElementRef.current as VideoFrameCallbackVideo | null;
+    if (
+      videoFrameRequestRef.current !== null &&
+      source &&
+      typeof source.cancelVideoFrameCallback === "function"
+    ) {
+      source.cancelVideoFrameCallback(videoFrameRequestRef.current);
+    }
+    videoFrameRequestRef.current = null;
   }, []);
 
   const startTicker = useCallback(() => {
     if (isTickerRunningRef.current) return;
     isTickerRunningRef.current = true;
+
+    const scheduleNext = () => {
+      const source = previewElementRef.current as VideoFrameCallbackVideo | null;
+      const useVideoFrameCallback =
+        (previewKindRef.current === "video" || previewKindRef.current === "capture") &&
+        source &&
+        typeof source.requestVideoFrameCallback === "function";
+
+      if (useVideoFrameCallback) {
+        videoFrameRequestRef.current = source.requestVideoFrameCallback?.(() => {
+          videoFrameRequestRef.current = null;
+          tick();
+        }) ?? null;
+        return;
+      }
+
+      animationFrameRef.current = window.requestAnimationFrame(tick);
+    };
 
     const tick = () => {
       if (!isTickerRunningRef.current) return;
@@ -405,14 +438,15 @@ export function useRetroPixiStage({
 
       if (!shouldAnimate) {
         animationFrameRef.current = null;
+        videoFrameRequestRef.current = null;
         isTickerRunningRef.current = false;
         return;
       }
 
-      animationFrameRef.current = window.requestAnimationFrame(tick);
+      scheduleNext();
     };
 
-    animationFrameRef.current = window.requestAnimationFrame(tick);
+    scheduleNext();
   }, [isPlayingRef, previewKindRef]);
 
   const applyFilterState = useCallback(() => {
