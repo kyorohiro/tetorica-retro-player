@@ -627,10 +627,13 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   float glow = 1.0 - smoothstep(glowRadius - 0.03, glowRadius + 0.11, ellipseDist);
   float filament = exp(-ellipseDist * ellipseDist * mix(22.0, 7.0, brightness));
   float blackFloor = mix(0.0, uBlackFloor, brightness);
-  float bulbLight = bulb * (0.85 + brightness * 0.35);
-  float glowLight = glow * glow * (0.05 + brightness * 0.16);
-  float filamentLight = filament * (0.22 + brightness * 0.55);
-  vec3 maskedColor = color * (blackFloor + bulbLight + glowLight + filamentLight);
+  float bulbLight = bulb * (0.82 + brightness * 0.32);
+  float glowLight = glow * glow * (0.02 + brightness * 0.08);
+  float filamentLight = filament * (0.18 + brightness * 0.48);
+  float emission = bulbLight + glowLight + filamentLight;
+  float shape = clamp(max(bulb, max(glow * 0.65, filament)), 0.0, 1.0);
+  float blackMask = pow(1.0 - shape, 1.8);
+  vec3 maskedColor = color * (emission + blackFloor * blackMask);
 
   return mix(color, maskedColor, amount);
 }

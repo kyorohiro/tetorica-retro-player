@@ -560,7 +560,7 @@ export function RetroFilterPanel({
           </span>
           <input
             type="range"
-            min="0.05"
+            min="0.01"
             max="0.5"
             step="0.005"
             value={bulbRadius}

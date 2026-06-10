@@ -19,6 +19,8 @@ uniform float uVignetteStrength;
 uniform float uGlowStrength;
 uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
+uniform float uBulbRadius;
+uniform float uBlackFloor;
 uniform float uCloseUpNoiseStrength;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
@@ -588,16 +590,19 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   vec2 ellipseScale = vec2(1.32, 0.72);
   vec2 ellipseUv = cellUv / ellipseScale;
   float ellipseDist = length(ellipseUv);
-  float bulbRadius = mix(0.09, 0.3, pow(brightness, 0.7));
+  float bulbRadius = mix(uBulbRadius * 0.3, uBulbRadius, pow(brightness, 0.7));
   float glowRadius = bulbRadius + mix(0.08, 0.2, brightness);
   float bulb = 1.0 - smoothstep(bulbRadius - 0.025, bulbRadius + 0.04, ellipseDist);
   float glow = 1.0 - smoothstep(glowRadius - 0.03, glowRadius + 0.11, ellipseDist);
   float filament = exp(-ellipseDist * ellipseDist * mix(22.0, 7.0, brightness));
-  float blackFloor = mix(0.0, 0.008, brightness);
-  float bulbLight = bulb * (0.85 + brightness * 0.35);
-  float glowLight = glow * glow * (0.05 + brightness * 0.16);
-  float filamentLight = filament * (0.22 + brightness * 0.55);
-  vec3 maskedColor = color * (blackFloor + bulbLight + glowLight + filamentLight);
+  float blackFloor = mix(0.0, uBlackFloor, brightness);
+  float bulbLight = bulb * (0.82 + brightness * 0.32);
+  float glowLight = glow * glow * (0.02 + brightness * 0.08);
+  float filamentLight = filament * (0.18 + brightness * 0.48);
+  float emission = bulbLight + glowLight + filamentLight;
+  float shape = clamp(max(bulb, max(glow * 0.65, filament)), 0.0, 1.0);
+  float blackMask = pow(1.0 - shape, 1.8);
+  vec3 maskedColor = color * (emission + blackFloor * blackMask);
 
   return mix(color, maskedColor, amount);
 }
