@@ -601,6 +601,11 @@ function applySettings(gl, program, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uGlowStrength, settings.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
   gl.uniform1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
+  gl.uniform1f(
+    uniformLocations.uPixelAspect,
+    (Math.max(gl.drawingBufferWidth, 1) * Math.max(settings.targetHeight, 1)) /
+      (Math.max(gl.drawingBufferHeight, 1) * Math.max(settings.targetWidth, 1)),
+  );
   gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, settings.closeUpNoiseStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(settings.monoTint));
 }
@@ -694,6 +699,7 @@ function setupRenderer(webgl) {
       uGlowStrength: webgl.getUniformLocation(program, "uGlowStrength"),
       uPhosphorStrength: webgl.getUniformLocation(program, "uPhosphorStrength"),
       uSpotMaskStrength: webgl.getUniformLocation(program, "uSpotMaskStrength"),
+      uPixelAspect: webgl.getUniformLocation(program, "uPixelAspect"),
       uCloseUpNoiseStrength: webgl.getUniformLocation(program, "uCloseUpNoiseStrength"),
       uMonoTint: webgl.getUniformLocation(program, "uMonoTint"),
       uTime: webgl.getUniformLocation(program, "uTime"),

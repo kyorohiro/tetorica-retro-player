@@ -31,6 +31,7 @@ type RendererUniformLocations = {
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
+  uPixelAspect: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uMonoTint: WebGLUniformLocation | null;
   uNeonBoost: WebGLUniformLocation | null;
@@ -213,6 +214,7 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
       uSpotMaskStrength: gl.getUniformLocation(filterProgram, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
+      uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
       uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
       uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
       uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
@@ -252,6 +254,11 @@ function applyFilterUniforms(
   gl.uniform1f(uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
   gl.uniform1f(uniformLocations.uBulbRadius, filterState.bulbRadius);
   gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
+  gl.uniform1f(
+    uniformLocations.uPixelAspect,
+    (Math.max(gl.drawingBufferWidth, 1) * Math.max(filterState.targetHeight, 1)) /
+      (Math.max(gl.drawingBufferHeight, 1) * Math.max(filterState.targetWidth, 1)),
+  );
   gl.uniform1f(
     uniformLocations.uCloseUpNoiseStrength,
     filterState.closeUpNoiseStrength,
