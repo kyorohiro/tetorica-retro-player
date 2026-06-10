@@ -28,6 +28,9 @@ type RendererUniformLocations = {
   uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
+  uSpotMaskStrength: WebGLUniformLocation | null;
+  uBulbRadius: WebGLUniformLocation | null;
+  uBlackFloor: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uMonoTint: WebGLUniformLocation | null;
   uNeonBoost: WebGLUniformLocation | null;
@@ -207,6 +210,9 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
       uVignetteStrength: gl.getUniformLocation(filterProgram, "uVignetteStrength"),
       uGlowStrength: gl.getUniformLocation(filterProgram, "uGlowStrength"),
       uPhosphorStrength: gl.getUniformLocation(filterProgram, "uPhosphorStrength"),
+      uSpotMaskStrength: gl.getUniformLocation(filterProgram, "uSpotMaskStrength"),
+      uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
+      uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
       uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
       uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
       uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
@@ -243,6 +249,9 @@ function applyFilterUniforms(
   gl.uniform1f(uniformLocations.uVignetteStrength, filterState.vignetteStrength);
   gl.uniform1f(uniformLocations.uGlowStrength, filterState.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
+  gl.uniform1f(uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
+  gl.uniform1f(uniformLocations.uBulbRadius, filterState.bulbRadius);
+  gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
   gl.uniform1f(
     uniformLocations.uCloseUpNoiseStrength,
     filterState.closeUpNoiseStrength,
@@ -550,28 +559,14 @@ export function useRetroPixiStage({
     const styleWidth = Math.max(1, Math.round(viewRect.width));
     const styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
-    const nextWidth = currentFilterState.isFilterEnabled
-      ? Math.max(
-          1,
-          Math.round(
-            Math.max(1, currentFilterState.targetWidth) * Math.max(1, renderResolutionScale),
-          ),
-        )
-      : Math.max(
-          1,
-          Math.round(styleWidth * Math.max(1, renderResolutionScale)),
-        );
-    const nextHeight = currentFilterState.isFilterEnabled
-      ? Math.max(
-          1,
-          Math.round(
-            Math.max(1, currentFilterState.targetHeight) * Math.max(1, renderResolutionScale),
-          ),
-        )
-      : Math.max(
-          1,
-          Math.round(styleHeight * Math.max(1, renderResolutionScale)),
-        );
+    const nextWidth = Math.max(
+      1,
+      Math.round(styleWidth * Math.max(1, renderResolutionScale)),
+    );
+    const nextHeight = Math.max(
+      1,
+      Math.round(styleHeight * Math.max(1, renderResolutionScale)),
+    );
 
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;

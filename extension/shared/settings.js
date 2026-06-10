@@ -35,6 +35,7 @@ export const PRESETS = {
     vignetteStrength: 0.0,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "amber",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -55,6 +56,7 @@ export const PRESETS = {
     vignetteStrength: 0.04,
     glowStrength: 0.03,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.08,
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -75,6 +77,7 @@ export const PRESETS = {
     vignetteStrength: 0.08,
     glowStrength: 0.06,
     phosphorStrength: 0.05,
+    spotMaskStrength: 0.18,
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -95,6 +98,7 @@ export const PRESETS = {
     vignetteStrength: 0.1,
     glowStrength: 0.09,
     phosphorStrength: 0.06,
+    spotMaskStrength: 0.28,
     monoTint: "green",
     isAudioFxEnabled: true,
     lofiAmount: 1.0,
@@ -115,6 +119,7 @@ export const PRESETS = {
     vignetteStrength: 0.015,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "green",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -135,6 +140,7 @@ export const PRESETS = {
     vignetteStrength: 0.02,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -155,6 +161,7 @@ export const PRESETS = {
     vignetteStrength: 0.11,
     glowStrength: 0.1,
     phosphorStrength: 0.05,
+    spotMaskStrength: 0.24,
     monoTint: "amber",
     isAudioFxEnabled: true,
     lofiAmount: 0.85,
@@ -175,6 +182,7 @@ export const PRESETS = {
     vignetteStrength: 0.08,
     glowStrength: 0.07,
     phosphorStrength: 0.02,
+    spotMaskStrength: 0.2,
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.7,
@@ -195,6 +203,7 @@ export const PRESETS = {
     vignetteStrength: 0.015,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "ice",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -215,6 +224,7 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.06,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.12,
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.5,
@@ -235,6 +245,7 @@ export const PRESETS = {
     vignetteStrength: 0.02,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.55,
@@ -255,6 +266,7 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.06,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.12,
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.6,
@@ -275,6 +287,7 @@ export const PRESETS = {
     vignetteStrength: 0.06,
     glowStrength: 0.05,
     phosphorStrength: 0.04,
+    spotMaskStrength: 0.16,
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -295,6 +308,7 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.04,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.14,
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -315,6 +329,7 @@ export const PRESETS = {
     vignetteStrength: 0.04,
     glowStrength: 0.03,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.12,
     monoTint: "gray",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -335,6 +350,7 @@ export const PRESETS = {
     vignetteStrength: 0.04,
     glowStrength: 0.18,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "ice",
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
@@ -355,6 +371,7 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.06,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.18,
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.2,
@@ -379,6 +396,7 @@ export const DEFAULT_SETTINGS = {
   vignetteStrength: 0.11,
   glowStrength: 0.1,
   phosphorStrength: 0.05,
+  spotMaskStrength: 0.24,
   closeUpNoiseStrength: 0.0,
   colorLevels: 32,
   overlayTargetCount: 1,
@@ -470,6 +488,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.phosphorStrength === "number"
         ? clamp(candidate.phosphorStrength, 0, 0.5)
         : basePresetSettings.phosphorStrength,
+    spotMaskStrength:
+      typeof candidate?.spotMaskStrength === "number"
+        ? clamp(candidate.spotMaskStrength, 0, 0.5)
+        : basePresetSettings.spotMaskStrength ?? DEFAULT_SETTINGS.spotMaskStrength,
     closeUpNoiseStrength:
       typeof candidate?.closeUpNoiseStrength === "number"
         ? clamp(candidate.closeUpNoiseStrength, 0, 2)
@@ -531,6 +553,10 @@ export function applyPresetToSettings(presetKey) {
     vignetteStrength: preset.vignetteStrength,
     glowStrength: preset.glowStrength,
     phosphorStrength: preset.phosphorStrength,
+    spotMaskStrength:
+      typeof preset.spotMaskStrength === "number"
+        ? preset.spotMaskStrength
+        : DEFAULT_SETTINGS.spotMaskStrength,
     monoTint: preset.monoTint,
     isAudioFxEnabled:
       typeof preset.isAudioFxEnabled === "boolean"

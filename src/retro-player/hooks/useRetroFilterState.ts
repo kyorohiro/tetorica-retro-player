@@ -25,6 +25,9 @@ export type RetroFilterInitialState = Partial<{
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  spotMaskStrength: number;
+  bulbRadius: number;
+  blackFloor: number;
   closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -51,6 +54,9 @@ const resolvePresetKeyFromState = (
       preset.vignette === state.vignetteStrength &&
       preset.glow === state.glowStrength &&
       preset.phosphor === state.phosphorStrength &&
+      preset.spotMask === state.spotMaskStrength &&
+      preset.bulbRadius === state.bulbRadius &&
+      preset.blackFloor === state.blackFloor &&
       preset.monoTint === state.monoTint &&
       preset.neonBoost === state.neonBoost &&
       preset.neonSaturation === state.neonSaturation &&
@@ -91,6 +97,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+    spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
+    bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
+    blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
     closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
@@ -174,6 +183,21 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, phosphorStrength }));
   };
 
+  const setSpotMaskStrength = (spotMaskStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, spotMaskStrength }));
+  };
+
+  const setBulbRadius = (bulbRadius: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, bulbRadius }));
+  };
+
+  const setBlackFloor = (blackFloor: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, blackFloor }));
+  };
+
   const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, closeUpNoiseStrength }));
@@ -220,6 +244,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       vignetteStrength: presetSettings.vignette,
       glowStrength: presetSettings.glow,
       phosphorStrength: presetSettings.phosphor,
+      spotMaskStrength: presetSettings.spotMask,
+      bulbRadius: presetSettings.bulbRadius,
+      blackFloor: presetSettings.blackFloor,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
       neonSaturation: presetSettings.neonSaturation,
@@ -252,6 +279,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setVignetteStrength,
     setGlowStrength,
     setPhosphorStrength,
+    setSpotMaskStrength,
+    setBulbRadius,
+    setBlackFloor,
     setCloseUpNoiseStrength,
     setMonoTint,
     setNeonBoost,

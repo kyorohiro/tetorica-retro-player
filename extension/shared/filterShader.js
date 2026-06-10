@@ -18,6 +18,7 @@ uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uGlowStrength;
 uniform float uPhosphorStrength;
+uniform float uSpotMaskStrength;
 uniform float uCloseUpNoiseStrength;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
@@ -576,6 +577,31 @@ vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint, ve
   return monochromePalette(color, max(levels, 2.0), monoTint);
 }
 
+vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
+{
+  if (amount <= 0.0) {
+    return color;
+  }
+
+  float brightness = max(max(color.r, color.g), color.b);
+  vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
+  vec2 ellipseScale = vec2(1.32, 0.72);
+  vec2 ellipseUv = cellUv / ellipseScale;
+  float ellipseDist = length(ellipseUv);
+  float bulbRadius = mix(0.09, 0.3, pow(brightness, 0.7));
+  float glowRadius = bulbRadius + mix(0.08, 0.2, brightness);
+  float bulb = 1.0 - smoothstep(bulbRadius - 0.025, bulbRadius + 0.04, ellipseDist);
+  float glow = 1.0 - smoothstep(glowRadius - 0.03, glowRadius + 0.11, ellipseDist);
+  float filament = exp(-ellipseDist * ellipseDist * mix(22.0, 7.0, brightness));
+  float blackFloor = mix(0.0, 0.008, brightness);
+  float bulbLight = bulb * (0.85 + brightness * 0.35);
+  float glowLight = glow * glow * (0.05 + brightness * 0.16);
+  float filamentLight = filament * (0.22 + brightness * 0.55);
+  vec3 maskedColor = color * (blackFloor + bulbLight + glowLight + filamentLight);
+
+  return mix(color, maskedColor, amount);
+}
+
 void main(void)
 {
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
@@ -658,6 +684,10 @@ void main(void)
     color.rgb *= mix(vec3(1.0), 0.82 + phosphorTriad * 0.42, uPhosphorStrength);
   }
 
+  if (uSpotMaskStrength > 0.001) {
+    color.rgb = applySpotMask(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
+  }
+
   float closeUpAmount = uCloseUpNoiseStrength;
   if (closeUpAmount > 0.001) {
     color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
@@ -669,7 +699,10 @@ void main(void)
   color.rgb *= horizontalUnevenness(
     warpedMask,
     uTime,
-    max(max(uScanlineStrength, uScanline2Strength), max(uGlowStrength, uPhosphorStrength))
+    max(
+      max(uScanlineStrength, uScanline2Strength),
+      max(max(uGlowStrength, uPhosphorStrength), uSpotMaskStrength)
+    )
   );
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);

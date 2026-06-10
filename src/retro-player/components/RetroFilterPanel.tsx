@@ -44,6 +44,9 @@ type RetroFilterPanelProps = {
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
   phosphorStrength: number;
+  spotMaskStrength: number;
+  bulbRadius: number;
+  blackFloor: number;
   closeUpNoiseStrength: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
@@ -65,6 +68,9 @@ type RetroFilterPanelProps = {
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
+  onSetSpotMaskStrength: (value: number) => void;
+  onSetBulbRadius: (value: number) => void;
+  onSetBlackFloor: (value: number) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
@@ -87,6 +93,9 @@ export function RetroFilterPanel({
   monoTint,
   paletteMode,
   phosphorStrength,
+  spotMaskStrength,
+  bulbRadius,
+  blackFloor,
   closeUpNoiseStrength,
   scanlineBrightnessFade,
   scanlineStrength,
@@ -108,6 +117,9 @@ export function RetroFilterPanel({
   onSetMonoTint,
   onSetPaletteMode,
   onSetPhosphorStrength,
+  onSetSpotMaskStrength,
+  onSetBulbRadius,
+  onSetBlackFloor,
   onSetCloseUpNoiseStrength,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
@@ -288,7 +300,7 @@ export function RetroFilterPanel({
           <span className="text-slate-100">Target width: {targetWidth}px</span>
           <input
             type="range"
-            min="160"
+            min="10"
             max="2560"
             step="16"
             value={targetWidth}
@@ -303,7 +315,7 @@ export function RetroFilterPanel({
           <span className="text-slate-100">Target height: {targetHeight}px</span>
           <input
             type="range"
-            min="100"
+            min="10"
             max="2560"
             step="8"
             value={targetHeight}
@@ -514,6 +526,66 @@ export function RetroFilterPanel({
             value={phosphorStrength}
             onChange={(ev) => {
               onSetPhosphorStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Spot mask: ${spotMaskStrength.toFixed(2)}`}
+              text="Shapes each pixel into a darker-backed phosphor dot. Brighter pixels stay larger, so black gaps remain visible while highlights feel hotter."
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="0.5"
+            step="0.01"
+            value={spotMaskStrength}
+            onChange={(ev) => {
+              onSetSpotMaskStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
+              text="Sets how large the glowing bulb can grow inside each pixel. Lower values make the lit core smaller and expose more black around it."
+            />
+          </span>
+          <input
+            type="range"
+            min="0.05"
+            max="0.5"
+            step="0.005"
+            value={bulbRadius}
+            onChange={(ev) => {
+              onSetBulbRadius(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Black floor: ${blackFloor.toFixed(3)}`}
+              text="Sets how much light leaks into the black background inside each pixel cell. Lower values keep the unlit area closer to pure black."
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="0.5"
+            step="0.001"
+            value={blackFloor}
+            onChange={(ev) => {
+              onSetBlackFloor(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />
