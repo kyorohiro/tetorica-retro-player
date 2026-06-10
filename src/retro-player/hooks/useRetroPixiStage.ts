@@ -444,15 +444,15 @@ export function useRetroPixiStage({
   }, [isPlayingRef, previewKindRef]);
 
   const applyFilterState = useCallback(() => {
-    renderFrame(false);
+    renderFrame();
   }, [renderFrame]);
 
   const syncSpriteFilter = useCallback(() => {
-    renderFrame(false);
+    renderFrame();
   }, [renderFrame]);
 
   const syncTexturePresentation = useCallback(() => {
-    renderFrame(false);
+    renderFrame();
   }, [renderFrame]);
 
   const resetFilterInstance = useCallback(() => {
@@ -461,7 +461,7 @@ export function useRetroPixiStage({
         typeof performance !== "undefined" ? performance.now() : Date.now();
     }
     filterRef.current = {};
-    renderFrame(false);
+    renderFrame();
     return filterRef.current;
   }, [renderFrame]);
 
