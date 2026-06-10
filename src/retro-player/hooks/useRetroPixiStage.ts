@@ -234,11 +234,31 @@ function applyFilterUniforms(
   filterState: RetroFilterState,
   startedAt: number,
 ) {
+  const canvasElement = gl.canvas instanceof HTMLCanvasElement ? gl.canvas : null;
+  const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
+  const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+  const phosphorDotMinimumCellSize = 4;
+  const isPhosphorDotMode = filterState.spotMaskStrength > 0.001;
+  const effectiveTargetWidth =
+    isPhosphorDotMode
+      ? Math.min(
+          Math.max(filterState.targetWidth, 1),
+          Math.max(1, Math.floor(visibleWidth / phosphorDotMinimumCellSize)),
+        )
+      : Math.max(filterState.targetWidth, 1);
+  const effectiveTargetHeight =
+    isPhosphorDotMode
+      ? Math.min(
+          Math.max(filterState.targetHeight, 1),
+          Math.max(1, Math.floor(visibleHeight / phosphorDotMinimumCellSize)),
+        )
+      : Math.max(filterState.targetHeight, 1);
+
   gl.useProgram(program);
   gl.uniform2f(
     uniformLocations.uTargetSize,
-    Math.max(filterState.targetWidth, 1),
-    Math.max(filterState.targetHeight, 1),
+    effectiveTargetWidth,
+    effectiveTargetHeight,
   );
   gl.uniform1f(uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
   gl.uniform1f(uniformLocations.uDitherStrength, filterState.ditherStrength);
@@ -258,12 +278,12 @@ function applyFilterUniforms(
   gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
-    (Math.max(gl.drawingBufferWidth, 1) * Math.max(filterState.targetHeight, 1)) /
-      (Math.max(gl.drawingBufferHeight, 1) * Math.max(filterState.targetWidth, 1)),
+    (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
+      (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
   );
   gl.uniform1f(
     uniformLocations.uPhosphorDotMode,
-    filterState.selectedPreset === "phosphorDot" ? 1 : 0,
+    isPhosphorDotMode ? 1 : 0,
   );
   gl.uniform1f(
     uniformLocations.uCloseUpNoiseStrength,
@@ -606,6 +626,21 @@ export function useRetroPixiStage({
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
     app.canvas.style.imageRendering = "pixelated";
+
+    if (currentFilterState.spotMaskStrength > 0.001) {
+      console.log("[phosphor-dot layout]", {
+        targetWidth: currentFilterState.targetWidth,
+        targetHeight: currentFilterState.targetHeight,
+        styleWidth,
+        styleHeight,
+        displayBufferWidth,
+        displayBufferHeight,
+        logicalBufferWidth,
+        logicalBufferHeight,
+        canvasWidth: app.canvas.width,
+        canvasHeight: app.canvas.height,
+      });
+    }
 
     renderFrame();
   }, [fitCurrentSprite, renderFrame, renderResolutionScale]);

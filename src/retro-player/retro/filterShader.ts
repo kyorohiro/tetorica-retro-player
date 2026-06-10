@@ -649,8 +649,12 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   return maskedColor;
 }
 
-vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize)
+vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
 {
+  if (amount <= 0.0) {
+    return color;
+  }
+
   float brightness = max(max(color.r, color.g), color.b);
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
   vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
@@ -662,11 +666,16 @@ vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize)
   float dist = length(dotUv);
   float lit = smoothstep(0.12, 0.42, luminance);
   float gate = step(0.08, luminance);
-  float dotRadius = mix(0.035, 0.22, pow(brightness, 0.9));
-  float core = 1.0 - smoothstep(dotRadius - 0.012, dotRadius + 0.016, dist);
-  float halo = 1.0 - smoothstep(dotRadius + 0.004, dotRadius + 0.05, dist);
-  float emission = gate * lit * (core * (0.95 + brightness * 0.55) + halo * 0.08);
-  float floorLight = gate * lit * uBlackFloor * 0.08;
+  float dotRadius = mix(uBulbRadius * 0.18, uBulbRadius * 0.78, pow(brightness, 0.9));
+  float haloRadius = dotRadius + mix(0.02, 0.1, brightness);
+  float core = 1.0 - smoothstep(dotRadius - 0.018, dotRadius + 0.022, dist);
+  float halo = 1.0 - smoothstep(haloRadius - 0.02, haloRadius + 0.06, dist);
+  float emission =
+    gate *
+    lit *
+    amount *
+    (core * (0.95 + brightness * 0.55) + halo * halo * (0.04 + brightness * 0.08));
+  float floorLight = gate * lit * uBlackFloor * amount;
   vec3 dotColor = color * emission;
   dotColor += color * floorLight;
   return dotColor;
@@ -685,57 +694,11 @@ void main(void)
   vec2 cell = floor(curvedUv * uTargetSize);
   vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
   pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
-
-  vec2 maskCentered = warpedMask - vec2(0.5);
-  float edgeAmount = smoothstep(0.2, 0.95, length(maskCentered) * 1.35);
-  vec2 chromaOffset = maskCentered * (uCurvature * 0.01) * edgeAmount;
-  vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
-  vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
-  vec2 texel = 1.0 / uTargetSize;
-
   vec4 color = texture(uTexture, pixelatedUv);
-  color.r = texture(uTexture, redUv).r;
-  color.b = texture(uTexture, blueUv).b;
-  bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
-  if (isPc98Tile) {
-    color.rgb = samplePc98TileSource(uTexture, cell, uTargetSize);
-  }
-  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
-  color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
-  bool isNeon = uPaletteMode > 8.5;
-
-  if (isNeon) {
-    color.rgb = applyNeonLinePalette(uTexture, pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
-    if (uGlowStrength > 0.001) {
-      vec3 halo = applyNeonLinePalette(
-        uTexture,
-        clamp(pixelatedUv + vec2(texel.x * 0.5, texel.y * 0.5), vec2(0.0), vec2(1.0)),
-        texel,
-        max(uColorLevels, 2.0),
-        uMonoTint
-      );
-      color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22), 0.45);
-    }
-  } else {
-    color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint, cell);
-
-    if (uGlowStrength > 0.001) {
-      vec3 glow = vec3(0.0);
-      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(1.0, 0.0)) * 0.34;
-      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(1.0, 0.0)) * 0.34;
-      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(2.0, 0.0)) * 0.18;
-      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(2.0, 0.0)) * 0.18;
-      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(0.0, 1.0)) * 0.10;
-      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(0.0, 1.0)) * 0.10;
-
-      float brightness = max(max(color.r, color.g), color.b);
-      float glowMask = smoothstep(0.45, 1.0, brightness);
-      color.rgb += glow * glowMask * uGlowStrength;
-    }
-  }
+  color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
-    color.rgb = applyPhosphorDot(color.rgb, curvedUv, uTargetSize);
+    color.rgb = applyPhosphorDot(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
     color.rgb = clamp(color.rgb, 0.0, 1.0);
     finalColor = color;
     return;
@@ -764,23 +727,6 @@ void main(void)
   if (uSpotMaskStrength > 0.001) {
     color.rgb = applySpotMask(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
   }
-
-  float closeUpAmount = uCloseUpNoiseStrength;
-  if (closeUpAmount > 0.001) {
-    color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
-  }
-
-  float vignette = distance(vMaskCoord, vec2(0.5));
-  color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-  color.rgb *= edgeShadow(warpedMask, uCurvature);
-  color.rgb *= horizontalUnevenness(
-    warpedMask,
-    uTime,
-    max(
-      max(uScanlineStrength, uScanline2Strength),
-      max(max(uGlowStrength, uPhosphorStrength), uSpotMaskStrength)
-    )
-  );
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 

@@ -108,7 +108,7 @@ export function RetroPlayer({
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
 
   React.useEffect(() => {
-    if (filterState.selectedPreset !== "phosphorDot" || !player.sourceDimensions) {
+    if (filterState.spotMaskStrength <= 0.001 || !player.sourceDimensions) {
       return;
     }
 
@@ -137,7 +137,7 @@ export function RetroPlayer({
     filterState.setTargetWidth(nextWidth);
     filterState.setTargetHeight(nextHeight);
   }, [
-    filterState.selectedPreset,
+    filterState.spotMaskStrength,
     filterState.setTargetHeight,
     filterState.setTargetWidth,
     filterState.targetHeight,
