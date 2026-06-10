@@ -112,6 +112,52 @@ const getSourceSize = (source: HTMLVideoElement | HTMLImageElement) => ({
   height: source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
 });
 
+const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
+  filterState.spotMaskStrength > 0.001;
+
+const getPhosphorDotInternalScale = (filterState: RetroFilterState) =>
+  isPhosphorDotModeEnabled(filterState) ? 2 : 1;
+
+const getEffectiveTargetSize = (
+  filterState: RetroFilterState,
+  visibleWidth?: number,
+  visibleHeight?: number,
+) => {
+  const internalScale = getPhosphorDotInternalScale(filterState);
+  const requestedWidth = Math.max(filterState.targetWidth, 1);
+  const requestedHeight = Math.max(filterState.targetHeight, 1);
+
+  if (
+    !isPhosphorDotModeEnabled(filterState) ||
+    visibleWidth === undefined ||
+    visibleHeight === undefined
+  ) {
+    return {
+      width: requestedWidth * internalScale,
+      height: requestedHeight * internalScale,
+      internalScale,
+      isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
+    };
+  }
+
+  const phosphorDotMinimumCellSize = 4;
+  const clampedWidth = Math.min(
+    requestedWidth,
+    Math.max(1, Math.floor(visibleWidth / phosphorDotMinimumCellSize)),
+  );
+  const clampedHeight = Math.min(
+    requestedHeight,
+    Math.max(1, Math.floor(visibleHeight / phosphorDotMinimumCellSize)),
+  );
+
+  return {
+    width: clampedWidth * internalScale,
+    height: clampedHeight * internalScale,
+    internalScale,
+    isPhosphorDotMode: true,
+  };
+};
+
 function compileShader(
   gl: WebGL2RenderingContext,
   type: number,
@@ -237,22 +283,11 @@ function applyFilterUniforms(
   const canvasElement = gl.canvas instanceof HTMLCanvasElement ? gl.canvas : null;
   const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
   const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
-  const phosphorDotMinimumCellSize = 4;
-  const isPhosphorDotMode = filterState.spotMaskStrength > 0.001;
-  const effectiveTargetWidth =
-    isPhosphorDotMode
-      ? Math.min(
-          Math.max(filterState.targetWidth, 1),
-          Math.max(1, Math.floor(visibleWidth / phosphorDotMinimumCellSize)),
-        )
-      : Math.max(filterState.targetWidth, 1);
-  const effectiveTargetHeight =
-    isPhosphorDotMode
-      ? Math.min(
-          Math.max(filterState.targetHeight, 1),
-          Math.max(1, Math.floor(visibleHeight / phosphorDotMinimumCellSize)),
-        )
-      : Math.max(filterState.targetHeight, 1);
+  const {
+    width: effectiveTargetWidth,
+    height: effectiveTargetHeight,
+    isPhosphorDotMode,
+  } = getEffectiveTargetSize(filterState, visibleWidth, visibleHeight);
 
   gl.useProgram(program);
   gl.uniform2f(
@@ -376,8 +411,12 @@ export function useRetroPixiStage({
       return source;
     }
 
-    const targetWidth = Math.max(1, Math.round(currentFilterState.targetWidth));
-    const targetHeight = Math.max(1, Math.round(currentFilterState.targetHeight));
+    const {
+      width: effectiveTargetWidth,
+      height: effectiveTargetHeight,
+    } = getEffectiveTargetSize(currentFilterState);
+    const targetWidth = Math.max(1, Math.round(effectiveTargetWidth));
+    const targetHeight = Math.max(1, Math.round(effectiveTargetHeight));
 
     let uploadCanvas = uploadCanvasRef.current;
     let uploadContext = uploadContextRef.current;
@@ -603,13 +642,17 @@ export function useRetroPixiStage({
       1,
       Math.round(styleHeight * Math.max(1, renderResolutionScale)),
     );
+    const {
+      width: effectiveTargetWidth,
+      height: effectiveTargetHeight,
+    } = getEffectiveTargetSize(currentFilterState, styleWidth, styleHeight);
     const logicalBufferWidth = Math.max(
       1,
-      Math.round(Math.max(1, currentFilterState.targetWidth) * Math.max(1, renderResolutionScale)),
+      Math.round(Math.max(1, effectiveTargetWidth) * Math.max(1, renderResolutionScale)),
     );
     const logicalBufferHeight = Math.max(
       1,
-      Math.round(Math.max(1, currentFilterState.targetHeight) * Math.max(1, renderResolutionScale)),
+      Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, renderResolutionScale)),
     );
     const nextWidth = currentFilterState.isFilterEnabled
       ? Math.max(displayBufferWidth, logicalBufferWidth)
@@ -631,6 +674,8 @@ export function useRetroPixiStage({
       console.log("[phosphor-dot layout]", {
         targetWidth: currentFilterState.targetWidth,
         targetHeight: currentFilterState.targetHeight,
+        effectiveTargetWidth,
+        effectiveTargetHeight,
         styleWidth,
         styleHeight,
         displayBufferWidth,
