@@ -694,7 +694,54 @@ void main(void)
   vec2 cell = floor(curvedUv * uTargetSize);
   vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
   pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
+
+  vec2 maskCentered = warpedMask - vec2(0.5);
+  float edgeAmount = smoothstep(0.2, 0.95, length(maskCentered) * 1.35);
+  vec2 chromaOffset = maskCentered * (uCurvature * 0.01) * edgeAmount;
+  vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
+  vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
+  vec2 texel = 1.0 / uTargetSize;
+
   vec4 color = texture(uTexture, pixelatedUv);
+  color.r = texture(uTexture, redUv).r;
+  color.b = texture(uTexture, blueUv).b;
+  bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
+  if (isPc98Tile) {
+    color.rgb = samplePc98TileSource(uTexture, cell, uTargetSize);
+  }
+  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
+  color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
+  bool isNeon = uPaletteMode > 8.5;
+
+  if (isNeon) {
+    color.rgb = applyNeonLinePalette(uTexture, pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
+    if (uGlowStrength > 0.001) {
+      vec3 halo = applyNeonLinePalette(
+        uTexture,
+        clamp(pixelatedUv + vec2(texel.x * 0.5, texel.y * 0.5), vec2(0.0), vec2(1.0)),
+        texel,
+        max(uColorLevels, 2.0),
+        uMonoTint
+      );
+      color.rgb = mix(color.rgb, color.rgb + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22), 0.45);
+    }
+  } else {
+    color.rgb = applyPalette(color.rgb, uColorLevels, uPaletteMode, uMonoTint, cell);
+
+    if (uGlowStrength > 0.001) {
+      vec3 glow = vec3(0.0);
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(1.0, 0.0)) * 0.34;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(1.0, 0.0)) * 0.34;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(2.0, 0.0)) * 0.18;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(2.0, 0.0)) * 0.18;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell + vec2(0.0, 1.0)) * 0.10;
+      glow += applyPalette(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb, uColorLevels, uPaletteMode, uMonoTint, cell - vec2(0.0, 1.0)) * 0.10;
+
+      float brightness = max(max(color.r, color.g), color.b);
+      float glowMask = smoothstep(0.45, 1.0, brightness);
+      color.rgb += glow * glowMask * uGlowStrength;
+    }
+  }
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
@@ -727,6 +774,23 @@ void main(void)
   if (uSpotMaskStrength > 0.001) {
     color.rgb = applySpotMask(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
   }
+
+  float closeUpAmount = uCloseUpNoiseStrength;
+  if (closeUpAmount > 0.001) {
+    color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
+  }
+
+  float vignette = distance(vMaskCoord, vec2(0.5));
+  color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
+  color.rgb *= edgeShadow(warpedMask, uCurvature);
+  color.rgb *= horizontalUnevenness(
+    warpedMask,
+    uTime,
+    max(
+      max(uScanlineStrength, uScanline2Strength),
+      max(max(uGlowStrength, uPhosphorStrength), uSpotMaskStrength)
+    )
+  );
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
