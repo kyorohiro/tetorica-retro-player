@@ -129,7 +129,7 @@ paletteModeSelect.addEventListener("change", () => {
     presetKey: CUSTOM_PRESET_KEY,
     paletteMode,
     colorLevels:
-      paletteMode === "mono" || paletteMode === "free"
+      paletteMode === "mono" || paletteMode === "free" || paletteMode === "neon"
         ? currentSettings.colorLevels
         : getDefaultColorLevelsForPalette(paletteMode),
   });
@@ -305,17 +305,23 @@ function renderSettings(settings) {
   presetSelect.value = settings.presetKey;
   paletteModeSelect.value = settings.paletteMode;
   monoTintSelect.value = settings.monoTint;
-  monoTintSelect.disabled = settings.paletteMode !== "mono";
+  monoTintSelect.disabled =
+    settings.paletteMode !== "mono" && settings.paletteMode !== "neon";
   targetWidthInput.value = String(settings.targetWidth);
   targetWidthValue.textContent = `${settings.targetWidth}px`;
   targetHeightInput.value = String(settings.targetHeight);
   targetHeightValue.textContent = `${settings.targetHeight}px`;
   colorLevelsInput.value = String(settings.colorLevels);
   colorLevelsValue.textContent = String(settings.colorLevels);
-  colorLevelsInput.disabled = settings.paletteMode !== "mono" && settings.paletteMode !== "free";
+  colorLevelsInput.disabled =
+    settings.paletteMode !== "mono" &&
+    settings.paletteMode !== "free" &&
+    settings.paletteMode !== "neon";
   colorLevelsInput.min = String(COLOR_LEVEL_LIMITS.min);
   colorLevelsInput.max = String(
-    settings.paletteMode === "mono" || settings.paletteMode === "free"
+    settings.paletteMode === "mono" ||
+      settings.paletteMode === "free" ||
+      settings.paletteMode === "neon"
       ? COLOR_LEVEL_LIMITS.max
       : getDefaultColorLevelsForPalette(settings.paletteMode),
   );
