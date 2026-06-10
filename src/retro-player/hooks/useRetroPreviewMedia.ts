@@ -1,4 +1,4 @@
-import { Sprite, Texture, VideoSource } from "pixi.js";
+import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
@@ -6,11 +6,11 @@ type CurrentRef<T> = { current: T };
 
 type UseRetroPreviewMediaParams = {
   filterState: RetroFilterState;
-  appRef: CurrentRef<any>;
-  spriteRef: CurrentRef<Sprite | null>;
-  textureRef: CurrentRef<Texture | null>;
+  appRef: CurrentRef<CanvasStageApp | null>;
+  spriteRef: CurrentRef<null>;
+  textureRef: CurrentRef<null>;
   previewElementRef: CurrentRef<HTMLImageElement | HTMLMediaElement | null>;
-  filterRef: CurrentRef<any>;
+  filterRef: CurrentRef<Record<string, never> | null>;
   mediaRef: CurrentRef<HTMLMediaElement | null>;
   objectUrlRef: CurrentRef<string | null>;
   streamRef: CurrentRef<MediaStream | null>;
@@ -48,24 +48,24 @@ type UseRetroPreviewMediaParams = {
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
   connectMediaAudio: (media: HTMLMediaElement) => Promise<void>;
-  createVideoTexture: (video: HTMLVideoElement) => Texture<VideoSource>;
-  fitSprite: (app: any, sprite: Sprite, source: HTMLVideoElement | HTMLImageElement) => void;
+  fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) =>
+    | { width: number; height: number; x: number; y: number }
+    | undefined;
   refreshLayout: () => void;
   scheduleRefreshLayout: () => void;
   safeRender: () => void;
   resetFilterInstance: () => void;
   initPixi: () => Promise<void>;
+  resetPerfAccumulators?: () => void;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
 };
 
 export function useRetroPreviewMedia({
-  filterState,
   appRef,
   spriteRef,
   textureRef,
   previewElementRef,
-  filterRef,
   mediaRef,
   objectUrlRef,
   streamRef,
@@ -103,13 +103,13 @@ export function useRetroPreviewMedia({
   ensureAudioContext,
   updateAudioNodes,
   connectMediaAudio,
-  createVideoTexture,
   fitSprite,
   refreshLayout,
   scheduleRefreshLayout,
   safeRender,
   resetFilterInstance,
   initPixi,
+  resetPerfAccumulators,
   debugVideo,
   debugAudio,
 }: UseRetroPreviewMediaParams) {
@@ -134,7 +134,7 @@ export function useRetroPreviewMedia({
     media.src = "";
     media.load();
 
-    if (url) {
+    if (url?.startsWith("blob:")) {
       URL.revokeObjectURL(url);
     }
   };
@@ -255,11 +255,34 @@ export function useRetroPreviewMedia({
       image.addEventListener("error", handleError, { once: true });
     });
 
+  const attachMediaEventListeners = (media: HTMLMediaElement) => {
+    media.addEventListener("play", syncVideoState);
+    media.addEventListener("pause", syncVideoState);
+    media.addEventListener("volumechange", syncVideoState);
+    media.addEventListener("timeupdate", syncVideoState);
+    media.addEventListener("durationchange", syncVideoState);
+    media.addEventListener("seeked", syncVideoState);
+    media.addEventListener("ended", syncVideoState);
+    media.addEventListener("ratechange", syncVideoState);
+  };
+
+  const applyMediaSettings = (media: HTMLMediaElement) => {
+    media.loop = isLoopingRef.current;
+    media.muted = isMutedRef.current;
+    media.volume = isMutedRef.current ? 0 : volumeRef.current;
+    media.playbackRate = playbackRateRef.current;
+    media.autoplay = false;
+    media.preload = "auto";
+    media.crossOrigin = "anonymous";
+    if (media instanceof HTMLVideoElement) {
+      media.playsInline = true;
+    }
+  };
+
   const syncVideoState = () => {
     if (!mediaRef.current) {
       debugVideo("syncVideoState:no-media", {
         previewKind: previewKindRef.current,
-        hasSprite: Boolean(spriteRef.current),
         hasPreviewElement: Boolean(previewElementRef.current),
       });
       isPlayingRef.current = false;
@@ -267,19 +290,11 @@ export function useRetroPreviewMedia({
       setCurrentTime(0);
       setDuration(0);
       updateAudioNodes();
+      safeRender();
       return;
     }
 
     isPlayingRef.current = !mediaRef.current.paused;
-    debugVideo("syncVideoState", {
-      previewKind: previewKindRef.current,
-      paused: mediaRef.current.paused,
-      currentTime: mediaRef.current.currentTime,
-      duration: mediaRef.current.duration || 0,
-      readyState: mediaRef.current.readyState,
-      hasSprite: Boolean(spriteRef.current),
-      hasPreviewElement: Boolean(previewElementRef.current),
-    });
     setIsPlaying(!mediaRef.current.paused);
     if (!mediaRef.current.paused) {
       finishLoading();
@@ -289,29 +304,21 @@ export function useRetroPreviewMedia({
     setPlaybackRate(mediaRef.current.playbackRate || 1);
     setIsLooping(mediaRef.current.loop);
     updateAudioNodes();
+    safeRender();
   };
 
   const cleanupPreview = () => {
     debugVideo("cleanupPreview:start", {
       previewKind: previewKindRef.current,
-      hasSprite: Boolean(spriteRef.current),
-      hasTexture: Boolean(textureRef.current),
       hasMedia: Boolean(mediaRef.current),
       hasPreviewElement: Boolean(previewElementRef.current),
     });
     previewRequestIdRef.current += 1;
     finishLoading();
-    const app = appRef.current;
-    const currentSprite = spriteRef.current;
-    const currentTexture = textureRef.current;
+
     const currentMedia = mediaRef.current;
     const currentStream = streamRef.current;
     const shouldStopCurrentStream = streamOwnedRef.current;
-
-    if (currentSprite) {
-      currentSprite.filters = [];
-      app?.stage.removeChild(currentSprite);
-    }
 
     spriteRef.current = null;
     textureRef.current = null;
@@ -319,10 +326,6 @@ export function useRetroPreviewMedia({
     previewElementRef.current = null;
     streamRef.current = null;
     streamOwnedRef.current = false;
-
-    if (currentTexture?.source instanceof VideoSource) {
-      currentTexture.source.autoUpdate = false;
-    }
     mediaSourceRef.current?.disconnect();
     mediaSourceRef.current = null;
 
@@ -335,35 +338,18 @@ export function useRetroPreviewMedia({
     setSourceDimensions(null);
     setViewportRect(null);
 
-    if (objectUrlRef.current) {
+    if (objectUrlRef.current?.startsWith("blob:")) {
       URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+    }
+    objectUrlRef.current = null;
+
+    if (currentMedia) {
+      releaseDetachedMedia(currentMedia, undefined, shouldStopCurrentStream);
+    } else if (shouldStopCurrentStream) {
+      currentStream?.getTracks().forEach((track) => track.stop());
     }
 
-    const finalizeDisposal = () => {
-      debugVideo("cleanupPreview:finalize", {
-        hadSprite: Boolean(currentSprite),
-        hadTexture: Boolean(currentTexture),
-        hadMedia: Boolean(currentMedia),
-      });
-      currentSprite?.destroy();
-      currentTexture?.destroy(true);
-
-      if (currentMedia) {
-        releaseDetachedMedia(currentMedia, undefined, shouldStopCurrentStream);
-      } else if (shouldStopCurrentStream) {
-        currentStream?.getTracks().forEach((track) => track.stop());
-      }
-    };
-
-    if (typeof window === "undefined") {
-      finalizeDisposal();
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      finalizeDisposal();
-    });
+    safeRender();
   };
 
   const cleanupForPageLeave = () => {
@@ -386,6 +372,16 @@ export function useRetroPreviewMedia({
     }
   };
 
+  const powerOn = () => {
+    setIsPoweredOn(true);
+    appRef.current?.ticker.start();
+    try {
+      resetPerfAccumulators?.();
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const playVideoWithAudio = async () => {
     if (!mediaRef.current) return;
 
@@ -394,11 +390,6 @@ export function useRetroPreviewMedia({
       mediaRef.current.muted = isMutedRef.current;
       mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
       await mediaRef.current.play();
-      const activeTexture = textureRef.current;
-      if (activeTexture?.source instanceof VideoSource) {
-        activeTexture.source.autoUpdate = true;
-        activeTexture.source.update();
-      }
       isPlayingRef.current = true;
       setIsPlaying(true);
       setPreviewError("");
@@ -433,62 +424,33 @@ export function useRetroPreviewMedia({
     }
   };
 
-  const ensurePixiReady = async () => {
+  const ensureRendererReady = async () => {
     await initPixi();
 
-    const app = appRef.current;
-    const filter = filterRef.current;
-
-    if (!app || !filter) {
-      throw new Error("Pixi の初期化がまだ終わっていません。");
+    if (!appRef.current) {
+      throw new Error("Canvas renderer is not ready yet.");
     }
 
-    return { app, filter };
+    return appRef.current;
   };
 
-  const attachVideoPreview = async (
-    video: HTMLVideoElement,
-    kind: "video" | "capture",
+  const attachVisualPreview = async (
+    source: HTMLVideoElement | HTMLImageElement,
+    kind: "video" | "image" | "capture",
   ) => {
-    const filter = filterRef.current;
-    if (!filter) {
-      throw new Error("Pixi filter is not ready.");
-    }
-
-    const texture = createVideoTexture(video);
-    texture.source.update();
-    texture.source.scaleMode = "linear";
-
-    const sprite = new Sprite(texture);
-    sprite.filters = filterState.isFilterEnabled ? [filter] : [];
-
-    fitSprite(appRef.current, sprite, video);
-    appRef.current?.stage.removeChildren();
-    appRef.current?.stage.addChild(sprite);
-    window.requestAnimationFrame(safeRender);
-
-    textureRef.current = texture;
-    spriteRef.current = sprite;
-    mediaRef.current = video;
-    previewElementRef.current = video;
+    const app = await ensureRendererReady();
+    previewElementRef.current = source;
+    fitSprite(app, null, source);
     setPreviewKindState(kind);
-    setSourceDimensions({
-      width: video.videoWidth,
-      height: video.videoHeight,
-    });
-    debugVideo("attachVideoPreview", {
-      kind,
-      videoWidth: video.videoWidth,
-      videoHeight: video.videoHeight,
-      screenWidth: appRef.current?.screen.width ?? null,
-      screenHeight: appRef.current?.screen.height ?? null,
-    });
+    setSourceDimensions(
+      source instanceof HTMLVideoElement
+        ? { width: source.videoWidth, height: source.videoHeight }
+        : { width: source.naturalWidth, height: source.naturalHeight },
+    );
+    safeRender();
+    refreshLayout();
     scheduleRefreshLayout();
-    syncVideoState();
-  };
 
-  const powerOn = () => {
-    setIsPoweredOn(true);
     appRef.current?.ticker.start();
   };
 
@@ -503,18 +465,9 @@ export function useRetroPreviewMedia({
     }
 
     powerOn();
-
     cleanupPreview();
     resetFilterInstance();
     const requestId = previewRequestIdRef.current;
-    debugVideo("previewFile:start", {
-      name: file.name,
-      type: file.type,
-      isVideo,
-      isAudio,
-      isImage,
-      requestId,
-    });
     setPreviewError("");
     setPreviewName(file.name);
     beginLoading(
@@ -524,34 +477,15 @@ export function useRetroPreviewMedia({
     let url: string | null = null;
 
     try {
-      const { app, filter } = await ensurePixiReady();
+      await ensureRendererReady();
       url = URL.createObjectURL(file);
       objectUrlRef.current = url;
 
       if (isVideo || isAudio) {
-        const media = isVideo
-          ? document.createElement("video")
-          : document.createElement("audio");
+        const media = isVideo ? document.createElement("video") : document.createElement("audio");
         media.src = url;
-        media.crossOrigin = "anonymous";
-        media.loop = isLoopingRef.current;
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
-        media.playbackRate = playbackRateRef.current;
-        media.autoplay = false;
-        media.preload = "auto";
-        media.addEventListener("play", syncVideoState);
-        media.addEventListener("pause", syncVideoState);
-        media.addEventListener("volumechange", syncVideoState);
-        media.addEventListener("timeupdate", syncVideoState);
-        media.addEventListener("durationchange", syncVideoState);
-        media.addEventListener("seeked", syncVideoState);
-        media.addEventListener("ended", syncVideoState);
-        media.addEventListener("ratechange", syncVideoState);
-
-        if (media instanceof HTMLVideoElement) {
-          media.playsInline = true;
-        }
+        applyMediaSettings(media);
+        attachMediaEventListeners(media);
 
         if (media instanceof HTMLVideoElement) {
           await waitForVideoFrame(media);
@@ -564,50 +498,20 @@ export function useRetroPreviewMedia({
           return;
         }
 
+        mediaRef.current = media;
+
         if (media instanceof HTMLVideoElement) {
-          const texture = createVideoTexture(media);
-          texture.source.update();
-          texture.source.scaleMode = "linear";
-
-          const sprite = new Sprite(texture);
-          sprite.filters = filterState.isFilterEnabled ? [filter] : [];
-
-          fitSprite(app, sprite, media);
-          app.stage.removeChildren();
-          app.stage.addChild(sprite);
-          window.requestAnimationFrame(safeRender);
-
-          textureRef.current = texture;
-          spriteRef.current = sprite;
-          previewElementRef.current = media;
-          setPreviewKindState("video");
-          setSourceDimensions({
-            width: media.videoWidth,
-            height: media.videoHeight,
-          });
-          debugVideo("previewFile:video-attached", {
-            name: file.name,
-            requestId,
-            videoWidth: media.videoWidth,
-            videoHeight: media.videoHeight,
-            screenWidth: app.screen.width ?? null,
-            screenHeight: app.screen.height ?? null,
-          });
-          refreshLayout();
-          scheduleRefreshLayout();
+          await attachVisualPreview(media, "video");
         } else {
-          app.stage.removeChildren();
-          spriteRef.current = null;
-          textureRef.current = null;
           previewElementRef.current = null;
           setPreviewKindState("audio");
           setSourceDimensions(null);
+          setViewportRect(null);
+          safeRender();
         }
 
-        mediaRef.current = media;
         await connectMediaAudio(media);
         syncVideoState();
-
         await playVideoWithAudio();
         if (requestId === previewRequestIdRef.current) {
           finishLoading();
@@ -621,50 +525,23 @@ export function useRetroPreviewMedia({
       await waitForImageFrame(image);
 
       if (requestId !== previewRequestIdRef.current) {
-        URL.revokeObjectURL(url);
+        if (url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
         return;
       }
 
-      const texture = Texture.from(image);
-      texture.source.update();
-      texture.source.scaleMode = "linear";
-
-      const sprite = new Sprite(texture);
-      sprite.filters = filterState.isFilterEnabled ? [filter] : [];
-
-      fitSprite(app, sprite, image);
-      app.stage.removeChildren();
-      app.stage.addChild(sprite);
-      window.requestAnimationFrame(safeRender);
-
-      textureRef.current = texture;
-      spriteRef.current = sprite;
       mediaRef.current = null;
-      previewElementRef.current = image;
-      setPreviewKindState("image");
       muteNoiseImmediately();
       updateAudioNodes();
-      setSourceDimensions({
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-      });
-      debugVideo("previewFile:image-attached", {
-        name: file.name,
-        requestId,
-        imageWidth: image.naturalWidth,
-        imageHeight: image.naturalHeight,
-        screenWidth: app.screen.width ?? null,
-        screenHeight: app.screen.height ?? null,
-      });
-      refreshLayout();
-      scheduleRefreshLayout();
+      await attachVisualPreview(image, "image");
       syncVideoState();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
       }
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) {
-        if (url) {
+        if (url?.startsWith("blob:")) {
           URL.revokeObjectURL(url);
         }
         return;
@@ -695,11 +572,7 @@ export function useRetroPreviewMedia({
     beginLoading("Preparing display capture...");
 
     try {
-      if (!appRef.current || !filterRef.current) {
-        setPreviewError("Pixi の初期化がまだ終わっていません。");
-        return;
-      }
-
+      await ensureRendererReady();
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
@@ -712,40 +585,27 @@ export function useRetroPreviewMedia({
 
       const video = document.createElement("video");
       video.srcObject = stream;
-      video.loop = isLoopingRef.current;
-      video.muted = isMutedRef.current;
-      video.volume = isMutedRef.current ? 0 : volumeRef.current;
-      video.playbackRate = playbackRateRef.current;
-      video.playsInline = true;
-      video.autoplay = false;
-      video.addEventListener("play", syncVideoState);
-      video.addEventListener("pause", syncVideoState);
-      video.addEventListener("volumechange", syncVideoState);
-      video.addEventListener("timeupdate", syncVideoState);
-      video.addEventListener("durationchange", syncVideoState);
-      video.addEventListener("seeked", syncVideoState);
-      video.addEventListener("ended", syncVideoState);
-      video.addEventListener("ratechange", syncVideoState);
+      applyMediaSettings(video);
+      attachMediaEventListeners(video);
 
       stream.getVideoTracks()[0]?.addEventListener("ended", () => {
         stopDisplayCapture();
       });
 
       await waitForVideoFrame(video);
-      await video.play();
 
       streamRef.current = stream;
       streamOwnedRef.current = true;
-      await attachVideoPreview(video, "capture");
+      mediaRef.current = video;
+      await attachVisualPreview(video, "capture");
       await connectMediaAudio(video);
       setNeedsUserPlay(false);
+      await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
       }
     } catch (error) {
-      if (requestId !== previewRequestIdRef.current) {
-        return;
-      }
+      if (requestId !== previewRequestIdRef.current) return;
 
       cleanupPreview();
       setPreviewError(
@@ -779,28 +639,13 @@ export function useRetroPreviewMedia({
       setPreviewError("");
       setPreviewName(name);
       beginLoading(kind === "video" ? "Loading stream preview..." : "Loading stream audio...");
-      const { app } = await ensurePixiReady();
+      await ensureRendererReady();
 
       if (kind === "video") {
         const media = document.createElement("video");
         media.srcObject = stream;
-        media.crossOrigin = "anonymous";
-        media.loop = isLoopingRef.current;
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
-        media.playbackRate = playbackRateRef.current;
-        media.playsInline = true;
-        media.autoplay = false;
-        media.preload = "auto";
-        media.addEventListener("play", syncVideoState);
-        media.addEventListener("pause", syncVideoState);
-        media.addEventListener("volumechange", syncVideoState);
-        media.addEventListener("timeupdate", syncVideoState);
-        media.addEventListener("durationchange", syncVideoState);
-        media.addEventListener("seeked", syncVideoState);
-        media.addEventListener("ended", syncVideoState);
-        media.addEventListener("ratechange", syncVideoState);
-
+        applyMediaSettings(media);
+        attachMediaEventListeners(media);
         await waitForVideoFrame(media);
 
         if (requestId !== previewRequestIdRef.current) {
@@ -810,25 +655,14 @@ export function useRetroPreviewMedia({
 
         streamRef.current = stream;
         streamOwnedRef.current = false;
-        await attachVideoPreview(media, "capture");
+        mediaRef.current = media;
+        await attachVisualPreview(media, "capture");
         await connectMediaAudio(media);
       } else {
         const media = document.createElement("audio");
         media.srcObject = stream;
-        media.crossOrigin = "anonymous";
-        media.loop = isLoopingRef.current;
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
-        media.playbackRate = playbackRateRef.current;
-        media.preload = "auto";
-        media.addEventListener("play", syncVideoState);
-        media.addEventListener("pause", syncVideoState);
-        media.addEventListener("volumechange", syncVideoState);
-        media.addEventListener("timeupdate", syncVideoState);
-        media.addEventListener("durationchange", syncVideoState);
-        media.addEventListener("seeked", syncVideoState);
-        media.addEventListener("ended", syncVideoState);
-        media.addEventListener("ratechange", syncVideoState);
+        applyMediaSettings(media);
+        attachMediaEventListeners(media);
         await waitForAudioReady(media);
 
         if (requestId !== previewRequestIdRef.current) {
@@ -836,23 +670,19 @@ export function useRetroPreviewMedia({
           return;
         }
 
-        app.stage.removeChildren();
-        spriteRef.current = null;
-        textureRef.current = null;
-        previewElementRef.current = null;
-        setPreviewKindState("audio");
-        setSourceDimensions(null);
-
         streamRef.current = stream;
         streamOwnedRef.current = false;
         mediaRef.current = media;
+        previewElementRef.current = null;
+        setPreviewKindState("audio");
+        setSourceDimensions(null);
+        setViewportRect(null);
+        safeRender();
         await connectMediaAudio(media);
         syncVideoState();
       }
 
-      if (requestId !== previewRequestIdRef.current) {
-        return;
-      }
+      if (requestId !== previewRequestIdRef.current) return;
 
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
@@ -884,28 +714,13 @@ export function useRetroPreviewMedia({
             ? "Loading image preview..."
             : "Loading audio preview...",
       );
-      const { app, filter } = await ensurePixiReady();
+      await ensureRendererReady();
 
       if (kind === "video") {
         const media = document.createElement("video");
         media.src = url;
-        media.crossOrigin = "anonymous";
-        media.loop = isLoopingRef.current;
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
-        media.playbackRate = playbackRateRef.current;
-        media.playsInline = true;
-        media.autoplay = false;
-        media.preload = "auto";
-        media.addEventListener("play", syncVideoState);
-        media.addEventListener("pause", syncVideoState);
-        media.addEventListener("volumechange", syncVideoState);
-        media.addEventListener("timeupdate", syncVideoState);
-        media.addEventListener("durationchange", syncVideoState);
-        media.addEventListener("seeked", syncVideoState);
-        media.addEventListener("ended", syncVideoState);
-        media.addEventListener("ratechange", syncVideoState);
-
+        applyMediaSettings(media);
+        attachMediaEventListeners(media);
         await waitForVideoFrame(media);
 
         if (requestId !== previewRequestIdRef.current) {
@@ -913,36 +728,8 @@ export function useRetroPreviewMedia({
           return;
         }
 
-        const texture = createVideoTexture(media as HTMLVideoElement);
-        texture.source.update();
-        texture.source.scaleMode = "linear";
-
-        const sprite = new Sprite(texture);
-        sprite.filters = filterState.isFilterEnabled ? [filter] : [];
-
-        fitSprite(app, sprite, media);
-        app.stage.removeChildren();
-        app.stage.addChild(sprite);
-        window.requestAnimationFrame(safeRender);
-
-        textureRef.current = texture;
-        spriteRef.current = sprite;
         mediaRef.current = media;
-        previewElementRef.current = media;
-        setPreviewKindState("video");
-        setSourceDimensions({
-          width: media.videoWidth,
-          height: media.videoHeight,
-        });
-        debugVideo("previewUrl:video-attached", {
-          url,
-          requestId,
-          videoWidth: media.videoWidth,
-          videoHeight: media.videoHeight,
-          screenWidth: app.screen.width ?? null,
-          screenHeight: app.screen.height ?? null,
-        });
-        scheduleRefreshLayout();
+        await attachVisualPreview(media, "video");
         await connectMediaAudio(media);
         syncVideoState();
       } else if (kind === "image") {
@@ -955,49 +742,16 @@ export function useRetroPreviewMedia({
           return;
         }
 
-        const texture = Texture.from(image as HTMLImageElement);
-        texture.source.update();
-        texture.source.scaleMode = "linear";
-
-        const sprite = new Sprite(texture);
-        sprite.filters = filterState.isFilterEnabled ? [filter] : [];
-
-        fitSprite(app, sprite, image);
-        app.stage.removeChildren();
-        app.stage.addChild(sprite);
-        window.requestAnimationFrame(safeRender);
-
-        textureRef.current = texture;
-        spriteRef.current = sprite;
         mediaRef.current = null;
-        previewElementRef.current = image;
-        setPreviewKindState("image");
         muteNoiseImmediately();
         updateAudioNodes();
-        setSourceDimensions({
-          width: image.naturalWidth,
-          height: image.naturalHeight,
-        });
-        refreshLayout();
-        scheduleRefreshLayout();
+        await attachVisualPreview(image, "image");
         syncVideoState();
       } else {
         const audio = document.createElement("audio");
         audio.src = url;
-        audio.crossOrigin = "anonymous";
-        audio.loop = isLoopingRef.current;
-        audio.muted = isMutedRef.current;
-        audio.volume = isMutedRef.current ? 0 : volumeRef.current;
-        audio.playbackRate = playbackRateRef.current;
-        audio.preload = "auto";
-        audio.addEventListener("play", syncVideoState);
-        audio.addEventListener("pause", syncVideoState);
-        audio.addEventListener("volumechange", syncVideoState);
-        audio.addEventListener("timeupdate", syncVideoState);
-        audio.addEventListener("durationchange", syncVideoState);
-        audio.addEventListener("seeked", syncVideoState);
-        audio.addEventListener("ended", syncVideoState);
-        audio.addEventListener("ratechange", syncVideoState);
+        applyMediaSettings(audio);
+        attachMediaEventListeners(audio);
         await waitForAudioReady(audio);
 
         if (requestId !== previewRequestIdRef.current) {
@@ -1005,21 +759,17 @@ export function useRetroPreviewMedia({
           return;
         }
 
-        app.stage.removeChildren();
-        spriteRef.current = null;
-        textureRef.current = null;
         previewElementRef.current = null;
         setPreviewKindState("audio");
         setSourceDimensions(null);
-
+        setViewportRect(null);
         mediaRef.current = audio;
+        safeRender();
         await connectMediaAudio(audio);
         syncVideoState();
       }
 
-      if (requestId !== previewRequestIdRef.current) {
-        return;
-      }
+      if (requestId !== previewRequestIdRef.current) return;
 
       if (kind === "video" || kind === "audio") {
         await playVideoWithAudio();
@@ -1046,6 +796,6 @@ export function useRetroPreviewMedia({
     stopDisplayCapture,
     syncVideoState,
     releaseDetachedMedia,
-    ensurePixiReady,
+    ensurePixiReady: ensureRendererReady,
   };
 }

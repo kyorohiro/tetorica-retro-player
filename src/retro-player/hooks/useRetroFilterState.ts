@@ -33,8 +33,10 @@ export type RetroFilterInitialState = Partial<{
   isFilterEnabled: boolean;
 }>;
 
+type RetroFilterSettings = Required<RetroFilterInitialState>;
+
 const resolvePresetKeyFromState = (
-  state: Required<RetroFilterInitialState>,
+  state: RetroFilterSettings,
 ): RetroPresetKey | null => {
   for (const [key, preset] of Object.entries(RETRO_PRESETS)) {
     if (
@@ -61,8 +63,22 @@ const resolvePresetKeyFromState = (
   return null;
 };
 
+const resolveColorLevelsForPalette = (
+  paletteMode: PaletteMode,
+  fallback: number,
+) => {
+  if (paletteMode === "pc98") return 16;
+  if (paletteMode === "pc98_tile") return 16;
+  if (paletteMode === "pc98_4096") return 16;
+  if (paletteMode === "pc98_512") return 8;
+  if (paletteMode === "pc98_512_sat") return 8;
+  if (paletteMode === "color32") return 32;
+  if (paletteMode === "color64") return 64;
+  return fallback;
+};
+
 export function useRetroFilterState(initialState: RetroFilterInitialState = {}) {
-  const [baseInitialState] = useState<Required<RetroFilterInitialState>>(() => ({
+  const [baseInitialState] = useState<RetroFilterSettings>(() => ({
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
@@ -83,232 +99,146 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     isFilterEnabled: initialState.isFilterEnabled ?? true,
   }));
 
-  const [resolvedInitialState] = useState<RetroFilterInitialState>(() => ({
+  const [resolvedInitialState] = useState<RetroFilterSettings>(() => ({
     ...baseInitialState,
     ...loadPersistedRetroSettings()?.filter,
     ...initialState,
   }));
 
-  const [targetWidth, setTargetWidth] = useState<number>(
-    resolvedInitialState.targetWidth ?? DEFAULT_PRESET.width,
-  );
-  const [targetHeight, setTargetHeight] = useState<number>(
-    resolvedInitialState.targetHeight ?? DEFAULT_PRESET.height,
-  );
-  const [colorLevels, setColorLevels] = useState<number>(
-    resolvedInitialState.colorLevels ?? DEFAULT_PRESET.colors,
-  );
-  const [ditherStrength, setDitherStrength] = useState<number>(
-    resolvedInitialState.ditherStrength ?? DEFAULT_PRESET.dither,
-  );
-  const [paletteMode, rawSetPaletteMode] = useState<PaletteMode>(
-    resolvedInitialState.paletteMode ?? DEFAULT_PRESET.palette,
-  );
-  const [curvature, setCurvature] = useState<number>(
-    resolvedInitialState.curvature ?? DEFAULT_PRESET.curvature,
-  );
-  const [scanlineStrength, setScanlineStrength] = useState<number>(
-    resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
-  );
-  const [scanline2Strength, setScanline2Strength] = useState<number>(
-    resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
-  );
-  const [scanlineBrightnessFade, setScanlineBrightnessFade] = useState<number>(
-    resolvedInitialState.scanlineBrightnessFade ?? 0.6,
-  );
-  const [vignetteStrength, setVignetteStrength] = useState<number>(
-    resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
-  );
-  const [glowStrength, setGlowStrength] = useState<number>(
-    resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
-  );
-  const [phosphorStrength, setPhosphorStrength] = useState<number>(
-    resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
-  );
-  const [closeUpNoiseStrength, setCloseUpNoiseStrength] = useState<number>(
-    resolvedInitialState.closeUpNoiseStrength ?? 0,
-  );
-  const [monoTint, setMonoTint] = useState<MonoTintMode>(
-    resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
-  );
-  const [neonBoost, setNeonBoost] = useState<number>(
-    resolvedInitialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
-  );
-  const [neonSaturation, setNeonSaturation] = useState<number>(
-    resolvedInitialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
-  );
-  const [neonDetail, setNeonDetail] = useState<number>(
-    resolvedInitialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
-  );
-  const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(
-    resolvedInitialState.isFilterEnabled ?? true,
-  );
+  const [settings, setSettings] = useState<RetroFilterSettings>(resolvedInitialState);
   const [selectedPreset, setSelectedPreset] = useState<RetroPresetKey | null>(
-    resolvePresetKeyFromState({
-      targetWidth: resolvedInitialState.targetWidth ?? DEFAULT_PRESET.width,
-      targetHeight: resolvedInitialState.targetHeight ?? DEFAULT_PRESET.height,
-      colorLevels: resolvedInitialState.colorLevels ?? DEFAULT_PRESET.colors,
-      ditherStrength: resolvedInitialState.ditherStrength ?? DEFAULT_PRESET.dither,
-      paletteMode: resolvedInitialState.paletteMode ?? DEFAULT_PRESET.palette,
-      curvature: resolvedInitialState.curvature ?? DEFAULT_PRESET.curvature,
-      scanlineStrength: resolvedInitialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
-      scanline2Strength: resolvedInitialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
-      scanlineBrightnessFade: resolvedInitialState.scanlineBrightnessFade ?? 0.6,
-      vignetteStrength: resolvedInitialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
-      glowStrength: resolvedInitialState.glowStrength ?? DEFAULT_PRESET.glow,
-      phosphorStrength: resolvedInitialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
-      closeUpNoiseStrength: resolvedInitialState.closeUpNoiseStrength ?? 0,
-      monoTint: resolvedInitialState.monoTint ?? DEFAULT_PRESET.monoTint,
-      neonBoost: resolvedInitialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
-      neonSaturation: resolvedInitialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
-      neonDetail: resolvedInitialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
-      isFilterEnabled: resolvedInitialState.isFilterEnabled ?? true,
-    }),
+    resolvePresetKeyFromState(resolvedInitialState),
   );
 
-  const setPaletteMode = (nextPalette: PaletteMode) => {
-    rawSetPaletteMode(nextPalette);
+  const setTargetWidth = (targetWidth: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, targetWidth }));
+  };
 
-    if (nextPalette === "pc98") {
-      setColorLevels(16);
-      return;
-    }
+  const setTargetHeight = (targetHeight: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, targetHeight }));
+  };
 
-    if (nextPalette === "pc98_tile") {
-      setColorLevels(16);
-      return;
-    }
+  const setColorLevels = (colorLevels: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, colorLevels }));
+  };
 
-    if (nextPalette === "pc98_4096") {
-      setColorLevels(16);
-      return;
-    }
+  const setDitherStrength = (ditherStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, ditherStrength }));
+  };
 
-    if (nextPalette === "pc98_512") {
-      setColorLevels(8);
-      return;
-    }
+  const setPaletteMode = (paletteMode: PaletteMode) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({
+      ...current,
+      paletteMode,
+      colorLevels: resolveColorLevelsForPalette(paletteMode, current.colorLevels),
+    }));
+  };
 
-    if (nextPalette === "pc98_512_sat") {
-      setColorLevels(8);
-      return;
-    }
+  const setCurvature = (curvature: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, curvature }));
+  };
 
-    if (nextPalette === "color32") {
-      setColorLevels(32);
-      return;
-    }
+  const setScanlineStrength = (scanlineStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, scanlineStrength }));
+  };
 
-    if (nextPalette === "color64") {
-      setColorLevels(64);
-    }
+  const setScanline2Strength = (scanline2Strength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, scanline2Strength }));
+  };
+
+  const setScanlineBrightnessFade = (scanlineBrightnessFade: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, scanlineBrightnessFade }));
+  };
+
+  const setVignetteStrength = (vignetteStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, vignetteStrength }));
+  };
+
+  const setGlowStrength = (glowStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, glowStrength }));
+  };
+
+  const setPhosphorStrength = (phosphorStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorStrength }));
+  };
+
+  const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, closeUpNoiseStrength }));
+  };
+
+  const setMonoTint = (monoTint: MonoTintMode) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, monoTint }));
+  };
+
+  const setNeonBoost = (neonBoost: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, neonBoost }));
+  };
+
+  const setNeonSaturation = (neonSaturation: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, neonSaturation }));
+  };
+
+  const setNeonDetail = (neonDetail: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, neonDetail }));
+  };
+
+  const setIsFilterEnabled = (isFilterEnabled: boolean) => {
+    setSettings((current) => ({ ...current, isFilterEnabled }));
   };
 
   const applyPreset = (preset: RetroPresetKey) => {
-    const settings = RETRO_PRESETS[preset];
+    const presetSettings = RETRO_PRESETS[preset];
 
-    setIsFilterEnabled(true);
     setSelectedPreset(preset);
-    setTargetWidth(settings.width);
-    setTargetHeight(settings.height);
-    setColorLevels(settings.colors);
-    setDitherStrength(settings.dither);
-    setPaletteMode(settings.palette);
-    setCurvature(settings.curvature);
-    setScanlineStrength(settings.scanline);
-    setScanline2Strength(settings.scanline2);
-    setVignetteStrength(settings.vignette);
-    setGlowStrength(settings.glow);
-    setPhosphorStrength(settings.phosphor);
-    setMonoTint(settings.monoTint);
-    setNeonBoost(settings.neonBoost);
-    setNeonSaturation(settings.neonSaturation);
-    setNeonDetail(settings.neonDetail);
+    setSettings((current) => ({
+      ...current,
+      targetWidth: presetSettings.width,
+      targetHeight: presetSettings.height,
+      colorLevels: presetSettings.colors,
+      ditherStrength: presetSettings.dither,
+      paletteMode: presetSettings.palette,
+      curvature: presetSettings.curvature,
+      scanlineStrength: presetSettings.scanline,
+      scanline2Strength: presetSettings.scanline2,
+      vignetteStrength: presetSettings.vignette,
+      glowStrength: presetSettings.glow,
+      phosphorStrength: presetSettings.phosphor,
+      monoTint: presetSettings.monoTint,
+      neonBoost: presetSettings.neonBoost,
+      neonSaturation: presetSettings.neonSaturation,
+      neonDetail: presetSettings.neonDetail,
+      isFilterEnabled: true,
+    }));
   };
 
   const resetSettings = () => {
     setSelectedPreset(resolvePresetKeyFromState(baseInitialState));
-    setTargetWidth(baseInitialState.targetWidth);
-    setTargetHeight(baseInitialState.targetHeight);
-    setColorLevels(baseInitialState.colorLevels);
-    setDitherStrength(baseInitialState.ditherStrength);
-    rawSetPaletteMode(baseInitialState.paletteMode);
-    setCurvature(baseInitialState.curvature);
-    setScanlineStrength(baseInitialState.scanlineStrength);
-    setScanline2Strength(baseInitialState.scanline2Strength);
-    setScanlineBrightnessFade(baseInitialState.scanlineBrightnessFade);
-    setVignetteStrength(baseInitialState.vignetteStrength);
-    setGlowStrength(baseInitialState.glowStrength);
-    setPhosphorStrength(baseInitialState.phosphorStrength);
-    setCloseUpNoiseStrength(baseInitialState.closeUpNoiseStrength);
-    setMonoTint(baseInitialState.monoTint);
-    setNeonBoost(baseInitialState.neonBoost);
-    setNeonSaturation(baseInitialState.neonSaturation);
-    setNeonDetail(baseInitialState.neonDetail);
-    setIsFilterEnabled(baseInitialState.isFilterEnabled);
+    setSettings(baseInitialState);
   };
 
   useEffect(() => {
-    savePersistedRetroFilterSettings({
-      targetWidth,
-      targetHeight,
-      colorLevels,
-      ditherStrength,
-      paletteMode,
-      curvature,
-      scanlineStrength,
-      scanline2Strength,
-      scanlineBrightnessFade,
-      vignetteStrength,
-      glowStrength,
-      phosphorStrength,
-      closeUpNoiseStrength,
-      monoTint,
-      neonBoost,
-      neonSaturation,
-      neonDetail,
-      isFilterEnabled,
-    });
-  }, [
-    colorLevels,
-    curvature,
-    ditherStrength,
-    isFilterEnabled,
-    monoTint,
-    neonBoost,
-    neonSaturation,
-    neonDetail,
-    paletteMode,
-    phosphorStrength,
-    closeUpNoiseStrength,
-    scanlineBrightnessFade,
-    scanlineStrength,
-    scanline2Strength,
-    targetHeight,
-    targetWidth,
-    vignetteStrength,
-    glowStrength,
-  ]);
+    savePersistedRetroFilterSettings(settings);
+  }, [settings]);
 
   return {
-    targetWidth,
-    targetHeight,
-    colorLevels,
-    ditherStrength,
-    paletteMode,
-    curvature,
-    scanlineStrength,
-    scanline2Strength,
-    scanlineBrightnessFade,
-    vignetteStrength,
-    glowStrength,
-    phosphorStrength,
-    closeUpNoiseStrength,
-    monoTint,
-    neonBoost,
-    neonSaturation,
-    neonDetail,
-    isFilterEnabled,
+    ...settings,
     selectedPreset,
     setTargetWidth,
     setTargetHeight,

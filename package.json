@@ -1,7 +1,7 @@
 {
   "name": "tetorica-retro-player",
   "private": true,
-  "version": "0.11.1",
+  "version": "0.21.1",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && vite",
@@ -19,7 +19,6 @@
     "heic2any": "^0.0.4",
     "lucide-react": "^1.17.0",
     "node-unrar-js": "^2.0.2",
-    "pixi.js": "^8.18.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-reader": "^2.0.15"
