@@ -642,6 +642,26 @@ export function useRetroPixiStage({
     };
   }, []);
 
+  const resetPerfAccumulators = useCallback(() => {
+    perfAccumulatorRef.current = {
+      frames: 0,
+      totalRafMs: 0,
+      totalFrameMs: 0,
+      totalUploadMs: 0,
+      totalDrawMs: 0,
+      totalGpuMs: 0,
+      windowStartedAt: 0,
+    };
+    lastFrameAtRef.current = 0;
+    tickPerfAccumulatorRef.current = {
+      frames: 0,
+      totalRafMs: 0,
+      windowStartedAt: 0,
+    };
+    lastTickAtRef.current = 0;
+    setPerfStats(null);
+  }, []);
+
   const startTicker = useCallback(() => {
     if (isTickerRunningRef.current) return;
     isTickerRunningRef.current = true;
@@ -1064,5 +1084,6 @@ export function useRetroPixiStage({
     scheduleRefreshLayout,
     syncSpriteFilter,
     syncTexturePresentation,
+    resetPerfAccumulators,
   };
 }

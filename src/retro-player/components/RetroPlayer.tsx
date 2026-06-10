@@ -93,6 +93,17 @@ export function RetroPlayer({
     const numericValue = value ?? NaN;
     return Number.isFinite(numericValue) ? numericValue.toFixed(digits) : "--";
   };
+  const formatMsStat = (value: number | null | undefined, digits = 2) => {
+    const numericValue = value ?? NaN;
+    if (!Number.isFinite(numericValue)) return "--";
+
+    // Some sources report seconds (e.g. 0.17) while others report ms (e.g. 17.0).
+    // Heuristic: if value is small (< 3) treat as seconds and convert to ms.
+    const ms = Math.abs(numericValue) < 3 ? numericValue * 1000 : numericValue;
+    // Treat tiny or zero values as missing data.
+    if (ms <= 0.1) return "--";
+    return ms.toFixed(digits);
+  };
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -513,12 +524,12 @@ export function RetroPlayer({
                     <div>page-raf {pageRafStats.rafMs.toFixed(2)}ms ({pageRafStats.fps.toFixed(1)}fps)</div>
                   )}
                   <div>fps {formatPerfStat(player.perfStats?.fps, 1)}</div>
-                  <div>raf {formatPerfStat(player.perfStats?.rafMs)}ms</div>
-                  <div>tick {formatPerfStat(player.perfStats?.tickRafMs)}ms ({formatPerfStat(player.perfStats?.tickFps, 1)}fps)</div>
-                  <div>frame {formatPerfStat(player.perfStats?.frameMs)}ms</div>
-                  <div>upload {formatPerfStat(player.perfStats?.uploadMs)}ms</div>
-                  <div>draw {formatPerfStat(player.perfStats?.drawMs)}ms</div>
-                  <div>gpu {formatPerfStat(player.perfStats?.gpuMs)}ms</div>
+                  <div>raf {formatMsStat(player.perfStats?.rafMs)}ms</div>
+                  <div>tick {formatMsStat(player.perfStats?.tickRafMs)}ms ({formatPerfStat(player.perfStats?.tickFps, 1)}fps)</div>
+                  <div>frame {formatMsStat(player.perfStats?.frameMs)}ms</div>
+                  <div>upload {formatMsStat(player.perfStats?.uploadMs)}ms</div>
+                  <div>draw {formatMsStat(player.perfStats?.drawMs)}ms</div>
+                  <div>gpu {formatMsStat(player.perfStats?.gpuMs)}ms</div>
                 </div>
               )}
               {!player.isPoweredOn && (

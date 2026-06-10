@@ -56,6 +56,7 @@ type UseRetroPreviewMediaParams = {
   safeRender: () => void;
   resetFilterInstance: () => void;
   initPixi: () => Promise<void>;
+  resetPerfAccumulators?: () => void;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
 };
@@ -108,6 +109,7 @@ export function useRetroPreviewMedia({
   safeRender,
   resetFilterInstance,
   initPixi,
+  resetPerfAccumulators,
   debugVideo,
   debugAudio,
 }: UseRetroPreviewMediaParams) {
@@ -373,6 +375,11 @@ export function useRetroPreviewMedia({
   const powerOn = () => {
     setIsPoweredOn(true);
     appRef.current?.ticker.start();
+    try {
+      resetPerfAccumulators?.();
+    } catch (e) {
+      // ignore
+    }
   };
 
   const playVideoWithAudio = async () => {

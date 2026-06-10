@@ -106,6 +106,7 @@ export function usePixiVideoPlayer(
     scheduleRefreshLayout,
     syncSpriteFilter,
     syncTexturePresentation,
+    resetPerfAccumulators,
   } = stage;
   const initPixiRef = useRef(initPixi);
   const destroyPixiRef = useRef(destroyPixi);
@@ -251,6 +252,7 @@ export function usePixiVideoPlayer(
     safeRender,
     resetFilterInstance,
     initPixi,
+    resetPerfAccumulators,
     debugVideo,
     debugAudio,
   });
