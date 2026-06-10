@@ -32,6 +32,7 @@ type RendererUniformLocations = {
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
+  uPhosphorDotMode: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uMonoTint: WebGLUniformLocation | null;
   uNeonBoost: WebGLUniformLocation | null;
@@ -184,8 +185,8 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
 
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -215,6 +216,7 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
       uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
       uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
+      uPhosphorDotMode: gl.getUniformLocation(filterProgram, "uPhosphorDotMode"),
       uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
       uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
       uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
@@ -258,6 +260,10 @@ function applyFilterUniforms(
     uniformLocations.uPixelAspect,
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(filterState.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(filterState.targetWidth, 1)),
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotMode,
+    filterState.selectedPreset === "phosphorDot" ? 1 : 0,
   );
   gl.uniform1f(
     uniformLocations.uCloseUpNoiseStrength,
@@ -403,6 +409,9 @@ export function useRetroPixiStage({
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    const textureFilter = currentFilterState.isFilterEnabled ? gl.LINEAR : gl.NEAREST;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, textureFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, textureFilter);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
 
     if (currentFilterState.isFilterEnabled) {
@@ -566,14 +575,28 @@ export function useRetroPixiStage({
     const styleWidth = Math.max(1, Math.round(viewRect.width));
     const styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
-    const nextWidth = Math.max(
+    const displayBufferWidth = Math.max(
       1,
       Math.round(styleWidth * Math.max(1, renderResolutionScale)),
     );
-    const nextHeight = Math.max(
+    const displayBufferHeight = Math.max(
       1,
       Math.round(styleHeight * Math.max(1, renderResolutionScale)),
     );
+    const logicalBufferWidth = Math.max(
+      1,
+      Math.round(Math.max(1, currentFilterState.targetWidth) * Math.max(1, renderResolutionScale)),
+    );
+    const logicalBufferHeight = Math.max(
+      1,
+      Math.round(Math.max(1, currentFilterState.targetHeight) * Math.max(1, renderResolutionScale)),
+    );
+    const nextWidth = currentFilterState.isFilterEnabled
+      ? Math.max(displayBufferWidth, logicalBufferWidth)
+      : displayBufferWidth;
+    const nextHeight = currentFilterState.isFilterEnabled
+      ? Math.max(displayBufferHeight, logicalBufferHeight)
+      : displayBufferHeight;
 
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
@@ -582,9 +605,7 @@ export function useRetroPixiStage({
     app.canvas.style.top = `${Math.round(viewRect.y)}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
-    app.canvas.style.imageRendering = currentFilterState.isFilterEnabled
-      ? "pixelated"
-      : "auto";
+    app.canvas.style.imageRendering = "pixelated";
 
     renderFrame();
   }, [fitCurrentSprite, renderFrame, renderResolutionScale]);

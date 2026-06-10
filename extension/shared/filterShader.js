@@ -22,6 +22,7 @@ uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
 uniform float uBlackFloor;
 uniform float uPixelAspect;
+uniform float uPhosphorDotMode;
 uniform float uCloseUpNoiseStrength;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
@@ -588,10 +589,11 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
 
   float brightness = max(max(color.r, color.g), color.b);
   vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
-  float pixelAspect = max(uPixelAspect, 0.0001);
+  float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
+  float aspectCompensation = sqrt(pixelAspect);
   vec2 aspectAdjustedUv = pixelAspect >= 1.0
-    ? vec2(cellUv.x, cellUv.y * pixelAspect)
-    : vec2(cellUv.x / pixelAspect, cellUv.y);
+    ? vec2(cellUv.x, cellUv.y * aspectCompensation)
+    : vec2(cellUv.x / aspectCompensation, cellUv.y);
   float crtBias = 0.12;
   vec2 ellipseScale = vec2(1.0 + crtBias, 1.0 - crtBias * 0.55);
   vec2 ellipseUv = aspectAdjustedUv / ellipseScale;
@@ -606,12 +608,37 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   float glowLight = glow * glow * (0.01 + brightness * 0.04);
   float filamentLight = filament * (0.24 + brightness * 0.42);
   float emission = (bulbLight + glowLight + filamentLight) * amount;
+  float visibilityFloor = smoothstep(0.02, 0.28, brightness) * (0.035 + amount * 0.045);
+  emission = max(emission, visibilityFloor);
   float shape = clamp(max(bulb, max(glow * 0.35, filament)), 0.0, 1.0);
   float blackMask = pow(1.0 - shape, 2.8);
   vec3 maskedColor = color * emission;
   maskedColor += color * (blackFloor * blackMask);
 
   return maskedColor;
+}
+
+vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize)
+{
+  float brightness = max(max(color.r, color.g), color.b);
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
+  float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
+  float aspectCompensation = sqrt(pixelAspect);
+  vec2 dotUv = pixelAspect >= 1.0
+    ? vec2(cellUv.x, cellUv.y * aspectCompensation)
+    : vec2(cellUv.x / aspectCompensation, cellUv.y);
+  float dist = length(dotUv);
+  float lit = smoothstep(0.12, 0.42, luminance);
+  float gate = step(0.08, luminance);
+  float dotRadius = mix(0.035, 0.22, pow(brightness, 0.9));
+  float core = 1.0 - smoothstep(dotRadius - 0.012, dotRadius + 0.016, dist);
+  float halo = 1.0 - smoothstep(dotRadius + 0.004, dotRadius + 0.05, dist);
+  float emission = gate * lit * (core * (0.95 + brightness * 0.55) + halo * 0.08);
+  float floorLight = gate * lit * uBlackFloor * 0.08;
+  vec3 dotColor = color * emission;
+  dotColor += color * floorLight;
+  return dotColor;
 }
 
 void main(void)
@@ -674,6 +701,13 @@ void main(void)
       float glowMask = smoothstep(0.45, 1.0, brightness);
       color.rgb += glow * glowMask * uGlowStrength;
     }
+  }
+
+  if (uPhosphorDotMode > 0.5) {
+    color.rgb = applyPhosphorDot(color.rgb, curvedUv, uTargetSize);
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    finalColor = color;
+    return;
   }
 
   float scanlineBrightness = max(max(color.r, color.g), color.b);
