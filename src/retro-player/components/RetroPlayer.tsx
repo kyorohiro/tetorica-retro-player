@@ -297,26 +297,12 @@ export function RetroPlayer({
   }, [isPreviewMaximized, isPreviewPinned, isFitWidthEnabled, player.sourceDimensions]);
 
   React.useEffect(() => {
-    const frameA = window.requestAnimationFrame(() => {
-      player.refreshLayout();
-      window.requestAnimationFrame(() => {
-        player.refreshLayout();
-      });
-    });
-
-    const timeoutId = window.setTimeout(() => {
-      player.refreshLayout();
-    }, 120);
-
-    return () => {
-      window.cancelAnimationFrame(frameA);
-      window.clearTimeout(timeoutId);
-    };
+    player.refreshLayout();
   }, [
     isFitWidthEnabled,
     isPreviewPinned,
     isPreviewMaximized,
-    player,
+    player.refreshLayout,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
   ]);

@@ -1,14 +1,57 @@
-import { useCallback, useRef, useState, type MutableRefObject } from "react";
-import { Application, Filter, Sprite, Texture, VideoSource } from "pixi.js";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 import {
   MONO_TINTS,
-  RETRO_PRESETS,
   paletteModeToUniform,
 } from "../retro/config";
-import { FILTER_FRAGMENT, FILTER_VERTEX } from "../retro/filterShader";
+import { FILTER_FRAGMENT } from "../retro/filterShader";
 import type { RetroFilterState } from "./useRetroFilterState";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
+
+type RendererUniformLocations = {
+  uTargetSize: WebGLUniformLocation | null;
+  uColorLevels: WebGLUniformLocation | null;
+  uDitherStrength: WebGLUniformLocation | null;
+  uPaletteMode: WebGLUniformLocation | null;
+  uCurvature: WebGLUniformLocation | null;
+  uScanlineStrength: WebGLUniformLocation | null;
+  uScanline2Strength: WebGLUniformLocation | null;
+  uScanlineBrightnessFade: WebGLUniformLocation | null;
+  uVignetteStrength: WebGLUniformLocation | null;
+  uGlowStrength: WebGLUniformLocation | null;
+  uPhosphorStrength: WebGLUniformLocation | null;
+  uCloseUpNoiseStrength: WebGLUniformLocation | null;
+  uMonoTint: WebGLUniformLocation | null;
+  uNeonBoost: WebGLUniformLocation | null;
+  uNeonSaturation: WebGLUniformLocation | null;
+  uNeonDetail: WebGLUniformLocation | null;
+  uTime: WebGLUniformLocation | null;
+};
+
+type RendererResources = {
+  gl: WebGL2RenderingContext;
+  filterProgram: WebGLProgram;
+  passthroughProgram: WebGLProgram;
+  texture: WebGLTexture;
+  uniformLocations: RendererUniformLocations;
+};
+
+type CanvasStageApp = {
+  canvas: HTMLCanvasElement;
+  renderer: RendererResources;
+  ticker: {
+    start: () => void;
+    stop: () => void;
+  };
+  startedAt: number;
+};
 
 type UseRetroPixiStageParams = {
   filterState: RetroFilterState;
@@ -20,6 +63,201 @@ type UseRetroPixiStageParams = {
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
 
+const PASS_THROUGH_FRAGMENT = `#version 300 es
+precision mediump float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+
+void main(void)
+{
+  finalColor = texture(uTexture, vTextureCoord);
+}
+`;
+
+const VERTEX_SHADER_SOURCE = `#version 300 es
+in vec2 aPosition;
+out vec2 vTextureCoord;
+out vec2 vMaskCoord;
+
+void main() {
+  vec2 uv = (aPosition + 1.0) * 0.5;
+  vTextureCoord = uv;
+  vMaskCoord = uv;
+  gl_Position = vec4(aPosition, 0.0, 1.0);
+}
+`;
+
+const QUAD_VERTICES = new Float32Array([
+  -1, -1,
+  1, -1,
+  -1, 1,
+  -1, 1,
+  1, -1,
+  1, 1,
+]);
+
+const getSourceSize = (source: HTMLVideoElement | HTMLImageElement) => ({
+  width: source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth,
+  height: source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
+});
+
+function compileShader(
+  gl: WebGL2RenderingContext,
+  type: number,
+  source: string,
+) {
+  const shader = gl.createShader(type);
+  if (!shader) {
+    throw new Error("Failed to create shader.");
+  }
+
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const message = gl.getShaderInfoLog(shader) || "Unknown shader compile error.";
+    gl.deleteShader(shader);
+    throw new Error(message);
+  }
+
+  return shader;
+}
+
+function createProgram(
+  gl: WebGL2RenderingContext,
+  vertexSource: string,
+  fragmentSource: string,
+) {
+  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+  const program = gl.createProgram();
+
+  if (!program) {
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+    throw new Error("Failed to create WebGL program.");
+  }
+
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.bindAttribLocation(program, 0, "aPosition");
+  gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const message = gl.getProgramInfoLog(program) || "Unknown program link error.";
+    gl.deleteProgram(program);
+    throw new Error(message);
+  }
+
+  return program;
+}
+
+function createRenderer(gl: WebGL2RenderingContext): RendererResources {
+  const filterProgram = createProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT);
+  const passthroughProgram = createProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
+
+  const vertexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, QUAD_VERTICES, gl.STATIC_DRAW);
+
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  const texture = gl.createTexture();
+  if (!texture) {
+    throw new Error("Failed to create WebGL texture.");
+  }
+
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  gl.useProgram(filterProgram);
+  gl.uniform1i(gl.getUniformLocation(filterProgram, "uTexture"), 0);
+  gl.useProgram(passthroughProgram);
+  gl.uniform1i(gl.getUniformLocation(passthroughProgram, "uTexture"), 0);
+
+  return {
+    gl,
+    filterProgram,
+    passthroughProgram,
+    texture,
+    uniformLocations: {
+      uTargetSize: gl.getUniformLocation(filterProgram, "uTargetSize"),
+      uColorLevels: gl.getUniformLocation(filterProgram, "uColorLevels"),
+      uDitherStrength: gl.getUniformLocation(filterProgram, "uDitherStrength"),
+      uPaletteMode: gl.getUniformLocation(filterProgram, "uPaletteMode"),
+      uCurvature: gl.getUniformLocation(filterProgram, "uCurvature"),
+      uScanlineStrength: gl.getUniformLocation(filterProgram, "uScanlineStrength"),
+      uScanline2Strength: gl.getUniformLocation(filterProgram, "uScanline2Strength"),
+      uScanlineBrightnessFade: gl.getUniformLocation(filterProgram, "uScanlineBrightnessFade"),
+      uVignetteStrength: gl.getUniformLocation(filterProgram, "uVignetteStrength"),
+      uGlowStrength: gl.getUniformLocation(filterProgram, "uGlowStrength"),
+      uPhosphorStrength: gl.getUniformLocation(filterProgram, "uPhosphorStrength"),
+      uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
+      uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
+      uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
+      uNeonSaturation: gl.getUniformLocation(filterProgram, "uNeonSaturation"),
+      uNeonDetail: gl.getUniformLocation(filterProgram, "uNeonDetail"),
+      uTime: gl.getUniformLocation(filterProgram, "uTime"),
+    },
+  };
+}
+
+function applyFilterUniforms(
+  gl: WebGL2RenderingContext,
+  program: WebGLProgram,
+  uniformLocations: RendererUniformLocations,
+  filterState: RetroFilterState,
+  startedAt: number,
+) {
+  gl.useProgram(program);
+  gl.uniform2f(
+    uniformLocations.uTargetSize,
+    Math.max(filterState.targetWidth, 1),
+    Math.max(filterState.targetHeight, 1),
+  );
+  gl.uniform1f(uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
+  gl.uniform1f(uniformLocations.uDitherStrength, filterState.ditherStrength);
+  gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
+  gl.uniform1f(uniformLocations.uCurvature, filterState.curvature);
+  gl.uniform1f(uniformLocations.uScanlineStrength, filterState.scanlineStrength);
+  gl.uniform1f(uniformLocations.uScanline2Strength, filterState.scanline2Strength);
+  gl.uniform1f(
+    uniformLocations.uScanlineBrightnessFade,
+    filterState.scanlineBrightnessFade,
+  );
+  gl.uniform1f(uniformLocations.uVignetteStrength, filterState.vignetteStrength);
+  gl.uniform1f(uniformLocations.uGlowStrength, filterState.glowStrength);
+  gl.uniform1f(uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
+  gl.uniform1f(
+    uniformLocations.uCloseUpNoiseStrength,
+    filterState.closeUpNoiseStrength,
+  );
+  gl.uniform3f(
+    uniformLocations.uMonoTint,
+    ...MONO_TINTS[filterState.monoTint].rgb,
+  );
+  gl.uniform1f(uniformLocations.uNeonBoost, filterState.neonBoost);
+  gl.uniform1f(uniformLocations.uNeonSaturation, filterState.neonSaturation);
+  gl.uniform1f(uniformLocations.uNeonDetail, filterState.neonDetail);
+  gl.uniform1f(
+    uniformLocations.uTime,
+    ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) /
+      1000,
+  );
+}
+
 export function useRetroPixiStage({
   filterState,
   fitMode,
@@ -30,12 +268,23 @@ export function useRetroPixiStage({
   debugVideo,
 }: UseRetroPixiStageParams) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
-  const appRef = useRef<Application | null>(null);
-  const spriteRef = useRef<Sprite | null>(null);
-  const textureRef = useRef<Texture | null>(null);
+  const appRef = useRef<CanvasStageApp | null>(null);
+  const spriteRef = useRef<null>(null);
+  const textureRef = useRef<null>(null);
   const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
-  const filterRef = useRef<Filter | null>(null);
+  const filterRef = useRef<Record<string, never> | null>(null);
   const initPromiseRef = useRef<Promise<void> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const isTickerRunningRef = useRef(false);
+  const layoutFrameRef = useRef<number | null>(null);
+  const layoutNestedFrameRef = useRef<number | null>(null);
+  const layoutTimeoutRef = useRef<number | null>(null);
+  const viewportRectRef = useRef<{
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [isRendererReady, setIsRendererReady] = useState(false);
   const [viewportRect, setViewportRect] = useState<{
     width: number;
@@ -44,120 +293,145 @@ export function useRetroPixiStage({
     y: number;
   } | null>(null);
 
-  const applyFilterStateTo = useCallback((filter: Filter | null) => {
-    if (!filter) return;
-    const uniformGroup = filter.resources.pixelUniforms;
-    const uniforms = uniformGroup.uniforms;
-
-    uniforms.uTargetSize[0] = Math.max(filterState.targetWidth, 1);
-    uniforms.uTargetSize[1] = Math.max(filterState.targetHeight, 1);
-    uniforms.uColorLevels = Math.max(filterState.colorLevels, 2);
-    uniforms.uDitherStrength = filterState.ditherStrength;
-    uniforms.uPaletteMode = paletteModeToUniform(filterState.paletteMode);
-    uniforms.uCurvature = filterState.curvature;
-    uniforms.uScanlineStrength = filterState.scanlineStrength;
-    uniforms.uScanline2Strength = filterState.scanline2Strength;
-    uniforms.uScanlineBrightnessFade = filterState.scanlineBrightnessFade;
-    uniforms.uVignetteStrength = filterState.vignetteStrength;
-    uniforms.uGlowStrength = filterState.glowStrength;
-    uniforms.uPhosphorStrength = filterState.phosphorStrength;
-    uniforms.uCloseUpNoiseStrength = filterState.closeUpNoiseStrength;
-    uniforms.uMonoTint[0] = MONO_TINTS[filterState.monoTint].rgb[0];
-    uniforms.uMonoTint[1] = MONO_TINTS[filterState.monoTint].rgb[1];
-    uniforms.uMonoTint[2] = MONO_TINTS[filterState.monoTint].rgb[2];
-    uniforms.uNeonBoost = filterState.neonBoost;
-    uniforms.uNeonSaturation = filterState.neonSaturation;
-    uniforms.uNeonDetail = filterState.neonDetail;
-    uniformGroup.update();
-  }, [filterState]);
-
-  const applyFilterState = useCallback(() => {
-    applyFilterStateTo(filterRef.current);
-  }, [applyFilterStateTo]);
-
-  const createRetroFilter = useCallback(() => {
-    const filter = Filter.from({
-      gl: {
-        vertex: FILTER_VERTEX,
-        fragment: FILTER_FRAGMENT,
-      },
-      resolution: "inherit",
-      resources: {
-        pixelUniforms: {
-          uTargetSize: {
-            value: new Float32Array([
-              RETRO_PRESETS.pc98_512.width,
-              RETRO_PRESETS.pc98_512.height,
-            ]),
-            type: "vec2<f32>",
-          },
-          uColorLevels: { value: RETRO_PRESETS.pc98_512.colors, type: "f32" },
-          uDitherStrength: { value: RETRO_PRESETS.pc98_512.dither, type: "f32" },
-          uPaletteMode: { value: 2, type: "f32" },
-          uCurvature: { value: RETRO_PRESETS.pc98_512.curvature, type: "f32" },
-          uScanlineStrength: { value: RETRO_PRESETS.pc98_512.scanline, type: "f32" },
-          uScanline2Strength: { value: RETRO_PRESETS.pc98_512.scanline2, type: "f32" },
-          uScanlineBrightnessFade: { value: 0.6, type: "f32" },
-          uVignetteStrength: { value: RETRO_PRESETS.pc98_512.vignette, type: "f32" },
-          uGlowStrength: { value: RETRO_PRESETS.pc98_512.glow, type: "f32" },
-          uPhosphorStrength: { value: RETRO_PRESETS.pc98_512.phosphor, type: "f32" },
-          uCloseUpNoiseStrength: { value: 0.0, type: "f32" },
-          uMonoTint: {
-            value: new Float32Array(MONO_TINTS.green.rgb),
-            type: "vec3<f32>",
-          },
-          uNeonBoost: { value: 1.0, type: "f32" },
-          uNeonSaturation: { value: 1.0, type: "f32" },
-          uNeonDetail: { value: 1.0, type: "f32" },
-          uTime: { value: 0, type: "f32" },
-        },
-      },
+  const updateViewportRect = useCallback((
+    nextValue: SetStateAction<{
+      width: number;
+      height: number;
+      x: number;
+      y: number;
+    } | null>,
+  ) => {
+    setViewportRect((current) => {
+      const resolved =
+        typeof nextValue === "function"
+          ? nextValue(current)
+          : nextValue;
+      viewportRectRef.current = resolved;
+      return resolved;
     });
-
-    applyFilterStateTo(filter);
-
-    return filter;
-  }, [applyFilterStateTo]);
-
-  const syncSpriteFilter = useCallback(() => {
-    if (!spriteRef.current) return;
-
-    spriteRef.current.filters =
-      filterState.isFilterEnabled && filterRef.current ? [filterRef.current] : [];
-  }, [filterState.isFilterEnabled]);
-
-  const syncTexturePresentation = useCallback(() => {
-    const texture = textureRef.current;
-    if (!texture?.source) return;
-
-    texture.source.scaleMode = "linear";
   }, []);
 
+  const renderFrame = useCallback(() => {
+    const app = appRef.current;
+    const host = canvasHostRef.current;
+    const source = previewElementRef.current;
+    if (!app || !host) return;
+
+    const { gl, texture, filterProgram, passthroughProgram, uniformLocations } = app.renderer;
+    const canvas = app.canvas;
+
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.clearColor(0.01, 0.02, 0.01, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    if (!isPoweredOn || !source) {
+      return;
+    }
+
+    const viewRect = viewportRectRef.current ?? {
+      x: 0,
+      y: 0,
+      width: host.clientWidth,
+      height: host.clientHeight,
+    };
+
+    const scaleX = canvas.width / Math.max(host.clientWidth, 1);
+    const scaleY = canvas.height / Math.max(host.clientHeight, 1);
+    const viewportX = Math.round(viewRect.x * scaleX);
+    const viewportY = Math.round(viewRect.y * scaleY);
+    const viewportWidth = Math.max(1, Math.round(viewRect.width * scaleX));
+    const viewportHeight = Math.max(1, Math.round(viewRect.height * scaleY));
+
+    gl.viewport(
+      viewportX,
+      Math.max(0, canvas.height - viewportY - viewportHeight),
+      viewportWidth,
+      viewportHeight,
+    );
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+
+    if (filterState.isFilterEnabled) {
+      applyFilterUniforms(gl, filterProgram, uniformLocations, filterState, app.startedAt);
+      gl.useProgram(filterProgram);
+    } else {
+      gl.useProgram(passthroughProgram);
+    }
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }, [filterState, isPoweredOn]);
+
+  const stopTicker = useCallback(() => {
+    isTickerRunningRef.current = false;
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }, []);
+
+  const startTicker = useCallback(() => {
+    if (isTickerRunningRef.current) return;
+    isTickerRunningRef.current = true;
+
+    const tick = () => {
+      if (!isTickerRunningRef.current) return;
+      renderFrame();
+
+      const shouldAnimate =
+        previewKindRef.current === "video" ||
+        previewKindRef.current === "capture" ||
+        previewKindRef.current === "image" ||
+        isPlayingRef.current;
+
+      if (!shouldAnimate) {
+        animationFrameRef.current = null;
+        isTickerRunningRef.current = false;
+        return;
+      }
+
+      animationFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+  }, [isPlayingRef, previewKindRef, renderFrame]);
+
+  const applyFilterState = useCallback(() => {
+    renderFrame();
+  }, [renderFrame]);
+
+  const syncSpriteFilter = useCallback(() => {
+    renderFrame();
+  }, [renderFrame]);
+
+  const syncTexturePresentation = useCallback(() => {
+    renderFrame();
+  }, [renderFrame]);
+
   const resetFilterInstance = useCallback(() => {
-    const previousFilter = filterRef.current;
-    const nextFilter = createRetroFilter();
-
-    filterRef.current = nextFilter;
-    syncSpriteFilter();
-    previousFilter?.destroy();
-
-    return nextFilter;
-  }, [createRetroFilter, syncSpriteFilter]);
+    if (appRef.current) {
+      appRef.current.startedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+    }
+    filterRef.current = {};
+    renderFrame();
+    return filterRef.current;
+  }, [renderFrame]);
 
   const fitSprite = useCallback((
-    app: Application | null,
-    sprite: Sprite,
+    app: CanvasStageApp | null,
+    _sprite: null,
     source: HTMLVideoElement | HTMLImageElement,
   ) => {
     if (!app) return;
 
-    const sourceWidth =
-      source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth;
-    const sourceHeight =
-      source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight;
+    const { width: sourceWidth, height: sourceHeight } = getSourceSize(source);
+    if (sourceWidth <= 0 || sourceHeight <= 0) return;
 
-    const screenWidth = app.screen.width;
-    const screenHeight = app.screen.height;
+    const host = canvasHostRef.current;
+    const screenWidth = host?.clientWidth ?? app.canvas.width;
+    const screenHeight = host?.clientHeight ?? app.canvas.height;
     const scale =
       fitMode === "width"
         ? screenWidth / sourceWidth
@@ -170,6 +444,11 @@ export function useRetroPixiStage({
           ? integerScale
           : scale;
 
+    const nextWidth = sourceWidth * appliedScale;
+    const nextHeight = sourceHeight * appliedScale;
+    const nextX = (screenWidth - nextWidth) / 2;
+    const nextY = (screenHeight - nextHeight) / 2;
+
     debugVideo("fitSprite", {
       sourceTag: source.tagName,
       sourceWidth,
@@ -181,111 +460,88 @@ export function useRetroPixiStage({
       appliedScale,
     });
 
-    const nextWidth = sourceWidth * appliedScale;
-    const nextHeight = sourceHeight * appliedScale;
-    const nextX = (screenWidth - nextWidth) / 2;
-    const nextY = (screenHeight - nextHeight) / 2;
+    const next = {
+      width: nextWidth,
+      height: nextHeight,
+      x: nextX,
+      y: nextY,
+    };
 
-    sprite.width = nextWidth;
-    sprite.height = nextHeight;
-    sprite.x = nextX;
-    sprite.y = nextY;
+    const current = viewportRectRef.current;
+    if (
+      current &&
+      current.width === next.width &&
+      current.height === next.height &&
+      current.x === next.x &&
+      current.y === next.y
+    ) {
+      return current;
+    }
 
-    setViewportRect((current) => {
-      const next = {
-        width: nextWidth,
-        height: nextHeight,
-        x: nextX,
-        y: nextY,
-      };
-
-      if (
-        current &&
-        current.width === next.width &&
-        current.height === next.height &&
-        current.x === next.x &&
-        current.y === next.y
-      ) {
-        return current;
-      }
-
-      return next;
-    });
-  }, [debugVideo, fitMode]);
-
-  const createVideoTexture = useCallback((video: HTMLVideoElement) => {
-    const source = new VideoSource({
-      resource: video,
-      autoPlay: false,
-    });
-    const texture = new Texture({ source });
-
-    source.resource.autoplay = false;
-    source.update();
-
-    return texture;
-  }, []);
+    viewportRectRef.current = next;
+    updateViewportRect(next);
+    return next;
+  }, [debugVideo, fitMode, updateViewportRect]);
 
   const fitCurrentSprite = useCallback(() => {
-    if (spriteRef.current && previewElementRef.current) {
-      fitSprite(appRef.current, spriteRef.current, previewElementRef.current);
-    }
+    if (!previewElementRef.current) return;
+    fitSprite(appRef.current, null, previewElementRef.current);
   }, [fitSprite]);
 
   const safeRender = useCallback(() => {
-    const app = appRef.current;
-
-    if (!app) return;
-    if (!canvasHostRef.current?.isConnected) return;
-    if (!app.canvas?.isConnected) return;
-
-    try {
-      app.render();
-    } catch (error) {
-      debugVideo("safeRender:skipped", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }, [debugVideo]);
+    renderFrame();
+  }, [renderFrame]);
 
   const refreshLayout = useCallback(() => {
     const app = appRef.current;
     const host = canvasHostRef.current;
     if (!app || !host) return;
 
-    const nextWidth = Math.max(1, Math.round(host.clientWidth));
-    const nextHeight = Math.max(1, Math.round(host.clientHeight));
+    const nextWidth = Math.max(
+      1,
+      Math.round(host.clientWidth * Math.max(1, renderResolutionScale)),
+    );
+    const nextHeight = Math.max(
+      1,
+      Math.round(host.clientHeight * Math.max(1, renderResolutionScale)),
+    );
+    const styleWidth = Math.max(1, Math.round(host.clientWidth));
+    const styleHeight = Math.max(1, Math.round(host.clientHeight));
 
-    debugVideo("refreshLayout", {
-      hostWidth: host.clientWidth,
-      hostHeight: host.clientHeight,
-      nextWidth,
-      nextHeight,
-      previewKind: previewKindRef.current,
-      hasSprite: Boolean(spriteRef.current),
-      hasPreviewElement: Boolean(previewElementRef.current),
-      isPoweredOn,
-    });
+    if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
+    if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
+    app.canvas.style.width = `${styleWidth}px`;
+    app.canvas.style.height = `${styleHeight}px`;
 
-    app.renderer.resize(nextWidth, nextHeight);
     fitCurrentSprite();
-    safeRender();
-  }, [debugVideo, fitCurrentSprite, isPoweredOn, previewKindRef, safeRender]);
+    renderFrame();
+  }, [fitCurrentSprite, renderFrame, renderResolutionScale]);
 
   const scheduleRefreshLayout = useCallback(() => {
-    if (typeof window === "undefined") {
-      refreshLayout();
-      return;
+    if (layoutFrameRef.current !== null) {
+      window.cancelAnimationFrame(layoutFrameRef.current);
+      layoutFrameRef.current = null;
+    }
+    if (layoutNestedFrameRef.current !== null) {
+      window.cancelAnimationFrame(layoutNestedFrameRef.current);
+      layoutNestedFrameRef.current = null;
+    }
+    if (layoutTimeoutRef.current !== null) {
+      window.clearTimeout(layoutTimeoutRef.current);
+      layoutTimeoutRef.current = null;
     }
 
-    window.requestAnimationFrame(() => {
+    layoutFrameRef.current = window.requestAnimationFrame(() => {
+      layoutFrameRef.current = null;
       refreshLayout();
-      window.requestAnimationFrame(() => {
+      layoutNestedFrameRef.current = window.requestAnimationFrame(() => {
+        layoutNestedFrameRef.current = null;
         refreshLayout();
       });
     });
 
-    window.setTimeout(() => {
+    layoutTimeoutRef.current = window.setTimeout(() => {
+      layoutTimeoutRef.current = null;
       refreshLayout();
     }, 120);
   }, [refreshLayout]);
@@ -301,63 +557,50 @@ export function useRetroPixiStage({
       const host = canvasHostRef.current;
       if (!host || appRef.current) return;
 
-      const app = new Application();
-      await app.init({
-        resizeTo: host,
-        background: "#020617",
-        antialias: true,
-        preference: "webgl",
-        autoDensity: true,
-        resolution: Math.max(1, renderResolutionScale),
-      });
+      const canvas = document.createElement("canvas");
+      canvas.style.display = "block";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.imageRendering = "pixelated";
+      canvas.style.background = "#020617";
+
+      const gl = canvas.getContext("webgl2");
+      if (!gl) {
+        throw new Error("WebGL2 is not available in this app view.");
+      }
+
+      const renderer = createRenderer(gl);
+      const app: CanvasStageApp = {
+        canvas,
+        renderer,
+        ticker: {
+          start: startTicker,
+          stop: stopTicker,
+        },
+        startedAt: typeof performance !== "undefined" ? performance.now() : Date.now(),
+      };
 
       const nextHost = canvasHostRef.current;
       if (!nextHost || nextHost !== host || !nextHost.isConnected) {
-        app.destroy(true);
         return;
       }
 
-      nextHost.appendChild(app.canvas);
-
-      const filter = createRetroFilter();
-
-      app.ticker.add((ticker) => {
-        const shouldAnimate =
-          previewKindRef.current === "image" ||
-          previewKindRef.current === "video" ||
-          previewKindRef.current === "capture" ||
-          isPlayingRef.current;
-
-        if (!shouldAnimate) {
-          return;
-        }
-
-        const activeFilter = filterRef.current;
-        if (!activeFilter) {
-          return;
-        }
-
-        activeFilter.resources.pixelUniforms.uniforms.uTime += 0.016 * ticker.deltaTime;
-        activeFilter.resources.pixelUniforms.update();
-      });
-
-      app.renderer.on("resize", fitCurrentSprite);
+      nextHost.appendChild(canvas);
       appRef.current = app;
-      filterRef.current = filter;
+      filterRef.current = {};
       setIsRendererReady(true);
-      debugVideo("initPixi:ready", {
+
+      debugVideo("initWebGL:ready", {
         hostWidth: nextHost.clientWidth ?? null,
         hostHeight: nextHost.clientHeight ?? null,
         resolution: renderResolutionScale,
       });
 
-      if (!isPoweredOn) {
-        app.ticker.stop();
-      }
-
-      applyFilterState();
       refreshLayout();
-      scheduleRefreshLayout();
+
+      if (isPoweredOn) {
+        startTicker();
+      }
     })();
 
     try {
@@ -366,26 +609,70 @@ export function useRetroPixiStage({
       initPromiseRef.current = null;
     }
   }, [
-    applyFilterState,
-    createRetroFilter,
-    fitCurrentSprite,
-    isPlayingRef,
+    debugVideo,
     isPoweredOn,
-    previewKindRef,
     refreshLayout,
     renderResolutionScale,
-    scheduleRefreshLayout,
+    startTicker,
+    stopTicker,
   ]);
 
   const destroyPixi = useCallback(() => {
     initPromiseRef.current = null;
-    appRef.current?.renderer.off("resize", fitCurrentSprite);
-    appRef.current?.destroy(true);
-    filterRef.current?.destroy();
-    filterRef.current = null;
+    stopTicker();
+
+    if (layoutFrameRef.current !== null) {
+      window.cancelAnimationFrame(layoutFrameRef.current);
+      layoutFrameRef.current = null;
+    }
+    if (layoutNestedFrameRef.current !== null) {
+      window.cancelAnimationFrame(layoutNestedFrameRef.current);
+      layoutNestedFrameRef.current = null;
+    }
+    if (layoutTimeoutRef.current !== null) {
+      window.clearTimeout(layoutTimeoutRef.current);
+      layoutTimeoutRef.current = null;
+    }
+
+    const app = appRef.current;
+    if (app) {
+      const { gl, filterProgram, passthroughProgram, texture } = app.renderer;
+      gl.deleteTexture(texture);
+      gl.deleteProgram(filterProgram);
+      gl.deleteProgram(passthroughProgram);
+      app.canvas.remove();
+    }
+
     appRef.current = null;
+    filterRef.current = null;
+    previewElementRef.current = null;
+    updateViewportRect(null);
     setIsRendererReady(false);
-  }, [fitCurrentSprite]);
+  }, [stopTicker, updateViewportRect]);
+
+  useEffect(() => {
+    const host = canvasHostRef.current;
+    if (!host) return;
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        scheduleRefreshLayout();
+      });
+      observer.observe(host);
+      return () => {
+        observer.disconnect();
+      };
+    }
+
+    const handleResize = () => {
+      scheduleRefreshLayout();
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [scheduleRefreshLayout]);
 
   return {
     canvasHostRef,
@@ -396,9 +683,9 @@ export function useRetroPixiStage({
     filterRef,
     isRendererReady,
     viewportRect,
-    setViewportRect,
+    setViewportRect: updateViewportRect,
     applyFilterState,
-    createVideoTexture,
+    createVideoTexture: (_video: HTMLVideoElement) => null,
     destroyPixi,
     fitCurrentSprite,
     fitSprite,
