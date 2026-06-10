@@ -120,6 +120,7 @@ sh deploy_mac.sh
 % ~/bin/butler push "tetorica-retro-player_0.21.1_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.21.1
 
 % ~/bin/butler push "tetorica-retro-player_0.21.1_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.21.1
+
 % ~/bin/butler push "tetorica-retro-player_0.21.1_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.21.1
 
 ~/bin/butler push \
