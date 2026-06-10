@@ -397,6 +397,16 @@ export function RetroPlayer({
   ]);
 
   React.useEffect(() => {
+    player.refreshLayout();
+  }, [
+    filterState.targetWidth,
+    filterState.targetHeight,
+    filterState.isFilterEnabled,
+    renderResolutionScale,
+    player.refreshLayout,
+  ]);
+
+  React.useEffect(() => {
     if (typeof looping !== "boolean") return;
 
     const mediaKey = stream

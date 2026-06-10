@@ -477,22 +477,7 @@ export function useRetroPixiStage({
     uploadContext.fillStyle = "#000";
     uploadContext.fillRect(0, 0, targetWidth, targetHeight);
 
-    const sourceAspect = sourceSize.width / sourceSize.height;
-    const targetAspect = targetWidth / targetHeight;
-
-    let drawWidth = targetWidth;
-    let drawHeight = targetHeight;
-
-    if (sourceAspect > targetAspect) {
-      drawHeight = Math.max(1, Math.round(targetWidth / sourceAspect));
-    } else {
-      drawWidth = Math.max(1, Math.round(targetHeight * sourceAspect));
-    }
-
-    const drawX = Math.round((targetWidth - drawWidth) / 2);
-    const drawY = Math.round((targetHeight - drawHeight) / 2);
-
-    uploadContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+    uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
     return uploadCanvas;
   }, []);
 
