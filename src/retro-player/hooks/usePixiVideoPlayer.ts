@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -588,7 +588,7 @@ export function usePixiVideoPlayer(
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyFilterState();
     syncSpriteFilter();
     syncTexturePresentation();

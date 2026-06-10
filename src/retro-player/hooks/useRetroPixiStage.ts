@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type MutableRefObject,
@@ -275,6 +276,9 @@ export function useRetroPixiStage({
   const filterRef = useRef<Record<string, never> | null>(null);
   const initPromiseRef = useRef<Promise<void> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const renderFrameRef = useRef<() => void>(() => {});
+  const filterStateRef = useRef(filterState);
+  const isPoweredOnRef = useRef(isPoweredOn);
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutNestedFrameRef = useRef<number | null>(null);
@@ -292,6 +296,9 @@ export function useRetroPixiStage({
     x: number;
     y: number;
   } | null>(null);
+
+  filterStateRef.current = filterState;
+  isPoweredOnRef.current = isPoweredOn;
 
   const updateViewportRect = useCallback((
     nextValue: SetStateAction<{
@@ -324,7 +331,7 @@ export function useRetroPixiStage({
     gl.clearColor(0.01, 0.02, 0.01, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    if (!isPoweredOn || !source) {
+    if (!isPoweredOnRef.current || !source) {
       return;
     }
 
@@ -353,15 +360,26 @@ export function useRetroPixiStage({
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 
-    if (filterState.isFilterEnabled) {
-      applyFilterUniforms(gl, filterProgram, uniformLocations, filterState, app.startedAt);
+    const currentFilterState = filterStateRef.current;
+    if (currentFilterState.isFilterEnabled) {
+      applyFilterUniforms(
+        gl,
+        filterProgram,
+        uniformLocations,
+        currentFilterState,
+        app.startedAt,
+      );
       gl.useProgram(filterProgram);
     } else {
       gl.useProgram(passthroughProgram);
     }
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }, [filterState, isPoweredOn]);
+  }, []);
+
+  useLayoutEffect(() => {
+    renderFrameRef.current = renderFrame;
+  }, [renderFrame]);
 
   const stopTicker = useCallback(() => {
     isTickerRunningRef.current = false;
@@ -377,7 +395,7 @@ export function useRetroPixiStage({
 
     const tick = () => {
       if (!isTickerRunningRef.current) return;
-      renderFrame();
+      renderFrameRef.current();
 
       const shouldAnimate =
         previewKindRef.current === "video" ||
@@ -395,7 +413,7 @@ export function useRetroPixiStage({
     };
 
     animationFrameRef.current = window.requestAnimationFrame(tick);
-  }, [isPlayingRef, previewKindRef, renderFrame]);
+  }, [isPlayingRef, previewKindRef]);
 
   const applyFilterState = useCallback(() => {
     renderFrame();
