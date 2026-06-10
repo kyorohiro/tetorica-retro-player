@@ -657,6 +657,10 @@ vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
 
   float brightness = max(max(color.r, color.g), color.b);
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  float minChannel = min(min(color.r, color.g), color.b);
+  float saturation = brightness - minChannel;
+  float chromaLift = smoothstep(0.04, 0.28, saturation) * smoothstep(0.0, 0.22, brightness);
+  float perceivedLight = max(luminance, brightness * 0.72 + chromaLift * 0.12);
   vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
   float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
   float aspectCompensation = sqrt(pixelAspect);
@@ -664,9 +668,10 @@ vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
     ? vec2(cellUv.x, cellUv.y * aspectCompensation)
     : vec2(cellUv.x / aspectCompensation, cellUv.y);
   float dist = length(dotUv);
-  float lit = smoothstep(0.12, 0.42, luminance);
-  float gate = step(0.08, luminance);
-  float dotRadius = mix(uBulbRadius * 0.18, uBulbRadius * 0.78, pow(brightness, 0.9));
+  float lit = smoothstep(0.01, 0.28, perceivedLight);
+  float gate = smoothstep(0.0, 0.12, perceivedLight);
+  float radiusBias = pow(brightness, 0.7);
+  float dotRadius = mix(uBulbRadius * 0.18, uBulbRadius * 0.78, radiusBias);
   float haloRadius = dotRadius + mix(0.02, 0.1, brightness);
   float core = 1.0 - smoothstep(dotRadius - 0.018, dotRadius + 0.022, dist);
   float halo = 1.0 - smoothstep(haloRadius - 0.02, haloRadius + 0.06, dist);
