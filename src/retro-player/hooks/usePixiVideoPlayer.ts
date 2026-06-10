@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -10,7 +10,10 @@ let retroPlayerInstanceSeed = 0;
 
 const isRetroPlayerDebugEnabled = () =>
   typeof window !== "undefined" &&
-  Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__);
+  (
+    import.meta.env.DEV ||
+    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+  );
 
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
@@ -91,9 +94,7 @@ export function usePixiVideoPlayer(
     viewportRect,
     setViewportRect,
     applyFilterState,
-    createVideoTexture,
     destroyPixi,
-    fitCurrentSprite,
     fitSprite,
     initPixi,
     refreshLayout,
@@ -241,7 +242,6 @@ export function usePixiVideoPlayer(
     ensureAudioContext,
     updateAudioNodes,
     connectMediaAudio,
-    createVideoTexture,
     fitSprite,
     refreshLayout,
     scheduleRefreshLayout,
@@ -590,11 +590,11 @@ export function usePixiVideoPlayer(
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyFilterState();
     syncSpriteFilter();
     syncTexturePresentation();
-    fitCurrentSprite();
+    refreshLayout();
   }, [
     filterState.colorLevels,
     filterState.curvature,
@@ -614,6 +614,7 @@ export function usePixiVideoPlayer(
     filterState.targetWidth,
     filterState.vignetteStrength,
     filterState.glowStrength,
+    refreshLayout,
   ]);
 
   useEffect(() => {

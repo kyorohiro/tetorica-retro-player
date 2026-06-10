@@ -297,28 +297,24 @@ export function RetroPlayer({
   }, [isPreviewMaximized, isPreviewPinned, isFitWidthEnabled, player.sourceDimensions]);
 
   React.useEffect(() => {
-    const frameA = window.requestAnimationFrame(() => {
-      player.refreshLayout();
-      window.requestAnimationFrame(() => {
-        player.refreshLayout();
-      });
-    });
-
-    const timeoutId = window.setTimeout(() => {
-      player.refreshLayout();
-    }, 120);
-
-    return () => {
-      window.cancelAnimationFrame(frameA);
-      window.clearTimeout(timeoutId);
-    };
+    player.refreshLayout();
   }, [
     isFitWidthEnabled,
     isPreviewPinned,
     isPreviewMaximized,
-    player,
+    player.refreshLayout,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
+  ]);
+
+  React.useEffect(() => {
+    player.refreshLayout();
+  }, [
+    filterState.targetWidth,
+    filterState.targetHeight,
+    filterState.isFilterEnabled,
+    renderResolutionScale,
+    player.refreshLayout,
   ]);
 
   React.useEffect(() => {
@@ -687,7 +683,19 @@ export function RetroPlayer({
                   aria-label={isPreviewPinned ? "Unpin preview" : "Pin preview"}
                   onClick={() => {
                     hideTooltip();
-                    setIsPreviewPinned((current) => !current);
+                        setIsPreviewPinned((current) => {
+                          const next = !current;
+                          if (next) {
+                            const el = previewShellRef.current;
+                            if (el) {
+                              const rect = el.getBoundingClientRect();
+                              setPinnedPreviewMetrics({ left: rect.left, width: rect.width, height: rect.height });
+                            }
+                          } else {
+                            setPinnedPreviewMetrics(null);
+                          }
+                          return next;
+                        });
                   }}
                   onMouseEnter={() => scheduleTooltip("pin")}
                   onMouseLeave={hideTooltip}
