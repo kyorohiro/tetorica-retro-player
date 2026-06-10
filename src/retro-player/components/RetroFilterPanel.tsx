@@ -300,9 +300,9 @@ export function RetroFilterPanel({
           <span className="text-slate-100">Target width: {targetWidth}px</span>
           <input
             type="range"
-            min="10"
+            min="1"
             max="2560"
-            step="16"
+            step="1"
             value={targetWidth}
             onChange={(ev) => {
               onSetTargetWidth(Number(ev.currentTarget.value));
@@ -315,9 +315,9 @@ export function RetroFilterPanel({
           <span className="text-slate-100">Target height: {targetHeight}px</span>
           <input
             type="range"
-            min="10"
+            min="1"
             max="2560"
-            step="8"
+            step="1"
             value={targetHeight}
             onChange={(ev) => {
               onSetTargetHeight(Number(ev.currentTarget.value));
@@ -534,7 +534,7 @@ export function RetroFilterPanel({
         <label className="block">
           <span className="text-slate-100">
             <InfoTip
-              label={`Spot mask: ${spotMaskStrength.toFixed(2)}`}
+              label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
               text="Shapes each pixel into a darker-backed phosphor dot. Brighter pixels stay larger, so black gaps remain visible while highlights feel hotter."
             />
           </span>
@@ -542,7 +542,7 @@ export function RetroFilterPanel({
             type="range"
             min="0"
             max="0.5"
-            step="0.01"
+            step="0.001"
             value={spotMaskStrength}
             onChange={(ev) => {
               onSetSpotMaskStrength(Number(ev.currentTarget.value));
@@ -560,9 +560,9 @@ export function RetroFilterPanel({
           </span>
           <input
             type="range"
-            min="0.01"
+            min="0.001"
             max="0.5"
-            step="0.005"
+            step="0.001"
             value={bulbRadius}
             onChange={(ev) => {
               onSetBulbRadius(Number(ev.currentTarget.value));

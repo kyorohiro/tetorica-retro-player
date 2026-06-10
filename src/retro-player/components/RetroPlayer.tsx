@@ -23,7 +23,7 @@ import {
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
 import { useDialog } from "../../useDialog";
-import { RETRO_PRESETS } from "../retro/config";
+import { RETRO_PRESETS, type RetroPresetKey } from "../retro/config";
 
 type RetroPlayerProps = {
   src?: string;
@@ -107,43 +107,42 @@ export function RetroPlayer({
     filterState.setTargetHeight(nextHeight);
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
 
-  React.useEffect(() => {
-    if (filterState.spotMaskStrength <= 0.001 || !player.sourceDimensions) {
-      return;
-    }
+  const applyPresetWithAspect = React.useCallback(
+    (presetKey: RetroPresetKey) => {
+      filterState.applyPreset(presetKey);
+      if (presetKey !== "phosphorDot" || !player.sourceDimensions) {
+        return;
+      }
 
-    const preset = RETRO_PRESETS.phosphorDot;
-    const sourceWidth = Math.max(player.sourceDimensions.width, 1);
-    const sourceHeight = Math.max(player.sourceDimensions.height, 1);
-    const sourceAspect = sourceWidth / sourceHeight;
-    const presetAspect = preset.width / preset.height;
+      const preset = RETRO_PRESETS.phosphorDot;
+      const sourceWidth = Math.max(player.sourceDimensions.width, 1);
+      const sourceHeight = Math.max(player.sourceDimensions.height, 1);
+      const sourceAspect = sourceWidth / sourceHeight;
+      const presetAspect = preset.width / preset.height;
 
-    let nextWidth = preset.width;
-    let nextHeight = preset.height;
+      let nextWidth = preset.width;
+      let nextHeight = preset.height;
 
-    if (sourceAspect > presetAspect) {
-      nextHeight = Math.max(8, Math.round((preset.width / sourceAspect) / 8) * 8);
-    } else {
-      nextWidth = Math.max(8, Math.round((preset.height * sourceAspect) / 8) * 8);
-    }
+      if (sourceAspect > presetAspect) {
+        nextHeight = Math.max(8, Math.round((preset.width / sourceAspect) / 8) * 8);
+      } else {
+        nextWidth = Math.max(8, Math.round((preset.height * sourceAspect) / 8) * 8);
+      }
 
-    if (
-      filterState.targetWidth === nextWidth &&
-      filterState.targetHeight === nextHeight
-    ) {
-      return;
-    }
+      if (preset.width === nextWidth && preset.height === nextHeight) {
+        return;
+      }
 
-    filterState.setTargetWidth(nextWidth);
-    filterState.setTargetHeight(nextHeight);
-  }, [
-    filterState.spotMaskStrength,
-    filterState.setTargetHeight,
-    filterState.setTargetWidth,
-    filterState.targetHeight,
-    filterState.targetWidth,
-    player.sourceDimensions,
-  ]);
+      filterState.setTargetWidth(nextWidth);
+      filterState.setTargetHeight(nextHeight);
+    },
+    [
+      filterState.applyPreset,
+      filterState.setTargetHeight,
+      filterState.setTargetWidth,
+      player.sourceDimensions,
+    ],
+  );
 
   const refitPreview = React.useCallback(() => {
     if (stream && player.isCaptureActive) {
@@ -878,7 +877,7 @@ export function RetroPlayer({
                 targetHeight={filterState.targetHeight}
                 targetWidth={filterState.targetWidth}
                 vignetteStrength={filterState.vignetteStrength}
-                onApplyPreset={filterState.applyPreset}
+                onApplyPreset={applyPresetWithAspect}
                 onSetColorLevels={filterState.setColorLevels}
                 onSetCurvature={filterState.setCurvature}
                 onSetDitherStrength={filterState.setDitherStrength}
