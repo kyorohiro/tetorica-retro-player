@@ -777,7 +777,19 @@ export function RetroPlayer({
                   aria-label={isPreviewPinned ? "Unpin preview" : "Pin preview"}
                   onClick={() => {
                     hideTooltip();
-                    setIsPreviewPinned((current) => !current);
+                        setIsPreviewPinned((current) => {
+                          const next = !current;
+                          if (next) {
+                            const el = previewShellRef.current;
+                            if (el) {
+                              const rect = el.getBoundingClientRect();
+                              setPinnedPreviewMetrics({ left: rect.left, width: rect.width, height: rect.height });
+                            }
+                          } else {
+                            setPinnedPreviewMetrics(null);
+                          }
+                          return next;
+                        });
                   }}
                   onMouseEnter={() => scheduleTooltip("pin")}
                   onMouseLeave={hideTooltip}

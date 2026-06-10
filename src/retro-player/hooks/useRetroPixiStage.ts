@@ -760,13 +760,9 @@ export function useRetroPixiStage({
       fitMode === "width"
         ? screenWidth / sourceWidth
         : Math.min(screenWidth / sourceWidth, screenHeight / sourceHeight);
-    const integerScale = Math.max(1, Math.floor(scale));
-    const appliedScale =
-      fitMode === "width"
-        ? scale
-        : scale >= 1
-          ? integerScale
-          : scale;
+    // Use the raw computed scale for smoother, predictable sizing across presets
+    // (avoid integer rounding which can cause large jumps in applied size).
+    const appliedScale = scale;
 
     const nextWidth = sourceWidth * appliedScale;
     const nextHeight = sourceHeight * appliedScale;
