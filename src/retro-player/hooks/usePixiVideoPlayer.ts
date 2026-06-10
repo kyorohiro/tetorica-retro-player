@@ -73,6 +73,7 @@ export function usePixiVideoPlayer(
     );
   };
 
+  const debugEnabled = isRetroPlayerDebugEnabled();
   const stage = useRetroPixiStage({
     filterState,
     fitMode,
@@ -80,6 +81,7 @@ export function usePixiVideoPlayer(
     isPoweredOn,
     isPlayingRef,
     previewKindRef,
+    debugEnabled,
     debugVideo,
   });
 

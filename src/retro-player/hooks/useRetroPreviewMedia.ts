@@ -443,6 +443,8 @@ export function useRetroPreviewMedia({
     safeRender();
     refreshLayout();
     scheduleRefreshLayout();
+
+    appRef.current?.ticker.start();
   };
 
   const previewFile = async (file: File) => {

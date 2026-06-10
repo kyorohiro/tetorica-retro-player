@@ -74,15 +74,9 @@ type UseRetroPixiStageParams = {
   isPoweredOn: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   previewKindRef: MutableRefObject<PreviewKind>;
+  debugEnabled: boolean;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
-
-const isRetroPlayerDebugEnabled = () =>
-  typeof window !== "undefined" &&
-  (
-    import.meta.env.DEV ||
-    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
-  );
 
 const isRetroPlayerMinimalRafModeEnabled = () =>
   typeof window !== "undefined" &&
@@ -367,6 +361,7 @@ export function useRetroPixiStage({
   isPoweredOn,
   isPlayingRef,
   previewKindRef,
+  debugEnabled,
   debugVideo,
 }: UseRetroPixiStageParams) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
@@ -380,6 +375,7 @@ export function useRetroPixiStage({
   const renderFrameRef = useRef<(trackPerf?: boolean) => void>(() => {});
   const filterStateRef = useRef(filterState);
   const isPoweredOnRef = useRef(isPoweredOn);
+  const debugEnabledRef = useRef(debugEnabled);
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutNestedFrameRef = useRef<number | null>(null);
@@ -419,6 +415,7 @@ export function useRetroPixiStage({
 
   filterStateRef.current = filterState;
   isPoweredOnRef.current = isPoweredOn;
+  debugEnabledRef.current = debugEnabled;
 
   const updateViewportRect = useCallback((
     nextValue: SetStateAction<{
@@ -502,7 +499,6 @@ export function useRetroPixiStage({
   const renderFrame = useCallback((trackPerf = true) => {
     const frameStartedAt =
       typeof performance !== "undefined" ? performance.now() : Date.now();
-    const debugEnabled = isRetroPlayerDebugEnabled();
     const app = appRef.current;
     const source = previewElementRef.current;
     if (!app) return;
@@ -585,7 +581,7 @@ export function useRetroPixiStage({
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     const gpuStartedAt =
       typeof performance !== "undefined" ? performance.now() : Date.now();
-    if (debugEnabled) {
+    if (debugEnabledRef.current) {
       gl.finish();
     }
     const frameEndedAt =
@@ -607,7 +603,7 @@ export function useRetroPixiStage({
       accumulator.totalGpuMs += frameEndedAt - gpuStartedAt;
 
       const elapsedMs = frameEndedAt - accumulator.windowStartedAt;
-      if (debugEnabled && elapsedMs >= 500) {
+      if (debugEnabledRef.current && elapsedMs >= 500) {
         setPerfStats((current) => {
           const stats = resolveFramePerf(current, accumulator, frameEndedAt);
           const tickStats = resolveTickPerf(current, tickPerfAccumulatorRef.current, frameEndedAt);
@@ -658,8 +654,7 @@ export function useRetroPixiStage({
 
     const tick = () => {
       if (!isTickerRunningRef.current) return;
-      const debugEnabled = isRetroPlayerDebugEnabled();
-      const tickNow =
+        const tickNow =
         typeof performance !== "undefined" ? performance.now() : Date.now();
       const tickAccumulator = tickPerfAccumulatorRef.current;
       if (tickAccumulator.windowStartedAt === 0) {
@@ -685,7 +680,7 @@ export function useRetroPixiStage({
       }
 
       const tickElapsedMs = tickNow - tickAccumulator.windowStartedAt;
-      if (debugEnabled && tickElapsedMs >= 500) {
+      if (debugEnabledRef.current && tickElapsedMs >= 500) {
         setPerfStats((current) => {
           const stats = resolveTickPerf(current, tickAccumulator, tickNow);
           const frameStats = resolveFramePerf(current, perfAccumulatorRef.current, tickNow);
@@ -945,7 +940,13 @@ export function useRetroPixiStage({
 
       refreshLayout();
 
-      if (isPoweredOn) {
+      const shouldAnimateOnInit =
+        previewKindRef.current === "video" ||
+        previewKindRef.current === "capture" ||
+        previewKindRef.current === "image" ||
+        isPlayingRef.current;
+
+      if (isPoweredOn && shouldAnimateOnInit) {
         startTicker();
       }
     })();
