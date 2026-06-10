@@ -621,9 +621,10 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
   float pixelAspect = max(uPixelAspect, 0.0001);
   vec2 aspectAdjustedUv = pixelAspect >= 1.0
-    ? vec2(cellUv.x * pixelAspect, cellUv.y)
-    : vec2(cellUv.x, cellUv.y / pixelAspect);
-  vec2 ellipseScale = vec2(1.08, 0.9);
+    ? vec2(cellUv.x, cellUv.y * pixelAspect)
+    : vec2(cellUv.x / pixelAspect, cellUv.y);
+  float crtBias = 0.12;
+  vec2 ellipseScale = vec2(1.0 + crtBias, 1.0 - crtBias * 0.55);
   vec2 ellipseUv = aspectAdjustedUv / ellipseScale;
   float ellipseDist = length(ellipseUv);
   float bulbRadius = mix(uBulbRadius * 0.22, uBulbRadius * 0.78, pow(brightness, 0.7));
