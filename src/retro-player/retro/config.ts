@@ -357,6 +357,7 @@ export const RETRO_PRESETS = {
     phosphorDotBrightCore: true,
     phosphorDotCellFill: 0.12,
     phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: true,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -405,6 +406,7 @@ export const RETRO_PRESETS = {
     phosphorDotBrightCore?: boolean;
     phosphorDotCellFill?: number;
     phosphorDotFlatDisc?: boolean;
+    phosphorDotNeighborBlend?: boolean;
     monoTint: MonoTintMode;
     neonBoost: number;
     neonSaturation: number;

@@ -54,9 +54,11 @@ uniform float uBulbRadius;
 uniform float uBlackFloor;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
+uniform float uPhosphorDotInternalScale;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
+uniform float uPhosphorDotNeighborBlend;
 uniform float uCloseUpNoiseStrength;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
@@ -803,15 +805,65 @@ void main(void)
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
-    vec3 phosphorColor = applyPhosphorDot(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
-    float phosphorBrightness = max(max(color.r, color.g), color.b);
+    vec2 rightUv = clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 leftUv = clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 downUv = clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upUv = clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec3 rightColor = texture(uTexture, rightUv).rgb;
+    vec3 leftColor = texture(uTexture, leftUv).rgb;
+    vec3 downColor = texture(uTexture, downUv).rgb;
+    vec3 upColor = texture(uTexture, upUv).rgb;
+    float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
+    float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
+    float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
+    vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
+    float sourceColorDelta = length(color.rgb - neighborMix);
+    float sourceBlendAmount =
+      neighborBlendMix *
+      (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
+    vec3 mixedSourceColor = mix(color.rgb, color.rgb * 0.24 + neighborMix * 0.76, sourceBlendAmount);
+
+    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
+    float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
-    bleedColor += texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb * 0.34;
-    bleedColor += texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb * 0.34;
-    bleedColor += texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb * 0.16;
-    bleedColor += texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb * 0.16;
+    bleedColor += rightColor * 0.34;
+    bleedColor += leftColor * 0.34;
+    bleedColor += downColor * 0.16;
+    bleedColor += upColor * 0.16;
     phosphorColor += bleedColor * bleedMask * uSpotMaskStrength * (0.06 + phosphorBrightness * 0.1);
+
+    float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
+    float aspectCompensation = sqrt(pixelAspect);
+    vec2 cellUv = fract(curvedUv * uTargetSize) - 0.5;
+    vec2 dotUv = pixelAspect >= 1.0
+      ? vec2(cellUv.x, cellUv.y * aspectCompensation)
+      : vec2(cellUv.x / aspectCompensation, cellUv.y);
+    float dist = length(dotUv);
+    float highlightBloom = smoothstep(0.68, 1.0, phosphorBrightness);
+    bool useBrightCore = uPhosphorDotBrightCore > 0.5;
+    float dotRadius = mix(
+      uBulbRadius * (useBrightCore ? 0.14 : 0.19),
+      uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
+      pow(phosphorBrightness, 0.7)
+    );
+    float edgeWidth = max(fwidth(dist) * mix(1.4, 2.2, flatDiscMode), 0.002);
+    float edgeBand = 1.0 - smoothstep(0.0, edgeWidth, abs(dist - dotRadius));
+    float colorDelta = length(mixedSourceColor - neighborMix);
+    float edgeBlend =
+      edgeBand *
+      smoothstep(0.04, 0.32, colorDelta) *
+      neighborBlendMix *
+      (0.14 + phosphorBrightness * 0.18 + flatDiscMode * 0.1);
+    phosphorColor = mix(phosphorColor, mix(phosphorColor, neighborMix, 0.7), edgeBlend);
+
+    vec3 fourWayMix =
+      mixedSourceColor * 0.34 +
+      (rightColor + leftColor + upColor + downColor) * 0.165;
+    float fourWayAmount =
+      neighborBlendMix *
+      (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08 + internalScaleMix * 0.06);
+    phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount);
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
     float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);

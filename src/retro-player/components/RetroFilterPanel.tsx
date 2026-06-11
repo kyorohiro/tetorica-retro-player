@@ -51,6 +51,7 @@ type RetroFilterPanelProps = {
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
+  phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
@@ -79,6 +80,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
+  onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
@@ -108,6 +110,7 @@ export function RetroFilterPanel({
   phosphorDotBrightCore,
   phosphorDotCellFill,
   phosphorDotFlatDisc,
+  phosphorDotNeighborBlend,
   closeUpNoiseStrength,
   scanlineBrightnessFade,
   scanlineStrength,
@@ -136,6 +139,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotBrightCore,
   onSetPhosphorDotCellFill,
   onSetPhosphorDotFlatDisc,
+  onSetPhosphorDotNeighborBlend,
   onSetCloseUpNoiseStrength,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
@@ -594,6 +598,20 @@ export function RetroFilterPanel({
               ].join(" ")}
             >
               Flat disc
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                phosphorDotNeighborBlend
+                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              Neighbor blend
             </button>
           </div>
 

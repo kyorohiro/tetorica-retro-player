@@ -32,6 +32,7 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
+  phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -65,6 +66,7 @@ const resolvePresetKeyFromState = (
       (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
       (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
       (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
+      (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
       preset.monoTint === state.monoTint &&
       preset.neonBoost === state.neonBoost &&
       preset.neonSaturation === state.neonSaturation &&
@@ -116,6 +118,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotCellFill ?? (DEFAULT_PRESET.phosphorDotCellFill ?? 0),
     phosphorDotFlatDisc:
       initialState.phosphorDotFlatDisc ?? (DEFAULT_PRESET.phosphorDotFlatDisc ?? false),
+    phosphorDotNeighborBlend:
+      initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
@@ -234,6 +238,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, phosphorDotFlatDisc }));
   };
 
+  const setPhosphorDotNeighborBlend = (phosphorDotNeighborBlend: boolean) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotNeighborBlend }));
+  };
+
   const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, closeUpNoiseStrength }));
@@ -287,6 +296,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
+      phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
       neonSaturation: presetSettings.neonSaturation,
@@ -326,6 +336,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotBrightCore,
     setPhosphorDotCellFill,
     setPhosphorDotFlatDisc,
+    setPhosphorDotNeighborBlend,
     setCloseUpNoiseStrength,
     setMonoTint,
     setNeonBoost,

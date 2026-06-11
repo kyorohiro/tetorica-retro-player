@@ -872,6 +872,7 @@ export function RetroPlayer({
                 phosphorDotBrightCore={filterState.phosphorDotBrightCore}
                 phosphorDotCellFill={filterState.phosphorDotCellFill}
                 phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
+                phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
                 closeUpNoiseStrength={filterState.closeUpNoiseStrength}
                 scanlineBrightnessFade={filterState.scanlineBrightnessFade}
                 scanlineStrength={filterState.scanlineStrength}
@@ -900,6 +901,7 @@ export function RetroPlayer({
                 onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
                 onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
                 onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
+                onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
                 onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
                 onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
                 onSetScanlineStrength={filterState.setScanlineStrength}
