@@ -3,6 +3,7 @@ import {
   RETRO_PRESETS,
   type MonoTintMode,
   type PaletteMode,
+  type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
 import {
@@ -10,7 +11,7 @@ import {
   savePersistedRetroFilterSettings,
 } from "./persistedRetroSettings";
 
-const DEFAULT_PRESET = RETRO_PRESETS.pc98_512;
+const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.pc98_512;
 
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;
@@ -25,6 +26,14 @@ export type RetroFilterInitialState = Partial<{
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  spotMaskStrength: number;
+  bulbRadius: number;
+  blackFloor: number;
+  phosphorDotInternalScale: boolean;
+  phosphorDotBrightCore: boolean;
+  phosphorDotCellFill: number;
+  phosphorDotFlatDisc: boolean;
+  phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -38,7 +47,10 @@ type RetroFilterSettings = Required<RetroFilterInitialState>;
 const resolvePresetKeyFromState = (
   state: RetroFilterSettings,
 ): RetroPresetKey | null => {
-  for (const [key, preset] of Object.entries(RETRO_PRESETS)) {
+  for (const [key, preset] of Object.entries(RETRO_PRESETS) as [
+    RetroPresetKey,
+    RetroPresetDefinition,
+  ][]) {
     if (
       preset.width === state.targetWidth &&
       preset.height === state.targetHeight &&
@@ -51,6 +63,14 @@ const resolvePresetKeyFromState = (
       preset.vignette === state.vignetteStrength &&
       preset.glow === state.glowStrength &&
       preset.phosphor === state.phosphorStrength &&
+      preset.spotMask === state.spotMaskStrength &&
+      preset.bulbRadius === state.bulbRadius &&
+      preset.blackFloor === state.blackFloor &&
+      (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
+      (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
+      (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
+      (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
+      (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
       preset.monoTint === state.monoTint &&
       preset.neonBoost === state.neonBoost &&
       preset.neonSaturation === state.neonSaturation &&
@@ -91,6 +111,19 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
+    spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
+    bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
+    blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
+    phosphorDotInternalScale:
+      initialState.phosphorDotInternalScale ?? (DEFAULT_PRESET.phosphorDotInternalScale ?? false),
+    phosphorDotBrightCore:
+      initialState.phosphorDotBrightCore ?? (DEFAULT_PRESET.phosphorDotBrightCore ?? false),
+    phosphorDotCellFill:
+      initialState.phosphorDotCellFill ?? (DEFAULT_PRESET.phosphorDotCellFill ?? 0),
+    phosphorDotFlatDisc:
+      initialState.phosphorDotFlatDisc ?? (DEFAULT_PRESET.phosphorDotFlatDisc ?? false),
+    phosphorDotNeighborBlend:
+      initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
@@ -174,6 +207,46 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, phosphorStrength }));
   };
 
+  const setSpotMaskStrength = (spotMaskStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, spotMaskStrength }));
+  };
+
+  const setBulbRadius = (bulbRadius: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, bulbRadius }));
+  };
+
+  const setBlackFloor = (blackFloor: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, blackFloor }));
+  };
+
+  const setPhosphorDotInternalScale = (phosphorDotInternalScale: boolean) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotInternalScale }));
+  };
+
+  const setPhosphorDotBrightCore = (phosphorDotBrightCore: boolean) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotBrightCore }));
+  };
+
+  const setPhosphorDotCellFill = (phosphorDotCellFill: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotCellFill }));
+  };
+
+  const setPhosphorDotFlatDisc = (phosphorDotFlatDisc: boolean) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotFlatDisc }));
+  };
+
+  const setPhosphorDotNeighborBlend = (phosphorDotNeighborBlend: boolean) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotNeighborBlend }));
+  };
+
   const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, closeUpNoiseStrength }));
@@ -204,7 +277,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   };
 
   const applyPreset = (preset: RetroPresetKey) => {
-    const presetSettings = RETRO_PRESETS[preset];
+    const presetSettings: RetroPresetDefinition = RETRO_PRESETS[preset];
 
     setSelectedPreset(preset);
     setSettings((current) => ({
@@ -220,6 +293,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       vignetteStrength: presetSettings.vignette,
       glowStrength: presetSettings.glow,
       phosphorStrength: presetSettings.phosphor,
+      spotMaskStrength: presetSettings.spotMask,
+      bulbRadius: presetSettings.bulbRadius,
+      blackFloor: presetSettings.blackFloor,
+      phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? false,
+      phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
+      phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
+      phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
+      phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
       neonSaturation: presetSettings.neonSaturation,
@@ -252,6 +333,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setVignetteStrength,
     setGlowStrength,
     setPhosphorStrength,
+    setSpotMaskStrength,
+    setBulbRadius,
+    setBlackFloor,
+    setPhosphorDotInternalScale,
+    setPhosphorDotBrightCore,
+    setPhosphorDotCellFill,
+    setPhosphorDotFlatDisc,
+    setPhosphorDotNeighborBlend,
     setCloseUpNoiseStrength,
     setMonoTint,
     setNeonBoost,

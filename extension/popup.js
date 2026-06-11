@@ -42,6 +42,8 @@ const glowStrengthInput = document.getElementById("glowStrength");
 const glowStrengthValue = document.getElementById("glowStrengthValue");
 const phosphorStrengthInput = document.getElementById("phosphorStrength");
 const phosphorStrengthValue = document.getElementById("phosphorStrengthValue");
+const spotMaskStrengthInput = document.getElementById("spotMaskStrength");
+const spotMaskStrengthValue = document.getElementById("spotMaskStrengthValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
@@ -118,7 +120,6 @@ presetSelect.addEventListener("change", () => {
     scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
     closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
-    wowFlutterAmount: currentSettings.wowFlutterAmount,
   });
   void persistSettings();
 });
@@ -225,6 +226,13 @@ phosphorStrengthInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     phosphorStrength: Number(phosphorStrengthInput.value),
+  });
+});
+
+spotMaskStrengthInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    spotMaskStrength: Number(spotMaskStrengthInput.value),
   });
 });
 
@@ -343,6 +351,8 @@ function renderSettings(settings) {
   glowStrengthValue.textContent = settings.glowStrength.toFixed(2);
   phosphorStrengthInput.value = String(settings.phosphorStrength);
   phosphorStrengthValue.textContent = settings.phosphorStrength.toFixed(2);
+  spotMaskStrengthInput.value = String(settings.spotMaskStrength);
+  spotMaskStrengthValue.textContent = settings.spotMaskStrength.toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);

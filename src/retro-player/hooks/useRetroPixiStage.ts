@@ -28,6 +28,16 @@ type RendererUniformLocations = {
   uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
+  uSpotMaskStrength: WebGLUniformLocation | null;
+  uBulbRadius: WebGLUniformLocation | null;
+  uBlackFloor: WebGLUniformLocation | null;
+  uPixelAspect: WebGLUniformLocation | null;
+  uPhosphorDotMode: WebGLUniformLocation | null;
+  uPhosphorDotInternalScale: WebGLUniformLocation | null;
+  uPhosphorDotBrightCore: WebGLUniformLocation | null;
+  uPhosphorDotCellFill: WebGLUniformLocation | null;
+  uPhosphorDotFlatDisc: WebGLUniformLocation | null;
+  uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uMonoTint: WebGLUniformLocation | null;
   uNeonBoost: WebGLUniformLocation | null;
@@ -102,10 +112,149 @@ const QUAD_VERTICES = new Float32Array([
   1, 1,
 ]);
 
+const LARGE_VIDEO_SOURCE_THRESHOLD = 640;
+const SAFARI_CLAMPED_UPLOAD_LONG_EDGE = 1280;
+const SAFARI_CLAMPED_UPLOAD_MAX_PIXELS = 1280 * 1280;
+
 const getSourceSize = (source: HTMLVideoElement | HTMLImageElement) => ({
   width: source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth,
   height: source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
 });
+
+const isLikelySafari = () => {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent;
+  const vendor = navigator.vendor;
+  return (
+    /Safari/i.test(userAgent) &&
+    /Apple/i.test(vendor) &&
+    !/CriOS|Chrome|Chromium|EdgiOS|FxiOS/i.test(userAgent)
+  );
+};
+
+const clampLargeSourceTargetSize = (
+  width: number,
+  height: number,
+  sourceWidth?: number,
+  sourceHeight?: number,
+) => {
+  if (
+    !isLikelySafari() ||
+    sourceWidth === undefined ||
+    sourceHeight === undefined ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0
+  ) {
+    return { width, height, wasClamped: false };
+  }
+
+  if (
+    sourceWidth <= LARGE_VIDEO_SOURCE_THRESHOLD &&
+    sourceHeight <= LARGE_VIDEO_SOURCE_THRESHOLD
+  ) {
+    return { width, height, wasClamped: false };
+  }
+
+  const longestEdge = Math.max(width, height, 1);
+  const pixelCount = Math.max(width, 1) * Math.max(height, 1);
+  const edgeScale = Math.min(1, SAFARI_CLAMPED_UPLOAD_LONG_EDGE / longestEdge);
+  const areaScale = Math.min(
+    1,
+    Math.sqrt(SAFARI_CLAMPED_UPLOAD_MAX_PIXELS / Math.max(pixelCount, 1)),
+  );
+  const scale = Math.min(edgeScale, areaScale);
+
+  if (scale >= 0.999) {
+    return { width, height, wasClamped: false };
+  }
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+    wasClamped: true,
+  };
+};
+
+const shouldUseDirectVideoUpload = (
+  source: HTMLVideoElement | HTMLImageElement,
+  sourceWidth: number,
+  sourceHeight: number,
+) =>
+  source instanceof HTMLVideoElement &&
+  (
+    sourceWidth > LARGE_VIDEO_SOURCE_THRESHOLD ||
+    sourceHeight > LARGE_VIDEO_SOURCE_THRESHOLD
+  );
+
+const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
+  filterState.spotMaskStrength > 0.001 &&
+  (
+    filterState.phosphorDotInternalScale ||
+    filterState.phosphorDotBrightCore ||
+    filterState.phosphorDotCellFill > 0.001 ||
+    filterState.phosphorDotFlatDisc ||
+    filterState.phosphorDotNeighborBlend
+  );
+
+const getPhosphorDotInternalScale = (filterState: RetroFilterState) =>
+  isPhosphorDotModeEnabled(filterState) && filterState.phosphorDotInternalScale ? 2 : 1;
+
+const getEffectiveTargetSize = (
+  filterState: RetroFilterState,
+  visibleWidth?: number,
+  visibleHeight?: number,
+  sourceWidth?: number,
+  sourceHeight?: number,
+) => {
+  const internalScale = getPhosphorDotInternalScale(filterState);
+  const requestedWidth = Math.max(filterState.targetWidth, 1);
+  const requestedHeight = Math.max(filterState.targetHeight, 1);
+
+  if (
+    !isPhosphorDotModeEnabled(filterState) ||
+    visibleWidth === undefined ||
+    visibleHeight === undefined
+  ) {
+    const clampedTarget = clampLargeSourceTargetSize(
+      requestedWidth * internalScale,
+      requestedHeight * internalScale,
+      sourceWidth,
+      sourceHeight,
+    );
+    return {
+      width: clampedTarget.width,
+      height: clampedTarget.height,
+      internalScale,
+      isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
+      isSafariSourceClamped: clampedTarget.wasClamped,
+    };
+  }
+
+  const phosphorDotMinimumCellSize = 4;
+  const clampedWidth = Math.min(
+    requestedWidth,
+    Math.max(1, Math.floor(visibleWidth / phosphorDotMinimumCellSize)),
+  );
+  const clampedHeight = Math.min(
+    requestedHeight,
+    Math.max(1, Math.floor(visibleHeight / phosphorDotMinimumCellSize)),
+  );
+  const clampedTarget = clampLargeSourceTargetSize(
+    clampedWidth * internalScale,
+    clampedHeight * internalScale,
+    sourceWidth,
+    sourceHeight,
+  );
+
+  return {
+    width: clampedTarget.width,
+    height: clampedTarget.height,
+    internalScale,
+    isPhosphorDotMode: true,
+    isSafariSourceClamped: clampedTarget.wasClamped,
+  };
+};
 
 function compileShader(
   gl: WebGL2RenderingContext,
@@ -180,8 +329,8 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
 
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -207,6 +356,16 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
       uVignetteStrength: gl.getUniformLocation(filterProgram, "uVignetteStrength"),
       uGlowStrength: gl.getUniformLocation(filterProgram, "uGlowStrength"),
       uPhosphorStrength: gl.getUniformLocation(filterProgram, "uPhosphorStrength"),
+      uSpotMaskStrength: gl.getUniformLocation(filterProgram, "uSpotMaskStrength"),
+      uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
+      uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
+      uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
+      uPhosphorDotMode: gl.getUniformLocation(filterProgram, "uPhosphorDotMode"),
+      uPhosphorDotInternalScale: gl.getUniformLocation(filterProgram, "uPhosphorDotInternalScale"),
+      uPhosphorDotBrightCore: gl.getUniformLocation(filterProgram, "uPhosphorDotBrightCore"),
+      uPhosphorDotCellFill: gl.getUniformLocation(filterProgram, "uPhosphorDotCellFill"),
+      uPhosphorDotFlatDisc: gl.getUniformLocation(filterProgram, "uPhosphorDotFlatDisc"),
+      uPhosphorDotNeighborBlend: gl.getUniformLocation(filterProgram, "uPhosphorDotNeighborBlend"),
       uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
       uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
       uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
@@ -224,11 +383,20 @@ function applyFilterUniforms(
   filterState: RetroFilterState,
   startedAt: number,
 ) {
+  const canvasElement = gl.canvas instanceof HTMLCanvasElement ? gl.canvas : null;
+  const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
+  const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+  const {
+    width: effectiveTargetWidth,
+    height: effectiveTargetHeight,
+    isPhosphorDotMode,
+  } = getEffectiveTargetSize(filterState, visibleWidth, visibleHeight);
+
   gl.useProgram(program);
   gl.uniform2f(
     uniformLocations.uTargetSize,
-    Math.max(filterState.targetWidth, 1),
-    Math.max(filterState.targetHeight, 1),
+    effectiveTargetWidth,
+    effectiveTargetHeight,
   );
   gl.uniform1f(uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
   gl.uniform1f(uniformLocations.uDitherStrength, filterState.ditherStrength);
@@ -243,6 +411,38 @@ function applyFilterUniforms(
   gl.uniform1f(uniformLocations.uVignetteStrength, filterState.vignetteStrength);
   gl.uniform1f(uniformLocations.uGlowStrength, filterState.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
+  gl.uniform1f(uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
+  gl.uniform1f(uniformLocations.uBulbRadius, filterState.bulbRadius);
+  gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
+  gl.uniform1f(
+    uniformLocations.uPixelAspect,
+    (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
+      (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotMode,
+    isPhosphorDotMode ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotInternalScale,
+    filterState.phosphorDotInternalScale ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotBrightCore,
+    filterState.phosphorDotBrightCore ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotCellFill,
+    filterState.phosphorDotCellFill,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotFlatDisc,
+    filterState.phosphorDotFlatDisc ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotNeighborBlend,
+    filterState.phosphorDotNeighborBlend ? 1 : 0,
+  );
   gl.uniform1f(
     uniformLocations.uCloseUpNoiseStrength,
     filterState.closeUpNoiseStrength,
@@ -334,8 +534,27 @@ export function useRetroPixiStage({
       return source;
     }
 
-    const targetWidth = Math.max(1, Math.round(currentFilterState.targetWidth));
-    const targetHeight = Math.max(1, Math.round(currentFilterState.targetHeight));
+    if (shouldUseDirectVideoUpload(source, sourceSize.width, sourceSize.height)) {
+      debugVideo("largeVideoDirectUpload", {
+        sourceWidth: sourceSize.width,
+        sourceHeight: sourceSize.height,
+      });
+      return source;
+    }
+
+    const {
+      width: effectiveTargetWidth,
+      height: effectiveTargetHeight,
+      isSafariSourceClamped,
+    } = getEffectiveTargetSize(
+      currentFilterState,
+      undefined,
+      undefined,
+      sourceSize.width,
+      sourceSize.height,
+    );
+    const targetWidth = Math.max(1, Math.round(effectiveTargetWidth));
+    const targetHeight = Math.max(1, Math.round(effectiveTargetHeight));
 
     let uploadCanvas = uploadCanvasRef.current;
     let uploadContext = uploadContextRef.current;
@@ -363,9 +582,18 @@ export function useRetroPixiStage({
     uploadContext.fillStyle = "#000";
     uploadContext.fillRect(0, 0, targetWidth, targetHeight);
 
+    if (isSafariSourceClamped) {
+      debugVideo("safariLargeSourceClamp", {
+        sourceWidth: sourceSize.width,
+        sourceHeight: sourceSize.height,
+        uploadWidth: targetWidth,
+        uploadHeight: targetHeight,
+      });
+    }
+
     uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
     return uploadCanvas;
-  }, []);
+  }, [debugVideo]);
 
   const renderFrame = useCallback(() => {
     const app = appRef.current;
@@ -387,6 +615,9 @@ export function useRetroPixiStage({
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    const textureFilter = currentFilterState.isFilterEnabled ? gl.LINEAR : gl.NEAREST;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, textureFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, textureFilter);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
 
     if (currentFilterState.isFilterEnabled) {
@@ -550,28 +781,42 @@ export function useRetroPixiStage({
     const styleWidth = Math.max(1, Math.round(viewRect.width));
     const styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
+    const sourceSize = previewElementRef.current
+      ? getSourceSize(previewElementRef.current)
+      : null;
+    const displayBufferWidth = Math.max(
+      1,
+      Math.round(styleWidth * Math.max(1, renderResolutionScale)),
+    );
+    const displayBufferHeight = Math.max(
+      1,
+      Math.round(styleHeight * Math.max(1, renderResolutionScale)),
+    );
+    const {
+      width: effectiveTargetWidth,
+      height: effectiveTargetHeight,
+      isSafariSourceClamped,
+    } = getEffectiveTargetSize(
+      currentFilterState,
+      styleWidth,
+      styleHeight,
+      sourceSize?.width,
+      sourceSize?.height,
+    );
+    const logicalBufferWidth = Math.max(
+      1,
+      Math.round(Math.max(1, effectiveTargetWidth) * Math.max(1, renderResolutionScale)),
+    );
+    const logicalBufferHeight = Math.max(
+      1,
+      Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, renderResolutionScale)),
+    );
     const nextWidth = currentFilterState.isFilterEnabled
-      ? Math.max(
-          1,
-          Math.round(
-            Math.max(1, currentFilterState.targetWidth) * Math.max(1, renderResolutionScale),
-          ),
-        )
-      : Math.max(
-          1,
-          Math.round(styleWidth * Math.max(1, renderResolutionScale)),
-        );
+      ? Math.max(displayBufferWidth, logicalBufferWidth)
+      : displayBufferWidth;
     const nextHeight = currentFilterState.isFilterEnabled
-      ? Math.max(
-          1,
-          Math.round(
-            Math.max(1, currentFilterState.targetHeight) * Math.max(1, renderResolutionScale),
-          ),
-        )
-      : Math.max(
-          1,
-          Math.round(styleHeight * Math.max(1, renderResolutionScale)),
-        );
+      ? Math.max(displayBufferHeight, logicalBufferHeight)
+      : displayBufferHeight;
 
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
@@ -580,9 +825,37 @@ export function useRetroPixiStage({
     app.canvas.style.top = `${Math.round(viewRect.y)}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
-    app.canvas.style.imageRendering = currentFilterState.isFilterEnabled
-      ? "pixelated"
-      : "auto";
+    app.canvas.style.imageRendering = "pixelated";
+
+    if (isPhosphorDotModeEnabled(currentFilterState)) {
+      console.log("[phosphor-dot layout]", {
+        targetWidth: currentFilterState.targetWidth,
+        targetHeight: currentFilterState.targetHeight,
+        effectiveTargetWidth,
+        effectiveTargetHeight,
+        styleWidth,
+        styleHeight,
+        displayBufferWidth,
+        displayBufferHeight,
+        logicalBufferWidth,
+        logicalBufferHeight,
+        canvasWidth: app.canvas.width,
+        canvasHeight: app.canvas.height,
+      });
+    }
+
+    if (isSafariSourceClamped && sourceSize) {
+      debugVideo("safariLargeSourceLayoutClamp", {
+        sourceWidth: sourceSize.width,
+        sourceHeight: sourceSize.height,
+        requestedTargetWidth: currentFilterState.targetWidth,
+        requestedTargetHeight: currentFilterState.targetHeight,
+        effectiveTargetWidth,
+        effectiveTargetHeight,
+        canvasWidth: app.canvas.width,
+        canvasHeight: app.canvas.height,
+      });
+    }
 
     renderFrame();
   }, [fitCurrentSprite, renderFrame, renderResolutionScale]);
