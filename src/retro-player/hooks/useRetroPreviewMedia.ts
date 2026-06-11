@@ -430,9 +430,6 @@ export function useRetroPreviewMedia({
 
     try {
       await ensureAudioContext();
-      if (!mediaSourceRef.current) {
-        await connectMediaAudio(mediaRef.current);
-      }
       mediaRef.current.muted = isMutedRef.current;
       mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
       await mediaRef.current.play();
@@ -563,6 +560,7 @@ export function useRetroPreviewMedia({
           safeRender();
         }
 
+        await connectMediaAudio(media);
         syncVideoState();
         await playVideoWithAudio();
         if (requestId === previewRequestIdRef.current) {
@@ -656,6 +654,7 @@ export function useRetroPreviewMedia({
       streamOwnedRef.current = true;
       mediaRef.current = video;
       await attachVisualPreview(video, "capture");
+      await connectMediaAudio(video);
       setNeedsUserPlay(false);
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
@@ -718,6 +717,7 @@ export function useRetroPreviewMedia({
         streamOwnedRef.current = false;
         mediaRef.current = media;
         await attachVisualPreview(media, "capture");
+        await connectMediaAudio(media);
       } else {
         const media = document.createElement("audio");
         media.srcObject = stream;
@@ -738,6 +738,7 @@ export function useRetroPreviewMedia({
         setSourceDimensions(null);
         setViewportRect(null);
         safeRender();
+        await connectMediaAudio(media);
         syncVideoState();
       }
 
@@ -793,6 +794,7 @@ export function useRetroPreviewMedia({
 
         mediaRef.current = media;
         await attachVisualPreview(media, "video");
+        await connectMediaAudio(media);
         syncVideoState();
       } else if (kind === "image") {
         const image = new Image();
@@ -827,6 +829,7 @@ export function useRetroPreviewMedia({
         setViewportRect(null);
         mediaRef.current = audio;
         safeRender();
+        await connectMediaAudio(audio);
         syncVideoState();
       }
 
