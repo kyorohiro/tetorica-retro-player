@@ -741,6 +741,33 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   return dotColor;
 }
 
+vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
+{
+  vec2 clampedUv = clamp(sampleUv, vec2(0.0), vec2(1.0));
+  vec4 sampleColor = texture(uTexture, clampedUv);
+  bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
+
+  if (isPc98Tile) {
+    return samplePc98TileSource(uTexture, sampleCell, uTargetSize);
+  }
+
+  float dither = (bayer4x4(sampleCell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
+  sampleColor.rgb = clamp(sampleColor.rgb + dither, 0.0, 1.0);
+  bool isNeon = uPaletteMode > 8.5;
+
+  if (isNeon) {
+    return applyNeonLinePalette(
+      uTexture,
+      clampedUv,
+      texel,
+      max(uColorLevels, 2.0),
+      uMonoTint
+    );
+  }
+
+  return applyPalette(sampleColor.rgb, uColorLevels, uPaletteMode, uMonoTint, sampleCell);
+}
+
 void main(void)
 {
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
@@ -813,11 +840,11 @@ void main(void)
     vec2 leftUv = clamp((dotCell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
     vec2 downUv = clamp((dotCell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
     vec2 upUv = clamp((dotCell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec3 centerColor = texture(uTexture, dotPixelatedUv).rgb;
-    vec3 rightColor = texture(uTexture, rightUv).rgb;
-    vec3 leftColor = texture(uTexture, leftUv).rgb;
-    vec3 downColor = texture(uTexture, downUv).rgb;
-    vec3 upColor = texture(uTexture, upUv).rgb;
+    vec3 centerColor = sampleProcessedSourceColor(dotPixelatedUv, dotCell, texel);
+    vec3 rightColor = sampleProcessedSourceColor(rightUv, dotCell + vec2(1.0, 0.0), texel);
+    vec3 leftColor = sampleProcessedSourceColor(leftUv, dotCell + vec2(-1.0, 0.0), texel);
+    vec3 downColor = sampleProcessedSourceColor(downUv, dotCell + vec2(0.0, 1.0), texel);
+    vec3 upColor = sampleProcessedSourceColor(upUv, dotCell + vec2(0.0, -1.0), texel);
     float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
