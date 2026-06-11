@@ -35,6 +35,7 @@ type VideoControlsProps = {
   midAmount: number;
   trebleAmount: number;
   stereoWidthAmount: number;
+  smallSpeakerRoomAmount: number;
   wowFlutterAmount: number;
   noiseLevel: number;
   playbackRate: number;
@@ -47,6 +48,7 @@ type VideoControlsProps = {
   onChangeMidAmount: (amount: number) => void;
   onChangeTrebleAmount: (amount: number) => void;
   onChangeStereoWidthAmount: (amount: number) => void;
+  onChangeSmallSpeakerRoomAmount: (amount: number) => void;
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
@@ -97,6 +99,7 @@ export function VideoControls({
   midAmount,
   trebleAmount,
   stereoWidthAmount,
+  smallSpeakerRoomAmount,
   wowFlutterAmount,
   noiseLevel,
   playbackRate,
@@ -109,6 +112,7 @@ export function VideoControls({
   onChangeMidAmount,
   onChangeTrebleAmount,
   onChangeStereoWidthAmount,
+  onChangeSmallSpeakerRoomAmount,
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangePlaybackRate,
@@ -335,6 +339,24 @@ export function VideoControls({
             value={stereoWidthAmount}
             onChange={(ev) => {
               onChangeStereoWidthAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Small room</span>
+            <span>{Math.round(smallSpeakerRoomAmount * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={smallSpeakerRoomAmount}
+            onChange={(ev) => {
+              onChangeSmallSpeakerRoomAmount(Number(ev.currentTarget.value));
             }}
             className="w-full"
           />

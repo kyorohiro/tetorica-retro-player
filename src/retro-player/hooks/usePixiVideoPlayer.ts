@@ -152,6 +152,8 @@ export function usePixiVideoPlayer(
     setTrebleAmount,
     stereoWidthAmount,
     setStereoWidthAmount,
+    smallSpeakerRoomAmount,
+    setSmallSpeakerRoomAmount,
     wowFlutterAmount,
     setWowFlutterAmount,
     isNoiseEnabled,
@@ -242,6 +244,7 @@ export function usePixiVideoPlayer(
     midAmount,
     trebleAmount,
     stereoWidthAmount,
+    smallSpeakerRoomAmount,
     isMuted,
     volume,
     previewKind,
@@ -758,6 +761,7 @@ export function usePixiVideoPlayer(
     midAmount,
     trebleAmount,
     stereoWidthAmount,
+    smallSpeakerRoomAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -809,6 +813,7 @@ export function usePixiVideoPlayer(
     setMidAmount,
     setTrebleAmount,
     setStereoWidthAmount,
+    setSmallSpeakerRoomAmount,
     setWowFlutterAmount,
     toggleNoise: () => {
       setIsNoiseEnabled((current) => !current);
