@@ -57,6 +57,12 @@ const bitCrushAmountInput = document.getElementById("bitCrushAmount");
 const bitCrushAmountValue = document.getElementById("bitCrushAmountValue");
 const sampleRateReductionAmountInput = document.getElementById("sampleRateReductionAmount");
 const sampleRateReductionAmountValue = document.getElementById("sampleRateReductionAmountValue");
+const bassAmountInput = document.getElementById("bassAmount");
+const bassAmountValue = document.getElementById("bassAmountValue");
+const midAmountInput = document.getElementById("midAmount");
+const midAmountValue = document.getElementById("midAmountValue");
+const trebleAmountInput = document.getElementById("trebleAmount");
+const trebleAmountValue = document.getElementById("trebleAmountValue");
 const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
 const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
@@ -285,6 +291,24 @@ sampleRateReductionAmountInput.addEventListener("input", () => {
   updateSettings({ sampleRateReductionAmount });
 });
 
+bassAmountInput.addEventListener("input", () => {
+  const bassAmount = Number(bassAmountInput.value);
+  bassAmountValue.textContent = formatEqAmount(bassAmount);
+  updateSettings({ bassAmount });
+});
+
+midAmountInput.addEventListener("input", () => {
+  const midAmount = Number(midAmountInput.value);
+  midAmountValue.textContent = formatEqAmount(midAmount);
+  updateSettings({ midAmount });
+});
+
+trebleAmountInput.addEventListener("input", () => {
+  const trebleAmount = Number(trebleAmountInput.value);
+  trebleAmountValue.textContent = formatEqAmount(trebleAmount);
+  updateSettings({ trebleAmount });
+});
+
 wowFlutterAmountInput.addEventListener("input", () => {
   const wowFlutterAmount = Number(wowFlutterAmountInput.value);
   wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
@@ -392,6 +416,12 @@ function renderSettings(settings) {
   bitCrushAmountValue.textContent = settings.bitCrushAmount.toFixed(2);
   sampleRateReductionAmountInput.value = String(settings.sampleRateReductionAmount);
   sampleRateReductionAmountValue.textContent = settings.sampleRateReductionAmount.toFixed(2);
+  bassAmountInput.value = String(settings.bassAmount);
+  bassAmountValue.textContent = formatEqAmount(settings.bassAmount);
+  midAmountInput.value = String(settings.midAmount);
+  midAmountValue.textContent = formatEqAmount(settings.midAmount);
+  trebleAmountInput.value = String(settings.trebleAmount);
+  trebleAmountValue.textContent = formatEqAmount(settings.trebleAmount);
   wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
   wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
@@ -415,4 +445,9 @@ async function persistSettings() {
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function formatEqAmount(value) {
+  const amount = value * 15;
+  return `${amount >= 0 ? "+" : ""}${amount.toFixed(1)} dB`;
 }
