@@ -133,6 +133,35 @@ export function useRetroPreviewMedia({
     }
   };
 
+  const isAutoplayBlockedError = (error: unknown) => {
+    if (error instanceof DOMException) {
+      if (error.name === "NotAllowedError" || error.name === "AbortError") {
+        return true;
+      }
+    }
+
+    if (error instanceof Error) {
+      return /autoplay|user gesture|user activation|interaction|not allowed/i.test(
+        error.message,
+      );
+    }
+
+    return false;
+  };
+
+  const recoverToManualPlayPrompt = (error: unknown) => {
+    if (!isAutoplayBlockedError(error)) {
+      return false;
+    }
+
+    finishLoading();
+    setPreviewError("");
+    setNeedsUserPlay(true);
+    syncVideoState();
+    safeRender();
+    return true;
+  };
+
   const releaseDetachedMedia = (
     media: HTMLMediaElement,
     url?: string,
@@ -401,6 +430,9 @@ export function useRetroPreviewMedia({
 
     try {
       await ensureAudioContext();
+      if (!mediaSourceRef.current) {
+        await connectMediaAudio(mediaRef.current);
+      }
       mediaRef.current.muted = isMutedRef.current;
       mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
       await mediaRef.current.play();
@@ -430,7 +462,7 @@ export function useRetroPreviewMedia({
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
       finishLoading();
-      if (error instanceof DOMException && error.name === "NotAllowedError") {
+      if (isAutoplayBlockedError(error)) {
         setNeedsUserPlay(true);
         setPreviewError("");
         return;
@@ -531,7 +563,6 @@ export function useRetroPreviewMedia({
           safeRender();
         }
 
-        await connectMediaAudio(media);
         syncVideoState();
         await playVideoWithAudio();
         if (requestId === previewRequestIdRef.current) {
@@ -568,13 +599,19 @@ export function useRetroPreviewMedia({
         return;
       }
 
+      const isAutoplayBlocked = isAutoplayBlockedError(error);
+      if (isAutoplayBlocked) {
+        recoverToManualPlayPrompt(error);
+        return;
+      }
+
       cleanupPreview();
       setPreviewError(
-        error instanceof Error ? error.message : "動画プレビューに失敗しました。",
+        error instanceof Error
+          ? error.message
+          : "動画プレビューに失敗しました。",
       );
-      setNeedsUserPlay(
-        error instanceof DOMException && error.name === "NotAllowedError",
-      );
+      setNeedsUserPlay(false);
     }
   };
 
@@ -619,7 +656,6 @@ export function useRetroPreviewMedia({
       streamOwnedRef.current = true;
       mediaRef.current = video;
       await attachVisualPreview(video, "capture");
-      await connectMediaAudio(video);
       setNeedsUserPlay(false);
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
@@ -627,6 +663,10 @@ export function useRetroPreviewMedia({
       }
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) return;
+
+      if (recoverToManualPlayPrompt(error)) {
+        return;
+      }
 
       cleanupPreview();
       setPreviewError(
@@ -678,7 +718,6 @@ export function useRetroPreviewMedia({
         streamOwnedRef.current = false;
         mediaRef.current = media;
         await attachVisualPreview(media, "capture");
-        await connectMediaAudio(media);
       } else {
         const media = document.createElement("audio");
         media.srcObject = stream;
@@ -699,7 +738,6 @@ export function useRetroPreviewMedia({
         setSourceDimensions(null);
         setViewportRect(null);
         safeRender();
-        await connectMediaAudio(media);
         syncVideoState();
       }
 
@@ -711,6 +749,10 @@ export function useRetroPreviewMedia({
       }
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) return;
+
+      if (recoverToManualPlayPrompt(error)) {
+        return;
+      }
 
       cleanupPreview();
       setPreviewError(error instanceof Error ? error.message : String(error));
@@ -751,7 +793,6 @@ export function useRetroPreviewMedia({
 
         mediaRef.current = media;
         await attachVisualPreview(media, "video");
-        await connectMediaAudio(media);
         syncVideoState();
       } else if (kind === "image") {
         const image = new Image();
@@ -786,7 +827,6 @@ export function useRetroPreviewMedia({
         setViewportRect(null);
         mediaRef.current = audio;
         safeRender();
-        await connectMediaAudio(audio);
         syncVideoState();
       }
 
@@ -800,6 +840,10 @@ export function useRetroPreviewMedia({
       }
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) return;
+
+      if (recoverToManualPlayPrompt(error)) {
+        return;
+      }
 
       cleanupPreview();
       setPreviewError(error instanceof Error ? error.message : String(error));

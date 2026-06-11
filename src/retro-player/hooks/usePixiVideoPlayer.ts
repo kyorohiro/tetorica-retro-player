@@ -666,15 +666,24 @@ export function usePixiVideoPlayer(
     const isVideoReady =
       (previewKind === "video" || previewKind === "capture") &&
       mediaRef.current?.tagName === "VIDEO";
+    const isAtStart =
+      !mediaRef.current || Math.abs(mediaRef.current.currentTime) < 0.05;
+    const isEnded = mediaRef.current?.ended ?? false;
 
     if (isVideoReady) {
       finishLoading();
     }
 
-    if (isVideoReady && !isPlaying && audioContextRef.current?.state === "suspended") {
+    if (
+      isVideoReady &&
+      !isPlaying &&
+      !previewError &&
+      !isEnded &&
+      (audioContextRef.current?.state === "suspended" || isAtStart)
+    ) {
       setNeedsUserPlay(true);
     }
-  }, [audioContextRef, isPlaying, previewKind]);
+  }, [audioContextRef, isPlaying, previewError, previewKind]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
