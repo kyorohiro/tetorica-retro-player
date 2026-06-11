@@ -601,13 +601,39 @@ function applySettings(gl, program, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uGlowStrength, settings.glowStrength);
   gl.uniform1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
   gl.uniform1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
+  gl.uniform1f(uniformLocations.uBulbRadius, settings.bulbRadius ?? 0.22);
+  gl.uniform1f(uniformLocations.uBlackFloor, settings.blackFloor ?? 0.01);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(settings.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(settings.targetWidth, 1)),
   );
+  gl.uniform1f(uniformLocations.uPhosphorDotMode, settings.phosphorDotMode ? 1 : 0);
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotInternalScale,
+    settings.phosphorDotInternalScale ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotBrightCore,
+    settings.phosphorDotBrightCore ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotCellFill,
+    settings.phosphorDotCellFill ?? 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotFlatDisc,
+    settings.phosphorDotFlatDisc ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotNeighborBlend,
+    settings.phosphorDotNeighborBlend ? 1 : 0,
+  );
   gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, settings.closeUpNoiseStrength);
   gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(settings.monoTint));
+  gl.uniform1f(uniformLocations.uNeonBoost, settings.neonBoost ?? 1);
+  gl.uniform1f(uniformLocations.uNeonSaturation, settings.neonSaturation ?? 1);
+  gl.uniform1f(uniformLocations.uNeonDetail, settings.neonDetail ?? 1);
 }
 
 async function loadLatestSettings(fallbackSettings) {
@@ -699,9 +725,20 @@ function setupRenderer(webgl) {
       uGlowStrength: webgl.getUniformLocation(program, "uGlowStrength"),
       uPhosphorStrength: webgl.getUniformLocation(program, "uPhosphorStrength"),
       uSpotMaskStrength: webgl.getUniformLocation(program, "uSpotMaskStrength"),
+      uBulbRadius: webgl.getUniformLocation(program, "uBulbRadius"),
+      uBlackFloor: webgl.getUniformLocation(program, "uBlackFloor"),
       uPixelAspect: webgl.getUniformLocation(program, "uPixelAspect"),
+      uPhosphorDotMode: webgl.getUniformLocation(program, "uPhosphorDotMode"),
+      uPhosphorDotInternalScale: webgl.getUniformLocation(program, "uPhosphorDotInternalScale"),
+      uPhosphorDotBrightCore: webgl.getUniformLocation(program, "uPhosphorDotBrightCore"),
+      uPhosphorDotCellFill: webgl.getUniformLocation(program, "uPhosphorDotCellFill"),
+      uPhosphorDotFlatDisc: webgl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
+      uPhosphorDotNeighborBlend: webgl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
       uCloseUpNoiseStrength: webgl.getUniformLocation(program, "uCloseUpNoiseStrength"),
       uMonoTint: webgl.getUniformLocation(program, "uMonoTint"),
+      uNeonBoost: webgl.getUniformLocation(program, "uNeonBoost"),
+      uNeonSaturation: webgl.getUniformLocation(program, "uNeonSaturation"),
+      uNeonDetail: webgl.getUniformLocation(program, "uNeonDetail"),
       uTime: webgl.getUniformLocation(program, "uTime"),
     },
   };

@@ -23,7 +23,11 @@ import {
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
 import { useDialog } from "../../useDialog";
-import { RETRO_PRESETS, type RetroPresetKey } from "../retro/config";
+import {
+  RETRO_PRESETS,
+  type RetroPresetDefinition,
+  type RetroPresetKey,
+} from "../retro/config";
 
 type RetroPlayerProps = {
   src?: string;
@@ -114,7 +118,7 @@ export function RetroPlayer({
         return;
       }
 
-      const preset = RETRO_PRESETS.phosphorDot;
+      const preset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
       const sourceWidth = Math.max(player.sourceDimensions.width, 1);
       const sourceHeight = Math.max(player.sourceDimensions.height, 1);
       const sourceAspect = sourceWidth / sourceHeight;

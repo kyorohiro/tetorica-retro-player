@@ -21,6 +21,33 @@ export const MONO_TINTS: Record<
   ice: { label: "Ice", rgb: [0.7, 0.9, 1] },
 };
 
+export type RetroPresetDefinition = {
+  label: string;
+  width: number;
+  height: number;
+  colors: number;
+  dither: number;
+  palette: PaletteMode;
+  curvature: number;
+  scanline: number;
+  scanline2: number;
+  vignette: number;
+  glow: number;
+  phosphor: number;
+  spotMask: number;
+  bulbRadius: number;
+  blackFloor: number;
+  phosphorDotInternalScale?: boolean;
+  phosphorDotBrightCore?: boolean;
+  phosphorDotCellFill?: number;
+  phosphorDotFlatDisc?: boolean;
+  phosphorDotNeighborBlend?: boolean;
+  monoTint: MonoTintMode;
+  neonBoost: number;
+  neonSaturation: number;
+  neonDetail: number;
+};
+
 export const RETRO_PRESETS = {
   chunky: {
     label: "Chunky",
@@ -386,32 +413,7 @@ export const RETRO_PRESETS = {
   },
 } as const satisfies Record<
   string,
-  {
-    label: string;
-    width: number;
-    height: number;
-    colors: number;
-    dither: number;
-    palette: PaletteMode;
-    curvature: number;
-    scanline: number;
-    scanline2: number;
-    vignette: number;
-    glow: number;
-    phosphor: number;
-    spotMask: number;
-    bulbRadius: number;
-    blackFloor: number;
-    phosphorDotInternalScale?: boolean;
-    phosphorDotBrightCore?: boolean;
-    phosphorDotCellFill?: number;
-    phosphorDotFlatDisc?: boolean;
-    phosphorDotNeighborBlend?: boolean;
-    monoTint: MonoTintMode;
-    neonBoost: number;
-    neonSaturation: number;
-    neonDetail: number;
-  }
+  RetroPresetDefinition
 >;
 
 export type RetroPresetKey = keyof typeof RETRO_PRESETS;

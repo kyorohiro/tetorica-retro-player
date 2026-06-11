@@ -3,6 +3,7 @@ import {
   RETRO_PRESETS,
   type MonoTintMode,
   type PaletteMode,
+  type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
 import {
@@ -10,7 +11,7 @@ import {
   savePersistedRetroFilterSettings,
 } from "./persistedRetroSettings";
 
-const DEFAULT_PRESET = RETRO_PRESETS.pc98_512;
+const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.pc98_512;
 
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;
@@ -46,7 +47,10 @@ type RetroFilterSettings = Required<RetroFilterInitialState>;
 const resolvePresetKeyFromState = (
   state: RetroFilterSettings,
 ): RetroPresetKey | null => {
-  for (const [key, preset] of Object.entries(RETRO_PRESETS)) {
+  for (const [key, preset] of Object.entries(RETRO_PRESETS) as [
+    RetroPresetKey,
+    RetroPresetDefinition,
+  ][]) {
     if (
       preset.width === state.targetWidth &&
       preset.height === state.targetHeight &&
@@ -273,7 +277,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   };
 
   const applyPreset = (preset: RetroPresetKey) => {
-    const presetSettings = RETRO_PRESETS[preset];
+    const presetSettings: RetroPresetDefinition = RETRO_PRESETS[preset];
 
     setSelectedPreset(preset);
     setSettings((current) => ({
