@@ -113,68 +113,11 @@ const QUAD_VERTICES = new Float32Array([
 ]);
 
 const LARGE_VIDEO_SOURCE_THRESHOLD = 640;
-const SAFARI_CLAMPED_UPLOAD_LONG_EDGE = 1280;
-const SAFARI_CLAMPED_UPLOAD_MAX_PIXELS = 1280 * 1280;
 
 const getSourceSize = (source: HTMLVideoElement | HTMLImageElement) => ({
   width: source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth,
   height: source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
 });
-
-const isLikelySafari = () => {
-  if (typeof navigator === "undefined") return false;
-
-  const userAgent = navigator.userAgent;
-  const vendor = navigator.vendor;
-  return (
-    /Safari/i.test(userAgent) &&
-    /Apple/i.test(vendor) &&
-    !/CriOS|Chrome|Chromium|EdgiOS|FxiOS/i.test(userAgent)
-  );
-};
-
-const clampLargeSourceTargetSize = (
-  width: number,
-  height: number,
-  sourceWidth?: number,
-  sourceHeight?: number,
-) => {
-  if (
-    !isLikelySafari() ||
-    sourceWidth === undefined ||
-    sourceHeight === undefined ||
-    sourceWidth <= 0 ||
-    sourceHeight <= 0
-  ) {
-    return { width, height, wasClamped: false };
-  }
-
-  if (
-    sourceWidth <= LARGE_VIDEO_SOURCE_THRESHOLD &&
-    sourceHeight <= LARGE_VIDEO_SOURCE_THRESHOLD
-  ) {
-    return { width, height, wasClamped: false };
-  }
-
-  const longestEdge = Math.max(width, height, 1);
-  const pixelCount = Math.max(width, 1) * Math.max(height, 1);
-  const edgeScale = Math.min(1, SAFARI_CLAMPED_UPLOAD_LONG_EDGE / longestEdge);
-  const areaScale = Math.min(
-    1,
-    Math.sqrt(SAFARI_CLAMPED_UPLOAD_MAX_PIXELS / Math.max(pixelCount, 1)),
-  );
-  const scale = Math.min(edgeScale, areaScale);
-
-  if (scale >= 0.999) {
-    return { width, height, wasClamped: false };
-  }
-
-  return {
-    width: Math.max(1, Math.round(width * scale)),
-    height: Math.max(1, Math.round(height * scale)),
-    wasClamped: true,
-  };
-};
 
 const shouldUseDirectVideoUpload = (
   source: HTMLVideoElement | HTMLImageElement,
@@ -204,8 +147,6 @@ const getEffectiveTargetSize = (
   filterState: RetroFilterState,
   visibleWidth?: number,
   visibleHeight?: number,
-  sourceWidth?: number,
-  sourceHeight?: number,
 ) => {
   const internalScale = getPhosphorDotInternalScale(filterState);
   const requestedWidth = Math.max(filterState.targetWidth, 1);
@@ -216,18 +157,11 @@ const getEffectiveTargetSize = (
     visibleWidth === undefined ||
     visibleHeight === undefined
   ) {
-    const clampedTarget = clampLargeSourceTargetSize(
-      requestedWidth * internalScale,
-      requestedHeight * internalScale,
-      sourceWidth,
-      sourceHeight,
-    );
     return {
-      width: clampedTarget.width,
-      height: clampedTarget.height,
+      width: requestedWidth * internalScale,
+      height: requestedHeight * internalScale,
       internalScale,
       isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
-      isSafariSourceClamped: clampedTarget.wasClamped,
     };
   }
 
@@ -240,19 +174,12 @@ const getEffectiveTargetSize = (
     requestedHeight,
     Math.max(1, Math.floor(visibleHeight / phosphorDotMinimumCellSize)),
   );
-  const clampedTarget = clampLargeSourceTargetSize(
-    clampedWidth * internalScale,
-    clampedHeight * internalScale,
-    sourceWidth,
-    sourceHeight,
-  );
 
   return {
-    width: clampedTarget.width,
-    height: clampedTarget.height,
+    width: clampedWidth * internalScale,
+    height: clampedHeight * internalScale,
     internalScale,
     isPhosphorDotMode: true,
-    isSafariSourceClamped: clampedTarget.wasClamped,
   };
 };
 
@@ -545,14 +472,7 @@ export function useRetroPixiStage({
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
-      isSafariSourceClamped,
-    } = getEffectiveTargetSize(
-      currentFilterState,
-      undefined,
-      undefined,
-      sourceSize.width,
-      sourceSize.height,
-    );
+    } = getEffectiveTargetSize(currentFilterState);
     const targetWidth = Math.max(1, Math.round(effectiveTargetWidth));
     const targetHeight = Math.max(1, Math.round(effectiveTargetHeight));
 
@@ -581,15 +501,6 @@ export function useRetroPixiStage({
     uploadContext.imageSmoothingQuality = "high";
     uploadContext.fillStyle = "#000";
     uploadContext.fillRect(0, 0, targetWidth, targetHeight);
-
-    if (isSafariSourceClamped) {
-      debugVideo("safariLargeSourceClamp", {
-        sourceWidth: sourceSize.width,
-        sourceHeight: sourceSize.height,
-        uploadWidth: targetWidth,
-        uploadHeight: targetHeight,
-      });
-    }
 
     uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
     return uploadCanvas;
@@ -781,9 +692,6 @@ export function useRetroPixiStage({
     const styleWidth = Math.max(1, Math.round(viewRect.width));
     const styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
-    const sourceSize = previewElementRef.current
-      ? getSourceSize(previewElementRef.current)
-      : null;
     const displayBufferWidth = Math.max(
       1,
       Math.round(styleWidth * Math.max(1, renderResolutionScale)),
@@ -795,14 +703,7 @@ export function useRetroPixiStage({
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
-      isSafariSourceClamped,
-    } = getEffectiveTargetSize(
-      currentFilterState,
-      styleWidth,
-      styleHeight,
-      sourceSize?.width,
-      sourceSize?.height,
-    );
+    } = getEffectiveTargetSize(currentFilterState, styleWidth, styleHeight);
     const logicalBufferWidth = Math.max(
       1,
       Math.round(Math.max(1, effectiveTargetWidth) * Math.max(1, renderResolutionScale)),
@@ -839,19 +740,6 @@ export function useRetroPixiStage({
         displayBufferHeight,
         logicalBufferWidth,
         logicalBufferHeight,
-        canvasWidth: app.canvas.width,
-        canvasHeight: app.canvas.height,
-      });
-    }
-
-    if (isSafariSourceClamped && sourceSize) {
-      debugVideo("safariLargeSourceLayoutClamp", {
-        sourceWidth: sourceSize.width,
-        sourceHeight: sourceSize.height,
-        requestedTargetWidth: currentFilterState.targetWidth,
-        requestedTargetHeight: currentFilterState.targetHeight,
-        effectiveTargetWidth,
-        effectiveTargetHeight,
         canvasWidth: app.canvas.width,
         canvasHeight: app.canvas.height,
       });
