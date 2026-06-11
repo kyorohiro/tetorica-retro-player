@@ -654,7 +654,7 @@ vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   return maskedColor;
 }
 
-vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
+vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
 {
   if (amount <= 0.0) {
     return color;
@@ -666,7 +666,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   float saturation = brightness - minChannel;
   float chromaLift = smoothstep(0.04, 0.28, saturation) * smoothstep(0.0, 0.22, brightness);
   float perceivedLight = max(luminance, brightness * 0.72 + chromaLift * 0.12);
-  vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
+  vec2 cellUv = fract(gridUv * targetSize) - 0.5;
   float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
   float aspectCompensation = sqrt(pixelAspect);
   vec2 dotUv = pixelAspect >= 1.0
@@ -746,6 +746,7 @@ void main(void)
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
   vec2 delta = warpedMask - vMaskCoord;
   vec2 curvedUv = vTextureCoord + delta;
+  vec2 gridUv = vTextureCoord;
   if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
     finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
@@ -805,10 +806,14 @@ void main(void)
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
-    vec2 rightUv = clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 leftUv = clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 downUv = clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 upUv = clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 dotCell = floor(gridUv * uTargetSize);
+    vec2 dotPixelatedUv = (dotCell + 0.5) / uTargetSize;
+    dotPixelatedUv = clamp(dotPixelatedUv, vec2(0.0), vec2(1.0));
+    vec2 rightUv = clamp((dotCell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 leftUv = clamp((dotCell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 downUv = clamp((dotCell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upUv = clamp((dotCell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec3 centerColor = texture(uTexture, dotPixelatedUv).rgb;
     vec3 rightColor = texture(uTexture, rightUv).rgb;
     vec3 leftColor = texture(uTexture, leftUv).rgb;
     vec3 downColor = texture(uTexture, downUv).rgb;
@@ -817,13 +822,13 @@ void main(void)
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
     vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
-    float sourceColorDelta = length(color.rgb - neighborMix);
+    float sourceColorDelta = length(centerColor - neighborMix);
     float sourceBlendAmount =
       neighborBlendMix *
       (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
-    vec3 mixedSourceColor = mix(color.rgb, color.rgb * 0.24 + neighborMix * 0.76, sourceBlendAmount);
+    vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
 
-    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
+    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, gridUv, uTargetSize, uSpotMaskStrength);
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
@@ -835,7 +840,7 @@ void main(void)
 
     float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
     float aspectCompensation = sqrt(pixelAspect);
-    vec2 cellUv = fract(curvedUv * uTargetSize) - 0.5;
+    vec2 cellUv = fract(gridUv * uTargetSize) - 0.5;
     vec2 dotUv = pixelAspect >= 1.0
       ? vec2(cellUv.x, cellUv.y * aspectCompensation)
       : vec2(cellUv.x / aspectCompensation, cellUv.y);
