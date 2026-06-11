@@ -467,16 +467,16 @@ export function useRetroAudioEngine({
       } else {
         drive.connect(bassEq);
       }
-    bassEq.connect(midEq);
-    midEq.connect(trebleEq);
-    if (stereoWidth) {
-      trebleEq.connect(stereoWidth);
-      stereoWidth.connect(roomDryGain);
-      stereoWidth.connect(roomConvolver);
-    } else {
-      trebleEq.connect(roomDryGain);
-      trebleEq.connect(roomConvolver);
-    }
+      bassEq.connect(midEq);
+      midEq.connect(trebleEq);
+      if (stereoWidth) {
+        trebleEq.connect(stereoWidth);
+        stereoWidth.connect(roomDryGain);
+        stereoWidth.connect(roomConvolver);
+      } else {
+        trebleEq.connect(roomDryGain);
+        trebleEq.connect(roomConvolver);
+      }
       roomConvolver.connect(roomWetGain);
       roomDryGain.connect(masterGain);
       roomWetGain.connect(masterGain);
