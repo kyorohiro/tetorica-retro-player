@@ -46,6 +46,7 @@ export type PersistedRetroAudioSettings = {
   midAmount: number;
   trebleAmount: number;
   stereoWidthAmount: number;
+  smallSpeakerRoomAmount: number;
   wowFlutterAmount: number;
   isNoiseEnabled: boolean;
   noiseLevel: number;

@@ -46,6 +46,9 @@ let bassEqNode = null;
 let midEqNode = null;
 let trebleEqNode = null;
 let stereoWidthNode = null;
+let roomDryGainNode = null;
+let roomConvolverNode = null;
+let roomWetGainNode = null;
 let wowFlutterDelayNode = null;
 let wowLfoNode = null;
 let wowLfoGainNode = null;
@@ -515,6 +518,24 @@ function createDriveCurve(amount) {
   return curve;
 }
 
+function createSmallRoomImpulse(context) {
+  const duration = 0.14;
+  const length = Math.max(1, Math.floor(context.sampleRate * duration));
+  const impulse = context.createBuffer(2, length, context.sampleRate);
+
+  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+    const channelData = impulse.getChannelData(channel);
+    for (let index = 0; index < channelData.length; index += 1) {
+      const t = index / channelData.length;
+      const decay = (1 - t) ** 2.2;
+      const flutter = 0.82 + 0.18 * Math.sin(t * 36 + channel * 0.7);
+      channelData[index] = (Math.random() * 2 - 1) * decay * flutter * 0.18;
+    }
+  }
+
+  return impulse;
+}
+
 function updateAudioNodes() {
   if (radioToneHighpassNode && radioToneLowpassNode && radioTonePresenceNode) {
     const amount = currentSettings.isAudioFxEnabled ? currentSettings.radioToneAmount : 0;
@@ -572,6 +593,12 @@ function updateAudioNodes() {
     );
   }
 
+  if (roomDryGainNode && roomWetGainNode) {
+    const amount = currentSettings.isAudioFxEnabled ? currentSettings.smallSpeakerRoomAmount : 0;
+    roomDryGainNode.gain.value = 1 - amount * 0.12;
+    roomWetGainNode.gain.value = amount * 0.35;
+  }
+
   if (
     wowFlutterDelayNode &&
     wowLfoNode &&
@@ -608,6 +635,9 @@ async function ensureAudioContext() {
     midEqNode = null;
     trebleEqNode = null;
     stereoWidthNode = null;
+    roomDryGainNode = null;
+    roomConvolverNode = null;
+    roomWetGainNode = null;
     wowFlutterDelayNode = null;
     wowLfoNode = null;
     wowLfoGainNode = null;
@@ -651,6 +681,9 @@ async function ensureAudioContext() {
     bassEqNode = audioContext.createBiquadFilter();
     midEqNode = audioContext.createBiquadFilter();
     trebleEqNode = audioContext.createBiquadFilter();
+    roomDryGainNode = audioContext.createGain();
+    roomConvolverNode = audioContext.createConvolver();
+    roomWetGainNode = audioContext.createGain();
     wowFlutterDelayNode = audioContext.createDelay(0.05);
     wowLfoNode = audioContext.createOscillator();
     wowLfoGainNode = audioContext.createGain();
@@ -669,6 +702,7 @@ async function ensureAudioContext() {
     midEqNode.Q.value = 0.9;
     trebleEqNode.type = "highshelf";
     trebleEqNode.frequency.value = 3200;
+    roomConvolverNode.buffer = createSmallRoomImpulse(audioContext);
     lofiHighshelfNode.frequency.value = 2800;
     lofiDriveNode.oversample = "4x";
     wowFlutterDelayNode.delayTime.value = 0.006;
@@ -696,10 +730,15 @@ async function ensureAudioContext() {
     midEqNode.connect(trebleEqNode);
     if (stereoWidthNode) {
       trebleEqNode.connect(stereoWidthNode);
-      stereoWidthNode.connect(masterGainNode);
+      stereoWidthNode.connect(roomDryGainNode);
+      stereoWidthNode.connect(roomConvolverNode);
     } else {
-      trebleEqNode.connect(masterGainNode);
+      trebleEqNode.connect(roomDryGainNode);
+      trebleEqNode.connect(roomConvolverNode);
     }
+    roomConvolverNode.connect(roomWetGainNode);
+    roomDryGainNode.connect(masterGainNode);
+    roomWetGainNode.connect(masterGainNode);
     masterGainNode.connect(audioContext.destination);
 
     noiseSourceNode = audioContext.createBufferSource();
@@ -815,6 +854,9 @@ async function disposeAudioEngine() {
   midEqNode = null;
   trebleEqNode = null;
   stereoWidthNode = null;
+  roomDryGainNode = null;
+  roomConvolverNode = null;
+  roomWetGainNode = null;
   wowFlutterDelayNode = null;
   wowLfoNode = null;
   wowLfoGainNode = null;

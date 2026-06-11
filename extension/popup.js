@@ -65,6 +65,8 @@ const trebleAmountInput = document.getElementById("trebleAmount");
 const trebleAmountValue = document.getElementById("trebleAmountValue");
 const stereoWidthAmountInput = document.getElementById("stereoWidthAmount");
 const stereoWidthAmountValue = document.getElementById("stereoWidthAmountValue");
+const smallSpeakerRoomAmountInput = document.getElementById("smallSpeakerRoomAmount");
+const smallSpeakerRoomAmountValue = document.getElementById("smallSpeakerRoomAmountValue");
 const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
 const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
@@ -317,6 +319,12 @@ stereoWidthAmountInput.addEventListener("input", () => {
   updateSettings({ stereoWidthAmount });
 });
 
+smallSpeakerRoomAmountInput.addEventListener("input", () => {
+  const smallSpeakerRoomAmount = Number(smallSpeakerRoomAmountInput.value);
+  smallSpeakerRoomAmountValue.textContent = smallSpeakerRoomAmount.toFixed(2);
+  updateSettings({ smallSpeakerRoomAmount });
+});
+
 wowFlutterAmountInput.addEventListener("input", () => {
   const wowFlutterAmount = Number(wowFlutterAmountInput.value);
   wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
@@ -432,6 +440,8 @@ function renderSettings(settings) {
   trebleAmountValue.textContent = formatEqAmount(settings.trebleAmount);
   stereoWidthAmountInput.value = String(settings.stereoWidthAmount);
   stereoWidthAmountValue.textContent = formatStereoWidthAmount(settings.stereoWidthAmount);
+  smallSpeakerRoomAmountInput.value = String(settings.smallSpeakerRoomAmount);
+  smallSpeakerRoomAmountValue.textContent = settings.smallSpeakerRoomAmount.toFixed(2);
   wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
   wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;

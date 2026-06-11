@@ -34,6 +34,7 @@ type UseRetroPreviewMediaParams = {
   midAmount: number;
   trebleAmount: number;
   stereoWidthAmount: number;
+  smallSpeakerRoomAmount: number;
   isMuted: boolean;
   volume: number;
   previewKind: PreviewKind;
@@ -95,6 +96,7 @@ export function useRetroPreviewMedia({
   midAmount,
   trebleAmount,
   stereoWidthAmount,
+  smallSpeakerRoomAmount,
   isMuted,
   volume,
   previewKind,
@@ -417,6 +419,7 @@ export function useRetroPreviewMedia({
         midAmount,
         trebleAmount,
         stereoWidthAmount,
+        smallSpeakerRoomAmount,
         isMuted,
         volume,
       });

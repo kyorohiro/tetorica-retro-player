@@ -485,6 +485,7 @@ export const DEFAULT_SETTINGS = {
   midAmount: 0.0,
   trebleAmount: 0.0,
   stereoWidthAmount: 0.0,
+  smallSpeakerRoomAmount: 0.0,
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
@@ -669,6 +670,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.stereoWidthAmount === "number"
         ? clamp(candidate.stereoWidthAmount, -1, 1)
         : basePresetSettings.stereoWidthAmount ?? DEFAULT_SETTINGS.stereoWidthAmount,
+    smallSpeakerRoomAmount:
+      typeof candidate?.smallSpeakerRoomAmount === "number"
+        ? clamp(candidate.smallSpeakerRoomAmount, 0, 1)
+        : basePresetSettings.smallSpeakerRoomAmount ?? DEFAULT_SETTINGS.smallSpeakerRoomAmount,
     wowFlutterAmount:
       typeof candidate?.wowFlutterAmount === "number"
         ? clamp(candidate.wowFlutterAmount, 0, 1)
@@ -794,6 +799,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.stereoWidthAmount === "number"
         ? preset.stereoWidthAmount
         : DEFAULT_SETTINGS.stereoWidthAmount,
+    smallSpeakerRoomAmount:
+      typeof preset.smallSpeakerRoomAmount === "number"
+        ? preset.smallSpeakerRoomAmount
+        : DEFAULT_SETTINGS.smallSpeakerRoomAmount,
     wowFlutterAmount:
       typeof preset.wowFlutterAmount === "number"
         ? preset.wowFlutterAmount

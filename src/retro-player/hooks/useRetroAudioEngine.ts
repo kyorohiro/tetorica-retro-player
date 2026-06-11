@@ -18,6 +18,7 @@ const DEFAULT_AUDIO_SETTINGS = {
   midAmount: 0,
   trebleAmount: 0,
   stereoWidthAmount: 0,
+  smallSpeakerRoomAmount: 0,
   wowFlutterAmount: 0,
   isNoiseEnabled: true,
   noiseLevel: 0.02,
@@ -69,6 +70,9 @@ export function useRetroAudioEngine({
       trebleAmount: persisted?.trebleAmount ?? DEFAULT_AUDIO_SETTINGS.trebleAmount,
       stereoWidthAmount:
         persisted?.stereoWidthAmount ?? DEFAULT_AUDIO_SETTINGS.stereoWidthAmount,
+      smallSpeakerRoomAmount:
+        persisted?.smallSpeakerRoomAmount ??
+        DEFAULT_AUDIO_SETTINGS.smallSpeakerRoomAmount,
       wowFlutterAmount:
         persisted?.wowFlutterAmount ?? DEFAULT_AUDIO_SETTINGS.wowFlutterAmount,
       isNoiseEnabled:
@@ -91,6 +95,9 @@ export function useRetroAudioEngine({
   const midEqRef = useRef<BiquadFilterNode | null>(null);
   const trebleEqRef = useRef<BiquadFilterNode | null>(null);
   const stereoWidthRef = useRef<AudioWorkletNode | null>(null);
+  const roomDryGainRef = useRef<GainNode | null>(null);
+  const roomConvolverRef = useRef<ConvolverNode | null>(null);
+  const roomWetGainRef = useRef<GainNode | null>(null);
   const wowFlutterDelayRef = useRef<DelayNode | null>(null);
   const wowLfoRef = useRef<OscillatorNode | null>(null);
   const wowLfoGainRef = useRef<GainNode | null>(null);
@@ -118,6 +125,9 @@ export function useRetroAudioEngine({
   const midAmountRef = useRef<number>(initialAudioSettings.midAmount);
   const trebleAmountRef = useRef<number>(initialAudioSettings.trebleAmount);
   const stereoWidthAmountRef = useRef<number>(initialAudioSettings.stereoWidthAmount);
+  const smallSpeakerRoomAmountRef = useRef<number>(
+    initialAudioSettings.smallSpeakerRoomAmount,
+  );
   const wowFlutterAmountRef = useRef<number>(initialAudioSettings.wowFlutterAmount);
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
@@ -153,6 +163,9 @@ export function useRetroAudioEngine({
   const [stereoWidthAmount, setStereoWidthAmount] = useState<number>(
     initialAudioSettings.stereoWidthAmount,
   );
+  const [smallSpeakerRoomAmount, setSmallSpeakerRoomAmount] = useState<number>(
+    initialAudioSettings.smallSpeakerRoomAmount,
+  );
   const [wowFlutterAmount, setWowFlutterAmount] = useState<number>(
     initialAudioSettings.wowFlutterAmount,
   );
@@ -185,6 +198,24 @@ export function useRetroAudioEngine({
     return curve;
   };
 
+  const createSmallRoomImpulse = (context: AudioContext) => {
+    const duration = 0.14;
+    const length = Math.max(1, Math.floor(context.sampleRate * duration));
+    const impulse = context.createBuffer(2, length, context.sampleRate);
+
+    for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+      const channelData = impulse.getChannelData(channel);
+      for (let index = 0; index < channelData.length; index += 1) {
+        const t = index / channelData.length;
+        const decay = (1 - t) ** 2.2;
+        const flutter = 0.82 + 0.18 * Math.sin(t * 36 + channel * 0.7);
+        channelData[index] = (Math.random() * 2 - 1) * decay * flutter * 0.18;
+      }
+    }
+
+    return impulse;
+  };
+
   const updateAudioNodes = () => {
     const masterGain = masterGainRef.current;
     const radioToneHighpass = radioToneHighpassRef.current;
@@ -198,6 +229,8 @@ export function useRetroAudioEngine({
     const midEq = midEqRef.current;
     const trebleEq = trebleEqRef.current;
     const stereoWidth = stereoWidthRef.current;
+    const roomDryGain = roomDryGainRef.current;
+    const roomWetGain = roomWetGainRef.current;
     const wowFlutterDelay = wowFlutterDelayRef.current;
     const wowLfo = wowLfoRef.current;
     const wowLfoGain = wowLfoGainRef.current;
@@ -222,6 +255,7 @@ export function useRetroAudioEngine({
     const nextMidAmount = midAmountRef.current;
     const nextTrebleAmount = trebleAmountRef.current;
     const nextStereoWidthAmount = stereoWidthAmountRef.current;
+    const nextSmallSpeakerRoomAmount = smallSpeakerRoomAmountRef.current;
     const nextWowFlutterAmount = wowFlutterAmountRef.current;
     const nextNoiseEnabled = isNoiseEnabledRef.current;
     const nextNoiseLevel = noiseLevelRef.current;
@@ -295,6 +329,12 @@ export function useRetroAudioEngine({
       );
     }
 
+    if (roomDryGain && roomWetGain) {
+      const amount = nextAudioFxEnabled ? nextSmallSpeakerRoomAmount : 0;
+      roomDryGain.gain.value = 1 - amount * 0.12;
+      roomWetGain.gain.value = amount * 0.35;
+    }
+
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
       const amount = nextAudioFxEnabled ? nextWowFlutterAmount : 0;
       wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
@@ -330,6 +370,9 @@ export function useRetroAudioEngine({
       midEqRef.current = null;
       trebleEqRef.current = null;
       stereoWidthRef.current = null;
+      roomDryGainRef.current = null;
+      roomConvolverRef.current = null;
+      roomWetGainRef.current = null;
       wowFlutterDelayRef.current = null;
       wowLfoRef.current = null;
       wowLfoGainRef.current = null;
@@ -380,6 +423,9 @@ export function useRetroAudioEngine({
       const bassEq = context.createBiquadFilter();
       const midEq = context.createBiquadFilter();
       const trebleEq = context.createBiquadFilter();
+      const roomDryGain = context.createGain();
+      const roomConvolver = context.createConvolver();
+      const roomWetGain = context.createGain();
       const wowFlutterDelay = context.createDelay(0.05);
       const wowLfo = context.createOscillator();
       const wowLfoGain = context.createGain();
@@ -397,6 +443,7 @@ export function useRetroAudioEngine({
       midEq.Q.value = 0.9;
       trebleEq.type = "highshelf";
       trebleEq.frequency.value = 3200;
+      roomConvolver.buffer = createSmallRoomImpulse(context);
       highshelf.frequency.value = 2800;
       drive.oversample = "4x";
       wowFlutterDelay.delayTime.value = 0.006;
@@ -420,14 +467,19 @@ export function useRetroAudioEngine({
       } else {
         drive.connect(bassEq);
       }
-      bassEq.connect(midEq);
-      midEq.connect(trebleEq);
-      if (stereoWidth) {
-        trebleEq.connect(stereoWidth);
-        stereoWidth.connect(masterGain);
-      } else {
-        trebleEq.connect(masterGain);
-      }
+    bassEq.connect(midEq);
+    midEq.connect(trebleEq);
+    if (stereoWidth) {
+      trebleEq.connect(stereoWidth);
+      stereoWidth.connect(roomDryGain);
+      stereoWidth.connect(roomConvolver);
+    } else {
+      trebleEq.connect(roomDryGain);
+      trebleEq.connect(roomConvolver);
+    }
+      roomConvolver.connect(roomWetGain);
+      roomDryGain.connect(masterGain);
+      roomWetGain.connect(masterGain);
       masterGain.connect(context.destination);
       masterGain.connect(recordingDestination);
 
@@ -483,6 +535,9 @@ export function useRetroAudioEngine({
       midEqRef.current = midEq;
       trebleEqRef.current = trebleEq;
       stereoWidthRef.current = stereoWidth;
+      roomDryGainRef.current = roomDryGain;
+      roomConvolverRef.current = roomConvolver;
+      roomWetGainRef.current = roomWetGain;
       wowFlutterDelayRef.current = wowFlutterDelay;
       wowLfoRef.current = wowLfo;
       wowLfoGainRef.current = wowLfoGain;
@@ -551,6 +606,9 @@ export function useRetroAudioEngine({
     midEqRef.current = null;
     trebleEqRef.current = null;
     stereoWidthRef.current = null;
+    roomDryGainRef.current = null;
+    roomConvolverRef.current = null;
+    roomWetGainRef.current = null;
     wowFlutterDelayRef.current = null;
     wowLfoRef.current = null;
     wowLfoGainRef.current = null;
@@ -608,6 +666,7 @@ export function useRetroAudioEngine({
         midAmount,
         trebleAmount,
         stereoWidthAmount,
+        smallSpeakerRoomAmount,
         wowFlutterAmount,
         isAudioFxEnabled,
         isMuted,
@@ -643,6 +702,7 @@ export function useRetroAudioEngine({
     midAmountRef.current = nextSettings.midAmount;
     trebleAmountRef.current = nextSettings.trebleAmount;
     stereoWidthAmountRef.current = nextSettings.stereoWidthAmount;
+    smallSpeakerRoomAmountRef.current = nextSettings.smallSpeakerRoomAmount;
     wowFlutterAmountRef.current = nextSettings.wowFlutterAmount;
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
@@ -660,6 +720,7 @@ export function useRetroAudioEngine({
     setMidAmount(nextSettings.midAmount);
     setTrebleAmount(nextSettings.trebleAmount);
     setStereoWidthAmount(nextSettings.stereoWidthAmount);
+    setSmallSpeakerRoomAmount(nextSettings.smallSpeakerRoomAmount);
     setWowFlutterAmount(nextSettings.wowFlutterAmount);
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
@@ -688,6 +749,7 @@ export function useRetroAudioEngine({
     midAmountRef.current = midAmount;
     trebleAmountRef.current = trebleAmount;
     stereoWidthAmountRef.current = stereoWidthAmount;
+    smallSpeakerRoomAmountRef.current = smallSpeakerRoomAmount;
     wowFlutterAmountRef.current = wowFlutterAmount;
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
@@ -705,6 +767,7 @@ export function useRetroAudioEngine({
     midAmount,
     trebleAmount,
     stereoWidthAmount,
+    smallSpeakerRoomAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -729,6 +792,7 @@ export function useRetroAudioEngine({
       midAmount,
       trebleAmount,
       stereoWidthAmount,
+      smallSpeakerRoomAmount,
       wowFlutterAmount,
       isNoiseEnabled,
       noiseLevel,
@@ -747,6 +811,7 @@ export function useRetroAudioEngine({
     midAmount,
     trebleAmount,
     stereoWidthAmount,
+    smallSpeakerRoomAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -768,6 +833,9 @@ export function useRetroAudioEngine({
     midEqRef,
     trebleEqRef,
     stereoWidthRef,
+    roomDryGainRef,
+    roomConvolverRef,
+    roomWetGainRef,
     wowFlutterDelayRef,
     wowLfoRef,
     wowLfoGainRef,
@@ -792,6 +860,7 @@ export function useRetroAudioEngine({
     midAmountRef,
     trebleAmountRef,
     stereoWidthAmountRef,
+    smallSpeakerRoomAmountRef,
     wowFlutterAmountRef,
     isNoiseEnabledRef,
     noiseLevelRef,
@@ -821,6 +890,8 @@ export function useRetroAudioEngine({
     setTrebleAmount,
     stereoWidthAmount,
     setStereoWidthAmount,
+    smallSpeakerRoomAmount,
+    setSmallSpeakerRoomAmount,
     wowFlutterAmount,
     setWowFlutterAmount,
     isNoiseEnabled,
