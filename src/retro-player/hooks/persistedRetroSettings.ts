@@ -16,6 +16,14 @@ export type PersistedRetroFilterSettings = {
   vignetteStrength: number;
   glowStrength: number;
   phosphorStrength: number;
+  spotMaskStrength: number;
+  bulbRadius: number;
+  blackFloor: number;
+  phosphorDotInternalScale: boolean;
+  phosphorDotBrightCore: boolean;
+  phosphorDotCellFill: number;
+  phosphorDotFlatDisc: boolean;
+  phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;

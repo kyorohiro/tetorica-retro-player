@@ -23,6 +23,11 @@ import {
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
 import { useDialog } from "../../useDialog";
+import {
+  RETRO_PRESETS,
+  type RetroPresetDefinition,
+  type RetroPresetKey,
+} from "../retro/config";
 
 type RetroPlayerProps = {
   src?: string;
@@ -105,6 +110,43 @@ export function RetroPlayer({
 
     filterState.setTargetHeight(nextHeight);
   }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
+
+  const applyPresetWithAspect = React.useCallback(
+    (presetKey: RetroPresetKey) => {
+      filterState.applyPreset(presetKey);
+      if (presetKey !== "phosphorDot" || !player.sourceDimensions) {
+        return;
+      }
+
+      const preset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
+      const sourceWidth = Math.max(player.sourceDimensions.width, 1);
+      const sourceHeight = Math.max(player.sourceDimensions.height, 1);
+      const sourceAspect = sourceWidth / sourceHeight;
+      const presetAspect = preset.width / preset.height;
+
+      let nextWidth = preset.width;
+      let nextHeight = preset.height;
+
+      if (sourceAspect > presetAspect) {
+        nextHeight = Math.max(8, Math.round((preset.width / sourceAspect) / 8) * 8);
+      } else {
+        nextWidth = Math.max(8, Math.round((preset.height * sourceAspect) / 8) * 8);
+      }
+
+      if (preset.width === nextWidth && preset.height === nextHeight) {
+        return;
+      }
+
+      filterState.setTargetWidth(nextWidth);
+      filterState.setTargetHeight(nextHeight);
+    },
+    [
+      filterState.applyPreset,
+      filterState.setTargetHeight,
+      filterState.setTargetWidth,
+      player.sourceDimensions,
+    ],
+  );
 
   const refitPreview = React.useCallback(() => {
     if (stream && player.isCaptureActive) {
@@ -827,6 +869,14 @@ export function RetroPlayer({
                 neonSaturation={filterState.neonSaturation}
                 paletteMode={filterState.paletteMode}
                 phosphorStrength={filterState.phosphorStrength}
+                spotMaskStrength={filterState.spotMaskStrength}
+                bulbRadius={filterState.bulbRadius}
+                blackFloor={filterState.blackFloor}
+                phosphorDotInternalScale={filterState.phosphorDotInternalScale}
+                phosphorDotBrightCore={filterState.phosphorDotBrightCore}
+                phosphorDotCellFill={filterState.phosphorDotCellFill}
+                phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
+                phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
                 closeUpNoiseStrength={filterState.closeUpNoiseStrength}
                 scanlineBrightnessFade={filterState.scanlineBrightnessFade}
                 scanlineStrength={filterState.scanlineStrength}
@@ -836,7 +886,7 @@ export function RetroPlayer({
                 targetHeight={filterState.targetHeight}
                 targetWidth={filterState.targetWidth}
                 vignetteStrength={filterState.vignetteStrength}
-                onApplyPreset={filterState.applyPreset}
+                onApplyPreset={applyPresetWithAspect}
                 onSetColorLevels={filterState.setColorLevels}
                 onSetCurvature={filterState.setCurvature}
                 onSetDitherStrength={filterState.setDitherStrength}
@@ -848,6 +898,14 @@ export function RetroPlayer({
                 onSetNeonSaturation={filterState.setNeonSaturation}
                 onSetPaletteMode={filterState.setPaletteMode}
                 onSetPhosphorStrength={filterState.setPhosphorStrength}
+                onSetSpotMaskStrength={filterState.setSpotMaskStrength}
+                onSetBulbRadius={filterState.setBulbRadius}
+                onSetBlackFloor={filterState.setBlackFloor}
+                onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
+                onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
+                onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
+                onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
+                onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
                 onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
                 onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
                 onSetScanlineStrength={filterState.setScanlineStrength}

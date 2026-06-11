@@ -150,6 +150,15 @@
 
           <label class="control">
             <span class="label-with-tip">
+              <span>Spot mask</span>
+              <span class="info-tip" tabindex="0" data-tip="Shapes each pixel into a darker-backed phosphor dot. Brighter pixels stay larger, so black gaps remain visible while highlights feel hotter.">?</span>
+            </span>
+            <input id="spotMaskStrength" type="range" min="0" max="0.5" step="0.01" />
+            <output id="spotMaskStrengthValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
               <span>Close-up noise</span>
               <span class="info-tip" tabindex="0" data-tip="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT.">?</span>
             </span>

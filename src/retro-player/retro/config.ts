@@ -21,6 +21,33 @@ export const MONO_TINTS: Record<
   ice: { label: "Ice", rgb: [0.7, 0.9, 1] },
 };
 
+export type RetroPresetDefinition = {
+  label: string;
+  width: number;
+  height: number;
+  colors: number;
+  dither: number;
+  palette: PaletteMode;
+  curvature: number;
+  scanline: number;
+  scanline2: number;
+  vignette: number;
+  glow: number;
+  phosphor: number;
+  spotMask: number;
+  bulbRadius: number;
+  blackFloor: number;
+  phosphorDotInternalScale?: boolean;
+  phosphorDotBrightCore?: boolean;
+  phosphorDotCellFill?: number;
+  phosphorDotFlatDisc?: boolean;
+  phosphorDotNeighborBlend?: boolean;
+  monoTint: MonoTintMode;
+  neonBoost: number;
+  neonSaturation: number;
+  neonDetail: number;
+};
+
 export const RETRO_PRESETS = {
   chunky: {
     label: "Chunky",
@@ -35,6 +62,9 @@ export const RETRO_PRESETS = {
     vignette: 0.04,
     glow: 0.03,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 0.8,
     neonSaturation: 1.0,
@@ -53,6 +83,9 @@ export const RETRO_PRESETS = {
     vignette: 0.08,
     glow: 0.06,
     phosphor: 0.05,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 0.9,
     neonSaturation: 1.0,
@@ -71,6 +104,9 @@ export const RETRO_PRESETS = {
     vignette: 0.015,
     glow: 0.0,
     phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "green",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -89,6 +125,9 @@ export const RETRO_PRESETS = {
     vignette: 0.02,
     glow: 0.0,
     phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -107,6 +146,9 @@ export const RETRO_PRESETS = {
     vignette: 0.05,
     glow: 0.06,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -125,6 +167,9 @@ export const RETRO_PRESETS = {
     vignette: 0.05,
     glow: 0.05,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -143,6 +188,9 @@ export const RETRO_PRESETS = {
     vignette: 0.06,
     glow: 0.05,
     phosphor: 0.04,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -161,6 +209,9 @@ export const RETRO_PRESETS = {
     vignette: 0.02,
     glow: 0.0,
     phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -179,6 +230,9 @@ export const RETRO_PRESETS = {
     vignette: 0.05,
     glow: 0.04,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -197,6 +251,9 @@ export const RETRO_PRESETS = {
     vignette: 0.04,
     glow: 0.03,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -215,6 +272,9 @@ export const RETRO_PRESETS = {
     vignette: 0.08,
     glow: 0.07,
     phosphor: 0.02,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -233,6 +293,9 @@ export const RETRO_PRESETS = {
     vignette: 0.1,
     glow: 0.09,
     phosphor: 0.06,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "green",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -251,6 +314,9 @@ export const RETRO_PRESETS = {
     vignette: 0.11,
     glow: 0.10,
     phosphor: 0.05,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "amber",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -269,6 +335,9 @@ export const RETRO_PRESETS = {
     vignette: 0.04,
     glow: 0.18,
     phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "ice",
     neonBoost: 1.15,
     neonSaturation: 1.2,
@@ -287,7 +356,36 @@ export const RETRO_PRESETS = {
     vignette: 0.015,
     glow: 0.00,
     phosphor: 0.00,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "ice",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
+  phosphorDot: {
+    label: "Phosphor Dot",
+    width: 320,
+    height: 180,
+    colors: 32,
+    dither: 0.0,
+    palette: "free",
+    curvature: 0.065,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.3,
+    glow: 0.04,
+    phosphor: 0.0,
+    spotMask: 1.0,
+    bulbRadius: 0.29,
+    blackFloor: 0.006,
+    phosphorDotInternalScale: true,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0.12,
+    phosphorDotFlatDisc: true,
+    phosphorDotNeighborBlend: true,
+    monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
@@ -305,6 +403,9 @@ export const RETRO_PRESETS = {
     vignette: 0.05,
     glow: 0.06,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -312,24 +413,7 @@ export const RETRO_PRESETS = {
   },
 } as const satisfies Record<
   string,
-  {
-    label: string;
-    width: number;
-    height: number;
-    colors: number;
-    dither: number;
-    palette: PaletteMode;
-    curvature: number;
-    scanline: number;
-    scanline2: number;
-    vignette: number;
-    glow: number;
-    phosphor: number;
-    monoTint: MonoTintMode;
-    neonBoost: number;
-    neonSaturation: number;
-    neonDetail: number;
-  }
+  RetroPresetDefinition
 >;
 
 export type RetroPresetKey = keyof typeof RETRO_PRESETS;

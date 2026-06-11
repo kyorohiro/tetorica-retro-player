@@ -35,7 +35,19 @@ export const PRESETS = {
     vignetteStrength: 0.0,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
+    phosphorDotMode: false,
+    bulbRadius: 0.22,
+    blackFloor: 0.01,
+    phosphorDotInternalScale: false,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0.0,
+    phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: false,
     monoTint: "amber",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
     isAudioFxEnabled: false,
     lofiAmount: 0.0,
     wowFlutterAmount: 0.0,
@@ -55,9 +67,10 @@ export const PRESETS = {
     vignetteStrength: 0.04,
     glowStrength: 0.03,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.25,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -75,9 +88,10 @@ export const PRESETS = {
     vignetteStrength: 0.08,
     glowStrength: 0.06,
     phosphorStrength: 0.05,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.25,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -95,9 +109,10 @@ export const PRESETS = {
     vignetteStrength: 0.1,
     glowStrength: 0.09,
     phosphorStrength: 0.06,
+    spotMaskStrength: 0.0,
     monoTint: "green",
     isAudioFxEnabled: true,
-    lofiAmount: 1.0,
+    lofiAmount: 0.5,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.018,
@@ -115,9 +130,10 @@ export const PRESETS = {
     vignetteStrength: 0.015,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "green",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -135,9 +151,10 @@ export const PRESETS = {
     vignetteStrength: 0.02,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -155,9 +172,10 @@ export const PRESETS = {
     vignetteStrength: 0.11,
     glowStrength: 0.1,
     phosphorStrength: 0.05,
+    spotMaskStrength: 0.0,
     monoTint: "amber",
     isAudioFxEnabled: true,
-    lofiAmount: 0.85,
+    lofiAmount: 0.5,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.015,
@@ -175,9 +193,10 @@ export const PRESETS = {
     vignetteStrength: 0.08,
     glowStrength: 0.07,
     phosphorStrength: 0.02,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
     isAudioFxEnabled: true,
-    lofiAmount: 0.7,
+    lofiAmount: 0.4,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.012,
@@ -195,9 +214,10 @@ export const PRESETS = {
     vignetteStrength: 0.015,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "ice",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -215,9 +235,10 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.06,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
     isAudioFxEnabled: true,
-    lofiAmount: 0.5,
+    lofiAmount: 0.3,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.006,
@@ -235,6 +256,7 @@ export const PRESETS = {
     vignetteStrength: 0.02,
     glowStrength: 0.0,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
     isAudioFxEnabled: true,
     lofiAmount: 0.55,
@@ -255,9 +277,10 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.06,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
     isAudioFxEnabled: true,
-    lofiAmount: 0.6,
+    lofiAmount: 0.4,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.005,
@@ -275,9 +298,10 @@ export const PRESETS = {
     vignetteStrength: 0.06,
     glowStrength: 0.05,
     phosphorStrength: 0.04,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -295,9 +319,10 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.04,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -315,9 +340,10 @@ export const PRESETS = {
     vignetteStrength: 0.04,
     glowStrength: 0.03,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.0,
     monoTint: "gray",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -335,9 +361,21 @@ export const PRESETS = {
     vignetteStrength: 0.04,
     glowStrength: 0.18,
     phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
+    phosphorDotMode: false,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
+    phosphorDotInternalScale: false,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0.0,
+    phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: false,
     monoTint: "ice",
-    isAudioFxEnabled: false,
-    lofiAmount: 0.0,
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: false,
     noiseLevel: 0.0,
@@ -355,12 +393,56 @@ export const PRESETS = {
     vignetteStrength: 0.05,
     glowStrength: 0.06,
     phosphorStrength: 0.03,
+    spotMaskStrength: 0.0,
+    phosphorDotMode: false,
+    bulbRadius: 0.22,
+    blackFloor: 0.01,
+    phosphorDotInternalScale: false,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0.0,
+    phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: false,
     monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
     isAudioFxEnabled: true,
     lofiAmount: 0.2,
     wowFlutterAmount: 0.0,
     isNoiseEnabled: true,
     noiseLevel: 0.008,
+  },
+  phosphorDot: {
+    label: "Phosphor Dot",
+    targetWidth: 320,
+    targetHeight: 180,
+    colorLevels: 32,
+    ditherStrength: 0.0,
+    paletteMode: 0,
+    curvature: 0.065,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.3,
+    glowStrength: 0.04,
+    phosphorStrength: 0.0,
+    spotMaskStrength: 1.0,
+    phosphorDotMode: true,
+    bulbRadius: 0.29,
+    blackFloor: 0.006,
+    phosphorDotInternalScale: true,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0.12,
+    phosphorDotFlatDisc: true,
+    phosphorDotNeighborBlend: true,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
   },
 };
 
@@ -379,11 +461,23 @@ export const DEFAULT_SETTINGS = {
   vignetteStrength: 0.11,
   glowStrength: 0.1,
   phosphorStrength: 0.05,
+  spotMaskStrength: 0.0,
+  phosphorDotMode: false,
+  bulbRadius: 0.22,
+  blackFloor: 0.01,
+  phosphorDotInternalScale: false,
+  phosphorDotBrightCore: false,
+  phosphorDotCellFill: 0.0,
+  phosphorDotFlatDisc: false,
+  phosphorDotNeighborBlend: false,
   closeUpNoiseStrength: 0.0,
+  neonBoost: 1.0,
+  neonSaturation: 1.0,
+  neonDetail: 1.0,
   colorLevels: 32,
   overlayTargetCount: 1,
   isAudioFxEnabled: true,
-  lofiAmount: 0.85,
+  lofiAmount: 0.65,
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
@@ -470,10 +564,58 @@ export function normalizeSettings(candidate) {
       typeof candidate?.phosphorStrength === "number"
         ? clamp(candidate.phosphorStrength, 0, 0.5)
         : basePresetSettings.phosphorStrength,
+    spotMaskStrength:
+      typeof candidate?.spotMaskStrength === "number"
+        ? clamp(candidate.spotMaskStrength, 0, 0.5)
+        : basePresetSettings.spotMaskStrength ?? DEFAULT_SETTINGS.spotMaskStrength,
+    phosphorDotMode:
+      typeof candidate?.phosphorDotMode === "boolean"
+        ? candidate.phosphorDotMode
+        : basePresetSettings.phosphorDotMode ?? DEFAULT_SETTINGS.phosphorDotMode,
+    bulbRadius:
+      typeof candidate?.bulbRadius === "number"
+        ? clamp(candidate.bulbRadius, 0.001, 0.5)
+        : basePresetSettings.bulbRadius ?? DEFAULT_SETTINGS.bulbRadius,
+    blackFloor:
+      typeof candidate?.blackFloor === "number"
+        ? clamp(candidate.blackFloor, 0, 0.5)
+        : basePresetSettings.blackFloor ?? DEFAULT_SETTINGS.blackFloor,
+    phosphorDotInternalScale:
+      typeof candidate?.phosphorDotInternalScale === "boolean"
+        ? candidate.phosphorDotInternalScale
+        : basePresetSettings.phosphorDotInternalScale ?? DEFAULT_SETTINGS.phosphorDotInternalScale,
+    phosphorDotBrightCore:
+      typeof candidate?.phosphorDotBrightCore === "boolean"
+        ? candidate.phosphorDotBrightCore
+        : basePresetSettings.phosphorDotBrightCore ?? DEFAULT_SETTINGS.phosphorDotBrightCore,
+    phosphorDotCellFill:
+      typeof candidate?.phosphorDotCellFill === "number"
+        ? clamp(candidate.phosphorDotCellFill, 0, 0.5)
+        : basePresetSettings.phosphorDotCellFill ?? DEFAULT_SETTINGS.phosphorDotCellFill,
+    phosphorDotFlatDisc:
+      typeof candidate?.phosphorDotFlatDisc === "boolean"
+        ? candidate.phosphorDotFlatDisc
+        : basePresetSettings.phosphorDotFlatDisc ?? DEFAULT_SETTINGS.phosphorDotFlatDisc,
+    phosphorDotNeighborBlend:
+      typeof candidate?.phosphorDotNeighborBlend === "boolean"
+        ? candidate.phosphorDotNeighborBlend
+        : basePresetSettings.phosphorDotNeighborBlend ?? DEFAULT_SETTINGS.phosphorDotNeighborBlend,
     closeUpNoiseStrength:
       typeof candidate?.closeUpNoiseStrength === "number"
         ? clamp(candidate.closeUpNoiseStrength, 0, 2)
         : basePresetSettings.closeUpNoiseStrength ?? DEFAULT_SETTINGS.closeUpNoiseStrength,
+    neonBoost:
+      typeof candidate?.neonBoost === "number"
+        ? clamp(candidate.neonBoost, 0, 2)
+        : basePresetSettings.neonBoost ?? DEFAULT_SETTINGS.neonBoost,
+    neonSaturation:
+      typeof candidate?.neonSaturation === "number"
+        ? clamp(candidate.neonSaturation, 0, 2)
+        : basePresetSettings.neonSaturation ?? DEFAULT_SETTINGS.neonSaturation,
+    neonDetail:
+      typeof candidate?.neonDetail === "number"
+        ? clamp(candidate.neonDetail, 0, 2)
+        : basePresetSettings.neonDetail ?? DEFAULT_SETTINGS.neonDetail,
     colorLevels: resolvedColorLevels,
     overlayTargetCount:
       typeof candidate?.overlayTargetCount === "number"
@@ -531,7 +673,55 @@ export function applyPresetToSettings(presetKey) {
     vignetteStrength: preset.vignetteStrength,
     glowStrength: preset.glowStrength,
     phosphorStrength: preset.phosphorStrength,
+    spotMaskStrength:
+      typeof preset.spotMaskStrength === "number"
+        ? preset.spotMaskStrength
+        : DEFAULT_SETTINGS.spotMaskStrength,
+    phosphorDotMode:
+      typeof preset.phosphorDotMode === "boolean"
+        ? preset.phosphorDotMode
+        : DEFAULT_SETTINGS.phosphorDotMode,
+    bulbRadius:
+      typeof preset.bulbRadius === "number"
+        ? preset.bulbRadius
+        : DEFAULT_SETTINGS.bulbRadius,
+    blackFloor:
+      typeof preset.blackFloor === "number"
+        ? preset.blackFloor
+        : DEFAULT_SETTINGS.blackFloor,
+    phosphorDotInternalScale:
+      typeof preset.phosphorDotInternalScale === "boolean"
+        ? preset.phosphorDotInternalScale
+        : DEFAULT_SETTINGS.phosphorDotInternalScale,
+    phosphorDotBrightCore:
+      typeof preset.phosphorDotBrightCore === "boolean"
+        ? preset.phosphorDotBrightCore
+        : DEFAULT_SETTINGS.phosphorDotBrightCore,
+    phosphorDotCellFill:
+      typeof preset.phosphorDotCellFill === "number"
+        ? preset.phosphorDotCellFill
+        : DEFAULT_SETTINGS.phosphorDotCellFill,
+    phosphorDotFlatDisc:
+      typeof preset.phosphorDotFlatDisc === "boolean"
+        ? preset.phosphorDotFlatDisc
+        : DEFAULT_SETTINGS.phosphorDotFlatDisc,
+    phosphorDotNeighborBlend:
+      typeof preset.phosphorDotNeighborBlend === "boolean"
+        ? preset.phosphorDotNeighborBlend
+        : DEFAULT_SETTINGS.phosphorDotNeighborBlend,
     monoTint: preset.monoTint,
+    neonBoost:
+      typeof preset.neonBoost === "number"
+        ? preset.neonBoost
+        : DEFAULT_SETTINGS.neonBoost,
+    neonSaturation:
+      typeof preset.neonSaturation === "number"
+        ? preset.neonSaturation
+        : DEFAULT_SETTINGS.neonSaturation,
+    neonDetail:
+      typeof preset.neonDetail === "number"
+        ? preset.neonDetail
+        : DEFAULT_SETTINGS.neonDetail,
     isAudioFxEnabled:
       typeof preset.isAudioFxEnabled === "boolean"
         ? preset.isAudioFxEnabled
