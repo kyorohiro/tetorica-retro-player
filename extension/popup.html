@@ -198,6 +198,24 @@
 
           <label class="control">
             <span class="label-with-tip">
+              <span>Bit crush</span>
+              <span class="info-tip" tabindex="0" data-tip="Reduces amplitude precision for a rougher digital edge and crunchy sample feel.">?</span>
+            </span>
+            <input id="bitCrushAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="bitCrushAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Sample rate</span>
+              <span class="info-tip" tabindex="0" data-tip="Holds each sample longer so the sound gets stair-stepped and cheap-digital.">?</span>
+            </span>
+            <input id="sampleRateReductionAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="sampleRateReductionAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
               <span>Wow & Flutter</span>
               <span class="info-tip" tabindex="0" data-tip="Adds slow and fast pitch wobble like tape or unstable rotating hardware.">?</span>
             </span>

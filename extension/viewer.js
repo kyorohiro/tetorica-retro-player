@@ -41,6 +41,7 @@ let radioTonePresenceNode = null;
 let lofiLowpassNode = null;
 let lofiHighshelfNode = null;
 let lofiDriveNode = null;
+let bitcrusherNode = null;
 let wowFlutterDelayNode = null;
 let wowLfoNode = null;
 let wowLfoGainNode = null;
@@ -530,6 +531,28 @@ function updateAudioNodes() {
     lofiDriveNode.curve = createDriveCurve(amount * 0.6);
   }
 
+  if (bitcrusherNode) {
+    const isEnabled = currentSettings.isAudioFxEnabled;
+    const bitDepth = 16 - (isEnabled ? currentSettings.bitCrushAmount : 0) * 12;
+    const holdFrames = 1 + (isEnabled ? currentSettings.sampleRateReductionAmount : 0) * 23;
+    const mix = isEnabled
+      ? Math.max(currentSettings.bitCrushAmount, currentSettings.sampleRateReductionAmount)
+      : 0;
+
+    bitcrusherNode.parameters.get("bitDepth")?.setValueAtTime(
+      bitDepth,
+      bitcrusherNode.context.currentTime,
+    );
+    bitcrusherNode.parameters.get("holdFrames")?.setValueAtTime(
+      holdFrames,
+      bitcrusherNode.context.currentTime,
+    );
+    bitcrusherNode.parameters.get("mix")?.setValueAtTime(
+      mix,
+      bitcrusherNode.context.currentTime,
+    );
+  }
+
   if (
     wowFlutterDelayNode &&
     wowLfoNode &&
@@ -561,6 +584,7 @@ async function ensureAudioContext() {
     lofiLowpassNode = null;
     lofiHighshelfNode = null;
     lofiDriveNode = null;
+    bitcrusherNode = null;
     wowFlutterDelayNode = null;
     wowLfoNode = null;
     wowLfoGainNode = null;
@@ -583,6 +607,16 @@ async function ensureAudioContext() {
     lofiLowpassNode = audioContext.createBiquadFilter();
     lofiHighshelfNode = audioContext.createBiquadFilter();
     lofiDriveNode = audioContext.createWaveShaper();
+    if ("audioWorklet" in audioContext) {
+      await audioContext.audioWorklet.addModule(
+        new URL("./shared/bitcrusherWorklet.js", import.meta.url).href,
+      );
+      bitcrusherNode = new AudioWorkletNode(audioContext, "retro-bitcrusher", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+    }
     wowFlutterDelayNode = audioContext.createDelay(0.05);
     wowLfoNode = audioContext.createOscillator();
     wowLfoGainNode = audioContext.createGain();
@@ -611,7 +645,12 @@ async function ensureAudioContext() {
     radioTonePresenceNode.connect(lofiLowpassNode);
     lofiLowpassNode.connect(lofiHighshelfNode);
     lofiHighshelfNode.connect(lofiDriveNode);
-    lofiDriveNode.connect(masterGainNode);
+    if (bitcrusherNode) {
+      lofiDriveNode.connect(bitcrusherNode);
+      bitcrusherNode.connect(masterGainNode);
+    } else {
+      lofiDriveNode.connect(masterGainNode);
+    }
     masterGainNode.connect(audioContext.destination);
 
     noiseSourceNode = audioContext.createBufferSource();
@@ -722,6 +761,7 @@ async function disposeAudioEngine() {
   lofiLowpassNode = null;
   lofiHighshelfNode = null;
   lofiDriveNode = null;
+  bitcrusherNode = null;
   wowFlutterDelayNode = null;
   wowLfoNode = null;
   wowLfoGainNode = null;

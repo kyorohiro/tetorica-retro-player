@@ -40,6 +40,8 @@ export type PersistedRetroAudioSettings = {
   isAudioFxEnabled: boolean;
   lofiAmount: number;
   radioToneAmount: number;
+  bitCrushAmount: number;
+  sampleRateReductionAmount: number;
   wowFlutterAmount: number;
   isNoiseEnabled: boolean;
   noiseLevel: number;

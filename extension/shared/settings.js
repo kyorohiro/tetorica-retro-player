@@ -479,6 +479,8 @@ export const DEFAULT_SETTINGS = {
   isAudioFxEnabled: true,
   lofiAmount: 0.65,
   radioToneAmount: 0.0,
+  bitCrushAmount: 0.0,
+  sampleRateReductionAmount: 0.0,
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
@@ -638,6 +640,15 @@ export function normalizeSettings(candidate) {
       typeof candidate?.radioToneAmount === "number"
         ? clamp(candidate.radioToneAmount, 0, 1)
         : basePresetSettings.radioToneAmount ?? DEFAULT_SETTINGS.radioToneAmount,
+    bitCrushAmount:
+      typeof candidate?.bitCrushAmount === "number"
+        ? clamp(candidate.bitCrushAmount, 0, 1)
+        : basePresetSettings.bitCrushAmount ?? DEFAULT_SETTINGS.bitCrushAmount,
+    sampleRateReductionAmount:
+      typeof candidate?.sampleRateReductionAmount === "number"
+        ? clamp(candidate.sampleRateReductionAmount, 0, 1)
+        : basePresetSettings.sampleRateReductionAmount ??
+          DEFAULT_SETTINGS.sampleRateReductionAmount,
     wowFlutterAmount:
       typeof candidate?.wowFlutterAmount === "number"
         ? clamp(candidate.wowFlutterAmount, 0, 1)
@@ -739,6 +750,14 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.radioToneAmount === "number"
         ? preset.radioToneAmount
         : DEFAULT_SETTINGS.radioToneAmount,
+    bitCrushAmount:
+      typeof preset.bitCrushAmount === "number"
+        ? preset.bitCrushAmount
+        : DEFAULT_SETTINGS.bitCrushAmount,
+    sampleRateReductionAmount:
+      typeof preset.sampleRateReductionAmount === "number"
+        ? preset.sampleRateReductionAmount
+        : DEFAULT_SETTINGS.sampleRateReductionAmount,
     wowFlutterAmount:
       typeof preset.wowFlutterAmount === "number"
         ? preset.wowFlutterAmount

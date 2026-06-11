@@ -12,6 +12,8 @@ const DEFAULT_AUDIO_SETTINGS = {
   isAudioFxEnabled: true,
   lofiAmount: 0.80,
   radioToneAmount: 0,
+  bitCrushAmount: 0,
+  sampleRateReductionAmount: 0,
   wowFlutterAmount: 0,
   isNoiseEnabled: true,
   noiseLevel: 0.02,
@@ -53,6 +55,11 @@ export function useRetroAudioEngine({
       lofiAmount: persisted?.lofiAmount ?? DEFAULT_AUDIO_SETTINGS.lofiAmount,
       radioToneAmount:
         persisted?.radioToneAmount ?? DEFAULT_AUDIO_SETTINGS.radioToneAmount,
+      bitCrushAmount:
+        persisted?.bitCrushAmount ?? DEFAULT_AUDIO_SETTINGS.bitCrushAmount,
+      sampleRateReductionAmount:
+        persisted?.sampleRateReductionAmount ??
+        DEFAULT_AUDIO_SETTINGS.sampleRateReductionAmount,
       wowFlutterAmount:
         persisted?.wowFlutterAmount ?? DEFAULT_AUDIO_SETTINGS.wowFlutterAmount,
       isNoiseEnabled:
@@ -70,6 +77,7 @@ export function useRetroAudioEngine({
   const lofiLowpassRef = useRef<BiquadFilterNode | null>(null);
   const lofiHighshelfRef = useRef<BiquadFilterNode | null>(null);
   const lofiDriveRef = useRef<WaveShaperNode | null>(null);
+  const bitcrusherRef = useRef<AudioWorkletNode | null>(null);
   const wowFlutterDelayRef = useRef<DelayNode | null>(null);
   const wowLfoRef = useRef<OscillatorNode | null>(null);
   const wowLfoGainRef = useRef<GainNode | null>(null);
@@ -89,6 +97,10 @@ export function useRetroAudioEngine({
   const isAudioFxEnabledRef = useRef<boolean>(initialAudioSettings.isAudioFxEnabled);
   const lofiAmountRef = useRef<number>(initialAudioSettings.lofiAmount);
   const radioToneAmountRef = useRef<number>(initialAudioSettings.radioToneAmount);
+  const bitCrushAmountRef = useRef<number>(initialAudioSettings.bitCrushAmount);
+  const sampleRateReductionAmountRef = useRef<number>(
+    initialAudioSettings.sampleRateReductionAmount,
+  );
   const wowFlutterAmountRef = useRef<number>(initialAudioSettings.wowFlutterAmount);
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
@@ -107,6 +119,12 @@ export function useRetroAudioEngine({
   );
   const [radioToneAmount, setRadioToneAmount] = useState<number>(
     initialAudioSettings.radioToneAmount,
+  );
+  const [bitCrushAmount, setBitCrushAmount] = useState<number>(
+    initialAudioSettings.bitCrushAmount,
+  );
+  const [sampleRateReductionAmount, setSampleRateReductionAmount] = useState<number>(
+    initialAudioSettings.sampleRateReductionAmount,
   );
   const [wowFlutterAmount, setWowFlutterAmount] = useState<number>(
     initialAudioSettings.wowFlutterAmount,
@@ -148,6 +166,7 @@ export function useRetroAudioEngine({
     const lowpass = lofiLowpassRef.current;
     const highshelf = lofiHighshelfRef.current;
     const drive = lofiDriveRef.current;
+    const bitcrusher = bitcrusherRef.current;
     const wowFlutterDelay = wowFlutterDelayRef.current;
     const wowLfo = wowLfoRef.current;
     const wowLfoGain = wowLfoGainRef.current;
@@ -166,6 +185,8 @@ export function useRetroAudioEngine({
     const nextAudioFxEnabled = isAudioFxEnabledRef.current;
     const nextLofiAmount = lofiAmountRef.current;
     const nextRadioToneAmount = radioToneAmountRef.current;
+    const nextBitCrushAmount = bitCrushAmountRef.current;
+    const nextSampleRateReductionAmount = sampleRateReductionAmountRef.current;
     const nextWowFlutterAmount = wowFlutterAmountRef.current;
     const nextNoiseEnabled = isNoiseEnabledRef.current;
     const nextNoiseLevel = noiseLevelRef.current;
@@ -200,6 +221,30 @@ export function useRetroAudioEngine({
       drive.curve = createDriveCurve(amount * 0.6);
     }
 
+    if (bitcrusher) {
+      const isEnabled = nextAudioFxEnabled;
+      const bitDepth =
+        16 - (isEnabled ? nextBitCrushAmount : 0) * 12;
+      const holdFrames =
+        1 + (isEnabled ? nextSampleRateReductionAmount : 0) * 23;
+      const mix = isEnabled
+        ? Math.max(nextBitCrushAmount, nextSampleRateReductionAmount)
+        : 0;
+
+      bitcrusher.parameters.get("bitDepth")?.setValueAtTime(
+        bitDepth,
+        bitcrusher.context.currentTime,
+      );
+      bitcrusher.parameters.get("holdFrames")?.setValueAtTime(
+        holdFrames,
+        bitcrusher.context.currentTime,
+      );
+      bitcrusher.parameters.get("mix")?.setValueAtTime(
+        mix,
+        bitcrusher.context.currentTime,
+      );
+    }
+
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
       const amount = nextAudioFxEnabled ? nextWowFlutterAmount : 0;
       wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
@@ -230,6 +275,7 @@ export function useRetroAudioEngine({
       lofiLowpassRef.current = null;
       lofiHighshelfRef.current = null;
       lofiDriveRef.current = null;
+      bitcrusherRef.current = null;
       wowFlutterDelayRef.current = null;
       wowLfoRef.current = null;
       wowLfoGainRef.current = null;
@@ -253,6 +299,19 @@ export function useRetroAudioEngine({
       const lowpass = context.createBiquadFilter();
       const highshelf = context.createBiquadFilter();
       const drive = context.createWaveShaper();
+      let bitcrusher: AudioWorkletNode | null = null;
+      if ("audioWorklet" in context) {
+        const bitcrusherModuleUrl = new URL(
+          "../audio/bitcrusherWorklet.js",
+          import.meta.url,
+        );
+        await context.audioWorklet.addModule(bitcrusherModuleUrl.href);
+        bitcrusher = new AudioWorkletNode(context, "retro-bitcrusher", {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [2],
+        });
+      }
       const wowFlutterDelay = context.createDelay(0.05);
       const wowLfo = context.createOscillator();
       const wowLfoGain = context.createGain();
@@ -280,7 +339,12 @@ export function useRetroAudioEngine({
       radioTonePresence.connect(lowpass);
       lowpass.connect(highshelf);
       highshelf.connect(drive);
-      drive.connect(masterGain);
+      if (bitcrusher) {
+        drive.connect(bitcrusher);
+        bitcrusher.connect(masterGain);
+      } else {
+        drive.connect(masterGain);
+      }
       masterGain.connect(context.destination);
       masterGain.connect(recordingDestination);
 
@@ -331,6 +395,7 @@ export function useRetroAudioEngine({
       lofiLowpassRef.current = lowpass;
       lofiHighshelfRef.current = highshelf;
       lofiDriveRef.current = drive;
+      bitcrusherRef.current = bitcrusher;
       wowFlutterDelayRef.current = wowFlutterDelay;
       wowLfoRef.current = wowLfo;
       wowLfoGainRef.current = wowLfoGain;
@@ -394,6 +459,7 @@ export function useRetroAudioEngine({
     lofiLowpassRef.current = null;
     lofiHighshelfRef.current = null;
     lofiDriveRef.current = null;
+    bitcrusherRef.current = null;
     wowFlutterDelayRef.current = null;
     wowLfoRef.current = null;
     wowLfoGainRef.current = null;
@@ -445,6 +511,8 @@ export function useRetroAudioEngine({
         audioContextState: context.state,
         lofiAmount,
         radioToneAmount,
+        bitCrushAmount,
+        sampleRateReductionAmount,
         wowFlutterAmount,
         isAudioFxEnabled,
         isMuted,
@@ -474,6 +542,8 @@ export function useRetroAudioEngine({
     isAudioFxEnabledRef.current = nextSettings.isAudioFxEnabled;
     lofiAmountRef.current = nextSettings.lofiAmount;
     radioToneAmountRef.current = nextSettings.radioToneAmount;
+    bitCrushAmountRef.current = nextSettings.bitCrushAmount;
+    sampleRateReductionAmountRef.current = nextSettings.sampleRateReductionAmount;
     wowFlutterAmountRef.current = nextSettings.wowFlutterAmount;
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
@@ -485,6 +555,8 @@ export function useRetroAudioEngine({
     setIsAudioFxEnabled(nextSettings.isAudioFxEnabled);
     setLofiAmount(nextSettings.lofiAmount);
     setRadioToneAmount(nextSettings.radioToneAmount);
+    setBitCrushAmount(nextSettings.bitCrushAmount);
+    setSampleRateReductionAmount(nextSettings.sampleRateReductionAmount);
     setWowFlutterAmount(nextSettings.wowFlutterAmount);
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
@@ -507,6 +579,8 @@ export function useRetroAudioEngine({
     isAudioFxEnabledRef.current = isAudioFxEnabled;
     lofiAmountRef.current = lofiAmount;
     radioToneAmountRef.current = radioToneAmount;
+    bitCrushAmountRef.current = bitCrushAmount;
+    sampleRateReductionAmountRef.current = sampleRateReductionAmount;
     wowFlutterAmountRef.current = wowFlutterAmount;
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
@@ -518,6 +592,8 @@ export function useRetroAudioEngine({
     isAudioFxEnabled,
     lofiAmount,
     radioToneAmount,
+    bitCrushAmount,
+    sampleRateReductionAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -536,6 +612,8 @@ export function useRetroAudioEngine({
       isAudioFxEnabled,
       lofiAmount,
       radioToneAmount,
+      bitCrushAmount,
+      sampleRateReductionAmount,
       wowFlutterAmount,
       isNoiseEnabled,
       noiseLevel,
@@ -548,6 +626,8 @@ export function useRetroAudioEngine({
     isAudioFxEnabled,
     lofiAmount,
     radioToneAmount,
+    bitCrushAmount,
+    sampleRateReductionAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -564,6 +644,7 @@ export function useRetroAudioEngine({
     lofiLowpassRef,
     lofiHighshelfRef,
     lofiDriveRef,
+    bitcrusherRef,
     wowFlutterDelayRef,
     wowLfoRef,
     wowLfoGainRef,
@@ -582,6 +663,8 @@ export function useRetroAudioEngine({
     isAudioFxEnabledRef,
     lofiAmountRef,
     radioToneAmountRef,
+    bitCrushAmountRef,
+    sampleRateReductionAmountRef,
     wowFlutterAmountRef,
     isNoiseEnabledRef,
     noiseLevelRef,
@@ -599,6 +682,10 @@ export function useRetroAudioEngine({
     setLofiAmount,
     radioToneAmount,
     setRadioToneAmount,
+    bitCrushAmount,
+    setBitCrushAmount,
+    sampleRateReductionAmount,
+    setSampleRateReductionAmount,
     wowFlutterAmount,
     setWowFlutterAmount,
     isNoiseEnabled,

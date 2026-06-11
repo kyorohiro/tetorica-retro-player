@@ -53,6 +53,10 @@ const lofiAmountInput = document.getElementById("lofiAmount");
 const lofiAmountValue = document.getElementById("lofiAmountValue");
 const radioToneAmountInput = document.getElementById("radioToneAmount");
 const radioToneAmountValue = document.getElementById("radioToneAmountValue");
+const bitCrushAmountInput = document.getElementById("bitCrushAmount");
+const bitCrushAmountValue = document.getElementById("bitCrushAmountValue");
+const sampleRateReductionAmountInput = document.getElementById("sampleRateReductionAmount");
+const sampleRateReductionAmountValue = document.getElementById("sampleRateReductionAmountValue");
 const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
 const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
@@ -269,6 +273,18 @@ radioToneAmountInput.addEventListener("input", () => {
   updateSettings({ radioToneAmount });
 });
 
+bitCrushAmountInput.addEventListener("input", () => {
+  const bitCrushAmount = Number(bitCrushAmountInput.value);
+  bitCrushAmountValue.textContent = bitCrushAmount.toFixed(2);
+  updateSettings({ bitCrushAmount });
+});
+
+sampleRateReductionAmountInput.addEventListener("input", () => {
+  const sampleRateReductionAmount = Number(sampleRateReductionAmountInput.value);
+  sampleRateReductionAmountValue.textContent = sampleRateReductionAmount.toFixed(2);
+  updateSettings({ sampleRateReductionAmount });
+});
+
 wowFlutterAmountInput.addEventListener("input", () => {
   const wowFlutterAmount = Number(wowFlutterAmountInput.value);
   wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
@@ -372,6 +388,10 @@ function renderSettings(settings) {
   lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);
   radioToneAmountInput.value = String(settings.radioToneAmount);
   radioToneAmountValue.textContent = settings.radioToneAmount.toFixed(2);
+  bitCrushAmountInput.value = String(settings.bitCrushAmount);
+  bitCrushAmountValue.textContent = settings.bitCrushAmount.toFixed(2);
+  sampleRateReductionAmountInput.value = String(settings.sampleRateReductionAmount);
+  sampleRateReductionAmountValue.textContent = settings.sampleRateReductionAmount.toFixed(2);
   wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
   wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
