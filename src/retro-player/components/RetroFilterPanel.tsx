@@ -152,6 +152,16 @@ export function RetroFilterPanel({
   onSetVignetteStrength,
   onSyncTargetAspect,
 }: RetroFilterPanelProps) {
+  const isPhosphorDotModeActive =
+    spotMaskStrength > 0.001 &&
+    (
+      phosphorDotInternalScale ||
+      phosphorDotBrightCore ||
+      phosphorDotCellFill > 0.001 ||
+      phosphorDotFlatDisc ||
+      phosphorDotNeighborBlend
+    );
+
   return (
     <>
       <div className="grid grid-cols-3 gap-2">
@@ -549,7 +559,7 @@ export function RetroFilterPanel({
             }}
             className="mt-2 w-full"
           />
-          {spotMaskStrength > 0.001 ? (
+          {isPhosphorDotModeActive ? (
             <span className="mt-2 block text-[11px] text-slate-400">
               Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
             </span>

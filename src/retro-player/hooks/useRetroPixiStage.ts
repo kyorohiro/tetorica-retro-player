@@ -118,7 +118,14 @@ const getSourceSize = (source: HTMLVideoElement | HTMLImageElement) => ({
 });
 
 const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
-  filterState.spotMaskStrength > 0.001;
+  filterState.spotMaskStrength > 0.001 &&
+  (
+    filterState.phosphorDotInternalScale ||
+    filterState.phosphorDotBrightCore ||
+    filterState.phosphorDotCellFill > 0.001 ||
+    filterState.phosphorDotFlatDisc ||
+    filterState.phosphorDotNeighborBlend
+  );
 
 const getPhosphorDotInternalScale = (filterState: RetroFilterState) =>
   isPhosphorDotModeEnabled(filterState) && filterState.phosphorDotInternalScale ? 2 : 1;
@@ -700,7 +707,7 @@ export function useRetroPixiStage({
     app.canvas.style.height = `${styleHeight}px`;
     app.canvas.style.imageRendering = "pixelated";
 
-    if (currentFilterState.spotMaskStrength > 0.001) {
+    if (isPhosphorDotModeEnabled(currentFilterState)) {
       console.log("[phosphor-dot layout]", {
         targetWidth: currentFilterState.targetWidth,
         targetHeight: currentFilterState.targetHeight,
