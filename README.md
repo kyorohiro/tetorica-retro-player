@@ -101,6 +101,11 @@ When updating the public demo, rebuild the app and copy the latest build output 
 - Screen capture availability depends on browser support and permission prompts.
 - The GitHub Pages demo is best experienced on a desktop Chromium-based browser.
 
+## TODO
+
+- Add a CRT afterimage / persistence effect for moving video and scrolling scenes.
+- Expand the audio retro effects with more lo-fi style options around noise, flutter, and wow.
+
 ## License
 
 This project is licensed under the MIT License.
