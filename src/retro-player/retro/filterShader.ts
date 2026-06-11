@@ -827,6 +827,7 @@ void main(void)
       neighborBlendMix *
       (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
+    vec3 baseProcessedColor = color.rgb;
 
     vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, gridUv, uTargetSize, uSpotMaskStrength);
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
@@ -877,6 +878,23 @@ void main(void)
       (phosphorScanline * 0.5 + 0.5) *
       phosphorScanlineStrength *
       phosphorScanlineVisibility
+    );
+
+    if (uGlowStrength > 0.001) {
+      vec3 glowLift = max(baseProcessedColor - mixedSourceColor, vec3(0.0));
+      phosphorColor += glowLift * (0.3 + bleedMask * 0.25 + phosphorBrightness * 0.15);
+    }
+
+    float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));
+    phosphorColor *= 1.0 - smoothstep(0.2, 0.78, phosphorDotVignette) * uVignetteStrength;
+    phosphorColor *= edgeShadow(warpedMask, uCurvature);
+    phosphorColor *= horizontalUnevenness(
+      warpedMask,
+      uTime,
+      max(
+        max(uScanlineStrength, uScanline2Strength),
+        max(max(uGlowStrength, uPhosphorStrength), uSpotMaskStrength)
+      )
     );
 
     color.rgb = clamp(phosphorColor, 0.0, 1.0);

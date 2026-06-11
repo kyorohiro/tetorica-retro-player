@@ -549,6 +549,11 @@ export function RetroFilterPanel({
             }}
             className="mt-2 w-full"
           />
+          {spotMaskStrength > 0.001 ? (
+            <span className="mt-2 block text-[11px] text-slate-400">
+              Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
+            </span>
+          ) : null}
         </label>
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
