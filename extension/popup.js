@@ -63,6 +63,8 @@ const midAmountInput = document.getElementById("midAmount");
 const midAmountValue = document.getElementById("midAmountValue");
 const trebleAmountInput = document.getElementById("trebleAmount");
 const trebleAmountValue = document.getElementById("trebleAmountValue");
+const stereoWidthAmountInput = document.getElementById("stereoWidthAmount");
+const stereoWidthAmountValue = document.getElementById("stereoWidthAmountValue");
 const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
 const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
@@ -309,6 +311,12 @@ trebleAmountInput.addEventListener("input", () => {
   updateSettings({ trebleAmount });
 });
 
+stereoWidthAmountInput.addEventListener("input", () => {
+  const stereoWidthAmount = Number(stereoWidthAmountInput.value);
+  stereoWidthAmountValue.textContent = formatStereoWidthAmount(stereoWidthAmount);
+  updateSettings({ stereoWidthAmount });
+});
+
 wowFlutterAmountInput.addEventListener("input", () => {
   const wowFlutterAmount = Number(wowFlutterAmountInput.value);
   wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
@@ -422,6 +430,8 @@ function renderSettings(settings) {
   midAmountValue.textContent = formatEqAmount(settings.midAmount);
   trebleAmountInput.value = String(settings.trebleAmount);
   trebleAmountValue.textContent = formatEqAmount(settings.trebleAmount);
+  stereoWidthAmountInput.value = String(settings.stereoWidthAmount);
+  stereoWidthAmountValue.textContent = formatStereoWidthAmount(settings.stereoWidthAmount);
   wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
   wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
@@ -450,4 +460,14 @@ function setStatus(message) {
 function formatEqAmount(value) {
   const amount = value * 15;
   return `${amount >= 0 ? "+" : ""}${amount.toFixed(1)} dB`;
+}
+
+function formatStereoWidthAmount(value) {
+  if (value < 0) {
+    return `Mono ${Math.round(Math.abs(value) * 100)}%`;
+  }
+  if (value > 0) {
+    return `Wide ${Math.round(value * 100)}%`;
+  }
+  return "Original";
 }

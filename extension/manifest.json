@@ -32,6 +32,7 @@
         "overlayRuntime.js",
         "shared/bitcrusherWorklet.js",
         "shared/filterShader.js",
+        "shared/stereoWidthWorklet.js",
         "shared/settings.js"
       ],
       "matches": ["<all_urls>"]

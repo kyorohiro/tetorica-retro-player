@@ -45,6 +45,7 @@ let bitcrusherNode = null;
 let bassEqNode = null;
 let midEqNode = null;
 let trebleEqNode = null;
+let stereoWidthNode = null;
 let wowFlutterDelayNode = null;
 let wowLfoNode = null;
 let wowLfoGainNode = null;
@@ -563,6 +564,14 @@ function updateAudioNodes() {
     trebleEqNode.gain.value = currentSettings.trebleAmount * eqScale;
   }
 
+  if (stereoWidthNode) {
+    const width = currentSettings.isAudioFxEnabled ? 1 + currentSettings.stereoWidthAmount : 1;
+    stereoWidthNode.parameters.get("width")?.setValueAtTime(
+      width,
+      stereoWidthNode.context.currentTime,
+    );
+  }
+
   if (
     wowFlutterDelayNode &&
     wowLfoNode &&
@@ -598,6 +607,7 @@ async function ensureAudioContext() {
     bassEqNode = null;
     midEqNode = null;
     trebleEqNode = null;
+    stereoWidthNode = null;
     wowFlutterDelayNode = null;
     wowLfoNode = null;
     wowLfoGainNode = null;
@@ -625,6 +635,14 @@ async function ensureAudioContext() {
         new URL("./shared/bitcrusherWorklet.js", import.meta.url).href,
       );
       bitcrusherNode = new AudioWorkletNode(audioContext, "retro-bitcrusher", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+      await audioContext.audioWorklet.addModule(
+        new URL("./shared/stereoWidthWorklet.js", import.meta.url).href,
+      );
+      stereoWidthNode = new AudioWorkletNode(audioContext, "retro-stereo-width", {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [2],
@@ -676,7 +694,12 @@ async function ensureAudioContext() {
     }
     bassEqNode.connect(midEqNode);
     midEqNode.connect(trebleEqNode);
-    trebleEqNode.connect(masterGainNode);
+    if (stereoWidthNode) {
+      trebleEqNode.connect(stereoWidthNode);
+      stereoWidthNode.connect(masterGainNode);
+    } else {
+      trebleEqNode.connect(masterGainNode);
+    }
     masterGainNode.connect(audioContext.destination);
 
     noiseSourceNode = audioContext.createBufferSource();
@@ -791,6 +814,7 @@ async function disposeAudioEngine() {
   bassEqNode = null;
   midEqNode = null;
   trebleEqNode = null;
+  stereoWidthNode = null;
   wowFlutterDelayNode = null;
   wowLfoNode = null;
   wowLfoGainNode = null;
