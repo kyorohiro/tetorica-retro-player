@@ -34,6 +34,7 @@ type VideoControlsProps = {
   bassAmount: number;
   midAmount: number;
   trebleAmount: number;
+  stereoWidthAmount: number;
   wowFlutterAmount: number;
   noiseLevel: number;
   playbackRate: number;
@@ -45,6 +46,7 @@ type VideoControlsProps = {
   onChangeBassAmount: (amount: number) => void;
   onChangeMidAmount: (amount: number) => void;
   onChangeTrebleAmount: (amount: number) => void;
+  onChangeStereoWidthAmount: (amount: number) => void;
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
@@ -94,6 +96,7 @@ export function VideoControls({
   bassAmount,
   midAmount,
   trebleAmount,
+  stereoWidthAmount,
   wowFlutterAmount,
   noiseLevel,
   playbackRate,
@@ -105,6 +108,7 @@ export function VideoControls({
   onChangeBassAmount,
   onChangeMidAmount,
   onChangeTrebleAmount,
+  onChangeStereoWidthAmount,
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangePlaybackRate,
@@ -307,6 +311,30 @@ export function VideoControls({
             value={trebleAmount}
             onChange={(ev) => {
               onChangeTrebleAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Stereo width</span>
+            <span>
+              {stereoWidthAmount < 0
+                ? `Mono ${Math.round(Math.abs(stereoWidthAmount) * 100)}%`
+                : stereoWidthAmount > 0
+                  ? `Wide ${Math.round(stereoWidthAmount * 100)}%`
+                  : "Original"}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="-1"
+            max="1"
+            step="0.01"
+            value={stereoWidthAmount}
+            onChange={(ev) => {
+              onChangeStereoWidthAmount(Number(ev.currentTarget.value));
             }}
             className="w-full"
           />

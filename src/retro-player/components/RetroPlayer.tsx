@@ -807,6 +807,7 @@ export function RetroPlayer({
               bassAmount={player.bassAmount}
               midAmount={player.midAmount}
               trebleAmount={player.trebleAmount}
+              stereoWidthAmount={player.stereoWidthAmount}
               wowFlutterAmount={player.wowFlutterAmount}
               noiseLevel={player.noiseLevel}
               playbackRate={player.playbackRate}
@@ -818,6 +819,7 @@ export function RetroPlayer({
               onChangeBassAmount={player.setBassAmount}
               onChangeMidAmount={player.setMidAmount}
               onChangeTrebleAmount={player.setTrebleAmount}
+              onChangeStereoWidthAmount={player.setStereoWidthAmount}
               onChangeWowFlutterAmount={player.setWowFlutterAmount}
               onChangeNoiseLevel={player.setNoiseLevel}
               onChangePlaybackRate={player.changePlaybackRate}

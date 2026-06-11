@@ -150,6 +150,8 @@ export function usePixiVideoPlayer(
     setMidAmount,
     trebleAmount,
     setTrebleAmount,
+    stereoWidthAmount,
+    setStereoWidthAmount,
     wowFlutterAmount,
     setWowFlutterAmount,
     isNoiseEnabled,
@@ -239,6 +241,7 @@ export function usePixiVideoPlayer(
     bassAmount,
     midAmount,
     trebleAmount,
+    stereoWidthAmount,
     isMuted,
     volume,
     previewKind,
@@ -754,6 +757,7 @@ export function usePixiVideoPlayer(
     bassAmount,
     midAmount,
     trebleAmount,
+    stereoWidthAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -804,6 +808,7 @@ export function usePixiVideoPlayer(
     setBassAmount,
     setMidAmount,
     setTrebleAmount,
+    setStereoWidthAmount,
     setWowFlutterAmount,
     toggleNoise: () => {
       setIsNoiseEnabled((current) => !current);

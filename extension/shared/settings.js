@@ -484,6 +484,7 @@ export const DEFAULT_SETTINGS = {
   bassAmount: 0.0,
   midAmount: 0.0,
   trebleAmount: 0.0,
+  stereoWidthAmount: 0.0,
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
@@ -664,6 +665,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.trebleAmount === "number"
         ? clamp(candidate.trebleAmount, -1, 1)
         : basePresetSettings.trebleAmount ?? DEFAULT_SETTINGS.trebleAmount,
+    stereoWidthAmount:
+      typeof candidate?.stereoWidthAmount === "number"
+        ? clamp(candidate.stereoWidthAmount, -1, 1)
+        : basePresetSettings.stereoWidthAmount ?? DEFAULT_SETTINGS.stereoWidthAmount,
     wowFlutterAmount:
       typeof candidate?.wowFlutterAmount === "number"
         ? clamp(candidate.wowFlutterAmount, 0, 1)
@@ -785,6 +790,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.trebleAmount === "number"
         ? preset.trebleAmount
         : DEFAULT_SETTINGS.trebleAmount,
+    stereoWidthAmount:
+      typeof preset.stereoWidthAmount === "number"
+        ? preset.stereoWidthAmount
+        : DEFAULT_SETTINGS.stereoWidthAmount,
     wowFlutterAmount:
       typeof preset.wowFlutterAmount === "number"
         ? preset.wowFlutterAmount

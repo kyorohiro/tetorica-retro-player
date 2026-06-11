@@ -33,6 +33,7 @@ type UseRetroPreviewMediaParams = {
   bassAmount: number;
   midAmount: number;
   trebleAmount: number;
+  stereoWidthAmount: number;
   isMuted: boolean;
   volume: number;
   previewKind: PreviewKind;
@@ -93,6 +94,7 @@ export function useRetroPreviewMedia({
   bassAmount,
   midAmount,
   trebleAmount,
+  stereoWidthAmount,
   isMuted,
   volume,
   previewKind,
@@ -414,6 +416,7 @@ export function useRetroPreviewMedia({
         bassAmount,
         midAmount,
         trebleAmount,
+        stereoWidthAmount,
         isMuted,
         volume,
       });
