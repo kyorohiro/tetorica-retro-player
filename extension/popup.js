@@ -120,7 +120,6 @@ presetSelect.addEventListener("change", () => {
     scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
     closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
-    wowFlutterAmount: currentSettings.wowFlutterAmount,
   });
   void persistSettings();
 });
