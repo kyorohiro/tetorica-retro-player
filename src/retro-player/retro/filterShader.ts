@@ -54,6 +54,9 @@ uniform float uBulbRadius;
 uniform float uBlackFloor;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
+uniform float uPhosphorDotBrightCore;
+uniform float uPhosphorDotCellFill;
+uniform float uPhosphorDotFlatDisc;
 uniform float uCloseUpNoiseStrength;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
@@ -672,18 +675,67 @@ vec3 applyPhosphorDot(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
   float gate = smoothstep(0.0, 0.12, perceivedLight);
   float radiusBias = pow(brightness, 0.7);
   float highlightBloom = smoothstep(0.68, 1.0, brightness);
-  float dotRadius = mix(uBulbRadius * 0.18, uBulbRadius * (0.78 + highlightBloom * 0.28), radiusBias);
-  float haloRadius = dotRadius + mix(0.02, 0.1 + highlightBloom * 0.08, brightness);
-  float core = 1.0 - smoothstep(dotRadius - 0.018, dotRadius + 0.022, dist);
-  float halo = 1.0 - smoothstep(haloRadius - 0.02, haloRadius + 0.06, dist);
+  float cellFillMix = smoothstep(0.2, 0.5, uPhosphorDotCellFill);
+  float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
+  bool useBrightCore = uPhosphorDotBrightCore > 0.5;
+  float brightCoreMix = (useBrightCore ? 1.0 : 0.0) * (1.0 - cellFillMix) * (1.0 - flatDiscMode);
+  float dotRadius = mix(
+    uBulbRadius * (useBrightCore ? 0.14 : 0.19),
+    uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
+    radiusBias
+  );
+  float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
+  float haloRadius = dotRadius + mix(0.028, 0.12 + highlightBloom * 0.08, brightness);
+  float innerCore = exp(-dist * dist * mix(useBrightCore ? 220.0 : 120.0, useBrightCore ? 110.0 : 72.0, brightness));
+  float bulb = 1.0 - smoothstep(dotRadius - 0.014, dotRadius + 0.02, dist);
+  float flatDisc = 1.0 - smoothstep(dotRadius - 0.01, dotRadius + 0.012, dist);
+  float halo = 1.0 - smoothstep(haloRadius - 0.025, haloRadius + 0.07, dist);
+  float rimDarkness = smoothstep(innerCoreRadius * (useBrightCore ? 0.9 : 1.02), dotRadius * 1.05, dist);
+  float cavity = 1.0 - rimDarkness * (useBrightCore ? 0.18 : 0.04);
+  float bodyGlow = bulb * mix(
+    0.28 + brightness * 0.32,
+    0.2 + brightness * 0.26,
+    brightCoreMix
+  );
   float emission =
     gate *
     lit *
     amount *
-    (core * (0.95 + brightness * 0.55 + highlightBloom * 0.18) + halo * halo * (0.04 + brightness * 0.08 + highlightBloom * 0.08));
-  float floorLight = gate * lit * uBlackFloor * amount;
+    (
+      innerCore * mix(
+        0.9 + brightness * 0.56 + highlightBloom * 0.14,
+        1.15 + brightness * 0.85 + highlightBloom * 0.28,
+        brightCoreMix
+      ) +
+      bodyGlow +
+      bulb * cavity * mix(
+        0.24 + brightness * 0.28,
+        0.18 + brightness * 0.24,
+        brightCoreMix
+      ) +
+      halo * halo * (0.03 + brightness * 0.06 + highlightBloom * 0.09)
+    );
+  float floorLight =
+    gate *
+    lit *
+    amount *
+    (uBlackFloor * (0.32 + halo * 0.42) + brightness * 0.015);
+  float cellFill =
+    gate *
+    lit *
+    amount *
+    uPhosphorDotCellFill *
+    (0.18 + brightness * 0.16);
+  float flatDiscFill =
+    gate *
+    lit *
+    amount *
+    flatDisc *
+    (0.78 + brightness * 0.18);
   vec3 dotColor = color * emission;
   dotColor += color * floorLight;
+  dotColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix);
+  dotColor = mix(dotColor, color * flatDiscFill, flatDiscMode);
   return dotColor;
 }
 
@@ -751,8 +803,26 @@ void main(void)
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
-    color.rgb = applyPhosphorDot(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
-    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    vec3 phosphorColor = applyPhosphorDot(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
+    float phosphorBrightness = max(max(color.r, color.g), color.b);
+    float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
+    vec3 bleedColor = vec3(0.0);
+    bleedColor += texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb * 0.34;
+    bleedColor += texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb * 0.34;
+    bleedColor += texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb * 0.16;
+    bleedColor += texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb * 0.16;
+    phosphorColor += bleedColor * bleedMask * uSpotMaskStrength * (0.06 + phosphorBrightness * 0.1);
+
+    float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
+    float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
+    float phosphorScanlineStrength = mix(0.035, 0.12, bleedMask) + uScanlineStrength * 0.25;
+    phosphorColor *= 1.0 - (
+      (phosphorScanline * 0.5 + 0.5) *
+      phosphorScanlineStrength *
+      phosphorScanlineVisibility
+    );
+
+    color.rgb = clamp(phosphorColor, 0.0, 1.0);
     finalColor = color;
     return;
   }

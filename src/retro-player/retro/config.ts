@@ -351,8 +351,12 @@ export const RETRO_PRESETS = {
     glow: 0.0,
     phosphor: 0.0,
     spotMask: 1.0,
-    bulbRadius: 0.2,
-    blackFloor: 0.01,
+    bulbRadius: 0.16,
+    blackFloor: 0.006,
+    phosphorDotInternalScale: true,
+    phosphorDotBrightCore: true,
+    phosphorDotCellFill: 0.12,
+    phosphorDotFlatDisc: false,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -397,6 +401,10 @@ export const RETRO_PRESETS = {
     spotMask: number;
     bulbRadius: number;
     blackFloor: number;
+    phosphorDotInternalScale?: boolean;
+    phosphorDotBrightCore?: boolean;
+    phosphorDotCellFill?: number;
+    phosphorDotFlatDisc?: boolean;
     monoTint: MonoTintMode;
     neonBoost: number;
     neonSaturation: number;

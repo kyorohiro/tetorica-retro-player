@@ -47,6 +47,10 @@ type RetroFilterPanelProps = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  phosphorDotInternalScale: boolean;
+  phosphorDotBrightCore: boolean;
+  phosphorDotCellFill: number;
+  phosphorDotFlatDisc: boolean;
   closeUpNoiseStrength: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
@@ -71,6 +75,10 @@ type RetroFilterPanelProps = {
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
+  onSetPhosphorDotInternalScale: (value: boolean) => void;
+  onSetPhosphorDotBrightCore: (value: boolean) => void;
+  onSetPhosphorDotCellFill: (value: number) => void;
+  onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
@@ -96,6 +104,10 @@ export function RetroFilterPanel({
   spotMaskStrength,
   bulbRadius,
   blackFloor,
+  phosphorDotInternalScale,
+  phosphorDotBrightCore,
+  phosphorDotCellFill,
+  phosphorDotFlatDisc,
   closeUpNoiseStrength,
   scanlineBrightnessFade,
   scanlineStrength,
@@ -120,6 +132,10 @@ export function RetroFilterPanel({
   onSetSpotMaskStrength,
   onSetBulbRadius,
   onSetBlackFloor,
+  onSetPhosphorDotInternalScale,
+  onSetPhosphorDotBrightCore,
+  onSetPhosphorDotCellFill,
+  onSetPhosphorDotFlatDisc,
   onSetCloseUpNoiseStrength,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
@@ -531,65 +547,136 @@ export function RetroFilterPanel({
           />
         </label>
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
-              text="Shapes each pixel into a darker-backed phosphor dot. Brighter pixels stay larger, so black gaps remain visible while highlights feel hotter."
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.5"
-            step="0.001"
-            value={spotMaskStrength}
-            onChange={(ev) => {
-              onSetSpotMaskStrength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-200/90">
+            Phosphor Dot / Spot Mask
+          </div>
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
-              text="Sets how large the glowing bulb can grow inside each pixel. Lower values make the lit core smaller and expose more black around it."
-            />
-          </span>
-          <input
-            type="range"
-            min="0.001"
-            max="0.5"
-            step="0.001"
-            value={bulbRadius}
-            onChange={(ev) => {
-              onSetBulbRadius(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotInternalScale(!phosphorDotInternalScale);
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                phosphorDotInternalScale
+                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              2x internal resolution
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotBrightCore(!phosphorDotBrightCore);
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                phosphorDotBrightCore
+                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              Bright core
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotFlatDisc(!phosphorDotFlatDisc);
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                phosphorDotFlatDisc
+                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              Flat disc
+            </button>
+          </div>
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Black floor: ${blackFloor.toFixed(3)}`}
-              text="Sets how much light leaks into the black background inside each pixel cell. Lower values keep the unlit area closer to pure black."
+          <label className="mt-3 block">
+            <span className="text-slate-100">
+              <InfoTip
+                label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
+                text="Enables the phosphor-dot cell shaping itself. Higher values make the dot structure and CRT-style masking more visible."
+              />
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="0.5"
+              step="0.001"
+              value={spotMaskStrength}
+              onChange={(ev) => {
+                onSetSpotMaskStrength(Number(ev.currentTarget.value));
+              }}
+              className="mt-2 w-full"
             />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.5"
-            step="0.001"
-            value={blackFloor}
-            onChange={(ev) => {
-              onSetBlackFloor(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
+          </label>
+
+          <label className="mt-3 block">
+            <span className="text-slate-100">
+              <InfoTip
+                label={`Cell fill: ${phosphorDotCellFill.toFixed(3)}`}
+                text="Adds a more uniform base fill inside each phosphor cell. Raise it to make the whole cell brighter; lower it to keep more black visible."
+              />
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="0.5"
+              step="0.001"
+              value={phosphorDotCellFill}
+              onChange={(ev) => {
+                onSetPhosphorDotCellFill(Number(ev.currentTarget.value));
+              }}
+              className="mt-2 w-full"
+            />
+          </label>
+
+          <label className="mt-3 block">
+            <span className="text-slate-100">
+              <InfoTip
+                label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
+                text="Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it."
+              />
+            </span>
+            <input
+              type="range"
+              min="0.001"
+              max="0.5"
+              step="0.001"
+              value={bulbRadius}
+              onChange={(ev) => {
+                onSetBulbRadius(Number(ev.currentTarget.value));
+              }}
+              className="mt-2 w-full"
+            />
+          </label>
+
+          <label className="mt-3 block">
+            <span className="text-slate-100">
+              <InfoTip
+                label={`Black floor: ${blackFloor.toFixed(3)}`}
+                text="Sets how much light leaks into the black background around each phosphor bulb. Lower values keep the unlit area closer to pure black."
+              />
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="0.5"
+              step="0.001"
+              value={blackFloor}
+              onChange={(ev) => {
+                onSetBlackFloor(Number(ev.currentTarget.value));
+              }}
+              className="mt-2 w-full"
+            />
+          </label>
+        </div>
 
         <label className="block">
           <span className="text-slate-100">

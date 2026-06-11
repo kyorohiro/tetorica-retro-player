@@ -33,6 +33,9 @@ type RendererUniformLocations = {
   uBlackFloor: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
+  uPhosphorDotBrightCore: WebGLUniformLocation | null;
+  uPhosphorDotCellFill: WebGLUniformLocation | null;
+  uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uMonoTint: WebGLUniformLocation | null;
   uNeonBoost: WebGLUniformLocation | null;
@@ -116,7 +119,7 @@ const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
   filterState.spotMaskStrength > 0.001;
 
 const getPhosphorDotInternalScale = (filterState: RetroFilterState) =>
-  isPhosphorDotModeEnabled(filterState) ? 2 : 1;
+  isPhosphorDotModeEnabled(filterState) && filterState.phosphorDotInternalScale ? 2 : 1;
 
 const getEffectiveTargetSize = (
   filterState: RetroFilterState,
@@ -263,6 +266,9 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
       uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
       uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(filterProgram, "uPhosphorDotMode"),
+      uPhosphorDotBrightCore: gl.getUniformLocation(filterProgram, "uPhosphorDotBrightCore"),
+      uPhosphorDotCellFill: gl.getUniformLocation(filterProgram, "uPhosphorDotCellFill"),
+      uPhosphorDotFlatDisc: gl.getUniformLocation(filterProgram, "uPhosphorDotFlatDisc"),
       uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
       uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
       uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
@@ -319,6 +325,18 @@ function applyFilterUniforms(
   gl.uniform1f(
     uniformLocations.uPhosphorDotMode,
     isPhosphorDotMode ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotBrightCore,
+    filterState.phosphorDotBrightCore ? 1 : 0,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotCellFill,
+    filterState.phosphorDotCellFill,
+  );
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotFlatDisc,
+    filterState.phosphorDotFlatDisc ? 1 : 0,
   );
   gl.uniform1f(
     uniformLocations.uCloseUpNoiseStrength,

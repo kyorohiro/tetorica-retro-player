@@ -868,6 +868,10 @@ export function RetroPlayer({
                 spotMaskStrength={filterState.spotMaskStrength}
                 bulbRadius={filterState.bulbRadius}
                 blackFloor={filterState.blackFloor}
+                phosphorDotInternalScale={filterState.phosphorDotInternalScale}
+                phosphorDotBrightCore={filterState.phosphorDotBrightCore}
+                phosphorDotCellFill={filterState.phosphorDotCellFill}
+                phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
                 closeUpNoiseStrength={filterState.closeUpNoiseStrength}
                 scanlineBrightnessFade={filterState.scanlineBrightnessFade}
                 scanlineStrength={filterState.scanlineStrength}
@@ -892,6 +896,10 @@ export function RetroPlayer({
                 onSetSpotMaskStrength={filterState.setSpotMaskStrength}
                 onSetBulbRadius={filterState.setBulbRadius}
                 onSetBlackFloor={filterState.setBlackFloor}
+                onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
+                onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
+                onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
+                onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
                 onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
                 onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
                 onSetScanlineStrength={filterState.setScanlineStrength}
