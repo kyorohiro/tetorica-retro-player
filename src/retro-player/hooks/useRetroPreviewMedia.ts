@@ -30,6 +30,9 @@ type UseRetroPreviewMediaParams = {
   lofiAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
   isMuted: boolean;
   volume: number;
   previewKind: PreviewKind;
@@ -87,6 +90,9 @@ export function useRetroPreviewMedia({
   lofiAmount,
   bitCrushAmount,
   sampleRateReductionAmount,
+  bassAmount,
+  midAmount,
+  trebleAmount,
   isMuted,
   volume,
   previewKind,
@@ -405,6 +411,9 @@ export function useRetroPreviewMedia({
         lofiAmount,
         bitCrushAmount,
         sampleRateReductionAmount,
+        bassAmount,
+        midAmount,
+        trebleAmount,
         isMuted,
         volume,
       });

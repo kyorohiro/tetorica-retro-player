@@ -31,6 +31,9 @@ type VideoControlsProps = {
   radioToneAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
   wowFlutterAmount: number;
   noiseLevel: number;
   playbackRate: number;
@@ -39,6 +42,9 @@ type VideoControlsProps = {
   onChangeRadioToneAmount: (amount: number) => void;
   onChangeBitCrushAmount: (amount: number) => void;
   onChangeSampleRateReductionAmount: (amount: number) => void;
+  onChangeBassAmount: (amount: number) => void;
+  onChangeMidAmount: (amount: number) => void;
+  onChangeTrebleAmount: (amount: number) => void;
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
@@ -85,6 +91,9 @@ export function VideoControls({
   radioToneAmount,
   bitCrushAmount,
   sampleRateReductionAmount,
+  bassAmount,
+  midAmount,
+  trebleAmount,
   wowFlutterAmount,
   noiseLevel,
   playbackRate,
@@ -93,6 +102,9 @@ export function VideoControls({
   onChangeRadioToneAmount,
   onChangeBitCrushAmount,
   onChangeSampleRateReductionAmount,
+  onChangeBassAmount,
+  onChangeMidAmount,
+  onChangeTrebleAmount,
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangePlaybackRate,
@@ -241,6 +253,60 @@ export function VideoControls({
             value={sampleRateReductionAmount}
             onChange={(ev) => {
               onChangeSampleRateReductionAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Bass</span>
+            <span>{bassAmount >= 0 ? "+" : ""}{(bassAmount * 15).toFixed(1)} dB</span>
+          </div>
+          <input
+            type="range"
+            min="-1"
+            max="1"
+            step="0.01"
+            value={bassAmount}
+            onChange={(ev) => {
+              onChangeBassAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Mid</span>
+            <span>{midAmount >= 0 ? "+" : ""}{(midAmount * 15).toFixed(1)} dB</span>
+          </div>
+          <input
+            type="range"
+            min="-1"
+            max="1"
+            step="0.01"
+            value={midAmount}
+            onChange={(ev) => {
+              onChangeMidAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Treble</span>
+            <span>{trebleAmount >= 0 ? "+" : ""}{(trebleAmount * 15).toFixed(1)} dB</span>
+          </div>
+          <input
+            type="range"
+            min="-1"
+            max="1"
+            step="0.01"
+            value={trebleAmount}
+            onChange={(ev) => {
+              onChangeTrebleAmount(Number(ev.currentTarget.value));
             }}
             className="w-full"
           />

@@ -14,6 +14,9 @@ const DEFAULT_AUDIO_SETTINGS = {
   radioToneAmount: 0,
   bitCrushAmount: 0,
   sampleRateReductionAmount: 0,
+  bassAmount: 0,
+  midAmount: 0,
+  trebleAmount: 0,
   wowFlutterAmount: 0,
   isNoiseEnabled: true,
   noiseLevel: 0.02,
@@ -60,6 +63,9 @@ export function useRetroAudioEngine({
       sampleRateReductionAmount:
         persisted?.sampleRateReductionAmount ??
         DEFAULT_AUDIO_SETTINGS.sampleRateReductionAmount,
+      bassAmount: persisted?.bassAmount ?? DEFAULT_AUDIO_SETTINGS.bassAmount,
+      midAmount: persisted?.midAmount ?? DEFAULT_AUDIO_SETTINGS.midAmount,
+      trebleAmount: persisted?.trebleAmount ?? DEFAULT_AUDIO_SETTINGS.trebleAmount,
       wowFlutterAmount:
         persisted?.wowFlutterAmount ?? DEFAULT_AUDIO_SETTINGS.wowFlutterAmount,
       isNoiseEnabled:
@@ -78,6 +84,9 @@ export function useRetroAudioEngine({
   const lofiHighshelfRef = useRef<BiquadFilterNode | null>(null);
   const lofiDriveRef = useRef<WaveShaperNode | null>(null);
   const bitcrusherRef = useRef<AudioWorkletNode | null>(null);
+  const bassEqRef = useRef<BiquadFilterNode | null>(null);
+  const midEqRef = useRef<BiquadFilterNode | null>(null);
+  const trebleEqRef = useRef<BiquadFilterNode | null>(null);
   const wowFlutterDelayRef = useRef<DelayNode | null>(null);
   const wowLfoRef = useRef<OscillatorNode | null>(null);
   const wowLfoGainRef = useRef<GainNode | null>(null);
@@ -101,6 +110,9 @@ export function useRetroAudioEngine({
   const sampleRateReductionAmountRef = useRef<number>(
     initialAudioSettings.sampleRateReductionAmount,
   );
+  const bassAmountRef = useRef<number>(initialAudioSettings.bassAmount);
+  const midAmountRef = useRef<number>(initialAudioSettings.midAmount);
+  const trebleAmountRef = useRef<number>(initialAudioSettings.trebleAmount);
   const wowFlutterAmountRef = useRef<number>(initialAudioSettings.wowFlutterAmount);
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
@@ -125,6 +137,13 @@ export function useRetroAudioEngine({
   );
   const [sampleRateReductionAmount, setSampleRateReductionAmount] = useState<number>(
     initialAudioSettings.sampleRateReductionAmount,
+  );
+  const [bassAmount, setBassAmount] = useState<number>(
+    initialAudioSettings.bassAmount,
+  );
+  const [midAmount, setMidAmount] = useState<number>(initialAudioSettings.midAmount);
+  const [trebleAmount, setTrebleAmount] = useState<number>(
+    initialAudioSettings.trebleAmount,
   );
   const [wowFlutterAmount, setWowFlutterAmount] = useState<number>(
     initialAudioSettings.wowFlutterAmount,
@@ -167,6 +186,9 @@ export function useRetroAudioEngine({
     const highshelf = lofiHighshelfRef.current;
     const drive = lofiDriveRef.current;
     const bitcrusher = bitcrusherRef.current;
+    const bassEq = bassEqRef.current;
+    const midEq = midEqRef.current;
+    const trebleEq = trebleEqRef.current;
     const wowFlutterDelay = wowFlutterDelayRef.current;
     const wowLfo = wowLfoRef.current;
     const wowLfoGain = wowLfoGainRef.current;
@@ -187,6 +209,9 @@ export function useRetroAudioEngine({
     const nextRadioToneAmount = radioToneAmountRef.current;
     const nextBitCrushAmount = bitCrushAmountRef.current;
     const nextSampleRateReductionAmount = sampleRateReductionAmountRef.current;
+    const nextBassAmount = bassAmountRef.current;
+    const nextMidAmount = midAmountRef.current;
+    const nextTrebleAmount = trebleAmountRef.current;
     const nextWowFlutterAmount = wowFlutterAmountRef.current;
     const nextNoiseEnabled = isNoiseEnabledRef.current;
     const nextNoiseLevel = noiseLevelRef.current;
@@ -245,6 +270,13 @@ export function useRetroAudioEngine({
       );
     }
 
+    if (bassEq && midEq && trebleEq) {
+      const eqScale = nextAudioFxEnabled ? 15 : 0;
+      bassEq.gain.value = nextBassAmount * eqScale;
+      midEq.gain.value = nextMidAmount * eqScale;
+      trebleEq.gain.value = nextTrebleAmount * eqScale;
+    }
+
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
       const amount = nextAudioFxEnabled ? nextWowFlutterAmount : 0;
       wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
@@ -276,6 +308,9 @@ export function useRetroAudioEngine({
       lofiHighshelfRef.current = null;
       lofiDriveRef.current = null;
       bitcrusherRef.current = null;
+      bassEqRef.current = null;
+      midEqRef.current = null;
+      trebleEqRef.current = null;
       wowFlutterDelayRef.current = null;
       wowLfoRef.current = null;
       wowLfoGainRef.current = null;
@@ -312,6 +347,9 @@ export function useRetroAudioEngine({
           outputChannelCount: [2],
         });
       }
+      const bassEq = context.createBiquadFilter();
+      const midEq = context.createBiquadFilter();
+      const trebleEq = context.createBiquadFilter();
       const wowFlutterDelay = context.createDelay(0.05);
       const wowLfo = context.createOscillator();
       const wowLfoGain = context.createGain();
@@ -322,6 +360,13 @@ export function useRetroAudioEngine({
       radioTonePresence.type = "peaking";
       lowpass.type = "lowpass";
       highshelf.type = "highshelf";
+      bassEq.type = "lowshelf";
+      bassEq.frequency.value = 180;
+      midEq.type = "peaking";
+      midEq.frequency.value = 1200;
+      midEq.Q.value = 0.9;
+      trebleEq.type = "highshelf";
+      trebleEq.frequency.value = 3200;
       highshelf.frequency.value = 2800;
       drive.oversample = "4x";
       wowFlutterDelay.delayTime.value = 0.006;
@@ -341,10 +386,13 @@ export function useRetroAudioEngine({
       highshelf.connect(drive);
       if (bitcrusher) {
         drive.connect(bitcrusher);
-        bitcrusher.connect(masterGain);
+        bitcrusher.connect(bassEq);
       } else {
-        drive.connect(masterGain);
+        drive.connect(bassEq);
       }
+      bassEq.connect(midEq);
+      midEq.connect(trebleEq);
+      trebleEq.connect(masterGain);
       masterGain.connect(context.destination);
       masterGain.connect(recordingDestination);
 
@@ -396,6 +444,9 @@ export function useRetroAudioEngine({
       lofiHighshelfRef.current = highshelf;
       lofiDriveRef.current = drive;
       bitcrusherRef.current = bitcrusher;
+      bassEqRef.current = bassEq;
+      midEqRef.current = midEq;
+      trebleEqRef.current = trebleEq;
       wowFlutterDelayRef.current = wowFlutterDelay;
       wowLfoRef.current = wowLfo;
       wowLfoGainRef.current = wowLfoGain;
@@ -460,6 +511,9 @@ export function useRetroAudioEngine({
     lofiHighshelfRef.current = null;
     lofiDriveRef.current = null;
     bitcrusherRef.current = null;
+    bassEqRef.current = null;
+    midEqRef.current = null;
+    trebleEqRef.current = null;
     wowFlutterDelayRef.current = null;
     wowLfoRef.current = null;
     wowLfoGainRef.current = null;
@@ -513,6 +567,9 @@ export function useRetroAudioEngine({
         radioToneAmount,
         bitCrushAmount,
         sampleRateReductionAmount,
+        bassAmount,
+        midAmount,
+        trebleAmount,
         wowFlutterAmount,
         isAudioFxEnabled,
         isMuted,
@@ -544,6 +601,9 @@ export function useRetroAudioEngine({
     radioToneAmountRef.current = nextSettings.radioToneAmount;
     bitCrushAmountRef.current = nextSettings.bitCrushAmount;
     sampleRateReductionAmountRef.current = nextSettings.sampleRateReductionAmount;
+    bassAmountRef.current = nextSettings.bassAmount;
+    midAmountRef.current = nextSettings.midAmount;
+    trebleAmountRef.current = nextSettings.trebleAmount;
     wowFlutterAmountRef.current = nextSettings.wowFlutterAmount;
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
@@ -557,6 +617,9 @@ export function useRetroAudioEngine({
     setRadioToneAmount(nextSettings.radioToneAmount);
     setBitCrushAmount(nextSettings.bitCrushAmount);
     setSampleRateReductionAmount(nextSettings.sampleRateReductionAmount);
+    setBassAmount(nextSettings.bassAmount);
+    setMidAmount(nextSettings.midAmount);
+    setTrebleAmount(nextSettings.trebleAmount);
     setWowFlutterAmount(nextSettings.wowFlutterAmount);
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
@@ -581,6 +644,9 @@ export function useRetroAudioEngine({
     radioToneAmountRef.current = radioToneAmount;
     bitCrushAmountRef.current = bitCrushAmount;
     sampleRateReductionAmountRef.current = sampleRateReductionAmount;
+    bassAmountRef.current = bassAmount;
+    midAmountRef.current = midAmount;
+    trebleAmountRef.current = trebleAmount;
     wowFlutterAmountRef.current = wowFlutterAmount;
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
@@ -594,6 +660,9 @@ export function useRetroAudioEngine({
     radioToneAmount,
     bitCrushAmount,
     sampleRateReductionAmount,
+    bassAmount,
+    midAmount,
+    trebleAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -614,6 +683,9 @@ export function useRetroAudioEngine({
       radioToneAmount,
       bitCrushAmount,
       sampleRateReductionAmount,
+      bassAmount,
+      midAmount,
+      trebleAmount,
       wowFlutterAmount,
       isNoiseEnabled,
       noiseLevel,
@@ -628,6 +700,9 @@ export function useRetroAudioEngine({
     radioToneAmount,
     bitCrushAmount,
     sampleRateReductionAmount,
+    bassAmount,
+    midAmount,
+    trebleAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -645,6 +720,9 @@ export function useRetroAudioEngine({
     lofiHighshelfRef,
     lofiDriveRef,
     bitcrusherRef,
+    bassEqRef,
+    midEqRef,
+    trebleEqRef,
     wowFlutterDelayRef,
     wowLfoRef,
     wowLfoGainRef,
@@ -665,6 +743,9 @@ export function useRetroAudioEngine({
     radioToneAmountRef,
     bitCrushAmountRef,
     sampleRateReductionAmountRef,
+    bassAmountRef,
+    midAmountRef,
+    trebleAmountRef,
     wowFlutterAmountRef,
     isNoiseEnabledRef,
     noiseLevelRef,
@@ -686,6 +767,12 @@ export function useRetroAudioEngine({
     setBitCrushAmount,
     sampleRateReductionAmount,
     setSampleRateReductionAmount,
+    bassAmount,
+    setBassAmount,
+    midAmount,
+    setMidAmount,
+    trebleAmount,
+    setTrebleAmount,
     wowFlutterAmount,
     setWowFlutterAmount,
     isNoiseEnabled,

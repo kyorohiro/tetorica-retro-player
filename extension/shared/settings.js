@@ -481,6 +481,9 @@ export const DEFAULT_SETTINGS = {
   radioToneAmount: 0.0,
   bitCrushAmount: 0.0,
   sampleRateReductionAmount: 0.0,
+  bassAmount: 0.0,
+  midAmount: 0.0,
+  trebleAmount: 0.0,
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
@@ -649,6 +652,18 @@ export function normalizeSettings(candidate) {
         ? clamp(candidate.sampleRateReductionAmount, 0, 1)
         : basePresetSettings.sampleRateReductionAmount ??
           DEFAULT_SETTINGS.sampleRateReductionAmount,
+    bassAmount:
+      typeof candidate?.bassAmount === "number"
+        ? clamp(candidate.bassAmount, -1, 1)
+        : basePresetSettings.bassAmount ?? DEFAULT_SETTINGS.bassAmount,
+    midAmount:
+      typeof candidate?.midAmount === "number"
+        ? clamp(candidate.midAmount, -1, 1)
+        : basePresetSettings.midAmount ?? DEFAULT_SETTINGS.midAmount,
+    trebleAmount:
+      typeof candidate?.trebleAmount === "number"
+        ? clamp(candidate.trebleAmount, -1, 1)
+        : basePresetSettings.trebleAmount ?? DEFAULT_SETTINGS.trebleAmount,
     wowFlutterAmount:
       typeof candidate?.wowFlutterAmount === "number"
         ? clamp(candidate.wowFlutterAmount, 0, 1)
@@ -758,6 +773,18 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.sampleRateReductionAmount === "number"
         ? preset.sampleRateReductionAmount
         : DEFAULT_SETTINGS.sampleRateReductionAmount,
+    bassAmount:
+      typeof preset.bassAmount === "number"
+        ? preset.bassAmount
+        : DEFAULT_SETTINGS.bassAmount,
+    midAmount:
+      typeof preset.midAmount === "number"
+        ? preset.midAmount
+        : DEFAULT_SETTINGS.midAmount,
+    trebleAmount:
+      typeof preset.trebleAmount === "number"
+        ? preset.trebleAmount
+        : DEFAULT_SETTINGS.trebleAmount,
     wowFlutterAmount:
       typeof preset.wowFlutterAmount === "number"
         ? preset.wowFlutterAmount

@@ -42,6 +42,9 @@ export type PersistedRetroAudioSettings = {
   radioToneAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
   wowFlutterAmount: number;
   isNoiseEnabled: boolean;
   noiseLevel: number;

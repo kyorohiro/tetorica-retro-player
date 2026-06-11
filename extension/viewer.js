@@ -42,6 +42,9 @@ let lofiLowpassNode = null;
 let lofiHighshelfNode = null;
 let lofiDriveNode = null;
 let bitcrusherNode = null;
+let bassEqNode = null;
+let midEqNode = null;
+let trebleEqNode = null;
 let wowFlutterDelayNode = null;
 let wowLfoNode = null;
 let wowLfoGainNode = null;
@@ -553,6 +556,13 @@ function updateAudioNodes() {
     );
   }
 
+  if (bassEqNode && midEqNode && trebleEqNode) {
+    const eqScale = currentSettings.isAudioFxEnabled ? 15 : 0;
+    bassEqNode.gain.value = currentSettings.bassAmount * eqScale;
+    midEqNode.gain.value = currentSettings.midAmount * eqScale;
+    trebleEqNode.gain.value = currentSettings.trebleAmount * eqScale;
+  }
+
   if (
     wowFlutterDelayNode &&
     wowLfoNode &&
@@ -585,6 +595,9 @@ async function ensureAudioContext() {
     lofiHighshelfNode = null;
     lofiDriveNode = null;
     bitcrusherNode = null;
+    bassEqNode = null;
+    midEqNode = null;
+    trebleEqNode = null;
     wowFlutterDelayNode = null;
     wowLfoNode = null;
     wowLfoGainNode = null;
@@ -617,6 +630,9 @@ async function ensureAudioContext() {
         outputChannelCount: [2],
       });
     }
+    bassEqNode = audioContext.createBiquadFilter();
+    midEqNode = audioContext.createBiquadFilter();
+    trebleEqNode = audioContext.createBiquadFilter();
     wowFlutterDelayNode = audioContext.createDelay(0.05);
     wowLfoNode = audioContext.createOscillator();
     wowLfoGainNode = audioContext.createGain();
@@ -628,6 +644,13 @@ async function ensureAudioContext() {
     radioTonePresenceNode.type = "peaking";
     lofiLowpassNode.type = "lowpass";
     lofiHighshelfNode.type = "highshelf";
+    bassEqNode.type = "lowshelf";
+    bassEqNode.frequency.value = 180;
+    midEqNode.type = "peaking";
+    midEqNode.frequency.value = 1200;
+    midEqNode.Q.value = 0.9;
+    trebleEqNode.type = "highshelf";
+    trebleEqNode.frequency.value = 3200;
     lofiHighshelfNode.frequency.value = 2800;
     lofiDriveNode.oversample = "4x";
     wowFlutterDelayNode.delayTime.value = 0.006;
@@ -647,10 +670,13 @@ async function ensureAudioContext() {
     lofiHighshelfNode.connect(lofiDriveNode);
     if (bitcrusherNode) {
       lofiDriveNode.connect(bitcrusherNode);
-      bitcrusherNode.connect(masterGainNode);
+      bitcrusherNode.connect(bassEqNode);
     } else {
-      lofiDriveNode.connect(masterGainNode);
+      lofiDriveNode.connect(bassEqNode);
     }
+    bassEqNode.connect(midEqNode);
+    midEqNode.connect(trebleEqNode);
+    trebleEqNode.connect(masterGainNode);
     masterGainNode.connect(audioContext.destination);
 
     noiseSourceNode = audioContext.createBufferSource();
@@ -762,6 +788,9 @@ async function disposeAudioEngine() {
   lofiHighshelfNode = null;
   lofiDriveNode = null;
   bitcrusherNode = null;
+  bassEqNode = null;
+  midEqNode = null;
+  trebleEqNode = null;
   wowFlutterDelayNode = null;
   wowLfoNode = null;
   wowLfoGainNode = null;

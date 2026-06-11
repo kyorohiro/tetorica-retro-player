@@ -216,6 +216,33 @@
 
           <label class="control">
             <span class="label-with-tip">
+              <span>Bass</span>
+              <span class="info-tip" tabindex="0" data-tip="Boosts or cuts the low end like a simple amp tone stack.">?</span>
+            </span>
+            <input id="bassAmount" type="range" min="-1" max="1" step="0.01" />
+            <output id="bassAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Mid</span>
+              <span class="info-tip" tabindex="0" data-tip="Boosts or cuts the middle voice band where a lot of guitar and radio character lives.">?</span>
+            </span>
+            <input id="midAmount" type="range" min="-1" max="1" step="0.01" />
+            <output id="midAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Treble</span>
+              <span class="info-tip" tabindex="0" data-tip="Boosts or cuts the upper edge and brightness of the sound.">?</span>
+            </span>
+            <input id="trebleAmount" type="range" min="-1" max="1" step="0.01" />
+            <output id="trebleAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
               <span>Wow & Flutter</span>
               <span class="info-tip" tabindex="0" data-tip="Adds slow and fast pitch wobble like tape or unstable rotating hardware.">?</span>
             </span>
