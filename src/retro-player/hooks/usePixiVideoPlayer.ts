@@ -138,6 +138,8 @@ export function usePixiVideoPlayer(
     setIsAudioFxEnabled,
     lofiAmount,
     setLofiAmount,
+    radioToneAmount,
+    setRadioToneAmount,
     wowFlutterAmount,
     setWowFlutterAmount,
     isNoiseEnabled,
@@ -731,6 +733,7 @@ export function usePixiVideoPlayer(
     viewportRect,
     isAudioFxEnabled,
     lofiAmount,
+    radioToneAmount,
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
@@ -775,6 +778,7 @@ export function usePixiVideoPlayer(
       setIsAudioFxEnabled((current) => !current);
     },
     setLofiAmount,
+    setRadioToneAmount,
     setWowFlutterAmount,
     toggleNoise: () => {
       setIsNoiseEnabled((current) => !current);

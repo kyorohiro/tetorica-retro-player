@@ -35,6 +35,9 @@ let mediaStream = null;
 let audioContext = null;
 let mediaSourceNode = null;
 let masterGainNode = null;
+let radioToneHighpassNode = null;
+let radioToneLowpassNode = null;
+let radioTonePresenceNode = null;
 let lofiLowpassNode = null;
 let lofiHighshelfNode = null;
 let lofiDriveNode = null;
@@ -508,6 +511,17 @@ function createDriveCurve(amount) {
 }
 
 function updateAudioNodes() {
+  if (radioToneHighpassNode && radioToneLowpassNode && radioTonePresenceNode) {
+    const amount = currentSettings.isAudioFxEnabled ? currentSettings.radioToneAmount : 0;
+    radioToneHighpassNode.frequency.value = 20 + amount * 430;
+    radioToneHighpassNode.Q.value = 0.4 + amount * 0.35;
+    radioToneLowpassNode.frequency.value = 20000 - amount * 17400;
+    radioToneLowpassNode.Q.value = 0.2 + amount * 0.9;
+    radioTonePresenceNode.frequency.value = 1700;
+    radioTonePresenceNode.Q.value = 0.8 + amount * 1.4;
+    radioTonePresenceNode.gain.value = amount * 6;
+  }
+
   if (lofiLowpassNode && lofiHighshelfNode && lofiDriveNode) {
     const amount = currentSettings.isAudioFxEnabled ? currentSettings.lofiAmount : 0;
     lofiLowpassNode.frequency.value = 16000 - amount * 14200;
@@ -541,6 +555,9 @@ async function ensureAudioContext() {
     audioContext = null;
     mediaSourceNode = null;
     masterGainNode = null;
+    radioToneHighpassNode = null;
+    radioToneLowpassNode = null;
+    radioTonePresenceNode = null;
     lofiLowpassNode = null;
     lofiHighshelfNode = null;
     lofiDriveNode = null;
@@ -560,6 +577,9 @@ async function ensureAudioContext() {
   if (!audioContext) {
     audioContext = new AudioContext();
     masterGainNode = audioContext.createGain();
+    radioToneHighpassNode = audioContext.createBiquadFilter();
+    radioToneLowpassNode = audioContext.createBiquadFilter();
+    radioTonePresenceNode = audioContext.createBiquadFilter();
     lofiLowpassNode = audioContext.createBiquadFilter();
     lofiHighshelfNode = audioContext.createBiquadFilter();
     lofiDriveNode = audioContext.createWaveShaper();
@@ -569,6 +589,9 @@ async function ensureAudioContext() {
     flutterLfoNode = audioContext.createOscillator();
     flutterLfoGainNode = audioContext.createGain();
 
+    radioToneHighpassNode.type = "highpass";
+    radioToneLowpassNode.type = "lowpass";
+    radioTonePresenceNode.type = "peaking";
     lofiLowpassNode.type = "lowpass";
     lofiHighshelfNode.type = "highshelf";
     lofiHighshelfNode.frequency.value = 2800;
@@ -582,7 +605,10 @@ async function ensureAudioContext() {
     flutterLfoNode.connect(flutterLfoGainNode);
     flutterLfoGainNode.connect(wowFlutterDelayNode.delayTime);
 
-    wowFlutterDelayNode.connect(lofiLowpassNode);
+    wowFlutterDelayNode.connect(radioToneHighpassNode);
+    radioToneHighpassNode.connect(radioToneLowpassNode);
+    radioToneLowpassNode.connect(radioTonePresenceNode);
+    radioTonePresenceNode.connect(lofiLowpassNode);
     lofiLowpassNode.connect(lofiHighshelfNode);
     lofiHighshelfNode.connect(lofiDriveNode);
     lofiDriveNode.connect(masterGainNode);
@@ -690,6 +716,9 @@ async function disposeAudioEngine() {
   const context = audioContext;
   audioContext = null;
   masterGainNode = null;
+  radioToneHighpassNode = null;
+  radioToneLowpassNode = null;
+  radioTonePresenceNode = null;
   lofiLowpassNode = null;
   lofiHighshelfNode = null;
   lofiDriveNode = null;

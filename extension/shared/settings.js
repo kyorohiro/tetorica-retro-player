@@ -478,6 +478,7 @@ export const DEFAULT_SETTINGS = {
   overlayTargetCount: 1,
   isAudioFxEnabled: true,
   lofiAmount: 0.65,
+  radioToneAmount: 0.0,
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
@@ -633,6 +634,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.lofiAmount === "number"
         ? clamp(candidate.lofiAmount, 0, 1)
         : DEFAULT_SETTINGS.lofiAmount,
+    radioToneAmount:
+      typeof candidate?.radioToneAmount === "number"
+        ? clamp(candidate.radioToneAmount, 0, 1)
+        : basePresetSettings.radioToneAmount ?? DEFAULT_SETTINGS.radioToneAmount,
     wowFlutterAmount:
       typeof candidate?.wowFlutterAmount === "number"
         ? clamp(candidate.wowFlutterAmount, 0, 1)
@@ -730,6 +735,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.lofiAmount === "number"
         ? preset.lofiAmount
         : DEFAULT_SETTINGS.lofiAmount,
+    radioToneAmount:
+      typeof preset.radioToneAmount === "number"
+        ? preset.radioToneAmount
+        : DEFAULT_SETTINGS.radioToneAmount,
     wowFlutterAmount:
       typeof preset.wowFlutterAmount === "number"
         ? preset.wowFlutterAmount

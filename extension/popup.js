@@ -51,6 +51,8 @@ const overlayTargetCountValue = document.getElementById("overlayTargetCountValue
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
 const lofiAmountInput = document.getElementById("lofiAmount");
 const lofiAmountValue = document.getElementById("lofiAmountValue");
+const radioToneAmountInput = document.getElementById("radioToneAmount");
+const radioToneAmountValue = document.getElementById("radioToneAmountValue");
 const wowFlutterAmountInput = document.getElementById("wowFlutterAmount");
 const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
@@ -261,6 +263,12 @@ lofiAmountInput.addEventListener("input", () => {
   updateSettings({ lofiAmount });
 });
 
+radioToneAmountInput.addEventListener("input", () => {
+  const radioToneAmount = Number(radioToneAmountInput.value);
+  radioToneAmountValue.textContent = radioToneAmount.toFixed(2);
+  updateSettings({ radioToneAmount });
+});
+
 wowFlutterAmountInput.addEventListener("input", () => {
   const wowFlutterAmount = Number(wowFlutterAmountInput.value);
   wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
@@ -362,6 +370,8 @@ function renderSettings(settings) {
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);
   lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);
+  radioToneAmountInput.value = String(settings.radioToneAmount);
+  radioToneAmountValue.textContent = settings.radioToneAmount.toFixed(2);
   wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
   wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;

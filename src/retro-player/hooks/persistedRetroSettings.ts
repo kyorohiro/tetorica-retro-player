@@ -39,6 +39,7 @@ export type PersistedRetroAudioSettings = {
   isLooping: boolean;
   isAudioFxEnabled: boolean;
   lofiAmount: number;
+  radioToneAmount: number;
   wowFlutterAmount: number;
   isNoiseEnabled: boolean;
   noiseLevel: number;
