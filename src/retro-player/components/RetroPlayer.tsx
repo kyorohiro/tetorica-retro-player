@@ -802,12 +802,16 @@ export function RetroPlayer({
               isVideoSettingsOpen={false}
               lofiAmount={player.lofiAmount}
               radioToneAmount={player.radioToneAmount}
+              bitCrushAmount={player.bitCrushAmount}
+              sampleRateReductionAmount={player.sampleRateReductionAmount}
               wowFlutterAmount={player.wowFlutterAmount}
               noiseLevel={player.noiseLevel}
               playbackRate={player.playbackRate}
               volume={player.volume}
               onChangeLofiAmount={player.setLofiAmount}
               onChangeRadioToneAmount={player.setRadioToneAmount}
+              onChangeBitCrushAmount={player.setBitCrushAmount}
+              onChangeSampleRateReductionAmount={player.setSampleRateReductionAmount}
               onChangeWowFlutterAmount={player.setWowFlutterAmount}
               onChangeNoiseLevel={player.setNoiseLevel}
               onChangePlaybackRate={player.changePlaybackRate}

@@ -29,12 +29,16 @@ type VideoControlsProps = {
   isVideoSettingsOpen: boolean;
   lofiAmount: number;
   radioToneAmount: number;
+  bitCrushAmount: number;
+  sampleRateReductionAmount: number;
   wowFlutterAmount: number;
   noiseLevel: number;
   playbackRate: number;
   volume: number;
   onChangeLofiAmount: (amount: number) => void;
   onChangeRadioToneAmount: (amount: number) => void;
+  onChangeBitCrushAmount: (amount: number) => void;
+  onChangeSampleRateReductionAmount: (amount: number) => void;
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
@@ -79,12 +83,16 @@ export function VideoControls({
   isVideoSettingsOpen,
   lofiAmount,
   radioToneAmount,
+  bitCrushAmount,
+  sampleRateReductionAmount,
   wowFlutterAmount,
   noiseLevel,
   playbackRate,
   volume,
   onChangeLofiAmount,
   onChangeRadioToneAmount,
+  onChangeBitCrushAmount,
+  onChangeSampleRateReductionAmount,
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangePlaybackRate,
@@ -197,6 +205,42 @@ export function VideoControls({
             value={radioToneAmount}
             onChange={(ev) => {
               onChangeRadioToneAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Bit crush</span>
+            <span>{Math.round(bitCrushAmount * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={bitCrushAmount}
+            onChange={(ev) => {
+              onChangeBitCrushAmount(Number(ev.currentTarget.value));
+            }}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Sample rate</span>
+            <span>{Math.round(sampleRateReductionAmount * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={sampleRateReductionAmount}
+            onChange={(ev) => {
+              onChangeSampleRateReductionAmount(Number(ev.currentTarget.value));
             }}
             className="w-full"
           />

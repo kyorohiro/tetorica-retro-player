@@ -28,6 +28,8 @@ type UseRetroPreviewMediaParams = {
   isLoopingRef: CurrentRef<boolean>;
   isAudioFxEnabled: boolean;
   lofiAmount: number;
+  bitCrushAmount: number;
+  sampleRateReductionAmount: number;
   isMuted: boolean;
   volume: number;
   previewKind: PreviewKind;
@@ -83,6 +85,8 @@ export function useRetroPreviewMedia({
   isLoopingRef,
   isAudioFxEnabled,
   lofiAmount,
+  bitCrushAmount,
+  sampleRateReductionAmount,
   isMuted,
   volume,
   previewKind,
@@ -399,6 +403,8 @@ export function useRetroPreviewMedia({
         currentTime: mediaRef.current.currentTime,
         isAudioFxEnabled,
         lofiAmount,
+        bitCrushAmount,
+        sampleRateReductionAmount,
         isMuted,
         volume,
       });
