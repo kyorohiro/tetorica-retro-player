@@ -112,7 +112,7 @@ const QUAD_VERTICES = new Float32Array([
   1, 1,
 ]);
 
-const SAFARI_LARGE_SOURCE_THRESHOLD = 2048;
+const LARGE_VIDEO_SOURCE_THRESHOLD = 640;
 const SAFARI_CLAMPED_UPLOAD_LONG_EDGE = 1280;
 const SAFARI_CLAMPED_UPLOAD_MAX_PIXELS = 1280 * 1280;
 
@@ -150,8 +150,8 @@ const clampLargeSourceTargetSize = (
   }
 
   if (
-    sourceWidth <= SAFARI_LARGE_SOURCE_THRESHOLD &&
-    sourceHeight <= SAFARI_LARGE_SOURCE_THRESHOLD
+    sourceWidth <= LARGE_VIDEO_SOURCE_THRESHOLD &&
+    sourceHeight <= LARGE_VIDEO_SOURCE_THRESHOLD
   ) {
     return { width, height, wasClamped: false };
   }
@@ -182,10 +182,9 @@ const shouldUseDirectVideoUpload = (
   sourceHeight: number,
 ) =>
   source instanceof HTMLVideoElement &&
-  isLikelySafari() &&
   (
-    sourceWidth > SAFARI_LARGE_SOURCE_THRESHOLD ||
-    sourceHeight > SAFARI_LARGE_SOURCE_THRESHOLD
+    sourceWidth > LARGE_VIDEO_SOURCE_THRESHOLD ||
+    sourceHeight > LARGE_VIDEO_SOURCE_THRESHOLD
   );
 
 const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
@@ -536,7 +535,7 @@ export function useRetroPixiStage({
     }
 
     if (shouldUseDirectVideoUpload(source, sourceSize.width, sourceSize.height)) {
-      debugVideo("safariDirectVideoUpload", {
+      debugVideo("largeVideoDirectUpload", {
         sourceWidth: sourceSize.width,
         sourceHeight: sourceSize.height,
       });
