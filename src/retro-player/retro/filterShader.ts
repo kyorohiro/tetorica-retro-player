@@ -773,7 +773,7 @@ void main(void)
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
   vec2 delta = warpedMask - vMaskCoord;
   vec2 curvedUv = vTextureCoord + delta;
-  vec2 gridUv = vTextureCoord;
+  vec2 gridUv = curvedUv;
   if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
     finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
