@@ -196,7 +196,8 @@ const getPhosphorDotViewportLimitedSize = (
 
   // When the target grid gets too dense for the visible viewport, phosphor
   // dots collapse into uniform black gaps instead of readable glowing cells.
-  const minCellPixels = Math.max(3, 2.2 + filterState.bulbRadius * 1.2);
+  //const minCellPixels = Math.max(3, 2.2 + filterState.bulbRadius * 1.2);
+  const minCellPixels = Math.max(2.8, 2.15 + filterState.bulbRadius * 1.15);
   const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
   const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
   const scale = Math.min(
