@@ -667,7 +667,13 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float chromaLift = smoothstep(0.04, 0.28, saturation) * smoothstep(0.0, 0.22, brightness);
   float perceivedLight = max(luminance, brightness * 0.72 + chromaLift * 0.12);
   vec2 cellIndex = floor(gridUv * targetSize);
-  float cellJitter = hash12(cellIndex + vec2(17.0, 43.0)) - 0.5;
+  float jitterTime = uTime * 0.22;
+  float jitterFrameA = floor(jitterTime);
+  float jitterFrameB = jitterFrameA + 1.0;
+  float jitterMix = smoothstep(0.0, 1.0, fract(jitterTime));
+  float jitterA = hash12(cellIndex + vec2(17.0 + jitterFrameA, 43.0)) - 0.5;
+  float jitterB = hash12(cellIndex + vec2(17.0 + jitterFrameB, 43.0)) - 0.5;
+  float cellJitter = mix(jitterA, jitterB, jitterMix);
   vec2 cellUv = fract(gridUv * targetSize) - 0.5;
   float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
   float aspectCompensation = sqrt(pixelAspect);
@@ -925,6 +931,16 @@ void main(void)
       uSpotMaskStrength *
       (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
     phosphorColor += mixedSourceColor * phosphorBaseLift;
+
+    float phosphorBreath =
+      sin(uTime * 2.6) * 0.5 + 0.5;
+    float phosphorPulse =
+      sin(uTime * 7.4 + warpedMask.y * 6.0) * 0.5 + 0.5;
+    float phosphorFlicker =
+      1.0 +
+      (phosphorBreath * 0.018 + phosphorPulse * 0.012 - 0.015) *
+      (0.45 + uSpotMaskStrength * 0.55);
+    phosphorColor *= phosphorFlicker;
 
     float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, phosphorDotVignette) * uVignetteStrength;
