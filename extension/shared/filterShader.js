@@ -635,6 +635,8 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float saturation = brightness - minChannel;
   float chromaLift = smoothstep(0.04, 0.28, saturation) * smoothstep(0.0, 0.22, brightness);
   float perceivedLight = max(luminance, brightness * 0.72 + chromaLift * 0.12);
+  vec2 cellIndex = floor(gridUv * targetSize);
+  float cellJitter = hash12(cellIndex + vec2(17.0, 43.0)) - 0.5;
   vec2 cellUv = fract(gridUv * targetSize) - 0.5;
   float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
   float aspectCompensation = sqrt(pixelAspect);
@@ -651,11 +653,13 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   bool useBrightCore = uPhosphorDotBrightCore > 0.5;
   float brightCoreMix = (useBrightCore ? 1.0 : 0.0) * (1.0 - cellFillMix) * (1.0 - flatDiscMode);
   float brightCoreCompensation = mix(1.0, 1.2 + brightness * 0.18 + highlightBloom * 0.08, brightCoreMix);
+  float radiusJitter = 1.0 + cellJitter * 0.045;
+  float emissionJitter = 1.0 + cellJitter * 0.035;
   float dotRadius = mix(
     uBulbRadius * (useBrightCore ? 0.14 : 0.19),
     uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
     radiusBias
-  );
+  ) * radiusJitter;
   float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
   float haloRadius = dotRadius + mix(0.028, 0.12 + highlightBloom * 0.08, brightness);
   float innerCore = exp(-dist * dist * mix(useBrightCore ? 220.0 : 120.0, useBrightCore ? 110.0 : 72.0, brightness));
@@ -687,12 +691,14 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       ) +
       halo * halo * (0.03 + brightness * 0.06 + highlightBloom * 0.09)
     ) *
-    brightCoreCompensation;
+    brightCoreCompensation *
+    emissionJitter;
   float floorLight =
     gate *
     lit *
     amount *
-    (uBlackFloor * (0.48 + halo * 0.58) + brightness * 0.035);
+    (uBlackFloor * (0.48 + halo * 0.58) + brightness * 0.035) *
+    (1.0 + cellJitter * 0.025);
   float cellFill =
     gate *
     lit *
