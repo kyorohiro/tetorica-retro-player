@@ -656,12 +656,13 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
     radiusBias
   );
+  float edgeSoftness = mix(0.018, 0.028, flatDiscMode) + highlightBloom * 0.006;
   float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
   float haloRadius = dotRadius + mix(0.028, 0.12 + highlightBloom * 0.08, brightness);
-  float innerCore = exp(-dist * dist * mix(useBrightCore ? 220.0 : 120.0, useBrightCore ? 110.0 : 72.0, brightness));
-  float bulb = 1.0 - smoothstep(dotRadius - 0.014, dotRadius + 0.02, dist);
-  float flatDisc = 1.0 - smoothstep(dotRadius - 0.01, dotRadius + 0.012, dist);
-  float halo = 1.0 - smoothstep(haloRadius - 0.025, haloRadius + 0.07, dist);
+  float innerCore = exp(-dist * dist * mix(useBrightCore ? 180.0 : 100.0, useBrightCore ? 96.0 : 62.0, brightness));
+  float bulb = 1.0 - smoothstep(dotRadius - edgeSoftness, dotRadius + edgeSoftness * 1.25, dist);
+  float flatDisc = 1.0 - smoothstep(dotRadius - edgeSoftness * 0.82, dotRadius + edgeSoftness, dist);
+  float halo = 1.0 - smoothstep(haloRadius - 0.03, haloRadius + 0.085, dist);
   float rimDarkness = smoothstep(innerCoreRadius * (useBrightCore ? 0.9 : 1.02), dotRadius * 1.05, dist);
   float cavity = 1.0 - rimDarkness * (useBrightCore ? 0.18 : 0.04);
   float bodyGlow = bulb * mix(
@@ -692,7 +693,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     gate *
     lit *
     amount *
-    (uBlackFloor * (0.48 + halo * 0.58) + brightness * 0.035);
+    (uBlackFloor * (0.56 + halo * 0.34) + brightness * 0.04);
   float cellFill =
     gate *
     lit *
@@ -822,9 +823,11 @@ void main(void)
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
     float sourceColorDelta = length(centerColor - neighborMix);
-    float sourceBlendAmount =
+    float flatAreaBlendAssist = 1.0 + (1.0 - smoothstep(0.02, 0.12, sourceColorDelta)) * 0.16;
+    float sourceBlendAmount = min(1.0,
       neighborBlendMix *
-      (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
+      (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28) *
+      flatAreaBlendAssist);
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
     vec3 baseProcessedColor = color.rgb;
 
@@ -855,19 +858,21 @@ void main(void)
     float edgeWidth = max(fwidth(dist) * mix(1.4, 2.2, flatDiscMode), 0.002);
     float edgeBand = 1.0 - smoothstep(0.0, edgeWidth, abs(dist - dotRadius));
     float colorDelta = length(mixedSourceColor - neighborMix);
-    float edgeBlend =
+    float edgeBlend = min(1.0,
       edgeBand *
       smoothstep(0.04, 0.32, colorDelta) *
       neighborBlendMix *
-      (0.14 + phosphorBrightness * 0.18 + flatDiscMode * 0.1);
+      (0.14 + phosphorBrightness * 0.18 + flatDiscMode * 0.1) *
+      flatAreaBlendAssist);
     phosphorColor = mix(phosphorColor, mix(phosphorColor, neighborMix, 0.7), edgeBlend);
 
     vec3 fourWayMix =
       mixedSourceColor * 0.34 +
       (rightColor + leftColor + upColor + downColor) * 0.165;
-    float fourWayAmount =
+    float fourWayAmount = min(1.0,
       neighborBlendMix *
-      (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08 + internalScaleMix * 0.06);
+      (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08 + internalScaleMix * 0.06) *
+      flatAreaBlendAssist);
     phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount);
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
