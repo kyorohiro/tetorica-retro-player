@@ -52,6 +52,7 @@ type RetroFilterPanelProps = {
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  persistenceStrength: number;
   closeUpNoiseStrength: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
@@ -81,6 +82,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
+  onSetPersistenceStrength: (value: number) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
@@ -111,6 +113,7 @@ export function RetroFilterPanel({
   phosphorDotCellFill,
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
+  persistenceStrength,
   closeUpNoiseStrength,
   scanlineBrightnessFade,
   scanlineStrength,
@@ -140,6 +143,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotCellFill,
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
+  onSetPersistenceStrength,
   onSetCloseUpNoiseStrength,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
@@ -564,6 +568,26 @@ export function RetroFilterPanel({
               Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
             </span>
           ) : null}
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Persistence: ${persistenceStrength.toFixed(2)}`}
+              text="Blends a little of the previous frame into the current one. Higher values increase afterimage and CRT-like trailing."
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="0.95"
+            step="0.01"
+            value={persistenceStrength}
+            onChange={(ev) => {
+              onSetPersistenceStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
         </label>
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">

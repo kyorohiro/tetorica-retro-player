@@ -632,6 +632,7 @@ export function usePixiVideoPlayer(
     filterState.spotMaskStrength,
     filterState.bulbRadius,
     filterState.blackFloor,
+    filterState.persistenceStrength,
     filterState.selectedPreset,
     filterState.closeUpNoiseStrength,
     filterState.scanlineBrightnessFade,

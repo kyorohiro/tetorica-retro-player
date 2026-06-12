@@ -42,6 +42,7 @@ export type RetroPresetDefinition = {
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
+  persistence?: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;

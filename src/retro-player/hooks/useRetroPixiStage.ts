@@ -491,6 +491,8 @@ export function useRetroPixiStage({
   const layoutTimeoutRef = useRef<number | null>(null);
   const uploadCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const uploadContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const persistenceCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const persistenceContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const viewportRectRef = useRef<{
     width: number;
     height: number;
@@ -566,6 +568,7 @@ export function useRetroPixiStage({
       1,
       Math.round(isPhosphorDotMode ? sampleHeight : effectiveTargetHeight),
     );
+    const persistenceStrength = Math.max(0, Math.min(currentFilterState.persistenceStrength, 0.95));
 
     let uploadCanvas = uploadCanvasRef.current;
     let uploadContext = uploadContextRef.current;
@@ -593,7 +596,54 @@ export function useRetroPixiStage({
     uploadContext.fillStyle = "#000";
     uploadContext.fillRect(0, 0, targetWidth, targetHeight);
 
-    uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
+    if (persistenceStrength > 0.001) {
+      let persistenceCanvas = persistenceCanvasRef.current;
+      let persistenceContext = persistenceContextRef.current;
+
+      if (!persistenceCanvas || !persistenceContext) {
+        persistenceCanvas = document.createElement("canvas");
+        persistenceContext = persistenceCanvas.getContext("2d", {
+          alpha: false,
+          desynchronized: true,
+        });
+
+        if (!persistenceContext) {
+          uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
+          return uploadCanvas;
+        }
+
+        persistenceCanvasRef.current = persistenceCanvas;
+        persistenceContextRef.current = persistenceContext;
+      }
+
+      if (persistenceCanvas.width !== targetWidth) persistenceCanvas.width = targetWidth;
+      if (persistenceCanvas.height !== targetHeight) persistenceCanvas.height = targetHeight;
+
+      uploadContext.globalCompositeOperation = "source-over";
+      uploadContext.globalAlpha = persistenceStrength;
+      uploadContext.drawImage(persistenceCanvas, 0, 0, targetWidth, targetHeight);
+      uploadContext.globalAlpha = 1.0 - persistenceStrength;
+      uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
+      uploadContext.globalAlpha = 1.0;
+
+      persistenceContext.globalCompositeOperation = "copy";
+      persistenceContext.globalAlpha = 1.0;
+      persistenceContext.drawImage(uploadCanvas, 0, 0, targetWidth, targetHeight);
+    } else {
+      uploadContext.globalCompositeOperation = "source-over";
+      uploadContext.globalAlpha = 1.0;
+      uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
+
+      if (persistenceCanvasRef.current && persistenceContextRef.current) {
+        const persistenceCanvas = persistenceCanvasRef.current;
+        const persistenceContext = persistenceContextRef.current;
+        persistenceContext.globalCompositeOperation = "copy";
+        persistenceContext.globalAlpha = 1.0;
+        persistenceContext.clearRect(0, 0, persistenceCanvas.width, persistenceCanvas.height);
+        persistenceCanvasRef.current = null;
+        persistenceContextRef.current = null;
+      }
+    }
     return uploadCanvas;
   }, [debugVideo]);
 

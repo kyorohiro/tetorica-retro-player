@@ -24,6 +24,7 @@ export type PersistedRetroFilterSettings = {
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  persistenceStrength: number;
   closeUpNoiseStrength: number;
   monoTint: MonoTintMode;
   neonBoost: number;
