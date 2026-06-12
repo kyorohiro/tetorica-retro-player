@@ -681,6 +681,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
   bool useBrightCore = uPhosphorDotBrightCore > 0.5;
   float brightCoreMix = (useBrightCore ? 1.0 : 0.0) * (1.0 - cellFillMix) * (1.0 - flatDiscMode);
+  float brightCoreCompensation = mix(1.0, 1.2 + brightness * 0.18 + highlightBloom * 0.08, brightCoreMix);
   float dotRadius = mix(
     uBulbRadius * (useBrightCore ? 0.14 : 0.19),
     uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
@@ -696,7 +697,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float cavity = 1.0 - rimDarkness * (useBrightCore ? 0.18 : 0.04);
   float bodyGlow = bulb * mix(
     0.28 + brightness * 0.32,
-    0.2 + brightness * 0.26,
+    0.28 + brightness * 0.32,
     brightCoreMix
   );
   float emission =
@@ -706,38 +707,40 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     (
       innerCore * mix(
         0.9 + brightness * 0.56 + highlightBloom * 0.14,
-        1.15 + brightness * 0.85 + highlightBloom * 0.28,
+        1.45 + brightness * 1.02 + highlightBloom * 0.34,
         brightCoreMix
       ) +
       bodyGlow +
       bulb * cavity * mix(
         0.24 + brightness * 0.28,
-        0.18 + brightness * 0.24,
+        0.26 + brightness * 0.32,
         brightCoreMix
       ) +
       halo * halo * (0.03 + brightness * 0.06 + highlightBloom * 0.09)
-    );
+    ) *
+    brightCoreCompensation;
   float floorLight =
     gate *
     lit *
     amount *
-    (uBlackFloor * (0.32 + halo * 0.42) + brightness * 0.015);
+    (uBlackFloor * (0.48 + halo * 0.58) + brightness * 0.035);
   float cellFill =
     gate *
     lit *
     amount *
     uPhosphorDotCellFill *
-    (0.18 + brightness * 0.16);
+    (0.26 + brightness * 0.22);
   float flatDiscFill =
     gate *
     lit *
     amount *
     flatDisc *
     (0.78 + brightness * 0.18);
-  vec3 dotColor = color * emission;
+  vec3 dotCoreColor = color * emission;
+  dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix);
+  vec3 discCoreColor = color * flatDiscFill;
+  vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
   dotColor += color * floorLight;
-  dotColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix);
-  dotColor = mix(dotColor, color * flatDiscFill, flatDiscMode);
   return dotColor;
 }
 
@@ -911,6 +914,11 @@ void main(void)
       vec3 glowLift = max(baseProcessedColor - mixedSourceColor, vec3(0.0));
       phosphorColor += glowLift * (0.3 + bleedMask * 0.25 + phosphorBrightness * 0.15);
     }
+
+    float phosphorBaseLift =
+      uSpotMaskStrength *
+      (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
+    phosphorColor += mixedSourceColor * phosphorBaseLift;
 
     float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, phosphorDotVignette) * uVignetteStrength;
