@@ -705,7 +705,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     gate *
     lit *
     amount *
-    (uBlackFloor * (0.48 + halo * 0.58) + brightness * 0.035) *
+    (uBlackFloor * (0.48 + halo * 0.58)) *
     (1.0 + cellJitter * 0.025);
   float cellFill =
     gate *
@@ -820,8 +820,8 @@ void main(void)
 
   if (uPhosphorDotMode > 0.5) {
     vec2 sampleTargetSize = max(uSampleTargetSize, vec2(1.0));
-    vec2 dotCell = floor(gridUv * uTargetSize);
-    vec2 sampleCell = floor(gridUv * sampleTargetSize);
+    vec2 dotCell = floor(curvedUv * uTargetSize);
+    vec2 sampleCell = floor(curvedUv * sampleTargetSize);
     vec2 dotPixelatedUv = (sampleCell + 0.5) / sampleTargetSize;
     dotPixelatedUv = clamp(dotPixelatedUv, vec2(0.0), vec2(1.0));
     vec2 sampleTexel = 1.0 / sampleTargetSize;
@@ -845,7 +845,7 @@ void main(void)
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
     vec3 baseProcessedColor = color.rgb;
 
-    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, gridUv, uTargetSize, uSpotMaskStrength);
+    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
@@ -857,7 +857,7 @@ void main(void)
 
     float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
     float aspectCompensation = sqrt(pixelAspect);
-    vec2 cellUv = fract(gridUv * uTargetSize) - 0.5;
+    vec2 cellUv = fract(curvedUv * uTargetSize) - 0.5;
     vec2 dotUv = pixelAspect >= 1.0
       ? vec2(cellUv.x, cellUv.y * aspectCompensation)
       : vec2(cellUv.x / aspectCompensation, cellUv.y);
