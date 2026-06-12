@@ -729,7 +729,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     gate *
     lit *
     amount *
-    (uBlackFloor * (0.48 + halo * 0.58) + brightness * 0.035) *
+    (uBlackFloor * (0.48 + halo * 0.58)) *
     (1.0 + cellJitter * 0.025);
   float cellFill =
     gate *
