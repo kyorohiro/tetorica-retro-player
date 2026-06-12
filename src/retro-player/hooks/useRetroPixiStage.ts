@@ -177,6 +177,40 @@ const getAspectCorrectedSize = (
   };
 };
 
+const getPhosphorDotViewportLimitedSize = (
+  width: number,
+  height: number,
+  filterState: RetroFilterState,
+  visibleWidth?: number,
+  visibleHeight?: number,
+) => {
+  if (
+    !isPhosphorDotModeEnabled(filterState) ||
+    visibleWidth === undefined ||
+    visibleHeight === undefined ||
+    visibleWidth <= 0 ||
+    visibleHeight <= 0
+  ) {
+    return { width, height };
+  }
+
+  // When the target grid gets too dense for the visible viewport, phosphor
+  // dots collapse into uniform black gaps instead of readable glowing cells.
+  const minCellPixels = Math.max(3, 2.2 + filterState.bulbRadius * 1.2);
+  const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
+  const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
+  const scale = Math.min(
+    1,
+    maxWidth / Math.max(width, 1),
+    maxHeight / Math.max(height, 1),
+  );
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+};
+
 const getEffectiveTargetSize = (
   filterState: RetroFilterState,
   sourceWidth?: number,
@@ -193,10 +227,19 @@ const getEffectiveTargetSize = (
     sourceWidth,
     sourceHeight,
   );
+  const scaledWidth = aspectCorrected.width * internalScale;
+  const scaledHeight = aspectCorrected.height * internalScale;
+  const viewportLimited = getPhosphorDotViewportLimitedSize(
+    scaledWidth,
+    scaledHeight,
+    filterState,
+    visibleWidth,
+    visibleHeight,
+  );
 
   return {
-    width: aspectCorrected.width * internalScale,
-    height: aspectCorrected.height * internalScale,
+    width: viewportLimited.width,
+    height: viewportLimited.height,
     internalScale,
     isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
   };
@@ -651,36 +694,7 @@ export function useRetroPixiStage({
       fitMode === "width"
         ? screenWidth / sourceWidth
         : Math.min(screenWidth / sourceWidth, screenHeight / sourceHeight);
-    let appliedScale = scale;
-    const currentFilterState = filterStateRef.current;
-
-    if (isPhosphorDotModeEnabled(currentFilterState)) {
-      const {
-        width: effectiveTargetWidth,
-        height: effectiveTargetHeight,
-      } = getEffectiveTargetSize(
-        currentFilterState,
-        sourceWidth,
-        sourceHeight,
-      );
-      const cellScaleX = screenWidth / Math.max(effectiveTargetWidth, 1);
-      const cellScaleY = screenHeight / Math.max(effectiveTargetHeight, 1);
-      const snappedCellScale = Math.max(
-        1,
-        Math.floor(
-          fitMode === "width"
-            ? cellScaleX
-            : Math.min(cellScaleX, cellScaleY),
-        ),
-      );
-
-      appliedScale = Math.min(
-        snappedCellScale * (Math.max(effectiveTargetWidth, 1) / sourceWidth),
-        fitMode === "width"
-          ? snappedCellScale * (Math.max(effectiveTargetWidth, 1) / sourceWidth)
-          : screenHeight / sourceHeight,
-      );
-    }
+    const appliedScale = scale;
 
     const nextWidth = sourceWidth * appliedScale;
     const nextHeight = sourceHeight * appliedScale;
@@ -743,8 +757,8 @@ export function useRetroPixiStage({
       width: host.clientWidth,
       height: host.clientHeight,
     };
-    let styleWidth = Math.max(1, Math.round(viewRect.width));
-    let styleHeight = Math.max(1, Math.round(viewRect.height));
+    const styleWidth = Math.max(1, Math.round(viewRect.width));
+    const styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
     const previewSourceSize = previewElementRef.current
       ? getSourceSize(previewElementRef.current)
@@ -759,20 +773,6 @@ export function useRetroPixiStage({
       styleWidth,
       styleHeight,
     );
-
-    if (isPhosphorDotModeEnabled(currentFilterState)) {
-      const snappedScale = Math.max(
-        1,
-        Math.floor(
-          Math.min(
-            styleWidth / Math.max(effectiveTargetWidth, 1),
-            styleHeight / Math.max(effectiveTargetHeight, 1),
-          ),
-        ),
-      );
-      styleWidth = Math.max(1, Math.round(effectiveTargetWidth * snappedScale));
-      styleHeight = Math.max(1, Math.round(effectiveTargetHeight * snappedScale));
-    }
 
     const displayBufferWidth = Math.max(
       1,
@@ -808,32 +808,13 @@ export function useRetroPixiStage({
 
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
-    const snappedOffsetX = viewRect.x + (viewRect.width - styleWidth) / 2;
-    const snappedOffsetY = viewRect.y + (viewRect.height - styleHeight) / 2;
 
     app.canvas.style.position = "absolute";
-    app.canvas.style.left = `${Math.round(snappedOffsetX)}px`;
-    app.canvas.style.top = `${Math.round(snappedOffsetY)}px`;
+    app.canvas.style.left = `${Math.round(viewRect.x)}px`;
+    app.canvas.style.top = `${Math.round(viewRect.y)}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
     app.canvas.style.imageRendering = "pixelated";
-
-    if (isPhosphorDotModeEnabled(currentFilterState)) {
-      console.log("[phosphor-dot layout]", {
-        targetWidth: currentFilterState.targetWidth,
-        targetHeight: currentFilterState.targetHeight,
-        effectiveTargetWidth,
-        effectiveTargetHeight,
-        styleWidth,
-        styleHeight,
-        displayBufferWidth,
-        displayBufferHeight,
-        logicalBufferWidth,
-        logicalBufferHeight,
-        canvasWidth: app.canvas.width,
-        canvasHeight: app.canvas.height,
-      });
-    }
 
     renderFrame();
   }, [fitCurrentSprite, renderFrame, renderResolutionScale]);

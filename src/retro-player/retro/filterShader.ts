@@ -903,7 +903,7 @@ void main(void)
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
     float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-    float phosphorScanlineStrength = mix(0.02, 0.065, bleedMask) + uScanlineStrength * 0.1;
+    float phosphorScanlineStrength = mix(0.035, 0.12, bleedMask) + uScanlineStrength * 0.25;
     phosphorColor *= 1.0 - (
       (phosphorScanline * 0.5 + 0.5) *
       phosphorScanlineStrength *
@@ -917,7 +917,7 @@ void main(void)
 
     float phosphorBaseLift =
       uSpotMaskStrength *
-      (0.028 + uPhosphorDotCellFill * 0.16 + phosphorBrightness * 0.03);
+      (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
     phosphorColor += mixedSourceColor * phosphorBaseLift;
 
     float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));
