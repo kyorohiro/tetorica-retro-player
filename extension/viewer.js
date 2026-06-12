@@ -457,8 +457,16 @@ function logCaptureAspect(reason) {
 function applyPreset(presetKey) {
   if (!gl || !uniformLocations) return;
 
+  const internalScale =
+    currentSettings.phosphorDotMode && currentSettings.phosphorDotInternalScale ? 2 : 1;
+  const sampleTargetWidth = Math.max(currentSettings.targetWidth, 1);
+  const sampleTargetHeight = Math.max(currentSettings.targetHeight, 1);
+  const maskTargetWidth = sampleTargetWidth * internalScale;
+  const maskTargetHeight = sampleTargetHeight * internalScale;
+
   gl.useProgram(program);
-  gl.uniform2f(uniformLocations.uTargetSize, currentSettings.targetWidth, currentSettings.targetHeight);
+  gl.uniform2f(uniformLocations.uSampleTargetSize, sampleTargetWidth, sampleTargetHeight);
+  gl.uniform2f(uniformLocations.uMaskTargetSize, maskTargetWidth, maskTargetHeight);
   gl.uniform1f(uniformLocations.uColorLevels, currentSettings.colorLevels);
   gl.uniform1f(uniformLocations.uDitherStrength, currentSettings.ditherStrength);
   gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(currentSettings.paletteMode));
@@ -474,8 +482,8 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uBlackFloor, currentSettings.blackFloor ?? 0.01);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
-    (Math.max(gl.drawingBufferWidth, 1) * Math.max(currentSettings.targetHeight, 1)) /
-      (Math.max(gl.drawingBufferHeight, 1) * Math.max(currentSettings.targetWidth, 1)),
+    (Math.max(gl.drawingBufferWidth, 1) * maskTargetHeight) /
+      (Math.max(gl.drawingBufferHeight, 1) * maskTargetWidth),
   );
   gl.uniform1f(uniformLocations.uPhosphorDotMode, currentSettings.phosphorDotMode ? 1 : 0);
   gl.uniform1f(
@@ -930,7 +938,8 @@ function setupRenderer(webgl) {
   webgl.uniform1i(webgl.getUniformLocation(program, "uTexture"), 0);
 
   uniformLocations = {
-    uTargetSize: webgl.getUniformLocation(program, "uTargetSize"),
+    uSampleTargetSize: webgl.getUniformLocation(program, "uSampleTargetSize"),
+    uMaskTargetSize: webgl.getUniformLocation(program, "uMaskTargetSize"),
     uColorLevels: webgl.getUniformLocation(program, "uColorLevels"),
     uDitherStrength: webgl.getUniformLocation(program, "uDitherStrength"),
     uPaletteMode: webgl.getUniformLocation(program, "uPaletteMode"),

@@ -7,7 +7,8 @@ in vec2 vMaskCoord;
 out vec4 finalColor;
 
 uniform sampler2D uTexture;
-uniform vec2 uTargetSize;
+uniform vec2 uSampleTargetSize;
+uniform vec2 uMaskTargetSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
 uniform float uPaletteMode;
@@ -720,7 +721,7 @@ vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
   bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
 
   if (isPc98Tile) {
-    return samplePc98TileSource(uTexture, sampleCell, uTargetSize);
+    return samplePc98TileSource(uTexture, sampleCell, uSampleTargetSize);
   }
 
   float dither = (bayer4x4(sampleCell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
@@ -751,8 +752,8 @@ void main(void)
     return;
   }
 
-  vec2 cell = floor(curvedUv * uTargetSize);
-  vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
+  vec2 cell = floor(curvedUv * uSampleTargetSize);
+  vec2 pixelatedUv = (cell + 0.5) / uSampleTargetSize;
   pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
 
   vec2 maskCentered = warpedMask - vec2(0.5);
@@ -760,14 +761,14 @@ void main(void)
   vec2 chromaOffset = maskCentered * (uCurvature * 0.01) * edgeAmount;
   vec2 redUv = clamp(pixelatedUv + chromaOffset, vec2(0.0), vec2(1.0));
   vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
-  vec2 texel = 1.0 / uTargetSize;
+  vec2 texel = 1.0 / uSampleTargetSize;
 
   vec4 color = texture(uTexture, pixelatedUv);
   color.r = texture(uTexture, redUv).r;
   color.b = texture(uTexture, blueUv).b;
   bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
   if (isPc98Tile) {
-    color.rgb = samplePc98TileSource(uTexture, cell, uTargetSize);
+    color.rgb = samplePc98TileSource(uTexture, cell, uSampleTargetSize);
   }
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
@@ -805,13 +806,13 @@ void main(void)
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
-    vec2 dotCell = floor(gridUv * uTargetSize);
-    vec2 dotPixelatedUv = (dotCell + 0.5) / uTargetSize;
+    vec2 dotCell = floor(gridUv * uSampleTargetSize);
+    vec2 dotPixelatedUv = (dotCell + 0.5) / uSampleTargetSize;
     dotPixelatedUv = clamp(dotPixelatedUv, vec2(0.0), vec2(1.0));
-    vec2 rightUv = clamp((dotCell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 leftUv = clamp((dotCell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 downUv = clamp((dotCell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 upUv = clamp((dotCell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 rightUv = clamp((dotCell + vec2(1.0, 0.0) + 0.5) / uSampleTargetSize, vec2(0.0), vec2(1.0));
+    vec2 leftUv = clamp((dotCell + vec2(-1.0, 0.0) + 0.5) / uSampleTargetSize, vec2(0.0), vec2(1.0));
+    vec2 downUv = clamp((dotCell + vec2(0.0, 1.0) + 0.5) / uSampleTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upUv = clamp((dotCell + vec2(0.0, -1.0) + 0.5) / uSampleTargetSize, vec2(0.0), vec2(1.0));
     vec3 centerColor = sampleProcessedSourceColor(dotPixelatedUv, dotCell, texel);
     vec3 rightColor = sampleProcessedSourceColor(rightUv, dotCell + vec2(1.0, 0.0), texel);
     vec3 leftColor = sampleProcessedSourceColor(leftUv, dotCell + vec2(-1.0, 0.0), texel);
@@ -826,10 +827,33 @@ void main(void)
       neighborBlendMix *
       (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
+    vec2 detailCell = floor(gridUv * uMaskTargetSize);
+    vec2 detailUv = (detailCell + 0.5) / uMaskTargetSize;
+    detailUv = clamp(detailUv, vec2(0.0), vec2(1.0));
+    float temporalPhase = uTime * 0.85 + dot(detailCell, vec2(0.7549, 1.1327));
+    vec2 temporalRadius = vec2(0.32) / uMaskTargetSize;
+    vec2 orbit0 = vec2(cos(temporalPhase), sin(temporalPhase * 1.17 + 0.9));
+    vec2 orbit1 = vec2(cos(temporalPhase - 1.35), sin((temporalPhase - 1.35) * 1.17 + 0.9));
+    vec2 orbit2 = vec2(cos(temporalPhase - 2.7), sin((temporalPhase - 2.7) * 1.17 + 0.9));
+    vec3 detailRawColor =
+      texture(uTexture, clamp(detailUv, vec2(0.0), vec2(1.0))).rgb * 0.3 +
+      texture(uTexture, clamp(detailUv + orbit0 * temporalRadius, vec2(0.0), vec2(1.0))).rgb * 0.4 +
+      texture(uTexture, clamp(detailUv + orbit1 * temporalRadius, vec2(0.0), vec2(1.0))).rgb * 0.2 +
+      texture(uTexture, clamp(detailUv + orbit2 * temporalRadius, vec2(0.0), vec2(1.0))).rgb * 0.1;
+    vec3 baseRawColor = texture(uTexture, dotPixelatedUv).rgb;
     vec3 baseProcessedColor = color.rgb;
 
-    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, gridUv, uTargetSize, uSpotMaskStrength);
+    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, gridUv, uMaskTargetSize, uSpotMaskStrength);
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
+    float detailLuma = dot(detailRawColor, vec3(0.299, 0.587, 0.114));
+    float baseRawLuma = dot(baseRawColor, vec3(0.299, 0.587, 0.114));
+    float detailDelta = detailLuma - baseRawLuma;
+    float detailShape = clamp(0.5 + detailDelta * 3.2, 0.0, 1.0);
+    float detailPresence =
+      internalScaleMix *
+      smoothstep(0.04, 0.85, phosphorBrightness) *
+      (1.0 - flatDiscMode * 0.35) *
+      (0.5 + smoothstep(0.01, 0.18, abs(detailDelta)) * 0.5);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
     bleedColor += rightColor * 0.34;
@@ -840,7 +864,7 @@ void main(void)
 
     float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
     float aspectCompensation = sqrt(pixelAspect);
-    vec2 cellUv = fract(gridUv * uTargetSize) - 0.5;
+    vec2 cellUv = fract(gridUv * uMaskTargetSize) - 0.5;
     vec2 dotUv = pixelAspect >= 1.0
       ? vec2(cellUv.x, cellUv.y * aspectCompensation)
       : vec2(cellUv.x / aspectCompensation, cellUv.y);
@@ -852,6 +876,7 @@ void main(void)
       uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
       pow(phosphorBrightness, 0.7)
     );
+    dotRadius *= 1.0 + detailDelta * detailPresence * 0.2;
     float edgeWidth = max(fwidth(dist) * mix(1.4, 2.2, flatDiscMode), 0.002);
     float edgeBand = 1.0 - smoothstep(0.0, edgeWidth, abs(dist - dotRadius));
     float colorDelta = length(mixedSourceColor - neighborMix);
@@ -871,13 +896,20 @@ void main(void)
     phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount);
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
-    float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
+    float phosphorScanline = sin(pixelatedUv.y * uSampleTargetSize.y * 3.14159265);
     float phosphorScanlineStrength = mix(0.035, 0.12, bleedMask) + uScanlineStrength * 0.25;
     phosphorColor *= 1.0 - (
       (phosphorScanline * 0.5 + 0.5) *
       phosphorScanlineStrength *
       phosphorScanlineVisibility
     );
+
+    phosphorColor *= mix(1.0, mix(0.82, 1.18, detailShape), detailPresence * 0.65);
+    phosphorColor +=
+      mixedSourceColor *
+      max(detailDelta, 0.0) *
+      detailPresence *
+      (0.14 + phosphorBrightness * 0.14);
 
     if (uGlowStrength > 0.001) {
       vec3 glowLift = max(baseProcessedColor - mixedSourceColor, vec3(0.0));
@@ -909,14 +941,14 @@ void main(void)
   float scanlineBrightness = max(max(color.r, color.g), color.b);
   float scanlineVisibility = mix(1.0, 1.0 - scanlineBrightness, uScanlineBrightnessFade);
 
-  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
+  float scanline = sin(pixelatedUv.y * uSampleTargetSize.y * 3.14159265);
   color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength * scanlineVisibility);
 
   float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength * scanlineVisibility;
   color.rgb += scanline2;
 
   if (uPhosphorStrength > 0.001) {
-    float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
+    float phosphorPhase = pixelatedUv.x * uSampleTargetSize.x * 6.2831853;
     vec3 phosphorTriad = vec3(
       sin(phosphorPhase) * 0.5 + 0.5,
       sin(phosphorPhase + 2.0943951) * 0.5 + 0.5,
@@ -927,7 +959,7 @@ void main(void)
   }
 
   if (uSpotMaskStrength > 0.001) {
-    color.rgb = applySpotMask(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
+    color.rgb = applySpotMask(color.rgb, curvedUv, uSampleTargetSize, uSpotMaskStrength);
   }
 
   float closeUpAmount = uCloseUpNoiseStrength;

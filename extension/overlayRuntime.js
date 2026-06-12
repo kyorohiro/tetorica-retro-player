@@ -588,8 +588,15 @@ function isUsableImage(candidate) {
 }
 
 function applySettings(gl, program, uniformLocations, settings) {
+  const internalScale = settings.phosphorDotMode && settings.phosphorDotInternalScale ? 2 : 1;
+  const sampleTargetWidth = Math.max(settings.targetWidth, 1);
+  const sampleTargetHeight = Math.max(settings.targetHeight, 1);
+  const maskTargetWidth = sampleTargetWidth * internalScale;
+  const maskTargetHeight = sampleTargetHeight * internalScale;
+
   gl.useProgram(program);
-  gl.uniform2f(uniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
+  gl.uniform2f(uniformLocations.uSampleTargetSize, sampleTargetWidth, sampleTargetHeight);
+  gl.uniform2f(uniformLocations.uMaskTargetSize, maskTargetWidth, maskTargetHeight);
   gl.uniform1f(uniformLocations.uColorLevels, settings.colorLevels);
   gl.uniform1f(uniformLocations.uDitherStrength, settings.ditherStrength);
   gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
@@ -605,8 +612,8 @@ function applySettings(gl, program, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uBlackFloor, settings.blackFloor ?? 0.01);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
-    (Math.max(gl.drawingBufferWidth, 1) * Math.max(settings.targetHeight, 1)) /
-      (Math.max(gl.drawingBufferHeight, 1) * Math.max(settings.targetWidth, 1)),
+    (Math.max(gl.drawingBufferWidth, 1) * maskTargetHeight) /
+      (Math.max(gl.drawingBufferHeight, 1) * maskTargetWidth),
   );
   gl.uniform1f(uniformLocations.uPhosphorDotMode, settings.phosphorDotMode ? 1 : 0);
   gl.uniform1f(
@@ -713,7 +720,8 @@ function setupRenderer(webgl) {
     program,
     texture,
     uniformLocations: {
-      uTargetSize: webgl.getUniformLocation(program, "uTargetSize"),
+      uSampleTargetSize: webgl.getUniformLocation(program, "uSampleTargetSize"),
+      uMaskTargetSize: webgl.getUniformLocation(program, "uMaskTargetSize"),
       uColorLevels: webgl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: webgl.getUniformLocation(program, "uDitherStrength"),
       uPaletteMode: webgl.getUniformLocation(program, "uPaletteMode"),

@@ -17,7 +17,8 @@ import type { RetroFilterState } from "./useRetroFilterState";
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 type RendererUniformLocations = {
-  uTargetSize: WebGLUniformLocation | null;
+  uSampleTargetSize: WebGLUniformLocation | null;
+  uMaskTargetSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
   uPaletteMode: WebGLUniformLocation | null;
@@ -158,8 +159,10 @@ const getEffectiveTargetSize = (
     visibleHeight === undefined
   ) {
     return {
-      width: requestedWidth * internalScale,
-      height: requestedHeight * internalScale,
+      sampleWidth: requestedWidth,
+      sampleHeight: requestedHeight,
+      maskWidth: requestedWidth * internalScale,
+      maskHeight: requestedHeight * internalScale,
       internalScale,
       isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
     };
@@ -176,8 +179,10 @@ const getEffectiveTargetSize = (
   );
 
   return {
-    width: clampedWidth * internalScale,
-    height: clampedHeight * internalScale,
+    sampleWidth: clampedWidth,
+    sampleHeight: clampedHeight,
+    maskWidth: clampedWidth * internalScale,
+    maskHeight: clampedHeight * internalScale,
     internalScale,
     isPhosphorDotMode: true,
   };
@@ -272,7 +277,8 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
     passthroughProgram,
     texture,
     uniformLocations: {
-      uTargetSize: gl.getUniformLocation(filterProgram, "uTargetSize"),
+      uSampleTargetSize: gl.getUniformLocation(filterProgram, "uSampleTargetSize"),
+      uMaskTargetSize: gl.getUniformLocation(filterProgram, "uMaskTargetSize"),
       uColorLevels: gl.getUniformLocation(filterProgram, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(filterProgram, "uDitherStrength"),
       uPaletteMode: gl.getUniformLocation(filterProgram, "uPaletteMode"),
@@ -314,16 +320,23 @@ function applyFilterUniforms(
   const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
   const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
   const {
-    width: effectiveTargetWidth,
-    height: effectiveTargetHeight,
+    sampleWidth: effectiveSampleTargetWidth,
+    sampleHeight: effectiveSampleTargetHeight,
+    maskWidth: effectiveMaskTargetWidth,
+    maskHeight: effectiveMaskTargetHeight,
     isPhosphorDotMode,
   } = getEffectiveTargetSize(filterState, visibleWidth, visibleHeight);
 
   gl.useProgram(program);
   gl.uniform2f(
-    uniformLocations.uTargetSize,
-    effectiveTargetWidth,
-    effectiveTargetHeight,
+    uniformLocations.uSampleTargetSize,
+    effectiveSampleTargetWidth,
+    effectiveSampleTargetHeight,
+  );
+  gl.uniform2f(
+    uniformLocations.uMaskTargetSize,
+    effectiveMaskTargetWidth,
+    effectiveMaskTargetHeight,
   );
   gl.uniform1f(uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
   gl.uniform1f(uniformLocations.uDitherStrength, filterState.ditherStrength);
@@ -343,8 +356,8 @@ function applyFilterUniforms(
   gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
-    (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
-      (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
+    (Math.max(gl.drawingBufferWidth, 1) * effectiveMaskTargetHeight) /
+      (Math.max(gl.drawingBufferHeight, 1) * effectiveMaskTargetWidth),
   );
   gl.uniform1f(
     uniformLocations.uPhosphorDotMode,
@@ -470,8 +483,8 @@ export function useRetroPixiStage({
     }
 
     const {
-      width: effectiveTargetWidth,
-      height: effectiveTargetHeight,
+      sampleWidth: effectiveTargetWidth,
+      sampleHeight: effectiveTargetHeight,
     } = getEffectiveTargetSize(currentFilterState);
     const targetWidth = Math.max(1, Math.round(effectiveTargetWidth));
     const targetHeight = Math.max(1, Math.round(effectiveTargetHeight));
@@ -701,8 +714,8 @@ export function useRetroPixiStage({
       Math.round(styleHeight * Math.max(1, renderResolutionScale)),
     );
     const {
-      width: effectiveTargetWidth,
-      height: effectiveTargetHeight,
+      sampleWidth: effectiveTargetWidth,
+      sampleHeight: effectiveTargetHeight,
     } = getEffectiveTargetSize(currentFilterState, styleWidth, styleHeight);
     const logicalBufferWidth = Math.max(
       1,
