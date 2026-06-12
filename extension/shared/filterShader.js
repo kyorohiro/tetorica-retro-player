@@ -745,7 +745,7 @@ void main(void)
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
   vec2 delta = warpedMask - vMaskCoord;
   vec2 curvedUv = vTextureCoord + delta;
-  vec2 gridUv = curvedUv;
+  vec2 gridUv = vTextureCoord;
   if (curvedUv.x < 0.0 || curvedUv.x > 1.0 || curvedUv.y < 0.0 || curvedUv.y > 1.0) {
     finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
@@ -818,8 +818,8 @@ void main(void)
     vec3 downColor = sampleProcessedSourceColor(downUv, dotCell + vec2(0.0, 1.0), texel);
     vec3 upColor = sampleProcessedSourceColor(upUv, dotCell + vec2(0.0, -1.0), texel);
     float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
-    float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
+    float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
     float sourceColorDelta = length(centerColor - neighborMix);
     float sourceBlendAmount =
@@ -872,7 +872,7 @@ void main(void)
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
     float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-    float phosphorScanlineStrength = mix(0.035, 0.12, bleedMask) + uScanlineStrength * 0.25;
+    float phosphorScanlineStrength = mix(0.02, 0.065, bleedMask) + uScanlineStrength * 0.1;
     phosphorColor *= 1.0 - (
       (phosphorScanline * 0.5 + 0.5) *
       phosphorScanlineStrength *
@@ -886,7 +886,7 @@ void main(void)
 
     float phosphorBaseLift =
       uSpotMaskStrength *
-      (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
+      (0.028 + uPhosphorDotCellFill * 0.16 + phosphorBrightness * 0.03);
     phosphorColor += mixedSourceColor * phosphorBaseLift;
 
     float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));
