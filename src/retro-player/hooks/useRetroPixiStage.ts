@@ -143,18 +143,60 @@ const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
 const getPhosphorDotInternalScale = (filterState: RetroFilterState) =>
   isPhosphorDotModeEnabled(filterState) && filterState.phosphorDotInternalScale ? 2 : 1;
 
+const getAspectCorrectedSize = (
+  requestedWidth: number,
+  requestedHeight: number,
+  sourceWidth?: number,
+  sourceHeight?: number,
+) => {
+  if (
+    sourceWidth === undefined ||
+    sourceHeight === undefined ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0
+  ) {
+    return {
+      width: requestedWidth,
+      height: requestedHeight,
+    };
+  }
+
+  const sourceAspect = sourceWidth / sourceHeight;
+  const requestedAspect = requestedWidth / requestedHeight;
+
+  if (requestedAspect > sourceAspect) {
+    return {
+      width: Math.max(1, Math.round(requestedHeight * sourceAspect)),
+      height: requestedHeight,
+    };
+  }
+
+  return {
+    width: requestedWidth,
+    height: Math.max(1, Math.round(requestedWidth / sourceAspect)),
+  };
+};
+
 const getEffectiveTargetSize = (
   filterState: RetroFilterState,
+  sourceWidth?: number,
+  sourceHeight?: number,
   visibleWidth?: number,
   visibleHeight?: number,
 ) => {
   const internalScale = getPhosphorDotInternalScale(filterState);
   const requestedWidth = Math.max(filterState.targetWidth, 1);
   const requestedHeight = Math.max(filterState.targetHeight, 1);
+  const aspectCorrected = getAspectCorrectedSize(
+    requestedWidth,
+    requestedHeight,
+    sourceWidth,
+    sourceHeight,
+  );
 
   return {
-    width: requestedWidth * internalScale,
-    height: requestedHeight * internalScale,
+    width: aspectCorrected.width * internalScale,
+    height: aspectCorrected.height * internalScale,
     internalScale,
     isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
   };
@@ -285,6 +327,8 @@ function applyFilterUniforms(
   program: WebGLProgram,
   uniformLocations: RendererUniformLocations,
   filterState: RetroFilterState,
+  sourceWidth: number | undefined,
+  sourceHeight: number | undefined,
   startedAt: number,
 ) {
   const canvasElement = gl.canvas instanceof HTMLCanvasElement ? gl.canvas : null;
@@ -294,7 +338,7 @@ function applyFilterUniforms(
     width: effectiveTargetWidth,
     height: effectiveTargetHeight,
     isPhosphorDotMode,
-  } = getEffectiveTargetSize(filterState, visibleWidth, visibleHeight);
+  } = getEffectiveTargetSize(filterState, sourceWidth, sourceHeight, visibleWidth, visibleHeight);
 
   gl.useProgram(program);
   gl.uniform2f(
@@ -449,7 +493,11 @@ export function useRetroPixiStage({
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
-    } = getEffectiveTargetSize(currentFilterState);
+    } = getEffectiveTargetSize(
+      currentFilterState,
+      sourceSize.width,
+      sourceSize.height,
+    );
     const targetWidth = Math.max(1, Math.round(effectiveTargetWidth));
     const targetHeight = Math.max(1, Math.round(effectiveTargetHeight));
 
@@ -514,6 +562,8 @@ export function useRetroPixiStage({
         filterProgram,
         uniformLocations,
         currentFilterState,
+        source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth,
+        source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
         app.startedAt,
       );
       gl.useProgram(filterProgram);
@@ -608,7 +658,11 @@ export function useRetroPixiStage({
       const {
         width: effectiveTargetWidth,
         height: effectiveTargetHeight,
-      } = getEffectiveTargetSize(currentFilterState);
+      } = getEffectiveTargetSize(
+        currentFilterState,
+        sourceWidth,
+        sourceHeight,
+      );
       const cellScaleX = screenWidth / Math.max(effectiveTargetWidth, 1);
       const cellScaleY = screenHeight / Math.max(effectiveTargetHeight, 1);
       const snappedCellScale = Math.max(
@@ -692,10 +746,19 @@ export function useRetroPixiStage({
     let styleWidth = Math.max(1, Math.round(viewRect.width));
     let styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
+    const previewSourceSize = previewElementRef.current
+      ? getSourceSize(previewElementRef.current)
+      : null;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
-    } = getEffectiveTargetSize(currentFilterState, styleWidth, styleHeight);
+    } = getEffectiveTargetSize(
+      currentFilterState,
+      previewSourceSize?.width,
+      previewSourceSize?.height,
+      styleWidth,
+      styleHeight,
+    );
 
     if (isPhosphorDotModeEnabled(currentFilterState)) {
       const snappedScale = Math.max(
