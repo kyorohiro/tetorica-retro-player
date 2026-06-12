@@ -18,6 +18,7 @@ type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 type RendererUniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
+  uSampleTargetSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
   uPaletteMode: WebGLUniformLocation | null;
@@ -181,6 +182,7 @@ const getPhosphorDotViewportLimitedSize = (
   width: number,
   height: number,
   filterState: RetroFilterState,
+  internalScale: number,
   visibleWidth?: number,
   visibleHeight?: number,
 ) => {
@@ -196,8 +198,8 @@ const getPhosphorDotViewportLimitedSize = (
 
   // When the target grid gets too dense for the visible viewport, phosphor
   // dots collapse into uniform black gaps instead of readable glowing cells.
-  //const minCellPixels = Math.max(3, 2.2 + filterState.bulbRadius * 1.2);
-  const minCellPixels = Math.max(1.8, 2.15 + filterState.bulbRadius * 1.15);
+  const baseMinCellPixels = Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / Math.max(internalScale, 1));
   const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
   const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
   const scale = Math.min(
@@ -234,6 +236,7 @@ const getEffectiveTargetSize = (
     scaledWidth,
     scaledHeight,
     filterState,
+    internalScale,
     visibleWidth,
     visibleHeight,
   );
@@ -241,6 +244,8 @@ const getEffectiveTargetSize = (
   return {
     width: viewportLimited.width,
     height: viewportLimited.height,
+    sampleWidth: Math.max(1, Math.round(scaledWidth)),
+    sampleHeight: Math.max(1, Math.round(scaledHeight)),
     internalScale,
     isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
   };
@@ -336,6 +341,7 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
     texture,
     uniformLocations: {
       uTargetSize: gl.getUniformLocation(filterProgram, "uTargetSize"),
+      uSampleTargetSize: gl.getUniformLocation(filterProgram, "uSampleTargetSize"),
       uColorLevels: gl.getUniformLocation(filterProgram, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(filterProgram, "uDitherStrength"),
       uPaletteMode: gl.getUniformLocation(filterProgram, "uPaletteMode"),
@@ -381,6 +387,8 @@ function applyFilterUniforms(
   const {
     width: effectiveTargetWidth,
     height: effectiveTargetHeight,
+    sampleWidth,
+    sampleHeight,
     isPhosphorDotMode,
   } = getEffectiveTargetSize(filterState, sourceWidth, sourceHeight, visibleWidth, visibleHeight);
 
@@ -389,6 +397,11 @@ function applyFilterUniforms(
     uniformLocations.uTargetSize,
     effectiveTargetWidth,
     effectiveTargetHeight,
+  );
+  gl.uniform2f(
+    uniformLocations.uSampleTargetSize,
+    sampleWidth,
+    sampleHeight,
   );
   gl.uniform1f(uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
   gl.uniform1f(uniformLocations.uDitherStrength, filterState.ditherStrength);
@@ -537,13 +550,22 @@ export function useRetroPixiStage({
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
+      sampleWidth,
+      sampleHeight,
+      isPhosphorDotMode,
     } = getEffectiveTargetSize(
       currentFilterState,
       sourceSize.width,
       sourceSize.height,
     );
-    const targetWidth = Math.max(1, Math.round(effectiveTargetWidth));
-    const targetHeight = Math.max(1, Math.round(effectiveTargetHeight));
+    const targetWidth = Math.max(
+      1,
+      Math.round(isPhosphorDotMode ? sampleWidth : effectiveTargetWidth),
+    );
+    const targetHeight = Math.max(
+      1,
+      Math.round(isPhosphorDotMode ? sampleHeight : effectiveTargetHeight),
+    );
 
     let uploadCanvas = uploadCanvasRef.current;
     let uploadContext = uploadContextRef.current;

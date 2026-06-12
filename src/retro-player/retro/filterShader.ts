@@ -39,6 +39,7 @@ out vec4 finalColor;
 
 uniform sampler2D uTexture;
 uniform vec2 uTargetSize;
+uniform vec2 uSampleTargetSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
 uniform float uPaletteMode;
@@ -842,18 +843,21 @@ void main(void)
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   if (uPhosphorDotMode > 0.5) {
+    vec2 sampleTargetSize = max(uSampleTargetSize, vec2(1.0));
     vec2 dotCell = floor(gridUv * uTargetSize);
-    vec2 dotPixelatedUv = (dotCell + 0.5) / uTargetSize;
+    vec2 sampleCell = floor(gridUv * sampleTargetSize);
+    vec2 dotPixelatedUv = (sampleCell + 0.5) / sampleTargetSize;
     dotPixelatedUv = clamp(dotPixelatedUv, vec2(0.0), vec2(1.0));
-    vec2 rightUv = clamp((dotCell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 leftUv = clamp((dotCell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 downUv = clamp((dotCell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec2 upUv = clamp((dotCell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
-    vec3 centerColor = sampleProcessedSourceColor(dotPixelatedUv, dotCell, texel);
-    vec3 rightColor = sampleProcessedSourceColor(rightUv, dotCell + vec2(1.0, 0.0), texel);
-    vec3 leftColor = sampleProcessedSourceColor(leftUv, dotCell + vec2(-1.0, 0.0), texel);
-    vec3 downColor = sampleProcessedSourceColor(downUv, dotCell + vec2(0.0, 1.0), texel);
-    vec3 upColor = sampleProcessedSourceColor(upUv, dotCell + vec2(0.0, -1.0), texel);
+    vec2 sampleTexel = 1.0 / sampleTargetSize;
+    vec2 rightUv = clamp((sampleCell + vec2(1.0, 0.0) + 0.5) / sampleTargetSize, vec2(0.0), vec2(1.0));
+    vec2 leftUv = clamp((sampleCell + vec2(-1.0, 0.0) + 0.5) / sampleTargetSize, vec2(0.0), vec2(1.0));
+    vec2 downUv = clamp((sampleCell + vec2(0.0, 1.0) + 0.5) / sampleTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upUv = clamp((sampleCell + vec2(0.0, -1.0) + 0.5) / sampleTargetSize, vec2(0.0), vec2(1.0));
+    vec3 centerColor = sampleProcessedSourceColor(dotPixelatedUv, sampleCell, sampleTexel);
+    vec3 rightColor = sampleProcessedSourceColor(rightUv, sampleCell + vec2(1.0, 0.0), sampleTexel);
+    vec3 leftColor = sampleProcessedSourceColor(leftUv, sampleCell + vec2(-1.0, 0.0), sampleTexel);
+    vec3 downColor = sampleProcessedSourceColor(downUv, sampleCell + vec2(0.0, 1.0), sampleTexel);
+    vec3 upColor = sampleProcessedSourceColor(upUv, sampleCell + vec2(0.0, -1.0), sampleTexel);
     float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
