@@ -232,8 +232,13 @@
             <h2 id="audioControlsTitle">Retro sound effects</h2>
           </div>
 
+          <label class="control">
+            <span>Audio preset</span>
+            <select id="audioPresetSelect"></select>
+          </label>
+
           <label class="control control-toggle">
-            <span>Lo-fi FX</span>
+            <span>Effects on</span>
             <input id="audioFxEnabled" type="checkbox" />
           </label>
 
@@ -278,7 +283,7 @@
               <span>Bass</span>
               <span class="info-tip" tabindex="0" data-tip="Boosts or cuts the low end like a simple amp tone stack.">?</span>
             </span>
-            <input id="bassAmount" type="range" min="-1" max="1" step="0.01" />
+            <input id="bassAmount" type="range" min="-1.5" max="1.5" step="0.01" />
             <output id="bassAmountValue"></output>
           </label>
 
@@ -287,7 +292,7 @@
               <span>Mid</span>
               <span class="info-tip" tabindex="0" data-tip="Boosts or cuts the middle voice band where a lot of guitar and radio character lives.">?</span>
             </span>
-            <input id="midAmount" type="range" min="-1" max="1" step="0.01" />
+            <input id="midAmount" type="range" min="-1.5" max="1.5" step="0.01" />
             <output id="midAmountValue"></output>
           </label>
 
@@ -296,7 +301,7 @@
               <span>Treble</span>
               <span class="info-tip" tabindex="0" data-tip="Boosts or cuts the upper edge and brightness of the sound.">?</span>
             </span>
-            <input id="trebleAmount" type="range" min="-1" max="1" step="0.01" />
+            <input id="trebleAmount" type="range" min="-1.5" max="1.5" step="0.01" />
             <output id="trebleAmountValue"></output>
           </label>
 
@@ -328,17 +333,26 @@
           </label>
 
           <label class="control control-toggle">
-            <span>Spatial noise</span>
+            <span>Noise on</span>
             <input id="noiseEnabled" type="checkbox" />
           </label>
 
           <label class="control">
             <span class="label-with-tip">
-              <span>Noise level</span>
+              <span>Surface hiss</span>
               <span class="info-tip" tabindex="0" data-tip="Controls the amount of added background hiss and room-like noise texture.">?</span>
             </span>
-            <input id="noiseLevel" type="range" min="0" max="1.5" step="0.001" />
+            <input id="noiseLevel" type="range" min="0" max="5" step="0.05" />
             <output id="noiseLevelValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Vinyl dust</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds crackle, pops, and dusty surface texture like an older record.">?</span>
+            </span>
+            <input id="vinylDustAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="vinylDustAmountValue"></output>
           </label>
         </section>
 

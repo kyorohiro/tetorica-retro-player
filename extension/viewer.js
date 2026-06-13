@@ -60,6 +60,11 @@ let noisePannerNode = null;
 let noiseGainNode = null;
 let noiseLfoNode = null;
 let noiseLfoGainNode = null;
+let crackleSourceNode = null;
+let crackleFilterNode = null;
+let vinylDustBedFilterNode = null;
+let vinylDustBedGainNode = null;
+let crackleGainNode = null;
 let uniformLocations = null;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
@@ -529,7 +534,7 @@ function createDriveCurve(amount) {
 }
 
 function createSmallRoomImpulse(context) {
-  const duration = 0.14;
+  const duration = 0.22;
   const length = Math.max(1, Math.floor(context.sampleRate * duration));
   const impulse = context.createBuffer(2, length, context.sampleRate);
 
@@ -537,13 +542,101 @@ function createSmallRoomImpulse(context) {
     const channelData = impulse.getChannelData(channel);
     for (let index = 0; index < channelData.length; index += 1) {
       const t = index / channelData.length;
-      const decay = (1 - t) ** 2.2;
-      const flutter = 0.82 + 0.18 * Math.sin(t * 36 + channel * 0.7);
-      channelData[index] = (Math.random() * 2 - 1) * decay * flutter * 0.18;
+      const decay = (1 - t) ** 1.85;
+      const flutter = 0.78 + 0.22 * Math.sin(t * 42 + channel * 0.9);
+      const earlyReflection = Math.sin(t * 130 + channel * 0.35) * 0.08;
+      channelData[index] =
+        ((Math.random() * 2 - 1) + earlyReflection) * decay * flutter * 0.28;
     }
   }
 
   return impulse;
+}
+
+function createTintedNoiseBuffer(context) {
+  const length = context.sampleRate * 2;
+  const buffer = context.createBuffer(2, length, context.sampleRate);
+  let brownState = 0;
+  let airState = 0;
+
+  for (let index = 0; index < length; index += 1) {
+    const white = Math.random() * 2 - 1;
+    brownState = (brownState + white * 0.045) / 1.045;
+    airState = airState * 0.82 + white * 0.18;
+    const body = brownState * 1.35;
+    const air = (white - airState) * 0.55;
+    const sample = Math.max(-1, Math.min(1, body + air));
+
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const channelData = buffer.getChannelData(channel);
+      const channelJitter = (Math.random() * 2 - 1) * 0.012;
+      channelData[index] = Math.max(-1, Math.min(1, sample + channelJitter));
+    }
+  }
+
+  return buffer;
+}
+
+function createVinylDustBuffer(context) {
+  const length = context.sampleRate * 2;
+  const monoData = new Float32Array(length);
+  let index = 0;
+  let dustState = 0;
+
+  while (index < length) {
+    const white = Math.random() * 2 - 1;
+    dustState = dustState * 0.72 + white * 0.28;
+    monoData[index] += (white - dustState) * 0.018;
+
+    const random = Math.random();
+
+    if (random < 0.0034) {
+      const crackleLength = 8 + Math.floor(Math.random() * 42);
+      const crackleAmplitude = 0.11 + Math.random() * 0.28;
+      const polarity = Math.random() < 0.5 ? -1 : 1;
+
+      for (let offset = 0; offset < crackleLength && index + offset < length; offset += 1) {
+        const decay = Math.exp(-offset / (2.4 + Math.random() * 5));
+        monoData[index + offset] +=
+          polarity * crackleAmplitude * decay * (0.7 + Math.random() * 0.3);
+      }
+
+      index += crackleLength + Math.floor(Math.random() * 640);
+      continue;
+    }
+
+    if (random < 0.0038) {
+      const popLength = 90 + Math.floor(Math.random() * 260);
+      const popAmplitude = 0.055 + Math.random() * 0.11;
+      const phase = Math.random() * Math.PI * 2;
+
+      for (let offset = 0; offset < popLength && index + offset < length; offset += 1) {
+        const decay = Math.exp(-offset / (18 + Math.random() * 40));
+        const wobble = Math.sin(phase + offset * (0.22 + Math.random() * 0.06));
+        monoData[index + offset] += popAmplitude * decay * wobble;
+      }
+
+      index += popLength + Math.floor(Math.random() * 2200);
+      continue;
+    }
+
+    index += 1;
+  }
+
+  const buffer = context.createBuffer(2, length, context.sampleRate);
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const channelData = buffer.getChannelData(channel);
+
+    for (let sampleIndex = 0; sampleIndex < length; sampleIndex += 1) {
+      const channelJitter = (Math.random() * 2 - 1) * 0.0035;
+      channelData[sampleIndex] = Math.max(
+        -1,
+        Math.min(1, monoData[sampleIndex] + channelJitter),
+      );
+    }
+  }
+
+  return buffer;
 }
 
 function updateAudioNodes() {
@@ -605,8 +698,8 @@ function updateAudioNodes() {
 
   if (roomDryGainNode && roomWetGainNode) {
     const amount = currentSettings.isAudioFxEnabled ? currentSettings.smallSpeakerRoomAmount : 0;
-    roomDryGainNode.gain.value = 1 - amount * 0.12;
-    roomWetGainNode.gain.value = amount * 0.35;
+    roomDryGainNode.gain.value = Math.max(0.52, 1 - amount * 0.42);
+    roomWetGainNode.gain.value = amount * 0.95;
   }
 
   if (
@@ -625,7 +718,25 @@ function updateAudioNodes() {
   }
 
   if (noiseGainNode) {
-    noiseGainNode.gain.value = currentSettings.isNoiseEnabled ? currentSettings.noiseLevel : 0;
+    noiseGainNode.gain.value = currentSettings.isNoiseEnabled
+      ? Math.min(0.24, currentSettings.noiseLevel * 5.5)
+      : 0;
+  }
+
+  if (crackleGainNode) {
+    crackleGainNode.gain.value = currentSettings.isNoiseEnabled
+      ? Math.min(
+          0.24,
+          currentSettings.vinylDustAmount * 0.22 + currentSettings.noiseLevel * 0.25,
+        )
+      : 0;
+  }
+
+  if (vinylDustBedFilterNode && vinylDustBedGainNode) {
+    const amount = currentSettings.isNoiseEnabled ? currentSettings.vinylDustAmount : 0;
+    vinylDustBedFilterNode.frequency.value = 2100 + amount * 2600;
+    vinylDustBedFilterNode.Q.value = 0.35 + amount * 0.25;
+    vinylDustBedGainNode.gain.value = amount * 0.11;
   }
 }
 
@@ -659,6 +770,11 @@ async function ensureAudioContext() {
     noiseGainNode = null;
     noiseLfoNode = null;
     noiseLfoGainNode = null;
+    crackleSourceNode = null;
+    crackleFilterNode = null;
+    vinylDustBedFilterNode = null;
+    vinylDustBedGainNode = null;
+    crackleGainNode = null;
   }
 
   if (!audioContext) {
@@ -752,42 +868,66 @@ async function ensureAudioContext() {
     masterGainNode.connect(audioContext.destination);
 
     noiseSourceNode = audioContext.createBufferSource();
-    const noiseBuffer = audioContext.createBuffer(
-      2,
-      audioContext.sampleRate * 2,
-      audioContext.sampleRate,
-    );
-    for (let channel = 0; channel < noiseBuffer.numberOfChannels; channel += 1) {
-      const channelData = noiseBuffer.getChannelData(channel);
-      for (let index = 0; index < channelData.length; index += 1) {
-        channelData[index] = Math.random() * 2 - 1;
-      }
-    }
-    noiseSourceNode.buffer = noiseBuffer;
+    noiseSourceNode.buffer = createTintedNoiseBuffer(audioContext);
     noiseSourceNode.loop = true;
 
+    const noiseHighpassNode = audioContext.createBiquadFilter();
+    noiseHighpassNode.type = "highpass";
+    noiseHighpassNode.frequency.value = 1100;
+    noiseHighpassNode.Q.value = 0.25;
+
+    const noiseLowpassNode = audioContext.createBiquadFilter();
+    noiseLowpassNode.type = "lowpass";
+    noiseLowpassNode.frequency.value = 5600;
+    noiseLowpassNode.Q.value = 0.18;
+
     noiseFilterNode = audioContext.createBiquadFilter();
-    noiseFilterNode.type = "bandpass";
-    noiseFilterNode.frequency.value = 4200;
-    noiseFilterNode.Q.value = 0.8;
+    noiseFilterNode.type = "peaking";
+    noiseFilterNode.frequency.value = 2400;
+    noiseFilterNode.Q.value = 0.7;
+    noiseFilterNode.gain.value = -2.5;
 
     noisePannerNode = audioContext.createStereoPanner();
     noiseGainNode = audioContext.createGain();
     noiseLfoNode = audioContext.createOscillator();
     noiseLfoGainNode = audioContext.createGain();
+    crackleSourceNode = audioContext.createBufferSource();
+    crackleFilterNode = audioContext.createBiquadFilter();
+    vinylDustBedFilterNode = audioContext.createBiquadFilter();
+    vinylDustBedGainNode = audioContext.createGain();
+    crackleGainNode = audioContext.createGain();
 
     noiseLfoNode.type = "sine";
-    noiseLfoNode.frequency.value = 0.065;
-    noiseLfoGainNode.gain.value = 0.45;
+    noiseLfoNode.frequency.value = 0.021;
+    noiseLfoGainNode.gain.value = 0.08;
+    crackleSourceNode.buffer = createVinylDustBuffer(audioContext);
+    crackleSourceNode.loop = true;
+    crackleFilterNode.type = "highpass";
+    crackleFilterNode.frequency.value = 1250;
+    crackleFilterNode.Q.value = 0.35;
+    vinylDustBedFilterNode.type = "bandpass";
+    vinylDustBedFilterNode.frequency.value = 2400;
+    vinylDustBedFilterNode.Q.value = 0.4;
+    vinylDustBedGainNode.gain.value = 0;
+    crackleGainNode.gain.value = 0;
 
-    noiseSourceNode.connect(noiseFilterNode);
+    noiseSourceNode.connect(noiseHighpassNode);
+    noiseHighpassNode.connect(noiseLowpassNode);
+    noiseLowpassNode.connect(noiseFilterNode);
     noiseFilterNode.connect(noisePannerNode);
     noisePannerNode.connect(noiseGainNode);
     noiseGainNode.connect(masterGainNode);
     noiseLfoNode.connect(noiseLfoGainNode);
     noiseLfoGainNode.connect(noisePannerNode.pan);
+    crackleSourceNode.connect(crackleFilterNode);
+    crackleFilterNode.connect(crackleGainNode);
+    crackleGainNode.connect(masterGainNode);
+    crackleSourceNode.connect(vinylDustBedFilterNode);
+    vinylDustBedFilterNode.connect(vinylDustBedGainNode);
+    vinylDustBedGainNode.connect(masterGainNode);
     noiseSourceNode.start();
     noiseLfoNode.start();
+    crackleSourceNode.start();
     wowLfoNode.start();
     flutterLfoNode.start();
 
@@ -839,6 +979,12 @@ async function disposeAudioEngine() {
   }
 
   try {
+    crackleSourceNode?.stop();
+  } catch {
+    // ignore repeated stop
+  }
+
+  try {
     wowLfoNode?.stop();
   } catch {
     // ignore repeated stop
@@ -878,6 +1024,11 @@ async function disposeAudioEngine() {
   noiseGainNode = null;
   noiseLfoNode = null;
   noiseLfoGainNode = null;
+  crackleSourceNode = null;
+  crackleFilterNode = null;
+  vinylDustBedFilterNode = null;
+  vinylDustBedGainNode = null;
+  crackleGainNode = null;
 
   if (!context || context.state === "closed") {
     return;

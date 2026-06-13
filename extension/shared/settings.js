@@ -453,6 +453,7 @@ export const PRESETS = {
 
 export const DEFAULT_SETTINGS = {
   presetKey: "amberCrt",
+  audioPresetKey: "custom",
   crtAspect: 1.0,
   paletteMode: "mono",
   monoTint: "amber",
@@ -496,6 +497,7 @@ export const DEFAULT_SETTINGS = {
   wowFlutterAmount: 0.0,
   isNoiseEnabled: true,
   noiseLevel: 0.015,
+  vinylDustAmount: 0.0,
 };
 
 export const COLOR_LEVEL_LIMITS = {
@@ -533,6 +535,10 @@ export function normalizeSettings(candidate) {
 
   return {
     presetKey,
+    audioPresetKey:
+      typeof candidate?.audioPresetKey === "string"
+        ? candidate.audioPresetKey
+        : DEFAULT_SETTINGS.audioPresetKey,
     crtAspect:
       typeof candidate?.crtAspect === "number"
         ? clamp(candidate.crtAspect, 0.9, 1.1)
@@ -671,15 +677,15 @@ export function normalizeSettings(candidate) {
           DEFAULT_SETTINGS.sampleRateReductionAmount,
     bassAmount:
       typeof candidate?.bassAmount === "number"
-        ? clamp(candidate.bassAmount, -1, 1)
+        ? clamp(candidate.bassAmount, -1.5, 1.5)
         : basePresetSettings.bassAmount ?? DEFAULT_SETTINGS.bassAmount,
     midAmount:
       typeof candidate?.midAmount === "number"
-        ? clamp(candidate.midAmount, -1, 1)
+        ? clamp(candidate.midAmount, -1.5, 1.5)
         : basePresetSettings.midAmount ?? DEFAULT_SETTINGS.midAmount,
     trebleAmount:
       typeof candidate?.trebleAmount === "number"
-        ? clamp(candidate.trebleAmount, -1, 1)
+        ? clamp(candidate.trebleAmount, -1.5, 1.5)
         : basePresetSettings.trebleAmount ?? DEFAULT_SETTINGS.trebleAmount,
     stereoWidthAmount:
       typeof candidate?.stereoWidthAmount === "number"
@@ -699,8 +705,12 @@ export function normalizeSettings(candidate) {
         : basePresetSettings.isNoiseEnabled,
     noiseLevel:
       typeof candidate?.noiseLevel === "number"
-        ? clamp(candidate.noiseLevel, 0, 1.5)
+        ? clamp(candidate.noiseLevel, 0, 0.05)
         : basePresetSettings.noiseLevel,
+    vinylDustAmount:
+      typeof candidate?.vinylDustAmount === "number"
+        ? clamp(candidate.vinylDustAmount, 0, 1)
+        : basePresetSettings.vinylDustAmount ?? DEFAULT_SETTINGS.vinylDustAmount,
   };
 }
 
@@ -710,6 +720,7 @@ export function applyPresetToSettings(presetKey) {
   return {
     ...DEFAULT_SETTINGS,
     presetKey,
+    audioPresetKey: DEFAULT_SETTINGS.audioPresetKey,
     crtAspect:
       typeof preset.crtAspect === "number"
         ? preset.crtAspect
@@ -838,6 +849,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.noiseLevel === "number"
         ? preset.noiseLevel
         : DEFAULT_SETTINGS.noiseLevel,
+    vinylDustAmount:
+      typeof preset.vinylDustAmount === "number"
+        ? preset.vinylDustAmount
+        : DEFAULT_SETTINGS.vinylDustAmount,
   };
 }
 

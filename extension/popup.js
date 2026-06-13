@@ -16,6 +16,7 @@ const captureButton = document.getElementById("captureButton");
 const viewerButton = document.getElementById("viewerButton");
 const overlayButton = document.getElementById("overlayButton");
 const presetSelect = document.getElementById("presetSelect");
+const audioPresetSelect = document.getElementById("audioPresetSelect");
 const paletteModeSelect = document.getElementById("paletteMode");
 const monoTintSelect = document.getElementById("monoTint");
 const targetWidthInput = document.getElementById("targetWidth");
@@ -85,9 +86,137 @@ const wowFlutterAmountValue = document.getElementById("wowFlutterAmountValue");
 const noiseEnabledInput = document.getElementById("noiseEnabled");
 const noiseLevelInput = document.getElementById("noiseLevel");
 const noiseLevelValue = document.getElementById("noiseLevelValue");
+const vinylDustAmountInput = document.getElementById("vinylDustAmount");
+const vinylDustAmountValue = document.getElementById("vinylDustAmountValue");
 const statusText = document.getElementById("statusText");
 
 let currentSettings = { ...DEFAULT_SETTINGS };
+
+const AUDIO_PRESET_OPTIONS = [
+  { key: "none", label: "None" },
+  { key: "lofi", label: "Lo-Fi" },
+  { key: "radio", label: "Radio" },
+  { key: "tape", label: "Tape" },
+  { key: "vinyl", label: "Vinyl" },
+  { key: "vintage-mic", label: "Vintage Mic" },
+  { key: "earphone", label: "Earphone" },
+  { key: "custom", label: "Custom" },
+];
+
+const AUDIO_PRESETS = {
+  none: {
+    isAudioFxEnabled: false,
+    isNoiseEnabled: false,
+    lofiAmount: 0,
+    radioToneAmount: 0,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0,
+    bassAmount: 0,
+    midAmount: 0,
+    trebleAmount: 0,
+    stereoWidthAmount: 0,
+    smallSpeakerRoomAmount: 0,
+    wowFlutterAmount: 0,
+    noiseLevel: 0,
+    vinylDustAmount: 0,
+  },
+  lofi: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    lofiAmount: 0.7,
+    radioToneAmount: 0.18,
+    bitCrushAmount: 0.22,
+    sampleRateReductionAmount: 0.24,
+    bassAmount: 0.08,
+    midAmount: -0.08,
+    trebleAmount: -0.18,
+    stereoWidthAmount: -0.08,
+    smallSpeakerRoomAmount: 0.08,
+    wowFlutterAmount: 0.12,
+    noiseLevel: 0.005,
+    vinylDustAmount: 0,
+  },
+  radio: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    lofiAmount: 0.4,
+    radioToneAmount: 0.9,
+    bitCrushAmount: 0.12,
+    sampleRateReductionAmount: 0.38,
+    bassAmount: -0.4,
+    midAmount: 0.18,
+    trebleAmount: -0.32,
+    stereoWidthAmount: -0.55,
+    smallSpeakerRoomAmount: 0.12,
+    wowFlutterAmount: 0.08,
+    noiseLevel: 0.01,
+    vinylDustAmount: 0,
+  },
+  tape: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    lofiAmount: 0.22,
+    radioToneAmount: 0.1,
+    bitCrushAmount: 0.04,
+    sampleRateReductionAmount: 0.08,
+    bassAmount: 0.12,
+    midAmount: 0,
+    trebleAmount: -0.14,
+    stereoWidthAmount: 0.06,
+    smallSpeakerRoomAmount: 0.18,
+    wowFlutterAmount: 0.42,
+    noiseLevel: 0.0075,
+    vinylDustAmount: 0,
+  },
+  vinyl: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    lofiAmount: 0.14,
+    radioToneAmount: 0.06,
+    bitCrushAmount: 0.01,
+    sampleRateReductionAmount: 0.03,
+    bassAmount: 0.06,
+    midAmount: -0.02,
+    trebleAmount: -0.16,
+    stereoWidthAmount: -0.18,
+    smallSpeakerRoomAmount: 0.03,
+    wowFlutterAmount: 0.18,
+    noiseLevel: 0.0035,
+    vinylDustAmount: 0.58,
+  },
+  "vintage-mic": {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    lofiAmount: 0.34,
+    radioToneAmount: 0.28,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0.02,
+    bassAmount: -0.24,
+    midAmount: 0.32,
+    trebleAmount: -0.68,
+    stereoWidthAmount: -0.32,
+    smallSpeakerRoomAmount: 0.12,
+    wowFlutterAmount: 0.04,
+    noiseLevel: 0.0025,
+    vinylDustAmount: 0.08,
+  },
+  earphone: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: false,
+    lofiAmount: 0,
+    radioToneAmount: 0,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0,
+    bassAmount: 0.1,
+    midAmount: 0,
+    trebleAmount: 0.08,
+    stereoWidthAmount: 0.22,
+    smallSpeakerRoomAmount: 0,
+    wowFlutterAmount: 0,
+    noiseLevel: 0,
+    vinylDustAmount: 0,
+  },
+};
 
 init().catch((error) => {
   setStatus(error instanceof Error ? error.message : String(error));
@@ -146,12 +275,40 @@ presetSelect.addEventListener("change", () => {
 
   currentSettings = normalizeSettings({
     ...applyPresetToSettings(presetSelect.value),
+    audioPresetKey: currentSettings.audioPresetKey,
     matchTargetAspect: currentSettings.matchTargetAspect,
     scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
     closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
+    isAudioFxEnabled: currentSettings.isAudioFxEnabled,
+    lofiAmount: currentSettings.lofiAmount,
+    radioToneAmount: currentSettings.radioToneAmount,
+    bitCrushAmount: currentSettings.bitCrushAmount,
+    sampleRateReductionAmount: currentSettings.sampleRateReductionAmount,
+    bassAmount: currentSettings.bassAmount,
+    midAmount: currentSettings.midAmount,
+    trebleAmount: currentSettings.trebleAmount,
+    stereoWidthAmount: currentSettings.stereoWidthAmount,
+    smallSpeakerRoomAmount: currentSettings.smallSpeakerRoomAmount,
+    wowFlutterAmount: currentSettings.wowFlutterAmount,
+    isNoiseEnabled: currentSettings.isNoiseEnabled,
+    noiseLevel: currentSettings.noiseLevel,
+    vinylDustAmount: currentSettings.vinylDustAmount,
   });
   void persistSettings();
+});
+
+audioPresetSelect.addEventListener("change", () => {
+  const presetKey = audioPresetSelect.value;
+  if (presetKey === "custom") {
+    updateSettings({ audioPresetKey: "custom" });
+    return;
+  }
+
+  updateSettings({
+    audioPresetKey: presetKey,
+    ...AUDIO_PRESETS[presetKey],
+  });
 });
 
 paletteModeSelect.addEventListener("change", () => {
@@ -367,77 +524,83 @@ overlayTargetCountInput.addEventListener("input", () => {
 });
 
 audioFxEnabledInput.addEventListener("change", () => {
-  updateSettings({ isAudioFxEnabled: audioFxEnabledInput.checked });
+  updateAudioSettings({ isAudioFxEnabled: audioFxEnabledInput.checked });
 });
 
 lofiAmountInput.addEventListener("input", () => {
   const lofiAmount = Number(lofiAmountInput.value);
   lofiAmountValue.textContent = lofiAmount.toFixed(2);
-  updateSettings({ lofiAmount });
+  updateAudioSettings({ lofiAmount });
 });
 
 radioToneAmountInput.addEventListener("input", () => {
   const radioToneAmount = Number(radioToneAmountInput.value);
   radioToneAmountValue.textContent = radioToneAmount.toFixed(2);
-  updateSettings({ radioToneAmount });
+  updateAudioSettings({ radioToneAmount });
 });
 
 bitCrushAmountInput.addEventListener("input", () => {
   const bitCrushAmount = Number(bitCrushAmountInput.value);
   bitCrushAmountValue.textContent = bitCrushAmount.toFixed(2);
-  updateSettings({ bitCrushAmount });
+  updateAudioSettings({ bitCrushAmount });
 });
 
 sampleRateReductionAmountInput.addEventListener("input", () => {
   const sampleRateReductionAmount = Number(sampleRateReductionAmountInput.value);
   sampleRateReductionAmountValue.textContent = sampleRateReductionAmount.toFixed(2);
-  updateSettings({ sampleRateReductionAmount });
+  updateAudioSettings({ sampleRateReductionAmount });
 });
 
 bassAmountInput.addEventListener("input", () => {
   const bassAmount = Number(bassAmountInput.value);
   bassAmountValue.textContent = formatEqAmount(bassAmount);
-  updateSettings({ bassAmount });
+  updateAudioSettings({ bassAmount });
 });
 
 midAmountInput.addEventListener("input", () => {
   const midAmount = Number(midAmountInput.value);
   midAmountValue.textContent = formatEqAmount(midAmount);
-  updateSettings({ midAmount });
+  updateAudioSettings({ midAmount });
 });
 
 trebleAmountInput.addEventListener("input", () => {
   const trebleAmount = Number(trebleAmountInput.value);
   trebleAmountValue.textContent = formatEqAmount(trebleAmount);
-  updateSettings({ trebleAmount });
+  updateAudioSettings({ trebleAmount });
 });
 
 stereoWidthAmountInput.addEventListener("input", () => {
   const stereoWidthAmount = Number(stereoWidthAmountInput.value);
   stereoWidthAmountValue.textContent = formatStereoWidthAmount(stereoWidthAmount);
-  updateSettings({ stereoWidthAmount });
+  updateAudioSettings({ stereoWidthAmount });
 });
 
 smallSpeakerRoomAmountInput.addEventListener("input", () => {
   const smallSpeakerRoomAmount = Number(smallSpeakerRoomAmountInput.value);
   smallSpeakerRoomAmountValue.textContent = smallSpeakerRoomAmount.toFixed(2);
-  updateSettings({ smallSpeakerRoomAmount });
+  updateAudioSettings({ smallSpeakerRoomAmount });
 });
 
 wowFlutterAmountInput.addEventListener("input", () => {
   const wowFlutterAmount = Number(wowFlutterAmountInput.value);
   wowFlutterAmountValue.textContent = wowFlutterAmount.toFixed(2);
-  updateSettings({ wowFlutterAmount });
+  updateAudioSettings({ wowFlutterAmount });
 });
 
 noiseEnabledInput.addEventListener("change", () => {
-  updateSettings({ isNoiseEnabled: noiseEnabledInput.checked });
+  updateAudioSettings({ isNoiseEnabled: noiseEnabledInput.checked });
 });
 
 noiseLevelInput.addEventListener("input", () => {
-  const noiseLevel = Number(noiseLevelInput.value);
-  noiseLevelValue.textContent = noiseLevel.toFixed(3);
-  updateSettings({ noiseLevel });
+  const noiseLevel = Number(noiseLevelInput.value) / 100;
+  noiseLevelValue.textContent = `${(noiseLevel * 100).toFixed(2)}%`;
+  updateAudioSettings({ noiseLevel });
+});
+
+vinylDustAmountInput.addEventListener("input", () => {
+  const vinylDustAmount = Number(vinylDustAmountInput.value);
+  vinylDustAmountValue.textContent = `${Math.round(vinylDustAmount * 100)}%`;
+  updateAudioSettings({ vinylDustAmount });
 });
 
 async function init() {
@@ -451,6 +614,13 @@ async function init() {
   customOption.value = CUSTOM_PRESET_KEY;
   customOption.textContent = "Custom";
   presetSelect.append(customOption);
+
+  for (const optionData of AUDIO_PRESET_OPTIONS) {
+    const option = document.createElement("option");
+    option.value = optionData.key;
+    option.textContent = optionData.label;
+    audioPresetSelect.append(option);
+  }
 
   for (const optionData of PALETTE_OPTIONS) {
     const option = document.createElement("option");
@@ -474,6 +644,7 @@ async function init() {
 
 function renderSettings(settings) {
   presetSelect.value = settings.presetKey;
+  audioPresetSelect.value = settings.audioPresetKey ?? "custom";
   paletteModeSelect.value = settings.paletteMode;
   monoTintSelect.value = settings.monoTint;
   monoTintSelect.disabled =
@@ -545,10 +716,16 @@ function renderSettings(settings) {
   sampleRateReductionAmountInput.value = String(settings.sampleRateReductionAmount);
   sampleRateReductionAmountValue.textContent = settings.sampleRateReductionAmount.toFixed(2);
   bassAmountInput.value = String(settings.bassAmount);
+  bassAmountInput.min = "-1.5";
+  bassAmountInput.max = "1.5";
   bassAmountValue.textContent = formatEqAmount(settings.bassAmount);
   midAmountInput.value = String(settings.midAmount);
+  midAmountInput.min = "-1.5";
+  midAmountInput.max = "1.5";
   midAmountValue.textContent = formatEqAmount(settings.midAmount);
   trebleAmountInput.value = String(settings.trebleAmount);
+  trebleAmountInput.min = "-1.5";
+  trebleAmountInput.max = "1.5";
   trebleAmountValue.textContent = formatEqAmount(settings.trebleAmount);
   stereoWidthAmountInput.value = String(settings.stereoWidthAmount);
   stereoWidthAmountValue.textContent = formatStereoWidthAmount(settings.stereoWidthAmount);
@@ -557,8 +734,10 @@ function renderSettings(settings) {
   wowFlutterAmountInput.value = String(settings.wowFlutterAmount);
   wowFlutterAmountValue.textContent = settings.wowFlutterAmount.toFixed(2);
   noiseEnabledInput.checked = settings.isNoiseEnabled;
-  noiseLevelInput.value = String(settings.noiseLevel);
-  noiseLevelValue.textContent = settings.noiseLevel.toFixed(3);
+  noiseLevelInput.value = String(settings.noiseLevel * 100);
+  noiseLevelValue.textContent = `${(settings.noiseLevel * 100).toFixed(2)}%`;
+  vinylDustAmountInput.value = String(settings.vinylDustAmount ?? 0);
+  vinylDustAmountValue.textContent = `${Math.round((settings.vinylDustAmount ?? 0) * 100)}%`;
 }
 
 async function updateSettings(patch) {
@@ -573,6 +752,13 @@ async function updateSettings(patch) {
 async function persistSettings() {
   renderSettings(currentSettings);
   await chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: currentSettings });
+}
+
+function updateAudioSettings(patch) {
+  return updateSettings({
+    audioPresetKey: "custom",
+    ...patch,
+  });
 }
 
 function setStatus(message) {
