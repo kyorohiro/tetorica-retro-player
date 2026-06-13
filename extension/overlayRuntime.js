@@ -590,6 +590,12 @@ function isUsableImage(candidate) {
 function applySettings(gl, program, uniformLocations, settings) {
   gl.useProgram(program);
   gl.uniform2f(uniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
+  const phosphorDotInternalScale = settings.phosphorDotInternalScale ? 2 : 1;
+  gl.uniform2f(
+    uniformLocations.uSampleTargetSize,
+    settings.targetWidth * phosphorDotInternalScale,
+    settings.targetHeight * phosphorDotInternalScale,
+  );
   gl.uniform1f(uniformLocations.uColorLevels, settings.colorLevels);
   gl.uniform1f(uniformLocations.uDitherStrength, settings.ditherStrength);
   gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
@@ -714,6 +720,7 @@ function setupRenderer(webgl) {
     texture,
     uniformLocations: {
       uTargetSize: webgl.getUniformLocation(program, "uTargetSize"),
+      uSampleTargetSize: webgl.getUniformLocation(program, "uSampleTargetSize"),
       uColorLevels: webgl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: webgl.getUniformLocation(program, "uDitherStrength"),
       uPaletteMode: webgl.getUniformLocation(program, "uPaletteMode"),

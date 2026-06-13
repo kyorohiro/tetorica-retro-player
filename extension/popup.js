@@ -44,6 +44,16 @@ const phosphorStrengthInput = document.getElementById("phosphorStrength");
 const phosphorStrengthValue = document.getElementById("phosphorStrengthValue");
 const spotMaskStrengthInput = document.getElementById("spotMaskStrength");
 const spotMaskStrengthValue = document.getElementById("spotMaskStrengthValue");
+const phosphorDotInternalScaleInput = document.getElementById("phosphorDotInternalScale");
+const phosphorDotBrightCoreInput = document.getElementById("phosphorDotBrightCore");
+const phosphorDotFlatDiscInput = document.getElementById("phosphorDotFlatDisc");
+const phosphorDotNeighborBlendInput = document.getElementById("phosphorDotNeighborBlend");
+const phosphorDotCellFillInput = document.getElementById("phosphorDotCellFill");
+const phosphorDotCellFillValue = document.getElementById("phosphorDotCellFillValue");
+const bulbRadiusInput = document.getElementById("bulbRadius");
+const bulbRadiusValue = document.getElementById("bulbRadiusValue");
+const blackFloorInput = document.getElementById("blackFloor");
+const blackFloorValue = document.getElementById("blackFloorValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
@@ -252,6 +262,55 @@ spotMaskStrengthInput.addEventListener("input", () => {
   });
 });
 
+phosphorDotInternalScaleInput.addEventListener("change", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorDotInternalScale: phosphorDotInternalScaleInput.checked,
+  });
+});
+
+phosphorDotBrightCoreInput.addEventListener("change", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorDotBrightCore: phosphorDotBrightCoreInput.checked,
+  });
+});
+
+phosphorDotFlatDiscInput.addEventListener("change", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorDotFlatDisc: phosphorDotFlatDiscInput.checked,
+  });
+});
+
+phosphorDotNeighborBlendInput.addEventListener("change", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorDotNeighborBlend: phosphorDotNeighborBlendInput.checked,
+  });
+});
+
+phosphorDotCellFillInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorDotCellFill: Number(phosphorDotCellFillInput.value),
+  });
+});
+
+bulbRadiusInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    bulbRadius: Number(bulbRadiusInput.value),
+  });
+});
+
+blackFloorInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    blackFloor: Number(blackFloorInput.value),
+  });
+});
+
 closeUpNoiseStrengthInput.addEventListener("input", () => {
   const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
   closeUpNoiseStrengthValue.textContent = closeUpNoiseStrength.toFixed(2);
@@ -417,6 +476,16 @@ function renderSettings(settings) {
   phosphorStrengthValue.textContent = settings.phosphorStrength.toFixed(2);
   spotMaskStrengthInput.value = String(settings.spotMaskStrength);
   spotMaskStrengthValue.textContent = settings.spotMaskStrength.toFixed(2);
+  phosphorDotInternalScaleInput.checked = settings.phosphorDotInternalScale;
+  phosphorDotBrightCoreInput.checked = settings.phosphorDotBrightCore;
+  phosphorDotFlatDiscInput.checked = settings.phosphorDotFlatDisc;
+  phosphorDotNeighborBlendInput.checked = settings.phosphorDotNeighborBlend;
+  phosphorDotCellFillInput.value = String(settings.phosphorDotCellFill);
+  phosphorDotCellFillValue.textContent = settings.phosphorDotCellFill.toFixed(3);
+  bulbRadiusInput.value = String(settings.bulbRadius);
+  bulbRadiusValue.textContent = settings.bulbRadius.toFixed(3);
+  blackFloorInput.value = String(settings.blackFloor);
+  blackFloorValue.textContent = settings.blackFloor.toFixed(3);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);
