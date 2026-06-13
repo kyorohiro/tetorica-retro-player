@@ -39,6 +39,7 @@ export const PRESETS = {
     phosphorDotMode: false,
     bulbRadius: 0.22,
     blackFloor: 0.01,
+    phosphorDotLightBalance: 1.0,
     phosphorDotInternalScale: false,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.0,
@@ -365,6 +366,7 @@ export const PRESETS = {
     phosphorDotMode: false,
     bulbRadius: 0.3,
     blackFloor: 0.008,
+    phosphorDotLightBalance: 1.0,
     phosphorDotInternalScale: false,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.0,
@@ -397,6 +399,7 @@ export const PRESETS = {
     phosphorDotMode: false,
     bulbRadius: 0.22,
     blackFloor: 0.01,
+    phosphorDotLightBalance: 1.0,
     phosphorDotInternalScale: false,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.0,
@@ -429,6 +432,7 @@ export const PRESETS = {
     phosphorDotMode: true,
     bulbRadius: 0.29,
     blackFloor: 0.006,
+    phosphorDotLightBalance: 1.0,
     phosphorDotInternalScale: true,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.12,
@@ -465,6 +469,7 @@ export const DEFAULT_SETTINGS = {
   phosphorDotMode: false,
   bulbRadius: 0.22,
   blackFloor: 0.01,
+  phosphorDotLightBalance: 1.0,
   phosphorDotInternalScale: false,
   phosphorDotBrightCore: false,
   phosphorDotCellFill: 0.0,
@@ -588,6 +593,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.blackFloor === "number"
         ? clamp(candidate.blackFloor, 0, 0.5)
         : basePresetSettings.blackFloor ?? DEFAULT_SETTINGS.blackFloor,
+    phosphorDotLightBalance:
+      typeof candidate?.phosphorDotLightBalance === "number"
+        ? clamp(candidate.phosphorDotLightBalance, 0, 2)
+        : basePresetSettings.phosphorDotLightBalance ?? DEFAULT_SETTINGS.phosphorDotLightBalance,
     phosphorDotInternalScale:
       typeof candidate?.phosphorDotInternalScale === "boolean"
         ? candidate.phosphorDotInternalScale
@@ -730,6 +739,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.blackFloor === "number"
         ? preset.blackFloor
         : DEFAULT_SETTINGS.blackFloor,
+    phosphorDotLightBalance:
+      typeof preset.phosphorDotLightBalance === "number"
+        ? preset.phosphorDotLightBalance
+        : DEFAULT_SETTINGS.phosphorDotLightBalance,
     phosphorDotInternalScale:
       typeof preset.phosphorDotInternalScale === "boolean"
         ? preset.phosphorDotInternalScale

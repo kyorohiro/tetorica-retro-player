@@ -54,6 +54,8 @@ const bulbRadiusInput = document.getElementById("bulbRadius");
 const bulbRadiusValue = document.getElementById("bulbRadiusValue");
 const blackFloorInput = document.getElementById("blackFloor");
 const blackFloorValue = document.getElementById("blackFloorValue");
+const phosphorDotLightBalanceInput = document.getElementById("phosphorDotLightBalance");
+const phosphorDotLightBalanceValue = document.getElementById("phosphorDotLightBalanceValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
@@ -311,6 +313,13 @@ blackFloorInput.addEventListener("input", () => {
   });
 });
 
+phosphorDotLightBalanceInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    phosphorDotLightBalance: Number(phosphorDotLightBalanceInput.value),
+  });
+});
+
 closeUpNoiseStrengthInput.addEventListener("input", () => {
   const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
   closeUpNoiseStrengthValue.textContent = closeUpNoiseStrength.toFixed(2);
@@ -486,6 +495,8 @@ function renderSettings(settings) {
   bulbRadiusValue.textContent = settings.bulbRadius.toFixed(3);
   blackFloorInput.value = String(settings.blackFloor);
   blackFloorValue.textContent = settings.blackFloor.toFixed(3);
+  phosphorDotLightBalanceInput.value = String(settings.phosphorDotLightBalance ?? 1);
+  phosphorDotLightBalanceValue.textContent = (settings.phosphorDotLightBalance ?? 1).toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);

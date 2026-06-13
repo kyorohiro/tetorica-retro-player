@@ -37,6 +37,7 @@ export type RetroPresetDefinition = {
   spotMask: number;
   bulbRadius: number;
   blackFloor: number;
+  phosphorDotLightBalance?: number;
   phosphorDotInternalScale?: boolean;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
@@ -380,6 +381,7 @@ export const RETRO_PRESETS = {
     spotMask: 1.0,
     bulbRadius: 0.29,
     blackFloor: 0.006,
+    phosphorDotLightBalance: 1.0,
     phosphorDotInternalScale: true,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.12,

@@ -32,6 +32,7 @@ type RendererUniformLocations = {
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
+  uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
   uPhosphorDotInternalScale: WebGLUniformLocation | null;
@@ -355,6 +356,7 @@ function createRenderer(gl: WebGL2RenderingContext): RendererResources {
       uSpotMaskStrength: gl.getUniformLocation(filterProgram, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
+      uPhosphorDotLightBalance: gl.getUniformLocation(filterProgram, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(filterProgram, "uPhosphorDotMode"),
       uPhosphorDotInternalScale: gl.getUniformLocation(filterProgram, "uPhosphorDotInternalScale"),
@@ -419,6 +421,10 @@ function applyFilterUniforms(
   gl.uniform1f(uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
   gl.uniform1f(uniformLocations.uBulbRadius, filterState.bulbRadius);
   gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotLightBalance,
+    filterState.phosphorDotLightBalance,
+  );
   gl.uniform1f(
     uniformLocations.uPixelAspect,
     (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
