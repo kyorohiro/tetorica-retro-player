@@ -5,13 +5,16 @@ import {
   type PaletteMode,
   type RetroPresetKey,
 } from "../retro/config";
+import type { Locale } from "../../i18n";
 
 function InfoTip({
   label,
   text,
+  helpSuffix,
 }: {
   label: string;
   text: string;
+  helpSuffix: string;
 }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -19,7 +22,7 @@ function InfoTip({
       <span className="relative inline-flex items-center group">
         <button
           type="button"
-          aria-label={`${label} help`}
+          aria-label={`${label}${helpSuffix}`}
           className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-500/80 bg-slate-900/90 text-[10px] font-bold leading-none text-slate-200 transition hover:border-sky-400 hover:text-sky-100 focus:outline-none focus:ring-1 focus:ring-sky-400"
         >
           ?
@@ -36,6 +39,7 @@ function InfoTip({
 }
 
 type RetroFilterPanelProps = {
+  locale: Locale;
   colorLevels: number;
   curvature: number;
   ditherStrength: number;
@@ -98,6 +102,7 @@ type RetroFilterPanelProps = {
 };
 
 export function RetroFilterPanel({
+  locale,
   colorLevels,
   curvature,
   ditherStrength,
@@ -158,6 +163,70 @@ export function RetroFilterPanel({
   onSetMatchTargetAspect,
   onSetVignetteStrength,
 }: RetroFilterPanelProps) {
+  const helpText =
+    locale === "ja"
+      ? {
+          helpSuffix: "のヘルプ",
+          curvature:
+            "古い CRT の湾曲ガラスのように、画面を内側へたわませます。値を上げるほど端の反りが強くなります。",
+          bayerDither:
+            "4x4 のドットパターンを加えて減色の見え方をなじませます。値を上げるほど格子感とザラつきが強くなります。",
+          scanline:
+            "古い表示のような横方向の暗い帯を加えます。値を上げるほど線の隙間が目立ちます。",
+          scanline2:
+            "さらに細かい第2のライン感を加えます。より密な CRT の縞感が欲しいときに使います。",
+          scanlineBrightFade:
+            "明るい部分では scanline を薄くします。値を上げると暗部は縞を保ちつつ、明部は自然に発光して見えます。",
+          vignette:
+            "画面の外周を暗くします。値を上げるほど中央に視線が集まり、レトロな額縁感も強くなります。",
+          glow:
+            "明るい部分のまわりに柔らかな光のにじみを足します。値を上げるほどハイライトが広がって熱っぽく見えます。",
+          phosphor:
+            "CRT 表面の発光構造のような RGB の細かな揺らぎを加えます。値を上げるほど画面テクスチャが見えやすくなります。",
+          spotMask:
+            "Phosphor Dot のセル形状を有効にします。値を上げるほどドット構造と CRT 風マスクがはっきり見えます。",
+          cellFill:
+            "各 phosphor セル内部に均一なベース光を加えます。上げるとセル全体が明るくなり、下げると黒が残りやすくなります。",
+          bulbRadius:
+            "各 phosphor セル内で光るバルブの大きさを決めます。下げるほど明るい芯が小さくなり、周囲の黒が増えます。",
+          blackFloor:
+            "phosphor バルブ周囲の黒背景へどれだけ光が漏れるかを決めます。下げるほど未点灯部分が純黒に近づきます。",
+          lightLevel:
+            "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
+          closeUpNoise:
+            "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
+        }
+      : {
+          helpSuffix: " help",
+          curvature:
+            "Bends the picture inward to mimic the curved glass of an old CRT. Higher values make the screen edges bow more.",
+          bayerDither:
+            "Adds a 4x4 dot pattern to smooth reduced colors. Higher values make the image feel more grid-like and gritty.",
+          scanline:
+            "Adds broad horizontal dark bands like an old display. Higher values make the line gaps more obvious.",
+          scanline2:
+            "Adds a finer second layer of line texture. Useful when you want a denser CRT stripe feel.",
+          scanlineBrightFade:
+            "Makes scanlines fade out in bright areas. Higher values keep dark parts striped while bright parts look more naturally emissive.",
+          vignette:
+            "Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.",
+          glow:
+            "Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look.",
+          phosphor:
+            "Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible and easier to inspect.",
+          spotMask:
+            "Enables the phosphor-dot cell shaping itself. Higher values make the dot structure and CRT-style masking more visible.",
+          cellFill:
+            "Adds a more uniform base fill inside each phosphor cell. Raise it to make the whole cell brighter; lower it to keep more black visible.",
+          bulbRadius:
+            "Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it.",
+          blackFloor:
+            "Sets how much light leaks into the black background around each phosphor bulb. Lower values keep the unlit area closer to pure black.",
+          lightLevel:
+            "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
+          closeUpNoise:
+            "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
+        };
   const isPhosphorDotModeActive =
     spotMaskStrength > 0.001 &&
     (
@@ -409,7 +478,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Curvature: ${curvature.toFixed(2)}`}
-              text="Bends the picture inward to mimic the curved glass of an old CRT. Higher values make the screen edges bow more."
+              text={helpText.curvature}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -429,7 +499,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
-              text="Adds a 4x4 dot pattern to smooth reduced colors. Higher values make the image feel more grid-like and gritty."
+              text={helpText.bayerDither}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -449,7 +520,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Scanline: ${scanlineStrength.toFixed(2)}`}
-              text="Adds broad horizontal dark bands like an old display. Higher values make the line gaps more obvious."
+              text={helpText.scanline}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -469,7 +541,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Scanline2: ${scanline2Strength.toFixed(2)}`}
-              text="Adds a finer second layer of line texture. Useful when you want a denser CRT stripe feel."
+              text={helpText.scanline2}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -489,7 +562,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Scanline bright fade: ${scanlineBrightnessFade.toFixed(2)}`}
-              text="Makes scanlines fade out in bright areas. Higher values keep dark parts striped while bright parts look more naturally emissive."
+              text={helpText.scanlineBrightFade}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -509,7 +583,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Vignette: ${vignetteStrength.toFixed(2)}`}
-              text="Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame."
+              text={helpText.vignette}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -529,7 +604,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Glow: ${glowStrength.toFixed(2)}`}
-              text="Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look."
+              text={helpText.glow}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -549,7 +625,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
-              text="Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible and easier to inspect."
+              text={helpText.phosphor}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
@@ -638,7 +715,8 @@ export function RetroFilterPanel({
             <span className="text-slate-100">
               <InfoTip
                 label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
-                text="Enables the phosphor-dot cell shaping itself. Higher values make the dot structure and CRT-style masking more visible."
+                text={helpText.spotMask}
+                helpSuffix={helpText.helpSuffix}
               />
             </span>
             <input
@@ -658,7 +736,8 @@ export function RetroFilterPanel({
             <span className="text-slate-100">
               <InfoTip
                 label={`Cell fill: ${phosphorDotCellFill.toFixed(3)}`}
-                text="Adds a more uniform base fill inside each phosphor cell. Raise it to make the whole cell brighter; lower it to keep more black visible."
+                text={helpText.cellFill}
+                helpSuffix={helpText.helpSuffix}
               />
             </span>
             <input
@@ -678,7 +757,8 @@ export function RetroFilterPanel({
             <span className="text-slate-100">
               <InfoTip
                 label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
-                text="Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it."
+                text={helpText.bulbRadius}
+                helpSuffix={helpText.helpSuffix}
               />
             </span>
             <input
@@ -698,7 +778,8 @@ export function RetroFilterPanel({
             <span className="text-slate-100">
               <InfoTip
                 label={`Black floor: ${blackFloor.toFixed(3)}`}
-                text="Sets how much light leaks into the black background around each phosphor bulb. Lower values keep the unlit area closer to pure black."
+                text={helpText.blackFloor}
+                helpSuffix={helpText.helpSuffix}
               />
             </span>
             <input
@@ -718,7 +799,8 @@ export function RetroFilterPanel({
             <span className="text-slate-100">
               <InfoTip
                 label={`Light level: ${phosphorDotLightBalance.toFixed(2)}`}
-                text="Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly."
+                text={helpText.lightLevel}
+                helpSuffix={helpText.helpSuffix}
               />
             </span>
             <input
@@ -739,7 +821,8 @@ export function RetroFilterPanel({
           <span className="text-slate-100">
             <InfoTip
               label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
-              text="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect."
+              text={helpText.closeUpNoise}
+              helpSuffix={helpText.helpSuffix}
             />
           </span>
           <input
