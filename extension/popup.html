@@ -165,6 +165,51 @@
             <input id="closeUpNoiseStrength" type="range" min="0" max="2" step="0.01" />
             <output id="closeUpNoiseStrengthValue"></output>
           </label>
+
+          <section class="subsection phosphor-dot-section" aria-labelledby="phosphorDotTitle">
+            <div class="subsection-header">
+              <p class="subsection-kicker">Phosphor Dot only</p>
+              <h3 id="phosphorDotTitle">Dot mask tuning</h3>
+            </div>
+
+            <label class="control control-toggle">
+              <span>2x internal resolution</span>
+              <input id="phosphorDotInternalScale" type="checkbox" />
+            </label>
+
+            <label class="control control-toggle">
+              <span>Bright core</span>
+              <input id="phosphorDotBrightCore" type="checkbox" />
+            </label>
+
+            <label class="control control-toggle">
+              <span>Flat disc</span>
+              <input id="phosphorDotFlatDisc" type="checkbox" />
+            </label>
+
+            <label class="control control-toggle">
+              <span>Neighbor blend</span>
+              <input id="phosphorDotNeighborBlend" type="checkbox" />
+            </label>
+
+            <label class="control">
+              <span>Cell fill</span>
+              <input id="phosphorDotCellFill" type="range" min="0" max="0.5" step="0.01" />
+              <output id="phosphorDotCellFillValue"></output>
+            </label>
+
+            <label class="control">
+              <span>Bulb radius</span>
+              <input id="bulbRadius" type="range" min="0.001" max="0.5" step="0.001" />
+              <output id="bulbRadiusValue"></output>
+            </label>
+
+            <label class="control">
+              <span>Black floor</span>
+              <input id="blackFloor" type="range" min="0" max="0.5" step="0.001" />
+              <output id="blackFloorValue"></output>
+            </label>
+          </section>
         </section>
 
         <section class="control-group" aria-labelledby="audioControlsTitle">
