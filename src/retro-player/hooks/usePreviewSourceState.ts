@@ -50,7 +50,7 @@ export function usePreviewSourceState() {
     }
 
     stopPreviewStream();
-    setPreviewLabel(undefined);
+    setPreviewLabel(file.name);
     setCaptureError("");
     setPreviewSrc((current) => {
       revokePreviewSrc(current);
