@@ -216,6 +216,30 @@ export function useRetroAudioEngine({
     return impulse;
   };
 
+  const createTintedNoiseBuffer = (context: AudioContext) => {
+    const length = context.sampleRate * 2;
+    const buffer = context.createBuffer(2, length, context.sampleRate);
+    let brownState = 0;
+    let airState = 0;
+
+    for (let index = 0; index < length; index += 1) {
+      const white = Math.random() * 2 - 1;
+      brownState = (brownState + white * 0.045) / 1.045;
+      airState = airState * 0.82 + white * 0.18;
+      const body = brownState * 1.35;
+      const air = (white - airState) * 0.55;
+      const sample = Math.max(-1, Math.min(1, body + air));
+
+      for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+        const channelData = buffer.getChannelData(channel);
+        const channelJitter = (Math.random() * 2 - 1) * 0.012;
+        channelData[index] = Math.max(-1, Math.min(1, sample + channelJitter));
+      }
+    }
+
+    return buffer;
+  };
+
   const updateAudioNodes = () => {
     const masterGain = masterGainRef.current;
     const radioToneHighpass = radioToneHighpassRef.current;
@@ -484,20 +508,24 @@ export function useRetroAudioEngine({
       masterGain.connect(recordingDestination);
 
       const noiseSource = context.createBufferSource();
-      const noiseBuffer = context.createBuffer(2, context.sampleRate * 2, context.sampleRate);
-      for (let channel = 0; channel < noiseBuffer.numberOfChannels; channel += 1) {
-        const channelData = noiseBuffer.getChannelData(channel);
-        for (let index = 0; index < channelData.length; index += 1) {
-          channelData[index] = Math.random() * 2 - 1;
-        }
-      }
-      noiseSource.buffer = noiseBuffer;
+      noiseSource.buffer = createTintedNoiseBuffer(context);
       noiseSource.loop = true;
 
-      const noiseFilter = context.createBiquadFilter();
-      noiseFilter.type = "bandpass";
-      noiseFilter.frequency.value = 4200;
-      noiseFilter.Q.value = 0.8;
+      const noiseHighpass = context.createBiquadFilter();
+      noiseHighpass.type = "highpass";
+      noiseHighpass.frequency.value = 1100;
+      noiseHighpass.Q.value = 0.25;
+
+      const noiseLowpass = context.createBiquadFilter();
+      noiseLowpass.type = "lowpass";
+      noiseLowpass.frequency.value = 5600;
+      noiseLowpass.Q.value = 0.18;
+
+      const noisePresence = context.createBiquadFilter();
+      noisePresence.type = "peaking";
+      noisePresence.frequency.value = 2400;
+      noisePresence.Q.value = 0.7;
+      noisePresence.gain.value = -2.5;
 
       const noisePanner = context.createStereoPanner();
       const noiseGain = context.createGain();
@@ -508,11 +536,13 @@ export function useRetroAudioEngine({
       noiseGain.gain.value = 0;
 
       noiseLfo.type = "sine";
-      noiseLfo.frequency.value = 0.065;
-      noiseLfoGain.gain.value = 0.45;
+      noiseLfo.frequency.value = 0.021;
+      noiseLfoGain.gain.value = 0.08;
 
-      noiseSource.connect(noiseFilter);
-      noiseFilter.connect(noisePanner);
+      noiseSource.connect(noiseHighpass);
+      noiseHighpass.connect(noiseLowpass);
+      noiseLowpass.connect(noisePresence);
+      noisePresence.connect(noisePanner);
       noisePanner.connect(noiseGain);
       noiseGain.connect(masterGain);
       noiseLfo.connect(noiseLfoGain);
@@ -544,7 +574,7 @@ export function useRetroAudioEngine({
       flutterLfoRef.current = flutterLfo;
       flutterLfoGainRef.current = flutterLfoGain;
       noiseSourceRef.current = noiseSource;
-      noiseFilterRef.current = noiseFilter;
+      noiseFilterRef.current = noisePresence;
       noisePannerRef.current = noisePanner;
       noiseGainRef.current = noiseGain;
       noiseLfoRef.current = noiseLfo;
