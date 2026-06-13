@@ -141,7 +141,8 @@ export function VideoControls({
     preset: "none" | "lofi" | "radio" | "tape" | "earphone",
   ) => {
     const presetNeedsFx = preset !== "none";
-    const presetNeedsNoise = preset === "radio" || preset === "tape";
+    const presetNeedsNoise =
+      preset === "lofi" || preset === "radio" || preset === "tape";
 
     if (presetNeedsFx && !isAudioFxEnabled) {
       onToggleAudioFx();
@@ -170,7 +171,7 @@ export function VideoControls({
         break;
       case "lofi":
         onChangeVolume(0.92);
-        onChangeLofiAmount(0.72);
+        onChangeLofiAmount(0.25);
         onChangeRadioToneAmount(0.18);
         onChangeBitCrushAmount(0.22);
         onChangeSampleRateReductionAmount(0.24);
@@ -180,7 +181,7 @@ export function VideoControls({
         onChangeStereoWidthAmount(-0.08);
         onChangeSmallSpeakerRoomAmount(0.08);
         onChangeWowFlutterAmount(0.12);
-        onChangeNoiseLevel(0.004);
+        onChangeNoiseLevel(0.005);
         break;
       case "radio":
         onChangeVolume(0.88);
@@ -208,7 +209,7 @@ export function VideoControls({
         onChangeStereoWidthAmount(0.06);
         onChangeSmallSpeakerRoomAmount(0.18);
         onChangeWowFlutterAmount(0.42);
-        onChangeNoiseLevel(0.007);
+        onChangeNoiseLevel(0.0075);
         break;
       case "earphone":
         onChangeVolume(1);
@@ -533,16 +534,16 @@ export function VideoControls({
           <div>
             <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
               <span>Spatial noise</span>
-              <span>{Math.round(noiseLevel * 100)}%</span>
+              <span>{(noiseLevel * 100).toFixed(2)}%</span>
             </div>
-              <input
-                type="range"
-                min="0"
-                max="0.01"
-                step="0.001"
-                value={noiseLevel}
-                onChange={(ev) => {
-                  onChangeNoiseLevel(Number(ev.currentTarget.value));
+            <input
+              type="range"
+              min="0"
+              max="5"
+              step="0.05"
+              value={noiseLevel * 100}
+              onChange={(ev) => {
+                onChangeNoiseLevel(Number(ev.currentTarget.value) / 100);
               }}
               className="w-full"
             />
