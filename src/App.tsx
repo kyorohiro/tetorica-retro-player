@@ -1,5 +1,12 @@
 import React, { useCallback, useRef } from "react";
-import { Menu, RefreshCw, X } from "lucide-react";
+import {
+  FileUp,
+  FolderOpen,
+  Menu,
+  MonitorUp,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import "./App.css";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
@@ -82,9 +89,11 @@ function App() {
 
     if (files.length === 1 && isDirectRetroFile(files[0])) {
       previewSource.previewFile(files[0]);
+      setIsMobileMenuOpen(false);
       return;
     }
 
+    setIsMobileMenuOpen(false);
     await openPortableTargets(files);
   }, [isDirectRetroFile, openPortableTargets, previewSource]);
 
@@ -210,14 +219,14 @@ function App() {
             <button
               type="button"
               aria-expanded={isMobileMenuOpen}
-                aria-label="Open menu"
-                onClick={() => {
-                  setIsMobileMenuOpen((current) => !current);
-                }}
-                className="safe-top-offset fixed left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-              >
-                {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              onClick={() => {
+                setIsMobileMenuOpen((current) => !current);
+              }}
+              className="safe-top-offset fixed left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+            >
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
             {isMobileMenuOpen && (
               <div className="safe-top-menu fixed left-3 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
@@ -226,7 +235,15 @@ function App() {
                     onClick={handleOpenFilePicker}
                     className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
                   >
-                    Drop image/video/audio here, or click to add file
+                    <span className="flex items-start gap-3">
+                      <FileUp className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <span>
+                        <span className="block font-medium text-slate-900">Open file</span>
+                        <span className="block text-slate-500">
+                          Image, video, audio, zip, pdf, epub, text
+                        </span>
+                      </span>
+                    </span>
                   </button>
                   {!isIosOrAndroid && (
                     <>
@@ -235,14 +252,30 @@ function App() {
                         onClick={handleOpenFolderPicker}
                         className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
                       >
-                        Drop folders/archives here, or click to add folders
+                        <span className="flex items-start gap-3">
+                          <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                          <span>
+                            <span className="block font-medium text-slate-900">Open folder</span>
+                            <span className="block text-slate-500">
+                              Browse dropped folders and archive-style collections
+                            </span>
+                          </span>
+                        </span>
                       </button>
                       <button
                         type="button"
                         onClick={handleOpenDisplayCapture}
                         className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
                       >
-                        Capture screen or window
+                        <span className="flex items-start gap-3">
+                          <MonitorUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                          <span>
+                            <span className="block font-medium text-slate-900">Capture screen</span>
+                            <span className="block text-slate-500">
+                              Preview a window or screen with retro effects
+                            </span>
+                          </span>
+                        </span>
                       </button>
                     </>
                   )}
