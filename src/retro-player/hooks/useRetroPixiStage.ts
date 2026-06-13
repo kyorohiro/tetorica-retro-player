@@ -225,12 +225,17 @@ const getEffectiveTargetSize = (
   const internalScale = getPhosphorDotInternalScale(filterState);
   const requestedWidth = Math.max(filterState.targetWidth, 1);
   const requestedHeight = Math.max(filterState.targetHeight, 1);
-  const aspectCorrected = getAspectCorrectedSize(
-    requestedWidth,
-    requestedHeight,
-    sourceWidth,
-    sourceHeight,
-  );
+  const aspectCorrected = filterState.matchTargetAspect
+    ? getAspectCorrectedSize(
+      requestedWidth,
+      requestedHeight,
+      sourceWidth,
+      sourceHeight,
+    )
+    : {
+      width: requestedWidth,
+      height: requestedHeight,
+    };
   const scaledWidth = aspectCorrected.width * internalScale;
   const scaledHeight = aspectCorrected.height * internalScale;
   const viewportLimited = getPhosphorDotViewportLimitedSize(

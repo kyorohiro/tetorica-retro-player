@@ -16,6 +16,7 @@ const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.pc98_512;
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;
   targetHeight: number;
+  matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
   paletteMode: PaletteMode;
@@ -103,6 +104,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [baseInitialState] = useState<RetroFilterSettings>(() => ({
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
+    matchTargetAspect: initialState.matchTargetAspect ?? true,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
     paletteMode: initialState.paletteMode ?? DEFAULT_PRESET.palette,
@@ -149,12 +151,29 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
 
   const setTargetWidth = (targetWidth: number) => {
     setSelectedPreset(null);
-    setSettings((current) => ({ ...current, targetWidth }));
+    setSettings((current) => (
+      current.targetWidth === targetWidth
+        ? current
+        : { ...current, targetWidth }
+    ));
   };
 
   const setTargetHeight = (targetHeight: number) => {
     setSelectedPreset(null);
-    setSettings((current) => ({ ...current, targetHeight }));
+    setSettings((current) => (
+      current.targetHeight === targetHeight
+        ? current
+        : { ...current, targetHeight }
+    ));
+  };
+
+  const setMatchTargetAspect = (matchTargetAspect: boolean) => {
+    setSelectedPreset(null);
+    setSettings((current) => (
+      current.matchTargetAspect === matchTargetAspect
+        ? current
+        : { ...current, matchTargetAspect }
+    ));
   };
 
   const setColorLevels = (colorLevels: number) => {
@@ -333,6 +352,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     selectedPreset,
     setTargetWidth,
     setTargetHeight,
+    setMatchTargetAspect,
     setColorLevels,
     setDitherStrength,
     setPaletteMode,

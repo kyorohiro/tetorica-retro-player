@@ -64,6 +64,7 @@ type RetroFilterPanelProps = {
   sourceDimensions: { width: number; height: number } | null;
   targetHeight: number;
   targetWidth: number;
+  matchTargetAspect: boolean;
   vignetteStrength: number;
   onApplyPreset: (preset: RetroPresetKey) => void;
   onSetIsFilterEnabled: (value: boolean) => void;
@@ -92,8 +93,8 @@ type RetroFilterPanelProps = {
   onSetNeonDetail: (value: number) => void;
   onSetTargetHeight: (value: number) => void;
   onSetTargetWidth: (value: number) => void;
+  onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
-  onSyncTargetAspect: () => void;
 };
 
 export function RetroFilterPanel({
@@ -125,6 +126,7 @@ export function RetroFilterPanel({
   sourceDimensions,
   targetHeight,
   targetWidth,
+  matchTargetAspect,
   vignetteStrength,
   onApplyPreset,
   onSetIsFilterEnabled,
@@ -153,8 +155,8 @@ export function RetroFilterPanel({
   onSetNeonDetail,
   onSetTargetHeight,
   onSetTargetWidth,
+  onSetMatchTargetAspect,
   onSetVignetteStrength,
-  onSyncTargetAspect,
 }: RetroFilterPanelProps) {
   const isPhosphorDotModeActive =
     spotMaskStrength > 0.001 &&
@@ -366,19 +368,17 @@ export function RetroFilterPanel({
               ? `Source aspect: ${sourceDimensions.width} x ${sourceDimensions.height}`
               : "Source aspect: unavailable for audio-only preview"}
           </div>
-          <button
-            type="button"
-            onClick={onSyncTargetAspect}
-            disabled={!sourceDimensions}
-            className={[
-              "min-h-11 rounded-lg border px-3 py-2 text-slate-100",
-              sourceDimensions
-                ? "border-sky-400/50 bg-sky-500/10 hover:bg-sky-500/20"
-                : "cursor-not-allowed border-slate-700 bg-slate-900 text-slate-500",
-            ].join(" ")}
-          >
-            Match aspect
-          </button>
+          <label className="flex min-h-11 items-center justify-between rounded-lg border border-sky-400/35 bg-sky-500/10 px-3 py-2 text-slate-100">
+            <span>Match aspect</span>
+            <input
+              type="checkbox"
+              checked={matchTargetAspect}
+              onChange={(ev) => {
+                onSetMatchTargetAspect(ev.currentTarget.checked);
+              }}
+              className="h-5 w-5"
+            />
+          </label>
         </div>
 
         <label className="block">

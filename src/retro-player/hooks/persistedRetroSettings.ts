@@ -6,6 +6,7 @@ const STORAGE_VERSION = 1;
 export type PersistedRetroFilterSettings = {
   targetWidth: number;
   targetHeight: number;
+  matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
   paletteMode: PaletteMode;

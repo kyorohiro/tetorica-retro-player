@@ -22,6 +22,7 @@ const targetWidthInput = document.getElementById("targetWidth");
 const targetWidthValue = document.getElementById("targetWidthValue");
 const targetHeightInput = document.getElementById("targetHeight");
 const targetHeightValue = document.getElementById("targetHeightValue");
+const matchTargetAspectInput = document.getElementById("matchTargetAspect");
 const colorLevelsInput = document.getElementById("colorLevels");
 const colorLevelsValue = document.getElementById("colorLevelsValue");
 const ditherStrengthInput = document.getElementById("ditherStrength");
@@ -145,6 +146,7 @@ presetSelect.addEventListener("change", () => {
 
   currentSettings = normalizeSettings({
     ...applyPresetToSettings(presetSelect.value),
+    matchTargetAspect: currentSettings.matchTargetAspect,
     scanlineBrightnessFade: currentSettings.scanlineBrightnessFade,
     closeUpNoiseStrength: currentSettings.closeUpNoiseStrength,
     overlayTargetCount: currentSettings.overlayTargetCount,
@@ -172,16 +174,45 @@ monoTintSelect.addEventListener("change", () => {
 });
 
 targetWidthInput.addEventListener("input", () => {
+  const targetWidth = Number(targetWidthInput.value);
+  if (!currentSettings.matchTargetAspect) {
+    updateSettings({
+      presetKey: CUSTOM_PRESET_KEY,
+      targetWidth,
+    });
+    return;
+  }
+
+  const aspectRatio = Math.max(currentSettings.targetWidth, 1) / Math.max(currentSettings.targetHeight, 1);
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
-    targetWidth: Number(targetWidthInput.value),
+    targetWidth,
+    targetHeight: Math.max(1, Math.round(targetWidth / Math.max(aspectRatio, 0.0001))),
   });
 });
 
 targetHeightInput.addEventListener("input", () => {
+  const targetHeight = Number(targetHeightInput.value);
+  if (!currentSettings.matchTargetAspect) {
+    updateSettings({
+      presetKey: CUSTOM_PRESET_KEY,
+      targetHeight,
+    });
+    return;
+  }
+
+  const aspectRatio = Math.max(currentSettings.targetWidth, 1) / Math.max(currentSettings.targetHeight, 1);
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
-    targetHeight: Number(targetHeightInput.value),
+    targetHeight,
+    targetWidth: Math.max(1, Math.round(targetHeight * aspectRatio)),
+  });
+});
+
+matchTargetAspectInput.addEventListener("change", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    matchTargetAspect: matchTargetAspectInput.checked,
   });
 });
 
@@ -451,6 +482,7 @@ function renderSettings(settings) {
   targetWidthValue.textContent = `${settings.targetWidth}px`;
   targetHeightInput.value = String(settings.targetHeight);
   targetHeightValue.textContent = `${settings.targetHeight}px`;
+  matchTargetAspectInput.checked = settings.matchTargetAspect ?? false;
   colorLevelsInput.value = String(settings.colorLevels);
   colorLevelsValue.textContent = String(settings.colorLevels);
   colorLevelsInput.disabled =
