@@ -160,6 +160,8 @@ export function usePixiVideoPlayer(
     setIsNoiseEnabled,
     noiseLevel,
     setNoiseLevel,
+    vinylDustAmount,
+    setVinylDustAmount,
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
@@ -774,6 +776,7 @@ export function usePixiVideoPlayer(
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
+    vinylDustAmount,
     hasPlayableMedia:
       previewKind === "video" || previewKind === "audio" || previewKind === "capture",
     hasVideo: previewKind === "video" || previewKind === "capture",
@@ -828,5 +831,6 @@ export function usePixiVideoPlayer(
       setIsNoiseEnabled((current) => !current);
     },
     setNoiseLevel,
+    setVinylDustAmount,
   };
 }

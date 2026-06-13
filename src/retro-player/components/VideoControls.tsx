@@ -38,6 +38,7 @@ type VideoControlsProps = {
   smallSpeakerRoomAmount: number;
   wowFlutterAmount: number;
   noiseLevel: number;
+  vinylDustAmount: number;
   playbackRate: number;
   volume: number;
   onChangeLofiAmount: (amount: number) => void;
@@ -51,6 +52,7 @@ type VideoControlsProps = {
   onChangeSmallSpeakerRoomAmount: (amount: number) => void;
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
+  onChangeVinylDustAmount: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
   onChangeVolume: (volume: number) => void;
   onRestart: () => void;
@@ -102,6 +104,7 @@ export function VideoControls({
   smallSpeakerRoomAmount,
   wowFlutterAmount,
   noiseLevel,
+  vinylDustAmount,
   playbackRate,
   volume,
   onChangeLofiAmount,
@@ -115,6 +118,7 @@ export function VideoControls({
   onChangeSmallSpeakerRoomAmount,
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
+  onChangeVinylDustAmount,
   onChangePlaybackRate,
   onChangeVolume,
   onRestart: _onRestart,
@@ -132,17 +136,17 @@ export function VideoControls({
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
   const [selectedAudioPreset, setSelectedAudioPreset] = useState<
-    "none" | "lofi" | "radio" | "tape" | "earphone" | null
+    "none" | "lofi" | "radio" | "tape" | "vinyl" | "earphone" | null
   >(null);
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
 
   const applyAudioPreset = (
-    preset: "none" | "lofi" | "radio" | "tape" | "earphone",
+    preset: "none" | "lofi" | "radio" | "tape" | "vinyl" | "earphone",
   ) => {
     const presetNeedsFx = preset !== "none";
     const presetNeedsNoise =
-      preset === "lofi" || preset === "radio" || preset === "tape";
+      preset === "lofi" || preset === "radio" || preset === "tape" || preset === "vinyl";
 
     if (presetNeedsFx && !isAudioFxEnabled) {
       onToggleAudioFx();
@@ -168,10 +172,11 @@ export function VideoControls({
         onChangeSmallSpeakerRoomAmount(0);
         onChangeWowFlutterAmount(0);
         onChangeNoiseLevel(0);
+        onChangeVinylDustAmount(0);
         break;
       case "lofi":
         onChangeVolume(0.92);
-        onChangeLofiAmount(0.25);
+        onChangeLofiAmount(0.7);
         onChangeRadioToneAmount(0.18);
         onChangeBitCrushAmount(0.22);
         onChangeSampleRateReductionAmount(0.24);
@@ -182,6 +187,7 @@ export function VideoControls({
         onChangeSmallSpeakerRoomAmount(0.08);
         onChangeWowFlutterAmount(0.12);
         onChangeNoiseLevel(0.005);
+        onChangeVinylDustAmount(0);
         break;
       case "radio":
         onChangeVolume(0.88);
@@ -196,6 +202,7 @@ export function VideoControls({
         onChangeSmallSpeakerRoomAmount(0.12);
         onChangeWowFlutterAmount(0.08);
         onChangeNoiseLevel(0.01);
+        onChangeVinylDustAmount(0);
         break;
       case "tape":
         onChangeVolume(0.94);
@@ -210,6 +217,22 @@ export function VideoControls({
         onChangeSmallSpeakerRoomAmount(0.18);
         onChangeWowFlutterAmount(0.42);
         onChangeNoiseLevel(0.0075);
+        onChangeVinylDustAmount(0);
+        break;
+      case "vinyl":
+        onChangeVolume(0.96);
+        onChangeLofiAmount(0.14);
+        onChangeRadioToneAmount(0.06);
+        onChangeBitCrushAmount(0.01);
+        onChangeSampleRateReductionAmount(0.03);
+        onChangeBassAmount(0.06);
+        onChangeMidAmount(-0.02);
+        onChangeTrebleAmount(-0.16);
+        onChangeStereoWidthAmount(-0.18);
+        onChangeSmallSpeakerRoomAmount(0.03);
+        onChangeWowFlutterAmount(0.18);
+        onChangeNoiseLevel(0.0035);
+        onChangeVinylDustAmount(0.58);
         break;
       case "earphone":
         onChangeVolume(1);
@@ -224,6 +247,7 @@ export function VideoControls({
         onChangeSmallSpeakerRoomAmount(0);
         onChangeWowFlutterAmount(0);
         onChangeNoiseLevel(0);
+        onChangeVinylDustAmount(0);
         break;
     }
 
@@ -286,6 +310,7 @@ export function VideoControls({
               ["lofi", "Lo-Fi"],
               ["radio", "Radio"],
               ["tape", "Tape"],
+              ["vinyl", "Vinyl"],
               ["earphone", "Earphone"],
             ].map(([key, label]) => (
               <button
@@ -293,7 +318,7 @@ export function VideoControls({
                 type="button"
                 onClick={() => {
                   applyAudioPreset(
-                    key as "none" | "lofi" | "radio" | "tape" | "earphone",
+                    key as "none" | "lofi" | "radio" | "tape" | "vinyl" | "earphone",
                   );
                 }}
                 className={[
@@ -533,7 +558,7 @@ export function VideoControls({
           </p>
           <div>
             <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Spatial noise</span>
+              <span>Surface hiss</span>
               <span>{(noiseLevel * 100).toFixed(2)}%</span>
             </div>
             <input
@@ -544,6 +569,23 @@ export function VideoControls({
               value={noiseLevel * 100}
               onChange={(ev) => {
                 onChangeNoiseLevel(Number(ev.currentTarget.value) / 100);
+              }}
+              className="w-full"
+            />
+          </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Vinyl dust</span>
+              <span>{Math.round(vinylDustAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={vinylDustAmount}
+              onChange={(ev) => {
+                onChangeVinylDustAmount(Number(ev.currentTarget.value));
               }}
               className="w-full"
             />

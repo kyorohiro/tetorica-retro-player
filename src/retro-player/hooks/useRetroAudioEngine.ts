@@ -22,6 +22,7 @@ const DEFAULT_AUDIO_SETTINGS = {
   wowFlutterAmount: 0,
   isNoiseEnabled: true,
   noiseLevel: 0.02,
+  vinylDustAmount: 0,
 } as const;
 
 const isRetroPlayerDebugEnabled = () =>
@@ -78,6 +79,8 @@ export function useRetroAudioEngine({
       isNoiseEnabled:
         persisted?.isNoiseEnabled ?? DEFAULT_AUDIO_SETTINGS.isNoiseEnabled,
       noiseLevel: persisted?.noiseLevel ?? DEFAULT_AUDIO_SETTINGS.noiseLevel,
+      vinylDustAmount:
+        persisted?.vinylDustAmount ?? DEFAULT_AUDIO_SETTINGS.vinylDustAmount,
     };
   });
 
@@ -109,6 +112,11 @@ export function useRetroAudioEngine({
   const noiseGainRef = useRef<GainNode | null>(null);
   const noiseLfoRef = useRef<OscillatorNode | null>(null);
   const noiseLfoGainRef = useRef<GainNode | null>(null);
+  const crackleSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const crackleFilterRef = useRef<BiquadFilterNode | null>(null);
+  const vinylDustBedFilterRef = useRef<BiquadFilterNode | null>(null);
+  const vinylDustBedGainRef = useRef<GainNode | null>(null);
+  const crackleGainRef = useRef<GainNode | null>(null);
   const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
   const volumeRef = useRef<number>(initialAudioSettings.volume);
@@ -131,6 +139,7 @@ export function useRetroAudioEngine({
   const wowFlutterAmountRef = useRef<number>(initialAudioSettings.wowFlutterAmount);
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
+  const vinylDustAmountRef = useRef<number>(initialAudioSettings.vinylDustAmount);
 
   const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRate] = useState<number>(
@@ -173,6 +182,9 @@ export function useRetroAudioEngine({
     initialAudioSettings.isNoiseEnabled,
   );
   const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
+  const [vinylDustAmount, setVinylDustAmount] = useState<number>(
+    initialAudioSettings.vinylDustAmount,
+  );
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -199,7 +211,7 @@ export function useRetroAudioEngine({
   };
 
   const createSmallRoomImpulse = (context: AudioContext) => {
-    const duration = 0.14;
+    const duration = 0.22;
     const length = Math.max(1, Math.floor(context.sampleRate * duration));
     const impulse = context.createBuffer(2, length, context.sampleRate);
 
@@ -207,9 +219,11 @@ export function useRetroAudioEngine({
       const channelData = impulse.getChannelData(channel);
       for (let index = 0; index < channelData.length; index += 1) {
         const t = index / channelData.length;
-        const decay = (1 - t) ** 2.2;
-        const flutter = 0.82 + 0.18 * Math.sin(t * 36 + channel * 0.7);
-        channelData[index] = (Math.random() * 2 - 1) * decay * flutter * 0.18;
+        const decay = (1 - t) ** 1.85;
+        const flutter = 0.78 + 0.22 * Math.sin(t * 42 + channel * 0.9);
+        const earlyReflection = Math.sin(t * 130 + channel * 0.35) * 0.08;
+        channelData[index] =
+          ((Math.random() * 2 - 1) + earlyReflection) * decay * flutter * 0.28;
       }
     }
 
@@ -240,6 +254,68 @@ export function useRetroAudioEngine({
     return buffer;
   };
 
+  const createVinylDustBuffer = (context: AudioContext) => {
+    const length = context.sampleRate * 2;
+    const monoData = new Float32Array(length);
+    let index = 0;
+    let dustState = 0;
+
+    while (index < length) {
+      const white = Math.random() * 2 - 1;
+      dustState = dustState * 0.72 + white * 0.28;
+      monoData[index] += (white - dustState) * 0.018;
+
+      const random = Math.random();
+
+      if (random < 0.0034) {
+        const crackleLength = 8 + Math.floor(Math.random() * 42);
+        const crackleAmplitude = 0.11 + Math.random() * 0.28;
+        const polarity = Math.random() < 0.5 ? -1 : 1;
+
+        for (let offset = 0; offset < crackleLength && index + offset < length; offset += 1) {
+          const decay = Math.exp(-offset / (2.4 + Math.random() * 5));
+          monoData[index + offset] +=
+            polarity * crackleAmplitude * decay * (0.7 + Math.random() * 0.3);
+        }
+
+        index += crackleLength + Math.floor(Math.random() * 640);
+        continue;
+      }
+
+      if (random < 0.0038) {
+        const popLength = 90 + Math.floor(Math.random() * 260);
+        const popAmplitude = 0.055 + Math.random() * 0.11;
+        const phase = Math.random() * Math.PI * 2;
+
+        for (let offset = 0; offset < popLength && index + offset < length; offset += 1) {
+          const decay = Math.exp(-offset / (18 + Math.random() * 40));
+          const wobble = Math.sin(phase + offset * (0.22 + Math.random() * 0.06));
+          monoData[index + offset] += popAmplitude * decay * wobble;
+        }
+
+        index += popLength + Math.floor(Math.random() * 2200);
+        continue;
+      }
+
+      index += 1;
+    }
+
+    const buffer = context.createBuffer(2, length, context.sampleRate);
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const channelData = buffer.getChannelData(channel);
+
+      for (let sampleIndex = 0; sampleIndex < length; sampleIndex += 1) {
+        const channelJitter = (Math.random() * 2 - 1) * 0.0035;
+        channelData[sampleIndex] = Math.max(
+          -1,
+          Math.min(1, monoData[sampleIndex] + channelJitter),
+        );
+      }
+    }
+
+    return buffer;
+  };
+
   const updateAudioNodes = () => {
     const masterGain = masterGainRef.current;
     const radioToneHighpass = radioToneHighpassRef.current;
@@ -261,6 +337,9 @@ export function useRetroAudioEngine({
     const flutterLfo = flutterLfoRef.current;
     const flutterLfoGain = flutterLfoGainRef.current;
     const noiseGainNode = noiseGainRef.current;
+    const crackleGainNode = crackleGainRef.current;
+    const vinylDustBedFilter = vinylDustBedFilterRef.current;
+    const vinylDustBedGain = vinylDustBedGainRef.current;
     const media = mediaRef.current;
     const currentPreviewKind = previewKindRef.current;
     const hasPlayablePreview =
@@ -283,6 +362,7 @@ export function useRetroAudioEngine({
     const nextWowFlutterAmount = wowFlutterAmountRef.current;
     const nextNoiseEnabled = isNoiseEnabledRef.current;
     const nextNoiseLevel = noiseLevelRef.current;
+    const nextVinylDustAmount = vinylDustAmountRef.current;
     const audibleMasterGain =
       nextMuted || !hasPlayablePreview ? 0 : nextVolume;
 
@@ -355,8 +435,8 @@ export function useRetroAudioEngine({
 
     if (roomDryGain && roomWetGain) {
       const amount = nextAudioFxEnabled ? nextSmallSpeakerRoomAmount : 0;
-      roomDryGain.gain.value = 1 - amount * 0.12;
-      roomWetGain.gain.value = amount * 0.35;
+      roomDryGain.gain.value = Math.max(0.52, 1 - amount * 0.42);
+      roomWetGain.gain.value = amount * 0.95;
     }
 
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
@@ -371,8 +451,34 @@ export function useRetroAudioEngine({
     if (noiseGainNode) {
       noiseGainNode.gain.value =
         nextNoiseEnabled && !nextMuted && hasPlayablePreview && isMediaPlaying
-          ? nextNoiseLevel
+          ? Math.min(0.24, nextNoiseLevel * 5.5)
           : 0;
+    }
+
+    if (crackleGainNode) {
+      const isCrackleActive =
+        nextNoiseEnabled &&
+        !nextMuted &&
+        hasPlayablePreview &&
+        isMediaPlaying;
+      crackleGainNode.gain.value = isCrackleActive
+        ? Math.min(
+            0.24,
+            nextVinylDustAmount * 0.22 + nextNoiseLevel * 0.25,
+          )
+        : 0;
+    }
+
+    if (vinylDustBedFilter && vinylDustBedGain) {
+      const isDustBedActive =
+        nextNoiseEnabled &&
+        !nextMuted &&
+        hasPlayablePreview &&
+        isMediaPlaying;
+      const amount = isDustBedActive ? nextVinylDustAmount : 0;
+      vinylDustBedFilter.frequency.value = 2100 + amount * 2600;
+      vinylDustBedFilter.Q.value = 0.35 + amount * 0.25;
+      vinylDustBedGain.gain.value = amount * 0.11;
     }
   };
 
@@ -408,6 +514,11 @@ export function useRetroAudioEngine({
       noiseGainRef.current = null;
       noiseLfoRef.current = null;
       noiseLfoGainRef.current = null;
+      crackleSourceRef.current = null;
+      crackleFilterRef.current = null;
+      vinylDustBedFilterRef.current = null;
+      vinylDustBedGainRef.current = null;
+      crackleGainRef.current = null;
     }
 
     if (!audioContextRef.current) {
@@ -531,6 +642,11 @@ export function useRetroAudioEngine({
       const noiseGain = context.createGain();
       const noiseLfo = context.createOscillator();
       const noiseLfoGain = context.createGain();
+      const crackleSource = context.createBufferSource();
+      const crackleFilter = context.createBiquadFilter();
+      const vinylDustBedFilter = context.createBiquadFilter();
+      const vinylDustBedGain = context.createGain();
+      const crackleGain = context.createGain();
 
       masterGain.gain.value = 0;
       noiseGain.gain.value = 0;
@@ -538,6 +654,16 @@ export function useRetroAudioEngine({
       noiseLfo.type = "sine";
       noiseLfo.frequency.value = 0.021;
       noiseLfoGain.gain.value = 0.08;
+      crackleSource.buffer = createVinylDustBuffer(context);
+      crackleSource.loop = true;
+      crackleFilter.type = "highpass";
+      crackleFilter.frequency.value = 1250;
+      crackleFilter.Q.value = 0.35;
+      vinylDustBedFilter.type = "bandpass";
+      vinylDustBedFilter.frequency.value = 2400;
+      vinylDustBedFilter.Q.value = 0.4;
+      vinylDustBedGain.gain.value = 0;
+      crackleGain.gain.value = 0;
 
       noiseSource.connect(noiseHighpass);
       noiseHighpass.connect(noiseLowpass);
@@ -547,8 +673,15 @@ export function useRetroAudioEngine({
       noiseGain.connect(masterGain);
       noiseLfo.connect(noiseLfoGain);
       noiseLfoGain.connect(noisePanner.pan);
+      crackleSource.connect(crackleFilter);
+      crackleFilter.connect(crackleGain);
+      crackleGain.connect(masterGain);
+      crackleSource.connect(vinylDustBedFilter);
+      vinylDustBedFilter.connect(vinylDustBedGain);
+      vinylDustBedGain.connect(masterGain);
       noiseSource.start();
       noiseLfo.start();
+      crackleSource.start();
       wowLfo.start();
       flutterLfo.start();
 
@@ -579,6 +712,11 @@ export function useRetroAudioEngine({
       noiseGainRef.current = noiseGain;
       noiseLfoRef.current = noiseLfo;
       noiseLfoGainRef.current = noiseLfoGain;
+      crackleSourceRef.current = crackleSource;
+      crackleFilterRef.current = crackleFilter;
+      vinylDustBedFilterRef.current = vinylDustBedFilter;
+      vinylDustBedGainRef.current = vinylDustBedGain;
+      crackleGainRef.current = crackleGain;
       recordingDestinationRef.current = recordingDestination;
     }
 
@@ -605,6 +743,12 @@ export function useRetroAudioEngine({
 
     try {
       noiseLfoRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      crackleSourceRef.current?.stop();
     } catch {
       // already stopped
     }
@@ -650,6 +794,11 @@ export function useRetroAudioEngine({
     noiseGainRef.current = null;
     noiseLfoRef.current = null;
     noiseLfoGainRef.current = null;
+    crackleSourceRef.current = null;
+    crackleFilterRef.current = null;
+    vinylDustBedFilterRef.current = null;
+    vinylDustBedGainRef.current = null;
+    crackleGainRef.current = null;
 
     if (!context || context.state === "closed") {
       return;
@@ -736,6 +885,7 @@ export function useRetroAudioEngine({
     wowFlutterAmountRef.current = nextSettings.wowFlutterAmount;
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
+    vinylDustAmountRef.current = nextSettings.vinylDustAmount;
 
     setIsMuted(nextSettings.isMuted);
     setVolume(nextSettings.volume);
@@ -754,6 +904,7 @@ export function useRetroAudioEngine({
     setWowFlutterAmount(nextSettings.wowFlutterAmount);
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
+    setVinylDustAmount(nextSettings.vinylDustAmount);
 
     if (mediaRef.current) {
       mediaRef.current.muted = nextSettings.isMuted;
@@ -783,6 +934,7 @@ export function useRetroAudioEngine({
     wowFlutterAmountRef.current = wowFlutterAmount;
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
+    vinylDustAmountRef.current = vinylDustAmount;
 
     updateAudioNodes();
   }, [
@@ -801,6 +953,7 @@ export function useRetroAudioEngine({
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
+    vinylDustAmount,
     isPlaying,
     playbackRate,
     isLooping,
@@ -826,6 +979,7 @@ export function useRetroAudioEngine({
       wowFlutterAmount,
       isNoiseEnabled,
       noiseLevel,
+      vinylDustAmount,
     });
   }, [
     isMuted,
@@ -845,6 +999,7 @@ export function useRetroAudioEngine({
     wowFlutterAmount,
     isNoiseEnabled,
     noiseLevel,
+    vinylDustAmount,
   ]);
 
   return {
@@ -877,6 +1032,11 @@ export function useRetroAudioEngine({
     noiseGainRef,
     noiseLfoRef,
     noiseLfoGainRef,
+    crackleSourceRef,
+    crackleFilterRef,
+    vinylDustBedFilterRef,
+    vinylDustBedGainRef,
+    crackleGainRef,
     isMutedRef,
     volumeRef,
     playbackRateRef,
@@ -894,6 +1054,7 @@ export function useRetroAudioEngine({
     wowFlutterAmountRef,
     isNoiseEnabledRef,
     noiseLevelRef,
+    vinylDustAmountRef,
     isMuted,
     setIsMuted,
     playbackRate,
@@ -928,6 +1089,8 @@ export function useRetroAudioEngine({
     setIsNoiseEnabled,
     noiseLevel,
     setNoiseLevel,
+    vinylDustAmount,
+    setVinylDustAmount,
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
