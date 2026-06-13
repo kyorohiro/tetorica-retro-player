@@ -562,7 +562,7 @@ export function VideoControls({
         </>
       )}
 
-      <div className={`grid gap-2 ${hasPlayback ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
           onClick={onToggleVideoSettings}
@@ -571,16 +571,14 @@ export function VideoControls({
           <SlidersHorizontal size={16} />
           {isVideoSettingsOpen ? "Close Video" : "Video"}
         </button>
-        {hasPlayback && (
-          <button
-            type="button"
-            onClick={onToggleAudioSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30"
-          >
-            <Mic2 size={16} />
-            Audio
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onToggleAudioSettings}
+          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30"
+        >
+          <Mic2 size={16} />
+          Audio
+        </button>
         {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
         <button
           type="button"
