@@ -22,6 +22,7 @@ uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
 uniform float uBlackFloor;
+uniform float uPhosphorDotLightBalance;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotInternalScale;
@@ -635,6 +636,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float minChannel = min(min(color.r, color.g), color.b);
   float saturation = brightness - minChannel;
   float chromaLift = smoothstep(0.04, 0.28, saturation) * smoothstep(0.0, 0.22, brightness);
+  float lightLevel = clamp(uPhosphorDotLightBalance, 0.0, 2.0);
   float perceivedLight = max(luminance, brightness * 0.72 + chromaLift * 0.12);
   vec2 cellIndex = floor(gridUv * targetSize);
   float cellJitter = hash12(cellIndex + vec2(17.0, 43.0)) - 0.5;
@@ -717,7 +719,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   vec3 discCoreColor = color * flatDiscFill;
   vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
   dotColor += color * floorLight;
-  return dotColor;
+  return dotColor * lightLevel;
 }
 
 vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)

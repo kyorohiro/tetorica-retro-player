@@ -888,6 +888,7 @@ export function RetroPlayer({
                 spotMaskStrength={filterState.spotMaskStrength}
                 bulbRadius={filterState.bulbRadius}
                 blackFloor={filterState.blackFloor}
+                phosphorDotLightBalance={filterState.phosphorDotLightBalance}
                 phosphorDotInternalScale={filterState.phosphorDotInternalScale}
                 phosphorDotBrightCore={filterState.phosphorDotBrightCore}
                 phosphorDotCellFill={filterState.phosphorDotCellFill}
@@ -917,6 +918,7 @@ export function RetroPlayer({
                 onSetSpotMaskStrength={filterState.setSpotMaskStrength}
                 onSetBulbRadius={filterState.setBulbRadius}
                 onSetBlackFloor={filterState.setBlackFloor}
+                onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
                 onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
                 onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
                 onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}

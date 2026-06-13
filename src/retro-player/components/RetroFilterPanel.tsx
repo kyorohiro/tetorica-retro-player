@@ -47,6 +47,7 @@ type RetroFilterPanelProps = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
@@ -76,6 +77,7 @@ type RetroFilterPanelProps = {
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
+  onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotInternalScale: (value: boolean) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
@@ -106,6 +108,7 @@ export function RetroFilterPanel({
   spotMaskStrength,
   bulbRadius,
   blackFloor,
+  phosphorDotLightBalance,
   phosphorDotInternalScale,
   phosphorDotBrightCore,
   phosphorDotCellFill,
@@ -135,6 +138,7 @@ export function RetroFilterPanel({
   onSetSpotMaskStrength,
   onSetBulbRadius,
   onSetBlackFloor,
+  onSetPhosphorDotLightBalance,
   onSetPhosphorDotInternalScale,
   onSetPhosphorDotBrightCore,
   onSetPhosphorDotCellFill,
@@ -705,6 +709,26 @@ export function RetroFilterPanel({
               value={blackFloor}
               onChange={(ev) => {
                 onSetBlackFloor(Number(ev.currentTarget.value));
+              }}
+              className="mt-2 w-full"
+            />
+          </label>
+
+          <label className="mt-3 block">
+            <span className="text-slate-100">
+              <InfoTip
+                label={`Light level: ${phosphorDotLightBalance.toFixed(2)}`}
+                text="Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly."
+              />
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.01"
+              value={phosphorDotLightBalance}
+              onChange={(ev) => {
+                onSetPhosphorDotLightBalance(Number(ev.currentTarget.value));
               }}
               className="mt-2 w-full"
             />

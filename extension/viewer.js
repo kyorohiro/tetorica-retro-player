@@ -479,6 +479,10 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uBulbRadius, currentSettings.bulbRadius ?? 0.22);
   gl.uniform1f(uniformLocations.uBlackFloor, currentSettings.blackFloor ?? 0.01);
   gl.uniform1f(
+    uniformLocations.uPhosphorDotLightBalance,
+    currentSettings.phosphorDotLightBalance ?? 1,
+  );
+  gl.uniform1f(
     uniformLocations.uPixelAspect,
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(currentSettings.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(currentSettings.targetWidth, 1)),
@@ -951,6 +955,7 @@ function setupRenderer(webgl) {
     uSpotMaskStrength: webgl.getUniformLocation(program, "uSpotMaskStrength"),
     uBulbRadius: webgl.getUniformLocation(program, "uBulbRadius"),
     uBlackFloor: webgl.getUniformLocation(program, "uBlackFloor"),
+    uPhosphorDotLightBalance: webgl.getUniformLocation(program, "uPhosphorDotLightBalance"),
     uPixelAspect: webgl.getUniformLocation(program, "uPixelAspect"),
     uPhosphorDotMode: webgl.getUniformLocation(program, "uPhosphorDotMode"),
     uPhosphorDotInternalScale: webgl.getUniformLocation(program, "uPhosphorDotInternalScale"),

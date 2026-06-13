@@ -19,6 +19,7 @@ export type PersistedRetroFilterSettings = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;

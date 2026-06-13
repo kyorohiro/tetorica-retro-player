@@ -29,6 +29,7 @@ export type RetroFilterInitialState = Partial<{
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
@@ -66,6 +67,7 @@ const resolvePresetKeyFromState = (
       preset.spotMask === state.spotMaskStrength &&
       preset.bulbRadius === state.bulbRadius &&
       preset.blackFloor === state.blackFloor &&
+      (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
       (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
       (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
       (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
@@ -114,6 +116,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
     blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
+    phosphorDotLightBalance:
+      initialState.phosphorDotLightBalance ?? (DEFAULT_PRESET.phosphorDotLightBalance ?? 1),
     phosphorDotInternalScale:
       initialState.phosphorDotInternalScale ?? (DEFAULT_PRESET.phosphorDotInternalScale ?? false),
     phosphorDotBrightCore:
@@ -222,6 +226,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, blackFloor }));
   };
 
+  const setPhosphorDotLightBalance = (phosphorDotLightBalance: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, phosphorDotLightBalance }));
+  };
+
   const setPhosphorDotInternalScale = (phosphorDotInternalScale: boolean) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, phosphorDotInternalScale }));
@@ -296,6 +305,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       spotMaskStrength: presetSettings.spotMask,
       bulbRadius: presetSettings.bulbRadius,
       blackFloor: presetSettings.blackFloor,
+      phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? false,
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
@@ -336,6 +346,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSpotMaskStrength,
     setBulbRadius,
     setBlackFloor,
+    setPhosphorDotLightBalance,
     setPhosphorDotInternalScale,
     setPhosphorDotBrightCore,
     setPhosphorDotCellFill,
