@@ -534,11 +534,11 @@ export function normalizeSettings(candidate) {
     monoTint,
     targetWidth:
       typeof candidate?.targetWidth === "number"
-        ? clamp(candidate.targetWidth, 160, 2560)
+        ? clamp(candidate.targetWidth, 1, 2560)
         : basePresetSettings.targetWidth,
     targetHeight:
       typeof candidate?.targetHeight === "number"
-        ? clamp(candidate.targetHeight, 100, 2560)
+        ? clamp(candidate.targetHeight, 1, 2560)
         : basePresetSettings.targetHeight,
     ditherStrength:
       typeof candidate?.ditherStrength === "number"
