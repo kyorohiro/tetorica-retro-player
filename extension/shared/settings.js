@@ -574,7 +574,7 @@ export function normalizeSettings(candidate) {
         : basePresetSettings.phosphorStrength,
     spotMaskStrength:
       typeof candidate?.spotMaskStrength === "number"
-        ? clamp(candidate.spotMaskStrength, 0, 0.5)
+        ? clamp(candidate.spotMaskStrength, 0, 1.0)
         : basePresetSettings.spotMaskStrength ?? DEFAULT_SETTINGS.spotMaskStrength,
     phosphorDotMode:
       typeof candidate?.phosphorDotMode === "boolean"
