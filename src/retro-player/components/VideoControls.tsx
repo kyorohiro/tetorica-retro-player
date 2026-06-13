@@ -131,13 +131,112 @@ export function VideoControls({
   onToggleAudioSettings,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
+  const [selectedAudioPreset, setSelectedAudioPreset] = useState<
+    "none" | "lofi" | "radio" | "tape" | "earphone" | null
+  >(null);
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
+
+  const applyAudioPreset = (
+    preset: "none" | "lofi" | "radio" | "tape" | "earphone",
+  ) => {
+    const presetNeedsFx = preset !== "none";
+    const presetNeedsNoise = preset === "radio" || preset === "tape";
+
+    if (presetNeedsFx && !isAudioFxEnabled) {
+      onToggleAudioFx();
+    }
+    if (!presetNeedsFx && isAudioFxEnabled) {
+      onToggleAudioFx();
+    }
+    if (presetNeedsNoise !== isNoiseEnabled) {
+      onToggleNoise();
+    }
+
+    switch (preset) {
+      case "none":
+        onChangeVolume(1);
+        onChangeLofiAmount(0);
+        onChangeRadioToneAmount(0);
+        onChangeBitCrushAmount(0);
+        onChangeSampleRateReductionAmount(0);
+        onChangeBassAmount(0);
+        onChangeMidAmount(0);
+        onChangeTrebleAmount(0);
+        onChangeStereoWidthAmount(0);
+        onChangeSmallSpeakerRoomAmount(0);
+        onChangeWowFlutterAmount(0);
+        onChangeNoiseLevel(0);
+        break;
+      case "lofi":
+        onChangeVolume(0.92);
+        onChangeLofiAmount(0.72);
+        onChangeRadioToneAmount(0.18);
+        onChangeBitCrushAmount(0.22);
+        onChangeSampleRateReductionAmount(0.24);
+        onChangeBassAmount(0.08);
+        onChangeMidAmount(-0.08);
+        onChangeTrebleAmount(-0.18);
+        onChangeStereoWidthAmount(-0.08);
+        onChangeSmallSpeakerRoomAmount(0.08);
+        onChangeWowFlutterAmount(0.12);
+        onChangeNoiseLevel(0.004);
+        break;
+      case "radio":
+        onChangeVolume(0.88);
+        onChangeLofiAmount(0.4);
+        onChangeRadioToneAmount(0.9);
+        onChangeBitCrushAmount(0.12);
+        onChangeSampleRateReductionAmount(0.38);
+        onChangeBassAmount(-0.4);
+        onChangeMidAmount(0.18);
+        onChangeTrebleAmount(-0.32);
+        onChangeStereoWidthAmount(-0.55);
+        onChangeSmallSpeakerRoomAmount(0.12);
+        onChangeWowFlutterAmount(0.08);
+        onChangeNoiseLevel(0.01);
+        break;
+      case "tape":
+        onChangeVolume(0.94);
+        onChangeLofiAmount(0.22);
+        onChangeRadioToneAmount(0.1);
+        onChangeBitCrushAmount(0.04);
+        onChangeSampleRateReductionAmount(0.08);
+        onChangeBassAmount(0.12);
+        onChangeMidAmount(0);
+        onChangeTrebleAmount(-0.14);
+        onChangeStereoWidthAmount(0.06);
+        onChangeSmallSpeakerRoomAmount(0.18);
+        onChangeWowFlutterAmount(0.42);
+        onChangeNoiseLevel(0.007);
+        break;
+      case "earphone":
+        onChangeVolume(1);
+        onChangeLofiAmount(0);
+        onChangeRadioToneAmount(0);
+        onChangeBitCrushAmount(0);
+        onChangeSampleRateReductionAmount(0);
+        onChangeBassAmount(0.1);
+        onChangeMidAmount(0);
+        onChangeTrebleAmount(0.08);
+        onChangeStereoWidthAmount(0.22);
+        onChangeSmallSpeakerRoomAmount(0);
+        onChangeWowFlutterAmount(0);
+        onChangeNoiseLevel(0);
+        break;
+    }
+
+    setSelectedAudioPreset(preset);
+  };
 
   if (mode === "audio-settings") {
     return (
       <div className="mt-3 space-y-3 rounded-xl border border-slate-700 bg-slate-900/50 p-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-100">Audio settings</p>
+            <p className="text-[11px] text-slate-400">Shape the sound with effects, noise, and space.</p>
+          </div>
           <button
             type="button"
             onClick={onBackToPlayback}
@@ -147,7 +246,7 @@ export function VideoControls({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={onToggleAudioFx}
@@ -159,7 +258,7 @@ export function VideoControls({
             ].join(" ")}
           >
             <Waves size={16} />
-            {isAudioFxEnabled ? "Lo-Fi on" : "Lo-Fi off"}
+            {isAudioFxEnabled ? "Effects on" : "Effects off"}
           </button>
           <button
             type="button"
@@ -176,226 +275,278 @@ export function VideoControls({
           </button>
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Volume</span>
-            <span>{Math.round(volume * 100)}%</span>
+        <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Presets
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ["none", "None"],
+              ["lofi", "Lo-Fi"],
+              ["radio", "Radio"],
+              ["tape", "Tape"],
+              ["earphone", "Earphone"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  applyAudioPreset(
+                    key as "none" | "lofi" | "radio" | "tape" | "earphone",
+                  );
+                }}
+                className={[
+                  "inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm transition",
+                  selectedAudioPreset === key
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50 shadow-[0_0_14px_rgba(74,222,128,0.45)]"
+                    : "border-cyan-400/40 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/20",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={volume}
-            onChange={(ev) => {
-              onChangeVolume(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Lo-Fi amount</span>
-            <span>{Math.round(lofiAmount * 100)}%</span>
+        <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Effects
+          </p>
+          <div className="space-y-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Lo-Fi amount</span>
+                <span>{Math.round(lofiAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={lofiAmount}
+                onChange={(ev) => {
+                  onChangeLofiAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Radio tone</span>
+                <span>{Math.round(radioToneAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={radioToneAmount}
+                onChange={(ev) => {
+                  onChangeRadioToneAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Bit crush</span>
+                <span>{Math.round(bitCrushAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={bitCrushAmount}
+                onChange={(ev) => {
+                  onChangeBitCrushAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Sample rate</span>
+                <span>{Math.round(sampleRateReductionAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={sampleRateReductionAmount}
+                onChange={(ev) => {
+                  onChangeSampleRateReductionAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Wow & Flutter</span>
+                <span>{Math.round(wowFlutterAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={wowFlutterAmount}
+                onChange={(ev) => {
+                  onChangeWowFlutterAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Bass</span>
+                <span>{bassAmount >= 0 ? "+" : ""}{(bassAmount * 15).toFixed(1)} dB</span>
+              </div>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.01"
+                value={bassAmount}
+                onChange={(ev) => {
+                  onChangeBassAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Mid</span>
+                <span>{midAmount >= 0 ? "+" : ""}{(midAmount * 15).toFixed(1)} dB</span>
+              </div>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.01"
+                value={midAmount}
+                onChange={(ev) => {
+                  onChangeMidAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Treble</span>
+                <span>{trebleAmount >= 0 ? "+" : ""}{(trebleAmount * 15).toFixed(1)} dB</span>
+              </div>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.01"
+                value={trebleAmount}
+                onChange={(ev) => {
+                  onChangeTrebleAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={lofiAmount}
-            onChange={(ev) => {
-              onChangeLofiAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Radio tone</span>
-            <span>{Math.round(radioToneAmount * 100)}%</span>
+        <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Output
+          </p>
+          <div className="space-y-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Volume</span>
+                <span>{Math.round(volume * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(ev) => {
+                  onChangeVolume(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Stereo width</span>
+                <span>
+                  {stereoWidthAmount < 0
+                    ? `Mono ${Math.round(Math.abs(stereoWidthAmount) * 100)}%`
+                    : stereoWidthAmount > 0
+                      ? `Wide ${Math.round(stereoWidthAmount * 100)}%`
+                      : "Original"}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.01"
+                value={stereoWidthAmount}
+                onChange={(ev) => {
+                  onChangeStereoWidthAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Small room</span>
+                <span>{Math.round(smallSpeakerRoomAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={smallSpeakerRoomAmount}
+                onChange={(ev) => {
+                  onChangeSmallSpeakerRoomAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={radioToneAmount}
-            onChange={(ev) => {
-              onChangeRadioToneAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Bit crush</span>
-            <span>{Math.round(bitCrushAmount * 100)}%</span>
+        <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Noise
+          </p>
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Spatial noise</span>
+              <span>{Math.round(noiseLevel * 100)}%</span>
+            </div>
+              <input
+                type="range"
+                min="0"
+                max="0.01"
+                step="0.001"
+                value={noiseLevel}
+                onChange={(ev) => {
+                  onChangeNoiseLevel(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={bitCrushAmount}
-            onChange={(ev) => {
-              onChangeBitCrushAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Sample rate</span>
-            <span>{Math.round(sampleRateReductionAmount * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={sampleRateReductionAmount}
-            onChange={(ev) => {
-              onChangeSampleRateReductionAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Bass</span>
-            <span>{bassAmount >= 0 ? "+" : ""}{(bassAmount * 15).toFixed(1)} dB</span>
-          </div>
-          <input
-            type="range"
-            min="-1"
-            max="1"
-            step="0.01"
-            value={bassAmount}
-            onChange={(ev) => {
-              onChangeBassAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Mid</span>
-            <span>{midAmount >= 0 ? "+" : ""}{(midAmount * 15).toFixed(1)} dB</span>
-          </div>
-          <input
-            type="range"
-            min="-1"
-            max="1"
-            step="0.01"
-            value={midAmount}
-            onChange={(ev) => {
-              onChangeMidAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Treble</span>
-            <span>{trebleAmount >= 0 ? "+" : ""}{(trebleAmount * 15).toFixed(1)} dB</span>
-          </div>
-          <input
-            type="range"
-            min="-1"
-            max="1"
-            step="0.01"
-            value={trebleAmount}
-            onChange={(ev) => {
-              onChangeTrebleAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Stereo width</span>
-            <span>
-              {stereoWidthAmount < 0
-                ? `Mono ${Math.round(Math.abs(stereoWidthAmount) * 100)}%`
-                : stereoWidthAmount > 0
-                  ? `Wide ${Math.round(stereoWidthAmount * 100)}%`
-                  : "Original"}
-            </span>
-          </div>
-          <input
-            type="range"
-            min="-1"
-            max="1"
-            step="0.01"
-            value={stereoWidthAmount}
-            onChange={(ev) => {
-              onChangeStereoWidthAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Small room</span>
-            <span>{Math.round(smallSpeakerRoomAmount * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={smallSpeakerRoomAmount}
-            onChange={(ev) => {
-              onChangeSmallSpeakerRoomAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Wow & Flutter</span>
-            <span>{Math.round(wowFlutterAmount * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={wowFlutterAmount}
-            onChange={(ev) => {
-              onChangeWowFlutterAmount(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Spatial noise</span>
-            <span>{Math.round(noiseLevel * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="0.4"
-            step="0.01"
-            value={noiseLevel}
-            onChange={(ev) => {
-              onChangeNoiseLevel(Number(ev.currentTarget.value));
-            }}
-            className="w-full"
-          />
         </div>
       </div>
     );
