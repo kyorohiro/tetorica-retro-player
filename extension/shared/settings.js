@@ -26,6 +26,7 @@ export const PRESETS = {
     label: "None",
     targetWidth: 1920,
     targetHeight: 1080,
+    matchTargetAspect: false,
     colorLevels: 64,
     ditherStrength: 0.0,
     paletteMode: 0,
@@ -457,6 +458,7 @@ export const DEFAULT_SETTINGS = {
   monoTint: "amber",
   targetWidth: 960,
   targetHeight: 600,
+  matchTargetAspect: false,
   ditherStrength: 0.16,
   curvature: 0.08,
   scanlineStrength: 0.0,
@@ -545,6 +547,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.targetHeight === "number"
         ? clamp(candidate.targetHeight, 1, 2560)
         : basePresetSettings.targetHeight,
+    matchTargetAspect:
+      typeof candidate?.matchTargetAspect === "boolean"
+        ? candidate.matchTargetAspect
+        : basePresetSettings.matchTargetAspect ?? DEFAULT_SETTINGS.matchTargetAspect,
     ditherStrength:
       typeof candidate?.ditherStrength === "number"
         ? clamp(candidate.ditherStrength, 0, 1)
@@ -710,6 +716,10 @@ export function applyPresetToSettings(presetKey) {
         : DEFAULT_SETTINGS.crtAspect,
     targetWidth: preset.targetWidth,
     targetHeight: preset.targetHeight,
+    matchTargetAspect:
+      typeof preset.matchTargetAspect === "boolean"
+        ? preset.matchTargetAspect
+        : DEFAULT_SETTINGS.matchTargetAspect,
     colorLevels: preset.colorLevels,
     ditherStrength: preset.ditherStrength,
     paletteMode: paletteModeFromUniform(preset.paletteMode),

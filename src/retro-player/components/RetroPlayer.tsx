@@ -108,8 +108,72 @@ export function RetroPlayer({
       ) * 8,
     );
 
-    filterState.setTargetHeight(nextHeight);
-  }, [filterState.targetWidth, filterState.setTargetHeight, player.sourceDimensions]);
+    if (nextHeight !== filterState.targetHeight) {
+      filterState.setTargetHeight(nextHeight);
+    }
+  }, [
+    filterState.targetHeight,
+    filterState.targetWidth,
+    filterState.setTargetHeight,
+    player.sourceDimensions,
+  ]);
+
+  const getTargetAspectRatio = React.useCallback(() => {
+    if (player.sourceDimensions?.width && player.sourceDimensions?.height) {
+      return player.sourceDimensions.width / player.sourceDimensions.height;
+    }
+
+    return Math.max(filterState.targetWidth, 1) / Math.max(filterState.targetHeight, 1);
+  }, [
+    filterState.targetHeight,
+    filterState.targetWidth,
+    player.sourceDimensions,
+  ]);
+
+  const handleSetTargetWidth = React.useCallback((targetWidth: number) => {
+    filterState.setTargetWidth(targetWidth);
+    if (!filterState.matchTargetAspect) return;
+
+    const aspectRatio = Math.max(getTargetAspectRatio(), 0.0001);
+    filterState.setTargetHeight(Math.max(1, Math.round(targetWidth / aspectRatio)));
+  }, [
+    filterState,
+    getTargetAspectRatio,
+  ]);
+
+  const handleSetTargetHeight = React.useCallback((targetHeight: number) => {
+    filterState.setTargetHeight(targetHeight);
+    if (!filterState.matchTargetAspect) return;
+
+    const aspectRatio = Math.max(getTargetAspectRatio(), 0.0001);
+    filterState.setTargetWidth(Math.max(1, Math.round(targetHeight * aspectRatio)));
+  }, [
+    filterState,
+    getTargetAspectRatio,
+  ]);
+
+  const handleSetMatchTargetAspect = React.useCallback((matchTargetAspect: boolean) => {
+    filterState.setMatchTargetAspect(matchTargetAspect);
+    if (matchTargetAspect) {
+      if (player.sourceDimensions) {
+        syncTargetAspect();
+      }
+    }
+  }, [
+    filterState,
+    player.sourceDimensions,
+    syncTargetAspect,
+  ]);
+
+  React.useEffect(() => {
+    if (!filterState.matchTargetAspect) return;
+    if (!player.sourceDimensions) return;
+    syncTargetAspect();
+  }, [
+    filterState.matchTargetAspect,
+    player.sourceDimensions,
+    syncTargetAspect,
+  ]);
 
   const applyPresetWithAspect = React.useCallback(
     (presetKey: RetroPresetKey) => {
@@ -902,6 +966,7 @@ export function RetroPlayer({
                 sourceDimensions={player.sourceDimensions}
                 targetHeight={filterState.targetHeight}
                 targetWidth={filterState.targetWidth}
+                matchTargetAspect={filterState.matchTargetAspect}
                 vignetteStrength={filterState.vignetteStrength}
                 onApplyPreset={applyPresetWithAspect}
                 onSetColorLevels={filterState.setColorLevels}
@@ -928,10 +993,10 @@ export function RetroPlayer({
                 onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
                 onSetScanlineStrength={filterState.setScanlineStrength}
                 onSetScanline2Strength={filterState.setScanline2Strength}
-                onSetTargetHeight={filterState.setTargetHeight}
-                onSetTargetWidth={filterState.setTargetWidth}
+                onSetTargetHeight={handleSetTargetHeight}
+                onSetTargetWidth={handleSetTargetWidth}
+                onSetMatchTargetAspect={handleSetMatchTargetAspect}
                 onSetVignetteStrength={filterState.setVignetteStrength}
-                onSyncTargetAspect={syncTargetAspect}
               />
             </div>
           )}
