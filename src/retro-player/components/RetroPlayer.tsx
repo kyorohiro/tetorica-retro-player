@@ -62,7 +62,10 @@ export function RetroPlayer({
   );
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
   const [isPreviewPinned, setIsPreviewPinned] = React.useState(false);
+  const [isAutoPreviewPinned, setIsAutoPreviewPinned] = React.useState(false);
+  const [autoPinnedHiddenOffset, setAutoPinnedHiddenOffset] = React.useState(0);
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
+  const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
   const [pinnedPreviewMetrics, setPinnedPreviewMetrics] = React.useState<{
@@ -374,7 +377,65 @@ export function RetroPlayer({
   }, [isPreviewMaximized]);
 
   React.useEffect(() => {
-    if (!isPreviewPinned || isPreviewMaximized) {
+    if (controlPanelMode !== "video-settings" || isPreviewMaximized || isPreviewPinned) {
+      setIsAutoPreviewPinned(false);
+      setAutoPinnedHiddenOffset(0);
+      return;
+    }
+
+    const updateAutoPin = () => {
+      const anchor = previewAnchorRef.current;
+      const shell = previewShellRef.current;
+      if (!anchor || !shell) return;
+
+      const anchorTop = anchor.getBoundingClientRect().top;
+      const shellHeight = shell.getBoundingClientRect().height;
+      const maxHiddenHeight = Math.round(
+        Math.min(shellHeight, window.innerHeight) * 0.4,
+      );
+      const pinTriggerTop = -Math.max(120, maxHiddenHeight);
+
+      setIsAutoPreviewPinned((current) => {
+        if (!current && anchorTop <= pinTriggerTop) {
+          const rect = shell.getBoundingClientRect();
+          setAutoPinnedHiddenOffset(Math.max(120, maxHiddenHeight));
+          setPinnedPreviewMetrics({
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          });
+          return true;
+        }
+
+        if (current) {
+          setAutoPinnedHiddenOffset(Math.max(120, maxHiddenHeight));
+        }
+
+        if (current && anchorTop >= -24) {
+          setAutoPinnedHiddenOffset(0);
+          return false;
+        }
+
+        return current;
+      });
+    };
+
+    updateAutoPin();
+
+    window.addEventListener("scroll", updateAutoPin, { passive: true });
+    window.addEventListener("resize", updateAutoPin);
+
+    return () => {
+      window.removeEventListener("scroll", updateAutoPin);
+      window.removeEventListener("resize", updateAutoPin);
+    };
+  }, [controlPanelMode, isPreviewMaximized, isPreviewPinned]);
+
+  React.useEffect(() => {
+    const shouldPinPreview =
+      (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
+
+    if (!shouldPinPreview) {
       setPinnedPreviewMetrics(null);
       return;
     }
@@ -400,7 +461,13 @@ export function RetroPlayer({
       window.removeEventListener("resize", updatePinnedMetrics);
       window.removeEventListener("scroll", updatePinnedMetrics);
     };
-  }, [isPreviewMaximized, isPreviewPinned, isFitWidthEnabled, player.sourceDimensions]);
+  }, [
+    isAutoPreviewPinned,
+    isPreviewMaximized,
+    isPreviewPinned,
+    isFitWidthEnabled,
+    player.sourceDimensions,
+  ]);
 
   React.useEffect(() => {
     player.refreshLayout();
@@ -454,6 +521,9 @@ export function RetroPlayer({
       player.sourceDimensions.width > player.sourceDimensions.height)
       ? Math.max(280, Math.ceil(player.viewportRect.height + 24))
       : null;
+  const normalPreviewHeight = previewFrameHeight
+    ? `${previewFrameHeight}px`
+    : "60vh";
 
   const fitWidthAspectRatio = React.useMemo(() => {
     if (!isFitWidthEnabled || !player.sourceDimensions) {
@@ -463,8 +533,39 @@ export function RetroPlayer({
     return `${player.sourceDimensions.width} / ${player.sourceDimensions.height}`;
   }, [isFitWidthEnabled, player.sourceDimensions]);
 
-  const isPinnedPreview = isPreviewPinned && !isPreviewMaximized;
-  const pinnedPreviewHeight = "min(50vh, 26rem)";
+  const isPinnedPreview =
+    (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
+  const pinnedPreviewTop = isAutoPreviewPinned
+    ? `calc(max(0.0rem, env(safe-area-inset-top)) - ${autoPinnedHiddenOffset}px)`
+    : undefined;
+  const pinnedFitWidthHeight = React.useMemo(() => {
+    if (
+      !isPinnedPreview ||
+      !isFitWidthEnabled ||
+      !player.sourceDimensions ||
+      !pinnedPreviewMetrics ||
+      typeof window === "undefined"
+    ) {
+      return undefined;
+    }
+
+    const aspectRatio = Math.max(
+      player.sourceDimensions.width / Math.max(player.sourceDimensions.height, 1),
+      0.0001,
+    );
+    const naturalHeight = pinnedPreviewMetrics.width / aspectRatio;
+    const maxVisibleHeight = Math.max(
+      220,
+      Math.round(window.innerHeight * 0.68),
+    );
+
+    return `${Math.min(naturalHeight, maxVisibleHeight)}px`;
+  }, [
+    isFitWidthEnabled,
+    isPinnedPreview,
+    pinnedPreviewMetrics,
+    player.sourceDimensions,
+  ]);
 
   return (
     <section
@@ -474,6 +575,7 @@ export function RetroPlayer({
       }
     >
       <div className="space-y-4">
+        <div ref={previewAnchorRef} aria-hidden="true" />
         <div
           ref={previewShellRef}
           className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
@@ -482,13 +584,14 @@ export function RetroPlayer({
                   isFitWidthEnabled ? "overflow-y-auto" : "flex items-stretch justify-stretch"
                 }`
               : isPinnedPreview
-                ? "safe-sticky-top fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
+                ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
               : ""
           }`}
           style={
             isPinnedPreview && pinnedPreviewMetrics
               ? {
                   left: `${pinnedPreviewMetrics.left}px`,
+                  top: pinnedPreviewTop ?? "calc(max(0.0rem, env(safe-area-inset-top)) + 0.5rem)",
                   width: `${pinnedPreviewMetrics.width}px`,
                 }
               : undefined
@@ -525,16 +628,10 @@ export function RetroPlayer({
                     }
                   : undefined
                 : {
-                    aspectRatio: isPinnedPreview ? undefined : fitWidthAspectRatio,
+                    aspectRatio: fitWidthAspectRatio,
                     height: fitWidthAspectRatio
-                      ? isPinnedPreview
-                        ? pinnedPreviewHeight
-                        : undefined
-                      : isPinnedPreview
-                        ? pinnedPreviewHeight
-                      : previewFrameHeight
-                        ? `${previewFrameHeight}px`
-                        : "60vh",
+                      ? pinnedFitWidthHeight
+                      : normalPreviewHeight,
                     minHeight: "220px",
                   }
             }
@@ -786,22 +883,29 @@ export function RetroPlayer({
               <div className="relative">
                 <button
                   type="button"
-                  aria-label={isPreviewPinned ? "Unpin preview" : "Pin preview"}
+                  aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
                   onClick={() => {
                     hideTooltip();
-                        setIsPreviewPinned((current) => {
-                          const next = !current;
-                          if (next) {
-                            const el = previewShellRef.current;
-                            if (el) {
-                              const rect = el.getBoundingClientRect();
-                              setPinnedPreviewMetrics({ left: rect.left, width: rect.width, height: rect.height });
-                            }
-                          } else {
-                            setPinnedPreviewMetrics(null);
-                          }
-                          return next;
-                        });
+                    setIsPreviewPinned((current) => {
+                      const next = !current;
+                      if (next) {
+                        const el = previewShellRef.current;
+                        if (el) {
+                          const rect = el.getBoundingClientRect();
+                          setPinnedPreviewMetrics({
+                            left: rect.left,
+                            width: rect.width,
+                            height: rect.height,
+                          });
+                        }
+                        return true;
+                      }
+
+                      setIsAutoPreviewPinned(false);
+                      setAutoPinnedHiddenOffset(0);
+                      setPinnedPreviewMetrics(null);
+                      return false;
+                    });
                   }}
                   onMouseEnter={() => scheduleTooltip("pin")}
                   onMouseLeave={hideTooltip}
@@ -809,14 +913,19 @@ export function RetroPlayer({
                   onBlur={hideTooltip}
                   className={[
                     floatingButtonClass,
-                    isPreviewPinned
+                    isPinnedPreview
                       ? glowingFloatingButtonClass
                       : idleFloatingButtonClass,
                   ].join(" ")}
                 >
                   <Pin size={16} />
                 </button>
-                {renderTooltip("pin", isPreviewPinned ? "Pin: keep preview fixed on screen." : "Pin: keep preview visible while you scroll.")}
+                {renderTooltip(
+                  "pin",
+                  isPinnedPreview
+                    ? "Pin: keep preview fixed on screen."
+                    : "Pin: keep preview visible while you scroll.",
+                )}
               </div>
               <div className="relative">
                 <button
