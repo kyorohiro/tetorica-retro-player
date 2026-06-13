@@ -374,6 +374,9 @@ export function RetroPlayer({
     if (!isPreviewMaximized) return;
 
     setIsPreviewPinned(false);
+    setIsAutoPreviewPinned(false);
+    setAutoPinnedHiddenOffset(0);
+    setPinnedPreviewMetrics(null);
   }, [isPreviewMaximized]);
 
   React.useEffect(() => {
@@ -886,6 +889,10 @@ export function RetroPlayer({
                   aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
                   onClick={() => {
                     hideTooltip();
+                    if (isPreviewMaximized) {
+                      return;
+                    }
+
                     setIsPreviewPinned((current) => {
                       const next = !current;
                       if (next) {
@@ -913,16 +920,21 @@ export function RetroPlayer({
                   onBlur={hideTooltip}
                   className={[
                     floatingButtonClass,
-                    isPinnedPreview
+                    isPreviewMaximized
+                      ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
+                      : isPinnedPreview
                       ? glowingFloatingButtonClass
                       : idleFloatingButtonClass,
                   ].join(" ")}
+                  disabled={isPreviewMaximized}
                 >
                   <Pin size={16} />
                 </button>
                 {renderTooltip(
                   "pin",
-                  isPinnedPreview
+                  isPreviewMaximized
+                    ? "Pin: unavailable while maximize is active."
+                    : isPinnedPreview
                     ? "Pin: keep preview fixed on screen."
                     : "Pin: keep preview visible while you scroll.",
                 )}
