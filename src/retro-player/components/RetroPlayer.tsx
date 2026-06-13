@@ -28,8 +28,10 @@ import {
   type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
+import type { Locale } from "../../i18n";
 
 type RetroPlayerProps = {
+  locale?: Locale;
   src?: string;
   stream?: MediaStream | null;
   streamName?: string;
@@ -41,6 +43,7 @@ type RetroPlayerProps = {
 };
 
 export function RetroPlayer({
+  locale = "en",
   src,
   stream,
   streamName,
@@ -50,6 +53,38 @@ export function RetroPlayer({
   onError,
   initialFilterState,
 }: RetroPlayerProps) {
+  const tooltipText =
+    locale === "ja"
+      ? {
+          recordIdle: "録画: 現在のレトロ出力を記録します。",
+          recordStop: "録画: 停止して書き出します。",
+          powerOn: "Power: フィルターをオンにします。",
+          powerOff: "Power: フィルターをオフにします。",
+          hiRes: "Hi-res: よりシャープになりますが GPU 負荷は上がります。",
+          fitWidthOn: "Fit width: 有効です。",
+          fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
+          refit: "Refit: プレビュー配置を立て直します。",
+          pinUnavailable: "Pin: 最大化中は使えません。",
+          pinOn: "Pin: プレビューを画面内に固定します。",
+          pinOff: "Pin: スクロール中も見えるようにします。",
+          maximizeOn: "Maximize: 通常表示に戻します。",
+          maximizeOff: "Maximize: プレビューを全画面表示します。",
+        }
+      : {
+          recordIdle: "Record: capture the current retro output.",
+          recordStop: "Record: stop and export clip.",
+          powerOn: "Power: turn filter on.",
+          powerOff: "Power: turn filter off.",
+          hiRes: "Hi-res: sharper preview, higher GPU cost.",
+          fitWidthOn: "Fit width: enabled.",
+          fitWidthOff: "Fit width: stretch preview to the frame width.",
+          refit: "Refit: recover the preview layout.",
+          pinUnavailable: "Pin: unavailable while maximize is active.",
+          pinOn: "Pin: keep preview fixed on screen.",
+          pinOff: "Pin: keep preview visible while you scroll.",
+          maximizeOn: "Maximize: return to normal view.",
+          maximizeOff: "Maximize: open the preview full screen.",
+        };
   const persistedUiSettings = React.useMemo(
     () => loadPersistedRetroSettings()?.ui,
     [],
@@ -787,7 +822,7 @@ export function RetroPlayer({
                         <Circle size={16} className="text-rose-300" />
                       )}
                     </button>
-                    {renderTooltip("record", player.isRecording ? "Record: stop and export clip." : "Record: capture the current retro output.")}
+                    {renderTooltip("record", player.isRecording ? tooltipText.recordStop : tooltipText.recordIdle)}
                   </div>
                 </>
               )}
@@ -821,7 +856,7 @@ export function RetroPlayer({
                 >
                   <Power size={16} />
                 </button>
-                {renderTooltip("power", player.isPoweredOn ? "Power: turn filter off." : "Power: turn filter on.")}
+                {renderTooltip("power", player.isPoweredOn ? tooltipText.powerOff : tooltipText.powerOn)}
               </div>
               <div className="relative">
                 <button
@@ -848,7 +883,7 @@ export function RetroPlayer({
                 >
                   <Aperture size={16} />
                 </button>
-                {renderTooltip("hi-res", "Hi-res: sharper preview, higher GPU cost.")}
+                {renderTooltip("hi-res", tooltipText.hiRes)}
               </div>
               <div className="relative">
                 <button
@@ -872,7 +907,7 @@ export function RetroPlayer({
                 >
                   <ArrowLeftRight size={16} />
                 </button>
-                {renderTooltip("fit-width", isFitWidthEnabled ? "Fit width: enabled." : "Fit width: stretch preview to the frame width.")}
+                {renderTooltip("fit-width", isFitWidthEnabled ? tooltipText.fitWidthOn : tooltipText.fitWidthOff)}
               </div>
               <div className="relative">
                 <button
@@ -890,7 +925,7 @@ export function RetroPlayer({
                 >
                   <RotateCcw size={16} />
                 </button>
-                {renderTooltip("refit", "Refit: recover the preview layout.")}
+                {renderTooltip("refit", tooltipText.refit)}
               </div>
               <div className="relative">
                 <button
@@ -937,10 +972,10 @@ export function RetroPlayer({
                 {renderTooltip(
                   "pin",
                   isPreviewMaximized
-                    ? "Pin: unavailable while maximize is active."
+                    ? tooltipText.pinUnavailable
                     : isPinnedPreview
-                    ? "Pin: keep preview fixed on screen."
-                    : "Pin: keep preview visible while you scroll.",
+                    ? tooltipText.pinOn
+                    : tooltipText.pinOff,
                 )}
               </div>
               <div className="relative">
@@ -964,7 +999,7 @@ export function RetroPlayer({
                 >
                   {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
-                {renderTooltip("maximize", isPreviewMaximized ? "Maximize: return to normal view." : "Maximize: open the preview full screen.")}
+                {renderTooltip("maximize", isPreviewMaximized ? tooltipText.maximizeOn : tooltipText.maximizeOff)}
               </div>
             </div>
           </div>
@@ -1063,6 +1098,7 @@ export function RetroPlayer({
                 </button>
               </div>
               <RetroFilterPanel
+                locale={locale}
                 colorLevels={filterState.colorLevels}
                 curvature={filterState.curvature}
                 ditherStrength={filterState.ditherStrength}

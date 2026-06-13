@@ -8,6 +8,13 @@ import {
   X,
 } from "lucide-react";
 import "./App.css";
+import {
+  loadLocalePreference,
+  resolveLocale,
+  saveLocalePreference,
+  t,
+  type LocalePreference,
+} from "./i18n";
 import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useDialog } from "./useDialog";
@@ -31,12 +38,16 @@ function App() {
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
+    () => loadLocalePreference(),
+  );
   const isIosOrAndroid = React.useMemo(() => {
     if (typeof navigator === "undefined") return false;
 
     const userAgent = navigator.userAgent || "";
     return /Android|iPhone|iPad|iPod/i.test(userAgent);
   }, []);
+  const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = previewSource.previewStream
@@ -46,6 +57,10 @@ function App() {
       : `default:${defaultPreviewSrc}:${defaultPreviewKind}:${retroPlayerEpoch}`;
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
+
+  React.useEffect(() => {
+    saveLocalePreference(localePreference);
+  }, [localePreference]);
 
   const filesToTargets = useCallback((files: FileList | File[]) => {
     const targets: FileTargetFile[] = [];
@@ -110,10 +125,10 @@ function App() {
     }
 
     const confirmed = await showConfirmDialog({
-      title: "Capture unavailable",
-      body: "Screen capture is not available on this site. Would you like to open the PWA version instead?",
-      okText: "Open PWA page",
-      cancelText: "Cancel",
+      title: t(locale, "captureUnavailableTitle"),
+      body: t(locale, "captureUnavailableBody"),
+      okText: t(locale, "openPwaPage"),
+      cancelText: t(locale, "cancel"),
     });
 
     console.log(">confirmed: ", confirmed);
@@ -132,7 +147,7 @@ function App() {
       }
       return;
     }
-  }, [previewSource, showConfirmDialog]);
+  }, [locale, previewSource, showConfirmDialog]);
 
   const onDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -198,6 +213,10 @@ function App() {
     }, 80);
   }, []);
 
+  const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
+    setLocalePreference(nextPreference);
+  }, []);
+
   return (
     <main
       className="safe-top-pad min-h-screen overflow-x-hidden overflow-y-auto bg-slate-200 text-slate-800"
@@ -209,8 +228,8 @@ function App() {
           <div className="relative">
             <button
               type="button"
-              aria-label="Reload app"
-              title="Reload app"
+              aria-label={t(locale, "reloadApp")}
+              title={t(locale, "reloadApp")}
               onClick={handleReloadApp}
               className="safe-top-offset fixed left-[3.85rem] z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
             >
@@ -219,7 +238,7 @@ function App() {
             <button
               type="button"
               aria-expanded={isMobileMenuOpen}
-              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
               onClick={() => {
                 setIsMobileMenuOpen((current) => !current);
               }}
@@ -238,9 +257,9 @@ function App() {
                     <span className="flex items-start gap-3">
                       <FileUp className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                       <span>
-                        <span className="block font-medium text-slate-900">Open file</span>
+                        <span className="block font-medium text-slate-900">{t(locale, "openFile")}</span>
                         <span className="block text-slate-500">
-                          Image, video, audio, zip, pdf, epub, text
+                          {t(locale, "openFileDetail")}
                         </span>
                       </span>
                     </span>
@@ -255,9 +274,9 @@ function App() {
                         <span className="flex items-start gap-3">
                           <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                           <span>
-                            <span className="block font-medium text-slate-900">Open folder</span>
+                            <span className="block font-medium text-slate-900">{t(locale, "openFolder")}</span>
                             <span className="block text-slate-500">
-                              Browse dropped folders and archive-style collections
+                              {t(locale, "openFolderDetail")}
                             </span>
                           </span>
                         </span>
@@ -270,15 +289,43 @@ function App() {
                         <span className="flex items-start gap-3">
                           <MonitorUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
                           <span>
-                            <span className="block font-medium text-slate-900">Capture screen</span>
+                            <span className="block font-medium text-slate-900">{t(locale, "captureScreen")}</span>
                             <span className="block text-slate-500">
-                              Preview a window or screen with retro effects
+                              {t(locale, "captureScreenDetail")}
                             </span>
                           </span>
                         </span>
                       </button>
                     </>
                   )}
+                </div>
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {t(locale, "language")}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      ["auto", t(locale, "auto")],
+                      ["en", t(locale, "english")],
+                      ["ja", t(locale, "japanese")],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          handleChangeLocale(value);
+                        }}
+                        className={[
+                          "rounded-lg border px-3 py-2 text-sm transition",
+                          localePreference === value
+                            ? "border-sky-500 bg-sky-500/10 text-sky-700"
+                            : "border-slate-300 bg-white text-slate-600 hover:border-slate-400",
+                        ].join(" ")}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -292,7 +339,7 @@ function App() {
               onClick={previewSource.stopPreviewStream}
               className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-sm text-slate-700 transition hover:bg-rose-500/20"
             >
-              Stop capture
+              {t(locale, "stopCapture")}
             </button>
           </div>
         )}
@@ -302,10 +349,11 @@ function App() {
 
         {isRetroPreviewDialogActive ? (
           <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500">
-            Retro preview is active in the dialog.
+            {t(locale, "retroPreviewActive")}
           </section>
         ) : (
           <RetroPlayer
+            locale={locale}
             key={retroPlayerKey}
             src={previewSource.previewSrc ?? defaultPreviewSrc}
             stream={previewSource.previewStream}
