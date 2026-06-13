@@ -65,6 +65,7 @@ export function RetroPlayer({
   const [isAutoPreviewPinned, setIsAutoPreviewPinned] = React.useState(false);
   const [autoPinnedHiddenOffset, setAutoPinnedHiddenOffset] = React.useState(0);
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
+  const previewFrameRef = React.useRef<HTMLDivElement | null>(null);
   const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
@@ -264,6 +265,21 @@ export function RetroPlayer({
     setActiveTooltipKey(null);
   }, []);
 
+  const measurePinnedPreviewMetrics = React.useCallback(() => {
+    const frame = previewFrameRef.current;
+    const shell = previewShellRef.current;
+    if (!frame || !shell) return null;
+
+    const frameRect = frame.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+
+    return {
+      left: frameRect.left,
+      width: frameRect.width,
+      height: shellRect.height,
+    };
+  }, []);
+
   const renderTooltip = React.useCallback(
     (key: string, text: string, widthClass = "w-44") => (
       <div
@@ -400,13 +416,11 @@ export function RetroPlayer({
 
       setIsAutoPreviewPinned((current) => {
         if (!current && anchorTop <= pinTriggerTop) {
-          const rect = shell.getBoundingClientRect();
           setAutoPinnedHiddenOffset(Math.max(120, maxHiddenHeight));
-          setPinnedPreviewMetrics({
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-          });
+          const nextMetrics = measurePinnedPreviewMetrics();
+          if (nextMetrics) {
+            setPinnedPreviewMetrics(nextMetrics);
+          }
           return true;
         }
 
@@ -432,7 +446,7 @@ export function RetroPlayer({
       window.removeEventListener("scroll", updateAutoPin);
       window.removeEventListener("resize", updateAutoPin);
     };
-  }, [controlPanelMode, isPreviewMaximized, isPreviewPinned]);
+  }, [controlPanelMode, isPreviewMaximized, isPreviewPinned, measurePinnedPreviewMetrics]);
 
   React.useEffect(() => {
     const shouldPinPreview =
@@ -444,15 +458,9 @@ export function RetroPlayer({
     }
 
     const updatePinnedMetrics = () => {
-      const element = previewShellRef.current;
-      if (!element) return;
-
-      const rect = element.getBoundingClientRect();
-      setPinnedPreviewMetrics({
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      });
+      const nextMetrics = measurePinnedPreviewMetrics();
+      if (!nextMetrics) return;
+      setPinnedPreviewMetrics(nextMetrics);
     };
 
     updatePinnedMetrics();
@@ -469,6 +477,7 @@ export function RetroPlayer({
     isPreviewMaximized,
     isPreviewPinned,
     isFitWidthEnabled,
+    measurePinnedPreviewMetrics,
     player.sourceDimensions,
   ]);
 
@@ -577,7 +586,7 @@ export function RetroPlayer({
         "rounded-2xl border border-slate-800 bg-slate-900/70 p-3 shadow-lg"
       }
     >
-      <div className="space-y-4">
+      <div ref={previewFrameRef} className="space-y-4">
         <div ref={previewAnchorRef} aria-hidden="true" />
         <div
           ref={previewShellRef}
@@ -896,14 +905,9 @@ export function RetroPlayer({
                     setIsPreviewPinned((current) => {
                       const next = !current;
                       if (next) {
-                        const el = previewShellRef.current;
-                        if (el) {
-                          const rect = el.getBoundingClientRect();
-                          setPinnedPreviewMetrics({
-                            left: rect.left,
-                            width: rect.width,
-                            height: rect.height,
-                          });
+                        const nextMetrics = measurePinnedPreviewMetrics();
+                        if (nextMetrics) {
+                          setPinnedPreviewMetrics(nextMetrics);
                         }
                         return true;
                       }
