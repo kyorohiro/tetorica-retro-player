@@ -921,6 +921,12 @@ void main(void)
       phosphorScanlineStrength *
       phosphorScanlineVisibility
     );
+    float phosphorScanline2 =
+      sin((vTextureCoord.y + uTime * 0.05) * 720.0) *
+      uScanline2Strength *
+      phosphorScanlineVisibility *
+      0.45;
+    phosphorColor += vec3(phosphorScanline2);
 
     if (uGlowStrength > 0.001) {
       vec3 glowLift = max(baseProcessedColor - mixedSourceColor, vec3(0.0));
