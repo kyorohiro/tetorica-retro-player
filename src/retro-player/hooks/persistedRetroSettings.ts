@@ -52,6 +52,7 @@ export type PersistedRetroAudioSettings = {
   wowFlutterAmount: number;
   isNoiseEnabled: boolean;
   noiseLevel: number;
+  vinylDustAmount: number;
 };
 
 export type PersistedRetroUiSettings = {

@@ -1035,6 +1035,7 @@ export function RetroPlayer({
               smallSpeakerRoomAmount={player.smallSpeakerRoomAmount}
               wowFlutterAmount={player.wowFlutterAmount}
               noiseLevel={player.noiseLevel}
+              vinylDustAmount={player.vinylDustAmount}
               playbackRate={player.playbackRate}
               volume={player.volume}
               onChangeLofiAmount={player.setLofiAmount}
@@ -1048,6 +1049,7 @@ export function RetroPlayer({
               onChangeSmallSpeakerRoomAmount={player.setSmallSpeakerRoomAmount}
               onChangeWowFlutterAmount={player.setWowFlutterAmount}
               onChangeNoiseLevel={player.setNoiseLevel}
+              onChangeVinylDustAmount={player.setVinylDustAmount}
               onChangePlaybackRate={player.changePlaybackRate}
               onChangeVolume={player.changeVolume}
               onRestart={() => {
