@@ -38,6 +38,7 @@ export async function toggleRetroOverlay(settingsInput) {
 function createOverlay(settings) {
   let currentSettings = settings;
   const badge = document.createElement("button");
+  const recordButton = document.createElement("button");
   badge.type = "button";
   badge.textContent = "Retro";
   badge.style.position = "fixed";
@@ -54,6 +55,24 @@ function createOverlay(settings) {
   badge.style.backdropFilter = "blur(8px)";
   badge.style.boxShadow = "0 0 18px rgba(110, 147, 58, 0.22)";
 
+  recordButton.type = "button";
+  recordButton.textContent = "Rec";
+  recordButton.setAttribute("aria-label", "Start recording");
+  recordButton.title = "Start recording";
+  recordButton.style.position = "fixed";
+  recordButton.style.right = "78px";
+  recordButton.style.top = "16px";
+  recordButton.style.zIndex = "2147483647";
+  recordButton.style.padding = "8px 12px";
+  recordButton.style.border = "1px solid rgba(248, 113, 113, 0.35)";
+  recordButton.style.borderRadius = "999px";
+  recordButton.style.background = "rgba(24, 9, 10, 0.82)";
+  recordButton.style.color = "#ffe5e5";
+  recordButton.style.font = '12px "IBM Plex Sans", "Segoe UI", sans-serif';
+  recordButton.style.cursor = "pointer";
+  recordButton.style.backdropFilter = "blur(8px)";
+  recordButton.style.boxShadow = "0 0 18px rgba(248, 113, 113, 0.22)";
+
   const surfaces = [];
   let rafId = 0;
   let frameCount = 0;
@@ -65,6 +84,10 @@ function createOverlay(settings) {
   let hoveredElement = null;
   let previousHoveredElement = null;
   const rejectedImages = new WeakSet();
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let recordingStream = null;
+  let recordingAudioStream = null;
 
   badge.addEventListener("click", async () => {
     isVisible = !isVisible;
@@ -78,10 +101,20 @@ function createOverlay(settings) {
     badge.textContent = isVisible ? "Orig" : "Retro";
   });
 
+  recordButton.addEventListener("click", () => {
+    if (mediaRecorder?.state === "recording") {
+      stopRecording({ save: true });
+      return;
+    }
+
+    startRecording();
+  });
+
   function start() {
-    document.body.append(badge);
+    document.body.append(badge, recordButton);
     attachSettingsSync();
     attachPointerTracking();
+    updateRecordButton();
     draw();
   }
 
@@ -101,8 +134,10 @@ function createOverlay(settings) {
       detachPointerTracking = null;
     }
 
+    stopRecording({ save: false });
     destroySurfaces();
     badge.remove();
+    recordButton.remove();
   }
 
   function attachSettingsSync() {
@@ -248,6 +283,8 @@ function createOverlay(settings) {
         surface.hideFailureOverlay();
       }
     }
+
+    recordButton.style.display = isVisible ? "block" : "none";
   }
 
   function renderSurface(surface, targetElement, priorityIndex) {
@@ -332,6 +369,121 @@ function createOverlay(settings) {
     start,
     destroy,
   };
+
+  function startRecording() {
+    const activeSurface = surfaces[0];
+    if (!activeSurface?.targetElement || activeSurface.canvas.style.display === "none") {
+      window.alert("Move the pointer over a visible video or image first.");
+      return;
+    }
+
+    const canvasStream = activeSurface.canvas.captureStream(30);
+    const nextRecordingStream = new MediaStream();
+    canvasStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
+
+    const audioStream = getElementAudioStream(activeSurface.targetElement);
+    audioStream?.getAudioTracks().forEach((track) => nextRecordingStream.addTrack(track));
+
+    const mimeType = getRecordingMimeType();
+
+    try {
+      mediaRecorder = mimeType
+        ? new MediaRecorder(nextRecordingStream, { mimeType })
+        : new MediaRecorder(nextRecordingStream);
+    } catch (error) {
+      window.alert(
+        `Recording is not available: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      nextRecordingStream.getTracks().forEach((track) => track.stop());
+      audioStream?.getTracks().forEach((track) => track.stop());
+      return;
+    }
+
+    recordingStream = nextRecordingStream;
+    recordingAudioStream = audioStream;
+    recordedChunks = [];
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) {
+        recordedChunks.push(event.data);
+      }
+    });
+    mediaRecorder.addEventListener(
+      "stop",
+      () => {
+        cleanupRecordingStreams();
+        saveRecording(mediaRecorder?.mimeType || mimeType || "video/webm");
+        mediaRecorder = null;
+        updateRecordButton();
+      },
+      { once: true },
+    );
+
+    mediaRecorder.start();
+    updateRecordButton();
+  }
+
+  function stopRecording({ save }) {
+    if (!mediaRecorder) {
+      cleanupRecordingStreams();
+      updateRecordButton();
+      return;
+    }
+
+    if (!save) {
+      recordedChunks = [];
+    }
+
+    if (mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+      return;
+    }
+
+    cleanupRecordingStreams();
+    mediaRecorder = null;
+    updateRecordButton();
+  }
+
+  function cleanupRecordingStreams() {
+    recordingStream?.getTracks().forEach((track) => track.stop());
+    recordingAudioStream?.getTracks().forEach((track) => track.stop());
+    recordingStream = null;
+    recordingAudioStream = null;
+  }
+
+  function saveRecording(mimeType) {
+    if (recordedChunks.length === 0) {
+      window.alert("Recording stopped, but no video data was captured.");
+      return;
+    }
+
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = `tetorica-overlay-${timestamp}.webm`;
+    downloadLink.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    recordedChunks = [];
+  }
+
+  function updateRecordButton() {
+    const isRecording = mediaRecorder?.state === "recording";
+    recordButton.textContent = isRecording ? "Stop" : "Rec";
+    recordButton.style.borderColor = isRecording
+      ? "rgba(251, 113, 133, 0.75)"
+      : "rgba(248, 113, 113, 0.35)";
+    recordButton.style.background = isRecording
+      ? "rgba(127, 29, 29, 0.9)"
+      : "rgba(24, 9, 10, 0.82)";
+    recordButton.style.boxShadow = isRecording
+      ? "0 0 22px rgba(251, 113, 133, 0.38)"
+      : "0 0 18px rgba(248, 113, 113, 0.22)";
+    recordButton.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
+    recordButton.title = isRecording ? "Stop recording" : "Start recording";
+  }
 }
 
 function findPrimaryDrawableElement() {
@@ -585,6 +737,41 @@ function isUsableImage(candidate) {
   }
   const rect = candidate.getBoundingClientRect();
   return rect.width > 32 && rect.height > 32;
+}
+
+function getElementAudioStream(targetElement) {
+  if (!(targetElement instanceof HTMLVideoElement)) {
+    return null;
+  }
+
+  const captureStream =
+    targetElement.captureStream?.bind(targetElement) ||
+    targetElement.mozCaptureStream?.bind(targetElement);
+
+  if (!captureStream) {
+    return null;
+  }
+
+  try {
+    const stream = captureStream();
+    return stream.getAudioTracks().length > 0 ? stream : null;
+  } catch {
+    return null;
+  }
+}
+
+function getRecordingMimeType() {
+  if (typeof MediaRecorder === "undefined") {
+    return "";
+  }
+
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+  ];
+
+  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
 function applySettings(gl, program, uniformLocations, settings) {
