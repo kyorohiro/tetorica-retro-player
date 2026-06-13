@@ -136,17 +136,21 @@ export function VideoControls({
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
   const [selectedAudioPreset, setSelectedAudioPreset] = useState<
-    "none" | "lofi" | "radio" | "tape" | "vinyl" | "earphone" | null
+    "none" | "lofi" | "radio" | "tape" | "vinyl" | "vintage-mic" | "earphone" | null
   >(null);
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
 
   const applyAudioPreset = (
-    preset: "none" | "lofi" | "radio" | "tape" | "vinyl" | "earphone",
+    preset: "none" | "lofi" | "radio" | "tape" | "vinyl" | "vintage-mic" | "earphone",
   ) => {
     const presetNeedsFx = preset !== "none";
     const presetNeedsNoise =
-      preset === "lofi" || preset === "radio" || preset === "tape" || preset === "vinyl";
+      preset === "lofi" ||
+      preset === "radio" ||
+      preset === "tape" ||
+      preset === "vinyl" ||
+      preset === "vintage-mic";
 
     if (presetNeedsFx && !isAudioFxEnabled) {
       onToggleAudioFx();
@@ -234,6 +238,21 @@ export function VideoControls({
         onChangeNoiseLevel(0.0035);
         onChangeVinylDustAmount(0.58);
         break;
+      case "vintage-mic":
+        onChangeVolume(0.94);
+        onChangeLofiAmount(0.34);
+        onChangeRadioToneAmount(0.28);
+        onChangeBitCrushAmount(0);
+        onChangeSampleRateReductionAmount(0.02);
+        onChangeBassAmount(-0.24);
+        onChangeMidAmount(0.32);
+        onChangeTrebleAmount(-0.68);
+        onChangeStereoWidthAmount(-0.32);
+        onChangeSmallSpeakerRoomAmount(0.12);
+        onChangeWowFlutterAmount(0.04);
+        onChangeNoiseLevel(0.0025);
+        onChangeVinylDustAmount(0.08);
+        break;
       case "earphone":
         onChangeVolume(1);
         onChangeLofiAmount(0);
@@ -311,6 +330,7 @@ export function VideoControls({
               ["radio", "Radio"],
               ["tape", "Tape"],
               ["vinyl", "Vinyl"],
+              ["vintage-mic", "Vintage Mic"],
               ["earphone", "Earphone"],
             ].map(([key, label]) => (
               <button
@@ -318,7 +338,14 @@ export function VideoControls({
                 type="button"
                 onClick={() => {
                   applyAudioPreset(
-                    key as "none" | "lofi" | "radio" | "tape" | "vinyl" | "earphone",
+                    key as
+                      | "none"
+                      | "lofi"
+                      | "radio"
+                      | "tape"
+                      | "vinyl"
+                      | "vintage-mic"
+                      | "earphone",
                   );
                 }}
                 className={[
@@ -436,8 +463,8 @@ export function VideoControls({
               </div>
               <input
                 type="range"
-                min="-1"
-                max="1"
+                min="-1.5"
+                max="1.5"
                 step="0.01"
                 value={bassAmount}
                 onChange={(ev) => {
@@ -454,8 +481,8 @@ export function VideoControls({
               </div>
               <input
                 type="range"
-                min="-1"
-                max="1"
+                min="-1.5"
+                max="1.5"
                 step="0.01"
                 value={midAmount}
                 onChange={(ev) => {
@@ -472,8 +499,8 @@ export function VideoControls({
               </div>
               <input
                 type="range"
-                min="-1"
-                max="1"
+                min="-1.5"
+                max="1.5"
                 step="0.01"
                 value={trebleAmount}
                 onChange={(ev) => {
