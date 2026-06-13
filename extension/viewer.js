@@ -459,6 +459,12 @@ function applyPreset(presetKey) {
 
   gl.useProgram(program);
   gl.uniform2f(uniformLocations.uTargetSize, currentSettings.targetWidth, currentSettings.targetHeight);
+  const phosphorDotInternalScale = currentSettings.phosphorDotInternalScale ? 2 : 1;
+  gl.uniform2f(
+    uniformLocations.uSampleTargetSize,
+    currentSettings.targetWidth * phosphorDotInternalScale,
+    currentSettings.targetHeight * phosphorDotInternalScale,
+  );
   gl.uniform1f(uniformLocations.uColorLevels, currentSettings.colorLevels);
   gl.uniform1f(uniformLocations.uDitherStrength, currentSettings.ditherStrength);
   gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(currentSettings.paletteMode));
@@ -931,6 +937,7 @@ function setupRenderer(webgl) {
 
   uniformLocations = {
     uTargetSize: webgl.getUniformLocation(program, "uTargetSize"),
+    uSampleTargetSize: webgl.getUniformLocation(program, "uSampleTargetSize"),
     uColorLevels: webgl.getUniformLocation(program, "uColorLevels"),
     uDitherStrength: webgl.getUniformLocation(program, "uDitherStrength"),
     uPaletteMode: webgl.getUniformLocation(program, "uPaletteMode"),
