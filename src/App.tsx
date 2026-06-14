@@ -35,9 +35,6 @@ const waitForNextPaint = async () => {
   });
 };
 
-const isAndroidRuntime = () =>
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-
 const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));
 
 function App() {
@@ -72,15 +69,6 @@ function App() {
     pickerStateRef.current = "idle";
     setIsPreparingSelection(false);
     setIsPreparingSelectionDismissed(false);
-  }, []);
-
-  React.useEffect(() => {
-    if (!isAndroidRuntime()) return;
-
-    console.log("[retro-player startup] app:mounted");
-    window.requestAnimationFrame(() => {
-      console.log("[retro-player startup] app:first-raf");
-    });
   }, []);
 
   React.useEffect(() => {
@@ -136,14 +124,9 @@ function App() {
   }, []);
 
   const dismissPreparingSelection = useCallback(() => {
-    console.log("[retro-player selection] hide loading overlay tapped");
     flushSync(() => {
       setIsPreparingSelectionDismissed(true);
     });
-  }, []);
-
-  const handlePreparingSelectionPointerDown = useCallback(() => {
-    console.log("[retro-player selection] loading card pointer down");
   }, []);
 
   const filesToTargets = useCallback((files: FileList | File[]) => {
@@ -221,9 +204,7 @@ function App() {
       cancelText: t(locale, "cancel"),
     });
 
-    console.log(">confirmed: ", confirmed);
     if (confirmed) {
-      console.log(">confirmed: move");
       const url = "https://kyorohiro.github.io/tetorica-retro-player/demo/";
 
       try {
@@ -441,9 +422,6 @@ function App() {
           <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-slate-950/56 px-4">
             <div
               className="pointer-events-auto w-[min(92vw,28rem)] rounded-2xl border border-slate-700 bg-slate-900/94 px-4 py-4 text-slate-100 shadow-2xl backdrop-blur-sm"
-              onPointerDown={handlePreparingSelectionPointerDown}
-              onTouchStart={handlePreparingSelectionPointerDown}
-              onMouseDown={handlePreparingSelectionPointerDown}
             >
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />

@@ -551,10 +551,6 @@ export function useRetroPixiStage({
     }
 
     if (shouldUseDirectVideoUpload(source, sourceSize.width, sourceSize.height)) {
-      debugVideo("largeVideoDirectUpload", {
-        sourceWidth: sourceSize.width,
-        sourceHeight: sourceSize.height,
-      });
       return source;
     }
 

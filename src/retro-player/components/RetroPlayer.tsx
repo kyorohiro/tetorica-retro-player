@@ -350,15 +350,6 @@ export function RetroPlayer({
   );
 
   React.useEffect(() => {
-    if (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)) {
-      console.log("[retro-player startup] retro-player:preview-effect", {
-        hasStream: Boolean(stream),
-        hasSrc: Boolean(src),
-        kind,
-        renderResolutionScale,
-      });
-    }
-
     if (stream) {
       const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}:${renderResolutionScale}`;
       if (lastPreviewRequestRef.current === streamKey) {

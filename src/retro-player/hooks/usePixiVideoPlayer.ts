@@ -19,7 +19,6 @@ const isRetroPlayerDebugEnabled = () =>
   typeof window !== "undefined" &&
   (
     import.meta.env.DEV ||
-    (isTauriRuntime() && isAndroidRuntime()) ||
     Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
   );
 
