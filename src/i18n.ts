@@ -24,6 +24,7 @@ const messages = {
       "Screen capture is not available on this site. Would you like to open the PWA version instead?",
     openPwaPage: "Open PWA page",
     cancel: "Cancel",
+    hideLoadingOverlay: "Hide",
     retroPreviewActive: "Retro preview is active in the dialog.",
     preparingSelection: "Preparing your files...",
     preparingSelectionDetail:
@@ -49,6 +50,7 @@ const messages = {
       "このサイトでは画面キャプチャを使えません。PWA 版を開きますか？",
     openPwaPage: "PWA 版を開く",
     cancel: "キャンセル",
+    hideLoadingOverlay: "閉じる",
     retroPreviewActive: "レトロプレビューはダイアログ側で表示中です。",
     preparingSelection: "ファイルを準備しています...",
     preparingSelectionDetail:

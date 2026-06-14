@@ -51,6 +51,7 @@ function App() {
   const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
+  const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
   const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
     () => loadLocalePreference(),
   );
@@ -70,6 +71,7 @@ function App() {
   const finishPreparingSelection = useCallback(() => {
     pickerStateRef.current = "idle";
     setIsPreparingSelection(false);
+    setIsPreparingSelectionDismissed(false);
   }, []);
 
   React.useEffect(() => {
@@ -120,8 +122,28 @@ function App() {
     pickerStateRef.current = "opening";
     flushSync(() => {
       setIsPreparingSelection(true);
+      setIsPreparingSelectionDismissed(false);
       setIsMobileMenuOpen(false);
     });
+  }, []);
+
+  const showPreparingSelection = useCallback(() => {
+    pickerStateRef.current = "processing";
+    flushSync(() => {
+      setIsPreparingSelection(true);
+      setIsPreparingSelectionDismissed(false);
+    });
+  }, []);
+
+  const dismissPreparingSelection = useCallback(() => {
+    console.log("[retro-player selection] hide loading overlay tapped");
+    flushSync(() => {
+      setIsPreparingSelectionDismissed(true);
+    });
+  }, []);
+
+  const handlePreparingSelectionPointerDown = useCallback(() => {
+    console.log("[retro-player selection] loading card pointer down");
   }, []);
 
   const filesToTargets = useCallback((files: FileList | File[]) => {
@@ -415,16 +437,35 @@ function App() {
           <p className="mb-4 text-sm text-rose-500">{previewSource.captureError}</p>
         )}
 
-        {isPreparingSelection && (
-          <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-slate-950/72 px-5">
-            <div className="w-[min(92vw,30rem)] rounded-3xl border border-slate-700 bg-slate-900/92 px-6 py-5 text-center text-slate-100 shadow-2xl backdrop-blur-sm">
-              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
-              <p className="text-base font-semibold">
-                {t(locale, "preparingSelection")}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                {t(locale, "preparingSelectionDetail")}
-              </p>
+        {isPreparingSelection && !isPreparingSelectionDismissed && (
+          <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-slate-950/56 px-4">
+            <div
+              className="pointer-events-auto w-[min(92vw,28rem)] rounded-2xl border border-slate-700 bg-slate-900/94 px-4 py-4 text-slate-100 shadow-2xl backdrop-blur-sm"
+              onPointerDown={handlePreparingSelectionPointerDown}
+              onTouchStart={handlePreparingSelectionPointerDown}
+              onMouseDown={handlePreparingSelectionPointerDown}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">
+                    {t(locale, "preparingSelection")}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">
+                    {t(locale, "preparingSelectionDetail")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onPointerDown={dismissPreparingSelection}
+                  onTouchStart={dismissPreparingSelection}
+                  onMouseDown={dismissPreparingSelection}
+                  onClick={dismissPreparingSelection}
+                  className="shrink-0 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-700"
+                >
+                  {t(locale, "hideLoadingOverlay")}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -478,7 +519,7 @@ function App() {
             const input = event.currentTarget;
             const files = input.files;
             if (files && files.length > 0) {
-              beginPreparingSelection();
+              showPreparingSelection();
               await waitForNextPaint();
               await openFiles(files);
             } else {
@@ -500,7 +541,7 @@ function App() {
               const input = event.currentTarget;
               const files = input.files;
               if (files && files.length > 0) {
-                beginPreparingSelection();
+                showPreparingSelection();
                 await waitForNextPaint();
                 try {
                   pickerStateRef.current = "processing";
