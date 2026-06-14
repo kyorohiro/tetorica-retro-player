@@ -20,6 +20,7 @@
     "heic2any": "^0.0.4",
     "lucide-react": "^1.17.0",
     "node-unrar-js": "^2.0.2",
+    "pdfjs-dist": "^6.0.227",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-reader": "^2.0.15"

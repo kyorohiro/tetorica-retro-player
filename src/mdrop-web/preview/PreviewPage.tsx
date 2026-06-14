@@ -19,6 +19,7 @@ const RetroPlayer = React.lazy(() => import("../../retro-player/components/Retro
 const ReactReader = React.lazy(() =>
     import("react-reader").then((module) => ({ default: module.ReactReader }))
 );
+const PdfPreview = React.lazy(() => import("./PdfPreview"));
 
 type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
 
@@ -217,11 +218,18 @@ export function PreviewPage({
 
     if (isPdf(file.path)) {
         return (
-            <iframe
-                src={src}
-                title={file.path}
-                className="h-full w-full bg-white"
-            />
+            <React.Suspense
+                fallback={
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                        Preparing PDF preview...
+                    </div>
+                }
+            >
+                <PdfPreview
+                    src={src}
+                    filePath={file.path}
+                />
+            </React.Suspense>
         );
     }
 
