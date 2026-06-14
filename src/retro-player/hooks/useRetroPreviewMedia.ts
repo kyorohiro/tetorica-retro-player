@@ -140,6 +140,16 @@ export function useRetroPreviewMedia({
     });
   };
 
+  const quietAudioOutputImmediately = () => {
+    if (noiseGainRef.current) {
+      noiseGainRef.current.gain.value = 0;
+    }
+
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.value = 0;
+    }
+  };
+
   const muteNoiseImmediately = () => {
     if (noiseGainRef.current) {
       noiseGainRef.current.gain.value = 0;
@@ -180,6 +190,7 @@ export function useRetroPreviewMedia({
     url?: string,
     stopStream = true,
   ) => {
+    quietAudioOutputImmediately();
     media.pause();
     if (media.srcObject instanceof MediaStream) {
       if (stopStream) {
@@ -314,6 +325,14 @@ export function useRetroPreviewMedia({
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
     media.addEventListener("play", syncVideoState);
     media.addEventListener("pause", syncVideoState);
+    media.addEventListener("pause", quietAudioOutputImmediately);
+    media.addEventListener("abort", quietAudioOutputImmediately);
+    media.addEventListener("emptied", quietAudioOutputImmediately);
+    media.addEventListener("loadstart", quietAudioOutputImmediately);
+    media.addEventListener("seeking", quietAudioOutputImmediately);
+    media.addEventListener("stalled", quietAudioOutputImmediately);
+    media.addEventListener("suspend", quietAudioOutputImmediately);
+    media.addEventListener("waiting", quietAudioOutputImmediately);
     media.addEventListener("volumechange", syncVideoState);
     media.addEventListener("timeupdate", syncVideoState);
     media.addEventListener("durationchange", syncVideoState);
@@ -369,6 +388,7 @@ export function useRetroPreviewMedia({
       hasMedia: Boolean(mediaRef.current),
       hasPreviewElement: Boolean(previewElementRef.current),
     });
+    quietAudioOutputImmediately();
     previewRequestIdRef.current += 1;
     finishLoading();
 
@@ -413,13 +433,7 @@ export function useRetroPreviewMedia({
       mediaRef.current.pause();
     }
 
-    if (noiseGainRef.current) {
-      noiseGainRef.current.gain.value = 0;
-    }
-
-    if (masterGainRef.current) {
-      masterGainRef.current.gain.value = 0;
-    }
+    quietAudioOutputImmediately();
 
     cleanupPreview();
 
