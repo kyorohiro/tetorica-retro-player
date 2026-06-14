@@ -12,6 +12,9 @@ const messages = {
     openFileDetail: "Image, video, audio, zip, pdf, epub, text",
     openFolder: "Open folder",
     openFolderDetail: "Browse dropped folders and archive-style collections",
+    localFileRecommendationTitle: "Local files recommended",
+    localFileRecommendationDetail:
+      "Files stored on this device are more stable. Remote or cloud-backed files may load slowly, pause, or stop during playback.",
     captureScreen: "Capture screen",
     captureScreenDetail: "Preview a window or screen with retro effects",
     language: "Language",
@@ -24,7 +27,11 @@ const messages = {
       "Screen capture is not available on this site. Would you like to open the PWA version instead?",
     openPwaPage: "Open PWA page",
     cancel: "Cancel",
+    hideLoadingOverlay: "Hide",
     retroPreviewActive: "Retro preview is active in the dialog.",
+    preparingSelection: "Preparing your files...",
+    preparingSelectionDetail:
+      "This can take a moment on phones or with large folders, but the app is still working.",
   },
   ja: {
     reloadApp: "再読み込み",
@@ -34,6 +41,9 @@ const messages = {
     openFileDetail: "画像、動画、音声、zip、pdf、epub、テキスト",
     openFolder: "フォルダを開く",
     openFolderDetail: "フォルダやアーカイブ風の一覧を開きます",
+    localFileRecommendationTitle: "端末内ファイルを推奨",
+    localFileRecommendationDetail:
+      "この端末に保存されたファイルの方が安定します。remote やクラウド上のファイルは、読み込み待ちや再生停止が起こることがあります。",
     captureScreen: "画面をキャプチャ",
     captureScreenDetail: "ウィンドウや画面をレトロ表示でプレビューします",
     language: "言語",
@@ -46,7 +56,11 @@ const messages = {
       "このサイトでは画面キャプチャを使えません。PWA 版を開きますか？",
     openPwaPage: "PWA 版を開く",
     cancel: "キャンセル",
+    hideLoadingOverlay: "閉じる",
     retroPreviewActive: "レトロプレビューはダイアログ側で表示中です。",
+    preparingSelection: "ファイルを準備しています...",
+    preparingSelectionDetail:
+      "スマホや大きなフォルダでは少し時間がかかりますが、アプリは動作中です。",
   },
 } as const;
 

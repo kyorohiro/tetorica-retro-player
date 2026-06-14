@@ -1,6 +1,4 @@
 import React from "react";
-import { ReactReader } from "react-reader";
-import RetroPlayer from "../../retro-player/components/RetroPlayer";
 import type { TargetFile } from "../api";
 import {
     heicToObjectUrl,
@@ -16,6 +14,15 @@ import {
 } from "../utils";
 import { useZipFileListDialog } from "../useZipFileListDialog";
 import { downloadUrl } from "../usePreviewDialog";
+
+const loadRetroPlayer = () => import("../../retro-player/components/RetroPlayer");
+const loadReactReader = () =>
+    import("react-reader").then((module) => ({ default: module.ReactReader }));
+const loadPdfPreview = () => import("./PdfPreview");
+
+const RetroPlayer = React.lazy(loadRetroPlayer);
+const ReactReader = React.lazy(loadReactReader);
+const PdfPreview = React.lazy(loadPdfPreview);
 
 type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
 
@@ -75,6 +82,18 @@ export function PreviewPage({
             setText("");
             setError("");
             onLoadingMessage?.("");
+
+            if (isPdf(file.path)) {
+                void loadPdfPreview();
+            }
+
+            if (isEpub(file.path)) {
+                void loadReactReader();
+            }
+
+            if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+                void loadRetroPlayer();
+            }
 
             const nextSrc = await getUrlFromTargetFile(file);
             addObjectUrl(nextSrc);
@@ -154,17 +173,28 @@ export function PreviewPage({
     if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
         return (
             <div className="mx-auto w-full max-w-6xl touch-manipulation">
-                <RetroPlayer
-                    src={src}
-                    kind={
-                        isVideo(file.path)
-                            ? "video"
-                            : isAudio(file.path)
-                                ? "audio"
-                            : "image"
+                <React.Suspense
+                    fallback={
+                        <div className="flex min-h-[220px] items-center justify-center rounded-2xl bg-slate-950/80">
+                            <div className="rounded-2xl border border-slate-700 bg-slate-900/88 px-5 py-4 text-center text-sm text-slate-100 shadow-lg">
+                                <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+                                <p className="font-medium">Preparing retro preview...</p>
+                            </div>
+                        </div>
                     }
-                    className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
-                />
+                >
+                    <RetroPlayer
+                        src={src}
+                        kind={
+                            isVideo(file.path)
+                                ? "video"
+                                : isAudio(file.path)
+                                    ? "audio"
+                                : "image"
+                        }
+                        className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
+                    />
+                </React.Suspense>
             </div>
         );
     }
@@ -203,11 +233,18 @@ export function PreviewPage({
 
     if (isPdf(file.path)) {
         return (
-            <iframe
-                src={src}
-                title={file.path}
-                className="h-full w-full bg-white"
-            />
+            <React.Suspense
+                fallback={
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                        Preparing PDF preview...
+                    </div>
+                }
+            >
+                <PdfPreview
+                    src={src}
+                    filePath={file.path}
+                />
+            </React.Suspense>
         );
     }
 
@@ -222,17 +259,25 @@ export function PreviewPage({
     if (isEpub(file.path)) {
         return (
             <div className="h-full w-full bg-white text-black">
-                <ReactReader
-                    epubInitOptions={{ openAs: "epub" }}
-                    url={src}
-                    location={epubLocation}
-                    locationChanged={(nextLocation: string) => {
-                        setEpubLocation(nextLocation);
-                    }}
-                    getRendition={(rendition) => {
-                        renditionRef.current = rendition;
-                    }}
-                />
+                <React.Suspense
+                    fallback={
+                        <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
+                            Preparing EPUB reader...
+                        </div>
+                    }
+                >
+                    <ReactReader
+                        epubInitOptions={{ openAs: "epub" }}
+                        url={src}
+                        location={epubLocation}
+                        locationChanged={(nextLocation: string) => {
+                            setEpubLocation(nextLocation);
+                        }}
+                        getRendition={(rendition) => {
+                            renditionRef.current = rendition;
+                        }}
+                    />
+                </React.Suspense>
             </div>
         );
     }

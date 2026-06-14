@@ -69,6 +69,178 @@ type VideoControlsProps = {
   onToggleAudioSettings: () => void;
 };
 
+type AudioPresetKey =
+  | "none"
+  | "lofi"
+  | "radio"
+  | "tape"
+  | "vinyl"
+  | "vintage-mic"
+  | "earphone";
+
+type AudioPresetSettings = {
+  isAudioFxEnabled: boolean;
+  isNoiseEnabled: boolean;
+  volume: number;
+  lofiAmount: number;
+  radioToneAmount: number;
+  bitCrushAmount: number;
+  sampleRateReductionAmount: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
+  stereoWidthAmount: number;
+  smallSpeakerRoomAmount: number;
+  wowFlutterAmount: number;
+  noiseLevel: number;
+  vinylDustAmount: number;
+};
+
+const AUDIO_PRESETS: Record<AudioPresetKey, { label: string; settings: AudioPresetSettings }> = {
+  none: {
+    label: "None",
+    settings: {
+      isAudioFxEnabled: false,
+      isNoiseEnabled: false,
+      volume: 1,
+      lofiAmount: 0,
+      radioToneAmount: 0,
+      bitCrushAmount: 0,
+      sampleRateReductionAmount: 0,
+      bassAmount: 0,
+      midAmount: 0,
+      trebleAmount: 0,
+      stereoWidthAmount: 0,
+      smallSpeakerRoomAmount: 0,
+      wowFlutterAmount: 0,
+      noiseLevel: 0,
+      vinylDustAmount: 0,
+    },
+  },
+  lofi: {
+    label: "Lo-Fi",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      volume: 0.92,
+      lofiAmount: 0.7,
+      radioToneAmount: 0.18,
+      bitCrushAmount: 0.22,
+      sampleRateReductionAmount: 0.24,
+      bassAmount: 0.08,
+      midAmount: -0.08,
+      trebleAmount: -0.18,
+      stereoWidthAmount: -0.08,
+      smallSpeakerRoomAmount: 0.08,
+      wowFlutterAmount: 0.12,
+      noiseLevel: 0.005,
+      vinylDustAmount: 0,
+    },
+  },
+  radio: {
+    label: "Radio",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      volume: 0.88,
+      lofiAmount: 0.4,
+      radioToneAmount: 0.9,
+      bitCrushAmount: 0.12,
+      sampleRateReductionAmount: 0.38,
+      bassAmount: -0.4,
+      midAmount: 0.18,
+      trebleAmount: -0.32,
+      stereoWidthAmount: -0.55,
+      smallSpeakerRoomAmount: 0.12,
+      wowFlutterAmount: 0.08,
+      noiseLevel: 0.01,
+      vinylDustAmount: 0,
+    },
+  },
+  tape: {
+    label: "Tape",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      volume: 0.94,
+      lofiAmount: 0.22,
+      radioToneAmount: 0.1,
+      bitCrushAmount: 0.04,
+      sampleRateReductionAmount: 0.08,
+      bassAmount: 0.12,
+      midAmount: 0,
+      trebleAmount: -0.14,
+      stereoWidthAmount: 0.06,
+      smallSpeakerRoomAmount: 0.18,
+      wowFlutterAmount: 0.42,
+      noiseLevel: 0.0075,
+      vinylDustAmount: 0,
+    },
+  },
+  vinyl: {
+    label: "Vinyl",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      volume: 0.96,
+      lofiAmount: 0.14,
+      radioToneAmount: 0.06,
+      bitCrushAmount: 0.01,
+      sampleRateReductionAmount: 0.03,
+      bassAmount: 0.06,
+      midAmount: -0.02,
+      trebleAmount: -0.16,
+      stereoWidthAmount: -0.18,
+      smallSpeakerRoomAmount: 0.03,
+      wowFlutterAmount: 0.18,
+      noiseLevel: 0.0035,
+      vinylDustAmount: 0.58,
+    },
+  },
+  "vintage-mic": {
+    label: "Vintage Mic",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      volume: 0.94,
+      lofiAmount: 0.34,
+      radioToneAmount: 0.28,
+      bitCrushAmount: 0,
+      sampleRateReductionAmount: 0.02,
+      bassAmount: -0.24,
+      midAmount: 0.32,
+      trebleAmount: -0.68,
+      stereoWidthAmount: -0.32,
+      smallSpeakerRoomAmount: 0.12,
+      wowFlutterAmount: 0.04,
+      noiseLevel: 0.0025,
+      vinylDustAmount: 0.08,
+    },
+  },
+  earphone: {
+    label: "Earphone",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: false,
+      volume: 1,
+      lofiAmount: 0,
+      radioToneAmount: 0,
+      bitCrushAmount: 0,
+      sampleRateReductionAmount: 0,
+      bassAmount: 0.1,
+      midAmount: 0,
+      trebleAmount: 0.08,
+      stereoWidthAmount: 0.22,
+      smallSpeakerRoomAmount: 0,
+      wowFlutterAmount: 0,
+      noiseLevel: 0,
+      vinylDustAmount: 0,
+    },
+  },
+};
+
+const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return "00:00";
@@ -135,142 +307,65 @@ export function VideoControls({
   onToggleAudioSettings,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
-  const [selectedAudioPreset, setSelectedAudioPreset] = useState<
-    "none" | "lofi" | "radio" | "tape" | "vinyl" | "vintage-mic" | "earphone" | null
-  >(null);
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
 
-  const applyAudioPreset = (
-    preset: "none" | "lofi" | "radio" | "tape" | "vinyl" | "vintage-mic" | "earphone",
-  ) => {
-    const presetNeedsFx = preset !== "none";
-    const presetNeedsNoise =
-      preset === "lofi" ||
-      preset === "radio" ||
-      preset === "tape" ||
-      preset === "vinyl" ||
-      preset === "vintage-mic";
+  const selectedAudioPreset = (
+    Object.entries(AUDIO_PRESETS).find(([, preset]) => {
+      const { settings } = preset;
 
-    if (presetNeedsFx && !isAudioFxEnabled) {
+      return (
+        settings.isAudioFxEnabled === isAudioFxEnabled &&
+        settings.isNoiseEnabled === isNoiseEnabled &&
+        isNearlyEqual(settings.volume, volume) &&
+        isNearlyEqual(settings.lofiAmount, lofiAmount) &&
+        isNearlyEqual(settings.radioToneAmount, radioToneAmount) &&
+        isNearlyEqual(settings.bitCrushAmount, bitCrushAmount) &&
+        isNearlyEqual(
+          settings.sampleRateReductionAmount,
+          sampleRateReductionAmount,
+        ) &&
+        isNearlyEqual(settings.bassAmount, bassAmount) &&
+        isNearlyEqual(settings.midAmount, midAmount) &&
+        isNearlyEqual(settings.trebleAmount, trebleAmount) &&
+        isNearlyEqual(settings.stereoWidthAmount, stereoWidthAmount) &&
+        isNearlyEqual(
+          settings.smallSpeakerRoomAmount,
+          smallSpeakerRoomAmount,
+        ) &&
+        isNearlyEqual(settings.wowFlutterAmount, wowFlutterAmount) &&
+        isNearlyEqual(settings.noiseLevel, noiseLevel) &&
+        isNearlyEqual(settings.vinylDustAmount, vinylDustAmount)
+      );
+    })?.[0] as AudioPresetKey | undefined
+  ) ?? null;
+
+  const applyAudioPreset = (preset: AudioPresetKey) => {
+    const presetSettings = AUDIO_PRESETS[preset].settings;
+
+    if (presetSettings.isAudioFxEnabled && !isAudioFxEnabled) {
       onToggleAudioFx();
     }
-    if (!presetNeedsFx && isAudioFxEnabled) {
+    if (!presetSettings.isAudioFxEnabled && isAudioFxEnabled) {
       onToggleAudioFx();
     }
-    if (presetNeedsNoise !== isNoiseEnabled) {
+    if (presetSettings.isNoiseEnabled !== isNoiseEnabled) {
       onToggleNoise();
     }
 
-    switch (preset) {
-      case "none":
-        onChangeVolume(1);
-        onChangeLofiAmount(0);
-        onChangeRadioToneAmount(0);
-        onChangeBitCrushAmount(0);
-        onChangeSampleRateReductionAmount(0);
-        onChangeBassAmount(0);
-        onChangeMidAmount(0);
-        onChangeTrebleAmount(0);
-        onChangeStereoWidthAmount(0);
-        onChangeSmallSpeakerRoomAmount(0);
-        onChangeWowFlutterAmount(0);
-        onChangeNoiseLevel(0);
-        onChangeVinylDustAmount(0);
-        break;
-      case "lofi":
-        onChangeVolume(0.92);
-        onChangeLofiAmount(0.7);
-        onChangeRadioToneAmount(0.18);
-        onChangeBitCrushAmount(0.22);
-        onChangeSampleRateReductionAmount(0.24);
-        onChangeBassAmount(0.08);
-        onChangeMidAmount(-0.08);
-        onChangeTrebleAmount(-0.18);
-        onChangeStereoWidthAmount(-0.08);
-        onChangeSmallSpeakerRoomAmount(0.08);
-        onChangeWowFlutterAmount(0.12);
-        onChangeNoiseLevel(0.005);
-        onChangeVinylDustAmount(0);
-        break;
-      case "radio":
-        onChangeVolume(0.88);
-        onChangeLofiAmount(0.4);
-        onChangeRadioToneAmount(0.9);
-        onChangeBitCrushAmount(0.12);
-        onChangeSampleRateReductionAmount(0.38);
-        onChangeBassAmount(-0.4);
-        onChangeMidAmount(0.18);
-        onChangeTrebleAmount(-0.32);
-        onChangeStereoWidthAmount(-0.55);
-        onChangeSmallSpeakerRoomAmount(0.12);
-        onChangeWowFlutterAmount(0.08);
-        onChangeNoiseLevel(0.01);
-        onChangeVinylDustAmount(0);
-        break;
-      case "tape":
-        onChangeVolume(0.94);
-        onChangeLofiAmount(0.22);
-        onChangeRadioToneAmount(0.1);
-        onChangeBitCrushAmount(0.04);
-        onChangeSampleRateReductionAmount(0.08);
-        onChangeBassAmount(0.12);
-        onChangeMidAmount(0);
-        onChangeTrebleAmount(-0.14);
-        onChangeStereoWidthAmount(0.06);
-        onChangeSmallSpeakerRoomAmount(0.18);
-        onChangeWowFlutterAmount(0.42);
-        onChangeNoiseLevel(0.0075);
-        onChangeVinylDustAmount(0);
-        break;
-      case "vinyl":
-        onChangeVolume(0.96);
-        onChangeLofiAmount(0.14);
-        onChangeRadioToneAmount(0.06);
-        onChangeBitCrushAmount(0.01);
-        onChangeSampleRateReductionAmount(0.03);
-        onChangeBassAmount(0.06);
-        onChangeMidAmount(-0.02);
-        onChangeTrebleAmount(-0.16);
-        onChangeStereoWidthAmount(-0.18);
-        onChangeSmallSpeakerRoomAmount(0.03);
-        onChangeWowFlutterAmount(0.18);
-        onChangeNoiseLevel(0.0035);
-        onChangeVinylDustAmount(0.58);
-        break;
-      case "vintage-mic":
-        onChangeVolume(0.94);
-        onChangeLofiAmount(0.34);
-        onChangeRadioToneAmount(0.28);
-        onChangeBitCrushAmount(0);
-        onChangeSampleRateReductionAmount(0.02);
-        onChangeBassAmount(-0.24);
-        onChangeMidAmount(0.32);
-        onChangeTrebleAmount(-0.68);
-        onChangeStereoWidthAmount(-0.32);
-        onChangeSmallSpeakerRoomAmount(0.12);
-        onChangeWowFlutterAmount(0.04);
-        onChangeNoiseLevel(0.0025);
-        onChangeVinylDustAmount(0.08);
-        break;
-      case "earphone":
-        onChangeVolume(1);
-        onChangeLofiAmount(0);
-        onChangeRadioToneAmount(0);
-        onChangeBitCrushAmount(0);
-        onChangeSampleRateReductionAmount(0);
-        onChangeBassAmount(0.1);
-        onChangeMidAmount(0);
-        onChangeTrebleAmount(0.08);
-        onChangeStereoWidthAmount(0.22);
-        onChangeSmallSpeakerRoomAmount(0);
-        onChangeWowFlutterAmount(0);
-        onChangeNoiseLevel(0);
-        onChangeVinylDustAmount(0);
-        break;
-    }
-
-    setSelectedAudioPreset(preset);
+    onChangeVolume(presetSettings.volume);
+    onChangeLofiAmount(presetSettings.lofiAmount);
+    onChangeRadioToneAmount(presetSettings.radioToneAmount);
+    onChangeBitCrushAmount(presetSettings.bitCrushAmount);
+    onChangeSampleRateReductionAmount(presetSettings.sampleRateReductionAmount);
+    onChangeBassAmount(presetSettings.bassAmount);
+    onChangeMidAmount(presetSettings.midAmount);
+    onChangeTrebleAmount(presetSettings.trebleAmount);
+    onChangeStereoWidthAmount(presetSettings.stereoWidthAmount);
+    onChangeSmallSpeakerRoomAmount(presetSettings.smallSpeakerRoomAmount);
+    onChangeWowFlutterAmount(presetSettings.wowFlutterAmount);
+    onChangeNoiseLevel(presetSettings.noiseLevel);
+    onChangeVinylDustAmount(presetSettings.vinylDustAmount);
   };
 
   if (mode === "audio-settings") {
@@ -324,29 +419,12 @@ export function VideoControls({
             Presets
           </p>
           <div className="grid grid-cols-2 gap-2">
-            {[
-              ["none", "None"],
-              ["lofi", "Lo-Fi"],
-              ["radio", "Radio"],
-              ["tape", "Tape"],
-              ["vinyl", "Vinyl"],
-              ["vintage-mic", "Vintage Mic"],
-              ["earphone", "Earphone"],
-            ].map(([key, label]) => (
+            {(Object.entries(AUDIO_PRESETS) as [AudioPresetKey, { label: string; settings: AudioPresetSettings }][]).map(([key, preset]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => {
-                  applyAudioPreset(
-                    key as
-                      | "none"
-                      | "lofi"
-                      | "radio"
-                      | "tape"
-                      | "vinyl"
-                      | "vintage-mic"
-                      | "earphone",
-                  );
+                  applyAudioPreset(key);
                 }}
                 className={[
                   "inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm transition",
@@ -355,7 +433,7 @@ export function VideoControls({
                     : "border-cyan-400/40 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/20",
                 ].join(" ")}
               >
-                {label}
+                {preset.label}
               </button>
             ))}
           </div>

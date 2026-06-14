@@ -11,15 +11,11 @@ import {
     isVideo,
     isArchive,
 } from "./utils";
-import {
-    ZipExtractor,
-    type ZipSource,
-    type ArchiveExtractorEntry,
-    compareByName,
-    compareComic,
+import type {
+    ZipSource,
+    ArchiveExtractorEntry,
     ArchiveExtractor,
 } from "./extractor";
-import { RarExtractor } from "./extractor_rar";
 type SortMode = "name" | "modifiedAt" | "comic";
 type ZipFileListDialogOptions = {
     title?: string;
@@ -30,8 +26,31 @@ type ZipTargetFile = ArchiveExtractorEntry & {
     name?: string;
 };
 
+const collator = new Intl.Collator("ja", {
+    numeric: true,
+    sensitivity: "base",
+});
+
+const isCover = (path: string) => {
+    const name = path.replace(/.*\//, "");
+    return /^(cover|表紙|hyoushi|000)\.(png|jpe?g|webp|gif|svg|avif)$/i.test(name);
+};
+
+const compareByName = (a: ZipTargetFile, b: ZipTargetFile) =>
+    collator.compare(a.path, b.path);
+
+const compareComic = (a: ZipTargetFile, b: ZipTargetFile) => {
+    if (a.isDir && !b.isDir) return -1;
+    if (!a.isDir && b.isDir) return 1;
+    if (isCover(a.path) && !isCover(b.path)) return -1;
+    if (!isCover(a.path) && isCover(b.path)) return 1;
+    return compareByName(a, b);
+};
+
+const normalizeArchivePath = (path: string) => path.trim().replace(/^\/+/, "");
+
 const parentPathOf = (path: string) => {
-    const clean = ZipExtractor.normalizeZipPath(path).replace(/\/+$/, "");
+    const clean = normalizeArchivePath(path).replace(/\/+$/, "");
     if (!clean) return "/";
     const parent = clean.split("/").slice(0, -1).join("/");
     return parent ? `/${parent}` : "/";
@@ -47,13 +66,18 @@ export const isRarLikePath = (path: string) =>
 export const isZipLikePath = (path: string) =>
     /\.(zip|cbz)$/i.test(path);
 
-export const createArchiveExtractor = (source: ZipSource, title?: string): ArchiveExtractor => {
+export const createArchiveExtractor = async (
+    source: ZipSource,
+    title?: string
+): Promise<ArchiveExtractor> => {
     const name = title ?? "";
 
     if (isRarLikePath(name)) {
+        const { RarExtractor } = await import("./extractor_rar");
         return RarExtractor.createFromZipSource(source);
     }
 
+    const { ZipExtractor } = await import("./extractor");
     return ZipExtractor.createFromZipSource(source);
 };
 
@@ -115,7 +139,7 @@ function ZipFileListDialog({
         const init = async () => {
             setLoading(true);
             try {
-                const extractor = createArchiveExtractor(source, title);
+                const extractor = await createArchiveExtractor(source, title);
                 extractorRef.current = extractor;
                 const nextFiles = await extractor.list(initialPath);
                 if (cancelled) return;

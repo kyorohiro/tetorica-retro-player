@@ -10,8 +10,6 @@ import {
   RotateCcw,
   Square,
 } from "lucide-react";
-import { RetroFilterPanel } from "./RetroFilterPanel";
-import { VideoControls } from "./VideoControls";
 import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
 import {
   useRetroFilterState,
@@ -29,6 +27,13 @@ import {
   type RetroPresetKey,
 } from "../retro/config";
 import type { Locale } from "../../i18n";
+
+const VideoControls = React.lazy(() => import("./VideoControls").then((module) => ({
+  default: module.VideoControls,
+})));
+const RetroFilterPanel = React.lazy(() => import("./RetroFilterPanel").then((module) => ({
+  default: module.RetroFilterPanel,
+})));
 
 type RetroPlayerProps = {
   locale?: Locale;
@@ -125,6 +130,16 @@ export function RetroPlayer({
     filterState,
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
+  );
+  const showImagePlaceholder =
+    kind === "image" &&
+    Boolean(src) &&
+    !player.previewError &&
+    (!player.isRendererReady || player.isLoading);
+  const controlsFallback = (
+    <div className="flex min-h-[6rem] items-center justify-center text-sm text-slate-400">
+      Preparing controls...
+    </div>
   );
 
   const resetAllSettings = React.useCallback(() => {
@@ -684,9 +699,17 @@ export function RetroPlayer({
             }
           >
             <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
+              {showImagePlaceholder && (
+                <img
+                  src={src}
+                  alt=""
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-95"
+                />
+              )}
               <div
                 ref={player.canvasHostRef}
-                className="pointer-events-none h-full w-full touch-manipulation"
+                className="pointer-events-none relative h-full w-full touch-manipulation"
               />
               {!player.isPoweredOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/72">
@@ -699,7 +722,12 @@ export function RetroPlayer({
                 </div>
               )}
               {player.isLoading && !player.needsUserPlay && !player.previewError && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72">
+                <div
+                  className={[
+                    "pointer-events-none absolute inset-0 flex items-center justify-center",
+                    showImagePlaceholder ? "bg-slate-950/26" : "bg-slate-950/72",
+                  ].join(" ")}
+                >
                   <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
                     <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
                     <p className="font-medium">
@@ -1012,74 +1040,76 @@ export function RetroPlayer({
         <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300">
           {(player.hasPlayableMedia || player.hasImage) &&
             controlPanelMode !== "video-settings" && (
-            <VideoControls
-              hasPlayback={player.hasPlayableMedia}
-              currentTime={player.currentTime}
-              duration={player.duration}
-              mode={controlPanelMode === "audio-settings" ? "audio-settings" : "playback"}
-              isAudioFxEnabled={player.isAudioFxEnabled}
-              isLooping={player.isLooping}
-              isMuted={player.isMuted}
-              isNoiseEnabled={player.isNoiseEnabled}
-              isPlaying={player.isPlaying}
-              hasVideo={player.hasVideo}
-              isVideoSettingsOpen={false}
-              lofiAmount={player.lofiAmount}
-              radioToneAmount={player.radioToneAmount}
-              bitCrushAmount={player.bitCrushAmount}
-              sampleRateReductionAmount={player.sampleRateReductionAmount}
-              bassAmount={player.bassAmount}
-              midAmount={player.midAmount}
-              trebleAmount={player.trebleAmount}
-              stereoWidthAmount={player.stereoWidthAmount}
-              smallSpeakerRoomAmount={player.smallSpeakerRoomAmount}
-              wowFlutterAmount={player.wowFlutterAmount}
-              noiseLevel={player.noiseLevel}
-              vinylDustAmount={player.vinylDustAmount}
-              playbackRate={player.playbackRate}
-              volume={player.volume}
-              onChangeLofiAmount={player.setLofiAmount}
-              onChangeRadioToneAmount={player.setRadioToneAmount}
-              onChangeBitCrushAmount={player.setBitCrushAmount}
-              onChangeSampleRateReductionAmount={player.setSampleRateReductionAmount}
-              onChangeBassAmount={player.setBassAmount}
-              onChangeMidAmount={player.setMidAmount}
-              onChangeTrebleAmount={player.setTrebleAmount}
-              onChangeStereoWidthAmount={player.setStereoWidthAmount}
-              onChangeSmallSpeakerRoomAmount={player.setSmallSpeakerRoomAmount}
-              onChangeWowFlutterAmount={player.setWowFlutterAmount}
-              onChangeNoiseLevel={player.setNoiseLevel}
-              onChangeVinylDustAmount={player.setVinylDustAmount}
-              onChangePlaybackRate={player.changePlaybackRate}
-              onChangeVolume={player.changeVolume}
-              onRestart={() => {
-                player.seekTo(0);
-                void player.playVideoWithAudio();
-              }}
-              onSeek={player.seekTo}
-              onStepFrame={player.stepFrame}
-              onToggleAudioFx={player.toggleAudioFx}
-              onToggleLoop={player.toggleLoop}
-              onToggleMute={player.toggleMute}
-              onToggleNoise={player.toggleNoise}
-              onTogglePlayback={() => {
-                void player.togglePlayback();
-              }}
-              onBackToPlayback={() => {
-                setControlPanelMode("playback");
-              }}
-              onResetSettings={resetAllSettings}
-              onToggleVideoSettings={() => {
-                setControlPanelMode((current) =>
-                  current === "video-settings" ? "playback" : "video-settings",
-                );
-              }}
-              onToggleAudioSettings={() => {
-                setControlPanelMode((current) =>
-                  current === "audio-settings" ? "playback" : "audio-settings",
-                );
-              }}
-            />
+            <React.Suspense fallback={controlsFallback}>
+              <VideoControls
+                hasPlayback={player.hasPlayableMedia}
+                currentTime={player.currentTime}
+                duration={player.duration}
+                mode={controlPanelMode === "audio-settings" ? "audio-settings" : "playback"}
+                isAudioFxEnabled={player.isAudioFxEnabled}
+                isLooping={player.isLooping}
+                isMuted={player.isMuted}
+                isNoiseEnabled={player.isNoiseEnabled}
+                isPlaying={player.isPlaying}
+                hasVideo={player.hasVideo}
+                isVideoSettingsOpen={false}
+                lofiAmount={player.lofiAmount}
+                radioToneAmount={player.radioToneAmount}
+                bitCrushAmount={player.bitCrushAmount}
+                sampleRateReductionAmount={player.sampleRateReductionAmount}
+                bassAmount={player.bassAmount}
+                midAmount={player.midAmount}
+                trebleAmount={player.trebleAmount}
+                stereoWidthAmount={player.stereoWidthAmount}
+                smallSpeakerRoomAmount={player.smallSpeakerRoomAmount}
+                wowFlutterAmount={player.wowFlutterAmount}
+                noiseLevel={player.noiseLevel}
+                vinylDustAmount={player.vinylDustAmount}
+                playbackRate={player.playbackRate}
+                volume={player.volume}
+                onChangeLofiAmount={player.setLofiAmount}
+                onChangeRadioToneAmount={player.setRadioToneAmount}
+                onChangeBitCrushAmount={player.setBitCrushAmount}
+                onChangeSampleRateReductionAmount={player.setSampleRateReductionAmount}
+                onChangeBassAmount={player.setBassAmount}
+                onChangeMidAmount={player.setMidAmount}
+                onChangeTrebleAmount={player.setTrebleAmount}
+                onChangeStereoWidthAmount={player.setStereoWidthAmount}
+                onChangeSmallSpeakerRoomAmount={player.setSmallSpeakerRoomAmount}
+                onChangeWowFlutterAmount={player.setWowFlutterAmount}
+                onChangeNoiseLevel={player.setNoiseLevel}
+                onChangeVinylDustAmount={player.setVinylDustAmount}
+                onChangePlaybackRate={player.changePlaybackRate}
+                onChangeVolume={player.changeVolume}
+                onRestart={() => {
+                  player.seekTo(0);
+                  void player.playVideoWithAudio();
+                }}
+                onSeek={player.seekTo}
+                onStepFrame={player.stepFrame}
+                onToggleAudioFx={player.toggleAudioFx}
+                onToggleLoop={player.toggleLoop}
+                onToggleMute={player.toggleMute}
+                onToggleNoise={player.toggleNoise}
+                onTogglePlayback={() => {
+                  void player.togglePlayback();
+                }}
+                onBackToPlayback={() => {
+                  setControlPanelMode("playback");
+                }}
+                onResetSettings={resetAllSettings}
+                onToggleVideoSettings={() => {
+                  setControlPanelMode((current) =>
+                    current === "video-settings" ? "playback" : "video-settings",
+                  );
+                }}
+                onToggleAudioSettings={() => {
+                  setControlPanelMode((current) =>
+                    current === "audio-settings" ? "playback" : "audio-settings",
+                  );
+                }}
+              />
+            </React.Suspense>
           )}
 
           {player.previewError && (
@@ -1099,68 +1129,70 @@ export function RetroPlayer({
                   Back to Playback
                 </button>
               </div>
-              <RetroFilterPanel
-                locale={locale}
-                colorLevels={filterState.colorLevels}
-                curvature={filterState.curvature}
-                ditherStrength={filterState.ditherStrength}
-                glowStrength={filterState.glowStrength}
-                isFilterEnabled={filterState.isFilterEnabled}
-                monoTint={filterState.monoTint}
-                neonBoost={filterState.neonBoost}
-                neonDetail={filterState.neonDetail}
-                neonSaturation={filterState.neonSaturation}
-                paletteMode={filterState.paletteMode}
-                phosphorStrength={filterState.phosphorStrength}
-                spotMaskStrength={filterState.spotMaskStrength}
-                bulbRadius={filterState.bulbRadius}
-                blackFloor={filterState.blackFloor}
-                phosphorDotLightBalance={filterState.phosphorDotLightBalance}
-                phosphorDotInternalScale={filterState.phosphorDotInternalScale}
-                phosphorDotBrightCore={filterState.phosphorDotBrightCore}
-                phosphorDotCellFill={filterState.phosphorDotCellFill}
-                phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
-                phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
-                closeUpNoiseStrength={filterState.closeUpNoiseStrength}
-                scanlineBrightnessFade={filterState.scanlineBrightnessFade}
-                scanlineStrength={filterState.scanlineStrength}
-                scanline2Strength={filterState.scanline2Strength}
-                selectedPreset={filterState.selectedPreset}
-                sourceDimensions={player.sourceDimensions}
-                targetHeight={filterState.targetHeight}
-                targetWidth={filterState.targetWidth}
-                matchTargetAspect={filterState.matchTargetAspect}
-                vignetteStrength={filterState.vignetteStrength}
-                onApplyPreset={applyPresetWithAspect}
-                onSetColorLevels={filterState.setColorLevels}
-                onSetCurvature={filterState.setCurvature}
-                onSetDitherStrength={filterState.setDitherStrength}
-                onSetGlowStrength={filterState.setGlowStrength}
-                onSetIsFilterEnabled={filterState.setIsFilterEnabled}
-                onSetMonoTint={filterState.setMonoTint}
-                onSetNeonBoost={filterState.setNeonBoost}
-                onSetNeonDetail={filterState.setNeonDetail}
-                onSetNeonSaturation={filterState.setNeonSaturation}
-                onSetPaletteMode={filterState.setPaletteMode}
-                onSetPhosphorStrength={filterState.setPhosphorStrength}
-                onSetSpotMaskStrength={filterState.setSpotMaskStrength}
-                onSetBulbRadius={filterState.setBulbRadius}
-                onSetBlackFloor={filterState.setBlackFloor}
-                onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
-                onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
-                onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
-                onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
-                onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
-                onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
-                onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
-                onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
-                onSetScanlineStrength={filterState.setScanlineStrength}
-                onSetScanline2Strength={filterState.setScanline2Strength}
-                onSetTargetHeight={handleSetTargetHeight}
-                onSetTargetWidth={handleSetTargetWidth}
-                onSetMatchTargetAspect={handleSetMatchTargetAspect}
-                onSetVignetteStrength={filterState.setVignetteStrength}
-              />
+              <React.Suspense fallback={controlsFallback}>
+                <RetroFilterPanel
+                  locale={locale}
+                  colorLevels={filterState.colorLevels}
+                  curvature={filterState.curvature}
+                  ditherStrength={filterState.ditherStrength}
+                  glowStrength={filterState.glowStrength}
+                  isFilterEnabled={filterState.isFilterEnabled}
+                  monoTint={filterState.monoTint}
+                  neonBoost={filterState.neonBoost}
+                  neonDetail={filterState.neonDetail}
+                  neonSaturation={filterState.neonSaturation}
+                  paletteMode={filterState.paletteMode}
+                  phosphorStrength={filterState.phosphorStrength}
+                  spotMaskStrength={filterState.spotMaskStrength}
+                  bulbRadius={filterState.bulbRadius}
+                  blackFloor={filterState.blackFloor}
+                  phosphorDotLightBalance={filterState.phosphorDotLightBalance}
+                  phosphorDotInternalScale={filterState.phosphorDotInternalScale}
+                  phosphorDotBrightCore={filterState.phosphorDotBrightCore}
+                  phosphorDotCellFill={filterState.phosphorDotCellFill}
+                  phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
+                  phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
+                  closeUpNoiseStrength={filterState.closeUpNoiseStrength}
+                  scanlineBrightnessFade={filterState.scanlineBrightnessFade}
+                  scanlineStrength={filterState.scanlineStrength}
+                  scanline2Strength={filterState.scanline2Strength}
+                  selectedPreset={filterState.selectedPreset}
+                  sourceDimensions={player.sourceDimensions}
+                  targetHeight={filterState.targetHeight}
+                  targetWidth={filterState.targetWidth}
+                  matchTargetAspect={filterState.matchTargetAspect}
+                  vignetteStrength={filterState.vignetteStrength}
+                  onApplyPreset={applyPresetWithAspect}
+                  onSetColorLevels={filterState.setColorLevels}
+                  onSetCurvature={filterState.setCurvature}
+                  onSetDitherStrength={filterState.setDitherStrength}
+                  onSetGlowStrength={filterState.setGlowStrength}
+                  onSetIsFilterEnabled={filterState.setIsFilterEnabled}
+                  onSetMonoTint={filterState.setMonoTint}
+                  onSetNeonBoost={filterState.setNeonBoost}
+                  onSetNeonDetail={filterState.setNeonDetail}
+                  onSetNeonSaturation={filterState.setNeonSaturation}
+                  onSetPaletteMode={filterState.setPaletteMode}
+                  onSetPhosphorStrength={filterState.setPhosphorStrength}
+                  onSetSpotMaskStrength={filterState.setSpotMaskStrength}
+                  onSetBulbRadius={filterState.setBulbRadius}
+                  onSetBlackFloor={filterState.setBlackFloor}
+                  onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
+                  onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
+                  onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
+                  onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
+                  onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
+                  onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
+                  onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
+                  onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
+                  onSetScanlineStrength={filterState.setScanlineStrength}
+                  onSetScanline2Strength={filterState.setScanline2Strength}
+                  onSetTargetHeight={handleSetTargetHeight}
+                  onSetTargetWidth={handleSetTargetWidth}
+                  onSetMatchTargetAspect={handleSetMatchTargetAspect}
+                  onSetVignetteStrength={filterState.setVignetteStrength}
+                />
+              </React.Suspense>
             </div>
           )}
         </div>

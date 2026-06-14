@@ -5,15 +5,9 @@ import type { RetroFilterState } from "./useRetroFilterState";
 import { useRetroAudioEngine } from "./useRetroAudioEngine";
 import { useRetroPixiStage } from "./useRetroPixiStage";
 import { useRetroPreviewMedia } from "./useRetroPreviewMedia";
+import { RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT } from "../events";
 
 let retroPlayerInstanceSeed = 0;
-
-const isRetroPlayerDebugEnabled = () =>
-  typeof window !== "undefined" &&
-  (
-    import.meta.env.DEV ||
-    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
-  );
 
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
@@ -21,6 +15,13 @@ const isTauriRuntime = () =>
 
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+const isRetroPlayerDebugEnabled = () =>
+  typeof window !== "undefined" &&
+  (
+    import.meta.env.DEV ||
+    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+  );
 
 export function usePixiVideoPlayer(
   filterState: RetroFilterState,
@@ -42,6 +43,7 @@ export function usePixiVideoPlayer(
   const previewRequestIdRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
+  const wasPlayingBeforeBackgroundRef = useRef(false);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
@@ -67,10 +69,8 @@ export function usePixiVideoPlayer(
       return;
     }
 
-    console.log(
-      `[retro-player video][${instanceLabelRef.current}] ${label}`,
-      payload ?? {},
-    );
+    const suffix = payload ? ` ${JSON.stringify(payload)}` : "";
+    console.log(`[retro-player video][${instanceLabelRef.current}] ${label}${suffix}`);
   };
 
   const stage = useRetroPixiStage({
@@ -166,6 +166,7 @@ export function usePixiVideoPlayer(
     ensureAudioContext,
     updateAudioNodes,
     connectMediaAudio,
+    reconnectCurrentMediaAudio,
     resetAudioSettings,
     disposeAudioEngine,
   } = audio;
@@ -574,6 +575,9 @@ export function usePixiVideoPlayer(
     let cancelled = false;
 
     const setupPixi = async () => {
+      debugVideo("startup:setupPixi-effect:start", {
+        renderResolutionScale,
+      });
       await initPixiRef.current();
 
       if (cancelled) {
@@ -614,6 +618,109 @@ export function usePixiVideoPlayer(
       //document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    const handlePrepareExternalNavigation = () => {
+      if (!mediaRef.current) {
+        return;
+      }
+
+      mediaRef.current.muted = true;
+      mediaRef.current.volume = 0;
+      mediaRef.current.pause();
+      syncVideoState();
+    };
+
+    window.addEventListener(
+      RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
+      handlePrepareExternalNavigation as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
+        handlePrepareExternalNavigation as EventListener,
+      );
+    };
+  }, [syncVideoState]);
+
+  useEffect(() => {
+    if (!isAndroidRuntime()) {
+      return;
+    }
+
+    const isPlayableKind = (kind: typeof previewKindRef.current) =>
+      kind === "video" || kind === "audio" || kind === "capture";
+
+    const handleVisibilityChange = () => {
+      const media = mediaRef.current;
+      if (!media || !isPlayableKind(previewKindRef.current)) {
+        return;
+      }
+
+      if (document.visibilityState === "hidden") {
+        wasPlayingBeforeBackgroundRef.current = !media.paused;
+
+        media.pause();
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+
+        if (noiseGainRef.current) {
+          noiseGainRef.current.gain.value = 0;
+        }
+
+        if (masterGainRef.current) {
+          masterGainRef.current.gain.value = 0;
+        }
+
+        if (audioContextRef.current?.state === "running") {
+          void audioContextRef.current.suspend().catch(() => {
+            // Ignore background suspension failures.
+          });
+        }
+
+        return;
+      }
+
+      window.setTimeout(() => {
+        void (async () => {
+          try {
+            await ensureAudioContext();
+            reconnectCurrentMediaAudio();
+            updateAudioNodes();
+
+            if (wasPlayingBeforeBackgroundRef.current && mediaRef.current) {
+              try {
+                await mediaRef.current.play();
+                setNeedsUserPlay(false);
+              } catch (error) {
+                if (error instanceof DOMException && error.name === "NotAllowedError") {
+                  setNeedsUserPlay(true);
+                }
+              }
+            }
+          } finally {
+            syncVideoState();
+            wasPlayingBeforeBackgroundRef.current = false;
+          }
+        })();
+      }, 80);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    audioContextRef,
+    ensureAudioContext,
+    masterGainRef,
+    noiseGainRef,
+    reconnectCurrentMediaAudio,
+    syncVideoState,
+    updateAudioNodes,
+  ]);
 
   useLayoutEffect(() => {
     applyFilterState();
