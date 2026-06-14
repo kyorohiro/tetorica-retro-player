@@ -45,7 +45,6 @@ function App() {
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
-  const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -61,7 +60,7 @@ function App() {
   const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
-  const retroPlayerKey = `player:${retroPlayerEpoch}`;
+  const retroPlayerKey = "player:root";
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
 
@@ -242,9 +241,6 @@ function App() {
       const detail = (event as CustomEvent<{ active?: boolean }>).detail;
       const isActive = Boolean(detail?.active);
       setIsRetroPreviewDialogActive(isActive);
-      if (!isActive) {
-        setRetroPlayerEpoch((current) => current + 1);
-      }
     };
 
     window.addEventListener(
