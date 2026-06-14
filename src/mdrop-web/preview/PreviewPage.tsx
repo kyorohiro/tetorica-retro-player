@@ -15,11 +15,14 @@ import {
 import { useZipFileListDialog } from "../useZipFileListDialog";
 import { downloadUrl } from "../usePreviewDialog";
 
-const RetroPlayer = React.lazy(() => import("../../retro-player/components/RetroPlayer"));
-const ReactReader = React.lazy(() =>
-    import("react-reader").then((module) => ({ default: module.ReactReader }))
-);
-const PdfPreview = React.lazy(() => import("./PdfPreview"));
+const loadRetroPlayer = () => import("../../retro-player/components/RetroPlayer");
+const loadReactReader = () =>
+    import("react-reader").then((module) => ({ default: module.ReactReader }));
+const loadPdfPreview = () => import("./PdfPreview");
+
+const RetroPlayer = React.lazy(loadRetroPlayer);
+const ReactReader = React.lazy(loadReactReader);
+const PdfPreview = React.lazy(loadPdfPreview);
 
 type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
 
@@ -79,6 +82,18 @@ export function PreviewPage({
             setText("");
             setError("");
             onLoadingMessage?.("");
+
+            if (isPdf(file.path)) {
+                void loadPdfPreview();
+            }
+
+            if (isEpub(file.path)) {
+                void loadReactReader();
+            }
+
+            if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+                void loadRetroPlayer();
+            }
 
             const nextSrc = await getUrlFromTargetFile(file);
             addObjectUrl(nextSrc);
