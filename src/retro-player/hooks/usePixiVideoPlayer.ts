@@ -5,6 +5,7 @@ import type { RetroFilterState } from "./useRetroFilterState";
 import { useRetroAudioEngine } from "./useRetroAudioEngine";
 import { useRetroPixiStage } from "./useRetroPixiStage";
 import { useRetroPreviewMedia } from "./useRetroPreviewMedia";
+import { RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT } from "../events";
 
 let retroPlayerInstanceSeed = 0;
 
@@ -617,6 +618,31 @@ export function usePixiVideoPlayer(
       //document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    const handlePrepareExternalNavigation = () => {
+      if (!mediaRef.current) {
+        return;
+      }
+
+      mediaRef.current.muted = true;
+      mediaRef.current.volume = 0;
+      mediaRef.current.pause();
+      syncVideoState();
+    };
+
+    window.addEventListener(
+      RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
+      handlePrepareExternalNavigation as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
+        handlePrepareExternalNavigation as EventListener,
+      );
+    };
+  }, [syncVideoState]);
 
   useEffect(() => {
     if (!isAndroidRuntime()) {

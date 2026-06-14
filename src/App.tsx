@@ -28,10 +28,18 @@ import {
   isVideo,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
+import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
+  });
+};
+
+const waitForExternalNavigationPause = async () => {
+  dispatchRetroPlayerPrepareExternalNavigation();
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 120);
   });
 };
 
@@ -256,20 +264,23 @@ function App() {
     };
   }, []);
 
-  const handleOpenFilePicker = useCallback(() => {
+  const handleOpenFilePicker = useCallback(async () => {
+    await waitForExternalNavigationPause();
     beginPreparingSelection();
     fileInputRef.current?.click();
   }, [beginPreparingSelection]);
 
-  const handleOpenFolderPicker = useCallback(() => {
+  const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
+    await waitForExternalNavigationPause();
     beginPreparingSelection();
     folderInputRef.current?.click();
   }, [beginPreparingSelection, isIosOrAndroid]);
 
-  const handleOpenDisplayCapture = useCallback(() => {
+  const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
     setIsMobileMenuOpen(false);
+    await waitForExternalNavigationPause();
     void handleDisplayCapture();
   }, [handleDisplayCapture, isIosOrAndroid]);
 
