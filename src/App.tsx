@@ -331,6 +331,12 @@ function App() {
                       </span>
                     </span>
                   </button>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-xs text-amber-900">
+                    <p className="font-semibold">{t(locale, "localFileRecommendationTitle")}</p>
+                    <p className="mt-1 leading-5 text-amber-800">
+                      {t(locale, "localFileRecommendationDetail")}
+                    </p>
+                  </div>
                   {!isIosOrAndroid && (
                     <>
                       <button

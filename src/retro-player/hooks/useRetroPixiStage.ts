@@ -731,17 +731,6 @@ export function useRetroPixiStage({
     const nextX = (screenWidth - nextWidth) / 2;
     const nextY = (screenHeight - nextHeight) / 2;
 
-    debugVideo("fitSprite", {
-      sourceTag: source.tagName,
-      sourceWidth,
-      sourceHeight,
-      screenWidth,
-      screenHeight,
-      fitMode,
-      scale,
-      appliedScale,
-    });
-
     const next = {
       width: nextWidth,
       height: nextHeight,
