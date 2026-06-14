@@ -1,5 +1,3 @@
-import heic2any from "heic2any";
-
 export const sleep = (ms: number): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
 };
@@ -203,6 +201,7 @@ export async function getDroppedFiles(
 }
 
 export async function heicToObjectUrl(file: Blob) {
+  const { default: heic2any } = await import("heic2any");
   const converted = await heic2any({
     blob: file,
     toType: "image/jpeg",

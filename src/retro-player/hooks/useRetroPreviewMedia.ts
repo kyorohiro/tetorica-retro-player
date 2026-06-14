@@ -68,6 +68,9 @@ type UseRetroPreviewMediaParams = {
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
 };
 
+const isAndroidRuntime = () =>
+  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
 export function useRetroPreviewMedia({
   appRef,
   spriteRef,
@@ -127,6 +130,42 @@ export function useRetroPreviewMedia({
   debugVideo,
   debugAudio,
 }: UseRetroPreviewMediaParams) {
+  const waitForMediaSwitchCooldown = async () => {
+    if (!isAndroidRuntime()) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 220);
+    });
+  };
+
+  const quietAudioOutputImmediately = () => {
+    const currentTime = audioContextRef.current?.currentTime;
+
+    if (noiseGainRef.current) {
+      if (typeof currentTime === "number") {
+        const gain = noiseGainRef.current.gain;
+        gain.cancelScheduledValues(currentTime);
+        gain.setValueAtTime(gain.value, currentTime);
+        gain.linearRampToValueAtTime(0, currentTime + 0.03);
+      } else {
+        noiseGainRef.current.gain.value = 0;
+      }
+    }
+
+    if (masterGainRef.current) {
+      if (typeof currentTime === "number") {
+        const gain = masterGainRef.current.gain;
+        gain.cancelScheduledValues(currentTime);
+        gain.setValueAtTime(gain.value, currentTime);
+        gain.linearRampToValueAtTime(0, currentTime + 0.03);
+      } else {
+        masterGainRef.current.gain.value = 0;
+      }
+    }
+  };
+
   const muteNoiseImmediately = () => {
     if (noiseGainRef.current) {
       noiseGainRef.current.gain.value = 0;
@@ -167,6 +206,9 @@ export function useRetroPreviewMedia({
     url?: string,
     stopStream = true,
   ) => {
+    quietAudioOutputImmediately();
+    media.muted = true;
+    media.volume = 0;
     media.pause();
     if (media.srcObject instanceof MediaStream) {
       if (stopStream) {
@@ -301,6 +343,14 @@ export function useRetroPreviewMedia({
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
     media.addEventListener("play", syncVideoState);
     media.addEventListener("pause", syncVideoState);
+    media.addEventListener("pause", quietAudioOutputImmediately);
+    media.addEventListener("abort", quietAudioOutputImmediately);
+    media.addEventListener("emptied", quietAudioOutputImmediately);
+    media.addEventListener("loadstart", quietAudioOutputImmediately);
+    media.addEventListener("seeking", quietAudioOutputImmediately);
+    media.addEventListener("stalled", quietAudioOutputImmediately);
+    media.addEventListener("suspend", quietAudioOutputImmediately);
+    media.addEventListener("waiting", quietAudioOutputImmediately);
     media.addEventListener("volumechange", syncVideoState);
     media.addEventListener("timeupdate", syncVideoState);
     media.addEventListener("durationchange", syncVideoState);
@@ -356,6 +406,7 @@ export function useRetroPreviewMedia({
       hasMedia: Boolean(mediaRef.current),
       hasPreviewElement: Boolean(previewElementRef.current),
     });
+    quietAudioOutputImmediately();
     previewRequestIdRef.current += 1;
     finishLoading();
 
@@ -397,16 +448,12 @@ export function useRetroPreviewMedia({
 
   const cleanupForPageLeave = () => {
     if (mediaRef.current) {
+      mediaRef.current.muted = true;
+      mediaRef.current.volume = 0;
       mediaRef.current.pause();
     }
 
-    if (noiseGainRef.current) {
-      noiseGainRef.current.gain.value = 0;
-    }
-
-    if (masterGainRef.current) {
-      masterGainRef.current.gain.value = 0;
-    }
+    quietAudioOutputImmediately();
 
     cleanupPreview();
 
@@ -562,6 +609,7 @@ export function useRetroPreviewMedia({
 
         await connectMediaAudio(media);
         syncVideoState();
+        await waitForMediaSwitchCooldown();
         await playVideoWithAudio();
         if (requestId === previewRequestIdRef.current) {
           finishLoading();
@@ -656,6 +704,7 @@ export function useRetroPreviewMedia({
       await attachVisualPreview(video, "capture");
       await connectMediaAudio(video);
       setNeedsUserPlay(false);
+      await waitForMediaSwitchCooldown();
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -744,6 +793,7 @@ export function useRetroPreviewMedia({
 
       if (requestId !== previewRequestIdRef.current) return;
 
+      await waitForMediaSwitchCooldown();
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -762,8 +812,17 @@ export function useRetroPreviewMedia({
 
   const previewUrl = async (url: string, kind: "video" | "image" | "audio" = "video") => {
     let requestId = 0;
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const elapsedMs = () =>
+      Math.round(
+        ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
+      ) / 10;
 
     try {
+      debugVideo("startup:previewUrl:start", {
+        url,
+        kind,
+      });
       powerOn();
       cleanupPreview();
       resetFilterInstance();
@@ -779,6 +838,10 @@ export function useRetroPreviewMedia({
             : "Loading audio preview...",
       );
       await ensureRendererReady();
+      debugVideo("startup:previewUrl:renderer-ready", {
+        kind,
+        elapsedMs: elapsedMs(),
+      });
 
       if (kind === "video") {
         const media = document.createElement("video");
@@ -786,6 +849,12 @@ export function useRetroPreviewMedia({
         applyMediaSettings(media);
         attachMediaEventListeners(media);
         await waitForVideoFrame(media);
+        debugVideo("startup:previewUrl:video-ready", {
+          elapsedMs: elapsedMs(),
+          readyState: media.readyState,
+          videoWidth: media.videoWidth,
+          videoHeight: media.videoHeight,
+        });
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(media, url);
@@ -801,6 +870,11 @@ export function useRetroPreviewMedia({
         image.src = url;
         image.crossOrigin = "anonymous";
         await waitForImageFrame(image);
+        debugVideo("startup:previewUrl:image-ready", {
+          elapsedMs: elapsedMs(),
+          naturalWidth: image.naturalWidth,
+          naturalHeight: image.naturalHeight,
+        });
 
         if (requestId !== previewRequestIdRef.current) {
           return;
@@ -817,6 +891,11 @@ export function useRetroPreviewMedia({
         applyMediaSettings(audio);
         attachMediaEventListeners(audio);
         await waitForAudioReady(audio);
+        debugVideo("startup:previewUrl:audio-ready", {
+          elapsedMs: elapsedMs(),
+          readyState: audio.readyState,
+          duration: audio.duration,
+        });
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(audio, url);
@@ -836,12 +915,22 @@ export function useRetroPreviewMedia({
       if (requestId !== previewRequestIdRef.current) return;
 
       if (kind === "video" || kind === "audio") {
+        await waitForMediaSwitchCooldown();
         await playVideoWithAudio();
       }
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
+        debugVideo("startup:previewUrl:done", {
+          kind,
+          elapsedMs: elapsedMs(),
+        });
       }
     } catch (error) {
+      debugVideo("startup:previewUrl:error", {
+        kind,
+        elapsedMs: elapsedMs(),
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (requestId !== previewRequestIdRef.current) return;
 
       if (recoverToManualPlayPrompt(error)) {

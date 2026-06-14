@@ -20,7 +20,7 @@ const DEFAULT_AUDIO_SETTINGS = {
   stereoWidthAmount: 0,
   smallSpeakerRoomAmount: 0,
   wowFlutterAmount: 0,
-  isNoiseEnabled: true,
+  isNoiseEnabled: false,
   noiseLevel: 0.02,
   vinylDustAmount: 0,
 } as const;
@@ -865,6 +865,17 @@ export function useRetroAudioEngine({
     }
   };
 
+  const reconnectCurrentMediaAudio = () => {
+    const mediaSource = mediaSourceRef.current;
+    if (!mediaSource) {
+      return;
+    }
+
+    mediaSource.disconnect();
+    mediaSource.connect(wowFlutterDelayRef.current ?? lofiLowpassRef.current!);
+    updateAudioNodes();
+  };
+
   const resetAudioSettings = () => {
     const nextSettings = { ...DEFAULT_AUDIO_SETTINGS };
 
@@ -1095,6 +1106,7 @@ export function useRetroAudioEngine({
     ensureAudioContext,
     updateAudioNodes,
     connectMediaAudio,
+    reconnectCurrentMediaAudio,
     resetAudioSettings,
     disposeAudioEngine,
   };

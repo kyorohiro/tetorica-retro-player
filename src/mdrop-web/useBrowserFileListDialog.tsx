@@ -40,6 +40,12 @@ function normalizePath(path: string) {
   return path.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
+const waitForNextPaint = async () => {
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+};
+
 function listBrowserFiles(allFiles: FileTargetFile[], currentPath: string): TargetFile[] {
   const cleanPath = normalizePath(currentPath);
   const prefix = cleanPath ? `${cleanPath}/` : "";
@@ -109,11 +115,9 @@ function BrowserFileListDialog({
   onClose,
 }: BrowserFileListDialogOptions & { onClose: () => void }) {
   const [path, setPath] = useState(initialPath);
-  const [files, setFiles] = useState<TargetFile[]>(() =>
-    listBrowserFiles(allFiles, initialPath)
-  );
+  const [files, setFiles] = useState<TargetFile[]>([]);
   const [sort, setSort] = useState<SortMode>("comic");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const { showPreviewDialog } = usePreviewDialog();
   const { showZipFileListDialog } = useZipFileListDialog();
@@ -123,6 +127,7 @@ function BrowserFileListDialog({
       setLoading(true);
       try {
         const resolvedPath = nextPath === ".." ? parentPathOf(path) : nextPath;
+        await waitForNextPaint();
         setFiles(listBrowserFiles(allFiles, resolvedPath));
         setPath(resolvedPath);
       } finally {
@@ -230,6 +235,17 @@ function BrowserFileListDialog({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {loading && files.length === 0 ? (
+          <div className="flex min-h-full items-center justify-center">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
+              <Loader className="mx-auto mb-3 h-7 w-7 animate-spin text-sky-300" />
+              <p className="font-medium">Preparing file list...</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Large folders can take a moment to scan.
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-2">
           {sortedFiles.map((file) => {
             const filename = file.path === ".." ? ".." : file.path.replace(/.*\//, "");
@@ -310,6 +326,7 @@ function BrowserFileListDialog({
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
