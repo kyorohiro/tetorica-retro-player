@@ -141,12 +141,28 @@ export function useRetroPreviewMedia({
   };
 
   const quietAudioOutputImmediately = () => {
+    const currentTime = audioContextRef.current?.currentTime;
+
     if (noiseGainRef.current) {
-      noiseGainRef.current.gain.value = 0;
+      if (typeof currentTime === "number") {
+        const gain = noiseGainRef.current.gain;
+        gain.cancelScheduledValues(currentTime);
+        gain.setValueAtTime(gain.value, currentTime);
+        gain.linearRampToValueAtTime(0, currentTime + 0.03);
+      } else {
+        noiseGainRef.current.gain.value = 0;
+      }
     }
 
     if (masterGainRef.current) {
-      masterGainRef.current.gain.value = 0;
+      if (typeof currentTime === "number") {
+        const gain = masterGainRef.current.gain;
+        gain.cancelScheduledValues(currentTime);
+        gain.setValueAtTime(gain.value, currentTime);
+        gain.linearRampToValueAtTime(0, currentTime + 0.03);
+      } else {
+        masterGainRef.current.gain.value = 0;
+      }
     }
   };
 
@@ -191,6 +207,8 @@ export function useRetroPreviewMedia({
     stopStream = true,
   ) => {
     quietAudioOutputImmediately();
+    media.muted = true;
+    media.volume = 0;
     media.pause();
     if (media.srcObject instanceof MediaStream) {
       if (stopStream) {
@@ -430,6 +448,8 @@ export function useRetroPreviewMedia({
 
   const cleanupForPageLeave = () => {
     if (mediaRef.current) {
+      mediaRef.current.muted = true;
+      mediaRef.current.volume = 0;
       mediaRef.current.pause();
     }
 
