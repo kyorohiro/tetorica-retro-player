@@ -68,6 +68,9 @@ type UseRetroPreviewMediaParams = {
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
 };
 
+const isAndroidRuntime = () =>
+  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
 export function useRetroPreviewMedia({
   appRef,
   spriteRef,
@@ -127,6 +130,16 @@ export function useRetroPreviewMedia({
   debugVideo,
   debugAudio,
 }: UseRetroPreviewMediaParams) {
+  const waitForMediaSwitchCooldown = async () => {
+    if (!isAndroidRuntime()) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 220);
+    });
+  };
+
   const muteNoiseImmediately = () => {
     if (noiseGainRef.current) {
       noiseGainRef.current.gain.value = 0;
@@ -562,6 +575,7 @@ export function useRetroPreviewMedia({
 
         await connectMediaAudio(media);
         syncVideoState();
+        await waitForMediaSwitchCooldown();
         await playVideoWithAudio();
         if (requestId === previewRequestIdRef.current) {
           finishLoading();
@@ -656,6 +670,7 @@ export function useRetroPreviewMedia({
       await attachVisualPreview(video, "capture");
       await connectMediaAudio(video);
       setNeedsUserPlay(false);
+      await waitForMediaSwitchCooldown();
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -744,6 +759,7 @@ export function useRetroPreviewMedia({
 
       if (requestId !== previewRequestIdRef.current) return;
 
+      await waitForMediaSwitchCooldown();
       await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -865,6 +881,7 @@ export function useRetroPreviewMedia({
       if (requestId !== previewRequestIdRef.current) return;
 
       if (kind === "video" || kind === "audio") {
+        await waitForMediaSwitchCooldown();
         await playVideoWithAudio();
       }
       if (requestId === previewRequestIdRef.current) {

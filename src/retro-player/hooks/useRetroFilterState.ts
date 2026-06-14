@@ -46,6 +46,44 @@ export type RetroFilterInitialState = Partial<{
 
 type RetroFilterSettings = Required<RetroFilterInitialState>;
 
+const doesPresetMatchState = (
+  state: RetroFilterSettings,
+  preset: RetroPresetDefinition,
+  options?: { ignoreDimensions?: boolean },
+) => {
+  const ignoreDimensions = options?.ignoreDimensions ?? false;
+
+  return (
+    (ignoreDimensions ||
+      (
+        preset.width === state.targetWidth &&
+        preset.height === state.targetHeight
+      )) &&
+    preset.colors === state.colorLevels &&
+    preset.dither === state.ditherStrength &&
+    preset.palette === state.paletteMode &&
+    preset.curvature === state.curvature &&
+    preset.scanline === state.scanlineStrength &&
+    preset.scanline2 === state.scanline2Strength &&
+    preset.vignette === state.vignetteStrength &&
+    preset.glow === state.glowStrength &&
+    preset.phosphor === state.phosphorStrength &&
+    preset.spotMask === state.spotMaskStrength &&
+    preset.bulbRadius === state.bulbRadius &&
+    preset.blackFloor === state.blackFloor &&
+    (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
+    (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
+    (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
+    (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
+    (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
+    (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
+    preset.monoTint === state.monoTint &&
+    preset.neonBoost === state.neonBoost &&
+    preset.neonSaturation === state.neonSaturation &&
+    preset.neonDetail === state.neonDetail
+  );
+};
+
 const resolvePresetKeyFromState = (
   state: RetroFilterSettings,
 ): RetroPresetKey | null => {
@@ -53,32 +91,20 @@ const resolvePresetKeyFromState = (
     RetroPresetKey,
     RetroPresetDefinition,
   ][]) {
-    if (
-      preset.width === state.targetWidth &&
-      preset.height === state.targetHeight &&
-      preset.colors === state.colorLevels &&
-      preset.dither === state.ditherStrength &&
-      preset.palette === state.paletteMode &&
-      preset.curvature === state.curvature &&
-      preset.scanline === state.scanlineStrength &&
-      preset.scanline2 === state.scanline2Strength &&
-      preset.vignette === state.vignetteStrength &&
-      preset.glow === state.glowStrength &&
-      preset.phosphor === state.phosphorStrength &&
-      preset.spotMask === state.spotMaskStrength &&
-      preset.bulbRadius === state.bulbRadius &&
-      preset.blackFloor === state.blackFloor &&
-      (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
-      (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
-      (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
-      (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
-      (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
-      (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
-      preset.monoTint === state.monoTint &&
-      preset.neonBoost === state.neonBoost &&
-      preset.neonSaturation === state.neonSaturation &&
-      preset.neonDetail === state.neonDetail
-    ) {
+    if (doesPresetMatchState(state, preset)) {
+      return key as RetroPresetKey;
+    }
+  }
+
+  if (!state.matchTargetAspect) {
+    return null;
+  }
+
+  for (const [key, preset] of Object.entries(RETRO_PRESETS) as [
+    RetroPresetKey,
+    RetroPresetDefinition,
+  ][]) {
+    if (doesPresetMatchState(state, preset, { ignoreDimensions: true })) {
       return key as RetroPresetKey;
     }
   }
@@ -345,6 +371,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
 
   useEffect(() => {
     savePersistedRetroFilterSettings(settings);
+  }, [settings]);
+
+  useEffect(() => {
+    const resolvedPreset = resolvePresetKeyFromState(settings);
+    setSelectedPreset((current) => (current === resolvedPreset ? current : resolvedPreset));
   }, [settings]);
 
   return {

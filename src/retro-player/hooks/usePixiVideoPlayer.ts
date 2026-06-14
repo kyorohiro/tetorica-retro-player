@@ -42,6 +42,7 @@ export function usePixiVideoPlayer(
   const previewRequestIdRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
+  const wasPlayingBeforeBackgroundRef = useRef(false);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
@@ -164,6 +165,7 @@ export function usePixiVideoPlayer(
     ensureAudioContext,
     updateAudioNodes,
     connectMediaAudio,
+    reconnectCurrentMediaAudio,
     resetAudioSettings,
     disposeAudioEngine,
   } = audio;
@@ -615,6 +617,84 @@ export function usePixiVideoPlayer(
       //document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAndroidRuntime()) {
+      return;
+    }
+
+    const isPlayableKind = (kind: typeof previewKindRef.current) =>
+      kind === "video" || kind === "audio" || kind === "capture";
+
+    const handleVisibilityChange = () => {
+      const media = mediaRef.current;
+      if (!media || !isPlayableKind(previewKindRef.current)) {
+        return;
+      }
+
+      if (document.visibilityState === "hidden") {
+        wasPlayingBeforeBackgroundRef.current = !media.paused;
+
+        media.pause();
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+
+        if (noiseGainRef.current) {
+          noiseGainRef.current.gain.value = 0;
+        }
+
+        if (masterGainRef.current) {
+          masterGainRef.current.gain.value = 0;
+        }
+
+        if (audioContextRef.current?.state === "running") {
+          void audioContextRef.current.suspend().catch(() => {
+            // Ignore background suspension failures.
+          });
+        }
+
+        return;
+      }
+
+      window.setTimeout(() => {
+        void (async () => {
+          try {
+            await ensureAudioContext();
+            reconnectCurrentMediaAudio();
+            updateAudioNodes();
+
+            if (wasPlayingBeforeBackgroundRef.current && mediaRef.current) {
+              try {
+                await mediaRef.current.play();
+                setNeedsUserPlay(false);
+              } catch (error) {
+                if (error instanceof DOMException && error.name === "NotAllowedError") {
+                  setNeedsUserPlay(true);
+                }
+              }
+            }
+          } finally {
+            syncVideoState();
+            wasPlayingBeforeBackgroundRef.current = false;
+          }
+        })();
+      }, 80);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    audioContextRef,
+    ensureAudioContext,
+    masterGainRef,
+    noiseGainRef,
+    reconnectCurrentMediaAudio,
+    syncVideoState,
+    updateAudioNodes,
+  ]);
 
   useLayoutEffect(() => {
     applyFilterState();
