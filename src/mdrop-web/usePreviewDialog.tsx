@@ -88,6 +88,13 @@ function PreviewDialog({
         startTime: number;
     } | null>(null);
 
+    const isZoom = React.useCallback(() => {
+        if (typeof window === "undefined") return false;
+
+        const scale = window.visualViewport?.scale ?? 1;
+        return scale > 1.01;
+    }, []);
+
     const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
         const t = e.touches[0];
         touchRef.current = {
@@ -117,13 +124,16 @@ function PreviewDialog({
             if (absX < absY * 1.2) return;
             if (dt > 800) return;
 
+            if(isZoom()) {
+                return;
+            }
             if (dx < 0) {
                 move(1); // 左にフリック => 次へ
             } else {
                 move(-1); // 右にフリック => 前へ
             }
         },
-        [move]
+        [isZoom ,move]
     );
 
     React.useEffect(() => {
