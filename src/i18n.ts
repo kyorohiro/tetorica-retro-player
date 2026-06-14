@@ -25,6 +25,9 @@ const messages = {
     openPwaPage: "Open PWA page",
     cancel: "Cancel",
     retroPreviewActive: "Retro preview is active in the dialog.",
+    preparingSelection: "Preparing your files...",
+    preparingSelectionDetail:
+      "This can take a moment on phones or with large folders, but the app is still working.",
   },
   ja: {
     reloadApp: "再読み込み",
@@ -47,6 +50,9 @@ const messages = {
     openPwaPage: "PWA 版を開く",
     cancel: "キャンセル",
     retroPreviewActive: "レトロプレビューはダイアログ側で表示中です。",
+    preparingSelection: "ファイルを準備しています...",
+    preparingSelectionDetail:
+      "スマホや大きなフォルダでは少し時間がかかりますが、アプリは動作中です。",
   },
 } as const;
 

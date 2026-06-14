@@ -8,19 +8,20 @@ import { useRetroPreviewMedia } from "./useRetroPreviewMedia";
 
 let retroPlayerInstanceSeed = 0;
 
-const isRetroPlayerDebugEnabled = () =>
-  typeof window !== "undefined" &&
-  (
-    import.meta.env.DEV ||
-    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
-  );
-
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+const isRetroPlayerDebugEnabled = () =>
+  typeof window !== "undefined" &&
+  (
+    import.meta.env.DEV ||
+    (isTauriRuntime() && isAndroidRuntime()) ||
+    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+  );
 
 export function usePixiVideoPlayer(
   filterState: RetroFilterState,
@@ -67,10 +68,8 @@ export function usePixiVideoPlayer(
       return;
     }
 
-    console.log(
-      `[retro-player video][${instanceLabelRef.current}] ${label}`,
-      payload ?? {},
-    );
+    const suffix = payload ? ` ${JSON.stringify(payload)}` : "";
+    console.log(`[retro-player video][${instanceLabelRef.current}] ${label}${suffix}`);
   };
 
   const stage = useRetroPixiStage({
@@ -574,6 +573,9 @@ export function usePixiVideoPlayer(
     let cancelled = false;
 
     const setupPixi = async () => {
+      debugVideo("startup:setupPixi-effect:start", {
+        renderResolutionScale,
+      });
       await initPixiRef.current();
 
       if (cancelled) {

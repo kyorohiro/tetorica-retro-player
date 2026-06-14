@@ -762,8 +762,17 @@ export function useRetroPreviewMedia({
 
   const previewUrl = async (url: string, kind: "video" | "image" | "audio" = "video") => {
     let requestId = 0;
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const elapsedMs = () =>
+      Math.round(
+        ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
+      ) / 10;
 
     try {
+      debugVideo("startup:previewUrl:start", {
+        url,
+        kind,
+      });
       powerOn();
       cleanupPreview();
       resetFilterInstance();
@@ -779,6 +788,10 @@ export function useRetroPreviewMedia({
             : "Loading audio preview...",
       );
       await ensureRendererReady();
+      debugVideo("startup:previewUrl:renderer-ready", {
+        kind,
+        elapsedMs: elapsedMs(),
+      });
 
       if (kind === "video") {
         const media = document.createElement("video");
@@ -786,6 +799,12 @@ export function useRetroPreviewMedia({
         applyMediaSettings(media);
         attachMediaEventListeners(media);
         await waitForVideoFrame(media);
+        debugVideo("startup:previewUrl:video-ready", {
+          elapsedMs: elapsedMs(),
+          readyState: media.readyState,
+          videoWidth: media.videoWidth,
+          videoHeight: media.videoHeight,
+        });
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(media, url);
@@ -801,6 +820,11 @@ export function useRetroPreviewMedia({
         image.src = url;
         image.crossOrigin = "anonymous";
         await waitForImageFrame(image);
+        debugVideo("startup:previewUrl:image-ready", {
+          elapsedMs: elapsedMs(),
+          naturalWidth: image.naturalWidth,
+          naturalHeight: image.naturalHeight,
+        });
 
         if (requestId !== previewRequestIdRef.current) {
           return;
@@ -817,6 +841,11 @@ export function useRetroPreviewMedia({
         applyMediaSettings(audio);
         attachMediaEventListeners(audio);
         await waitForAudioReady(audio);
+        debugVideo("startup:previewUrl:audio-ready", {
+          elapsedMs: elapsedMs(),
+          readyState: audio.readyState,
+          duration: audio.duration,
+        });
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(audio, url);
@@ -840,8 +869,17 @@ export function useRetroPreviewMedia({
       }
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
+        debugVideo("startup:previewUrl:done", {
+          kind,
+          elapsedMs: elapsedMs(),
+        });
       }
     } catch (error) {
+      debugVideo("startup:previewUrl:error", {
+        kind,
+        elapsedMs: elapsedMs(),
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (requestId !== previewRequestIdRef.current) return;
 
       if (recoverToManualPlayPrompt(error)) {

@@ -126,6 +126,11 @@ export function RetroPlayer({
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
   );
+  const showImagePlaceholder =
+    kind === "image" &&
+    Boolean(src) &&
+    !player.previewError &&
+    (!player.isRendererReady || player.isLoading);
 
   const resetAllSettings = React.useCallback(() => {
     clearPersistedRetroSettings();
@@ -335,6 +340,15 @@ export function RetroPlayer({
   );
 
   React.useEffect(() => {
+    if (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)) {
+      console.log("[retro-player startup] retro-player:preview-effect", {
+        hasStream: Boolean(stream),
+        hasSrc: Boolean(src),
+        kind,
+        renderResolutionScale,
+      });
+    }
+
     if (stream) {
       const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}:${renderResolutionScale}`;
       if (lastPreviewRequestRef.current === streamKey) {
@@ -684,9 +698,17 @@ export function RetroPlayer({
             }
           >
             <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
+              {showImagePlaceholder && (
+                <img
+                  src={src}
+                  alt=""
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-95"
+                />
+              )}
               <div
                 ref={player.canvasHostRef}
-                className="pointer-events-none h-full w-full touch-manipulation"
+                className="pointer-events-none relative h-full w-full touch-manipulation"
               />
               {!player.isPoweredOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/72">
@@ -699,7 +721,12 @@ export function RetroPlayer({
                 </div>
               )}
               {player.isLoading && !player.needsUserPlay && !player.previewError && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72">
+                <div
+                  className={[
+                    "pointer-events-none absolute inset-0 flex items-center justify-center",
+                    showImagePlaceholder ? "bg-slate-950/26" : "bg-slate-950/72",
+                  ].join(" ")}
+                >
                   <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
                     <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
                     <p className="font-medium">

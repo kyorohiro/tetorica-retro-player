@@ -883,6 +883,15 @@ export function useRetroPixiStage({
     initPromiseRef.current = (async () => {
       const host = canvasHostRef.current;
       if (!host || appRef.current) return;
+      const initStartedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+
+      debugVideo("startup:initPixi:start", {
+        hostConnected: host.isConnected,
+        hostWidth: host.clientWidth ?? null,
+        hostHeight: host.clientHeight ?? null,
+        resolution: renderResolutionScale,
+      });
 
       const canvas = document.createElement("canvas");
       canvas.style.display = "block";
@@ -895,6 +904,14 @@ export function useRetroPixiStage({
       if (!gl) {
         throw new Error("WebGL2 is not available in this app view.");
       }
+
+      debugVideo("startup:initPixi:webgl2-ready", {
+        elapsedMs:
+          Math.round(
+            ((typeof performance !== "undefined" ? performance.now() : Date.now()) - initStartedAt) *
+              10,
+          ) / 10,
+      });
 
       const renderer = createRenderer(gl);
       const app: CanvasStageApp = {
@@ -923,6 +940,13 @@ export function useRetroPixiStage({
         hostHeight: nextHost.clientHeight ?? null,
         resolution: renderResolutionScale,
       });
+      debugVideo("startup:initPixi:renderer-ready", {
+        elapsedMs:
+          Math.round(
+            ((typeof performance !== "undefined" ? performance.now() : Date.now()) - initStartedAt) *
+              10,
+          ) / 10,
+      });
 
       refreshLayout();
 
@@ -935,6 +959,15 @@ export function useRetroPixiStage({
       if (isPoweredOn && shouldAnimateOnInit) {
         startTicker();
       }
+
+      debugVideo("startup:initPixi:done", {
+        elapsedMs:
+          Math.round(
+            ((typeof performance !== "undefined" ? performance.now() : Date.now()) - initStartedAt) *
+              10,
+          ) / 10,
+        shouldAnimateOnInit,
+      });
     })();
 
     try {

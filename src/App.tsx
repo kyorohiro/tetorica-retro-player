@@ -1,4 +1,5 @@
 import React, { useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import {
   FileUp,
   FolderOpen,
@@ -15,7 +16,6 @@ import {
   t,
   type LocalePreference,
 } from "./i18n";
-import RetroPlayer from "./retro-player/components/RetroPlayer";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useDialog } from "./useDialog";
 import { FileTargetFile } from "./mdrop-web/api";
@@ -29,15 +29,28 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 
+const waitForNextPaint = async () => {
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+};
+
+const isAndroidRuntime = () =>
+  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));
+
 function App() {
   const defaultPreviewSrc = "./test_colorbars.png";
   const defaultPreviewKind = "image";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const [retroPlayerEpoch, setRetroPlayerEpoch] = React.useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
     () => loadLocalePreference(),
   );
@@ -50,17 +63,66 @@ function App() {
   const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
-  const retroPlayerKey = previewSource.previewStream
-    ? `stream:${previewSource.previewStream.id}:${previewSource.previewLabel ?? ""}:${retroPlayerEpoch}`
-    : previewSource.previewSrc
-      ? `src:${previewSource.previewSrc}:${previewSource.previewKind ?? "unknown"}:${retroPlayerEpoch}`
-      : `default:${defaultPreviewSrc}:${defaultPreviewKind}:${retroPlayerEpoch}`;
+  const retroPlayerKey = `player:${retroPlayerEpoch}`;
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
+
+  const finishPreparingSelection = useCallback(() => {
+    pickerStateRef.current = "idle";
+    setIsPreparingSelection(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!isAndroidRuntime()) return;
+
+    console.log("[retro-player startup] app:mounted");
+    window.requestAnimationFrame(() => {
+      console.log("[retro-player startup] app:first-raf");
+    });
+  }, []);
 
   React.useEffect(() => {
     saveLocalePreference(localePreference);
   }, [localePreference]);
+
+  React.useEffect(() => {
+    const clearIfPickerWasCancelled = () => {
+      if (pickerStateRef.current !== "opening") return;
+
+      window.setTimeout(() => {
+        if (pickerStateRef.current !== "opening") return;
+        finishPreparingSelection();
+      }, 0);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      clearIfPickerWasCancelled();
+    };
+
+    const fileInput = fileInputRef.current;
+    const folderInput = folderInputRef.current;
+
+    window.addEventListener("focus", clearIfPickerWasCancelled);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    fileInput?.addEventListener("cancel", clearIfPickerWasCancelled);
+    folderInput?.addEventListener("cancel", clearIfPickerWasCancelled);
+
+    return () => {
+      window.removeEventListener("focus", clearIfPickerWasCancelled);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      fileInput?.removeEventListener("cancel", clearIfPickerWasCancelled);
+      folderInput?.removeEventListener("cancel", clearIfPickerWasCancelled);
+    };
+  }, [finishPreparingSelection]);
+
+  const beginPreparingSelection = useCallback(() => {
+    pickerStateRef.current = "opening";
+    flushSync(() => {
+      setIsPreparingSelection(true);
+      setIsMobileMenuOpen(false);
+    });
+  }, []);
 
   const filesToTargets = useCallback((files: FileList | File[]) => {
     const targets: FileTargetFile[] = [];
@@ -102,15 +164,21 @@ function App() {
   const openFiles = useCallback(async (files: FileList | File[]) => {
     if (files.length === 0) return;
 
-    if (files.length === 1 && isDirectRetroFile(files[0])) {
-      previewSource.previewFile(files[0]);
-      setIsMobileMenuOpen(false);
-      return;
-    }
+    pickerStateRef.current = "processing";
 
-    setIsMobileMenuOpen(false);
-    await openPortableTargets(files);
-  }, [isDirectRetroFile, openPortableTargets, previewSource]);
+    try {
+      await waitForNextPaint();
+
+      if (files.length === 1 && isDirectRetroFile(files[0])) {
+        previewSource.previewFile(files[0]);
+        return;
+      }
+
+      await openPortableTargets(files);
+    } finally {
+      finishPreparingSelection();
+    }
+  }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets, previewSource]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -190,15 +258,15 @@ function App() {
   }, []);
 
   const handleOpenFilePicker = useCallback(() => {
+    beginPreparingSelection();
     fileInputRef.current?.click();
-    setIsMobileMenuOpen(false);
-  }, []);
+  }, [beginPreparingSelection]);
 
   const handleOpenFolderPicker = useCallback(() => {
     if (isIosOrAndroid) return;
+    beginPreparingSelection();
     folderInputRef.current?.click();
-    setIsMobileMenuOpen(false);
-  }, [isIosOrAndroid]);
+  }, [beginPreparingSelection, isIosOrAndroid]);
 
   const handleOpenDisplayCapture = useCallback(() => {
     if (isIosOrAndroid) return;
@@ -347,20 +415,57 @@ function App() {
           <p className="mb-4 text-sm text-rose-500">{previewSource.captureError}</p>
         )}
 
+        {isPreparingSelection && (
+          <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-slate-950/72 px-5">
+            <div className="w-[min(92vw,30rem)] rounded-3xl border border-slate-700 bg-slate-900/92 px-6 py-5 text-center text-slate-100 shadow-2xl backdrop-blur-sm">
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+              <p className="text-base font-semibold">
+                {t(locale, "preparingSelection")}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {t(locale, "preparingSelectionDetail")}
+              </p>
+            </div>
+          </div>
+        )}
+
         {isRetroPreviewDialogActive ? (
           <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500">
             {t(locale, "retroPreviewActive")}
           </section>
         ) : (
-          <RetroPlayer
-            locale={locale}
-            key={retroPlayerKey}
-            src={previewSource.previewSrc ?? defaultPreviewSrc}
-            stream={previewSource.previewStream}
-            streamName={previewSource.previewLabel}
-            kind={previewSource.previewKind ?? defaultPreviewKind}
-            looping={!isUsingDefaultPreview}
-          />
+          <React.Suspense
+            fallback={
+              <section className="rounded-3xl border border-slate-300 bg-slate-100/80 p-3 shadow-sm">
+                <div className="overflow-hidden rounded-2xl bg-slate-950">
+                  <div className="relative aspect-[16/10] min-h-[220px] w-full">
+                    <img
+                      src={previewSource.previewSrc ?? defaultPreviewSrc}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-contain opacity-95"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/28">
+                      <div className="rounded-2xl border border-slate-700 bg-slate-900/88 px-5 py-4 text-center text-sm text-slate-100 shadow-lg">
+                        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+                        <p className="font-medium">Preparing retro preview...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            }
+          >
+            <RetroPlayer
+              locale={locale}
+              key={retroPlayerKey}
+              src={previewSource.previewSrc ?? defaultPreviewSrc}
+              stream={previewSource.previewStream}
+              streamName={previewSource.previewLabel}
+              kind={previewSource.previewKind ?? defaultPreviewKind}
+              looping={!isUsingDefaultPreview}
+            />
+          </React.Suspense>
         )}
 
         <input
@@ -373,7 +478,11 @@ function App() {
             const input = event.currentTarget;
             const files = input.files;
             if (files && files.length > 0) {
+              beginPreparingSelection();
+              await waitForNextPaint();
               await openFiles(files);
+            } else {
+              finishPreparingSelection();
             }
 
             input.value = "";
@@ -391,7 +500,16 @@ function App() {
               const input = event.currentTarget;
               const files = input.files;
               if (files && files.length > 0) {
-                await openPortableTargets(files);
+                beginPreparingSelection();
+                await waitForNextPaint();
+                try {
+                  pickerStateRef.current = "processing";
+                  await openPortableTargets(files);
+                } finally {
+                  finishPreparingSelection();
+                }
+              } else {
+                finishPreparingSelection();
               }
 
               input.value = "";
