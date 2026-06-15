@@ -5,7 +5,7 @@ import {
   type PaletteMode,
   type RetroPresetKey,
 } from "../retro/config";
-import type { Locale } from "../../i18n";
+import type { RetroPlayerLocale } from "../types";
 
 function InfoTip({
   label,
@@ -39,7 +39,7 @@ function InfoTip({
 }
 
 type RetroFilterPanelProps = {
-  locale: Locale;
+  locale: RetroPlayerLocale;
   colorLevels: number;
   curvature: number;
   ditherStrength: number;
