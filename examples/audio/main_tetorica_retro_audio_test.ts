@@ -38,7 +38,7 @@ const engine = createTetoricaRetroAudioNode(context, {
   enableAudioWorklet: false, // AudioWorklet is not supported in the node-web-audio-api polyfill
 });
 
-await engine.ensureAudioContext();
+await engine.ensureInitialized();
 engine.setParams(
   {
     stereoWidthAmount: -0.08,

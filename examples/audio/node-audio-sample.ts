@@ -37,7 +37,7 @@ const engine = createTetoricaRetroAudioNode(context, {
   },
 });
 
-await engine.ensureAudioContext();
+await engine.ensureInitialized();
 engine.setParams(
   {
     stereoWidthAmount: -0.08,
