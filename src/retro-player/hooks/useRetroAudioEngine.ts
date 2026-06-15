@@ -25,8 +25,9 @@ export function useRetroAudioEngine({
   previewKindRef,
   mediaRef,
   isPlaying,
-  isPlayingRef,
+  isPlayingRef: _isPlayingRef,
 }: UseRetroAudioEngineParams) {
+  void _isPlayingRef;
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
 
@@ -129,38 +130,19 @@ export function useRetroAudioEngine({
   const [vinylDustAmount, setVinylDustAmount] = useState<number>(
     initialAudioSettings.vinylDustAmount,
   );
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [audioEngine] = useState(() =>
     createRetroAudioEngine({
       instanceLabel,
-      previewKindRef,
-      mediaRef,
-      isPlayingRef,
-      settingsRefs: {
-        isMutedRef,
-        volumeRef,
-        playbackRateRef,
-        isLoopingRef,
-        isAudioFxEnabledRef,
-        lofiAmountRef,
-        radioToneAmountRef,
-        bitCrushAmountRef,
-        sampleRateReductionAmountRef,
-        bassAmountRef,
-        midAmountRef,
-        trebleAmountRef,
-        stereoWidthAmountRef,
-        smallSpeakerRoomAmountRef,
-        wowFlutterAmountRef,
-        isNoiseEnabledRef,
-        noiseLevelRef,
-        vinylDustAmountRef,
-      },
+      params: initialAudioSettings,
+      isPlaying,
+      connectOutputToDestination: true,
+      connectOutputToRecordingDestination: true,
     }),
   );
 
   const {
     audioContextRef,
-    mediaSourceRef,
     masterGainRef,
     radioToneHighpassRef,
     radioToneLowpassRef,
@@ -196,10 +178,69 @@ export function useRetroAudioEngine({
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
-    connectMediaAudio,
-    reconnectCurrentMediaAudio,
+    connectSourceNode,
     disposeAudioEngine,
+    setParams,
+    setIsPlaying: setEngineIsPlaying,
+    setOutputEnabled,
   } = audioEngine;
+
+  const connectMediaAudio = async (media: HTMLMediaElement) => {
+    const context = await ensureAudioContext();
+    if (!context || !audioEngine.input) {
+      debugAudio("connectMediaAudio:no-context", {
+        mediaTag: media.tagName,
+      });
+      return;
+    }
+
+    if (mediaSourceRef.current) {
+      debugAudio("connectMediaAudio:disconnect-previous", {
+        mediaTag: media.tagName,
+      });
+      mediaSourceRef.current.disconnect();
+      mediaSourceRef.current = null;
+    }
+
+    try {
+      const mediaSource = context.createMediaElementSource(media);
+      mediaSource.connect(audioEngine.input);
+      mediaSourceRef.current = mediaSource;
+      media.muted = isMutedRef.current;
+      media.volume = isMutedRef.current ? 0 : volumeRef.current;
+      debugAudio("connectMediaAudio:connected", {
+        audioContextState: context.state,
+        mediaTag: media.tagName,
+        previewKind: previewKindRef.current,
+      });
+      updateAudioNodes();
+    } catch (error) {
+      debugAudio("connectMediaAudio:error", {
+        audioContextState: context.state,
+        mediaTag: media.tagName,
+        message: error instanceof Error ? error.message : String(error),
+        previewKind: previewKindRef.current,
+      });
+      throw error;
+    }
+  };
+
+  const reconnectCurrentMediaAudio = () => {
+    const mediaSource = mediaSourceRef.current;
+    if (!mediaSource || !audioEngine.input) {
+      return;
+    }
+
+    mediaSource.disconnect();
+    mediaSource.connect(audioEngine.input);
+    updateAudioNodes();
+  };
+
+  const disposeManagedAudioEngine = async () => {
+    mediaSourceRef.current?.disconnect();
+    mediaSourceRef.current = null;
+    await disposeAudioEngine();
+  };
 
   const resetAudioSettings = () => {
     const nextSettings = { ...DEFAULT_AUDIO_SETTINGS };
@@ -249,6 +290,7 @@ export function useRetroAudioEngine({
       mediaRef.current.loop = nextSettings.isLooping;
     }
 
+    setParams(nextSettings);
     window.requestAnimationFrame(updateAudioNodes);
   };
 
@@ -272,7 +314,42 @@ export function useRetroAudioEngine({
     noiseLevelRef.current = noiseLevel;
     vinylDustAmountRef.current = vinylDustAmount;
 
-    updateAudioNodes();
+    setParams(
+      {
+        isMuted,
+        volume,
+        playbackRate,
+        isLooping,
+        isAudioFxEnabled,
+        lofiAmount,
+        radioToneAmount,
+        bitCrushAmount,
+        sampleRateReductionAmount,
+        bassAmount,
+        midAmount,
+        trebleAmount,
+        stereoWidthAmount,
+        smallSpeakerRoomAmount,
+        wowFlutterAmount,
+        isNoiseEnabled,
+        noiseLevel,
+        vinylDustAmount,
+      },
+      true,
+    );
+    setEngineIsPlaying(isPlaying);
+    setOutputEnabled(
+      previewKind === "video" ||
+        previewKind === "audio" ||
+        previewKind === "capture",
+    );
+
+    if (mediaRef.current) {
+      mediaRef.current.muted = isMuted;
+      mediaRef.current.volume = isMuted ? 0 : volume;
+      mediaRef.current.playbackRate = playbackRate;
+      mediaRef.current.loop = isLooping;
+    }
   }, [
     isMuted,
     volume,
@@ -430,9 +507,10 @@ export function useRetroAudioEngine({
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
+    connectSourceNode,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
     resetAudioSettings,
-    disposeAudioEngine,
+    disposeAudioEngine: disposeManagedAudioEngine,
   };
 }
