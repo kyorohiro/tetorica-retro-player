@@ -228,6 +228,13 @@ export type RetroAudioSettingsRefs = {
 };
 
 export type CreateRetroAudioEngineParams = {
+  context?: AudioContextLike;
+  createAudioContext?: () => AudioContextLike;
+  connectOutputToDestination?: boolean;
+  connectOutputToRecordingDestination?: boolean;
+} & TetoricaRetroAudioNodeOptions;
+
+type CreateManagedRetroAudioEngineParams = {
   instanceLabel: string;
   previewKindRef: CurrentRef<RetroAudioPreviewKind>;
   mediaRef: CurrentRef<HTMLMediaElement | null>;
@@ -448,7 +455,7 @@ function resolveRetroAudioSettings({
   };
 }
 
-export function createRetroAudioEngine({
+function createManagedRetroAudioEngine({
   instanceLabel,
   previewKindRef,
   mediaRef,
@@ -457,7 +464,7 @@ export function createRetroAudioEngine({
   createAudioContext,
   connectOutputToDestination = true,
   connectOutputToRecordingDestination = true,
-}: CreateRetroAudioEngineParams) {
+}: CreateManagedRetroAudioEngineParams) {
   const audioContextRef: CurrentRef<AudioContext | null> = { current: null };
   const mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | null> = { current: null };
   const masterGainRef: CurrentRef<GainNode | null> = { current: null };
@@ -1191,34 +1198,38 @@ export function createRetroAudioEngine({
 }
 
 export type CreateTetoricaRetroAudioNodeParams = Omit<
-  CreateRetroAudioEngineParams,
-  | "createAudioContext"
-  | "connectOutputToDestination"
-  | "connectOutputToRecordingDestination"
+  CreateManagedRetroAudioEngineParams,
+  "createAudioContext" | "connectOutputToDestination" | "connectOutputToRecordingDestination"
 >;
 
 export type TetoricaRetroAudioNode = ReturnType<typeof createTetoricaRetroAudioNode>;
 
-export function createTetoricaRetroAudioNode(
-  context: AudioContextLike,
-  options: TetoricaRetroAudioNodeOptions = {},
+export function createRetroAudioEngine({
+  context,
+  createAudioContext,
+  connectOutputToDestination = false,
+  connectOutputToRecordingDestination = false,
+  ...options
+}: CreateRetroAudioEngineParams = {},
 ) {
   const currentSettings = resolveRetroAudioSettings(options);
-  const previewKindRef = createMutableRef<RetroAudioPreviewKind>(
-    options.previewKind ?? "audio",
-  );
+  const previewKindRef = createMutableRef<RetroAudioPreviewKind>("audio");
   const mediaRef = createMutableRef<HTMLMediaElement | null>(null);
   const isPlayingRef = createMutableRef(options.isPlaying ?? true);
   const settingsRefs = createSettingsRefs(currentSettings);
-  const engine = createRetroAudioEngine({
-    instanceLabel: options.instanceLabel ?? "tetorica-retro-audio-node",
+  const engine = createManagedRetroAudioEngine({
+    instanceLabel: options.instanceLabel ?? "tetorica-retro-audio-engine",
     previewKindRef,
     mediaRef,
     isPlayingRef,
     settingsRefs,
-    createAudioContext: () => context,
-    connectOutputToDestination: false,
-    connectOutputToRecordingDestination: false,
+    createAudioContext:
+      createAudioContext ??
+      (context
+        ? () => context
+        : undefined),
+    connectOutputToDestination,
+    connectOutputToRecordingDestination,
   });
 
   const setParams = (
@@ -1254,8 +1265,8 @@ export function createTetoricaRetroAudioNode(
     engine.updateAudioNodes();
   };
 
-  const setPreviewKind = (nextPreviewKind: RetroAudioPreviewKind) => {
-    previewKindRef.current = nextPreviewKind;
+  const setOutputEnabled = (isEnabled: boolean) => {
+    previewKindRef.current = isEnabled ? "audio" : "image";
     engine.updateAudioNodes();
   };
 
@@ -1264,6 +1275,16 @@ export function createTetoricaRetroAudioNode(
     getParams,
     applyPreset,
     setIsPlaying,
-    setPreviewKind,
+    setOutputEnabled,
+  });
+}
+
+export function createTetoricaRetroAudioNode(
+  context: AudioContextLike,
+  options: TetoricaRetroAudioNodeOptions = {},
+) {
+  return createRetroAudioEngine({
+    context,
+    ...options,
   });
 }
