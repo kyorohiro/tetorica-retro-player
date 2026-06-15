@@ -8,65 +8,24 @@ import {
   type SetStateAction,
 } from "react";
 import {
-  MONO_TINTS,
-  paletteModeToUniform,
-} from "../retro/config";
-import { FILTER_FRAGMENT } from "../retro/filterShader";
+  TetoricaRetroVideoPipeline,
+  getEffectiveRetroTargetSize,
+  getRetroVideoSourceSize,
+  isPhosphorDotModeEnabled,
+  type RetroVideoFilterState,
+} from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
-type RendererUniformLocations = {
-  uTargetSize: WebGLUniformLocation | null;
-  uSampleTargetSize: WebGLUniformLocation | null;
-  uColorLevels: WebGLUniformLocation | null;
-  uDitherStrength: WebGLUniformLocation | null;
-  uPaletteMode: WebGLUniformLocation | null;
-  uCurvature: WebGLUniformLocation | null;
-  uScanlineStrength: WebGLUniformLocation | null;
-  uScanline2Strength: WebGLUniformLocation | null;
-  uScanlineBrightnessFade: WebGLUniformLocation | null;
-  uVignetteStrength: WebGLUniformLocation | null;
-  uGlowStrength: WebGLUniformLocation | null;
-  uPhosphorStrength: WebGLUniformLocation | null;
-  uSpotMaskStrength: WebGLUniformLocation | null;
-  uBulbRadius: WebGLUniformLocation | null;
-  uBlackFloor: WebGLUniformLocation | null;
-  uPhosphorDotLightBalance: WebGLUniformLocation | null;
-  uPixelAspect: WebGLUniformLocation | null;
-  uPhosphorDotMode: WebGLUniformLocation | null;
-  uPhosphorDotInternalScale: WebGLUniformLocation | null;
-  uPhosphorDotBrightCore: WebGLUniformLocation | null;
-  uPhosphorDotCellFill: WebGLUniformLocation | null;
-  uPhosphorDotFlatDisc: WebGLUniformLocation | null;
-  uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
-  uCloseUpNoiseStrength: WebGLUniformLocation | null;
-  uMonoTint: WebGLUniformLocation | null;
-  uNeonBoost: WebGLUniformLocation | null;
-  uNeonSaturation: WebGLUniformLocation | null;
-  uNeonDetail: WebGLUniformLocation | null;
-  uTime: WebGLUniformLocation | null;
-};
-
-type RendererResources = {
-  gl: WebGL2RenderingContext;
-  filterProgram: WebGLProgram;
-  passthroughProgram: WebGLProgram;
-  texture: WebGLTexture;
-  uniformLocations: RendererUniformLocations;
-};
-
 export type CanvasStageApp = {
   canvas: HTMLCanvasElement;
-  renderer: RendererResources;
+  pipeline: TetoricaRetroVideoPipeline;
   ticker: {
     start: () => void;
     stop: () => void;
   };
-  startedAt: number;
 };
-
-type UploadSource = HTMLVideoElement | HTMLImageElement | HTMLCanvasElement;
 
 type UseRetroPixiStageParams = {
   filterState: RetroFilterState;
@@ -77,405 +36,6 @@ type UseRetroPixiStageParams = {
   previewKindRef: MutableRefObject<PreviewKind>;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
-
-const PASS_THROUGH_FRAGMENT = `#version 300 es
-precision mediump float;
-
-in vec2 vTextureCoord;
-out vec4 finalColor;
-
-uniform sampler2D uTexture;
-
-void main(void)
-{
-  finalColor = texture(uTexture, vTextureCoord);
-}
-`;
-
-const VERTEX_SHADER_SOURCE = `#version 300 es
-in vec2 aPosition;
-out vec2 vTextureCoord;
-out vec2 vMaskCoord;
-
-void main() {
-  vec2 uv = (aPosition + 1.0) * 0.5;
-  vTextureCoord = uv;
-  vMaskCoord = uv;
-  gl_Position = vec4(aPosition, 0.0, 1.0);
-}
-`;
-
-const QUAD_VERTICES = new Float32Array([
-  -1, -1,
-  1, -1,
-  -1, 1,
-  -1, 1,
-  1, -1,
-  1, 1,
-]);
-
-const LARGE_VIDEO_SOURCE_THRESHOLD = 640;
-
-const getSourceSize = (source: HTMLVideoElement | HTMLImageElement) => ({
-  width: source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth,
-  height: source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
-});
-
-const shouldUseDirectVideoUpload = (
-  source: HTMLVideoElement | HTMLImageElement,
-  sourceWidth: number,
-  sourceHeight: number,
-) =>
-  source instanceof HTMLVideoElement &&
-  (
-    sourceWidth > LARGE_VIDEO_SOURCE_THRESHOLD ||
-    sourceHeight > LARGE_VIDEO_SOURCE_THRESHOLD
-  );
-
-const isPhosphorDotModeEnabled = (filterState: RetroFilterState) =>
-  filterState.spotMaskStrength > 0.001 &&
-  (
-    filterState.phosphorDotInternalScale ||
-    filterState.phosphorDotBrightCore ||
-    filterState.phosphorDotCellFill > 0.001 ||
-    filterState.phosphorDotFlatDisc ||
-    filterState.phosphorDotNeighborBlend
-  );
-
-const getPhosphorDotInternalScale = (filterState: RetroFilterState) =>
-  isPhosphorDotModeEnabled(filterState) && filterState.phosphorDotInternalScale ? 2 : 1;
-
-const getAspectCorrectedSize = (
-  requestedWidth: number,
-  requestedHeight: number,
-  sourceWidth?: number,
-  sourceHeight?: number,
-) => {
-  if (
-    sourceWidth === undefined ||
-    sourceHeight === undefined ||
-    sourceWidth <= 0 ||
-    sourceHeight <= 0
-  ) {
-    return {
-      width: requestedWidth,
-      height: requestedHeight,
-    };
-  }
-
-  const sourceAspect = sourceWidth / sourceHeight;
-  const requestedAspect = requestedWidth / requestedHeight;
-
-  if (requestedAspect > sourceAspect) {
-    return {
-      width: Math.max(1, Math.round(requestedHeight * sourceAspect)),
-      height: requestedHeight,
-    };
-  }
-
-  return {
-    width: requestedWidth,
-    height: Math.max(1, Math.round(requestedWidth / sourceAspect)),
-  };
-};
-
-const getPhosphorDotViewportLimitedSize = (
-  width: number,
-  height: number,
-  filterState: RetroFilterState,
-  internalScale: number,
-  visibleWidth?: number,
-  visibleHeight?: number,
-) => {
-  if (
-    !isPhosphorDotModeEnabled(filterState) ||
-    visibleWidth === undefined ||
-    visibleHeight === undefined ||
-    visibleWidth <= 0 ||
-    visibleHeight <= 0
-  ) {
-    return { width, height };
-  }
-
-  // When the target grid gets too dense for the visible viewport, phosphor
-  // dots collapse into uniform black gaps instead of readable glowing cells.
-  const baseMinCellPixels = Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
-  const minCellPixels = Math.max(1.0, baseMinCellPixels / Math.max(internalScale, 1));
-  const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
-  const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
-  const scale = Math.min(
-    1,
-    maxWidth / Math.max(width, 1),
-    maxHeight / Math.max(height, 1),
-  );
-
-  return {
-    width: Math.max(1, Math.round(width * scale)),
-    height: Math.max(1, Math.round(height * scale)),
-  };
-};
-
-const getEffectiveTargetSize = (
-  filterState: RetroFilterState,
-  sourceWidth?: number,
-  sourceHeight?: number,
-  visibleWidth?: number,
-  visibleHeight?: number,
-) => {
-  const internalScale = getPhosphorDotInternalScale(filterState);
-  const requestedWidth = Math.max(filterState.targetWidth, 1);
-  const requestedHeight = Math.max(filterState.targetHeight, 1);
-  const aspectCorrected = filterState.matchTargetAspect
-    ? getAspectCorrectedSize(
-      requestedWidth,
-      requestedHeight,
-      sourceWidth,
-      sourceHeight,
-    )
-    : {
-      width: requestedWidth,
-      height: requestedHeight,
-    };
-  const scaledWidth = aspectCorrected.width * internalScale;
-  const scaledHeight = aspectCorrected.height * internalScale;
-  const viewportLimited = getPhosphorDotViewportLimitedSize(
-    scaledWidth,
-    scaledHeight,
-    filterState,
-    internalScale,
-    visibleWidth,
-    visibleHeight,
-  );
-
-  return {
-    width: viewportLimited.width,
-    height: viewportLimited.height,
-    sampleWidth: Math.max(1, Math.round(scaledWidth)),
-    sampleHeight: Math.max(1, Math.round(scaledHeight)),
-    internalScale,
-    isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
-  };
-};
-
-function compileShader(
-  gl: WebGL2RenderingContext,
-  type: number,
-  source: string,
-) {
-  const shader = gl.createShader(type);
-  if (!shader) {
-    throw new Error("Failed to create shader.");
-  }
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const message = gl.getShaderInfoLog(shader) || "Unknown shader compile error.";
-    gl.deleteShader(shader);
-    throw new Error(message);
-  }
-
-  return shader;
-}
-
-function createProgram(
-  gl: WebGL2RenderingContext,
-  vertexSource: string,
-  fragmentSource: string,
-) {
-  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
-  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  const program = gl.createProgram();
-
-  if (!program) {
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-    throw new Error("Failed to create WebGL program.");
-  }
-
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
-  gl.bindAttribLocation(program, 0, "aPosition");
-  gl.linkProgram(program);
-  gl.deleteShader(vertexShader);
-  gl.deleteShader(fragmentShader);
-
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const message = gl.getProgramInfoLog(program) || "Unknown program link error.";
-    gl.deleteProgram(program);
-    throw new Error(message);
-  }
-
-  return program;
-}
-
-function createRenderer(gl: WebGL2RenderingContext): RendererResources {
-  const filterProgram = createProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT);
-  const passthroughProgram = createProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
-
-  const vertexBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, QUAD_VERTICES, gl.STATIC_DRAW);
-
-  const vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-  const texture = gl.createTexture();
-  if (!texture) {
-    throw new Error("Failed to create WebGL texture.");
-  }
-
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-  gl.useProgram(filterProgram);
-  gl.uniform1i(gl.getUniformLocation(filterProgram, "uTexture"), 0);
-  gl.useProgram(passthroughProgram);
-  gl.uniform1i(gl.getUniformLocation(passthroughProgram, "uTexture"), 0);
-
-  return {
-    gl,
-    filterProgram,
-    passthroughProgram,
-    texture,
-    uniformLocations: {
-      uTargetSize: gl.getUniformLocation(filterProgram, "uTargetSize"),
-      uSampleTargetSize: gl.getUniformLocation(filterProgram, "uSampleTargetSize"),
-      uColorLevels: gl.getUniformLocation(filterProgram, "uColorLevels"),
-      uDitherStrength: gl.getUniformLocation(filterProgram, "uDitherStrength"),
-      uPaletteMode: gl.getUniformLocation(filterProgram, "uPaletteMode"),
-      uCurvature: gl.getUniformLocation(filterProgram, "uCurvature"),
-      uScanlineStrength: gl.getUniformLocation(filterProgram, "uScanlineStrength"),
-      uScanline2Strength: gl.getUniformLocation(filterProgram, "uScanline2Strength"),
-      uScanlineBrightnessFade: gl.getUniformLocation(filterProgram, "uScanlineBrightnessFade"),
-      uVignetteStrength: gl.getUniformLocation(filterProgram, "uVignetteStrength"),
-      uGlowStrength: gl.getUniformLocation(filterProgram, "uGlowStrength"),
-      uPhosphorStrength: gl.getUniformLocation(filterProgram, "uPhosphorStrength"),
-      uSpotMaskStrength: gl.getUniformLocation(filterProgram, "uSpotMaskStrength"),
-      uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
-      uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
-      uPhosphorDotLightBalance: gl.getUniformLocation(filterProgram, "uPhosphorDotLightBalance"),
-      uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
-      uPhosphorDotMode: gl.getUniformLocation(filterProgram, "uPhosphorDotMode"),
-      uPhosphorDotInternalScale: gl.getUniformLocation(filterProgram, "uPhosphorDotInternalScale"),
-      uPhosphorDotBrightCore: gl.getUniformLocation(filterProgram, "uPhosphorDotBrightCore"),
-      uPhosphorDotCellFill: gl.getUniformLocation(filterProgram, "uPhosphorDotCellFill"),
-      uPhosphorDotFlatDisc: gl.getUniformLocation(filterProgram, "uPhosphorDotFlatDisc"),
-      uPhosphorDotNeighborBlend: gl.getUniformLocation(filterProgram, "uPhosphorDotNeighborBlend"),
-      uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
-      uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
-      uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
-      uNeonSaturation: gl.getUniformLocation(filterProgram, "uNeonSaturation"),
-      uNeonDetail: gl.getUniformLocation(filterProgram, "uNeonDetail"),
-      uTime: gl.getUniformLocation(filterProgram, "uTime"),
-    },
-  };
-}
-
-function applyFilterUniforms(
-  gl: WebGL2RenderingContext,
-  program: WebGLProgram,
-  uniformLocations: RendererUniformLocations,
-  filterState: RetroFilterState,
-  sourceWidth: number | undefined,
-  sourceHeight: number | undefined,
-  startedAt: number,
-) {
-  const canvasElement = gl.canvas instanceof HTMLCanvasElement ? gl.canvas : null;
-  const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-  const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
-  const {
-    width: effectiveTargetWidth,
-    height: effectiveTargetHeight,
-    sampleWidth,
-    sampleHeight,
-    isPhosphorDotMode,
-  } = getEffectiveTargetSize(filterState, sourceWidth, sourceHeight, visibleWidth, visibleHeight);
-
-  gl.useProgram(program);
-  gl.uniform2f(
-    uniformLocations.uTargetSize,
-    effectiveTargetWidth,
-    effectiveTargetHeight,
-  );
-  gl.uniform2f(
-    uniformLocations.uSampleTargetSize,
-    sampleWidth,
-    sampleHeight,
-  );
-  gl.uniform1f(uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
-  gl.uniform1f(uniformLocations.uDitherStrength, filterState.ditherStrength);
-  gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
-  gl.uniform1f(uniformLocations.uCurvature, filterState.curvature);
-  gl.uniform1f(uniformLocations.uScanlineStrength, filterState.scanlineStrength);
-  gl.uniform1f(uniformLocations.uScanline2Strength, filterState.scanline2Strength);
-  gl.uniform1f(
-    uniformLocations.uScanlineBrightnessFade,
-    filterState.scanlineBrightnessFade,
-  );
-  gl.uniform1f(uniformLocations.uVignetteStrength, filterState.vignetteStrength);
-  gl.uniform1f(uniformLocations.uGlowStrength, filterState.glowStrength);
-  gl.uniform1f(uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
-  gl.uniform1f(uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
-  gl.uniform1f(uniformLocations.uBulbRadius, filterState.bulbRadius);
-  gl.uniform1f(uniformLocations.uBlackFloor, filterState.blackFloor);
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotLightBalance,
-    filterState.phosphorDotLightBalance,
-  );
-  gl.uniform1f(
-    uniformLocations.uPixelAspect,
-    (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
-      (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotMode,
-    isPhosphorDotMode ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotInternalScale,
-    filterState.phosphorDotInternalScale ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotBrightCore,
-    filterState.phosphorDotBrightCore ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotCellFill,
-    filterState.phosphorDotCellFill,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotFlatDisc,
-    filterState.phosphorDotFlatDisc ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotNeighborBlend,
-    filterState.phosphorDotNeighborBlend ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uCloseUpNoiseStrength,
-    filterState.closeUpNoiseStrength,
-  );
-  gl.uniform3f(
-    uniformLocations.uMonoTint,
-    ...MONO_TINTS[filterState.monoTint].rgb,
-  );
-  gl.uniform1f(uniformLocations.uNeonBoost, filterState.neonBoost);
-  gl.uniform1f(uniformLocations.uNeonSaturation, filterState.neonSaturation);
-  gl.uniform1f(uniformLocations.uNeonDetail, filterState.neonDetail);
-  gl.uniform1f(
-    uniformLocations.uTime,
-    ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) /
-      1000,
-  );
-}
 
 export function useRetroPixiStage({
   filterState,
@@ -500,8 +60,6 @@ export function useRetroPixiStage({
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutTimeoutRef = useRef<number | null>(null);
-  const uploadCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const uploadContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const viewportRectRef = useRef<{
     width: number;
     height: number;
@@ -537,114 +95,14 @@ export function useRetroPixiStage({
     });
   }, []);
 
-  const getUploadSource = useCallback((
-    source: HTMLVideoElement | HTMLImageElement,
-    currentFilterState: RetroFilterState,
-  ): UploadSource => {
-    if (!currentFilterState.isFilterEnabled) {
-      return source;
-    }
-
-    const sourceSize = getSourceSize(source);
-    if (sourceSize.width <= 0 || sourceSize.height <= 0) {
-      return source;
-    }
-
-    if (shouldUseDirectVideoUpload(source, sourceSize.width, sourceSize.height)) {
-      return source;
-    }
-
-    const {
-      width: effectiveTargetWidth,
-      height: effectiveTargetHeight,
-      sampleWidth,
-      sampleHeight,
-      isPhosphorDotMode,
-    } = getEffectiveTargetSize(
-      currentFilterState,
-      sourceSize.width,
-      sourceSize.height,
-    );
-    const targetWidth = Math.max(
-      1,
-      Math.round(isPhosphorDotMode ? sampleWidth : effectiveTargetWidth),
-    );
-    const targetHeight = Math.max(
-      1,
-      Math.round(isPhosphorDotMode ? sampleHeight : effectiveTargetHeight),
-    );
-
-    let uploadCanvas = uploadCanvasRef.current;
-    let uploadContext = uploadContextRef.current;
-
-    if (!uploadCanvas || !uploadContext) {
-      uploadCanvas = document.createElement("canvas");
-      uploadContext = uploadCanvas.getContext("2d", {
-        alpha: false,
-        desynchronized: true,
-      });
-
-      if (!uploadContext) {
-        return source;
-      }
-
-      uploadCanvasRef.current = uploadCanvas;
-      uploadContextRef.current = uploadContext;
-    }
-
-    if (uploadCanvas.width !== targetWidth) uploadCanvas.width = targetWidth;
-    if (uploadCanvas.height !== targetHeight) uploadCanvas.height = targetHeight;
-
-    uploadContext.imageSmoothingEnabled = true;
-    uploadContext.imageSmoothingQuality = "high";
-    uploadContext.fillStyle = "#000";
-    uploadContext.fillRect(0, 0, targetWidth, targetHeight);
-
-    uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
-    return uploadCanvas;
-  }, [debugVideo]);
-
   const renderFrame = useCallback(() => {
     const app = appRef.current;
     const source = previewElementRef.current;
     if (!app) return;
-
-    const { gl, texture, filterProgram, passthroughProgram, uniformLocations } = app.renderer;
-
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(0.01, 0.02, 0.01, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    if (!isPoweredOnRef.current || !source) {
-      return;
-    }
-
-    const currentFilterState = filterStateRef.current;
-    const uploadSource = getUploadSource(source, currentFilterState);
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    const textureFilter = currentFilterState.isFilterEnabled ? gl.LINEAR : gl.NEAREST;
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, textureFilter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, textureFilter);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
-
-    if (currentFilterState.isFilterEnabled) {
-      applyFilterUniforms(
-        gl,
-        filterProgram,
-        uniformLocations,
-        currentFilterState,
-        source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth,
-        source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight,
-        app.startedAt,
-      );
-      gl.useProgram(filterProgram);
-    } else {
-      gl.useProgram(passthroughProgram);
-    }
-
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    app.pipeline.setOutputEnabled(isPoweredOnRef.current);
+    app.pipeline.setSource(source);
+    app.pipeline.setFilterState(filterStateRef.current as RetroVideoFilterState);
+    app.pipeline.render();
   }, []);
 
   useLayoutEffect(() => {
@@ -699,8 +157,7 @@ export function useRetroPixiStage({
 
   const resetFilterInstance = useCallback(() => {
     if (appRef.current) {
-      appRef.current.startedAt =
-        typeof performance !== "undefined" ? performance.now() : Date.now();
+      appRef.current.pipeline.resetAnimationClock();
     }
     filterRef.current = {};
     renderFrame();
@@ -714,7 +171,7 @@ export function useRetroPixiStage({
   ) => {
     if (!app) return;
 
-    const { width: sourceWidth, height: sourceHeight } = getSourceSize(source);
+    const { width: sourceWidth, height: sourceHeight } = getRetroVideoSourceSize(source);
     if (sourceWidth <= 0 || sourceHeight <= 0) return;
 
     const host = canvasHostRef.current;
@@ -752,7 +209,7 @@ export function useRetroPixiStage({
     viewportRectRef.current = next;
     updateViewportRect(next);
     return next;
-  }, [debugVideo, fitMode, updateViewportRect]);
+  }, [fitMode, updateViewportRect]);
 
   const fitCurrentSprite = useCallback(() => {
     if (!previewElementRef.current) return;
@@ -780,13 +237,13 @@ export function useRetroPixiStage({
     const styleHeight = Math.max(1, Math.round(viewRect.height));
     const currentFilterState = filterStateRef.current;
     const previewSourceSize = previewElementRef.current
-      ? getSourceSize(previewElementRef.current)
+      ? getRetroVideoSourceSize(previewElementRef.current)
       : null;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
-    } = getEffectiveTargetSize(
-      currentFilterState,
+    } = getEffectiveRetroTargetSize(
+      currentFilterState as RetroVideoFilterState,
       previewSourceSize?.width,
       previewSourceSize?.height,
       styleWidth,
@@ -898,15 +355,13 @@ export function useRetroPixiStage({
           ) / 10,
       });
 
-      const renderer = createRenderer(gl);
       const app: CanvasStageApp = {
         canvas,
-        renderer,
+        pipeline: new TetoricaRetroVideoPipeline(gl),
         ticker: {
           start: startTicker,
           stop: stopTicker,
         },
-        startedAt: typeof performance !== "undefined" ? performance.now() : Date.now(),
       };
 
       const nextHost = canvasHostRef.current;
@@ -984,10 +439,7 @@ export function useRetroPixiStage({
 
     const app = appRef.current;
     if (app) {
-      const { gl, filterProgram, passthroughProgram, texture } = app.renderer;
-      gl.deleteTexture(texture);
-      gl.deleteProgram(filterProgram);
-      gl.deleteProgram(passthroughProgram);
+      app.pipeline.dispose();
       app.canvas.remove();
     }
 
@@ -995,8 +447,6 @@ export function useRetroPixiStage({
     filterRef.current = null;
     previewElementRef.current = null;
     updateViewportRect(null);
-    uploadContextRef.current = null;
-    uploadCanvasRef.current = null;
     setIsRendererReady(false);
   }, [stopTicker, updateViewportRect]);
 
