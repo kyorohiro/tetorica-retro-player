@@ -315,6 +315,10 @@ export function createRetroAudioEngine({
     return wowFlutterDelayRef.current ?? lofiLowpassRef.current;
   };
 
+  const getOutputNode = () => {
+    return masterGainRef.current;
+  };
+
   const updateAudioNodes = () => {
     const masterGain = masterGainRef.current;
     const radioToneHighpass = radioToneHighpassRef.current;
@@ -840,6 +844,33 @@ export function createRetroAudioEngine({
     });
   };
 
+  const connect = async (
+    destinationNode: AudioNode | AudioParam,
+    outputIndex?: number,
+    inputIndex?: number,
+  ) => {
+    const context = await ensureAudioContext();
+    if (!context) {
+      debugAudio("connect:no-context");
+      return;
+    }
+
+    const outputNode = getOutputNode();
+    if (!outputNode) {
+      debugAudio("connect:no-output-node", {
+        audioContextState: context.state,
+      });
+      return;
+    }
+
+    if (destinationNode instanceof AudioParam) {
+      outputNode.connect(destinationNode, outputIndex);
+      return;
+    }
+
+    outputNode.connect(destinationNode, outputIndex, inputIndex);
+  };
+
   return {
     audioContextRef,
     mediaSourceRef,
@@ -875,11 +906,18 @@ export function createRetroAudioEngine({
     vinylDustBedFilterRef,
     vinylDustBedGainRef,
     crackleGainRef,
+    get input() {
+      return getInputNode();
+    },
+    get output() {
+      return getOutputNode();
+    },
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
     connectMediaAudio,
     connectSourceNode,
+    connect,
     reconnectCurrentMediaAudio,
     disposeAudioEngine,
   };
