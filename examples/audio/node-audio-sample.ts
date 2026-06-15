@@ -5,61 +5,11 @@ import {
 } from "node-web-audio-api";
 import {
   createTetoricaRetroAudioNode,
-  DEFAULT_AUDIO_SETTINGS,
-  type RetroAudioSettingsRefs,
 } from "../../src/retro-player/audio/createRetroAudioEngine.ts";
 
 Object.assign(globalThis, {
   AudioContext,
 });
-
-const previewKindRef = { current: "audio" as const };
-const mediaRef = { current: null };
-const isPlayingRef = { current: true };
-
-const LOFI_PRESET_SETTINGS = {
-  ...DEFAULT_AUDIO_SETTINGS,
-  isAudioFxEnabled: true,
-  isNoiseEnabled: true,
-  volume: 0.92,
-  lofiAmount: 0.7,
-  radioToneAmount: 0.18,
-  bitCrushAmount: 0.22,
-  sampleRateReductionAmount: 0.24,
-  bassAmount: 0.08,
-  midAmount: -0.08,
-  trebleAmount: -0.18,
-  stereoWidthAmount: -0.08,
-  smallSpeakerRoomAmount: 0.08,
-  wowFlutterAmount: 0.12,
-  noiseLevel: 0.005,
-  vinylDustAmount: 0,
-};
-
-const settingsRefs: RetroAudioSettingsRefs = {
-  isMutedRef: { current: LOFI_PRESET_SETTINGS.isMuted },
-  volumeRef: { current: LOFI_PRESET_SETTINGS.volume },
-  playbackRateRef: { current: LOFI_PRESET_SETTINGS.playbackRate },
-  isLoopingRef: { current: LOFI_PRESET_SETTINGS.isLooping },
-  isAudioFxEnabledRef: { current: LOFI_PRESET_SETTINGS.isAudioFxEnabled },
-  lofiAmountRef: { current: LOFI_PRESET_SETTINGS.lofiAmount },
-  radioToneAmountRef: { current: LOFI_PRESET_SETTINGS.radioToneAmount },
-  bitCrushAmountRef: { current: LOFI_PRESET_SETTINGS.bitCrushAmount },
-  sampleRateReductionAmountRef: {
-    current: LOFI_PRESET_SETTINGS.sampleRateReductionAmount,
-  },
-  bassAmountRef: { current: LOFI_PRESET_SETTINGS.bassAmount },
-  midAmountRef: { current: LOFI_PRESET_SETTINGS.midAmount },
-  trebleAmountRef: { current: LOFI_PRESET_SETTINGS.trebleAmount },
-  stereoWidthAmountRef: { current: LOFI_PRESET_SETTINGS.stereoWidthAmount },
-  smallSpeakerRoomAmountRef: {
-    current: LOFI_PRESET_SETTINGS.smallSpeakerRoomAmount,
-  },
-  wowFlutterAmountRef: { current: LOFI_PRESET_SETTINGS.wowFlutterAmount },
-  isNoiseEnabledRef: { current: LOFI_PRESET_SETTINGS.isNoiseEnabled },
-  noiseLevelRef: { current: LOFI_PRESET_SETTINGS.noiseLevel },
-  vinylDustAmountRef: { current: LOFI_PRESET_SETTINGS.vinylDustAmount },
-};
 
 type NodeAudioContextCtor = new (
   options?: AudioContextOptions & { sinkId?: { type: "none" } },
@@ -80,16 +30,24 @@ const context = useSilentSink
 
 const engine = createTetoricaRetroAudioNode(context, {
   instanceLabel: "node-example",
-  previewKindRef,
-  mediaRef,
-  isPlayingRef,
-  settingsRefs,
+  preset: "lofiTape",
+  params: {
+    lofiAmount: 0.7,
+    wowFlutterAmount: 0.12,
+  },
 });
 
 await engine.ensureAudioContext();
+engine.setParams(
+  {
+    stereoWidthAmount: -0.08,
+    noiseLevel: 0.005,
+  },
+  true,
+);
 
 console.log(
-  "Running node audio sample with Lo-Fi preset settings.",
+  "Running node audio sample with lofiTape preset settings.",
   useSilentSink ? "Silent sink mode." : "Speaker output mode.",
   "AudioWorklet-based params may be ignored in this Node sample.",
 );

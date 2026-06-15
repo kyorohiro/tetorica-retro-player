@@ -13,7 +13,7 @@
 - [node-audio-sample.ts](/Users/kyorohiro/development8/tetorica-retro-player/examples/audio/node-audio-sample.ts)
   - Runs the separated `createTetoricaRetroAudioNode(...)` without React
   - Uses a simple `OscillatorNode -> GainNode -> TetoricaRetroAudioNode -> destination`
-  - Applies settings based on the current `Lo-Fi` preset
+  - Applies a `lofiTape` preset and then tweaks a few params with `setParams(..., true)`
 
 ## Run
 
@@ -38,6 +38,7 @@ npm run audio:node:silent
 - In the current Node sample, AudioWorklet-based behavior may differ from the browser path.
 - The examples currently import source files directly by relative path on purpose, because the interface is still evolving.
 - `createTetoricaRetroAudioNode(...)` does not auto-connect to `context.destination`; the caller connects the output explicitly.
+- `createTetoricaRetroAudioNode(...)` accepts plain params and presets; React-style `{ current: ... }` refs stay internal.
 
 ## Directions
 
