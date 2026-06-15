@@ -33,6 +33,8 @@ export type RetroPresetDefinition = {
   scanline2: number;
   vignette: number;
   glow: number;
+  smoothStrength?: number;
+  toonSteps?: number;
   edgeBoost?: number;
   phosphor: number;
   spotMask: number;
@@ -428,6 +430,30 @@ export const RETRO_PRESETS = {
     glow: 0.06,
     edgeBoost: 1.5,
     phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
+  animeToon: {
+    label: "Anime Toon",
+    width: 640,
+    height: 360,
+    colors: 8,
+    dither: 0.0,
+    palette: "free",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.0,
+    glow: 0.0,
+    smoothStrength: 0.35,
+    toonSteps: 4,
+    edgeBoost: 1.5,
+    phosphor: 0.0,
     spotMask: 0.0,
     bulbRadius: 0.3,
     blackFloor: 0.008,

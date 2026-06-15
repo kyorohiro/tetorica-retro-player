@@ -1157,6 +1157,8 @@ export function RetroPlayer({
                   curvature={filterState.curvature}
                   ditherStrength={filterState.ditherStrength}
                   glowStrength={filterState.glowStrength}
+                  smoothStrength={filterState.smoothStrength}
+                  toonSteps={filterState.toonSteps}
                   edgeBoost={filterState.edgeBoost}
                   isFilterEnabled={filterState.isFilterEnabled}
                   monoTint={filterState.monoTint}
@@ -1189,6 +1191,8 @@ export function RetroPlayer({
                   onSetCurvature={filterState.setCurvature}
                   onSetDitherStrength={filterState.setDitherStrength}
                   onSetGlowStrength={filterState.setGlowStrength}
+                  onSetSmoothStrength={filterState.setSmoothStrength}
+                  onSetToonSteps={filterState.setToonSteps}
                   onSetEdgeBoost={filterState.setEdgeBoost}
                   onSetIsFilterEnabled={filterState.setIsFilterEnabled}
                   onSetMonoTint={filterState.setMonoTint}

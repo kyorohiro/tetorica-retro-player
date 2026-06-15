@@ -49,6 +49,8 @@ uniform float uScanline2Strength;
 uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uGlowStrength;
+uniform float uSmoothStrength;
+uniform float uToonSteps;
 uniform float uEdgeBoost;
 uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
@@ -487,6 +489,34 @@ vec3 applyNeonLinePalette(
   return adjustSaturation(neon, 0.85 + saturation * 0.35);
 }
 
+vec3 smoothSourceColor(sampler2D textureSampler, vec2 uv, vec2 texel, float amount)
+{
+  if (amount <= 0.001) {
+    return texture(textureSampler, uv).rgb;
+  }
+
+  vec3 center = texture(textureSampler, uv).rgb * 0.4;
+  vec3 left = texture(textureSampler, clamp(uv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb * 0.15;
+  vec3 right = texture(textureSampler, clamp(uv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb * 0.15;
+  vec3 up = texture(textureSampler, clamp(uv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb * 0.15;
+  vec3 down = texture(textureSampler, clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb * 0.15;
+  vec3 blurred = center + left + right + up + down;
+  return mix(texture(textureSampler, uv).rgb, blurred, clamp(amount, 0.0, 1.0));
+}
+
+vec3 applyToonShading(vec3 color, float steps)
+{
+  if (steps < 2.0) {
+    return color;
+  }
+
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  float stepped = floor(luminance * (steps - 1.0) + 0.5) / max(steps - 1.0, 1.0);
+  float scale = stepped / max(luminance, 0.001);
+  vec3 scaled = clamp(color * scale, 0.0, 1.0);
+  return mix(color, scaled, 0.88);
+}
+
 vec2 curveUv(vec2 uv, float strength)
 {
   vec2 centered = uv * 2.0 - 1.0;
@@ -757,7 +787,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
 vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
 {
   vec2 clampedUv = clamp(sampleUv, vec2(0.0), vec2(1.0));
-  vec4 sampleColor = texture(uTexture, clampedUv);
+  vec4 sampleColor = vec4(smoothSourceColor(uTexture, clampedUv, texel, uSmoothStrength), 1.0);
   bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
 
   if (isPc98Tile) {
@@ -766,6 +796,7 @@ vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
 
   float dither = (bayer4x4(sampleCell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   sampleColor.rgb = clamp(sampleColor.rgb + dither, 0.0, 1.0);
+  sampleColor.rgb = applyToonShading(sampleColor.rgb, uToonSteps);
   bool isNeon = uPaletteMode > 8.5;
 
   if (isNeon) {
@@ -860,15 +891,17 @@ void main(void)
   vec2 blueUv = clamp(pixelatedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0));
   vec2 texel = 1.0 / uTargetSize;
 
-  vec4 color = texture(uTexture, pixelatedUv);
-  color.r = texture(uTexture, redUv).r;
-  color.b = texture(uTexture, blueUv).b;
+  float smoothStrength = clamp(uSmoothStrength, 0.0, 1.0);
+  vec4 color = vec4(smoothSourceColor(uTexture, pixelatedUv, texel, smoothStrength), 1.0);
+  color.r = smoothSourceColor(uTexture, redUv, texel, smoothStrength).r;
+  color.b = smoothSourceColor(uTexture, blueUv, texel, smoothStrength).b;
   bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
   if (isPc98Tile) {
     color.rgb = samplePc98TileSource(uTexture, cell, uTargetSize);
   }
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
+  color.rgb = applyToonShading(color.rgb, uToonSteps);
   bool isNeon = uPaletteMode > 8.5;
 
   if (isNeon) {
