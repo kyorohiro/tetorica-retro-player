@@ -608,13 +608,13 @@ export function RetroPlayer({
     ? `${previewFrameHeight}px`
     : "60vh";
 
-  const fitWidthAspectRatio = React.useMemo(() => {
-    if (!isFitWidthEnabled || !player.sourceDimensions) {
+  const previewAspectRatio = React.useMemo(() => {
+    if (!player.sourceDimensions) {
       return undefined;
     }
 
     return `${player.sourceDimensions.width} / ${player.sourceDimensions.height}`;
-  }, [isFitWidthEnabled, player.sourceDimensions]);
+  }, [player.sourceDimensions]);
 
   const isPinnedPreview =
     (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
@@ -663,9 +663,7 @@ export function RetroPlayer({
           ref={previewShellRef}
           className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
             isPreviewMaximized
-              ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 ${
-                  isFitWidthEnabled ? "overflow-y-auto" : "flex items-stretch justify-stretch"
-                }`
+              ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-y-auto flex items-stretch justify-stretch`
               : isPinnedPreview
                 ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
               : ""
@@ -697,26 +695,29 @@ export function RetroPlayer({
           <div
             className={`relative ${
               isPreviewMaximized
-                ? isFitWidthEnabled
-                  ? "w-full"
-                  : "h-full min-h-0 w-full"
+                ? "w-full"
                 : "w-full min-w-0"
             }`}
             style={
               isPreviewMaximized
-                ? isFitWidthEnabled && fitWidthAspectRatio
+                ? isFitWidthEnabled && previewAspectRatio
                   ? {
-                      aspectRatio: fitWidthAspectRatio,
+                      aspectRatio: previewAspectRatio,
                       minHeight: "220px",
                     }
                   : undefined
-                : {
-                    aspectRatio: fitWidthAspectRatio,
-                    height: fitWidthAspectRatio
-                      ? pinnedFitWidthHeight
-                      : normalPreviewHeight,
-                    minHeight: "220px",
-                  }
+                : previewAspectRatio
+                  ? {
+                      aspectRatio: previewAspectRatio,
+                      height: isFitWidthEnabled
+                        ? pinnedFitWidthHeight ?? normalPreviewHeight
+                        : undefined,
+                      minHeight: "220px",
+                    }
+                  : {
+                      height: normalPreviewHeight,
+                      minHeight: "220px",
+                    }
             }
           >
             <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
