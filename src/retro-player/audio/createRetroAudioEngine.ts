@@ -42,8 +42,168 @@ export type RetroAudioSettings = {
   vinylDustAmount: number;
 };
 
+export type RetroAudioPresetKey =
+  | "none"
+  | "lofi"
+  | "radio"
+  | "tape"
+  | "vinyl"
+  | "vintageMic"
+  | "earphone"
+  | "lofiTape";
+
+export const RETRO_AUDIO_PRESETS: Record<
+  RetroAudioPresetKey,
+  Partial<RetroAudioSettings>
+> = {
+  none: {
+    isAudioFxEnabled: false,
+    isNoiseEnabled: false,
+    volume: 1,
+    lofiAmount: 0,
+    radioToneAmount: 0,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0,
+    bassAmount: 0,
+    midAmount: 0,
+    trebleAmount: 0,
+    stereoWidthAmount: 0,
+    smallSpeakerRoomAmount: 0,
+    wowFlutterAmount: 0,
+    noiseLevel: 0,
+    vinylDustAmount: 0,
+  },
+  lofi: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    volume: 0.92,
+    lofiAmount: 0.7,
+    radioToneAmount: 0.18,
+    bitCrushAmount: 0.22,
+    sampleRateReductionAmount: 0.24,
+    bassAmount: 0.08,
+    midAmount: -0.08,
+    trebleAmount: -0.18,
+    stereoWidthAmount: -0.08,
+    smallSpeakerRoomAmount: 0.08,
+    wowFlutterAmount: 0.12,
+    noiseLevel: 0.005,
+    vinylDustAmount: 0,
+  },
+  radio: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    volume: 0.88,
+    lofiAmount: 0.4,
+    radioToneAmount: 0.9,
+    bitCrushAmount: 0.12,
+    sampleRateReductionAmount: 0.38,
+    bassAmount: -0.4,
+    midAmount: 0.18,
+    trebleAmount: -0.32,
+    stereoWidthAmount: -0.55,
+    smallSpeakerRoomAmount: 0.12,
+    wowFlutterAmount: 0.08,
+    noiseLevel: 0.01,
+    vinylDustAmount: 0,
+  },
+  tape: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    volume: 0.94,
+    lofiAmount: 0.22,
+    radioToneAmount: 0.1,
+    bitCrushAmount: 0.04,
+    sampleRateReductionAmount: 0.08,
+    bassAmount: 0.12,
+    midAmount: 0,
+    trebleAmount: -0.14,
+    stereoWidthAmount: 0.06,
+    smallSpeakerRoomAmount: 0.18,
+    wowFlutterAmount: 0.42,
+    noiseLevel: 0.0075,
+    vinylDustAmount: 0,
+  },
+  vinyl: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    volume: 0.96,
+    lofiAmount: 0.14,
+    radioToneAmount: 0.06,
+    bitCrushAmount: 0.01,
+    sampleRateReductionAmount: 0.03,
+    bassAmount: 0.06,
+    midAmount: -0.02,
+    trebleAmount: -0.16,
+    stereoWidthAmount: -0.18,
+    smallSpeakerRoomAmount: 0.03,
+    wowFlutterAmount: 0.18,
+    noiseLevel: 0.0035,
+    vinylDustAmount: 0.58,
+  },
+  vintageMic: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    volume: 0.94,
+    lofiAmount: 0.34,
+    radioToneAmount: 0.28,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0.02,
+    bassAmount: -0.24,
+    midAmount: 0.32,
+    trebleAmount: -0.68,
+    stereoWidthAmount: -0.32,
+    smallSpeakerRoomAmount: 0.12,
+    wowFlutterAmount: 0.04,
+    noiseLevel: 0.0025,
+    vinylDustAmount: 0.08,
+  },
+  earphone: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: false,
+    volume: 1,
+    lofiAmount: 0,
+    radioToneAmount: 0,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0,
+    bassAmount: 0.1,
+    midAmount: 0,
+    trebleAmount: 0.08,
+    stereoWidthAmount: 0.22,
+    smallSpeakerRoomAmount: 0,
+    wowFlutterAmount: 0,
+    noiseLevel: 0,
+    vinylDustAmount: 0,
+  },
+  lofiTape: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: true,
+    volume: 0.93,
+    lofiAmount: 0.58,
+    radioToneAmount: 0.12,
+    bitCrushAmount: 0.12,
+    sampleRateReductionAmount: 0.16,
+    bassAmount: 0.1,
+    midAmount: -0.02,
+    trebleAmount: -0.16,
+    stereoWidthAmount: -0.02,
+    smallSpeakerRoomAmount: 0.12,
+    wowFlutterAmount: 0.28,
+    noiseLevel: 0.006,
+    vinylDustAmount: 0,
+  },
+};
+
 export type CurrentRef<T> = {
   current: T;
+};
+
+export type TetoricaRetroAudioNodeOptions = {
+  instanceLabel?: string;
+  preset?: RetroAudioPresetKey;
+  params?: Partial<RetroAudioSettings>;
+  previewKind?: RetroAudioPreviewKind;
+  isPlaying?: boolean;
 };
 
 export type RetroAudioSettingsRefs = {
@@ -221,6 +381,71 @@ function isAudioParamLike(value: AudioNode | AudioParam): value is AudioParam {
     "setValueAtTime" in value &&
     "value" in value
   );
+}
+
+function createMutableRef<T>(current: T): CurrentRef<T> {
+  return { current };
+}
+
+function createSettingsRefs(settings: RetroAudioSettings): RetroAudioSettingsRefs {
+  return {
+    isMutedRef: createMutableRef(settings.isMuted),
+    volumeRef: createMutableRef(settings.volume),
+    playbackRateRef: createMutableRef(settings.playbackRate),
+    isLoopingRef: createMutableRef(settings.isLooping),
+    isAudioFxEnabledRef: createMutableRef(settings.isAudioFxEnabled),
+    lofiAmountRef: createMutableRef(settings.lofiAmount),
+    radioToneAmountRef: createMutableRef(settings.radioToneAmount),
+    bitCrushAmountRef: createMutableRef(settings.bitCrushAmount),
+    sampleRateReductionAmountRef: createMutableRef(settings.sampleRateReductionAmount),
+    bassAmountRef: createMutableRef(settings.bassAmount),
+    midAmountRef: createMutableRef(settings.midAmount),
+    trebleAmountRef: createMutableRef(settings.trebleAmount),
+    stereoWidthAmountRef: createMutableRef(settings.stereoWidthAmount),
+    smallSpeakerRoomAmountRef: createMutableRef(settings.smallSpeakerRoomAmount),
+    wowFlutterAmountRef: createMutableRef(settings.wowFlutterAmount),
+    isNoiseEnabledRef: createMutableRef(settings.isNoiseEnabled),
+    noiseLevelRef: createMutableRef(settings.noiseLevel),
+    vinylDustAmountRef: createMutableRef(settings.vinylDustAmount),
+  };
+}
+
+function updateSettingsRefs(
+  settingsRefs: RetroAudioSettingsRefs,
+  settings: RetroAudioSettings,
+) {
+  settingsRefs.isMutedRef.current = settings.isMuted;
+  settingsRefs.volumeRef.current = settings.volume;
+  settingsRefs.playbackRateRef.current = settings.playbackRate;
+  settingsRefs.isLoopingRef.current = settings.isLooping;
+  settingsRefs.isAudioFxEnabledRef.current = settings.isAudioFxEnabled;
+  settingsRefs.lofiAmountRef.current = settings.lofiAmount;
+  settingsRefs.radioToneAmountRef.current = settings.radioToneAmount;
+  settingsRefs.bitCrushAmountRef.current = settings.bitCrushAmount;
+  settingsRefs.sampleRateReductionAmountRef.current = settings.sampleRateReductionAmount;
+  settingsRefs.bassAmountRef.current = settings.bassAmount;
+  settingsRefs.midAmountRef.current = settings.midAmount;
+  settingsRefs.trebleAmountRef.current = settings.trebleAmount;
+  settingsRefs.stereoWidthAmountRef.current = settings.stereoWidthAmount;
+  settingsRefs.smallSpeakerRoomAmountRef.current = settings.smallSpeakerRoomAmount;
+  settingsRefs.wowFlutterAmountRef.current = settings.wowFlutterAmount;
+  settingsRefs.isNoiseEnabledRef.current = settings.isNoiseEnabled;
+  settingsRefs.noiseLevelRef.current = settings.noiseLevel;
+  settingsRefs.vinylDustAmountRef.current = settings.vinylDustAmount;
+}
+
+function resolveRetroAudioSettings({
+  preset,
+  params,
+}: {
+  preset?: RetroAudioPresetKey;
+  params?: Partial<RetroAudioSettings>;
+}): RetroAudioSettings {
+  return {
+    ...DEFAULT_AUDIO_SETTINGS,
+    ...(preset ? RETRO_AUDIO_PRESETS[preset] : null),
+    ...params,
+  };
 }
 
 export function createRetroAudioEngine({
@@ -972,18 +1197,73 @@ export type CreateTetoricaRetroAudioNodeParams = Omit<
   | "connectOutputToRecordingDestination"
 >;
 
-export type TetoricaRetroAudioNode = ReturnType<
-  typeof createTetoricaRetroAudioNode
->;
+export type TetoricaRetroAudioNode = ReturnType<typeof createTetoricaRetroAudioNode>;
 
 export function createTetoricaRetroAudioNode(
   context: AudioContextLike,
-  params: CreateTetoricaRetroAudioNodeParams,
+  options: TetoricaRetroAudioNodeOptions = {},
 ) {
-  return createRetroAudioEngine({
-    ...params,
+  const currentSettings = resolveRetroAudioSettings(options);
+  const previewKindRef = createMutableRef<RetroAudioPreviewKind>(
+    options.previewKind ?? "audio",
+  );
+  const mediaRef = createMutableRef<HTMLMediaElement | null>(null);
+  const isPlayingRef = createMutableRef(options.isPlaying ?? true);
+  const settingsRefs = createSettingsRefs(currentSettings);
+  const engine = createRetroAudioEngine({
+    instanceLabel: options.instanceLabel ?? "tetorica-retro-audio-node",
+    previewKindRef,
+    mediaRef,
+    isPlayingRef,
+    settingsRefs,
     createAudioContext: () => context,
     connectOutputToDestination: false,
     connectOutputToRecordingDestination: false,
+  });
+
+  const setParams = (
+    nextParams: Partial<RetroAudioSettings>,
+    isPartialUpdate = false,
+  ) => {
+    const nextSettings = isPartialUpdate
+      ? { ...currentSettings, ...nextParams }
+      : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
+
+    Object.assign(currentSettings, nextSettings);
+    updateSettingsRefs(settingsRefs, currentSettings);
+    engine.updateAudioNodes();
+  };
+
+  const getParams = () => ({ ...currentSettings });
+
+  const applyPreset = (
+    preset: RetroAudioPresetKey,
+    extraParams?: Partial<RetroAudioSettings>,
+  ) => {
+    const nextSettings = resolveRetroAudioSettings({
+      preset,
+      params: extraParams,
+    });
+    Object.assign(currentSettings, nextSettings);
+    updateSettingsRefs(settingsRefs, currentSettings);
+    engine.updateAudioNodes();
+  };
+
+  const setIsPlaying = (nextIsPlaying: boolean) => {
+    isPlayingRef.current = nextIsPlaying;
+    engine.updateAudioNodes();
+  };
+
+  const setPreviewKind = (nextPreviewKind: RetroAudioPreviewKind) => {
+    previewKindRef.current = nextPreviewKind;
+    engine.updateAudioNodes();
+  };
+
+  return Object.assign(engine, {
+    setParams,
+    getParams,
+    applyPreset,
+    setIsPlaying,
+    setPreviewKind,
   });
 }
