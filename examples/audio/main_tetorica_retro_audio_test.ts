@@ -1,8 +1,8 @@
-import {
-  AudioContext,
-  GainNode,
-  OscillatorNode,
-} from "node-web-audio-api";
+//
+// node --experimental-strip-types ./audio/main_retro_polyfill_test.ts
+//
+import "web-audio-api/polyfill";
+
 import {
   createTetoricaRetroAudioNode,
 } from "../../src/retro-player/audio/createRetroAudioEngine.ts";
@@ -35,6 +35,7 @@ const engine = createTetoricaRetroAudioNode(context, {
     lofiAmount: 0.7,
     wowFlutterAmount: 0.12,
   },
+  enableAudioWorklet: false, // AudioWorklet is not supported in the node-web-audio-api polyfill
 });
 
 await engine.ensureAudioContext();
