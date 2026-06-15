@@ -67,7 +67,7 @@ export type RetroAudioSettingsRefs = {
   vinylDustAmountRef: CurrentRef<number>;
 };
 
-type CreateRetroAudioEngineParams = {
+export type CreateRetroAudioEngineParams = {
   instanceLabel: string;
   previewKindRef: CurrentRef<RetroAudioPreviewKind>;
   mediaRef: CurrentRef<HTMLMediaElement | null>;
@@ -921,4 +921,19 @@ export function createRetroAudioEngine({
     reconnectCurrentMediaAudio,
     disposeAudioEngine,
   };
+}
+
+export type CreateTetoricaRetroAudioNodeParams = Omit<
+  CreateRetroAudioEngineParams,
+  "createAudioContext"
+>;
+
+export function createTetoricaRetroAudioNode(
+  context: AudioContextLike,
+  params: CreateTetoricaRetroAudioNodeParams,
+) {
+  return createRetroAudioEngine({
+    ...params,
+    createAudioContext: () => context,
+  });
 }
