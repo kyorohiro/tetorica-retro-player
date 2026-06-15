@@ -8,7 +8,9 @@
     "audio:node:silent": "NODE_AUDIO_SINK=none node --experimental-strip-types ./audio/node-audio-sample.ts"
   },
   "dependencies": {
-    "node-web-audio-api": "^1.0.0"
+    "node-web-audio-api": "^1.0.9",
+    "tone": "^15.1.22",
+    "web-audio-api": "^1.5.1"
   },
   "devDependencies": {
     "@types/node": "^25.9.3"
