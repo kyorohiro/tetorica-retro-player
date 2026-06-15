@@ -41,6 +41,25 @@ https://kyorohiro.itch.io/tetorica-retro-player
 - Pixi.js
 - Tauri
 
+## Reusable Core
+
+The reusable player core lives under `src/retro-player/`.
+
+- `src/retro-player/components/RetroPlayer.tsx`: ready-to-embed retro preview player
+- `src/retro-player/retro/config.ts`: presets and shared filter option definitions
+- `src/retro-player/retro/filterShader.ts`: shader source of truth
+- `src/retro-player/index.ts`: portable entrypoint for imports from other apps
+
+The main app shell stays outside that folder on purpose. Right now the outer app still owns file picking, dialogs, i18n preference storage, and page-level navigation.
+
+If you want to reuse the player in another app, start from:
+
+```ts
+import { RetroPlayer } from "./src/retro-player";
+```
+
+If the host app already has its own confirm modal, pass it into `confirmDialog` so the player does not need the current app's dialog context.
+
 ## Local Development
 
 ```bash

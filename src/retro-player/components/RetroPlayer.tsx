@@ -20,13 +20,12 @@ import {
   loadPersistedRetroSettings,
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
-import { useDialog } from "../../useDialog";
 import {
   RETRO_PRESETS,
   type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
-import type { Locale } from "../../i18n";
+import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 
 const VideoControls = React.lazy(() => import("./VideoControls").then((module) => ({
   default: module.VideoControls,
@@ -35,8 +34,29 @@ const RetroFilterPanel = React.lazy(() => import("./RetroFilterPanel").then((mod
   default: module.RetroFilterPanel,
 })));
 
+const defaultConfirmDialog: ConfirmDialogFn = async ({
+  title,
+  body,
+  okText,
+  cancelText,
+}) => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const message = [
+    title,
+    body,
+    okText || cancelText ? `${okText ?? "OK"} / ${cancelText ?? "Cancel"}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return window.confirm(message);
+};
+
 type RetroPlayerProps = {
-  locale?: Locale;
+  locale?: RetroPlayerLocale;
   src?: string;
   stream?: MediaStream | null;
   streamName?: string;
@@ -45,6 +65,7 @@ type RetroPlayerProps = {
   className?: string;
   onError?: (error: Error) => void;
   initialFilterState?: RetroFilterInitialState;
+  confirmDialog?: ConfirmDialogFn;
 };
 
 export function RetroPlayer({
@@ -57,6 +78,7 @@ export function RetroPlayer({
   className,
   onError,
   initialFilterState,
+  confirmDialog = defaultConfirmDialog,
 }: RetroPlayerProps) {
   const tooltipText =
     locale === "ja"
@@ -119,7 +141,6 @@ export function RetroPlayer({
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
-  const { showConfirmDialog } = useDialog();
   const filterState = useRetroFilterState(initialFilterState);
   const renderResolutionScale = isHighResolution
     ? typeof window !== "undefined"
@@ -787,7 +808,7 @@ export function RetroPlayer({
                               }
 
                               const prefersShareExport = player.prefersShareExport;
-                              const confirmed = await showConfirmDialog({
+                              const confirmed = await confirmDialog({
                                 title: "Recording ready",
                                 body: prefersShareExport
                                   ? "Share the recorded clip now?"
