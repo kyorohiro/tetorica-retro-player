@@ -3,8 +3,8 @@ import {
   paletteModeToUniform,
   type MonoTintMode,
   type PaletteMode,
-} from "../retro/config";
-import { FILTER_FRAGMENT } from "../retro/filterShader";
+} from "../retro/config.ts";
+import { FILTER_FRAGMENT } from "../retro/filterShader.ts";
 
 export type RetroVideoFilterState = {
   targetWidth: number;
@@ -40,7 +40,14 @@ export type RetroVideoFilterState = {
 export type RetroVideoSource =
   | HTMLVideoElement
   | HTMLImageElement
-  | HTMLCanvasElement;
+  | HTMLCanvasElement
+  | RawRetroVideoFrame;
+
+export type RawRetroVideoFrame = {
+  width: number;
+  height: number;
+  data: Uint8Array | Uint8ClampedArray;
+};
 
 type RendererUniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
@@ -115,17 +122,35 @@ const LARGE_VIDEO_SOURCE_THRESHOLD = 640;
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
+const isHtmlVideoElement = (value: unknown): value is HTMLVideoElement =>
+  typeof HTMLVideoElement !== "undefined" && value instanceof HTMLVideoElement;
+
+const isHtmlImageElement = (value: unknown): value is HTMLImageElement =>
+  typeof HTMLImageElement !== "undefined" && value instanceof HTMLImageElement;
+
+const isHtmlCanvasElement = (value: unknown): value is HTMLCanvasElement =>
+  typeof HTMLCanvasElement !== "undefined" && value instanceof HTMLCanvasElement;
+
+const isRawRetroVideoFrame = (value: unknown): value is RawRetroVideoFrame =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      "width" in value &&
+      "height" in value &&
+      "data" in value,
+  );
+
 export const getRetroVideoSourceSize = (source: RetroVideoSource) => ({
   width:
-    source instanceof HTMLVideoElement
+    isHtmlVideoElement(source)
       ? source.videoWidth
-      : source instanceof HTMLImageElement
+      : isHtmlImageElement(source)
         ? source.naturalWidth
         : source.width,
   height:
-    source instanceof HTMLVideoElement
+    isHtmlVideoElement(source)
       ? source.videoHeight
-      : source instanceof HTMLImageElement
+      : isHtmlImageElement(source)
         ? source.naturalHeight
         : source.height,
 });
@@ -135,7 +160,7 @@ const shouldUseDirectVideoUpload = (
   sourceWidth: number,
   sourceHeight: number,
 ) =>
-  source instanceof HTMLVideoElement &&
+  isHtmlVideoElement(source) &&
   (
     sourceWidth > LARGE_VIDEO_SOURCE_THRESHOLD ||
     sourceHeight > LARGE_VIDEO_SOURCE_THRESHOLD
@@ -456,7 +481,21 @@ export class TetoricaRetroVideoPipeline {
     const textureFilter = filterState.isFilterEnabled ? gl.LINEAR : gl.NEAREST;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, textureFilter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, textureFilter);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+    if (isRawRetroVideoFrame(uploadSource)) {
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        uploadSource.width,
+        uploadSource.height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        uploadSource.data,
+      );
+    } else {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+    }
 
     if (filterState.isFilterEnabled) {
       const sourceSize = getRetroVideoSourceSize(source);
@@ -483,6 +522,10 @@ export class TetoricaRetroVideoPipeline {
     source: RetroVideoSource,
     filterState: RetroVideoFilterState,
   ): RetroVideoSource {
+    if (isRawRetroVideoFrame(source)) {
+      return source;
+    }
+
     if (!filterState.isFilterEnabled) {
       return source;
     }
@@ -562,7 +605,7 @@ export class TetoricaRetroVideoPipeline {
     sourceHeight: number | undefined,
   ) {
     const { gl } = this;
-    const canvasElement = gl.canvas instanceof HTMLCanvasElement ? gl.canvas : null;
+    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
     const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
     const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
     const {

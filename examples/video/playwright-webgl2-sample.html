@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetorica Retro Video Pipeline WebGL2 Sample</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: #020617;
+        color: #d6e4ff;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top, rgba(56, 189, 248, 0.2), transparent 40%),
+          linear-gradient(180deg, #020617 0%, #030712 100%);
+      }
+
+      main {
+        display: grid;
+        gap: 16px;
+        padding: 24px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.92);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+
+      canvas {
+        width: 640px;
+        height: 400px;
+        image-rendering: pixelated;
+        background: #000;
+      }
+
+      pre {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <canvas id="preview" width="640" height="400"></canvas>
+      <pre id="status">booting...</pre>
+    </main>
+    <script type="module">
+      import { RETRO_PRESETS } from "/src/retro-player/retro/config.ts";
+      import { TetoricaRetroVideoPipeline } from "/src/retro-player/video/TetoricaRetroVideoPipeline.ts";
+
+      const statusElement = document.getElementById("status");
+      const canvas = document.getElementById("preview");
+
+      const setStatus = (message) => {
+        statusElement.textContent = message;
+      };
+
+      const preset = RETRO_PRESETS.pc98;
+      const filterState = {
+        targetWidth: preset.width,
+        targetHeight: preset.height,
+        matchTargetAspect: true,
+        colorLevels: preset.colors,
+        ditherStrength: preset.dither,
+        paletteMode: preset.palette,
+        curvature: preset.curvature,
+        scanlineStrength: preset.scanline,
+        scanline2Strength: preset.scanline2,
+        scanlineBrightnessFade: 0.6,
+        vignetteStrength: preset.vignette,
+        glowStrength: preset.glow,
+        phosphorStrength: preset.phosphor,
+        spotMaskStrength: preset.spotMask,
+        bulbRadius: preset.bulbRadius,
+        blackFloor: preset.blackFloor,
+        phosphorDotLightBalance: preset.phosphorDotLightBalance ?? 1,
+        phosphorDotInternalScale: preset.phosphorDotInternalScale ?? false,
+        phosphorDotBrightCore: preset.phosphorDotBrightCore ?? false,
+        phosphorDotCellFill: preset.phosphorDotCellFill ?? 0,
+        phosphorDotFlatDisc: preset.phosphorDotFlatDisc ?? false,
+        phosphorDotNeighborBlend: preset.phosphorDotNeighborBlend ?? false,
+        closeUpNoiseStrength: 0,
+        monoTint: preset.monoTint,
+        neonBoost: preset.neonBoost,
+        neonSaturation: preset.neonSaturation,
+        neonDetail: preset.neonDetail,
+        isFilterEnabled: true,
+      };
+
+      const createTestFrame = (width, height) => {
+        const data = new Uint8Array(width * height * 4);
+
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const offset = (y * width + x) * 4;
+            const checker = ((Math.floor(x / 16) + Math.floor(y / 16)) % 2) === 0;
+            const border = x < 8 || y < 8 || x >= width - 8 || y >= height - 8;
+
+            data[offset + 0] = border ? 255 : checker ? 40 : 220;
+            data[offset + 1] = checker ? 180 : 60;
+            data[offset + 2] = border ? 40 : Math.round((x / Math.max(width - 1, 1)) * 255);
+            data[offset + 3] = 255;
+          }
+        }
+
+        return { width, height, data };
+      };
+
+      try {
+        const gl = canvas.getContext("webgl2");
+        if (!gl) {
+          throw new Error("webgl2 context is unavailable");
+        }
+
+        const pipeline = new TetoricaRetroVideoPipeline(gl);
+        pipeline.setFilterState(filterState);
+        pipeline.setSource(createTestFrame(canvas.width, canvas.height));
+        pipeline.render();
+
+        const pixels = pipeline.readPixels();
+        window.__RETRO_SAMPLE__ = {
+          ok: true,
+          width: canvas.width,
+          height: canvas.height,
+          firstPixels: Array.from(pixels.slice(0, 16)),
+        };
+        setStatus(JSON.stringify(window.__RETRO_SAMPLE__, null, 2));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        window.__RETRO_SAMPLE__ = {
+          ok: false,
+          error: message,
+        };
+        setStatus(message);
+        console.error(error);
+      }
+    </script>
+  </body>
+</html>
