@@ -20,27 +20,6 @@ export type TetoricaRetroAudioNodeOptions = {
   enableAudioWorklet?: boolean;
 };
 
-export type RetroAudioSettingsRefs = {
-  isMutedRef: CurrentRef<boolean>;
-  volumeRef: CurrentRef<number>;
-  playbackRateRef: CurrentRef<number>;
-  isLoopingRef: CurrentRef<boolean>;
-  isAudioFxEnabledRef: CurrentRef<boolean>;
-  lofiAmountRef: CurrentRef<number>;
-  radioToneAmountRef: CurrentRef<number>;
-  bitCrushAmountRef: CurrentRef<number>;
-  sampleRateReductionAmountRef: CurrentRef<number>;
-  bassAmountRef: CurrentRef<number>;
-  midAmountRef: CurrentRef<number>;
-  trebleAmountRef: CurrentRef<number>;
-  stereoWidthAmountRef: CurrentRef<number>;
-  smallSpeakerRoomAmountRef: CurrentRef<number>;
-  wowFlutterAmountRef: CurrentRef<number>;
-  isNoiseEnabledRef: CurrentRef<boolean>;
-  noiseLevelRef: CurrentRef<number>;
-  vinylDustAmountRef: CurrentRef<number>;
-};
-
 export type CreateRetroAudioEngineParams = {
   context?: AudioContextLike;
   createAudioContext?: () => AudioContextLike;
@@ -996,11 +975,6 @@ export class TetoricaRetroAudioNode {
     await this.dispose();
   }
 }
-
-export type CreateTetoricaRetroAudioNodeParams = Omit<
-  CreateManagedRetroAudioEngineParams,
-  "createAudioContext" | "connectOutputToDestination" | "connectOutputToRecordingDestination"
->;
 
 export function createRetroAudioEngine({
   context,
