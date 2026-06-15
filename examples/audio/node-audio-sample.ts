@@ -101,7 +101,11 @@ const oscillator = new OscillatorNode(context, {
 const gain = new GainNode(context, { gain: 0.08 });
 
 oscillator.connect(gain);
-await engine.connectSourceNode(gain);
+if (!engine.input) {
+  throw new Error("Retro audio engine input is not available.");
+}
+gain.connect(engine.input);
+await engine.connect(context.destination);
 
 const now = context.currentTime;
 gain.gain.setValueAtTime(0.0001, now);
