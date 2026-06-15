@@ -405,6 +405,14 @@ function resolveRetroAudioSettings({
   };
 }
 
+function createCurrentAccessor<T>(getValue: () => T) {
+  return {
+    get current() {
+      return getValue();
+    },
+  };
+}
+
 function createManagedRetroAudioEngine({
   instanceLabel,
   runtimeState,
@@ -412,42 +420,42 @@ function createManagedRetroAudioEngine({
   connectOutputToDestination = true,
   connectOutputToRecordingDestination = true,
 }: CreateManagedRetroAudioEngineParams) {
-  const audioContextRef: CurrentRef<AudioContext | null> = { current: null };
-  const masterGainRef: CurrentRef<GainNode | null> = { current: null };
-  const radioToneHighpassRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const radioToneLowpassRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const radioTonePresenceRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const recordingDestinationRef: CurrentRef<MediaStreamAudioDestinationNode | null> = {
-    current: null,
+  const nodes = {
+    audioContext: null as AudioContext | null,
+    masterGain: null as GainNode | null,
+    radioToneHighpass: null as BiquadFilterNode | null,
+    radioToneLowpass: null as BiquadFilterNode | null,
+    radioTonePresence: null as BiquadFilterNode | null,
+    recordingDestination: null as MediaStreamAudioDestinationNode | null,
+    lofiLowpass: null as BiquadFilterNode | null,
+    lofiHighshelf: null as BiquadFilterNode | null,
+    lofiDrive: null as WaveShaperNode | null,
+    bitcrusher: null as AudioWorkletNode | null,
+    bassEq: null as BiquadFilterNode | null,
+    midEq: null as BiquadFilterNode | null,
+    trebleEq: null as BiquadFilterNode | null,
+    stereoWidth: null as AudioWorkletNode | null,
+    roomDryGain: null as GainNode | null,
+    roomConvolver: null as ConvolverNode | null,
+    roomWetGain: null as GainNode | null,
+    wowFlutterDelay: null as DelayNode | null,
+    wowLfo: null as OscillatorNode | null,
+    wowLfoGain: null as GainNode | null,
+    flutterLfo: null as OscillatorNode | null,
+    flutterLfoGain: null as GainNode | null,
+    noiseSource: null as AudioBufferSourceNode | null,
+    noiseFilter: null as BiquadFilterNode | null,
+    noisePanner: null as StereoPannerNode | null,
+    noiseGain: null as GainNode | null,
+    noiseLfo: null as OscillatorNode | null,
+    noiseLfoGain: null as GainNode | null,
+    crackleSource: null as AudioBufferSourceNode | null,
+    crackleFilter: null as BiquadFilterNode | null,
+    vinylDustBedFilter: null as BiquadFilterNode | null,
+    vinylDustBedGain: null as GainNode | null,
+    crackleGain: null as GainNode | null,
+    sourceNode: null as AudioNode | null,
   };
-  const lofiLowpassRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const lofiHighshelfRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const lofiDriveRef: CurrentRef<WaveShaperNode | null> = { current: null };
-  const bitcrusherRef: CurrentRef<AudioWorkletNode | null> = { current: null };
-  const bassEqRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const midEqRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const trebleEqRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const stereoWidthRef: CurrentRef<AudioWorkletNode | null> = { current: null };
-  const roomDryGainRef: CurrentRef<GainNode | null> = { current: null };
-  const roomConvolverRef: CurrentRef<ConvolverNode | null> = { current: null };
-  const roomWetGainRef: CurrentRef<GainNode | null> = { current: null };
-  const wowFlutterDelayRef: CurrentRef<DelayNode | null> = { current: null };
-  const wowLfoRef: CurrentRef<OscillatorNode | null> = { current: null };
-  const wowLfoGainRef: CurrentRef<GainNode | null> = { current: null };
-  const flutterLfoRef: CurrentRef<OscillatorNode | null> = { current: null };
-  const flutterLfoGainRef: CurrentRef<GainNode | null> = { current: null };
-  const noiseSourceRef: CurrentRef<AudioBufferSourceNode | null> = { current: null };
-  const noiseFilterRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const noisePannerRef: CurrentRef<StereoPannerNode | null> = { current: null };
-  const noiseGainRef: CurrentRef<GainNode | null> = { current: null };
-  const noiseLfoRef: CurrentRef<OscillatorNode | null> = { current: null };
-  const noiseLfoGainRef: CurrentRef<GainNode | null> = { current: null };
-  const crackleSourceRef: CurrentRef<AudioBufferSourceNode | null> = { current: null };
-  const crackleFilterRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const vinylDustBedFilterRef: CurrentRef<BiquadFilterNode | null> = { current: null };
-  const vinylDustBedGainRef: CurrentRef<GainNode | null> = { current: null };
-  const crackleGainRef: CurrentRef<GainNode | null> = { current: null };
-  const sourceNodeRef: CurrentRef<AudioNode | null> = { current: null };
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -458,40 +466,42 @@ function createManagedRetroAudioEngine({
   };
 
   const resetNodeRefs = () => {
-    audioContextRef.current = null;
-    masterGainRef.current = null;
-    radioToneHighpassRef.current = null;
-    radioToneLowpassRef.current = null;
-    radioTonePresenceRef.current = null;
-    recordingDestinationRef.current = null;
-    lofiLowpassRef.current = null;
-    lofiHighshelfRef.current = null;
-    lofiDriveRef.current = null;
-    bitcrusherRef.current = null;
-    bassEqRef.current = null;
-    midEqRef.current = null;
-    trebleEqRef.current = null;
-    stereoWidthRef.current = null;
-    roomDryGainRef.current = null;
-    roomConvolverRef.current = null;
-    roomWetGainRef.current = null;
-    wowFlutterDelayRef.current = null;
-    wowLfoRef.current = null;
-    wowLfoGainRef.current = null;
-    flutterLfoRef.current = null;
-    flutterLfoGainRef.current = null;
-    noiseSourceRef.current = null;
-    noiseFilterRef.current = null;
-    noisePannerRef.current = null;
-    noiseGainRef.current = null;
-    noiseLfoRef.current = null;
-    noiseLfoGainRef.current = null;
-    crackleSourceRef.current = null;
-    crackleFilterRef.current = null;
-    vinylDustBedFilterRef.current = null;
-    vinylDustBedGainRef.current = null;
-    crackleGainRef.current = null;
-    sourceNodeRef.current = null;
+    Object.assign(nodes, {
+      audioContext: null,
+      masterGain: null,
+      radioToneHighpass: null,
+      radioToneLowpass: null,
+      radioTonePresence: null,
+      recordingDestination: null,
+      lofiLowpass: null,
+      lofiHighshelf: null,
+      lofiDrive: null,
+      bitcrusher: null,
+      bassEq: null,
+      midEq: null,
+      trebleEq: null,
+      stereoWidth: null,
+      roomDryGain: null,
+      roomConvolver: null,
+      roomWetGain: null,
+      wowFlutterDelay: null,
+      wowLfo: null,
+      wowLfoGain: null,
+      flutterLfo: null,
+      flutterLfoGain: null,
+      noiseSource: null,
+      noiseFilter: null,
+      noisePanner: null,
+      noiseGain: null,
+      noiseLfo: null,
+      noiseLfoGain: null,
+      crackleSource: null,
+      crackleFilter: null,
+      vinylDustBedFilter: null,
+      vinylDustBedGain: null,
+      crackleGain: null,
+      sourceNode: null,
+    });
   };
 
   const resolveAudioContextCtor = (): AudioContextCtor | null => {
@@ -510,37 +520,37 @@ function createManagedRetroAudioEngine({
   };
 
   const getInputNode = () => {
-    return wowFlutterDelayRef.current ?? lofiLowpassRef.current;
+    return nodes.wowFlutterDelay ?? nodes.lofiLowpass;
   };
 
   const getOutputNode = () => {
-    return masterGainRef.current;
+    return nodes.masterGain;
   };
 
   const updateAudioNodes = () => {
-    const masterGain = masterGainRef.current;
-    const radioToneHighpass = radioToneHighpassRef.current;
-    const radioToneLowpass = radioToneLowpassRef.current;
-    const radioTonePresence = radioTonePresenceRef.current;
-    const lowpass = lofiLowpassRef.current;
-    const highshelf = lofiHighshelfRef.current;
-    const drive = lofiDriveRef.current;
-    const bitcrusher = bitcrusherRef.current;
-    const bassEq = bassEqRef.current;
-    const midEq = midEqRef.current;
-    const trebleEq = trebleEqRef.current;
-    const stereoWidth = stereoWidthRef.current;
-    const roomDryGain = roomDryGainRef.current;
-    const roomWetGain = roomWetGainRef.current;
-    const wowFlutterDelay = wowFlutterDelayRef.current;
-    const wowLfo = wowLfoRef.current;
-    const wowLfoGain = wowLfoGainRef.current;
-    const flutterLfo = flutterLfoRef.current;
-    const flutterLfoGain = flutterLfoGainRef.current;
-    const noiseGainNode = noiseGainRef.current;
-    const crackleGainNode = crackleGainRef.current;
-    const vinylDustBedFilter = vinylDustBedFilterRef.current;
-    const vinylDustBedGain = vinylDustBedGainRef.current;
+    const masterGain = nodes.masterGain;
+    const radioToneHighpass = nodes.radioToneHighpass;
+    const radioToneLowpass = nodes.radioToneLowpass;
+    const radioTonePresence = nodes.radioTonePresence;
+    const lowpass = nodes.lofiLowpass;
+    const highshelf = nodes.lofiHighshelf;
+    const drive = nodes.lofiDrive;
+    const bitcrusher = nodes.bitcrusher;
+    const bassEq = nodes.bassEq;
+    const midEq = nodes.midEq;
+    const trebleEq = nodes.trebleEq;
+    const stereoWidth = nodes.stereoWidth;
+    const roomDryGain = nodes.roomDryGain;
+    const roomWetGain = nodes.roomWetGain;
+    const wowFlutterDelay = nodes.wowFlutterDelay;
+    const wowLfo = nodes.wowLfo;
+    const wowLfoGain = nodes.wowLfoGain;
+    const flutterLfo = nodes.flutterLfo;
+    const flutterLfoGain = nodes.flutterLfoGain;
+    const noiseGainNode = nodes.noiseGain;
+    const crackleGainNode = nodes.crackleGain;
+    const vinylDustBedFilter = nodes.vinylDustBedFilter;
+    const vinylDustBedGain = nodes.vinylDustBedGain;
     const {
       settings,
       isPlaying,
@@ -679,11 +689,11 @@ function createManagedRetroAudioEngine({
     const AudioContextCtor = resolveAudioContextCtor();
     if (!AudioContextCtor) return null;
 
-    if (audioContextRef.current?.state === "closed") {
+    if (nodes.audioContext?.state === "closed") {
       resetNodeRefs();
     }
 
-    if (!audioContextRef.current) {
+    if (!nodes.audioContext) {
       const context = createAudioContext ? createAudioContext() : new AudioContextCtor();
       const masterGain = context.createGain();
       let recordingDestination: MediaStreamAudioDestinationNode | null = null;
@@ -856,85 +866,89 @@ function createManagedRetroAudioEngine({
       wowLfo.start();
       flutterLfo.start();
 
-      audioContextRef.current = context;
-      masterGainRef.current = masterGain;
-      radioToneHighpassRef.current = radioToneHighpass;
-      radioToneLowpassRef.current = radioToneLowpass;
-      radioTonePresenceRef.current = radioTonePresence;
-      recordingDestinationRef.current = recordingDestination;
-      lofiLowpassRef.current = lowpass;
-      lofiHighshelfRef.current = highshelf;
-      lofiDriveRef.current = drive;
-      bitcrusherRef.current = bitcrusher;
-      bassEqRef.current = bassEq;
-      midEqRef.current = midEq;
-      trebleEqRef.current = trebleEq;
-      stereoWidthRef.current = stereoWidth;
-      roomDryGainRef.current = roomDryGain;
-      roomConvolverRef.current = roomConvolver;
-      roomWetGainRef.current = roomWetGain;
-      wowFlutterDelayRef.current = wowFlutterDelay;
-      wowLfoRef.current = wowLfo;
-      wowLfoGainRef.current = wowLfoGain;
-      flutterLfoRef.current = flutterLfo;
-      flutterLfoGainRef.current = flutterLfoGain;
-      noiseSourceRef.current = noiseSource;
-      noiseFilterRef.current = noisePresence;
-      noisePannerRef.current = noisePanner;
-      noiseGainRef.current = noiseGain;
-      noiseLfoRef.current = noiseLfo;
-      noiseLfoGainRef.current = noiseLfoGain;
-      crackleSourceRef.current = crackleSource;
-      crackleFilterRef.current = crackleFilter;
-      vinylDustBedFilterRef.current = vinylDustBedFilter;
-      vinylDustBedGainRef.current = vinylDustBedGain;
-      crackleGainRef.current = crackleGain;
+      Object.assign(nodes, {
+        audioContext: context,
+        masterGain,
+        radioToneHighpass,
+        radioToneLowpass,
+        radioTonePresence,
+        recordingDestination,
+        lofiLowpass: lowpass,
+        lofiHighshelf: highshelf,
+        lofiDrive: drive,
+        bitcrusher,
+        bassEq,
+        midEq,
+        trebleEq,
+        stereoWidth,
+        roomDryGain,
+        roomConvolver,
+        roomWetGain,
+        wowFlutterDelay,
+        wowLfo,
+        wowLfoGain,
+        flutterLfo,
+        flutterLfoGain,
+        noiseSource,
+        noiseFilter: noisePresence,
+        noisePanner,
+        noiseGain,
+        noiseLfo,
+        noiseLfoGain,
+        crackleSource,
+        crackleFilter,
+        vinylDustBedFilter,
+        vinylDustBedGain,
+        crackleGain,
+      });
     }
 
-    if (audioContextRef.current.state === "suspended") {
+    const activeContext = nodes.audioContext;
+
+    if (activeContext?.state === "suspended") {
       try {
-        await audioContextRef.current.resume();
+        await activeContext.resume();
       } catch {
         // Resume can be blocked until the next user gesture.
       }
     }
 
     updateAudioNodes();
-    return audioContextRef.current;
+    return activeContext;
   };
 
   const disposeAudioEngine = async () => {
     try {
-      noiseSourceRef.current?.stop();
+      nodes.noiseSource?.stop();
     } catch {
       // already stopped
     }
 
     try {
-      noiseLfoRef.current?.stop();
+      nodes.noiseLfo?.stop();
     } catch {
       // already stopped
     }
 
     try {
-      crackleSourceRef.current?.stop();
+      nodes.crackleSource?.stop();
     } catch {
       // already stopped
     }
 
     try {
-      wowLfoRef.current?.stop();
+      nodes.wowLfo?.stop();
     } catch {
       // already stopped
     }
 
     try {
-      flutterLfoRef.current?.stop();
+      nodes.flutterLfo?.stop();
     } catch {
       // already stopped
     }
 
-    const context = audioContextRef.current;
+    const context = nodes.audioContext;
     resetNodeRefs();
 
     if (!context || context.state === "closed") {
@@ -955,17 +969,17 @@ function createManagedRetroAudioEngine({
       return;
     }
 
-    if (sourceNodeRef.current) {
+    if (nodes.sourceNode) {
       try {
-        sourceNodeRef.current.disconnect();
+        nodes.sourceNode.disconnect();
       } catch {
         // ignore disconnect races
       }
-      sourceNodeRef.current = null;
+      nodes.sourceNode = null;
     }
 
     sourceNode.connect(getInputNode()!);
-    sourceNodeRef.current = sourceNode;
+    nodes.sourceNode = sourceNode;
     updateAudioNodes();
     debugAudio("connectSourceNode:connected", {
       audioContextState: context.state,
@@ -1013,39 +1027,39 @@ function createManagedRetroAudioEngine({
   };
 
   return {
-    audioContextRef,
-    masterGainRef,
-    radioToneHighpassRef,
-    radioToneLowpassRef,
-    radioTonePresenceRef,
-    recordingDestinationRef,
-    lofiLowpassRef,
-    lofiHighshelfRef,
-    lofiDriveRef,
-    bitcrusherRef,
-    bassEqRef,
-    midEqRef,
-    trebleEqRef,
-    stereoWidthRef,
-    roomDryGainRef,
-    roomConvolverRef,
-    roomWetGainRef,
-    wowFlutterDelayRef,
-    wowLfoRef,
-    wowLfoGainRef,
-    flutterLfoRef,
-    flutterLfoGainRef,
-    noiseSourceRef,
-    noiseFilterRef,
-    noisePannerRef,
-    noiseGainRef,
-    noiseLfoRef,
-    noiseLfoGainRef,
-    crackleSourceRef,
-    crackleFilterRef,
-    vinylDustBedFilterRef,
-    vinylDustBedGainRef,
-    crackleGainRef,
+    audioContextRef: createCurrentAccessor(() => nodes.audioContext),
+    masterGainRef: createCurrentAccessor(() => nodes.masterGain),
+    radioToneHighpassRef: createCurrentAccessor(() => nodes.radioToneHighpass),
+    radioToneLowpassRef: createCurrentAccessor(() => nodes.radioToneLowpass),
+    radioTonePresenceRef: createCurrentAccessor(() => nodes.radioTonePresence),
+    recordingDestinationRef: createCurrentAccessor(() => nodes.recordingDestination),
+    lofiLowpassRef: createCurrentAccessor(() => nodes.lofiLowpass),
+    lofiHighshelfRef: createCurrentAccessor(() => nodes.lofiHighshelf),
+    lofiDriveRef: createCurrentAccessor(() => nodes.lofiDrive),
+    bitcrusherRef: createCurrentAccessor(() => nodes.bitcrusher),
+    bassEqRef: createCurrentAccessor(() => nodes.bassEq),
+    midEqRef: createCurrentAccessor(() => nodes.midEq),
+    trebleEqRef: createCurrentAccessor(() => nodes.trebleEq),
+    stereoWidthRef: createCurrentAccessor(() => nodes.stereoWidth),
+    roomDryGainRef: createCurrentAccessor(() => nodes.roomDryGain),
+    roomConvolverRef: createCurrentAccessor(() => nodes.roomConvolver),
+    roomWetGainRef: createCurrentAccessor(() => nodes.roomWetGain),
+    wowFlutterDelayRef: createCurrentAccessor(() => nodes.wowFlutterDelay),
+    wowLfoRef: createCurrentAccessor(() => nodes.wowLfo),
+    wowLfoGainRef: createCurrentAccessor(() => nodes.wowLfoGain),
+    flutterLfoRef: createCurrentAccessor(() => nodes.flutterLfo),
+    flutterLfoGainRef: createCurrentAccessor(() => nodes.flutterLfoGain),
+    noiseSourceRef: createCurrentAccessor(() => nodes.noiseSource),
+    noiseFilterRef: createCurrentAccessor(() => nodes.noiseFilter),
+    noisePannerRef: createCurrentAccessor(() => nodes.noisePanner),
+    noiseGainRef: createCurrentAccessor(() => nodes.noiseGain),
+    noiseLfoRef: createCurrentAccessor(() => nodes.noiseLfo),
+    noiseLfoGainRef: createCurrentAccessor(() => nodes.noiseLfoGain),
+    crackleSourceRef: createCurrentAccessor(() => nodes.crackleSource),
+    crackleFilterRef: createCurrentAccessor(() => nodes.crackleFilter),
+    vinylDustBedFilterRef: createCurrentAccessor(() => nodes.vinylDustBedFilter),
+    vinylDustBedGainRef: createCurrentAccessor(() => nodes.vinylDustBedGain),
+    crackleGainRef: createCurrentAccessor(() => nodes.crackleGain),
     get input() {
       return getInputNode();
     },
