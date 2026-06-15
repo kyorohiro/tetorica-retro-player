@@ -4,7 +4,7 @@ import {
   OscillatorNode,
 } from "node-web-audio-api";
 import {
-  createRetroAudioEngine,
+  createTetoricaRetroAudioNode,
   DEFAULT_AUDIO_SETTINGS,
   type RetroAudioSettingsRefs,
 } from "../../src/retro-player/audio/createRetroAudioEngine.ts";
@@ -70,26 +70,23 @@ const nodeProcess = (globalThis as typeof globalThis & {
 }).process;
 const useSilentSink = nodeProcess?.env?.NODE_AUDIO_SINK === "none";
 
-const engine = createRetroAudioEngine({
+const context = useSilentSink
+  ? new (AudioContext as NodeAudioContextCtor)({
+      sinkId: {
+        type: "none",
+      },
+    })
+  : new AudioContext();
+
+const engine = createTetoricaRetroAudioNode(context, {
   instanceLabel: "node-example",
   previewKindRef,
   mediaRef,
   isPlayingRef,
   settingsRefs,
-  createAudioContext: () =>
-    useSilentSink
-      ? new (AudioContext as NodeAudioContextCtor)({
-          sinkId: {
-            type: "none",
-          },
-        })
-      : new AudioContext(),
 });
 
-const context = await engine.ensureAudioContext();
-if (!context) {
-  throw new Error("AudioContext is not available in this environment.");
-}
+await engine.ensureAudioContext();
 
 console.log(
   "Running node audio sample with Lo-Fi preset settings.",
