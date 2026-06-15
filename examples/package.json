@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "audio:oscillator:test": "node --experimental-strip-types ./audio/main_oscillator_test.ts",
     "audio:node": "node --experimental-strip-types ./audio/node-audio-sample.ts",
     "audio:node:silent": "NODE_AUDIO_SINK=none node --experimental-strip-types ./audio/node-audio-sample.ts"
   },
