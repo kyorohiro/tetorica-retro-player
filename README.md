@@ -46,11 +46,19 @@ https://kyorohiro.itch.io/tetorica-retro-player
 The reusable player core lives under `src/retro-player/`.
 
 - `src/retro-player/components/RetroPlayer.tsx`: ready-to-embed retro preview player
+- `src/retro-player/audio/TetoricaRetroAudioNode.ts`: reusable retro audio effect chain with a plain TypeScript API
+- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`: reusable WebGL2 video shader pipeline separated from React
 - `src/retro-player/retro/config.ts`: presets and shared filter option definitions
 - `src/retro-player/retro/filterShader.ts`: shader source of truth
 - `src/retro-player/index.ts`: portable entrypoint for imports from other apps
 
 The main app shell stays outside that folder on purpose. Right now the outer app still owns file picking, dialogs, i18n preference storage, and page-level navigation.
+
+The recent split makes the lower-level media processing easier to reuse outside the current UI:
+
+- `TetoricaRetroAudioNode` holds the retro audio graph as a plain class, so host apps can connect their own `AudioContext`, source nodes, and destinations.
+- `TetoricaRetroVideoPipeline` holds shader compile, texture upload, uniform updates, and frame rendering as a plain class, while React hooks stay focused on browser media orchestration and layout.
+- The React hooks such as `useRetroAudioEngine`, `useRetroPixiStage`, and `useRetroPreviewMedia` now act as adapters around those reusable cores instead of owning all of the processing logic directly.
 
 If you want to reuse the player in another app, start from:
 
@@ -59,6 +67,13 @@ import { RetroPlayer } from "./src/retro-player";
 ```
 
 If the host app already has its own confirm modal, pass it into `confirmDialog` so the player does not need the current app's dialog context.
+
+If you want to reuse only the processing layers instead of the full player UI, look at:
+
+```ts
+import { createRetroAudioEngine } from "./src/retro-player/audio/TetoricaRetroAudioNode";
+import { TetoricaRetroVideoPipeline } from "./src/retro-player/video/TetoricaRetroVideoPipeline";
+```
 
 ## Local Development
 
