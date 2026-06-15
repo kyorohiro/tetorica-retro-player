@@ -19,6 +19,8 @@ export type RetroVideoFilterState = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  smoothStrength: number;
+  toonSteps: number;
   edgeBoost: number;
   phosphorStrength: number;
   spotMaskStrength: number;
@@ -62,6 +64,8 @@ type RendererUniformLocations = {
   uScanlineBrightnessFade: WebGLUniformLocation | null;
   uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
+  uSmoothStrength: WebGLUniformLocation | null;
+  uToonSteps: WebGLUniformLocation | null;
   uEdgeBoost: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
@@ -411,6 +415,8 @@ export class TetoricaRetroVideoPipeline {
       uScanlineBrightnessFade: gl.getUniformLocation(this.filterProgram, "uScanlineBrightnessFade"),
       uVignetteStrength: gl.getUniformLocation(this.filterProgram, "uVignetteStrength"),
       uGlowStrength: gl.getUniformLocation(this.filterProgram, "uGlowStrength"),
+      uSmoothStrength: gl.getUniformLocation(this.filterProgram, "uSmoothStrength"),
+      uToonSteps: gl.getUniformLocation(this.filterProgram, "uToonSteps"),
       uEdgeBoost: gl.getUniformLocation(this.filterProgram, "uEdgeBoost"),
       uPhosphorStrength: gl.getUniformLocation(this.filterProgram, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(this.filterProgram, "uSpotMaskStrength"),
@@ -651,6 +657,8 @@ export class TetoricaRetroVideoPipeline {
     );
     gl.uniform1f(this.uniformLocations.uVignetteStrength, filterState.vignetteStrength);
     gl.uniform1f(this.uniformLocations.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.uniformLocations.uSmoothStrength, filterState.smoothStrength);
+    gl.uniform1f(this.uniformLocations.uToonSteps, filterState.toonSteps);
     gl.uniform1f(this.uniformLocations.uEdgeBoost, filterState.edgeBoost);
     gl.uniform1f(this.uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(this.uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);

@@ -44,6 +44,8 @@ type RetroFilterPanelProps = {
   curvature: number;
   ditherStrength: number;
   glowStrength: number;
+  smoothStrength: number;
+  toonSteps: number;
   edgeBoost: number;
   isFilterEnabled: boolean;
   monoTint: MonoTintMode;
@@ -77,6 +79,8 @@ type RetroFilterPanelProps = {
   onSetCurvature: (value: number) => void;
   onSetDitherStrength: (value: number) => void;
   onSetGlowStrength: (value: number) => void;
+  onSetSmoothStrength: (value: number) => void;
+  onSetToonSteps: (value: number) => void;
   onSetEdgeBoost: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
@@ -109,6 +113,8 @@ export function RetroFilterPanel({
   curvature,
   ditherStrength,
   glowStrength,
+  smoothStrength,
+  toonSteps,
   edgeBoost,
   isFilterEnabled,
   monoTint,
@@ -142,6 +148,8 @@ export function RetroFilterPanel({
   onSetCurvature,
   onSetDitherStrength,
   onSetGlowStrength,
+  onSetSmoothStrength,
+  onSetToonSteps,
   onSetEdgeBoost,
   onSetMonoTint,
   onSetPaletteMode,
@@ -185,6 +193,10 @@ export function RetroFilterPanel({
             "画面の外周を暗くします。値を上げるほど中央に視線が集まり、レトロな額縁感も強くなります。",
           glow:
             "明るい部分のまわりに柔らかな光のにじみを足します。値を上げるほどハイライトが広がって熱っぽく見えます。",
+          smooth:
+            "近い色同士を少しだけならして、細かな質感を減らします。アニメ調では面がまとまりやすくなりますが、上げすぎると眠い絵になります。",
+          toonSteps:
+            "明るさの段階数を減らして、セル画みたいな影の切れ目を作ります。0 で無効、少ないほどアニメ寄りになります。",
           edgeBoost:
             "輪郭の変化を拾って、境界を少し暗く締めます。明るい場所では効きを少し弱めています。上げるほど形が読みやすくなりますが、ノイズや圧縮のザラつきも見えやすくなります。",
           phosphor:
@@ -218,6 +230,10 @@ export function RetroFilterPanel({
             "Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.",
           glow:
             "Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look.",
+          smooth:
+            "Gently blends nearby colors to knock back fine texture. This helps toon-style presets form cleaner color regions, but too much will make the image feel sleepy.",
+          toonSteps:
+            "Reduces the number of brightness bands to create cel-style shading breaks. Use 0 to disable it; fewer steps look more toon-like.",
           edgeBoost:
             "Detects local contrast changes and darkens contour boundaries slightly. The effect eases off in very bright areas. Higher values make shapes easier to read, but can also bring out noise and compression grit.",
           phosphor:
@@ -624,6 +640,48 @@ export function RetroFilterPanel({
             value={glowStrength}
             onChange={(ev) => {
               onSetGlowStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Smooth: ${smoothStrength.toFixed(2)}`}
+              text={helpText.smooth}
+              helpSuffix={helpText.helpSuffix}
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={smoothStrength}
+            onChange={(ev) => {
+              onSetSmoothStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Toon steps: ${toonSteps.toFixed(0)}`}
+              text={helpText.toonSteps}
+              helpSuffix={helpText.helpSuffix}
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="8"
+            step="1"
+            value={toonSteps}
+            onChange={(ev) => {
+              onSetToonSteps(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />
