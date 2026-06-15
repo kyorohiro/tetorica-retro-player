@@ -1,5 +1,8 @@
 # Tetorica Retro Player
 
+Japanese README: [README.ja.md](/Users/kyorohiro/development8/tetorica-retro-player/README.ja.md)  
+Release notes and shipping commands: [RELEASE_MEMO.md](/Users/kyorohiro/development8/tetorica-retro-player/RELEASE_MEMO.md)
+
 Retro-style preview player for images, videos, and live screen capture.
 
 The app uses a Pixi.js shader pipeline to push local media through palette reduction, monochrome tints, dithering, scanlines, and CRT-style finishing. The same filter flow works for still images, movie files, and captured windows or screens.
@@ -145,53 +148,3 @@ When updating the public demo, rebuild the app and copy the latest build output 
 This project is licensed under the MIT License.
 
 Third-party libraries and bundled dependencies remain under their respective licenses.
-
-
-## Release Memo
-
-Update versions before release:
-
-```sh
-npm run version:set -- 0.22.5
-```
-
-```
-sh deploy_mac.sh
-% ~/bin/butler login
-% ~/bin/butler push src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.22.5_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.22.5
-
-% ~/bin/butler push src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.22.5_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.22.5
-
-% ~/bin/butler push "tetorica-retro-player_0.22.5_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.22.5
-
-% ~/bin/butler push "tetorica-retro-player_0.22.5_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.22.5
-
-% ~/bin/butler push "tetorica-retro-player_0.22.5_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.22.5
-
-~/bin/butler push \
-  "app-release-signed_0.22.5.apk" \
-  kyorohiro/tetorica-retro-player:android \
-  --userversion 0.22.5
-
-```
-
-
-```
-npm run build
-cd dist
-zip -r ../web-build_0.22.5_gh.zip .
-```
-
-```
-npm run tauri android build -- --apk
-
-
-~/Library/Android/sdk/build-tools/35.0.0/apksigner sign \
-  --ks my-release-key.jks \
-  --out app-release-signed_0.22.5.apk \
-  src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
-```
-
-```
-npm run version:set -- 0.22.5
-```
