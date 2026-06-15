@@ -7,7 +7,7 @@ import {
   createRetroAudioEngine,
   type CurrentRef,
   type RetroAudioPreviewKind,
-} from "../audio/createRetroAudioEngine";
+} from "../audio/TetoricaRetroAudioNode";
 import {
   DEFAULT_AUDIO_SETTINGS,
   type RetroAudioSettings,
