@@ -5,7 +5,7 @@ import {
 } from "node-web-audio-api";
 import {
   createTetoricaRetroAudioNode,
-} from "../../src/retro-player/audio/createRetroAudioEngine.ts";
+} from "../../src/retro-player/audio/TetoricaRetroAudioNode.ts";
 
 Object.assign(globalThis, {
   AudioContext,
