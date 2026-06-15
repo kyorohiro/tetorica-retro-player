@@ -49,6 +49,7 @@ uniform float uScanline2Strength;
 uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uGlowStrength;
+uniform float uEdgeBoost;
 uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
@@ -780,6 +781,63 @@ vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
   return applyPalette(sampleColor.rgb, uColorLevels, uPaletteMode, uMonoTint, sampleCell);
 }
 
+float sampleProcessedLuminance(vec2 sampleUv, vec2 sampleCell, vec2 texel)
+{
+  return dot(
+    sampleProcessedSourceColor(sampleUv, sampleCell, texel),
+    vec3(0.299, 0.587, 0.114)
+  );
+}
+
+float computeEdgeBoost(vec2 uv, vec2 texel, vec2 cell)
+{
+  float tl = sampleProcessedLuminance(
+    clamp(uv + vec2(-texel.x, -texel.y), vec2(0.0), vec2(1.0)),
+    cell + vec2(-1.0, -1.0),
+    texel
+  );
+  float tc = sampleProcessedLuminance(
+    clamp(uv + vec2(0.0, -texel.y), vec2(0.0), vec2(1.0)),
+    cell + vec2(0.0, -1.0),
+    texel
+  );
+  float tr = sampleProcessedLuminance(
+    clamp(uv + vec2(texel.x, -texel.y), vec2(0.0), vec2(1.0)),
+    cell + vec2(1.0, -1.0),
+    texel
+  );
+  float ml = sampleProcessedLuminance(
+    clamp(uv + vec2(-texel.x, 0.0), vec2(0.0), vec2(1.0)),
+    cell + vec2(-1.0, 0.0),
+    texel
+  );
+  float mr = sampleProcessedLuminance(
+    clamp(uv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0)),
+    cell + vec2(1.0, 0.0),
+    texel
+  );
+  float bl = sampleProcessedLuminance(
+    clamp(uv + vec2(-texel.x, texel.y), vec2(0.0), vec2(1.0)),
+    cell + vec2(-1.0, 1.0),
+    texel
+  );
+  float bc = sampleProcessedLuminance(
+    clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0)),
+    cell + vec2(0.0, 1.0),
+    texel
+  );
+  float br = sampleProcessedLuminance(
+    clamp(uv + vec2(texel.x, texel.y), vec2(0.0), vec2(1.0)),
+    cell + vec2(1.0, 1.0),
+    texel
+  );
+
+  float gx = -tl + tr - 2.0 * ml + 2.0 * mr - bl + br;
+  float gy = -tl - 2.0 * tc - tr + bl + 2.0 * bc + br;
+  float gradient = length(vec2(gx, gy));
+  return clamp(pow(clamp(gradient * 0.85, 0.0, 1.0), 0.9), 0.0, 1.0);
+}
+
 void main(void)
 {
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
@@ -843,6 +901,21 @@ void main(void)
     }
   }
   color.rgb = clamp(color.rgb, 0.0, 1.0);
+
+  float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
+  if (edgeBoost > 0.001) {
+    float edge = computeEdgeBoost(pixelatedUv, texel, cell);
+    float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    float darkPreference = 1.0 - smoothstep(0.45, 0.92, luminance);
+    float edgeMix = smoothstep(0.04, 0.75, edge) * min(edgeBoost, 1.0) * (0.55 + darkPreference * 0.45);
+    float edgeShade = edge * (0.12 + edgeBoost * 0.34) * (0.65 + darkPreference * 0.55);
+    vec3 edgeColor = color.rgb * (1.0 - edgeShade);
+    color.rgb = clamp(
+      mix(color.rgb, edgeColor, edgeMix),
+      0.0,
+      1.0
+    );
+  }
 
   if (uPhosphorDotMode > 0.5) {
     vec2 sampleTargetSize = max(uSampleTargetSize, vec2(1.0));

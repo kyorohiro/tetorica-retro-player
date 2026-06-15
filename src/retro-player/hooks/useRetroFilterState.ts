@@ -26,6 +26,7 @@ export type RetroFilterInitialState = Partial<{
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  edgeBoost: number;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;
@@ -67,6 +68,7 @@ const doesPresetMatchState = (
     preset.scanline2 === state.scanline2Strength &&
     preset.vignette === state.vignetteStrength &&
     preset.glow === state.glowStrength &&
+    (preset.edgeBoost ?? 0) === state.edgeBoost &&
     preset.phosphor === state.phosphorStrength &&
     preset.spotMask === state.spotMaskStrength &&
     preset.bulbRadius === state.bulbRadius &&
@@ -140,6 +142,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
+    edgeBoost: initialState.edgeBoost ?? (DEFAULT_PRESET.edgeBoost ?? 0),
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
@@ -251,6 +254,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, glowStrength }));
   };
 
+  const setEdgeBoost = (edgeBoost: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, edgeBoost }));
+  };
+
   const setPhosphorStrength = (phosphorStrength: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, phosphorStrength }));
@@ -346,6 +354,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       scanline2Strength: presetSettings.scanline2,
       vignetteStrength: presetSettings.vignette,
       glowStrength: presetSettings.glow,
+      edgeBoost: presetSettings.edgeBoost ?? 0,
       phosphorStrength: presetSettings.phosphor,
       spotMaskStrength: presetSettings.spotMask,
       bulbRadius: presetSettings.bulbRadius,
@@ -393,6 +402,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineBrightnessFade,
     setVignetteStrength,
     setGlowStrength,
+    setEdgeBoost,
     setPhosphorStrength,
     setSpotMaskStrength,
     setBulbRadius,

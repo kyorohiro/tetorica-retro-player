@@ -106,6 +106,8 @@ export function usePixiVideoPlayer(
   } = stage;
   const initPixiRef = useRef(initPixi);
   const destroyPixiRef = useRef(destroyPixi);
+  const cleanupPreviewRef = useRef<() => void>(() => {});
+  const disposeAudioEngineRef = useRef<() => Promise<void> | void>(() => {});
 
   const audio = useRetroAudioEngine({
     instanceLabel: instanceLabelRef.current,
@@ -289,6 +291,14 @@ export function usePixiVideoPlayer(
     stopDisplayCapture,
     syncVideoState,
   } = media;
+
+  useEffect(() => {
+    cleanupPreviewRef.current = cleanupPreview;
+  }, [cleanupPreview]);
+
+  useEffect(() => {
+    disposeAudioEngineRef.current = disposeAudioEngine;
+  }, [disposeAudioEngine]);
 
   const togglePlayback = async () => {
     if (!mediaRef.current) return;
@@ -591,11 +601,16 @@ export function usePixiVideoPlayer(
       revokePendingRecording();
       stopRecording(false);
       cancelled = true;
-      cleanupPreview();
-      void disposeAudioEngine();
       destroyPixiRef.current();
     };
   }, [renderResolutionScale]);
+
+  useEffect(() => {
+    return () => {
+      cleanupPreviewRef.current();
+      void disposeAudioEngineRef.current();
+    };
+  }, []);
 
   useEffect(() => {
     const handlePageHide = () => {

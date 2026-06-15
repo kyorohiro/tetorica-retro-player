@@ -445,7 +445,6 @@ export function useRetroPixiStage({
 
     appRef.current = null;
     filterRef.current = null;
-    previewElementRef.current = null;
     updateViewportRect(null);
     setIsRendererReady(false);
   }, [stopTicker, updateViewportRect]);
