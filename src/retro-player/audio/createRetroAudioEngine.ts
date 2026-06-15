@@ -236,10 +236,11 @@ export type CreateRetroAudioEngineParams = {
 
 type CreateManagedRetroAudioEngineParams = {
   instanceLabel: string;
-  previewKindRef: CurrentRef<RetroAudioPreviewKind>;
-  mediaRef: CurrentRef<HTMLMediaElement | null>;
-  isPlayingRef: CurrentRef<boolean>;
-  settingsRefs: RetroAudioSettingsRefs;
+  runtimeState: {
+    settings: RetroAudioSettings;
+    isPlaying: boolean;
+    isOutputEnabled: boolean;
+  };
   createAudioContext?: () => AudioContextLike;
   connectOutputToDestination?: boolean;
   connectOutputToRecordingDestination?: boolean;
@@ -390,57 +391,6 @@ function isAudioParamLike(value: AudioNode | AudioParam): value is AudioParam {
   );
 }
 
-function createMutableRef<T>(current: T): CurrentRef<T> {
-  return { current };
-}
-
-function createSettingsRefs(settings: RetroAudioSettings): RetroAudioSettingsRefs {
-  return {
-    isMutedRef: createMutableRef(settings.isMuted),
-    volumeRef: createMutableRef(settings.volume),
-    playbackRateRef: createMutableRef(settings.playbackRate),
-    isLoopingRef: createMutableRef(settings.isLooping),
-    isAudioFxEnabledRef: createMutableRef(settings.isAudioFxEnabled),
-    lofiAmountRef: createMutableRef(settings.lofiAmount),
-    radioToneAmountRef: createMutableRef(settings.radioToneAmount),
-    bitCrushAmountRef: createMutableRef(settings.bitCrushAmount),
-    sampleRateReductionAmountRef: createMutableRef(settings.sampleRateReductionAmount),
-    bassAmountRef: createMutableRef(settings.bassAmount),
-    midAmountRef: createMutableRef(settings.midAmount),
-    trebleAmountRef: createMutableRef(settings.trebleAmount),
-    stereoWidthAmountRef: createMutableRef(settings.stereoWidthAmount),
-    smallSpeakerRoomAmountRef: createMutableRef(settings.smallSpeakerRoomAmount),
-    wowFlutterAmountRef: createMutableRef(settings.wowFlutterAmount),
-    isNoiseEnabledRef: createMutableRef(settings.isNoiseEnabled),
-    noiseLevelRef: createMutableRef(settings.noiseLevel),
-    vinylDustAmountRef: createMutableRef(settings.vinylDustAmount),
-  };
-}
-
-function updateSettingsRefs(
-  settingsRefs: RetroAudioSettingsRefs,
-  settings: RetroAudioSettings,
-) {
-  settingsRefs.isMutedRef.current = settings.isMuted;
-  settingsRefs.volumeRef.current = settings.volume;
-  settingsRefs.playbackRateRef.current = settings.playbackRate;
-  settingsRefs.isLoopingRef.current = settings.isLooping;
-  settingsRefs.isAudioFxEnabledRef.current = settings.isAudioFxEnabled;
-  settingsRefs.lofiAmountRef.current = settings.lofiAmount;
-  settingsRefs.radioToneAmountRef.current = settings.radioToneAmount;
-  settingsRefs.bitCrushAmountRef.current = settings.bitCrushAmount;
-  settingsRefs.sampleRateReductionAmountRef.current = settings.sampleRateReductionAmount;
-  settingsRefs.bassAmountRef.current = settings.bassAmount;
-  settingsRefs.midAmountRef.current = settings.midAmount;
-  settingsRefs.trebleAmountRef.current = settings.trebleAmount;
-  settingsRefs.stereoWidthAmountRef.current = settings.stereoWidthAmount;
-  settingsRefs.smallSpeakerRoomAmountRef.current = settings.smallSpeakerRoomAmount;
-  settingsRefs.wowFlutterAmountRef.current = settings.wowFlutterAmount;
-  settingsRefs.isNoiseEnabledRef.current = settings.isNoiseEnabled;
-  settingsRefs.noiseLevelRef.current = settings.noiseLevel;
-  settingsRefs.vinylDustAmountRef.current = settings.vinylDustAmount;
-}
-
 function resolveRetroAudioSettings({
   preset,
   params,
@@ -457,16 +407,12 @@ function resolveRetroAudioSettings({
 
 function createManagedRetroAudioEngine({
   instanceLabel,
-  previewKindRef,
-  mediaRef,
-  isPlayingRef,
-  settingsRefs,
+  runtimeState,
   createAudioContext,
   connectOutputToDestination = true,
   connectOutputToRecordingDestination = true,
 }: CreateManagedRetroAudioEngineParams) {
   const audioContextRef: CurrentRef<AudioContext | null> = { current: null };
-  const mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | null> = { current: null };
   const masterGainRef: CurrentRef<GainNode | null> = { current: null };
   const radioToneHighpassRef: CurrentRef<BiquadFilterNode | null> = { current: null };
   const radioToneLowpassRef: CurrentRef<BiquadFilterNode | null> = { current: null };
@@ -513,7 +459,6 @@ function createManagedRetroAudioEngine({
 
   const resetNodeRefs = () => {
     audioContextRef.current = null;
-    mediaSourceRef.current = null;
     masterGainRef.current = null;
     radioToneHighpassRef.current = null;
     radioToneLowpassRef.current = null;
@@ -596,38 +541,32 @@ function createManagedRetroAudioEngine({
     const crackleGainNode = crackleGainRef.current;
     const vinylDustBedFilter = vinylDustBedFilterRef.current;
     const vinylDustBedGain = vinylDustBedGainRef.current;
-    const media = mediaRef.current;
-    const currentPreviewKind = previewKindRef.current;
-    const hasPlayablePreview =
-      currentPreviewKind === "video" ||
-      currentPreviewKind === "audio" ||
-      currentPreviewKind === "capture";
-    const isMediaPlaying = media ? !media.paused : isPlayingRef.current;
-    const nextMuted = settingsRefs.isMutedRef.current;
-    const nextVolume = settingsRefs.volumeRef.current;
-    const nextAudioFxEnabled = settingsRefs.isAudioFxEnabledRef.current;
-    const nextLofiAmount = settingsRefs.lofiAmountRef.current;
-    const nextRadioToneAmount = settingsRefs.radioToneAmountRef.current;
-    const nextBitCrushAmount = settingsRefs.bitCrushAmountRef.current;
-    const nextSampleRateReductionAmount = settingsRefs.sampleRateReductionAmountRef.current;
-    const nextBassAmount = settingsRefs.bassAmountRef.current;
-    const nextMidAmount = settingsRefs.midAmountRef.current;
-    const nextTrebleAmount = settingsRefs.trebleAmountRef.current;
-    const nextStereoWidthAmount = settingsRefs.stereoWidthAmountRef.current;
-    const nextSmallSpeakerRoomAmount = settingsRefs.smallSpeakerRoomAmountRef.current;
-    const nextWowFlutterAmount = settingsRefs.wowFlutterAmountRef.current;
-    const nextNoiseEnabled = settingsRefs.isNoiseEnabledRef.current;
-    const nextNoiseLevel = settingsRefs.noiseLevelRef.current;
-    const nextVinylDustAmount = settingsRefs.vinylDustAmountRef.current;
-    const audibleMasterGain = nextMuted || !hasPlayablePreview ? 0 : nextVolume;
+    const {
+      settings,
+      isPlaying,
+      isOutputEnabled,
+    } = runtimeState;
+    const isMediaPlaying = isPlaying;
+    const nextMuted = settings.isMuted;
+    const nextVolume = settings.volume;
+    const nextAudioFxEnabled = settings.isAudioFxEnabled;
+    const nextLofiAmount = settings.lofiAmount;
+    const nextRadioToneAmount = settings.radioToneAmount;
+    const nextBitCrushAmount = settings.bitCrushAmount;
+    const nextSampleRateReductionAmount = settings.sampleRateReductionAmount;
+    const nextBassAmount = settings.bassAmount;
+    const nextMidAmount = settings.midAmount;
+    const nextTrebleAmount = settings.trebleAmount;
+    const nextStereoWidthAmount = settings.stereoWidthAmount;
+    const nextSmallSpeakerRoomAmount = settings.smallSpeakerRoomAmount;
+    const nextWowFlutterAmount = settings.wowFlutterAmount;
+    const nextNoiseEnabled = settings.isNoiseEnabled;
+    const nextNoiseLevel = settings.noiseLevel;
+    const nextVinylDustAmount = settings.vinylDustAmount;
+    const audibleMasterGain = nextMuted || !isOutputEnabled ? 0 : nextVolume;
 
     if (masterGain) {
       masterGain.gain.value = audibleMasterGain;
-    }
-
-    if (media) {
-      media.muted = nextMuted;
-      media.volume = nextMuted ? 0 : nextVolume;
     }
 
     if (radioToneHighpass && radioToneLowpass && radioTonePresence) {
@@ -707,7 +646,7 @@ function createManagedRetroAudioEngine({
 
     if (noiseGainNode) {
       noiseGainNode.gain.value =
-        nextNoiseEnabled && !nextMuted && hasPlayablePreview && isMediaPlaying
+        nextNoiseEnabled && !nextMuted && isOutputEnabled && isMediaPlaying
           ? Math.min(0.24, nextNoiseLevel * 5.5)
           : 0;
     }
@@ -716,7 +655,7 @@ function createManagedRetroAudioEngine({
       const isCrackleActive =
         nextNoiseEnabled &&
         !nextMuted &&
-        hasPlayablePreview &&
+        isOutputEnabled &&
         isMediaPlaying;
       crackleGainNode.gain.value = isCrackleActive
         ? Math.min(0.24, nextVinylDustAmount * 0.22 + nextNoiseLevel * 0.25)
@@ -727,7 +666,7 @@ function createManagedRetroAudioEngine({
       const isDustBedActive =
         nextNoiseEnabled &&
         !nextMuted &&
-        hasPlayablePreview &&
+        isOutputEnabled &&
         isMediaPlaying;
       const amount = isDustBedActive ? nextVinylDustAmount : 0;
       vinylDustBedFilter.frequency.value = 2100 + amount * 2600;
@@ -965,9 +904,6 @@ function createManagedRetroAudioEngine({
   };
 
   const disposeAudioEngine = async () => {
-    mediaSourceRef.current?.disconnect();
-    mediaSourceRef.current = null;
-
     try {
       noiseSourceRef.current?.stop();
     } catch {
@@ -1012,73 +948,6 @@ function createManagedRetroAudioEngine({
     }
   };
 
-  const connectMediaAudio = async (media: HTMLMediaElement) => {
-    const context = await ensureAudioContext();
-    const currentPreviewKind = previewKindRef.current;
-
-    if (!context) {
-      debugAudio("connectMediaAudio:no-context", {
-        mediaTag: media.tagName,
-      });
-      return;
-    }
-
-    if (mediaSourceRef.current) {
-      debugAudio("connectMediaAudio:disconnect-previous", {
-        mediaTag: media.tagName,
-      });
-      mediaSourceRef.current.disconnect();
-      mediaSourceRef.current = null;
-    }
-
-    try {
-      const mediaSource = context.createMediaElementSource(media);
-      mediaSource.connect(getInputNode()!);
-      mediaSourceRef.current = mediaSource;
-      sourceNodeRef.current = mediaSource;
-      media.muted = settingsRefs.isMutedRef.current;
-      media.volume = settingsRefs.isMutedRef.current ? 0 : settingsRefs.volumeRef.current;
-      debugAudio("connectMediaAudio:connected", {
-        audioContextState: context.state,
-        lofiAmount: settingsRefs.lofiAmountRef.current,
-        radioToneAmount: settingsRefs.radioToneAmountRef.current,
-        bitCrushAmount: settingsRefs.bitCrushAmountRef.current,
-        sampleRateReductionAmount: settingsRefs.sampleRateReductionAmountRef.current,
-        bassAmount: settingsRefs.bassAmountRef.current,
-        midAmount: settingsRefs.midAmountRef.current,
-        trebleAmount: settingsRefs.trebleAmountRef.current,
-        stereoWidthAmount: settingsRefs.stereoWidthAmountRef.current,
-        smallSpeakerRoomAmount: settingsRefs.smallSpeakerRoomAmountRef.current,
-        wowFlutterAmount: settingsRefs.wowFlutterAmountRef.current,
-        isAudioFxEnabled: settingsRefs.isAudioFxEnabledRef.current,
-        isMuted: settingsRefs.isMutedRef.current,
-        volume: settingsRefs.volumeRef.current,
-        mediaTag: media.tagName,
-        previewKind: currentPreviewKind,
-      });
-      updateAudioNodes();
-    } catch (error) {
-      debugAudio("connectMediaAudio:error", {
-        audioContextState: context.state,
-        mediaTag: media.tagName,
-        message: error instanceof Error ? error.message : String(error),
-        previewKind: currentPreviewKind,
-      });
-      throw error;
-    }
-  };
-
-  const reconnectCurrentMediaAudio = () => {
-    const mediaSource = mediaSourceRef.current;
-    if (!mediaSource) {
-      return;
-    }
-
-    mediaSource.disconnect();
-    mediaSource.connect(getInputNode()!);
-    updateAudioNodes();
-  };
-
   const connectSourceNode = async (sourceNode: AudioNode) => {
     const context = await ensureAudioContext();
     if (!context) {
@@ -1086,7 +955,7 @@ function createManagedRetroAudioEngine({
       return;
     }
 
-    if (sourceNodeRef.current && sourceNodeRef.current !== mediaSourceRef.current) {
+    if (sourceNodeRef.current) {
       try {
         sourceNodeRef.current.disconnect();
       } catch {
@@ -1099,7 +968,6 @@ function createManagedRetroAudioEngine({
     sourceNodeRef.current = sourceNode;
     updateAudioNodes();
     debugAudio("connectSourceNode:connected", {
-      previewKind: previewKindRef.current,
       audioContextState: context.state,
     });
   };
@@ -1146,7 +1014,6 @@ function createManagedRetroAudioEngine({
 
   return {
     audioContextRef,
-    mediaSourceRef,
     masterGainRef,
     radioToneHighpassRef,
     radioToneLowpassRef,
@@ -1188,11 +1055,9 @@ function createManagedRetroAudioEngine({
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
-    connectMediaAudio,
     connectSourceNode,
     connect,
     disconnect,
-    reconnectCurrentMediaAudio,
     disposeAudioEngine,
   };
 }
@@ -1213,16 +1078,19 @@ export function createRetroAudioEngine({
 }: CreateRetroAudioEngineParams = {},
 ) {
   const currentSettings = resolveRetroAudioSettings(options);
-  const previewKindRef = createMutableRef<RetroAudioPreviewKind>("audio");
-  const mediaRef = createMutableRef<HTMLMediaElement | null>(null);
-  const isPlayingRef = createMutableRef(options.isPlaying ?? true);
-  const settingsRefs = createSettingsRefs(currentSettings);
+  const runtimeState = {
+    settings: currentSettings,
+    isPlaying: options.isPlaying ?? true,
+    isOutputEnabled:
+      options.previewKind === undefined
+        ? true
+        : options.previewKind === "video" ||
+          options.previewKind === "audio" ||
+          options.previewKind === "capture",
+  };
   const engine = createManagedRetroAudioEngine({
     instanceLabel: options.instanceLabel ?? "tetorica-retro-audio-engine",
-    previewKindRef,
-    mediaRef,
-    isPlayingRef,
-    settingsRefs,
+    runtimeState,
     createAudioContext:
       createAudioContext ??
       (context
@@ -1241,7 +1109,6 @@ export function createRetroAudioEngine({
       : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
 
     Object.assign(currentSettings, nextSettings);
-    updateSettingsRefs(settingsRefs, currentSettings);
     engine.updateAudioNodes();
   };
 
@@ -1256,17 +1123,16 @@ export function createRetroAudioEngine({
       params: extraParams,
     });
     Object.assign(currentSettings, nextSettings);
-    updateSettingsRefs(settingsRefs, currentSettings);
     engine.updateAudioNodes();
   };
 
   const setIsPlaying = (nextIsPlaying: boolean) => {
-    isPlayingRef.current = nextIsPlaying;
+    runtimeState.isPlaying = nextIsPlaying;
     engine.updateAudioNodes();
   };
 
   const setOutputEnabled = (isEnabled: boolean) => {
-    previewKindRef.current = isEnabled ? "audio" : "image";
+    runtimeState.isOutputEnabled = isEnabled;
     engine.updateAudioNodes();
   };
 
