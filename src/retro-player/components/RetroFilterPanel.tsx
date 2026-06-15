@@ -44,6 +44,7 @@ type RetroFilterPanelProps = {
   curvature: number;
   ditherStrength: number;
   glowStrength: number;
+  edgeBoost: number;
   isFilterEnabled: boolean;
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
@@ -76,6 +77,7 @@ type RetroFilterPanelProps = {
   onSetCurvature: (value: number) => void;
   onSetDitherStrength: (value: number) => void;
   onSetGlowStrength: (value: number) => void;
+  onSetEdgeBoost: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
@@ -107,6 +109,7 @@ export function RetroFilterPanel({
   curvature,
   ditherStrength,
   glowStrength,
+  edgeBoost,
   isFilterEnabled,
   monoTint,
   paletteMode,
@@ -139,6 +142,7 @@ export function RetroFilterPanel({
   onSetCurvature,
   onSetDitherStrength,
   onSetGlowStrength,
+  onSetEdgeBoost,
   onSetMonoTint,
   onSetPaletteMode,
   onSetPhosphorStrength,
@@ -181,6 +185,8 @@ export function RetroFilterPanel({
             "画面の外周を暗くします。値を上げるほど中央に視線が集まり、レトロな額縁感も強くなります。",
           glow:
             "明るい部分のまわりに柔らかな光のにじみを足します。値を上げるほどハイライトが広がって熱っぽく見えます。",
+          edgeBoost:
+            "輪郭の変化を拾って、境界を少し暗く締めます。明るい場所では効きを少し弱めています。上げるほど形が読みやすくなりますが、ノイズや圧縮のザラつきも見えやすくなります。",
           phosphor:
             "CRT 表面の発光構造のような RGB の細かな揺らぎを加えます。値を上げるほど画面テクスチャが見えやすくなります。",
           spotMask:
@@ -212,6 +218,8 @@ export function RetroFilterPanel({
             "Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.",
           glow:
             "Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look.",
+          edgeBoost:
+            "Detects local contrast changes and darkens contour boundaries slightly. The effect eases off in very bright areas. Higher values make shapes easier to read, but can also bring out noise and compression grit.",
           phosphor:
             "Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible and easier to inspect.",
           spotMask:
@@ -616,6 +624,27 @@ export function RetroFilterPanel({
             value={glowStrength}
             onChange={(ev) => {
               onSetGlowStrength(Number(ev.currentTarget.value));
+            }}
+            className="mt-2 w-full"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-slate-100">
+            <InfoTip
+              label={`Edge boost: ${edgeBoost.toFixed(2)}`}
+              text={helpText.edgeBoost}
+              helpSuffix={helpText.helpSuffix}
+            />
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="1.5"
+            step="0.01"
+            value={edgeBoost}
+            onChange={(ev) => {
+              onSetEdgeBoost(Number(ev.currentTarget.value));
             }}
             className="mt-2 w-full"
           />

@@ -16,6 +16,7 @@ export type PersistedRetroFilterSettings = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  edgeBoost: number;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;

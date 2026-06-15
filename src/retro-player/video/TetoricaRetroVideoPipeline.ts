@@ -19,6 +19,7 @@ export type RetroVideoFilterState = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  edgeBoost: number;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;
@@ -61,6 +62,7 @@ type RendererUniformLocations = {
   uScanlineBrightnessFade: WebGLUniformLocation | null;
   uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
+  uEdgeBoost: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
@@ -409,6 +411,7 @@ export class TetoricaRetroVideoPipeline {
       uScanlineBrightnessFade: gl.getUniformLocation(this.filterProgram, "uScanlineBrightnessFade"),
       uVignetteStrength: gl.getUniformLocation(this.filterProgram, "uVignetteStrength"),
       uGlowStrength: gl.getUniformLocation(this.filterProgram, "uGlowStrength"),
+      uEdgeBoost: gl.getUniformLocation(this.filterProgram, "uEdgeBoost"),
       uPhosphorStrength: gl.getUniformLocation(this.filterProgram, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(this.filterProgram, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(this.filterProgram, "uBulbRadius"),
@@ -648,6 +651,7 @@ export class TetoricaRetroVideoPipeline {
     );
     gl.uniform1f(this.uniformLocations.uVignetteStrength, filterState.vignetteStrength);
     gl.uniform1f(this.uniformLocations.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.uniformLocations.uEdgeBoost, filterState.edgeBoost);
     gl.uniform1f(this.uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(this.uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.uniformLocations.uBulbRadius, filterState.bulbRadius);

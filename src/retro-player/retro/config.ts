@@ -33,6 +33,7 @@ export type RetroPresetDefinition = {
   scanline2: number;
   vignette: number;
   glow: number;
+  edgeBoost?: number;
   phosphor: number;
   spotMask: number;
   bulbRadius: number;
@@ -404,6 +405,28 @@ export const RETRO_PRESETS = {
     scanline2: 0.02,
     vignette: 0.05,
     glow: 0.06,
+    phosphor: 0.03,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
+  crtEdge: {
+    label: "CRT Edge",
+    width: 1280,
+    height: 800,
+    colors: 256,
+    dither: 0.12,
+    palette: "free",
+    curvature: 0.03,
+    scanline: 0.00,
+    scanline2: 0.08,
+    vignette: 0.05,
+    glow: 0.06,
+    edgeBoost: 1.5,
     phosphor: 0.03,
     spotMask: 0.0,
     bulbRadius: 0.3,

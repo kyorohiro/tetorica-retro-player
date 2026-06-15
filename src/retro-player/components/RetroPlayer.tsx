@@ -372,7 +372,7 @@ export function RetroPlayer({
 
   React.useEffect(() => {
     if (stream) {
-      const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}:${renderResolutionScale}`;
+      const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}`;
       if (lastPreviewRequestRef.current === streamKey) {
         return;
       }
@@ -403,7 +403,7 @@ export function RetroPlayer({
       return;
     }
 
-    const srcKey = `src:${src}:${kind}:${renderResolutionScale}`;
+    const srcKey = `src:${src}:${kind}`;
     if (lastPreviewRequestRef.current === srcKey) {
       return;
     }
@@ -421,7 +421,7 @@ export function RetroPlayer({
         onError?.(new Error(String(error)));
       }
     })();
-  }, [src, stream, streamName, kind, onError, player, renderResolutionScale]);
+  }, [src, stream, streamName, kind, onError, player]);
 
   React.useEffect(() => {
     savePersistedRetroUiSettings({
@@ -1157,6 +1157,7 @@ export function RetroPlayer({
                   curvature={filterState.curvature}
                   ditherStrength={filterState.ditherStrength}
                   glowStrength={filterState.glowStrength}
+                  edgeBoost={filterState.edgeBoost}
                   isFilterEnabled={filterState.isFilterEnabled}
                   monoTint={filterState.monoTint}
                   neonBoost={filterState.neonBoost}
@@ -1188,6 +1189,7 @@ export function RetroPlayer({
                   onSetCurvature={filterState.setCurvature}
                   onSetDitherStrength={filterState.setDitherStrength}
                   onSetGlowStrength={filterState.setGlowStrength}
+                  onSetEdgeBoost={filterState.setEdgeBoost}
                   onSetIsFilterEnabled={filterState.setIsFilterEnabled}
                   onSetMonoTint={filterState.setMonoTint}
                   onSetNeonBoost={filterState.setNeonBoost}
