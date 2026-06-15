@@ -72,7 +72,7 @@ const nextCargoToml = cargoToml.replace(
 
 writeText(cargoTomlPath, nextCargoToml);
 
-const readmePath = "README.md";
+const readmePath = "RELEASE_MEMO.md";
 const readme = readText(readmePath);
 const nextReadme = readme.replaceAll(previousVersion, nextVersion);
 
