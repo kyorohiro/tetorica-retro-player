@@ -393,7 +393,11 @@ export function createRetroAudioEngine({
       lowpass.frequency.value = 16000 - amount * 14200;
       lowpass.Q.value = 0.3 + amount * 1.8;
       highshelf.gain.value = -amount * 18;
-      drive.curve = createDriveCurve(amount * 0.6);
+      try {
+        drive.curve = createDriveCurve(amount * 0.6);
+      } catch {
+        // Some non-browser Web Audio implementations reject reassigning curve.
+      }
     }
 
     if (bitcrusher) {
@@ -701,6 +705,7 @@ export function createRetroAudioEngine({
       }
     }
 
+    updateAudioNodes();
     return audioContextRef.current;
   };
 
