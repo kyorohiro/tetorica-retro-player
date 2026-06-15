@@ -46,7 +46,7 @@ export type CurrentRef<T> = {
   current: T;
 };
 
-type RetroAudioSettingsRefs = {
+export type RetroAudioSettingsRefs = {
   isMutedRef: CurrentRef<boolean>;
   volumeRef: CurrentRef<number>;
   playbackRateRef: CurrentRef<number>;
@@ -73,11 +73,17 @@ type CreateRetroAudioEngineParams = {
   mediaRef: CurrentRef<HTMLMediaElement | null>;
   isPlayingRef: CurrentRef<boolean>;
   settingsRefs: RetroAudioSettingsRefs;
+  createAudioContext?: () => AudioContextLike;
 };
 
+type AudioContextLike = AudioContext;
+type AudioContextCtor = new () => AudioContextLike;
+
 const isRetroPlayerDebugEnabled = () =>
-  typeof window !== "undefined" &&
-  Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__);
+  Boolean(
+    (globalThis as typeof globalThis & { __RETRO_PLAYER_DEBUG__?: boolean })
+      .__RETRO_PLAYER_DEBUG__,
+  );
 
 function createDriveCurve(amount: number) {
   const samples = 256;
@@ -204,6 +210,7 @@ export function createRetroAudioEngine({
   mediaRef,
   isPlayingRef,
   settingsRefs,
+  createAudioContext,
 }: CreateRetroAudioEngineParams) {
   const audioContextRef: CurrentRef<AudioContext | null> = { current: null };
   const mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | null> = { current: null };
@@ -241,6 +248,7 @@ export function createRetroAudioEngine({
   const vinylDustBedFilterRef: CurrentRef<BiquadFilterNode | null> = { current: null };
   const vinylDustBedGainRef: CurrentRef<GainNode | null> = { current: null };
   const crackleGainRef: CurrentRef<GainNode | null> = { current: null };
+  const sourceNodeRef: CurrentRef<AudioNode | null> = { current: null };
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -285,6 +293,26 @@ export function createRetroAudioEngine({
     vinylDustBedFilterRef.current = null;
     vinylDustBedGainRef.current = null;
     crackleGainRef.current = null;
+    sourceNodeRef.current = null;
+  };
+
+  const resolveAudioContextCtor = (): AudioContextCtor | null => {
+    const ctor = (globalThis as typeof globalThis & { AudioContext?: AudioContextCtor })
+      .AudioContext;
+    return typeof ctor === "function" ? ctor : null;
+  };
+
+  const resolveAudioWorkletNodeCtor = () => {
+    const ctor = (
+      globalThis as typeof globalThis & {
+        AudioWorkletNode?: typeof AudioWorkletNode;
+      }
+    ).AudioWorkletNode;
+    return typeof ctor === "function" ? ctor : null;
+  };
+
+  const getInputNode = () => {
+    return wowFlutterDelayRef.current ?? lofiLowpassRef.current;
   };
 
   const updateAudioNodes = () => {
@@ -448,18 +476,24 @@ export function createRetroAudioEngine({
   };
 
   const ensureAudioContext = async () => {
-    if (typeof window === "undefined") {
-      return null;
-    }
+    const AudioContextCtor = resolveAudioContextCtor();
+    if (!AudioContextCtor) return null;
 
     if (audioContextRef.current?.state === "closed") {
       resetNodeRefs();
     }
 
     if (!audioContextRef.current) {
-      const context = new window.AudioContext();
+      const context = createAudioContext ? createAudioContext() : new AudioContextCtor();
       const masterGain = context.createGain();
-      const recordingDestination = context.createMediaStreamDestination();
+      let recordingDestination: MediaStreamAudioDestinationNode | null = null;
+      if ("createMediaStreamDestination" in context) {
+        try {
+          recordingDestination = context.createMediaStreamDestination();
+        } catch {
+          recordingDestination = null;
+        }
+      }
       const radioToneHighpass = context.createBiquadFilter();
       const radioToneLowpass = context.createBiquadFilter();
       const radioTonePresence = context.createBiquadFilter();
@@ -469,10 +503,11 @@ export function createRetroAudioEngine({
       let bitcrusher: AudioWorkletNode | null = null;
       let stereoWidth: AudioWorkletNode | null = null;
 
-      if ("audioWorklet" in context) {
+      const AudioWorkletNodeCtor = resolveAudioWorkletNodeCtor();
+      if ("audioWorklet" in context && AudioWorkletNodeCtor) {
         const bitcrusherModuleUrl = new URL("./bitcrusherWorklet.js", import.meta.url);
         await context.audioWorklet.addModule(bitcrusherModuleUrl.href);
-        bitcrusher = new AudioWorkletNode(context, "retro-bitcrusher", {
+        bitcrusher = new AudioWorkletNodeCtor(context, "retro-bitcrusher", {
           numberOfInputs: 1,
           numberOfOutputs: 1,
           outputChannelCount: [2],
@@ -480,7 +515,7 @@ export function createRetroAudioEngine({
 
         const stereoWidthModuleUrl = new URL("./stereoWidthWorklet.js", import.meta.url);
         await context.audioWorklet.addModule(stereoWidthModuleUrl.href);
-        stereoWidth = new AudioWorkletNode(context, "retro-stereo-width", {
+        stereoWidth = new AudioWorkletNodeCtor(context, "retro-stereo-width", {
           numberOfInputs: 1,
           numberOfOutputs: 1,
           outputChannelCount: [2],
@@ -548,7 +583,9 @@ export function createRetroAudioEngine({
       roomDryGain.connect(masterGain);
       roomWetGain.connect(masterGain);
       masterGain.connect(context.destination);
-      masterGain.connect(recordingDestination);
+      if (recordingDestination) {
+        masterGain.connect(recordingDestination);
+      }
 
       const noiseSource = context.createBufferSource();
       noiseSource.buffer = createTintedNoiseBuffer(context);
@@ -732,8 +769,9 @@ export function createRetroAudioEngine({
 
     try {
       const mediaSource = context.createMediaElementSource(media);
-      mediaSource.connect(wowFlutterDelayRef.current ?? lofiLowpassRef.current!);
+      mediaSource.connect(getInputNode()!);
       mediaSourceRef.current = mediaSource;
+      sourceNodeRef.current = mediaSource;
       media.muted = settingsRefs.isMutedRef.current;
       media.volume = settingsRefs.isMutedRef.current ? 0 : settingsRefs.volumeRef.current;
       debugAudio("connectMediaAudio:connected", {
@@ -773,8 +811,33 @@ export function createRetroAudioEngine({
     }
 
     mediaSource.disconnect();
-    mediaSource.connect(wowFlutterDelayRef.current ?? lofiLowpassRef.current!);
+    mediaSource.connect(getInputNode()!);
     updateAudioNodes();
+  };
+
+  const connectSourceNode = async (sourceNode: AudioNode) => {
+    const context = await ensureAudioContext();
+    if (!context) {
+      debugAudio("connectSourceNode:no-context");
+      return;
+    }
+
+    if (sourceNodeRef.current && sourceNodeRef.current !== mediaSourceRef.current) {
+      try {
+        sourceNodeRef.current.disconnect();
+      } catch {
+        // ignore disconnect races
+      }
+      sourceNodeRef.current = null;
+    }
+
+    sourceNode.connect(getInputNode()!);
+    sourceNodeRef.current = sourceNode;
+    updateAudioNodes();
+    debugAudio("connectSourceNode:connected", {
+      previewKind: previewKindRef.current,
+      audioContextState: context.state,
+    });
   };
 
   return {
@@ -816,6 +879,7 @@ export function createRetroAudioEngine({
     ensureAudioContext,
     updateAudioNodes,
     connectMediaAudio,
+    connectSourceNode,
     reconnectCurrentMediaAudio,
     disposeAudioEngine,
   };
