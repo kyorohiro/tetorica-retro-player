@@ -21,27 +21,25 @@ export type TetoricaRetroAudioNodeOptions = {
 };
 
 export type CreateRetroAudioEngineParams = {
-  context?: AudioContextLike;
-  createAudioContext?: () => AudioContextLike;
+  context: AudioContextLike;
   connectOutputToDestination?: boolean;
   connectOutputToRecordingDestination?: boolean;
 } & TetoricaRetroAudioNodeOptions;
 
 type CreateManagedRetroAudioEngineParams = {
+  context: AudioContextLike;
   instanceLabel: string;
   runtimeState: {
     settings: RetroAudioSettings;
     isPlaying: boolean;
     isOutputEnabled: boolean;
   };
-  createAudioContext?: () => AudioContextLike;
   connectOutputToDestination?: boolean;
   connectOutputToRecordingDestination?: boolean;
   enableAudioWorklet?: boolean;
 };
 
 type AudioContextLike = AudioContext;
-type AudioContextCtor = new () => AudioContextLike;
 
 const isRetroPlayerDebugEnabled = () =>
   Boolean(
@@ -200,8 +198,8 @@ function resolveRetroAudioSettings({
 }
 
 export class TetoricaRetroAudioNode {
+  private readonly context: AudioContextLike;
   private readonly instanceLabel: string;
-  private readonly createAudioContext?: () => AudioContextLike;
   private readonly connectOutputToDestination: boolean;
   private readonly connectOutputToRecordingDestination: boolean;
   private readonly enableAudioWorklet: boolean;
@@ -245,17 +243,17 @@ export class TetoricaRetroAudioNode {
   };
 
   constructor({
+    context,
     instanceLabel,
     runtimeState,
-    createAudioContext,
     connectOutputToDestination = true,
     connectOutputToRecordingDestination = true,
     enableAudioWorklet = true,
   }: CreateManagedRetroAudioEngineParams) {
+    this.context = context;
     this.instanceLabel = instanceLabel;
     this.runtimeState = runtimeState;
     this.currentSettings = runtimeState.settings;
-    this.createAudioContext = createAudioContext;
     this.connectOutputToDestination = connectOutputToDestination;
     this.connectOutputToRecordingDestination = connectOutputToRecordingDestination;
     this.enableAudioWorklet = enableAudioWorklet;
@@ -483,12 +481,6 @@ export class TetoricaRetroAudioNode {
     });
   }
 
-  private resolveAudioContextCtor(): AudioContextCtor | null {
-    const ctor = (globalThis as typeof globalThis & { AudioContext?: AudioContextCtor })
-      .AudioContext;
-    return typeof ctor === "function" ? ctor : null;
-  }
-
   private resolveAudioWorkletNodeCtor() {
     const ctor = (
       globalThis as typeof globalThis & {
@@ -629,16 +621,14 @@ export class TetoricaRetroAudioNode {
     }
   }
 
-  async ensureAudioContext() {
-    const AudioContextCtor = this.resolveAudioContextCtor();
-    if (!AudioContextCtor) return null;
-
-    if (this.nodes.audioContext?.state === "closed") {
+  async ensureInitialized() {
+    if (this.context.state === "closed") {
       this.resetNodes();
+      return null;
     }
 
-    if (!this.nodes.audioContext) {
-      const context = this.createAudioContext ? this.createAudioContext() : new AudioContextCtor();
+    if (!this.nodes.audioContext || !this.nodes.masterGain) {
+      const context = this.context;
       const masterGain = context.createGain();
       let recordingDestination: MediaStreamAudioDestinationNode | null = null;
       if ("createMediaStreamDestination" in context) {
@@ -863,7 +853,7 @@ export class TetoricaRetroAudioNode {
   }
 
   async connectSourceNode(sourceNode: AudioNode) {
-    const context = await this.ensureAudioContext();
+    const context = await this.ensureInitialized();
     if (!context) {
       this.debugAudio("connectSourceNode:no-context");
       return;
@@ -891,7 +881,7 @@ export class TetoricaRetroAudioNode {
     outputIndex?: number,
     inputIndex?: number,
   ) {
-    const context = await this.ensureAudioContext();
+    const context = await this.ensureInitialized();
     if (!context) {
       this.debugAudio("connect:no-context");
       return;
@@ -974,16 +964,19 @@ export class TetoricaRetroAudioNode {
   async disposeAudioEngine() {
     await this.dispose();
   }
+
+  async ensureAudioContext() {
+    return this.ensureInitialized();
+  }
 }
 
 export function createRetroAudioEngine({
   context,
-  createAudioContext,
   connectOutputToDestination = false,
   connectOutputToRecordingDestination = false,
   //enableAudioWorklet = true,
   ...options
-}: CreateRetroAudioEngineParams = {},
+}: CreateRetroAudioEngineParams,
 ) {
   const currentSettings = resolveRetroAudioSettings(options);
   const runtimeState = {
@@ -997,13 +990,9 @@ export function createRetroAudioEngine({
           options.previewKind === "capture",
   };
   return new TetoricaRetroAudioNode({
+    context,
     instanceLabel: options.instanceLabel ?? "tetorica-retro-audio-engine",
     runtimeState,
-    createAudioContext:
-      createAudioContext ??
-      (context
-        ? () => context
-        : undefined),
     connectOutputToDestination,
     connectOutputToRecordingDestination,
     enableAudioWorklet: options.enableAudioWorklet,

@@ -39,6 +39,7 @@ export function useRetroAudioEngine({
   isPlayingRef: _isPlayingRef,
 }: UseRetroAudioEngineParams) {
   void _isPlayingRef;
+  const [audioContext] = useState(() => new AudioContext());
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
 
@@ -144,6 +145,7 @@ export function useRetroAudioEngine({
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [audioEngine] = useState(() =>
     createRetroAudioEngine({
+      context: audioContext,
       instanceLabel,
       params: initialAudioSettings,
       isPlaying,
@@ -225,7 +227,8 @@ export function useRetroAudioEngine({
 
   const debugAudio = (label: string, payload?: Record<string, unknown>) =>
     audioEngine.debugAudio(label, payload);
-  const ensureAudioContext = () => audioEngine.ensureAudioContext();
+  const ensureInitialized = () => audioEngine.ensureInitialized();
+  const ensureAudioContext = () => audioEngine.ensureInitialized();
   const updateAudioNodes = () => audioEngine.updateAudioNodes();
   const connectSourceNode = (sourceNode: AudioNode) =>
     audioEngine.connectSourceNode(sourceNode);
@@ -240,7 +243,7 @@ export function useRetroAudioEngine({
     audioEngine.setOutputEnabled(isEnabled);
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
-    const context = await ensureAudioContext();
+    const context = await ensureInitialized();
     if (!context || !audioEngine.input) {
       debugAudio("connectMediaAudio:no-context", {
         mediaTag: media.tagName,
@@ -560,6 +563,7 @@ export function useRetroAudioEngine({
     setVinylDustAmount,
     debugAudio,
     ensureAudioContext,
+    ensureInitialized,
     updateAudioNodes,
     connectSourceNode,
     connectMediaAudio,
