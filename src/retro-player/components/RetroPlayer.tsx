@@ -635,10 +635,10 @@ export function RetroPlayer({
           ref={previewShellRef}
           className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
             isPreviewMaximized
-              ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-y-auto flex items-stretch justify-stretch`
+              ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-visible flex items-stretch justify-stretch`
               : isPinnedPreview
                 ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
-              : "overflow-y-auto"
+              : "overflow-visible"
           }`}
           style={
             isPinnedPreview && pinnedPreviewMetrics
@@ -673,7 +673,7 @@ export function RetroPlayer({
             className={`relative ${
               isPreviewMaximized
                 ? "w-full"
-                : "max-w-full min-w-0 overflow-y-auto"
+                : "max-w-full min-w-0 overflow-visible"
             }`}
             style={
               isPreviewMaximized
@@ -712,7 +712,7 @@ export function RetroPlayer({
                 className="pointer-events-none relative h-full w-full touch-manipulation"
               />
               {!player.isPoweredOn && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/72">
+                <div className="absolute z-100 inset-0 flex items-center justify-center bg-black/72">
                   <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
                     <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
                       Power Off
