@@ -621,34 +621,6 @@ export function RetroPlayer({
   const pinnedPreviewTop = isAutoPreviewPinned
     ? `calc(max(0.0rem, env(safe-area-inset-top)) - ${autoPinnedHiddenOffset}px)`
     : undefined;
-  const pinnedFitWidthHeight = React.useMemo(() => {
-    if (
-      !isPinnedPreview ||
-      !isFitWidthEnabled ||
-      !player.sourceDimensions ||
-      !pinnedPreviewMetrics ||
-      typeof window === "undefined"
-    ) {
-      return undefined;
-    }
-
-    const aspectRatio = Math.max(
-      player.sourceDimensions.width / Math.max(player.sourceDimensions.height, 1),
-      0.0001,
-    );
-    const naturalHeight = pinnedPreviewMetrics.width / aspectRatio;
-    const maxVisibleHeight = Math.max(
-      220,
-      Math.round(window.innerHeight * 0.68),
-    );
-
-    return `${Math.min(naturalHeight, maxVisibleHeight)}px`;
-  }, [
-    isFitWidthEnabled,
-    isPinnedPreview,
-    pinnedPreviewMetrics,
-    player.sourceDimensions,
-  ]);
 
   return (
     <section
@@ -666,7 +638,7 @@ export function RetroPlayer({
               ? `fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-y-auto flex items-stretch justify-stretch`
               : isPinnedPreview
                 ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
-              : ""
+              : "overflow-y-auto"
           }`}
           style={
             isPinnedPreview && pinnedPreviewMetrics
@@ -675,7 +647,12 @@ export function RetroPlayer({
                   top: pinnedPreviewTop ?? "calc(max(0.0rem, env(safe-area-inset-top)) + 0.5rem)",
                   width: `${pinnedPreviewMetrics.width}px`,
                 }
-              : undefined
+              : !isPreviewMaximized
+                ? {
+                    maxHeight: "calc(100vh - 12rem)",
+                    overflow: "visible",
+                  }
+                : undefined
           }
         >
           {isPreviewMaximized && (
@@ -696,7 +673,7 @@ export function RetroPlayer({
             className={`relative ${
               isPreviewMaximized
                 ? "w-full"
-                : "w-full min-w-0"
+                : "max-w-full min-w-0 overflow-y-auto"
             }`}
             style={
               isPreviewMaximized
@@ -704,14 +681,15 @@ export function RetroPlayer({
                   ? {
                       aspectRatio: previewAspectRatio,
                       minHeight: "220px",
+                      maxHeight: "calc(100vh - 4rem)",
                     }
                   : undefined
                 : previewAspectRatio
                   ? {
                       aspectRatio: previewAspectRatio,
-                      height: isFitWidthEnabled
-                        ? pinnedFitWidthHeight ?? normalPreviewHeight
-                        : undefined,
+                      width: "100%",
+                      height: "auto",
+                      maxHeight: "calc(100vh - 12rem)",
                       minHeight: "220px",
                     }
                   : {
@@ -720,7 +698,7 @@ export function RetroPlayer({
                     }
             }
           >
-            <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-950">
+            <div className="relative h-full w-full overflow-visible rounded-xl bg-slate-950">
               {showImagePlaceholder && (
                 <img
                   src={src}
@@ -791,7 +769,7 @@ export function RetroPlayer({
                 </div>
               )}
             </div>
-            <div className="absolute -bottom-8 right-3 z-20 flex items-center gap-2">
+            <div className="absolute -bottom-8 right-3 z-50 flex items-center gap-2">
               {player.canRecord && (
                 <>
                   <div className="relative">
