@@ -1,8 +1,5 @@
 # Tetorica Retro Player
 
-Japanese README: [README.ja.md](/Users/kyorohiro/development8/tetorica-retro-player/README.ja.md)  
-Release notes and shipping commands: [RELEASE_MEMO.md](/Users/kyorohiro/development8/tetorica-retro-player/RELEASE_MEMO.md)
-
 Retro-style preview player for images, videos, and live screen capture.
 
 The app uses a Pixi.js shader pipeline to push local media through palette reduction, monochrome tints, dithering, scanlines, and CRT-style finishing. The same filter flow works for still images, movie files, and captured windows or screens.
