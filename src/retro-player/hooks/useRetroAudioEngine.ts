@@ -5,10 +5,12 @@ import {
 } from "./persistedRetroSettings";
 import {
   createRetroAudioEngine,
-  DEFAULT_AUDIO_SETTINGS,
   type RetroAudioPreviewKind,
-  type RetroAudioSettings,
 } from "../audio/createRetroAudioEngine";
+import {
+  DEFAULT_AUDIO_SETTINGS,
+  type RetroAudioSettings,
+} from "../audio/preset";
 
 type UseRetroAudioEngineParams = {
   instanceLabel: string;

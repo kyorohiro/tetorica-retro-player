@@ -14,6 +14,11 @@ import {
   VolumeX,
   Waves,
 } from "lucide-react";
+import {
+  RETRO_AUDIO_PRESETS,
+  type RetroAudioPresetDefinition,
+  type RetroAudioPresetKey,
+} from "../audio/preset";
 
 type VideoControlsProps = {
   mode: "playback" | "audio-settings";
@@ -67,176 +72,6 @@ type VideoControlsProps = {
   onResetSettings: () => void;
   onToggleVideoSettings: () => void;
   onToggleAudioSettings: () => void;
-};
-
-type AudioPresetKey =
-  | "none"
-  | "lofi"
-  | "radio"
-  | "tape"
-  | "vinyl"
-  | "vintage-mic"
-  | "earphone";
-
-type AudioPresetSettings = {
-  isAudioFxEnabled: boolean;
-  isNoiseEnabled: boolean;
-  volume: number;
-  lofiAmount: number;
-  radioToneAmount: number;
-  bitCrushAmount: number;
-  sampleRateReductionAmount: number;
-  bassAmount: number;
-  midAmount: number;
-  trebleAmount: number;
-  stereoWidthAmount: number;
-  smallSpeakerRoomAmount: number;
-  wowFlutterAmount: number;
-  noiseLevel: number;
-  vinylDustAmount: number;
-};
-
-const AUDIO_PRESETS: Record<AudioPresetKey, { label: string; settings: AudioPresetSettings }> = {
-  none: {
-    label: "None",
-    settings: {
-      isAudioFxEnabled: false,
-      isNoiseEnabled: false,
-      volume: 1,
-      lofiAmount: 0,
-      radioToneAmount: 0,
-      bitCrushAmount: 0,
-      sampleRateReductionAmount: 0,
-      bassAmount: 0,
-      midAmount: 0,
-      trebleAmount: 0,
-      stereoWidthAmount: 0,
-      smallSpeakerRoomAmount: 0,
-      wowFlutterAmount: 0,
-      noiseLevel: 0,
-      vinylDustAmount: 0,
-    },
-  },
-  lofi: {
-    label: "Lo-Fi",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      volume: 0.92,
-      lofiAmount: 0.7,
-      radioToneAmount: 0.18,
-      bitCrushAmount: 0.22,
-      sampleRateReductionAmount: 0.24,
-      bassAmount: 0.08,
-      midAmount: -0.08,
-      trebleAmount: -0.18,
-      stereoWidthAmount: -0.08,
-      smallSpeakerRoomAmount: 0.08,
-      wowFlutterAmount: 0.12,
-      noiseLevel: 0.005,
-      vinylDustAmount: 0,
-    },
-  },
-  radio: {
-    label: "Radio",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      volume: 0.88,
-      lofiAmount: 0.4,
-      radioToneAmount: 0.9,
-      bitCrushAmount: 0.12,
-      sampleRateReductionAmount: 0.38,
-      bassAmount: -0.4,
-      midAmount: 0.18,
-      trebleAmount: -0.32,
-      stereoWidthAmount: -0.55,
-      smallSpeakerRoomAmount: 0.12,
-      wowFlutterAmount: 0.08,
-      noiseLevel: 0.01,
-      vinylDustAmount: 0,
-    },
-  },
-  tape: {
-    label: "Tape",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      volume: 0.94,
-      lofiAmount: 0.22,
-      radioToneAmount: 0.1,
-      bitCrushAmount: 0.04,
-      sampleRateReductionAmount: 0.08,
-      bassAmount: 0.12,
-      midAmount: 0,
-      trebleAmount: -0.14,
-      stereoWidthAmount: 0.06,
-      smallSpeakerRoomAmount: 0.18,
-      wowFlutterAmount: 0.42,
-      noiseLevel: 0.0075,
-      vinylDustAmount: 0,
-    },
-  },
-  vinyl: {
-    label: "Vinyl",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      volume: 0.96,
-      lofiAmount: 0.14,
-      radioToneAmount: 0.06,
-      bitCrushAmount: 0.01,
-      sampleRateReductionAmount: 0.03,
-      bassAmount: 0.06,
-      midAmount: -0.02,
-      trebleAmount: -0.16,
-      stereoWidthAmount: -0.18,
-      smallSpeakerRoomAmount: 0.03,
-      wowFlutterAmount: 0.18,
-      noiseLevel: 0.0035,
-      vinylDustAmount: 0.58,
-    },
-  },
-  "vintage-mic": {
-    label: "Vintage Mic",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      volume: 0.94,
-      lofiAmount: 0.34,
-      radioToneAmount: 0.28,
-      bitCrushAmount: 0,
-      sampleRateReductionAmount: 0.02,
-      bassAmount: -0.24,
-      midAmount: 0.32,
-      trebleAmount: -0.68,
-      stereoWidthAmount: -0.32,
-      smallSpeakerRoomAmount: 0.12,
-      wowFlutterAmount: 0.04,
-      noiseLevel: 0.0025,
-      vinylDustAmount: 0.08,
-    },
-  },
-  earphone: {
-    label: "Earphone",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: false,
-      volume: 1,
-      lofiAmount: 0,
-      radioToneAmount: 0,
-      bitCrushAmount: 0,
-      sampleRateReductionAmount: 0,
-      bassAmount: 0.1,
-      midAmount: 0,
-      trebleAmount: 0.08,
-      stereoWidthAmount: 0.22,
-      smallSpeakerRoomAmount: 0,
-      wowFlutterAmount: 0,
-      noiseLevel: 0,
-      vinylDustAmount: 0,
-    },
-  },
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -311,7 +146,7 @@ export function VideoControls({
   void _onRestart;
 
   const selectedAudioPreset = (
-    Object.entries(AUDIO_PRESETS).find(([, preset]) => {
+    Object.entries(RETRO_AUDIO_PRESETS).find(([, preset]) => {
       const { settings } = preset;
 
       return (
@@ -337,11 +172,11 @@ export function VideoControls({
         isNearlyEqual(settings.noiseLevel, noiseLevel) &&
         isNearlyEqual(settings.vinylDustAmount, vinylDustAmount)
       );
-    })?.[0] as AudioPresetKey | undefined
+    })?.[0] as RetroAudioPresetKey | undefined
   ) ?? null;
 
-  const applyAudioPreset = (preset: AudioPresetKey) => {
-    const presetSettings = AUDIO_PRESETS[preset].settings;
+  const applyAudioPreset = (preset: RetroAudioPresetKey) => {
+    const presetSettings = RETRO_AUDIO_PRESETS[preset].settings;
 
     if (presetSettings.isAudioFxEnabled && !isAudioFxEnabled) {
       onToggleAudioFx();
@@ -419,7 +254,10 @@ export function VideoControls({
             Presets
           </p>
           <div className="grid grid-cols-2 gap-2">
-            {(Object.entries(AUDIO_PRESETS) as [AudioPresetKey, { label: string; settings: AudioPresetSettings }][]).map(([key, preset]) => (
+            {(Object.entries(RETRO_AUDIO_PRESETS) as [
+              RetroAudioPresetKey,
+              RetroAudioPresetDefinition,
+            ][]).map(([key, preset]) => (
               <button
                 key={key}
                 type="button"
