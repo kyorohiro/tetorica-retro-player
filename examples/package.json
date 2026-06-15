@@ -5,7 +5,8 @@
   "scripts": {
     "audio:oscillator:test": "node --experimental-strip-types ./audio/main_oscillator_test.ts",
     "audio:node": "node --experimental-strip-types ./audio/node-audio-sample.ts",
-    "audio:node:silent": "NODE_AUDIO_SINK=none node --experimental-strip-types ./audio/node-audio-sample.ts"
+    "audio:node:silent": "NODE_AUDIO_SINK=none node --experimental-strip-types ./audio/node-audio-sample.ts",
+    "video:webgl2:test": "node --experimental-strip-types ./video/playwright-webgl2-sample.ts"
   },
   "dependencies": {
     "node-web-audio-api": "^1.0.9",
@@ -13,6 +14,7 @@
     "web-audio-api": "^1.5.1"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3"
+    "@types/node": "^25.9.3",
+    "playwright": "^1.61.0"
   }
 }

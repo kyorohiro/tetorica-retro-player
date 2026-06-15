@@ -54,3 +54,30 @@ npm run audio:node:silent
   - BGM state changes
   - SFX bus processing
   - situation-based effect transitions
+
+## Video Direction
+
+- [../video/playwright-webgl2-sample.ts](/Users/kyorohiro/development8/tetorica-retro-player/examples/video/playwright-webgl2-sample.ts)
+  - Preferred browser-faithful sample for the current WebGL2 pipeline
+  - Starts the repo's Vite dev server, opens a dedicated sample page in headless Chromium, and saves a screenshot
+  - Uses the same `TetoricaRetroVideoPipeline` source that the app uses
+  - Requires Playwright:
+
+```bash
+cd examples
+npm install -D playwright
+npx playwright install chromium
+npm run video:webgl2:test
+```
+
+Generated files:
+
+- `examples/video/artifacts/playwright-webgl2-sample.png`
+- `examples/video/artifacts/playwright-webgl2-sample.json`
+
+Future direction:
+
+- `ffmpeg` can come later when you want:
+  - decode real video frames into RGBA
+  - encode rendered output back into mp4 or gif
+  - compare before/after filter results in a batch flow

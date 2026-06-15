@@ -107,3 +107,10 @@ btn.onclick = () => {
   btn.textContent = effectOn ? 'Control' : 'Effect';
 };
 ```
+
+
+
+
+```
+cd examples && npm install -D playwright && npx playwright install chromium && npm run video:webgl2:test
+```
