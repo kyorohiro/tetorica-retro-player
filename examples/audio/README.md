@@ -11,8 +11,8 @@
 ## Current Sample
 
 - [node-audio-sample.ts](/Users/kyorohiro/development8/tetorica-retro-player/examples/audio/node-audio-sample.ts)
-  - Runs the separated `createRetroAudioEngine(...)` without React
-  - Uses a simple `OscillatorNode -> GainNode -> retro audio chain`
+  - Runs the separated `createTetoricaRetroAudioNode(...)` without React
+  - Uses a simple `OscillatorNode -> GainNode -> TetoricaRetroAudioNode -> destination`
   - Applies settings based on the current `Lo-Fi` preset
 
 ## Run
@@ -37,6 +37,7 @@ npm run audio:node:silent
 - `audio:node:silent` is for engine boot / flow verification without audio output.
 - In the current Node sample, AudioWorklet-based behavior may differ from the browser path.
 - The examples currently import source files directly by relative path on purpose, because the interface is still evolving.
+- `createTetoricaRetroAudioNode(...)` does not auto-connect to `context.destination`; the caller connects the output explicitly.
 
 ## Directions
 

@@ -74,6 +74,8 @@ export type CreateRetroAudioEngineParams = {
   isPlayingRef: CurrentRef<boolean>;
   settingsRefs: RetroAudioSettingsRefs;
   createAudioContext?: () => AudioContextLike;
+  connectOutputToDestination?: boolean;
+  connectOutputToRecordingDestination?: boolean;
 };
 
 type AudioContextLike = AudioContext;
@@ -204,6 +206,23 @@ function createVinylDustBuffer(context: AudioContext) {
   return buffer;
 }
 
+function isAudioParamLike(value: AudioNode | AudioParam): value is AudioParam {
+  const AudioParamCtor = (globalThis as typeof globalThis & {
+    AudioParam?: typeof AudioParam;
+  }).AudioParam;
+
+  if (typeof AudioParamCtor === "function") {
+    return value instanceof AudioParamCtor;
+  }
+
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "setValueAtTime" in value &&
+    "value" in value
+  );
+}
+
 export function createRetroAudioEngine({
   instanceLabel,
   previewKindRef,
@@ -211,6 +230,8 @@ export function createRetroAudioEngine({
   isPlayingRef,
   settingsRefs,
   createAudioContext,
+  connectOutputToDestination = true,
+  connectOutputToRecordingDestination = true,
 }: CreateRetroAudioEngineParams) {
   const audioContextRef: CurrentRef<AudioContext | null> = { current: null };
   const mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | null> = { current: null };
@@ -590,8 +611,10 @@ export function createRetroAudioEngine({
       roomConvolver.connect(roomWetGain);
       roomDryGain.connect(masterGain);
       roomWetGain.connect(masterGain);
-      masterGain.connect(context.destination);
-      if (recordingDestination) {
+      if (connectOutputToDestination) {
+        masterGain.connect(context.destination);
+      }
+      if (recordingDestination && connectOutputToRecordingDestination) {
         masterGain.connect(recordingDestination);
       }
 
@@ -868,12 +891,25 @@ export function createRetroAudioEngine({
       return;
     }
 
-    if (destinationNode instanceof AudioParam) {
+    if (isAudioParamLike(destinationNode)) {
       outputNode.connect(destinationNode, outputIndex);
       return;
     }
 
     outputNode.connect(destinationNode, outputIndex, inputIndex);
+  };
+
+  const disconnect = () => {
+    const outputNode = getOutputNode();
+    if (!outputNode) {
+      return;
+    }
+
+    try {
+      outputNode.disconnect();
+    } catch {
+      // ignore disconnect races
+    }
   };
 
   return {
@@ -923,6 +959,7 @@ export function createRetroAudioEngine({
     connectMediaAudio,
     connectSourceNode,
     connect,
+    disconnect,
     reconnectCurrentMediaAudio,
     disposeAudioEngine,
   };
@@ -930,7 +967,13 @@ export function createRetroAudioEngine({
 
 export type CreateTetoricaRetroAudioNodeParams = Omit<
   CreateRetroAudioEngineParams,
-  "createAudioContext"
+  | "createAudioContext"
+  | "connectOutputToDestination"
+  | "connectOutputToRecordingDestination"
+>;
+
+export type TetoricaRetroAudioNode = ReturnType<
+  typeof createTetoricaRetroAudioNode
 >;
 
 export function createTetoricaRetroAudioNode(
@@ -940,5 +983,7 @@ export function createTetoricaRetroAudioNode(
   return createRetroAudioEngine({
     ...params,
     createAudioContext: () => context,
+    connectOutputToDestination: false,
+    connectOutputToRecordingDestination: false,
   });
 }
