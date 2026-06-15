@@ -65,6 +65,11 @@ type NodeAudioContextCtor = new (
   options?: AudioContextOptions & { sinkId?: { type: "none" } },
 ) => AudioContext;
 
+const nodeProcess = (globalThis as typeof globalThis & {
+  process?: { env?: Record<string, string | undefined> };
+}).process;
+const useSilentSink = nodeProcess?.env?.NODE_AUDIO_SINK === "none";
+
 const engine = createRetroAudioEngine({
   instanceLabel: "node-example",
   previewKindRef,
@@ -72,11 +77,13 @@ const engine = createRetroAudioEngine({
   isPlayingRef,
   settingsRefs,
   createAudioContext: () =>
-    new (AudioContext as NodeAudioContextCtor)({
-      sinkId: {
-        type: "none",
-      },
-    }),
+    useSilentSink
+      ? new (AudioContext as NodeAudioContextCtor)({
+          sinkId: {
+            type: "none",
+          },
+        })
+      : new AudioContext(),
 });
 
 const context = await engine.ensureAudioContext();
@@ -86,6 +93,7 @@ if (!context) {
 
 console.log(
   "Running node audio sample with Lo-Fi preset settings.",
+  useSilentSink ? "Silent sink mode." : "Speaker output mode.",
   "AudioWorklet-based params may be ignored in this Node sample.",
 );
 

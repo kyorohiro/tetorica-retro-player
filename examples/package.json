@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "audio:node": "node --experimental-strip-types ./audio/node-audio-sample.ts"
+    "audio:node": "node --experimental-strip-types ./audio/node-audio-sample.ts",
+    "audio:node:silent": "NODE_AUDIO_SINK=none node --experimental-strip-types ./audio/node-audio-sample.ts"
   },
   "dependencies": {
     "node-web-audio-api": "^1.0.0"
