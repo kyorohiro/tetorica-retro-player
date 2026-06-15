@@ -649,7 +649,7 @@ export function RetroPlayer({
                 }
               : !isPreviewMaximized
                 ? {
-                    maxHeight: "calc(100vh - 12rem)",
+                    // maxHeight: "calc(100vh - 12rem)",
                     overflow: "visible",
                   }
                 : undefined
@@ -680,21 +680,21 @@ export function RetroPlayer({
                 ? isFitWidthEnabled && previewAspectRatio
                   ? {
                       aspectRatio: previewAspectRatio,
-                      minHeight: "220px",
-                      maxHeight: "calc(100vh - 4rem)",
+                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                      maxHeight: "calc(100vh - 12rem)",
                     }
                   : undefined
                 : previewAspectRatio
                   ? {
                       aspectRatio: previewAspectRatio,
                       width: "100%",
-                      height: "auto",
+                      height: "min(60vh, calc(100vh - 12rem))",
                       maxHeight: "calc(100vh - 12rem)",
-                      minHeight: "220px",
+                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
                     }
                   : {
                       height: normalPreviewHeight,
-                      minHeight: "220px",
+                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
                     }
             }
           >
