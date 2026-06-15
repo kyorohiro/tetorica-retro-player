@@ -17,6 +17,7 @@ export type TetoricaRetroAudioNodeOptions = {
   params?: Partial<RetroAudioSettings>;
   previewKind?: RetroAudioPreviewKind;
   isPlaying?: boolean;
+  enableAudioWorklet?: boolean;
 };
 
 export type RetroAudioSettingsRefs = {
@@ -57,6 +58,7 @@ type CreateManagedRetroAudioEngineParams = {
   createAudioContext?: () => AudioContextLike;
   connectOutputToDestination?: boolean;
   connectOutputToRecordingDestination?: boolean;
+  enableAudioWorklet?: boolean;
 };
 
 type AudioContextLike = AudioContext;
@@ -218,22 +220,15 @@ function resolveRetroAudioSettings({
   };
 }
 
-function createCurrentAccessor<T>(getValue: () => T) {
-  return {
-    get current() {
-      return getValue();
-    },
-  };
-}
-
-function createManagedRetroAudioEngine({
-  instanceLabel,
-  runtimeState,
-  createAudioContext,
-  connectOutputToDestination = true,
-  connectOutputToRecordingDestination = true,
-}: CreateManagedRetroAudioEngineParams) {
-  const nodes = {
+export class TetoricaRetroAudioNode {
+  private readonly instanceLabel: string;
+  private readonly createAudioContext?: () => AudioContextLike;
+  private readonly connectOutputToDestination: boolean;
+  private readonly connectOutputToRecordingDestination: boolean;
+  private readonly enableAudioWorklet: boolean;
+  private readonly runtimeState: CreateManagedRetroAudioEngineParams["runtimeState"];
+  private readonly currentSettings: RetroAudioSettings;
+  private readonly nodes = {
     audioContext: null as AudioContext | null,
     masterGain: null as GainNode | null,
     radioToneHighpass: null as BiquadFilterNode | null,
@@ -270,16 +265,208 @@ function createManagedRetroAudioEngine({
     sourceNode: null as AudioNode | null,
   };
 
-  const debugAudio = (label: string, payload?: Record<string, unknown>) => {
+  constructor({
+    instanceLabel,
+    runtimeState,
+    createAudioContext,
+    connectOutputToDestination = true,
+    connectOutputToRecordingDestination = true,
+    enableAudioWorklet = true,
+  }: CreateManagedRetroAudioEngineParams) {
+    this.instanceLabel = instanceLabel;
+    this.runtimeState = runtimeState;
+    this.currentSettings = runtimeState.settings;
+    this.createAudioContext = createAudioContext;
+    this.connectOutputToDestination = connectOutputToDestination;
+    this.connectOutputToRecordingDestination = connectOutputToRecordingDestination;
+    this.enableAudioWorklet = enableAudioWorklet;
+  }
+
+  get input() {
+    return this.nodes.wowFlutterDelay ?? this.nodes.lofiLowpass;
+  }
+
+  get output() {
+    return this.nodes.masterGain;
+  }
+
+  get audioContext() {
+    return this.nodes.audioContext;
+  }
+
+  get masterGain() {
+    return this.nodes.masterGain;
+  }
+
+  get radioToneHighpass() {
+    return this.nodes.radioToneHighpass;
+  }
+
+  get radioToneLowpass() {
+    return this.nodes.radioToneLowpass;
+  }
+
+  get radioTonePresence() {
+    return this.nodes.radioTonePresence;
+  }
+
+  get recordingDestination() {
+    return this.nodes.recordingDestination;
+  }
+
+  get lofiLowpass() {
+    return this.nodes.lofiLowpass;
+  }
+
+  get lofiHighshelf() {
+    return this.nodes.lofiHighshelf;
+  }
+
+  get lofiDrive() {
+    return this.nodes.lofiDrive;
+  }
+
+  get bitcrusher() {
+    return this.nodes.bitcrusher;
+  }
+
+  get bassEq() {
+    return this.nodes.bassEq;
+  }
+
+  get midEq() {
+    return this.nodes.midEq;
+  }
+
+  get trebleEq() {
+    return this.nodes.trebleEq;
+  }
+
+  get stereoWidth() {
+    return this.nodes.stereoWidth;
+  }
+
+  get roomDryGain() {
+    return this.nodes.roomDryGain;
+  }
+
+  get roomConvolver() {
+    return this.nodes.roomConvolver;
+  }
+
+  get roomWetGain() {
+    return this.nodes.roomWetGain;
+  }
+
+  get wowFlutterDelay() {
+    return this.nodes.wowFlutterDelay;
+  }
+
+  get wowLfo() {
+    return this.nodes.wowLfo;
+  }
+
+  get wowLfoGain() {
+    return this.nodes.wowLfoGain;
+  }
+
+  get flutterLfo() {
+    return this.nodes.flutterLfo;
+  }
+
+  get flutterLfoGain() {
+    return this.nodes.flutterLfoGain;
+  }
+
+  get noiseSource() {
+    return this.nodes.noiseSource;
+  }
+
+  get noiseFilter() {
+    return this.nodes.noiseFilter;
+  }
+
+  get noisePanner() {
+    return this.nodes.noisePanner;
+  }
+
+  get noiseGain() {
+    return this.nodes.noiseGain;
+  }
+
+  get noiseLfo() {
+    return this.nodes.noiseLfo;
+  }
+
+  get noiseLfoGain() {
+    return this.nodes.noiseLfoGain;
+  }
+
+  get crackleSource() {
+    return this.nodes.crackleSource;
+  }
+
+  get crackleFilter() {
+    return this.nodes.crackleFilter;
+  }
+
+  get vinylDustBedFilter() {
+    return this.nodes.vinylDustBedFilter;
+  }
+
+  get vinylDustBedGain() {
+    return this.nodes.vinylDustBedGain;
+  }
+
+  get crackleGain() {
+    return this.nodes.crackleGain;
+  }
+
+  debugAudio(label: string, payload?: Record<string, unknown>) {
     if (!isRetroPlayerDebugEnabled()) {
       return;
     }
 
-    console.log(`[retro-player audio][${instanceLabel}] ${label}`, payload ?? {});
-  };
+    console.log(`[retro-player audio][${this.instanceLabel}] ${label}`, payload ?? {});
+  }
 
-  const resetNodeRefs = () => {
-    Object.assign(nodes, {
+  getParams() {
+    return { ...this.currentSettings };
+  }
+
+  setParams(nextParams: Partial<RetroAudioSettings>, isPartialUpdate = false) {
+    const nextSettings = isPartialUpdate
+      ? { ...this.currentSettings, ...nextParams }
+      : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
+
+    Object.assign(this.currentSettings, nextSettings);
+    this.updateAudioNodes();
+  }
+
+  applyPreset(
+    preset: RetroAudioPresetKey,
+    extraParams?: Partial<RetroAudioSettings>,
+  ) {
+    const nextSettings = resolveRetroAudioSettings({
+      preset,
+      params: extraParams,
+    });
+    Object.assign(this.currentSettings, nextSettings);
+    this.updateAudioNodes();
+  }
+
+  setIsPlaying(nextIsPlaying: boolean) {
+    this.runtimeState.isPlaying = nextIsPlaying;
+    this.updateAudioNodes();
+  }
+
+  setOutputEnabled(isEnabled: boolean) {
+    this.runtimeState.isOutputEnabled = isEnabled;
+    this.updateAudioNodes();
+  }
+
+  private resetNodes() {
+    Object.assign(this.nodes, {
       audioContext: null,
       masterGain: null,
       radioToneHighpass: null,
@@ -315,85 +502,56 @@ function createManagedRetroAudioEngine({
       crackleGain: null,
       sourceNode: null,
     });
-  };
+  }
 
-  const resolveAudioContextCtor = (): AudioContextCtor | null => {
+  private resolveAudioContextCtor(): AudioContextCtor | null {
     const ctor = (globalThis as typeof globalThis & { AudioContext?: AudioContextCtor })
       .AudioContext;
     return typeof ctor === "function" ? ctor : null;
-  };
+  }
 
-  const resolveAudioWorkletNodeCtor = () => {
+  private resolveAudioWorkletNodeCtor() {
     const ctor = (
       globalThis as typeof globalThis & {
         AudioWorkletNode?: typeof AudioWorkletNode;
       }
     ).AudioWorkletNode;
     return typeof ctor === "function" ? ctor : null;
-  };
+  }
 
-  const getInputNode = () => {
-    return nodes.wowFlutterDelay ?? nodes.lofiLowpass;
-  };
-
-  const getOutputNode = () => {
-    return nodes.masterGain;
-  };
-
-  const updateAudioNodes = () => {
-    const masterGain = nodes.masterGain;
-    const radioToneHighpass = nodes.radioToneHighpass;
-    const radioToneLowpass = nodes.radioToneLowpass;
-    const radioTonePresence = nodes.radioTonePresence;
-    const lowpass = nodes.lofiLowpass;
-    const highshelf = nodes.lofiHighshelf;
-    const drive = nodes.lofiDrive;
-    const bitcrusher = nodes.bitcrusher;
-    const bassEq = nodes.bassEq;
-    const midEq = nodes.midEq;
-    const trebleEq = nodes.trebleEq;
-    const stereoWidth = nodes.stereoWidth;
-    const roomDryGain = nodes.roomDryGain;
-    const roomWetGain = nodes.roomWetGain;
-    const wowFlutterDelay = nodes.wowFlutterDelay;
-    const wowLfo = nodes.wowLfo;
-    const wowLfoGain = nodes.wowLfoGain;
-    const flutterLfo = nodes.flutterLfo;
-    const flutterLfoGain = nodes.flutterLfoGain;
-    const noiseGainNode = nodes.noiseGain;
-    const crackleGainNode = nodes.crackleGain;
-    const vinylDustBedFilter = nodes.vinylDustBedFilter;
-    const vinylDustBedGain = nodes.vinylDustBedGain;
-    const {
-      settings,
-      isPlaying,
-      isOutputEnabled,
-    } = runtimeState;
-    const isMediaPlaying = isPlaying;
-    const nextMuted = settings.isMuted;
-    const nextVolume = settings.volume;
-    const nextAudioFxEnabled = settings.isAudioFxEnabled;
-    const nextLofiAmount = settings.lofiAmount;
-    const nextRadioToneAmount = settings.radioToneAmount;
-    const nextBitCrushAmount = settings.bitCrushAmount;
-    const nextSampleRateReductionAmount = settings.sampleRateReductionAmount;
-    const nextBassAmount = settings.bassAmount;
-    const nextMidAmount = settings.midAmount;
-    const nextTrebleAmount = settings.trebleAmount;
-    const nextStereoWidthAmount = settings.stereoWidthAmount;
-    const nextSmallSpeakerRoomAmount = settings.smallSpeakerRoomAmount;
-    const nextWowFlutterAmount = settings.wowFlutterAmount;
-    const nextNoiseEnabled = settings.isNoiseEnabled;
-    const nextNoiseLevel = settings.noiseLevel;
-    const nextVinylDustAmount = settings.vinylDustAmount;
-    const audibleMasterGain = nextMuted || !isOutputEnabled ? 0 : nextVolume;
+  updateAudioNodes() {
+    const masterGain = this.nodes.masterGain;
+    const radioToneHighpass = this.nodes.radioToneHighpass;
+    const radioToneLowpass = this.nodes.radioToneLowpass;
+    const radioTonePresence = this.nodes.radioTonePresence;
+    const lowpass = this.nodes.lofiLowpass;
+    const highshelf = this.nodes.lofiHighshelf;
+    const drive = this.nodes.lofiDrive;
+    const bitcrusher = this.nodes.bitcrusher;
+    const bassEq = this.nodes.bassEq;
+    const midEq = this.nodes.midEq;
+    const trebleEq = this.nodes.trebleEq;
+    const stereoWidth = this.nodes.stereoWidth;
+    const roomDryGain = this.nodes.roomDryGain;
+    const roomWetGain = this.nodes.roomWetGain;
+    const wowFlutterDelay = this.nodes.wowFlutterDelay;
+    const wowLfo = this.nodes.wowLfo;
+    const wowLfoGain = this.nodes.wowLfoGain;
+    const flutterLfo = this.nodes.flutterLfo;
+    const flutterLfoGain = this.nodes.flutterLfoGain;
+    const noiseGainNode = this.nodes.noiseGain;
+    const crackleGainNode = this.nodes.crackleGain;
+    const vinylDustBedFilter = this.nodes.vinylDustBedFilter;
+    const vinylDustBedGain = this.nodes.vinylDustBedGain;
+    const { settings, isPlaying, isOutputEnabled } = this.runtimeState;
+    const audibleMasterGain = settings.isMuted || !isOutputEnabled ? 0 : settings.volume;
 
     if (masterGain) {
       masterGain.gain.value = audibleMasterGain;
     }
 
     if (radioToneHighpass && radioToneLowpass && radioTonePresence) {
-      const amount = nextAudioFxEnabled ? nextRadioToneAmount : 0;
+      const amount = settings.isAudioFxEnabled ? settings.radioToneAmount : 0;
       radioToneHighpass.frequency.value = 20 + amount * 430;
       radioToneHighpass.Q.value = 0.4 + amount * 0.35;
       radioToneLowpass.frequency.value = 20000 - amount * 17400;
@@ -404,7 +562,7 @@ function createManagedRetroAudioEngine({
     }
 
     if (lowpass && highshelf && drive) {
-      const amount = nextAudioFxEnabled ? nextLofiAmount : 0;
+      const amount = settings.isAudioFxEnabled ? settings.lofiAmount : 0;
       lowpass.frequency.value = 16000 - amount * 14200;
       lowpass.Q.value = 0.3 + amount * 1.8;
       highshelf.gain.value = -amount * 18;
@@ -416,11 +574,11 @@ function createManagedRetroAudioEngine({
     }
 
     if (bitcrusher) {
-      const isEnabled = nextAudioFxEnabled;
-      const bitDepth = 16 - (isEnabled ? nextBitCrushAmount : 0) * 12;
-      const holdFrames = 1 + (isEnabled ? nextSampleRateReductionAmount : 0) * 23;
+      const isEnabled = settings.isAudioFxEnabled;
+      const bitDepth = 16 - (isEnabled ? settings.bitCrushAmount : 0) * 12;
+      const holdFrames = 1 + (isEnabled ? settings.sampleRateReductionAmount : 0) * 23;
       const mix = isEnabled
-        ? Math.max(nextBitCrushAmount, nextSampleRateReductionAmount)
+        ? Math.max(settings.bitCrushAmount, settings.sampleRateReductionAmount)
         : 0;
 
       bitcrusher.parameters.get("bitDepth")?.setValueAtTime(
@@ -438,14 +596,14 @@ function createManagedRetroAudioEngine({
     }
 
     if (bassEq && midEq && trebleEq) {
-      const eqScale = nextAudioFxEnabled ? 15 : 0;
-      bassEq.gain.value = nextBassAmount * eqScale;
-      midEq.gain.value = nextMidAmount * eqScale;
-      trebleEq.gain.value = nextTrebleAmount * eqScale;
+      const eqScale = settings.isAudioFxEnabled ? 15 : 0;
+      bassEq.gain.value = settings.bassAmount * eqScale;
+      midEq.gain.value = settings.midAmount * eqScale;
+      trebleEq.gain.value = settings.trebleAmount * eqScale;
     }
 
     if (stereoWidth) {
-      const width = nextAudioFxEnabled ? 1 + nextStereoWidthAmount : 1;
+      const width = settings.isAudioFxEnabled ? 1 + settings.stereoWidthAmount : 1;
       stereoWidth.parameters.get("width")?.setValueAtTime(
         width,
         stereoWidth.context.currentTime,
@@ -453,13 +611,13 @@ function createManagedRetroAudioEngine({
     }
 
     if (roomDryGain && roomWetGain) {
-      const amount = nextAudioFxEnabled ? nextSmallSpeakerRoomAmount : 0;
+      const amount = settings.isAudioFxEnabled ? settings.smallSpeakerRoomAmount : 0;
       roomDryGain.gain.value = Math.max(0.52, 1 - amount * 0.42);
       roomWetGain.gain.value = amount * 0.95;
     }
 
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
-      const amount = nextAudioFxEnabled ? nextWowFlutterAmount : 0;
+      const amount = settings.isAudioFxEnabled ? settings.wowFlutterAmount : 0;
       wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
       wowLfo.frequency.value = 0.18 + amount * 0.42;
       wowLfoGain.gain.value = amount * 0.0035;
@@ -469,45 +627,39 @@ function createManagedRetroAudioEngine({
 
     if (noiseGainNode) {
       noiseGainNode.gain.value =
-        nextNoiseEnabled && !nextMuted && isOutputEnabled && isMediaPlaying
-          ? Math.min(0.24, nextNoiseLevel * 5.5)
+        settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying
+          ? Math.min(0.24, settings.noiseLevel * 5.5)
           : 0;
     }
 
     if (crackleGainNode) {
       const isCrackleActive =
-        nextNoiseEnabled &&
-        !nextMuted &&
-        isOutputEnabled &&
-        isMediaPlaying;
+        settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
       crackleGainNode.gain.value = isCrackleActive
-        ? Math.min(0.24, nextVinylDustAmount * 0.22 + nextNoiseLevel * 0.25)
+        ? Math.min(0.24, settings.vinylDustAmount * 0.22 + settings.noiseLevel * 0.25)
         : 0;
     }
 
     if (vinylDustBedFilter && vinylDustBedGain) {
       const isDustBedActive =
-        nextNoiseEnabled &&
-        !nextMuted &&
-        isOutputEnabled &&
-        isMediaPlaying;
-      const amount = isDustBedActive ? nextVinylDustAmount : 0;
+        settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
+      const amount = isDustBedActive ? settings.vinylDustAmount : 0;
       vinylDustBedFilter.frequency.value = 2100 + amount * 2600;
       vinylDustBedFilter.Q.value = 0.35 + amount * 0.25;
       vinylDustBedGain.gain.value = amount * 0.11;
     }
-  };
+  }
 
-  const ensureAudioContext = async () => {
-    const AudioContextCtor = resolveAudioContextCtor();
+  async ensureAudioContext() {
+    const AudioContextCtor = this.resolveAudioContextCtor();
     if (!AudioContextCtor) return null;
 
-    if (nodes.audioContext?.state === "closed") {
-      resetNodeRefs();
+    if (this.nodes.audioContext?.state === "closed") {
+      this.resetNodes();
     }
 
-    if (!nodes.audioContext) {
-      const context = createAudioContext ? createAudioContext() : new AudioContextCtor();
+    if (!this.nodes.audioContext) {
+      const context = this.createAudioContext ? this.createAudioContext() : new AudioContextCtor();
       const masterGain = context.createGain();
       let recordingDestination: MediaStreamAudioDestinationNode | null = null;
       if ("createMediaStreamDestination" in context) {
@@ -523,11 +675,12 @@ function createManagedRetroAudioEngine({
       const lowpass = context.createBiquadFilter();
       const highshelf = context.createBiquadFilter();
       const drive = context.createWaveShaper();
+
       let bitcrusher: AudioWorkletNode | null = null;
       let stereoWidth: AudioWorkletNode | null = null;
 
-      const AudioWorkletNodeCtor = resolveAudioWorkletNodeCtor();
-      if ("audioWorklet" in context && AudioWorkletNodeCtor) {
+      const AudioWorkletNodeCtor = this.resolveAudioWorkletNodeCtor();
+      if (this.enableAudioWorklet && "audioWorklet" in context && AudioWorkletNodeCtor) {
         const bitcrusherModuleUrl = new URL("./bitcrusherWorklet.js", import.meta.url);
         await context.audioWorklet.addModule(bitcrusherModuleUrl.href);
         bitcrusher = new AudioWorkletNodeCtor(context, "retro-bitcrusher", {
@@ -605,10 +758,10 @@ function createManagedRetroAudioEngine({
       roomConvolver.connect(roomWetGain);
       roomDryGain.connect(masterGain);
       roomWetGain.connect(masterGain);
-      if (connectOutputToDestination) {
+      if (this.connectOutputToDestination) {
         masterGain.connect(context.destination);
       }
-      if (recordingDestination && connectOutputToRecordingDestination) {
+      if (recordingDestination && this.connectOutputToRecordingDestination) {
         masterGain.connect(recordingDestination);
       }
 
@@ -679,7 +832,7 @@ function createManagedRetroAudioEngine({
       wowLfo.start();
       flutterLfo.start();
 
-      Object.assign(nodes, {
+      Object.assign(this.nodes, {
         audioContext: context,
         masterGain,
         radioToneHighpass,
@@ -716,7 +869,7 @@ function createManagedRetroAudioEngine({
       });
     }
 
-    const activeContext = nodes.audioContext;
+    const activeContext = this.nodes.audioContext;
 
     if (activeContext?.state === "suspended") {
       try {
@@ -726,93 +879,48 @@ function createManagedRetroAudioEngine({
       }
     }
 
-    updateAudioNodes();
+    this.updateAudioNodes();
     return activeContext;
-  };
+  }
 
-  const disposeAudioEngine = async () => {
-    try {
-      nodes.noiseSource?.stop();
-    } catch {
-      // already stopped
-    }
-
-    try {
-      nodes.noiseLfo?.stop();
-    } catch {
-      // already stopped
-    }
-
-    try {
-      nodes.crackleSource?.stop();
-    } catch {
-      // already stopped
-    }
-
-    try {
-      nodes.wowLfo?.stop();
-    } catch {
-      // already stopped
-    }
-
-    try {
-      nodes.flutterLfo?.stop();
-    } catch {
-      // already stopped
-    }
-
-    const context = nodes.audioContext;
-    resetNodeRefs();
-
-    if (!context || context.state === "closed") {
-      return;
-    }
-
-    try {
-      await context.close();
-    } catch {
-      // ignore double-close races
-    }
-  };
-
-  const connectSourceNode = async (sourceNode: AudioNode) => {
-    const context = await ensureAudioContext();
+  async connectSourceNode(sourceNode: AudioNode) {
+    const context = await this.ensureAudioContext();
     if (!context) {
-      debugAudio("connectSourceNode:no-context");
+      this.debugAudio("connectSourceNode:no-context");
       return;
     }
 
-    if (nodes.sourceNode) {
+    if (this.nodes.sourceNode) {
       try {
-        nodes.sourceNode.disconnect();
+        this.nodes.sourceNode.disconnect();
       } catch {
         // ignore disconnect races
       }
-      nodes.sourceNode = null;
+      this.nodes.sourceNode = null;
     }
 
-    sourceNode.connect(getInputNode()!);
-    nodes.sourceNode = sourceNode;
-    updateAudioNodes();
-    debugAudio("connectSourceNode:connected", {
+    sourceNode.connect(this.input!);
+    this.nodes.sourceNode = sourceNode;
+    this.updateAudioNodes();
+    this.debugAudio("connectSourceNode:connected", {
       audioContextState: context.state,
     });
-  };
+  }
 
-  const connect = async (
+  async connect(
     destinationNode: AudioNode | AudioParam,
     outputIndex?: number,
     inputIndex?: number,
-  ) => {
-    const context = await ensureAudioContext();
+  ) {
+    const context = await this.ensureAudioContext();
     if (!context) {
-      debugAudio("connect:no-context");
+      this.debugAudio("connect:no-context");
       return;
     }
 
-    const outputNode = getOutputNode();
+    const outputNode = this.output;
     if (!outputNode) {
-      debugAudio("connect:no-output-node", {
+      this.debugAudio("connect:no-output-node", {
         audioContextState: context.state,
       });
       return;
@@ -824,10 +932,10 @@ function createManagedRetroAudioEngine({
     }
 
     outputNode.connect(destinationNode, outputIndex, inputIndex);
-  };
+  }
 
-  const disconnect = () => {
-    const outputNode = getOutputNode();
+  disconnect() {
+    const outputNode = this.output;
     if (!outputNode) {
       return;
     }
@@ -837,56 +945,56 @@ function createManagedRetroAudioEngine({
     } catch {
       // ignore disconnect races
     }
-  };
+  }
 
-  return {
-    audioContextRef: createCurrentAccessor(() => nodes.audioContext),
-    masterGainRef: createCurrentAccessor(() => nodes.masterGain),
-    radioToneHighpassRef: createCurrentAccessor(() => nodes.radioToneHighpass),
-    radioToneLowpassRef: createCurrentAccessor(() => nodes.radioToneLowpass),
-    radioTonePresenceRef: createCurrentAccessor(() => nodes.radioTonePresence),
-    recordingDestinationRef: createCurrentAccessor(() => nodes.recordingDestination),
-    lofiLowpassRef: createCurrentAccessor(() => nodes.lofiLowpass),
-    lofiHighshelfRef: createCurrentAccessor(() => nodes.lofiHighshelf),
-    lofiDriveRef: createCurrentAccessor(() => nodes.lofiDrive),
-    bitcrusherRef: createCurrentAccessor(() => nodes.bitcrusher),
-    bassEqRef: createCurrentAccessor(() => nodes.bassEq),
-    midEqRef: createCurrentAccessor(() => nodes.midEq),
-    trebleEqRef: createCurrentAccessor(() => nodes.trebleEq),
-    stereoWidthRef: createCurrentAccessor(() => nodes.stereoWidth),
-    roomDryGainRef: createCurrentAccessor(() => nodes.roomDryGain),
-    roomConvolverRef: createCurrentAccessor(() => nodes.roomConvolver),
-    roomWetGainRef: createCurrentAccessor(() => nodes.roomWetGain),
-    wowFlutterDelayRef: createCurrentAccessor(() => nodes.wowFlutterDelay),
-    wowLfoRef: createCurrentAccessor(() => nodes.wowLfo),
-    wowLfoGainRef: createCurrentAccessor(() => nodes.wowLfoGain),
-    flutterLfoRef: createCurrentAccessor(() => nodes.flutterLfo),
-    flutterLfoGainRef: createCurrentAccessor(() => nodes.flutterLfoGain),
-    noiseSourceRef: createCurrentAccessor(() => nodes.noiseSource),
-    noiseFilterRef: createCurrentAccessor(() => nodes.noiseFilter),
-    noisePannerRef: createCurrentAccessor(() => nodes.noisePanner),
-    noiseGainRef: createCurrentAccessor(() => nodes.noiseGain),
-    noiseLfoRef: createCurrentAccessor(() => nodes.noiseLfo),
-    noiseLfoGainRef: createCurrentAccessor(() => nodes.noiseLfoGain),
-    crackleSourceRef: createCurrentAccessor(() => nodes.crackleSource),
-    crackleFilterRef: createCurrentAccessor(() => nodes.crackleFilter),
-    vinylDustBedFilterRef: createCurrentAccessor(() => nodes.vinylDustBedFilter),
-    vinylDustBedGainRef: createCurrentAccessor(() => nodes.vinylDustBedGain),
-    crackleGainRef: createCurrentAccessor(() => nodes.crackleGain),
-    get input() {
-      return getInputNode();
-    },
-    get output() {
-      return getOutputNode();
-    },
-    debugAudio,
-    ensureAudioContext,
-    updateAudioNodes,
-    connectSourceNode,
-    connect,
-    disconnect,
-    disposeAudioEngine,
-  };
+  async dispose() {
+    try {
+      this.nodes.noiseSource?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      this.nodes.noiseLfo?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      this.nodes.crackleSource?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      this.nodes.wowLfo?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      this.nodes.flutterLfo?.stop();
+    } catch {
+      // already stopped
+    }
+
+    const context = this.nodes.audioContext;
+    this.resetNodes();
+
+    if (!context || context.state === "closed") {
+      return;
+    }
+
+    try {
+      await context.close();
+    } catch {
+      // ignore double-close races
+    }
+  }
+
+  async disposeAudioEngine() {
+    await this.dispose();
+  }
 }
 
 export type CreateTetoricaRetroAudioNodeParams = Omit<
@@ -894,13 +1002,12 @@ export type CreateTetoricaRetroAudioNodeParams = Omit<
   "createAudioContext" | "connectOutputToDestination" | "connectOutputToRecordingDestination"
 >;
 
-export type TetoricaRetroAudioNode = ReturnType<typeof createTetoricaRetroAudioNode>;
-
 export function createRetroAudioEngine({
   context,
   createAudioContext,
   connectOutputToDestination = false,
   connectOutputToRecordingDestination = false,
+  //enableAudioWorklet = true,
   ...options
 }: CreateRetroAudioEngineParams = {},
 ) {
@@ -915,7 +1022,7 @@ export function createRetroAudioEngine({
           options.previewKind === "audio" ||
           options.previewKind === "capture",
   };
-  const engine = createManagedRetroAudioEngine({
+  return new TetoricaRetroAudioNode({
     instanceLabel: options.instanceLabel ?? "tetorica-retro-audio-engine",
     runtimeState,
     createAudioContext:
@@ -925,50 +1032,7 @@ export function createRetroAudioEngine({
         : undefined),
     connectOutputToDestination,
     connectOutputToRecordingDestination,
-  });
-
-  const setParams = (
-    nextParams: Partial<RetroAudioSettings>,
-    isPartialUpdate = false,
-  ) => {
-    const nextSettings = isPartialUpdate
-      ? { ...currentSettings, ...nextParams }
-      : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
-
-    Object.assign(currentSettings, nextSettings);
-    engine.updateAudioNodes();
-  };
-
-  const getParams = () => ({ ...currentSettings });
-
-  const applyPreset = (
-    preset: RetroAudioPresetKey,
-    extraParams?: Partial<RetroAudioSettings>,
-  ) => {
-    const nextSettings = resolveRetroAudioSettings({
-      preset,
-      params: extraParams,
-    });
-    Object.assign(currentSettings, nextSettings);
-    engine.updateAudioNodes();
-  };
-
-  const setIsPlaying = (nextIsPlaying: boolean) => {
-    runtimeState.isPlaying = nextIsPlaying;
-    engine.updateAudioNodes();
-  };
-
-  const setOutputEnabled = (isEnabled: boolean) => {
-    runtimeState.isOutputEnabled = isEnabled;
-    engine.updateAudioNodes();
-  };
-
-  return Object.assign(engine, {
-    setParams,
-    getParams,
-    applyPreset,
-    setIsPlaying,
-    setOutputEnabled,
+    enableAudioWorklet: options.enableAudioWorklet,
   });
 }
 
