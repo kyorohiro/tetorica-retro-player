@@ -609,7 +609,11 @@ export function RetroPreviewView({
         ref={previewShellRef}
         className={`rounded-2xl border border-slate-700 bg-slate-950 p-2 ${
           isPreviewMaximized
-            ? "fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-visible flex items-stretch justify-stretch"
+            ? isFitWidthEnabled
+              // Fit-width maximize: scrollable fullscreen overlay so tall
+              // content (e.g. portrait manga/capture) can be read in full.
+              ? "fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-y-auto"
+              : "fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-visible flex items-stretch justify-stretch"
             : isPinnedPreview
               ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
               : "overflow-visible"
@@ -627,15 +631,31 @@ export function RetroPreviewView({
         }
       >
         {isPreviewMaximized && (
-          <button
-            type="button"
-            aria-label="Exit maximize"
-            title="Exit maximize"
-            onClick={() => { setIsPreviewMaximized(false); }}
-            className="safe-top-right-offset absolute z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
-          >
-            <Minimize2 size={18} />
-          </button>
+          isFitWidthEnabled ? (
+            // Fit-width maximize: shell is a scroll container, so the exit
+            // button must be sticky so it stays reachable at all scroll depths.
+            <div className="sticky top-0 z-10 flex justify-end pb-2">
+              <button
+                type="button"
+                aria-label="Exit maximize"
+                title="Exit maximize"
+                onClick={() => { setIsPreviewMaximized(false); }}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
+              >
+                <Minimize2 size={18} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              aria-label="Exit maximize"
+              title="Exit maximize"
+              onClick={() => { setIsPreviewMaximized(false); }}
+              className="safe-top-right-offset absolute z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
+            >
+              <Minimize2 size={18} />
+            </button>
+          )
         )}
 
         <div
@@ -646,9 +666,9 @@ export function RetroPreviewView({
             isPreviewMaximized
               ? isFitWidthEnabled && previewAspectRatio
                 ? {
+                    // Scrollable maximize: no height cap so all content is reachable
                     aspectRatio: previewAspectRatio,
-                    minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
-                    maxHeight: "calc(100vh - 12rem)",
+                    width: "100%",
                   }
                 : undefined
               : isFitWidthEnabled && previewAspectRatio
@@ -749,10 +769,19 @@ export function RetroPreviewView({
             </div>
           )}
         </div>
+
+        {/* Fit-width maximize: buttons live inside the scrollable shell so
+            they are reachable after scrolling through tall content. */}
+        {isFitWidthEnabled && isPreviewMaximized && (
+          <div className="flex items-center justify-end gap-2 pt-2 pr-1">
+            {renderButtonBar()}
+          </div>
+        )}
       </div>
 
-      {/* In fit-width (manga reading) mode, buttons sit below the preview in normal document flow */}
-      {isFitWidthEnabled && (
+      {/* Fit-width normal mode: buttons below the shell in document flow.
+          Excluded when maximized — the shell's internal button bar handles it. */}
+      {isFitWidthEnabled && !isPreviewMaximized && (
         <div className="flex items-center justify-end gap-2 pt-2 pr-1">
           {renderButtonBar()}
         </div>
