@@ -59,6 +59,8 @@ export type PersistedRetroAudioSettings = {
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
+  tapeSaturationAmount: number;
+  compressorAmount: number;
 };
 
 export type PersistedRetroUiSettings = {

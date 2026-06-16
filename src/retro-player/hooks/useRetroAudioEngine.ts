@@ -79,6 +79,10 @@ export function useRetroAudioEngine({
         persisted?.reverbAmount ?? DEFAULT_AUDIO_SETTINGS.reverbAmount,
       chorusAmount:
         persisted?.chorusAmount ?? DEFAULT_AUDIO_SETTINGS.chorusAmount,
+      tapeSaturationAmount:
+        persisted?.tapeSaturationAmount ?? DEFAULT_AUDIO_SETTINGS.tapeSaturationAmount,
+      compressorAmount:
+        persisted?.compressorAmount ?? DEFAULT_AUDIO_SETTINGS.compressorAmount,
     } satisfies RetroAudioSettings;
   });
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
@@ -106,6 +110,8 @@ export function useRetroAudioEngine({
   const delayAmountRef = useRef<number>(initialAudioSettings.delayAmount);
   const reverbAmountRef = useRef<number>(initialAudioSettings.reverbAmount);
   const chorusAmountRef = useRef<number>(initialAudioSettings.chorusAmount);
+  const tapeSaturationAmountRef = useRef<number>(initialAudioSettings.tapeSaturationAmount);
+  const compressorAmountRef = useRef<number>(initialAudioSettings.compressorAmount);
 
   const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRate] = useState<number>(
@@ -159,6 +165,12 @@ export function useRetroAudioEngine({
   );
   const [chorusAmount, setChorusAmount] = useState<number>(
     initialAudioSettings.chorusAmount,
+  );
+  const [tapeSaturationAmount, setTapeSaturationAmount] = useState<number>(
+    initialAudioSettings.tapeSaturationAmount,
+  );
+  const [compressorAmount, setCompressorAmount] = useState<number>(
+    initialAudioSettings.compressorAmount,
   );
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [audioEngine] = useState(() =>
@@ -341,6 +353,8 @@ export function useRetroAudioEngine({
     delayAmountRef.current = nextSettings.delayAmount;
     reverbAmountRef.current = nextSettings.reverbAmount;
     chorusAmountRef.current = nextSettings.chorusAmount;
+    tapeSaturationAmountRef.current = nextSettings.tapeSaturationAmount;
+    compressorAmountRef.current = nextSettings.compressorAmount;
 
     setIsMuted(nextSettings.isMuted);
     setVolume(nextSettings.volume);
@@ -363,6 +377,8 @@ export function useRetroAudioEngine({
     setDelayAmount(nextSettings.delayAmount);
     setReverbAmount(nextSettings.reverbAmount);
     setChorusAmount(nextSettings.chorusAmount);
+    setTapeSaturationAmount(nextSettings.tapeSaturationAmount);
+    setCompressorAmount(nextSettings.compressorAmount);
 
     if (mediaRef.current) {
       mediaRef.current.muted = nextSettings.isMuted;
@@ -397,6 +413,8 @@ export function useRetroAudioEngine({
     delayAmountRef.current = delayAmount;
     reverbAmountRef.current = reverbAmount;
     chorusAmountRef.current = chorusAmount;
+    tapeSaturationAmountRef.current = tapeSaturationAmount;
+    compressorAmountRef.current = compressorAmount;
 
     setParams(
       {
@@ -421,6 +439,8 @@ export function useRetroAudioEngine({
         delayAmount,
         reverbAmount,
         chorusAmount,
+        tapeSaturationAmount,
+        compressorAmount,
       },
       true,
     );
@@ -457,6 +477,8 @@ export function useRetroAudioEngine({
     delayAmount,
     reverbAmount,
     chorusAmount,
+    tapeSaturationAmount,
+    compressorAmount,
     isPlaying,
     playbackRate,
     isLooping,
@@ -486,6 +508,8 @@ export function useRetroAudioEngine({
       delayAmount,
       reverbAmount,
       chorusAmount,
+      tapeSaturationAmount,
+      compressorAmount,
     });
   }, [
     isMuted,
@@ -509,6 +533,8 @@ export function useRetroAudioEngine({
     delayAmount,
     reverbAmount,
     chorusAmount,
+    tapeSaturationAmount,
+    compressorAmount,
   ]);
 
   return {
@@ -567,6 +593,8 @@ export function useRetroAudioEngine({
     delayAmountRef,
     reverbAmountRef,
     chorusAmountRef,
+    tapeSaturationAmountRef,
+    compressorAmountRef,
     isMuted,
     setIsMuted,
     playbackRate,
@@ -609,6 +637,10 @@ export function useRetroAudioEngine({
     setReverbAmount,
     chorusAmount,
     setChorusAmount,
+    tapeSaturationAmount,
+    setTapeSaturationAmount,
+    compressorAmount,
+    setCompressorAmount,
     debugAudio,
     ensureAudioContext,
     ensureInitialized,

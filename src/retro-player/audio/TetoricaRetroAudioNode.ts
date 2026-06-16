@@ -60,6 +60,21 @@ function createDriveCurve(amount: number) {
   return curve;
 }
 
+function createTapeSaturationCurve(amount: number): Float32Array<ArrayBuffer> {
+  const samples = 256;
+  const curve = new Float32Array(samples) as Float32Array<ArrayBuffer>;
+  const k = amount * 8;
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / (samples - 1) - 1;
+    if (k < 0.001) {
+      curve[i] = x;
+    } else {
+      curve[i] = Math.tanh(x * (1 + k)) / Math.tanh(1 + k);
+    }
+  }
+  return curve;
+}
+
 function createHallReverbImpulse(context: AudioContext) {
   const duration = 2.2;
   const length = Math.max(1, Math.floor(context.sampleRate * duration));
@@ -274,6 +289,8 @@ export class TetoricaRetroAudioNode {
     chorusLfoGain1: null as GainNode | null,
     chorusLfoGain2: null as GainNode | null,
     chorusWetGain: null as GainNode | null,
+    tapeSaturator: null as WaveShaperNode | null,
+    busCompressor: null as DynamicsCompressorNode | null,
   };
 
   constructor({
@@ -525,6 +542,8 @@ export class TetoricaRetroAudioNode {
       chorusLfoGain1: null,
       chorusLfoGain2: null,
       chorusWetGain: null,
+      tapeSaturator: null,
+      busCompressor: null,
     });
   }
 
@@ -638,9 +657,9 @@ export class TetoricaRetroAudioNode {
       const amount = settings.isAudioFxEnabled ? settings.wowFlutterAmount : 0;
       wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
       wowLfo.frequency.value = 0.18 + amount * 0.42;
-      wowLfoGain.gain.value = amount * 0.0035;
+      wowLfoGain.gain.value = amount * 0.0023;
       flutterLfo.frequency.value = 5.2 + amount * 6.5;
-      flutterLfoGain.gain.value = amount * 0.0009;
+      flutterLfoGain.gain.value = amount * 0.0006;
     }
 
     if (noiseGainNode) {
@@ -690,6 +709,24 @@ export class TetoricaRetroAudioNode {
       chorusWetGain.gain.value = amount * 0.6;
       chorusLfoGain1.gain.value = amount * 0.005;
       chorusLfoGain2.gain.value = amount * 0.006;
+    }
+
+    const tapeSaturator = this.nodes.tapeSaturator;
+    if (tapeSaturator) {
+      try {
+        tapeSaturator.curve = createTapeSaturationCurve(
+          settings.isAudioFxEnabled ? settings.tapeSaturationAmount : 0,
+        );
+      } catch {
+        // Some non-browser Web Audio implementations reject reassigning curve.
+      }
+    }
+
+    const busCompressor = this.nodes.busCompressor;
+    if (busCompressor) {
+      const amount = settings.isAudioFxEnabled ? settings.compressorAmount : 0;
+      busCompressor.threshold.value = -36 * amount;
+      busCompressor.ratio.value = 1 + 9 * amount;
     }
   }
 
@@ -788,13 +825,20 @@ export class TetoricaRetroAudioNode {
       }
       bassEq.connect(midEq);
       midEq.connect(trebleEq);
+
+      // Tape saturation (series, after EQ)
+      const tapeSaturator = context.createWaveShaper();
+      tapeSaturator.curve = createTapeSaturationCurve(0);
+      tapeSaturator.oversample = "4x";
+
+      trebleEq.connect(tapeSaturator);
       if (stereoWidth) {
-        trebleEq.connect(stereoWidth);
+        tapeSaturator.connect(stereoWidth);
         stereoWidth.connect(roomDryGain);
         stereoWidth.connect(roomConvolver);
       } else {
-        trebleEq.connect(roomDryGain);
-        trebleEq.connect(roomConvolver);
+        tapeSaturator.connect(roomDryGain);
+        tapeSaturator.connect(roomConvolver);
       }
       roomConvolver.connect(roomWetGain);
       roomDryGain.connect(masterGain);
@@ -803,6 +847,14 @@ export class TetoricaRetroAudioNode {
       // --- Spatial effects (delay / reverb / chorus) ---
       const outputBus = context.createGain();
       outputBus.gain.value = 1;
+
+      // Bus compressor (after outputBus, before destination)
+      const busCompressor = context.createDynamicsCompressor();
+      busCompressor.knee.value = 10;
+      busCompressor.attack.value = 0.003;
+      busCompressor.release.value = 0.12;
+      busCompressor.threshold.value = 0;
+      busCompressor.ratio.value = 1;
 
       // Echo delay
       const echoDelayLine = context.createDelay(1.0);
@@ -859,11 +911,12 @@ export class TetoricaRetroAudioNode {
       chorusLfo1.start();
       chorusLfo2.start();
 
+      outputBus.connect(busCompressor);
       if (this.connectOutputToDestination) {
-        outputBus.connect(context.destination);
+        busCompressor.connect(context.destination);
       }
       if (recordingDestination && this.connectOutputToRecordingDestination) {
-        outputBus.connect(recordingDestination);
+        busCompressor.connect(recordingDestination);
       }
 
       const noiseSource = context.createBufferSource();
@@ -980,6 +1033,8 @@ export class TetoricaRetroAudioNode {
         chorusLfoGain1,
         chorusLfoGain2,
         chorusWetGain,
+        tapeSaturator,
+        busCompressor,
       });
     }
 

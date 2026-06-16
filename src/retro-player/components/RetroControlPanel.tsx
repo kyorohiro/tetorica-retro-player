@@ -40,6 +40,8 @@ export type RetroControlPlayerSlice = {
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
+  tapeSaturationAmount: number;
+  compressorAmount: number;
   playbackRate: number;
   volume: number;
   setLofiAmount: (v: number) => void;
@@ -57,6 +59,8 @@ export type RetroControlPlayerSlice = {
   setDelayAmount: (v: number) => void;
   setReverbAmount: (v: number) => void;
   setChorusAmount: (v: number) => void;
+  setTapeSaturationAmount: (v: number) => void;
+  setCompressorAmount: (v: number) => void;
   changePlaybackRate: (v: number) => void;
   changeVolume: (v: number) => void;
   seekTo: (time: number) => void;
@@ -136,6 +140,8 @@ export function RetroControlPanel({
               delayAmount={player.delayAmount}
               reverbAmount={player.reverbAmount}
               chorusAmount={player.chorusAmount}
+              tapeSaturationAmount={player.tapeSaturationAmount}
+              compressorAmount={player.compressorAmount}
               playbackRate={player.playbackRate}
               volume={player.volume}
               onChangeLofiAmount={player.setLofiAmount}
@@ -153,6 +159,8 @@ export function RetroControlPanel({
               onChangeDelayAmount={player.setDelayAmount}
               onChangeReverbAmount={player.setReverbAmount}
               onChangeChorusAmount={player.setChorusAmount}
+              onChangeTapeSaturationAmount={player.setTapeSaturationAmount}
+              onChangeCompressorAmount={player.setCompressorAmount}
               onChangePlaybackRate={player.changePlaybackRate}
               onChangeVolume={player.changeVolume}
               onRestart={() => {

@@ -20,6 +20,8 @@ export type RetroAudioSettings = {
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
+  tapeSaturationAmount: number;
+  compressorAmount: number;
 };
 
 export const DEFAULT_AUDIO_SETTINGS = {
@@ -44,6 +46,8 @@ export const DEFAULT_AUDIO_SETTINGS = {
   delayAmount: 0,
   reverbAmount: 0,
   chorusAmount: 0,
+  tapeSaturationAmount: 0,
+  compressorAmount: 0,
 } as const satisfies RetroAudioSettings;
 
 export type RetroAudioPresetKey =
@@ -86,6 +90,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0,
     },
   },
   lofi: {
@@ -108,6 +114,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       vinylDustAmount: 0,
       delayAmount: 0.1,
       reverbAmount: 0.1,
+      tapeSaturationAmount: 0.15,
+      compressorAmount: 0.25,
     },
   },
   radio: {
@@ -131,6 +139,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0.40,
     },
   },
   tape: {
@@ -148,11 +158,13 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       trebleAmount: -0.14,
       stereoWidthAmount: 0.06,
       smallSpeakerRoomAmount: 0.18,
-      wowFlutterAmount: 0.42,
+      wowFlutterAmount: 0.30,
       noiseLevel: 0.0075,
       vinylDustAmount: 0,
       reverbAmount: 0.1,
       chorusAmount: 0.25,
+      tapeSaturationAmount: 0.35,
+      compressorAmount: 0.25,
     },
   },
   vinyl: {
@@ -176,6 +188,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
+      tapeSaturationAmount: 0.10,
+      compressorAmount: 0.15,
     },
   },
   "vintage-mic": {
@@ -197,6 +211,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       noiseLevel: 0.0025,
       vinylDustAmount: 0.08,
       reverbAmount: 0.15,
+      tapeSaturationAmount: 0.15,
+      compressorAmount: 0.25,
     },
   },
   earphone: {
@@ -220,6 +236,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0,
     },
   },
   lofiTape: {
@@ -237,12 +255,14 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       trebleAmount: -0.14,
       stereoWidthAmount: -0.02,
       smallSpeakerRoomAmount: 0.1,
-      wowFlutterAmount: 0.22,
+      wowFlutterAmount: 0.16,
       noiseLevel: 0.005,
       vinylDustAmount: 0,
       delayAmount: 0.1,
       reverbAmount: 0.1,
       chorusAmount: 0.1,
+      tapeSaturationAmount: 0.25,
+      compressorAmount: 0.25,
     },
   },
 };
