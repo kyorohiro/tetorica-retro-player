@@ -83,6 +83,8 @@ export function useRetroAudioEngine({
         persisted?.tapeSaturationAmount ?? DEFAULT_AUDIO_SETTINGS.tapeSaturationAmount,
       compressorAmount:
         persisted?.compressorAmount ?? DEFAULT_AUDIO_SETTINGS.compressorAmount,
+      fxOutputTrimAmount:
+        persisted?.fxOutputTrimAmount ?? DEFAULT_AUDIO_SETTINGS.fxOutputTrimAmount,
     } satisfies RetroAudioSettings;
   });
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
@@ -112,6 +114,7 @@ export function useRetroAudioEngine({
   const chorusAmountRef = useRef<number>(initialAudioSettings.chorusAmount);
   const tapeSaturationAmountRef = useRef<number>(initialAudioSettings.tapeSaturationAmount);
   const compressorAmountRef = useRef<number>(initialAudioSettings.compressorAmount);
+  const fxOutputTrimAmountRef = useRef<number>(initialAudioSettings.fxOutputTrimAmount);
 
   const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRate] = useState<number>(
@@ -171,6 +174,9 @@ export function useRetroAudioEngine({
   );
   const [compressorAmount, setCompressorAmount] = useState<number>(
     initialAudioSettings.compressorAmount,
+  );
+  const [fxOutputTrimAmount, setFxOutputTrimAmount] = useState<number>(
+    initialAudioSettings.fxOutputTrimAmount,
   );
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [audioEngine] = useState(() =>
@@ -355,6 +361,7 @@ export function useRetroAudioEngine({
     chorusAmountRef.current = nextSettings.chorusAmount;
     tapeSaturationAmountRef.current = nextSettings.tapeSaturationAmount;
     compressorAmountRef.current = nextSettings.compressorAmount;
+    fxOutputTrimAmountRef.current = nextSettings.fxOutputTrimAmount;
 
     setIsMuted(nextSettings.isMuted);
     setVolume(nextSettings.volume);
@@ -379,6 +386,7 @@ export function useRetroAudioEngine({
     setChorusAmount(nextSettings.chorusAmount);
     setTapeSaturationAmount(nextSettings.tapeSaturationAmount);
     setCompressorAmount(nextSettings.compressorAmount);
+    setFxOutputTrimAmount(nextSettings.fxOutputTrimAmount);
 
     if (mediaRef.current) {
       mediaRef.current.muted = nextSettings.isMuted;
@@ -415,6 +423,7 @@ export function useRetroAudioEngine({
     chorusAmountRef.current = chorusAmount;
     tapeSaturationAmountRef.current = tapeSaturationAmount;
     compressorAmountRef.current = compressorAmount;
+    fxOutputTrimAmountRef.current = fxOutputTrimAmount;
 
     setParams(
       {
@@ -441,6 +450,7 @@ export function useRetroAudioEngine({
         chorusAmount,
         tapeSaturationAmount,
         compressorAmount,
+        fxOutputTrimAmount,
       },
       true,
     );
@@ -479,6 +489,7 @@ export function useRetroAudioEngine({
     chorusAmount,
     tapeSaturationAmount,
     compressorAmount,
+    fxOutputTrimAmount,
     isPlaying,
     playbackRate,
     isLooping,
@@ -510,6 +521,7 @@ export function useRetroAudioEngine({
       chorusAmount,
       tapeSaturationAmount,
       compressorAmount,
+      fxOutputTrimAmount,
     });
   }, [
     isMuted,
@@ -535,6 +547,7 @@ export function useRetroAudioEngine({
     chorusAmount,
     tapeSaturationAmount,
     compressorAmount,
+    fxOutputTrimAmount,
   ]);
 
   return {
@@ -595,6 +608,7 @@ export function useRetroAudioEngine({
     chorusAmountRef,
     tapeSaturationAmountRef,
     compressorAmountRef,
+    fxOutputTrimAmountRef,
     isMuted,
     setIsMuted,
     playbackRate,
@@ -641,6 +655,8 @@ export function useRetroAudioEngine({
     setTapeSaturationAmount,
     compressorAmount,
     setCompressorAmount,
+    fxOutputTrimAmount,
+    setFxOutputTrimAmount,
     debugAudio,
     ensureAudioContext,
     ensureInitialized,

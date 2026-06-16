@@ -174,6 +174,8 @@ export function usePixiVideoPlayer(
     setTapeSaturationAmount,
     compressorAmount,
     setCompressorAmount,
+    fxOutputTrimAmount,
+    setFxOutputTrimAmount,
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
@@ -916,6 +918,8 @@ export function usePixiVideoPlayer(
     setTapeSaturationAmount,
     compressorAmount,
     setCompressorAmount,
+    fxOutputTrimAmount,
+    setFxOutputTrimAmount,
     hasPlayableMedia:
       previewKind === "video" || previewKind === "audio" || previewKind === "capture",
     hasVideo: previewKind === "video" || previewKind === "capture",

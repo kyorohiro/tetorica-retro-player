@@ -68,6 +68,7 @@ type VideoControlsProps = {
   onChangeChorusAmount: (amount: number) => void;
   onChangeTapeSaturationAmount: (amount: number) => void;
   onChangeCompressorAmount: (amount: number) => void;
+  onChangeFxOutputTrimAmount: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
   onChangeVolume: (volume: number) => void;
   onRestart: () => void;
@@ -146,6 +147,7 @@ export function VideoControls({
   onChangeChorusAmount,
   onChangeTapeSaturationAmount,
   onChangeCompressorAmount,
+  onChangeFxOutputTrimAmount,
   onChangePlaybackRate,
   onChangeVolume,
   onRestart: _onRestart,
@@ -172,7 +174,6 @@ export function VideoControls({
       return (
         settings.isAudioFxEnabled === isAudioFxEnabled &&
         settings.isNoiseEnabled === isNoiseEnabled &&
-        isNearlyEqual(settings.volume, volume) &&
         isNearlyEqual(settings.lofiAmount, lofiAmount) &&
         isNearlyEqual(settings.radioToneAmount, radioToneAmount) &&
         isNearlyEqual(settings.bitCrushAmount, bitCrushAmount) &&
@@ -213,7 +214,6 @@ export function VideoControls({
       onToggleNoise();
     }
 
-    onChangeVolume(presetSettings.volume);
     onChangeLofiAmount(presetSettings.lofiAmount);
     onChangeRadioToneAmount(presetSettings.radioToneAmount);
     onChangeBitCrushAmount(presetSettings.bitCrushAmount);
@@ -231,6 +231,7 @@ export function VideoControls({
     onChangeChorusAmount(presetSettings.chorusAmount);
     onChangeTapeSaturationAmount(presetSettings.tapeSaturationAmount);
     onChangeCompressorAmount(presetSettings.compressorAmount);
+    onChangeFxOutputTrimAmount(presetSettings.fxOutputTrimAmount);
   };
 
   if (mode === "audio-settings") {
@@ -760,6 +761,33 @@ export function VideoControls({
                 </div>
               )}
             </div>
+            <div className="col-span-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onToggleMute}
+                aria-label={isMuted ? "Unmute" : "Mute"}
+                className="shrink-0 text-slate-400 hover:text-slate-100"
+              >
+                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={isMuted ? 0 : volume}
+                onChange={(ev) => {
+                  const v = Number(ev.currentTarget.value);
+                  if (isMuted && v > 0) onToggleMute();
+                  onChangeVolume(v);
+                }}
+                className="w-full"
+              />
+              <span className="w-8 shrink-0 text-right text-[11px] text-slate-400">
+                {Math.round(volume * 100)}%
+              </span>
+            </div>
+
             {hasVideo ? (
               <div className="col-span-4 grid grid-cols-6 gap-2">
                 <button

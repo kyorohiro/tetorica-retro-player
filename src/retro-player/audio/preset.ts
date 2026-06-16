@@ -22,11 +22,12 @@ export type RetroAudioSettings = {
   chorusAmount: number;
   tapeSaturationAmount: number;
   compressorAmount: number;
+  fxOutputTrimAmount: number;
 };
 
 export const DEFAULT_AUDIO_SETTINGS = {
   isMuted: false,
-  volume: 1,
+  volume: 0.3,
   playbackRate: 1,
   isLooping: true,
   isAudioFxEnabled: true,
@@ -48,6 +49,7 @@ export const DEFAULT_AUDIO_SETTINGS = {
   chorusAmount: 0,
   tapeSaturationAmount: 0,
   compressorAmount: 0,
+  fxOutputTrimAmount: 1.0,
 } as const satisfies RetroAudioSettings;
 
 export type RetroAudioPresetKey =
@@ -74,7 +76,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: false,
       isNoiseEnabled: false,
-      volume: 1,
+      //volume: 1,
       lofiAmount: 0,
       radioToneAmount: 0,
       bitCrushAmount: 0,
@@ -92,6 +94,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0,
       tapeSaturationAmount: 0,
       compressorAmount: 0,
+      fxOutputTrimAmount: 1.0,
     },
   },
   lofi: {
@@ -99,7 +102,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.92,
+      //volume: 0.92,
       lofiAmount: 0.58,
       radioToneAmount: 0.18,
       bitCrushAmount: 0.22,
@@ -116,6 +119,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       reverbAmount: 0.1,
       tapeSaturationAmount: 0.15,
       compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.78,
     },
   },
   radio: {
@@ -123,7 +127,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.88,
+      //volume: 0.88,
       lofiAmount: 0.4,
       radioToneAmount: 0.9,
       bitCrushAmount: 0.12,
@@ -141,6 +145,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0,
       tapeSaturationAmount: 0,
       compressorAmount: 0.40,
+      fxOutputTrimAmount: 0.78,
     },
   },
   tape: {
@@ -148,7 +153,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.94,
+      //volume: 0.94,
       lofiAmount: 0.22,
       radioToneAmount: 0.1,
       bitCrushAmount: 0.04,
@@ -165,6 +170,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0.25,
       tapeSaturationAmount: 0.35,
       compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.78,
     },
   },
   vinyl: {
@@ -172,7 +178,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.96,
+      //volume: 0.96,
       lofiAmount: 0.14,
       radioToneAmount: 0.06,
       bitCrushAmount: 0.01,
@@ -190,6 +196,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0,
       tapeSaturationAmount: 0.10,
       compressorAmount: 0.15,
+      fxOutputTrimAmount: 0.82,
     },
   },
   "vintage-mic": {
@@ -197,7 +204,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.94,
+      //volume: 0.94,
       lofiAmount: 0.34,
       radioToneAmount: 0.28,
       bitCrushAmount: 0,
@@ -213,6 +220,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       reverbAmount: 0.15,
       tapeSaturationAmount: 0.15,
       compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.82,
     },
   },
   earphone: {
@@ -220,7 +228,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: false,
-      volume: 1,
+      //volume: 1,
       lofiAmount: 0,
       radioToneAmount: 0,
       bitCrushAmount: 0,
@@ -238,6 +246,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0,
       tapeSaturationAmount: 0,
       compressorAmount: 0,
+      fxOutputTrimAmount: 1.0,
     },
   },
   lofiTape: {
@@ -245,7 +254,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.93,
+      //volume: 0.93,
       lofiAmount: 0.48,
       radioToneAmount: 0.1,
       bitCrushAmount: 0.1,
@@ -263,6 +272,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0.1,
       tapeSaturationAmount: 0.25,
       compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.78,
     },
   },
 };

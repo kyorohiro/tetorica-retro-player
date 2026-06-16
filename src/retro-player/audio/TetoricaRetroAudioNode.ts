@@ -291,6 +291,7 @@ export class TetoricaRetroAudioNode {
     chorusWetGain: null as GainNode | null,
     tapeSaturator: null as WaveShaperNode | null,
     busCompressor: null as DynamicsCompressorNode | null,
+    fxOutputGain: null as GainNode | null,
   };
 
   constructor({
@@ -544,6 +545,7 @@ export class TetoricaRetroAudioNode {
       chorusWetGain: null,
       tapeSaturator: null,
       busCompressor: null,
+      fxOutputGain: null,
     });
   }
 
@@ -728,6 +730,13 @@ export class TetoricaRetroAudioNode {
       busCompressor.threshold.value = -36 * amount;
       busCompressor.ratio.value = 1 + 9 * amount;
     }
+
+    const fxOutputGain = this.nodes.fxOutputGain;
+    if (fxOutputGain) {
+      fxOutputGain.gain.value = settings.isAudioFxEnabled
+        ? settings.fxOutputTrimAmount
+        : 1;
+    }
   }
 
   async ensureInitialized() {
@@ -911,12 +920,16 @@ export class TetoricaRetroAudioNode {
       chorusLfo1.start();
       chorusLfo2.start();
 
+      const fxOutputGain = context.createGain();
+      fxOutputGain.gain.value = 1;
+
       outputBus.connect(busCompressor);
+      busCompressor.connect(fxOutputGain);
       if (this.connectOutputToDestination) {
-        busCompressor.connect(context.destination);
+        fxOutputGain.connect(context.destination);
       }
       if (recordingDestination && this.connectOutputToRecordingDestination) {
-        busCompressor.connect(recordingDestination);
+        fxOutputGain.connect(recordingDestination);
       }
 
       const noiseSource = context.createBufferSource();
@@ -1035,6 +1048,7 @@ export class TetoricaRetroAudioNode {
         chorusWetGain,
         tapeSaturator,
         busCompressor,
+        fxOutputGain,
       });
     }
 
