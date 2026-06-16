@@ -17,11 +17,17 @@ export type RetroAudioSettings = {
   isNoiseEnabled: boolean;
   noiseLevel: number;
   vinylDustAmount: number;
+  delayAmount: number;
+  reverbAmount: number;
+  chorusAmount: number;
+  tapeSaturationAmount: number;
+  compressorAmount: number;
+  fxOutputTrimAmount: number;
 };
 
 export const DEFAULT_AUDIO_SETTINGS = {
   isMuted: false,
-  volume: 1,
+  volume: 0.3,
   playbackRate: 1,
   isLooping: true,
   isAudioFxEnabled: true,
@@ -38,6 +44,12 @@ export const DEFAULT_AUDIO_SETTINGS = {
   isNoiseEnabled: false,
   noiseLevel: 0.02,
   vinylDustAmount: 0,
+  delayAmount: 0,
+  reverbAmount: 0,
+  chorusAmount: 0,
+  tapeSaturationAmount: 0,
+  compressorAmount: 0,
+  fxOutputTrimAmount: 1.0,
 } as const satisfies RetroAudioSettings;
 
 export type RetroAudioPresetKey =
@@ -64,7 +76,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: false,
       isNoiseEnabled: false,
-      volume: 1,
+      //volume: 1,
       lofiAmount: 0,
       radioToneAmount: 0,
       bitCrushAmount: 0,
@@ -77,6 +89,12 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0,
       noiseLevel: 0,
       vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0,
+      fxOutputTrimAmount: 1.0,
     },
   },
   lofi: {
@@ -84,8 +102,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.92,
-      lofiAmount: 0.7,
+      //volume: 0.92,
+      lofiAmount: 0.58,
       radioToneAmount: 0.18,
       bitCrushAmount: 0.22,
       sampleRateReductionAmount: 0.24,
@@ -97,6 +115,11 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.12,
       noiseLevel: 0.005,
       vinylDustAmount: 0,
+      delayAmount: 0.1,
+      reverbAmount: 0.1,
+      tapeSaturationAmount: 0.15,
+      compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.78,
     },
   },
   radio: {
@@ -104,7 +127,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.88,
+      //volume: 0.88,
       lofiAmount: 0.4,
       radioToneAmount: 0.9,
       bitCrushAmount: 0.12,
@@ -117,6 +140,12 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.08,
       noiseLevel: 0.01,
       vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0.40,
+      fxOutputTrimAmount: 0.78,
     },
   },
   tape: {
@@ -124,7 +153,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.94,
+      //volume: 0.94,
       lofiAmount: 0.22,
       radioToneAmount: 0.1,
       bitCrushAmount: 0.04,
@@ -134,9 +163,14 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       trebleAmount: -0.14,
       stereoWidthAmount: 0.06,
       smallSpeakerRoomAmount: 0.18,
-      wowFlutterAmount: 0.42,
+      wowFlutterAmount: 0.30,
       noiseLevel: 0.0075,
       vinylDustAmount: 0,
+      reverbAmount: 0.1,
+      chorusAmount: 0.25,
+      tapeSaturationAmount: 0.35,
+      compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.78,
     },
   },
   vinyl: {
@@ -144,7 +178,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.96,
+      //volume: 0.96,
       lofiAmount: 0.14,
       radioToneAmount: 0.06,
       bitCrushAmount: 0.01,
@@ -157,6 +191,12 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.18,
       noiseLevel: 0.0035,
       vinylDustAmount: 0.58,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0.10,
+      compressorAmount: 0.15,
+      fxOutputTrimAmount: 0.82,
     },
   },
   "vintage-mic": {
@@ -164,7 +204,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.94,
+      //volume: 0.94,
       lofiAmount: 0.34,
       radioToneAmount: 0.28,
       bitCrushAmount: 0,
@@ -177,6 +217,10 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.04,
       noiseLevel: 0.0025,
       vinylDustAmount: 0.08,
+      reverbAmount: 0.15,
+      tapeSaturationAmount: 0.15,
+      compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.82,
     },
   },
   earphone: {
@@ -184,7 +228,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: false,
-      volume: 1,
+      //volume: 1,
       lofiAmount: 0,
       radioToneAmount: 0,
       bitCrushAmount: 0,
@@ -197,6 +241,12 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0,
       noiseLevel: 0,
       vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0,
+      fxOutputTrimAmount: 1.0,
     },
   },
   lofiTape: {
@@ -204,19 +254,25 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      volume: 0.93,
-      lofiAmount: 0.58,
-      radioToneAmount: 0.12,
-      bitCrushAmount: 0.12,
-      sampleRateReductionAmount: 0.16,
+      //volume: 0.93,
+      lofiAmount: 0.48,
+      radioToneAmount: 0.1,
+      bitCrushAmount: 0.1,
+      sampleRateReductionAmount: 0.12,
       bassAmount: 0.1,
       midAmount: -0.02,
-      trebleAmount: -0.16,
+      trebleAmount: -0.14,
       stereoWidthAmount: -0.02,
-      smallSpeakerRoomAmount: 0.12,
-      wowFlutterAmount: 0.28,
-      noiseLevel: 0.006,
+      smallSpeakerRoomAmount: 0.1,
+      wowFlutterAmount: 0.16,
+      noiseLevel: 0.005,
       vinylDustAmount: 0,
+      delayAmount: 0.1,
+      reverbAmount: 0.1,
+      chorusAmount: 0.1,
+      tapeSaturationAmount: 0.25,
+      compressorAmount: 0.25,
+      fxOutputTrimAmount: 0.78,
     },
   },
 };
