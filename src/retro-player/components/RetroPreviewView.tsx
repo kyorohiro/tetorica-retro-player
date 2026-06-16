@@ -495,7 +495,11 @@ export function RetroPreviewView({
           onClick={() => {
             hideTooltip();
             onFitWidthChange(!isFitWidthEnabled);
-            onRefit();
+            // onRefit() is intentionally NOT called here.
+            // RetroPlayer already calls refreshLayout() via useEffect when
+            // isFitWidthEnabled changes.  In capture mode, onRefit() would
+            // trigger a full previewStream() reinit with a stale fitMode
+            // closure, leaving the canvas locked at the expanded size.
           }}
           onMouseEnter={() => scheduleTooltip("fit-width")}
           onMouseLeave={hideTooltip}
