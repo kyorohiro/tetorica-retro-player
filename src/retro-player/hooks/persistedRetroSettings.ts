@@ -56,6 +56,12 @@ export type PersistedRetroAudioSettings = {
   isNoiseEnabled: boolean;
   noiseLevel: number;
   vinylDustAmount: number;
+  delayAmount: number;
+  reverbAmount: number;
+  chorusAmount: number;
+  tapeSaturationAmount: number;
+  compressorAmount: number;
+  fxOutputTrimAmount: number;
 };
 
 export type PersistedRetroUiSettings = {

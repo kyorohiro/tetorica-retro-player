@@ -73,6 +73,18 @@ export function useRetroAudioEngine({
       noiseLevel: persisted?.noiseLevel ?? DEFAULT_AUDIO_SETTINGS.noiseLevel,
       vinylDustAmount:
         persisted?.vinylDustAmount ?? DEFAULT_AUDIO_SETTINGS.vinylDustAmount,
+      delayAmount:
+        persisted?.delayAmount ?? DEFAULT_AUDIO_SETTINGS.delayAmount,
+      reverbAmount:
+        persisted?.reverbAmount ?? DEFAULT_AUDIO_SETTINGS.reverbAmount,
+      chorusAmount:
+        persisted?.chorusAmount ?? DEFAULT_AUDIO_SETTINGS.chorusAmount,
+      tapeSaturationAmount:
+        persisted?.tapeSaturationAmount ?? DEFAULT_AUDIO_SETTINGS.tapeSaturationAmount,
+      compressorAmount:
+        persisted?.compressorAmount ?? DEFAULT_AUDIO_SETTINGS.compressorAmount,
+      fxOutputTrimAmount:
+        persisted?.fxOutputTrimAmount ?? DEFAULT_AUDIO_SETTINGS.fxOutputTrimAmount,
     } satisfies RetroAudioSettings;
   });
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
@@ -97,6 +109,12 @@ export function useRetroAudioEngine({
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
   const vinylDustAmountRef = useRef<number>(initialAudioSettings.vinylDustAmount);
+  const delayAmountRef = useRef<number>(initialAudioSettings.delayAmount);
+  const reverbAmountRef = useRef<number>(initialAudioSettings.reverbAmount);
+  const chorusAmountRef = useRef<number>(initialAudioSettings.chorusAmount);
+  const tapeSaturationAmountRef = useRef<number>(initialAudioSettings.tapeSaturationAmount);
+  const compressorAmountRef = useRef<number>(initialAudioSettings.compressorAmount);
+  const fxOutputTrimAmountRef = useRef<number>(initialAudioSettings.fxOutputTrimAmount);
 
   const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRate] = useState<number>(
@@ -141,6 +159,24 @@ export function useRetroAudioEngine({
   const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
   const [vinylDustAmount, setVinylDustAmount] = useState<number>(
     initialAudioSettings.vinylDustAmount,
+  );
+  const [delayAmount, setDelayAmount] = useState<number>(
+    initialAudioSettings.delayAmount,
+  );
+  const [reverbAmount, setReverbAmount] = useState<number>(
+    initialAudioSettings.reverbAmount,
+  );
+  const [chorusAmount, setChorusAmount] = useState<number>(
+    initialAudioSettings.chorusAmount,
+  );
+  const [tapeSaturationAmount, setTapeSaturationAmount] = useState<number>(
+    initialAudioSettings.tapeSaturationAmount,
+  );
+  const [compressorAmount, setCompressorAmount] = useState<number>(
+    initialAudioSettings.compressorAmount,
+  );
+  const [fxOutputTrimAmount, setFxOutputTrimAmount] = useState<number>(
+    initialAudioSettings.fxOutputTrimAmount,
   );
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [audioEngine] = useState(() =>
@@ -320,6 +356,12 @@ export function useRetroAudioEngine({
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
     vinylDustAmountRef.current = nextSettings.vinylDustAmount;
+    delayAmountRef.current = nextSettings.delayAmount;
+    reverbAmountRef.current = nextSettings.reverbAmount;
+    chorusAmountRef.current = nextSettings.chorusAmount;
+    tapeSaturationAmountRef.current = nextSettings.tapeSaturationAmount;
+    compressorAmountRef.current = nextSettings.compressorAmount;
+    fxOutputTrimAmountRef.current = nextSettings.fxOutputTrimAmount;
 
     setIsMuted(nextSettings.isMuted);
     setVolume(nextSettings.volume);
@@ -339,6 +381,12 @@ export function useRetroAudioEngine({
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
     setVinylDustAmount(nextSettings.vinylDustAmount);
+    setDelayAmount(nextSettings.delayAmount);
+    setReverbAmount(nextSettings.reverbAmount);
+    setChorusAmount(nextSettings.chorusAmount);
+    setTapeSaturationAmount(nextSettings.tapeSaturationAmount);
+    setCompressorAmount(nextSettings.compressorAmount);
+    setFxOutputTrimAmount(nextSettings.fxOutputTrimAmount);
 
     if (mediaRef.current) {
       mediaRef.current.muted = nextSettings.isMuted;
@@ -370,6 +418,12 @@ export function useRetroAudioEngine({
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
     vinylDustAmountRef.current = vinylDustAmount;
+    delayAmountRef.current = delayAmount;
+    reverbAmountRef.current = reverbAmount;
+    chorusAmountRef.current = chorusAmount;
+    tapeSaturationAmountRef.current = tapeSaturationAmount;
+    compressorAmountRef.current = compressorAmount;
+    fxOutputTrimAmountRef.current = fxOutputTrimAmount;
 
     setParams(
       {
@@ -391,6 +445,12 @@ export function useRetroAudioEngine({
         isNoiseEnabled,
         noiseLevel,
         vinylDustAmount,
+        delayAmount,
+        reverbAmount,
+        chorusAmount,
+        tapeSaturationAmount,
+        compressorAmount,
+        fxOutputTrimAmount,
       },
       true,
     );
@@ -424,6 +484,12 @@ export function useRetroAudioEngine({
     isNoiseEnabled,
     noiseLevel,
     vinylDustAmount,
+    delayAmount,
+    reverbAmount,
+    chorusAmount,
+    tapeSaturationAmount,
+    compressorAmount,
+    fxOutputTrimAmount,
     isPlaying,
     playbackRate,
     isLooping,
@@ -450,6 +516,12 @@ export function useRetroAudioEngine({
       isNoiseEnabled,
       noiseLevel,
       vinylDustAmount,
+      delayAmount,
+      reverbAmount,
+      chorusAmount,
+      tapeSaturationAmount,
+      compressorAmount,
+      fxOutputTrimAmount,
     });
   }, [
     isMuted,
@@ -470,6 +542,12 @@ export function useRetroAudioEngine({
     isNoiseEnabled,
     noiseLevel,
     vinylDustAmount,
+    delayAmount,
+    reverbAmount,
+    chorusAmount,
+    tapeSaturationAmount,
+    compressorAmount,
+    fxOutputTrimAmount,
   ]);
 
   return {
@@ -525,6 +603,12 @@ export function useRetroAudioEngine({
     isNoiseEnabledRef,
     noiseLevelRef,
     vinylDustAmountRef,
+    delayAmountRef,
+    reverbAmountRef,
+    chorusAmountRef,
+    tapeSaturationAmountRef,
+    compressorAmountRef,
+    fxOutputTrimAmountRef,
     isMuted,
     setIsMuted,
     playbackRate,
@@ -561,6 +645,18 @@ export function useRetroAudioEngine({
     setNoiseLevel,
     vinylDustAmount,
     setVinylDustAmount,
+    delayAmount,
+    setDelayAmount,
+    reverbAmount,
+    setReverbAmount,
+    chorusAmount,
+    setChorusAmount,
+    tapeSaturationAmount,
+    setTapeSaturationAmount,
+    compressorAmount,
+    setCompressorAmount,
+    fxOutputTrimAmount,
+    setFxOutputTrimAmount,
     debugAudio,
     ensureAudioContext,
     ensureInitialized,
