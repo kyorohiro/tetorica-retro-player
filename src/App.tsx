@@ -182,7 +182,7 @@ function App() {
       await waitForNextPaint();
 
       if (files.length === 1 && isDirectRetroFile(files[0])) {
-        previewSource.previewFile(files[0]);
+        await previewSource.previewFile(files[0]);
         return;
       }
 
@@ -440,11 +440,40 @@ function App() {
                 <div className="mt-0.5 h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">
-                    {t(locale, "preparingSelection")}
+                    {previewSource.cacheProgress
+                      ? t(locale, "preparingSelection")
+                      : t(locale, "preparingSelection")}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">
-                    {t(locale, "preparingSelectionDetail")}
-                  </p>
+                  {previewSource.cacheProgress ? (
+                    <div className="mt-2">
+                      <div className="mb-1 flex justify-between text-xs text-slate-400">
+                        <span>{t(locale, "preparingSelectionDetail")}</span>
+                        <span>
+                          {Math.round(
+                            (previewSource.cacheProgress.loaded /
+                              previewSource.cacheProgress.total) *
+                              100,
+                          )}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700">
+                        <div
+                          className="h-full rounded-full bg-sky-400 transition-all duration-150"
+                          style={{
+                            width: `${Math.round(
+                              (previewSource.cacheProgress.loaded /
+                                previewSource.cacheProgress.total) *
+                                100,
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs leading-5 text-slate-300">
+                      {t(locale, "preparingSelectionDetail")}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
