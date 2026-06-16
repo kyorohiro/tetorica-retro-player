@@ -217,7 +217,7 @@ export function RetroPreviewView({
 
   // Auto-pin when the video-settings panel is open and user scrolls up.
   React.useEffect(() => {
-    if (controlPanelMode !== "video-settings" || isPreviewMaximized || isPreviewPinned) {
+    if (controlPanelMode !== "video-settings" || isPreviewMaximized || isPreviewPinned || isFitWidthEnabled) {
       setIsAutoPreviewPinned(false);
       setAutoPinnedHiddenOffset(0);
       return;
@@ -266,7 +266,7 @@ export function RetroPreviewView({
       window.removeEventListener("scroll", updateAutoPin);
       window.removeEventListener("resize", updateAutoPin);
     };
-  }, [controlPanelMode, isPreviewMaximized, isPreviewPinned, measurePinnedPreviewMetrics]);
+  }, [controlPanelMode, isFitWidthEnabled, isPreviewMaximized, isPreviewPinned, measurePinnedPreviewMetrics]);
 
   // Keep pinned shell metrics in sync with layout changes.
   React.useEffect(() => {
@@ -320,12 +320,14 @@ export function RetroPreviewView({
     !player.previewError &&
     (!player.isRendererReady || player.isLoading);
 
+  // In fit-width mode the container grows to natural content height via CSS
+  // aspect-ratio, so we don't force a pixel height from the viewport rect.
   const previewFrameHeight =
     !isPreviewMaximized &&
+    !isFitWidthEnabled &&
     player.viewportRect &&
     player.sourceDimensions &&
-    (isFitWidthEnabled ||
-      player.sourceDimensions.width > player.sourceDimensions.height)
+    player.sourceDimensions.width > player.sourceDimensions.height
       ? Math.max(280, Math.ceil(player.viewportRect.height + 24))
       : null;
   const normalPreviewHeight = previewFrameHeight
@@ -371,6 +373,230 @@ export function RetroPreviewView({
   );
 
   // --- Render ---
+
+  // Extracted so the same buttons can be placed inside the canvas area (normal
+  // mode) or below it in document flow (fit-width / manga reading mode).
+  const renderButtonBar = (): React.ReactNode => (
+    <>
+      {player.canRecord && (
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={player.isRecording ? "Stop recording" : "Start recording"}
+            onClick={() => {
+              hideTooltip();
+              void (async () => {
+                if (player.isRecording) {
+                  try {
+                    const filename = await player.stopRecording();
+                    if (!filename) return;
+
+                    const confirmed = await confirmDialog({
+                      title: "Recording ready",
+                      body: player.prefersShareExport
+                        ? "Share the recorded clip now?"
+                        : "Save the recorded clip now?",
+                      okText: player.prefersShareExport ? "Share" : "Save",
+                      cancelText: "Cancel",
+                    });
+
+                    if (!confirmed) return;
+
+                    if (player.prefersShareExport) {
+                      const shared = await player.sharePendingRecording();
+                      if (!shared) player.downloadPendingRecording();
+                      return;
+                    }
+
+                    player.downloadPendingRecording();
+                  } catch (error) {
+                    onError?.(error instanceof Error ? error : new Error(String(error)));
+                  }
+                  return;
+                }
+
+                try {
+                  await player.startRecording();
+                } catch (error) {
+                  onError?.(error instanceof Error ? error : new Error(String(error)));
+                }
+              })();
+            }}
+            onMouseEnter={() => scheduleTooltip("record")}
+            onMouseLeave={hideTooltip}
+            onFocus={() => scheduleTooltip("record")}
+            onBlur={hideTooltip}
+            className={[
+              pillButtonClass,
+              player.isRecording
+                ? "border-rose-300/80 bg-rose-500/20 text-rose-50 shadow-[0_0_18px_rgba(244,63,94,0.4)] hover:bg-rose-500/28"
+                : "border-rose-400/55 bg-slate-900/78 text-rose-200 hover:bg-rose-500/12",
+            ].join(" ")}
+          >
+            {player.isRecording ? (
+              <Square size={14} className="fill-current animate-pulse" />
+            ) : (
+              <Circle size={16} className="text-rose-300" />
+            )}
+          </button>
+          {renderTooltip(
+            "record",
+            player.isRecording ? tooltipText.recordStop : tooltipText.recordIdle,
+          )}
+        </div>
+      )}
+      <div className="relative">
+        <button
+          type="button"
+          aria-label={player.isPoweredOn ? "Power off" : "Power on"}
+          onClick={() => {
+            hideTooltip();
+            if (player.isPoweredOn) { player.powerOff(); return; }
+            player.powerOn();
+          }}
+          onMouseEnter={() => scheduleTooltip("power")}
+          onMouseLeave={hideTooltip}
+          onFocus={() => scheduleTooltip("power")}
+          onBlur={hideTooltip}
+          className={[
+            floatingButtonClass,
+            player.isPoweredOn ? glowingFloatingButtonClass : idleFloatingButtonClass,
+          ].join(" ")}
+        >
+          <Power size={16} />
+        </button>
+        {renderTooltip(
+          "power",
+          player.isPoweredOn ? tooltipText.powerOff : tooltipText.powerOn,
+        )}
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          aria-label={isHighResolution ? "Disable high resolution" : "Enable high resolution"}
+          onClick={() => { hideTooltip(); onHighResolutionChange(!isHighResolution); }}
+          onMouseEnter={() => scheduleTooltip("hi-res")}
+          onMouseLeave={hideTooltip}
+          onFocus={() => scheduleTooltip("hi-res")}
+          onBlur={hideTooltip}
+          className={[
+            floatingButtonClass,
+            isHighResolution ? glowingFloatingButtonClass : idleFloatingButtonClass,
+          ].join(" ")}
+        >
+          <Aperture size={16} />
+        </button>
+        {renderTooltip("hi-res", tooltipText.hiRes)}
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
+          onClick={() => {
+            hideTooltip();
+            onFitWidthChange(!isFitWidthEnabled);
+            onRefit();
+          }}
+          onMouseEnter={() => scheduleTooltip("fit-width")}
+          onMouseLeave={hideTooltip}
+          onFocus={() => scheduleTooltip("fit-width")}
+          onBlur={hideTooltip}
+          className={[
+            floatingButtonClass,
+            isFitWidthEnabled ? glowingFloatingButtonClass : idleFloatingButtonClass,
+          ].join(" ")}
+        >
+          <ArrowLeftRight size={16} />
+        </button>
+        {renderTooltip(
+          "fit-width",
+          isFitWidthEnabled ? tooltipText.fitWidthOn : tooltipText.fitWidthOff,
+        )}
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          aria-label="Refit preview"
+          onClick={() => { hideTooltip(); onRefit(); }}
+          onMouseEnter={() => scheduleTooltip("refit")}
+          onMouseLeave={hideTooltip}
+          onFocus={() => scheduleTooltip("refit")}
+          onBlur={hideTooltip}
+          className={[floatingButtonClass, idleFloatingButtonClass].join(" ")}
+        >
+          <RotateCcw size={16} />
+        </button>
+        {renderTooltip("refit", tooltipText.refit)}
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
+          onClick={() => {
+            hideTooltip();
+            if (isPreviewMaximized) return;
+            setIsPreviewPinned((current) => {
+              const next = !current;
+              if (next) {
+                const nextMetrics = measurePinnedPreviewMetrics();
+                if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
+                return true;
+              }
+
+              setIsAutoPreviewPinned(false);
+              setAutoPinnedHiddenOffset(0);
+              setPinnedPreviewMetrics(null);
+              return false;
+            });
+          }}
+          onMouseEnter={() => scheduleTooltip("pin")}
+          onMouseLeave={hideTooltip}
+          onFocus={() => scheduleTooltip("pin")}
+          onBlur={hideTooltip}
+          className={[
+            floatingButtonClass,
+            isPreviewMaximized
+              ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
+              : isPinnedPreview
+              ? glowingFloatingButtonClass
+              : idleFloatingButtonClass,
+          ].join(" ")}
+          disabled={isPreviewMaximized}
+        >
+          <Pin size={16} />
+        </button>
+        {renderTooltip(
+          "pin",
+          isPreviewMaximized
+            ? tooltipText.pinUnavailable
+            : isPinnedPreview
+            ? tooltipText.pinOn
+            : tooltipText.pinOff,
+        )}
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
+          onClick={() => { hideTooltip(); setIsPreviewMaximized((c) => !c); }}
+          onMouseEnter={() => scheduleTooltip("maximize")}
+          onMouseLeave={hideTooltip}
+          onFocus={() => scheduleTooltip("maximize")}
+          onBlur={hideTooltip}
+          className={[
+            floatingButtonClass,
+            isPreviewMaximized ? glowingFloatingButtonClass : idleFloatingButtonClass,
+          ].join(" ")}
+        >
+          {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+        {renderTooltip(
+          "maximize",
+          isPreviewMaximized ? tooltipText.maximizeOn : tooltipText.maximizeOff,
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div ref={previewFrameRef} className="space-y-4">
@@ -421,18 +647,24 @@ export function RetroPreviewView({
                     maxHeight: "calc(100vh - 12rem)",
                   }
                 : undefined
-              : previewAspectRatio
+              : isFitWidthEnabled && previewAspectRatio
                 ? {
+                    // Manga reading mode: let content height expand naturally — no cap
                     aspectRatio: previewAspectRatio,
                     width: "100%",
-                    height: "min(60vh, calc(100vh - 12rem))",
-                    maxHeight: "calc(100vh - 12rem)",
-                    minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
                   }
-                : {
-                    height: normalPreviewHeight,
-                    minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
-                  }
+                : previewAspectRatio
+                  ? {
+                      aspectRatio: previewAspectRatio,
+                      width: "100%",
+                      height: "min(60vh, calc(100vh - 12rem))",
+                      maxHeight: "calc(100vh - 12rem)",
+                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                    }
+                  : {
+                      height: normalPreviewHeight,
+                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                    }
           }
         >
           {/* Canvas area + overlays */}
@@ -506,228 +738,21 @@ export function RetroPreviewView({
             )}
           </div>
 
-          {/* Floating buttons */}
-          <div className="absolute -bottom-8 right-3 z-50 flex items-center gap-2">
-            {player.canRecord && (
-              <div className="relative">
-                <button
-                  type="button"
-                  aria-label={player.isRecording ? "Stop recording" : "Start recording"}
-                  onClick={() => {
-                    hideTooltip();
-                    void (async () => {
-                      if (player.isRecording) {
-                        try {
-                          const filename = await player.stopRecording();
-                          if (!filename) return;
-
-                          const confirmed = await confirmDialog({
-                            title: "Recording ready",
-                            body: player.prefersShareExport
-                              ? "Share the recorded clip now?"
-                              : "Save the recorded clip now?",
-                            okText: player.prefersShareExport ? "Share" : "Save",
-                            cancelText: "Cancel",
-                          });
-
-                          if (!confirmed) return;
-
-                          if (player.prefersShareExport) {
-                            const shared = await player.sharePendingRecording();
-                            if (!shared) player.downloadPendingRecording();
-                            return;
-                          }
-
-                          player.downloadPendingRecording();
-                        } catch (error) {
-                          onError?.(error instanceof Error ? error : new Error(String(error)));
-                        }
-                        return;
-                      }
-
-                      try {
-                        await player.startRecording();
-                      } catch (error) {
-                        onError?.(error instanceof Error ? error : new Error(String(error)));
-                      }
-                    })();
-                  }}
-                  onMouseEnter={() => scheduleTooltip("record")}
-                  onMouseLeave={hideTooltip}
-                  onFocus={() => scheduleTooltip("record")}
-                  onBlur={hideTooltip}
-                  className={[
-                    pillButtonClass,
-                    player.isRecording
-                      ? "border-rose-300/80 bg-rose-500/20 text-rose-50 shadow-[0_0_18px_rgba(244,63,94,0.4)] hover:bg-rose-500/28"
-                      : "border-rose-400/55 bg-slate-900/78 text-rose-200 hover:bg-rose-500/12",
-                  ].join(" ")}
-                >
-                  {player.isRecording ? (
-                    <Square size={14} className="fill-current animate-pulse" />
-                  ) : (
-                    <Circle size={16} className="text-rose-300" />
-                  )}
-                </button>
-                {renderTooltip(
-                  "record",
-                  player.isRecording ? tooltipText.recordStop : tooltipText.recordIdle,
-                )}
-              </div>
-            )}
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={player.isPoweredOn ? "Power off" : "Power on"}
-                onClick={() => {
-                  hideTooltip();
-                  if (player.isPoweredOn) { player.powerOff(); return; }
-                  player.powerOn();
-                }}
-                onMouseEnter={() => scheduleTooltip("power")}
-                onMouseLeave={hideTooltip}
-                onFocus={() => scheduleTooltip("power")}
-                onBlur={hideTooltip}
-                className={[
-                  floatingButtonClass,
-                  player.isPoweredOn ? glowingFloatingButtonClass : idleFloatingButtonClass,
-                ].join(" ")}
-              >
-                <Power size={16} />
-              </button>
-              {renderTooltip(
-                "power",
-                player.isPoweredOn ? tooltipText.powerOff : tooltipText.powerOn,
-              )}
+          {/* Floating buttons: overlaid below canvas in normal mode */}
+          {!isFitWidthEnabled && (
+            <div className="absolute -bottom-8 right-3 z-50 flex items-center gap-2">
+              {renderButtonBar()}
             </div>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={isHighResolution ? "Disable high resolution" : "Enable high resolution"}
-                onClick={() => { hideTooltip(); onHighResolutionChange(!isHighResolution); }}
-                onMouseEnter={() => scheduleTooltip("hi-res")}
-                onMouseLeave={hideTooltip}
-                onFocus={() => scheduleTooltip("hi-res")}
-                onBlur={hideTooltip}
-                className={[
-                  floatingButtonClass,
-                  isHighResolution ? glowingFloatingButtonClass : idleFloatingButtonClass,
-                ].join(" ")}
-              >
-                <Aperture size={16} />
-              </button>
-              {renderTooltip("hi-res", tooltipText.hiRes)}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
-                onClick={() => {
-                  hideTooltip();
-                  onFitWidthChange(!isFitWidthEnabled);
-                  onRefit();
-                }}
-                onMouseEnter={() => scheduleTooltip("fit-width")}
-                onMouseLeave={hideTooltip}
-                onFocus={() => scheduleTooltip("fit-width")}
-                onBlur={hideTooltip}
-                className={[
-                  floatingButtonClass,
-                  isFitWidthEnabled ? glowingFloatingButtonClass : idleFloatingButtonClass,
-                ].join(" ")}
-              >
-                <ArrowLeftRight size={16} />
-              </button>
-              {renderTooltip(
-                "fit-width",
-                isFitWidthEnabled ? tooltipText.fitWidthOn : tooltipText.fitWidthOff,
-              )}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="Refit preview"
-                onClick={() => { hideTooltip(); onRefit(); }}
-                onMouseEnter={() => scheduleTooltip("refit")}
-                onMouseLeave={hideTooltip}
-                onFocus={() => scheduleTooltip("refit")}
-                onBlur={hideTooltip}
-                className={[floatingButtonClass, idleFloatingButtonClass].join(" ")}
-              >
-                <RotateCcw size={16} />
-              </button>
-              {renderTooltip("refit", tooltipText.refit)}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
-                onClick={() => {
-                  hideTooltip();
-                  if (isPreviewMaximized) return;
-                  setIsPreviewPinned((current) => {
-                    const next = !current;
-                    if (next) {
-                      const nextMetrics = measurePinnedPreviewMetrics();
-                      if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                      return true;
-                    }
-
-                    setIsAutoPreviewPinned(false);
-                    setAutoPinnedHiddenOffset(0);
-                    setPinnedPreviewMetrics(null);
-                    return false;
-                  });
-                }}
-                onMouseEnter={() => scheduleTooltip("pin")}
-                onMouseLeave={hideTooltip}
-                onFocus={() => scheduleTooltip("pin")}
-                onBlur={hideTooltip}
-                className={[
-                  floatingButtonClass,
-                  isPreviewMaximized
-                    ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
-                    : isPinnedPreview
-                    ? glowingFloatingButtonClass
-                    : idleFloatingButtonClass,
-                ].join(" ")}
-                disabled={isPreviewMaximized}
-              >
-                <Pin size={16} />
-              </button>
-              {renderTooltip(
-                "pin",
-                isPreviewMaximized
-                  ? tooltipText.pinUnavailable
-                  : isPinnedPreview
-                  ? tooltipText.pinOn
-                  : tooltipText.pinOff,
-              )}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
-                onClick={() => { hideTooltip(); setIsPreviewMaximized((c) => !c); }}
-                onMouseEnter={() => scheduleTooltip("maximize")}
-                onMouseLeave={hideTooltip}
-                onFocus={() => scheduleTooltip("maximize")}
-                onBlur={hideTooltip}
-                className={[
-                  floatingButtonClass,
-                  isPreviewMaximized ? glowingFloatingButtonClass : idleFloatingButtonClass,
-                ].join(" ")}
-              >
-                {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </button>
-              {renderTooltip(
-                "maximize",
-                isPreviewMaximized ? tooltipText.maximizeOn : tooltipText.maximizeOff,
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* In fit-width (manga reading) mode, buttons sit below the preview in normal document flow */}
+      {isFitWidthEnabled && (
+        <div className="flex items-center justify-end gap-2 pt-2 pr-1">
+          {renderButtonBar()}
+        </div>
+      )}
 
       {/* Spacer that holds layout space while the shell is fixed/pinned */}
       {isPinnedPreview && pinnedPreviewMetrics && (
