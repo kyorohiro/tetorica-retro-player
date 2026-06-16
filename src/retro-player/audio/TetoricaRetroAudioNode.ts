@@ -71,10 +71,10 @@ function createHallReverbImpulse(context: AudioContext) {
     for (let i = 0; i < length; i += 1) {
       if (i < predelaySamples) continue;
       const t = (i - predelaySamples) / (length - predelaySamples);
-      const decay = (1 - t) ** 2.4;
-      const brightness = Math.max(0, 1 - t * 3);
-      const early = Math.sin(t * 160 + channel * 0.8) * brightness * 0.1;
-      channelData[i] = ((Math.random() * 2 - 1) + early) * decay * 0.32;
+      const decay = (1 - t) ** 1.8;
+      const brightness = Math.max(0, 1 - t * 2.5);
+      const early = Math.sin(t * 160 + channel * 0.8) * brightness * 0.35;
+      channelData[i] = ((Math.random() * 2 - 1) + early) * decay * 0.75;
     }
   }
 
@@ -672,14 +672,14 @@ export class TetoricaRetroAudioNode {
     const echoWetGain = this.nodes.echoWetGain;
     if (echoDelayLine && echoFeedbackGain && echoWetGain) {
       const amount = settings.isAudioFxEnabled ? settings.delayAmount : 0;
-      echoFeedbackGain.gain.value = amount * 0.45;
-      echoWetGain.gain.value = amount * 0.38;
+      echoFeedbackGain.gain.value = amount * 0.5;
+      echoWetGain.gain.value = amount * 0.55;
     }
 
     const hallReverbWetGain = this.nodes.hallReverbWetGain;
     if (hallReverbWetGain) {
       const amount = settings.isAudioFxEnabled ? settings.reverbAmount : 0;
-      hallReverbWetGain.gain.value = amount * 0.55;
+      hallReverbWetGain.gain.value = amount * 2.0;
     }
 
     const chorusLfoGain1 = this.nodes.chorusLfoGain1;
@@ -687,9 +687,9 @@ export class TetoricaRetroAudioNode {
     const chorusWetGain = this.nodes.chorusWetGain;
     if (chorusLfoGain1 && chorusLfoGain2 && chorusWetGain) {
       const amount = settings.isAudioFxEnabled ? settings.chorusAmount : 0;
-      chorusWetGain.gain.value = amount * 0.45;
-      chorusLfoGain1.gain.value = amount * 0.0035;
-      chorusLfoGain2.gain.value = amount * 0.0045;
+      chorusWetGain.gain.value = amount * 0.6;
+      chorusLfoGain1.gain.value = amount * 0.005;
+      chorusLfoGain2.gain.value = amount * 0.006;
     }
   }
 
