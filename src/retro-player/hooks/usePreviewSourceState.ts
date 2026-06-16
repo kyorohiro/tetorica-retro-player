@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    __onNativeFileCached?: (path: string, name: string, mime: string) => void;
+    __onNativeFileCacheError?: (msg: string) => void;
+  }
+}
 import { invoke } from "@tauri-apps/api/core";
 import { createFileStreamUrl, revokeFileStreamUrl } from "../../swFileStream";
 import { cacheMediaFile, makeSessionId } from "../../cacheMediaFile";
@@ -65,6 +72,37 @@ export function usePreviewSourceState() {
       previewStream?.getTracks().forEach((track) => track.stop());
     };
   }, [previewSrc, previewStream, revokePreviewSrc]);
+
+  // Android native cache path: called from Kotlin via evaluateJavascript
+  useEffect(() => {
+    if (!isTauriAndroid) return;
+    window.__onNativeFileCached = async (path, name, mime) => {
+      const isVideo = mime.startsWith("video/");
+      const isAudio = mime.startsWith("audio/");
+      if (!isVideo && !isAudio) return;
+      stopPreviewStream();
+      setPreviewLabel(name);
+      setCaptureError("");
+      try {
+        const { url } = await startMediaServerAndShare(path);
+        setPreviewSrc((current) => {
+          revokePreviewSrc(current);
+          return url;
+        });
+        setPreviewKind(isVideo ? "video" : "audio");
+        void invoke("cleanup_media_cache", { maxAgeSecs: 24 * 60 * 60 }).catch(() => {});
+      } catch (error) {
+        setCaptureError(error instanceof Error ? error.message : "Failed to serve file");
+      }
+    };
+    window.__onNativeFileCacheError = (msg) => {
+      setCaptureError(msg);
+    };
+    return () => {
+      delete window.__onNativeFileCached;
+      delete window.__onNativeFileCacheError;
+    };
+  }, [isTauriAndroid, stopPreviewStream, revokePreviewSrc]);
 
   const previewFile = useCallback(async (file: File) => {
     const isVideo = file.type.startsWith("video/");
