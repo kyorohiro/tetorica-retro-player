@@ -357,6 +357,21 @@ export function useRetroPreviewMedia({
     media.addEventListener("seeked", syncVideoState);
     media.addEventListener("ended", syncVideoState);
     media.addEventListener("ratechange", syncVideoState);
+
+    // The "resize" event fires on <video> when the video's intrinsic size
+    // changes — this happens for capture streams when the captured window is
+    // resized. Without this, sourceDimensions stays stale and the canvas keeps
+    // rendering at the old aspect ratio, squishing the content vertically.
+    if (media instanceof HTMLVideoElement) {
+      media.addEventListener("resize", () => {
+        const w = media.videoWidth;
+        const h = media.videoHeight;
+        if (w > 0 && h > 0) {
+          setSourceDimensions({ width: w, height: h });
+          scheduleRefreshLayout();
+        }
+      });
+    }
   };
 
   const applyMediaSettings = (media: HTMLMediaElement) => {
