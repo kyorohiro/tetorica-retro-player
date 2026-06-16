@@ -86,6 +86,7 @@ export function RetroPreviewView({
           fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
           refit: "Refit: プレビュー配置を立て直します。",
           pinUnavailable: "Pin: 最大化中は使えません。",
+          pinUnavailableFitWidth: "Pin: Fit Width 中は使えません。",
           pinOn: "Pin: プレビューを画面内に固定します。",
           pinOff: "Pin: スクロール中も見えるようにします。",
           maximizeOn: "Maximize: 通常表示に戻します。",
@@ -101,6 +102,7 @@ export function RetroPreviewView({
           fitWidthOff: "Fit width: stretch preview to the frame width.",
           refit: "Refit: recover the preview layout.",
           pinUnavailable: "Pin: unavailable while maximize is active.",
+          pinUnavailableFitWidth: "Pin: unavailable in fit-width mode.",
           pinOn: "Pin: keep preview fixed on screen.",
           pinOff: "Pin: keep preview visible while you scroll.",
           maximizeOn: "Maximize: return to normal view.",
@@ -214,6 +216,17 @@ export function RetroPreviewView({
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetrics(null);
   }, [isPreviewMaximized]);
+
+  // Fit Width: reset pin state (pin and fit-width conflict — fit-width expands
+  // the preview to natural content height, pinning would fight that).
+  React.useEffect(() => {
+    if (!isFitWidthEnabled) return;
+
+    setIsPreviewPinned(false);
+    setIsAutoPreviewPinned(false);
+    setAutoPinnedHiddenOffset(0);
+    setPinnedPreviewMetrics(null);
+  }, [isFitWidthEnabled]);
 
   // Auto-pin when the video-settings panel is open and user scrolls up.
   React.useEffect(() => {
@@ -538,7 +551,7 @@ export function RetroPreviewView({
           aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
           onClick={() => {
             hideTooltip();
-            if (isPreviewMaximized) return;
+            if (isPreviewMaximized || isFitWidthEnabled) return;
             setIsPreviewPinned((current) => {
               const next = !current;
               if (next) {
@@ -559,13 +572,13 @@ export function RetroPreviewView({
           onBlur={hideTooltip}
           className={[
             floatingButtonClass,
-            isPreviewMaximized
+            isPreviewMaximized || isFitWidthEnabled
               ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
               : isPinnedPreview
               ? glowingFloatingButtonClass
               : idleFloatingButtonClass,
           ].join(" ")}
-          disabled={isPreviewMaximized}
+          disabled={isPreviewMaximized || isFitWidthEnabled}
         >
           <Pin size={16} />
         </button>
@@ -573,6 +586,8 @@ export function RetroPreviewView({
           "pin",
           isPreviewMaximized
             ? tooltipText.pinUnavailable
+            : isFitWidthEnabled
+            ? tooltipText.pinUnavailableFitWidth
             : isPinnedPreview
             ? tooltipText.pinOn
             : tooltipText.pinOff,
