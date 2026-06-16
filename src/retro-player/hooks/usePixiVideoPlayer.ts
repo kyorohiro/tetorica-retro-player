@@ -164,6 +164,12 @@ export function usePixiVideoPlayer(
     setNoiseLevel,
     vinylDustAmount,
     setVinylDustAmount,
+    delayAmount,
+    setDelayAmount,
+    reverbAmount,
+    setReverbAmount,
+    chorusAmount,
+    setChorusAmount,
     debugAudio,
     ensureAudioContext,
     updateAudioNodes,
@@ -899,6 +905,9 @@ export function usePixiVideoPlayer(
     isNoiseEnabled,
     noiseLevel,
     vinylDustAmount,
+    delayAmount,
+    reverbAmount,
+    chorusAmount,
     hasPlayableMedia:
       previewKind === "video" || previewKind === "audio" || previewKind === "capture",
     hasVideo: previewKind === "video" || previewKind === "capture",
@@ -954,5 +963,8 @@ export function usePixiVideoPlayer(
     },
     setNoiseLevel,
     setVinylDustAmount,
+    setDelayAmount,
+    setReverbAmount,
+    setChorusAmount,
   };
 }

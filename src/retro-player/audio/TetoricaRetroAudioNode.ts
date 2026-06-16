@@ -60,6 +60,27 @@ function createDriveCurve(amount: number) {
   return curve;
 }
 
+function createHallReverbImpulse(context: AudioContext) {
+  const duration = 2.2;
+  const length = Math.max(1, Math.floor(context.sampleRate * duration));
+  const impulse = context.createBuffer(2, length, context.sampleRate);
+  const predelaySamples = Math.floor(context.sampleRate * 0.012);
+
+  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+    const channelData = impulse.getChannelData(channel);
+    for (let i = 0; i < length; i += 1) {
+      if (i < predelaySamples) continue;
+      const t = (i - predelaySamples) / (length - predelaySamples);
+      const decay = (1 - t) ** 2.4;
+      const brightness = Math.max(0, 1 - t * 3);
+      const early = Math.sin(t * 160 + channel * 0.8) * brightness * 0.1;
+      channelData[i] = ((Math.random() * 2 - 1) + early) * decay * 0.32;
+    }
+  }
+
+  return impulse;
+}
+
 function createSmallRoomImpulse(context: AudioContext) {
   const duration = 0.22;
   const length = Math.max(1, Math.floor(context.sampleRate * duration));
@@ -240,6 +261,19 @@ export class TetoricaRetroAudioNode {
     vinylDustBedGain: null as GainNode | null,
     crackleGain: null as GainNode | null,
     sourceNode: null as AudioNode | null,
+    outputBus: null as GainNode | null,
+    echoDelayLine: null as DelayNode | null,
+    echoFeedbackGain: null as GainNode | null,
+    echoWetGain: null as GainNode | null,
+    hallReverbConvolver: null as ConvolverNode | null,
+    hallReverbWetGain: null as GainNode | null,
+    chorusDelay1: null as DelayNode | null,
+    chorusDelay2: null as DelayNode | null,
+    chorusLfo1: null as OscillatorNode | null,
+    chorusLfo2: null as OscillatorNode | null,
+    chorusLfoGain1: null as GainNode | null,
+    chorusLfoGain2: null as GainNode | null,
+    chorusWetGain: null as GainNode | null,
   };
 
   constructor({
@@ -264,7 +298,7 @@ export class TetoricaRetroAudioNode {
   }
 
   get output() {
-    return this.nodes.masterGain;
+    return this.nodes.outputBus ?? this.nodes.masterGain;
   }
 
   get audioContext() {
@@ -478,6 +512,19 @@ export class TetoricaRetroAudioNode {
       vinylDustBedGain: null,
       crackleGain: null,
       sourceNode: null,
+      outputBus: null,
+      echoDelayLine: null,
+      echoFeedbackGain: null,
+      echoWetGain: null,
+      hallReverbConvolver: null,
+      hallReverbWetGain: null,
+      chorusDelay1: null,
+      chorusDelay2: null,
+      chorusLfo1: null,
+      chorusLfo2: null,
+      chorusLfoGain1: null,
+      chorusLfoGain2: null,
+      chorusWetGain: null,
     });
   }
 
@@ -619,6 +666,31 @@ export class TetoricaRetroAudioNode {
       vinylDustBedFilter.Q.value = 0.35 + amount * 0.25;
       vinylDustBedGain.gain.value = amount * 0.11;
     }
+
+    const echoDelayLine = this.nodes.echoDelayLine;
+    const echoFeedbackGain = this.nodes.echoFeedbackGain;
+    const echoWetGain = this.nodes.echoWetGain;
+    if (echoDelayLine && echoFeedbackGain && echoWetGain) {
+      const amount = settings.isAudioFxEnabled ? settings.delayAmount : 0;
+      echoFeedbackGain.gain.value = amount * 0.45;
+      echoWetGain.gain.value = amount * 0.38;
+    }
+
+    const hallReverbWetGain = this.nodes.hallReverbWetGain;
+    if (hallReverbWetGain) {
+      const amount = settings.isAudioFxEnabled ? settings.reverbAmount : 0;
+      hallReverbWetGain.gain.value = amount * 0.55;
+    }
+
+    const chorusLfoGain1 = this.nodes.chorusLfoGain1;
+    const chorusLfoGain2 = this.nodes.chorusLfoGain2;
+    const chorusWetGain = this.nodes.chorusWetGain;
+    if (chorusLfoGain1 && chorusLfoGain2 && chorusWetGain) {
+      const amount = settings.isAudioFxEnabled ? settings.chorusAmount : 0;
+      chorusWetGain.gain.value = amount * 0.45;
+      chorusLfoGain1.gain.value = amount * 0.0035;
+      chorusLfoGain2.gain.value = amount * 0.0045;
+    }
   }
 
   async ensureInitialized() {
@@ -727,11 +799,71 @@ export class TetoricaRetroAudioNode {
       roomConvolver.connect(roomWetGain);
       roomDryGain.connect(masterGain);
       roomWetGain.connect(masterGain);
+
+      // --- Spatial effects (delay / reverb / chorus) ---
+      const outputBus = context.createGain();
+      outputBus.gain.value = 1;
+
+      // Echo delay
+      const echoDelayLine = context.createDelay(1.0);
+      echoDelayLine.delayTime.value = 0.32;
+      const echoFeedbackGain = context.createGain();
+      echoFeedbackGain.gain.value = 0;
+      const echoWetGain = context.createGain();
+      echoWetGain.gain.value = 0;
+
+      // Hall reverb
+      const hallReverbConvolver = context.createConvolver();
+      hallReverbConvolver.buffer = createHallReverbImpulse(context);
+      const hallReverbWetGain = context.createGain();
+      hallReverbWetGain.gain.value = 0;
+
+      // Chorus
+      const chorusDelay1 = context.createDelay(0.05);
+      const chorusDelay2 = context.createDelay(0.05);
+      chorusDelay1.delayTime.value = 0.018;
+      chorusDelay2.delayTime.value = 0.023;
+      const chorusLfo1 = context.createOscillator();
+      const chorusLfo2 = context.createOscillator();
+      chorusLfo1.type = "sine";
+      chorusLfo2.type = "sine";
+      chorusLfo1.frequency.value = 0.8;
+      chorusLfo2.frequency.value = 1.3;
+      const chorusLfoGain1 = context.createGain();
+      const chorusLfoGain2 = context.createGain();
+      chorusLfoGain1.gain.value = 0;
+      chorusLfoGain2.gain.value = 0;
+      const chorusWetGain = context.createGain();
+      chorusWetGain.gain.value = 0;
+
+      // Wire spatial effects: tap from masterGain, output to outputBus
+      masterGain.connect(outputBus);
+      masterGain.connect(echoDelayLine);
+      echoDelayLine.connect(echoFeedbackGain);
+      echoFeedbackGain.connect(echoDelayLine);
+      echoDelayLine.connect(echoWetGain);
+      echoWetGain.connect(outputBus);
+      masterGain.connect(hallReverbConvolver);
+      hallReverbConvolver.connect(hallReverbWetGain);
+      hallReverbWetGain.connect(outputBus);
+      masterGain.connect(chorusDelay1);
+      masterGain.connect(chorusDelay2);
+      chorusLfo1.connect(chorusLfoGain1);
+      chorusLfoGain1.connect(chorusDelay1.delayTime);
+      chorusLfo2.connect(chorusLfoGain2);
+      chorusLfoGain2.connect(chorusDelay2.delayTime);
+      chorusDelay1.connect(chorusWetGain);
+      chorusDelay2.connect(chorusWetGain);
+      chorusWetGain.connect(outputBus);
+
+      chorusLfo1.start();
+      chorusLfo2.start();
+
       if (this.connectOutputToDestination) {
-        masterGain.connect(context.destination);
+        outputBus.connect(context.destination);
       }
       if (recordingDestination && this.connectOutputToRecordingDestination) {
-        masterGain.connect(recordingDestination);
+        outputBus.connect(recordingDestination);
       }
 
       const noiseSource = context.createBufferSource();
@@ -835,6 +967,19 @@ export class TetoricaRetroAudioNode {
         vinylDustBedFilter,
         vinylDustBedGain,
         crackleGain,
+        outputBus,
+        echoDelayLine,
+        echoFeedbackGain,
+        echoWetGain,
+        hallReverbConvolver,
+        hallReverbWetGain,
+        chorusDelay1,
+        chorusDelay2,
+        chorusLfo1,
+        chorusLfo2,
+        chorusLfoGain1,
+        chorusLfoGain2,
+        chorusWetGain,
       });
     }
 
@@ -943,6 +1088,18 @@ export class TetoricaRetroAudioNode {
 
     try {
       this.nodes.flutterLfo?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      this.nodes.chorusLfo1?.stop();
+    } catch {
+      // already stopped
+    }
+
+    try {
+      this.nodes.chorusLfo2?.stop();
     } catch {
       // already stopped
     }

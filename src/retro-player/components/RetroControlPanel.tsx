@@ -37,6 +37,9 @@ export type RetroControlPlayerSlice = {
   wowFlutterAmount: number;
   noiseLevel: number;
   vinylDustAmount: number;
+  delayAmount: number;
+  reverbAmount: number;
+  chorusAmount: number;
   playbackRate: number;
   volume: number;
   setLofiAmount: (v: number) => void;
@@ -51,6 +54,9 @@ export type RetroControlPlayerSlice = {
   setWowFlutterAmount: (v: number) => void;
   setNoiseLevel: (v: number) => void;
   setVinylDustAmount: (v: number) => void;
+  setDelayAmount: (v: number) => void;
+  setReverbAmount: (v: number) => void;
+  setChorusAmount: (v: number) => void;
   changePlaybackRate: (v: number) => void;
   changeVolume: (v: number) => void;
   seekTo: (time: number) => void;
@@ -127,6 +133,9 @@ export function RetroControlPanel({
               wowFlutterAmount={player.wowFlutterAmount}
               noiseLevel={player.noiseLevel}
               vinylDustAmount={player.vinylDustAmount}
+              delayAmount={player.delayAmount}
+              reverbAmount={player.reverbAmount}
+              chorusAmount={player.chorusAmount}
               playbackRate={player.playbackRate}
               volume={player.volume}
               onChangeLofiAmount={player.setLofiAmount}
@@ -141,6 +150,9 @@ export function RetroControlPanel({
               onChangeWowFlutterAmount={player.setWowFlutterAmount}
               onChangeNoiseLevel={player.setNoiseLevel}
               onChangeVinylDustAmount={player.setVinylDustAmount}
+              onChangeDelayAmount={player.setDelayAmount}
+              onChangeReverbAmount={player.setReverbAmount}
+              onChangeChorusAmount={player.setChorusAmount}
               onChangePlaybackRate={player.changePlaybackRate}
               onChangeVolume={player.changeVolume}
               onRestart={() => {

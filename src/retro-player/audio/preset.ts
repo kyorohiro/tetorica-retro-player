@@ -17,6 +17,9 @@ export type RetroAudioSettings = {
   isNoiseEnabled: boolean;
   noiseLevel: number;
   vinylDustAmount: number;
+  delayAmount: number;
+  reverbAmount: number;
+  chorusAmount: number;
 };
 
 export const DEFAULT_AUDIO_SETTINGS = {
@@ -38,6 +41,9 @@ export const DEFAULT_AUDIO_SETTINGS = {
   isNoiseEnabled: false,
   noiseLevel: 0.02,
   vinylDustAmount: 0,
+  delayAmount: 0,
+  reverbAmount: 0,
+  chorusAmount: 0,
 } as const satisfies RetroAudioSettings;
 
 export type RetroAudioPresetKey =
@@ -77,6 +83,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0,
       noiseLevel: 0,
       vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
     },
   },
   lofi: {
@@ -97,6 +106,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.12,
       noiseLevel: 0.005,
       vinylDustAmount: 0,
+      delayAmount: 0.15,
+      reverbAmount: 0.2,
     },
   },
   radio: {
@@ -117,6 +128,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.08,
       noiseLevel: 0.01,
       vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
     },
   },
   tape: {
@@ -137,6 +151,8 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.42,
       noiseLevel: 0.0075,
       vinylDustAmount: 0,
+      reverbAmount: 0.1,
+      chorusAmount: 0.25,
     },
   },
   vinyl: {
@@ -157,6 +173,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.18,
       noiseLevel: 0.0035,
       vinylDustAmount: 0.58,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
     },
   },
   "vintage-mic": {
@@ -177,6 +196,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.04,
       noiseLevel: 0.0025,
       vinylDustAmount: 0.08,
+      reverbAmount: 0.15,
     },
   },
   earphone: {
@@ -197,6 +217,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0,
       noiseLevel: 0,
       vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
     },
   },
   lofiTape: {
@@ -217,6 +240,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       wowFlutterAmount: 0.28,
       noiseLevel: 0.006,
       vinylDustAmount: 0,
+      delayAmount: 0.2,
+      reverbAmount: 0.25,
+      chorusAmount: 0.18,
     },
   },
 };

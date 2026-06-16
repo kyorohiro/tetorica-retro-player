@@ -44,6 +44,9 @@ type VideoControlsProps = {
   wowFlutterAmount: number;
   noiseLevel: number;
   vinylDustAmount: number;
+  delayAmount: number;
+  reverbAmount: number;
+  chorusAmount: number;
   playbackRate: number;
   volume: number;
   onChangeLofiAmount: (amount: number) => void;
@@ -58,6 +61,9 @@ type VideoControlsProps = {
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangeVinylDustAmount: (amount: number) => void;
+  onChangeDelayAmount: (amount: number) => void;
+  onChangeReverbAmount: (amount: number) => void;
+  onChangeChorusAmount: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
   onChangeVolume: (volume: number) => void;
   onRestart: () => void;
@@ -112,6 +118,9 @@ export function VideoControls({
   wowFlutterAmount,
   noiseLevel,
   vinylDustAmount,
+  delayAmount,
+  reverbAmount,
+  chorusAmount,
   playbackRate,
   volume,
   onChangeLofiAmount,
@@ -126,6 +135,9 @@ export function VideoControls({
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangeVinylDustAmount,
+  onChangeDelayAmount,
+  onChangeReverbAmount,
+  onChangeChorusAmount,
   onChangePlaybackRate,
   onChangeVolume,
   onRestart: _onRestart,
@@ -170,7 +182,10 @@ export function VideoControls({
         ) &&
         isNearlyEqual(settings.wowFlutterAmount, wowFlutterAmount) &&
         isNearlyEqual(settings.noiseLevel, noiseLevel) &&
-        isNearlyEqual(settings.vinylDustAmount, vinylDustAmount)
+        isNearlyEqual(settings.vinylDustAmount, vinylDustAmount) &&
+        isNearlyEqual(settings.delayAmount, delayAmount) &&
+        isNearlyEqual(settings.reverbAmount, reverbAmount) &&
+        isNearlyEqual(settings.chorusAmount, chorusAmount)
       );
     })?.[0] as RetroAudioPresetKey | undefined
   ) ?? null;
@@ -201,6 +216,9 @@ export function VideoControls({
     onChangeWowFlutterAmount(presetSettings.wowFlutterAmount);
     onChangeNoiseLevel(presetSettings.noiseLevel);
     onChangeVinylDustAmount(presetSettings.vinylDustAmount);
+    onChangeDelayAmount(presetSettings.delayAmount);
+    onChangeReverbAmount(presetSettings.reverbAmount);
+    onChangeChorusAmount(presetSettings.chorusAmount);
   };
 
   if (mode === "audio-settings") {
@@ -421,6 +439,67 @@ export function VideoControls({
                 value={trebleAmount}
                 onChange={(ev) => {
                   onChangeTrebleAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Space
+          </p>
+          <div className="space-y-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Delay</span>
+                <span>{Math.round(delayAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={delayAmount}
+                onChange={(ev) => {
+                  onChangeDelayAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Reverb</span>
+                <span>{Math.round(reverbAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={reverbAmount}
+                onChange={(ev) => {
+                  onChangeReverbAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Chorus</span>
+                <span>{Math.round(chorusAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={chorusAmount}
+                onChange={(ev) => {
+                  onChangeChorusAmount(Number(ev.currentTarget.value));
                 }}
                 className="w-full"
               />
