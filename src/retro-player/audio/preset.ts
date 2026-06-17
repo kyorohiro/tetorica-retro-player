@@ -60,7 +60,9 @@ export type RetroAudioPresetKey =
   | "vinyl"
   | "vintage-mic"
   | "earphone"
-  | "lofiTape";
+  | "lofiTape"
+  | "boombox"
+  | "club";
 
 export type RetroAudioPresetDefinition = {
   label: string;
@@ -108,7 +110,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       bitCrushAmount: 0.22,
       sampleRateReductionAmount: 0.18,
       bassAmount: 0.08,
-      midAmount: -0.08,
+      midAmount: -0.04,
       trebleAmount: -0.18,
       stereoWidthAmount: -0.08,
       smallSpeakerRoomAmount: 0.08,
@@ -119,7 +121,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       reverbAmount: 0.005,
       tapeSaturationAmount: 0.03,
       compressorAmount: 0.01,
-      fxOutputTrimAmount: 0.72,
+      fxOutputTrimAmount: 0.66,
     },
   },
   radio: {
@@ -133,7 +135,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       bitCrushAmount: 0.12,
       sampleRateReductionAmount: 0.28,
       bassAmount: -0.4,
-      midAmount: 0.18,
+      midAmount: 0.10,
       trebleAmount: -0.32,
       stereoWidthAmount: -0.55,
       smallSpeakerRoomAmount: 0.12,
@@ -170,7 +172,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       chorusAmount: 0,
       tapeSaturationAmount: 0.18,
       compressorAmount: 0.25,
-      fxOutputTrimAmount: 0.68,
+      fxOutputTrimAmount: 0.58,
     },
   },
   vinyl: {
@@ -210,7 +212,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       bitCrushAmount: 0,
       sampleRateReductionAmount: 0.02,
       bassAmount: -0.24,
-      midAmount: 0.32,
+      midAmount: 0.18,
       trebleAmount: -0.68,
       stereoWidthAmount: -0.32,
       smallSpeakerRoomAmount: 0.12,
@@ -273,6 +275,56 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       tapeSaturationAmount: 0.13,
       compressorAmount: 0.25,
       fxOutputTrimAmount: 0.50,
+    },
+  },
+  boombox: {
+    label: "Boom Box",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      lofiAmount: 0.30,
+      radioToneAmount: 0.06,
+      bitCrushAmount: 0.06,
+      sampleRateReductionAmount: 0.06,
+      bassAmount: 0.20,
+      midAmount: -0.40,
+      trebleAmount: 0.05,
+      stereoWidthAmount: -0.10,
+      smallSpeakerRoomAmount: 0.14,
+      wowFlutterAmount: 0.04,
+      noiseLevel: 0.004,
+      vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0.10,
+      compressorAmount: 0.40,
+      fxOutputTrimAmount: 0.58,
+    },
+  },
+  club: {
+    label: "Club",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: false,
+      lofiAmount: 0,
+      radioToneAmount: 0,
+      bitCrushAmount: 0,
+      sampleRateReductionAmount: 0,
+      bassAmount: 0.30,
+      midAmount: -0.58,
+      trebleAmount: 0.15,
+      stereoWidthAmount: 0.15,
+      smallSpeakerRoomAmount: 0,
+      wowFlutterAmount: 0,
+      noiseLevel: 0,
+      vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0.05,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0.45,
+      fxOutputTrimAmount: 0.62,
     },
   },
 };

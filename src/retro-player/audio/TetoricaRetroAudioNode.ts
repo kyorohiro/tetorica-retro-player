@@ -802,12 +802,12 @@ export class TetoricaRetroAudioNode {
       lowpass.type = "lowpass";
       highshelf.type = "highshelf";
       bassEq.type = "lowshelf";
-      bassEq.frequency.value = 180;
+      bassEq.frequency.value = 250;
       midEq.type = "peaking";
       midEq.frequency.value = 1200;
-      midEq.Q.value = 0.9;
+      midEq.Q.value = 0.35;
       trebleEq.type = "highshelf";
-      trebleEq.frequency.value = 3200;
+      trebleEq.frequency.value = 2800;
       roomConvolver.buffer = createSmallRoomImpulse(context);
       highshelf.frequency.value = 2800;
       drive.oversample = "4x";
