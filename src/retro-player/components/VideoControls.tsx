@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import {
   FolderOpen,
   Gauge,
@@ -108,7 +108,7 @@ const formatTime = (seconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
 };
 
-export function VideoControls({
+export const VideoControls = memo(function VideoControls({
   mode,
   hasPlayback,
   currentTime,
@@ -977,4 +977,4 @@ export function VideoControls({
       )}
     </div>
   );
-}
+});

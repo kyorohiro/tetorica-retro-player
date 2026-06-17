@@ -498,32 +498,35 @@ export function useRetroAudioEngine({
   ]);
 
   useEffect(() => {
-    savePersistedRetroAudioSettings({
-      isMuted,
-      volume,
-      playbackRate,
-      isLooping,
-      isAudioFxEnabled,
-      lofiAmount,
-      radioToneAmount,
-      bitCrushAmount,
-      sampleRateReductionAmount,
-      bassAmount,
-      midAmount,
-      trebleAmount,
-      stereoWidthAmount,
-      smallSpeakerRoomAmount,
-      wowFlutterAmount,
-      isNoiseEnabled,
-      noiseLevel,
-      vinylDustAmount,
-      delayAmount,
-      reverbAmount,
-      chorusAmount,
-      tapeSaturationAmount,
-      compressorAmount,
-      fxOutputTrimAmount,
-    });
+    const id = setTimeout(() => {
+      savePersistedRetroAudioSettings({
+        isMuted,
+        volume,
+        playbackRate,
+        isLooping,
+        isAudioFxEnabled,
+        lofiAmount,
+        radioToneAmount,
+        bitCrushAmount,
+        sampleRateReductionAmount,
+        bassAmount,
+        midAmount,
+        trebleAmount,
+        stereoWidthAmount,
+        smallSpeakerRoomAmount,
+        wowFlutterAmount,
+        isNoiseEnabled,
+        noiseLevel,
+        vinylDustAmount,
+        delayAmount,
+        reverbAmount,
+        chorusAmount,
+        tapeSaturationAmount,
+        compressorAmount,
+        fxOutputTrimAmount,
+      });
+    }, 300);
+    return () => clearTimeout(id);
   }, [
     isMuted,
     volume,
