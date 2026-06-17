@@ -181,6 +181,7 @@ export function usePixiVideoPlayer(
     updateAudioNodes,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
+    applyAudioSettings,
     resetAudioSettings,
     disposeAudioEngine,
   } = audio;
@@ -947,6 +948,7 @@ export function usePixiVideoPlayer(
     changeVolume,
     toggleLoop,
     setLoopingEnabled,
+    applyAudioSettings,
     resetAudioSettings,
     playVideoWithAudio,
     isPoweredOn,

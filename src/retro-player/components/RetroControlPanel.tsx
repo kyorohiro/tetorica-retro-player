@@ -1,5 +1,6 @@
 import React from "react";
 import type { RetroFilterState } from "../hooks/useRetroFilterState";
+import type { PresetFileData } from "../hooks/presetFile";
 import type { RetroPresetKey } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -87,6 +88,7 @@ export type RetroControlPanelProps = {
   onSetTargetHeight: (h: number) => void;
   onSetMatchTargetAspect: (v: boolean) => void;
   onResetSettings: () => void;
+  onImportSettings: (data: PresetFileData) => void;
 };
 
 const controlsFallback = (
@@ -106,6 +108,7 @@ export function RetroControlPanel({
   onSetTargetHeight,
   onSetMatchTargetAspect,
   onResetSettings,
+  onImportSettings,
 }: RetroControlPanelProps) {
   return (
     <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-3 text-xs text-slate-300">
@@ -178,6 +181,7 @@ export function RetroControlPanel({
               onTogglePlayback={() => { void player.togglePlayback(); }}
               onBackToPlayback={() => { onControlPanelModeChange("playback"); }}
               onResetSettings={onResetSettings}
+              onImportSettings={onImportSettings}
               onToggleVideoSettings={() => {
                 onControlPanelModeChange("video-settings");
               }}

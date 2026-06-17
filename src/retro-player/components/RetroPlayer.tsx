@@ -8,6 +8,8 @@ import {
   clearPersistedRetroSettings,
   loadPersistedRetroSettings,
 } from "../hooks/persistedRetroSettings";
+import { saveLocalePreference } from "../../i18n";
+import type { PresetFileData } from "../hooks/presetFile";
 import {
   RETRO_PRESETS,
   type RetroPresetDefinition,
@@ -97,6 +99,13 @@ export function RetroPlayer({
     filterState.resetSettings();
     player.resetAudioSettings();
     setIsHighResolution(false);
+  }, [filterState, player]);
+
+  const handleImportSettings = React.useCallback((data: PresetFileData) => {
+    filterState.applyAllFilterSettings(data.filter);
+    player.applyAudioSettings(data.audio);
+    setIsHighResolution(data.ui.isHighResolution);
+    saveLocalePreference(data.locale);
   }, [filterState, player]);
 
   const syncTargetAspect = React.useCallback(() => {
@@ -335,6 +344,7 @@ export function RetroPlayer({
           onSetTargetHeight={handleSetTargetHeight}
           onSetMatchTargetAspect={handleSetMatchTargetAspect}
           onResetSettings={resetAllSettings}
+          onImportSettings={handleImportSettings}
         />
       </div>
     </section>

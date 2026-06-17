@@ -391,6 +391,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     }));
   };
 
+  const applyAllFilterSettings = (s: RetroFilterSettings) => {
+    setSelectedPreset(resolvePresetKeyFromState(s));
+    setSettings(s);
+  };
+
   const resetSettings = () => {
     setSelectedPreset(resolvePresetKeyFromState(baseInitialState));
     setSettings(baseInitialState);
@@ -439,6 +444,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setNeonSaturation,
     setNeonDetail,
     setIsFilterEnabled,
+    applyAllFilterSettings,
     applyPreset,
     resetSettings,
   };
