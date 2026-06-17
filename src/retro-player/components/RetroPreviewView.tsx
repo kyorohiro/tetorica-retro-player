@@ -37,6 +37,7 @@ export type RetroPreviewPlayerSlice = {
   playVideoWithAudio: () => Promise<void>;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<string | null>;
+  ensureAudioContext: () => Promise<AudioContext | null | undefined>;
   downloadPendingRecording: () => void;
   sharePendingRecording: () => Promise<boolean>;
   refreshLayout: () => void;
@@ -412,6 +413,8 @@ export function RetroPreviewView({
                       okText: player.prefersShareExport ? "Share" : "Save",
                       cancelText: "Cancel",
                     });
+
+                    void player.ensureAudioContext();
 
                     if (!confirmed) return;
 
