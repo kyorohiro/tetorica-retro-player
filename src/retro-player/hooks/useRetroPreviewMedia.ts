@@ -75,7 +75,6 @@ const isAndroidRuntime = () =>
 // The behavioral probe in useRetroAudioEngine provides the authoritative result;
 // this is only used in playVideoWithAudio which runs before the probe completes.
 const staticNeedsNativeAudioSuppression = () => {
-  if (typeof window !== "undefined" && "safari" in window) return true;
   if (typeof navigator !== "undefined") {
     const ua = navigator.userAgent;
     return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS/i.test(ua);

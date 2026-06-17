@@ -30,7 +30,6 @@ let _needsNativeAudioSuppression: boolean | null = null;
 
 // Static detection used as initial fallback until the probe runs.
 function staticNeedsNativeAudioSuppression(): boolean {
-  if (typeof window !== "undefined" && "safari" in window) return true;
   if (typeof navigator !== "undefined") {
     const ua = navigator.userAgent;
     return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS/i.test(ua);
@@ -51,6 +50,7 @@ async function runNativeSuppressionProbe(
   context: AudioContext,
   sourceNode: MediaElementAudioSourceNode,
   media: HTMLMediaElement,
+  mainAudioInput: AudioNode,
 ): Promise<boolean | null> {
   if (_needsNativeAudioSuppression !== null) return _needsNativeAudioSuppression;
 
@@ -64,7 +64,13 @@ async function runNativeSuppressionProbe(
 
   const data = new Float32Array(analyser.fftSize);
   analyser.getFloatTimeDomainData(data);
-  try { sourceNode.disconnect(analyser); } catch { /* ignore disconnect races */ }
+
+  // Chrome bug: disconnect(specificNode) can silently drop ALL outputs from sourceNode,
+  // including the main audioEngine.input connection.
+  // Workaround: disconnect everything, then immediately restore the main audio path.
+  try { sourceNode.disconnect(); } catch { /* ignore */ }
+  try { sourceNode.connect(mainAudioInput); } catch { /* ignore */ }
+
   media.volume = savedVolume;
 
   const maxAmplitude = data.reduce((max, v) => Math.max(max, Math.abs(v)), 0);
@@ -365,9 +371,10 @@ export function useRetroAudioEngine({
       // Runs on the first 'playing' event; retries if content is silent (inconclusive).
       if (_needsNativeAudioSuppression === null) {
         const capturedSource = mediaSource;
+        const capturedInput = audioEngine.input;
         const handlePlaying = () => {
           void (async () => {
-            const result = await runNativeSuppressionProbe(context, capturedSource, media);
+            const result = await runNativeSuppressionProbe(context, capturedSource, media, capturedInput);
             if (result === null) {
               // Content was silent — retry on the next playing event
               media.addEventListener("playing", handlePlaying, { once: true });
