@@ -18,25 +18,7 @@ import {
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import { RetroPreviewView } from "./RetroPreviewView";
 import { RetroControlPanel } from "./RetroControlPanel";
-
-const defaultConfirmDialog: ConfirmDialogFn = async ({
-  title,
-  body,
-  okText,
-  cancelText,
-}) => {
-  if (typeof window === "undefined") return false;
-
-  const message = [
-    title,
-    body,
-    okText || cancelText ? `${okText ?? "OK"} / ${cancelText ?? "Cancel"}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
-  return window.confirm(message);
-};
+import { useDialog } from "../../useDialog";
 
 type RetroPlayerProps = {
   locale?: RetroPlayerLocale;
@@ -61,8 +43,12 @@ export function RetroPlayer({
   className,
   onError,
   initialFilterState,
-  confirmDialog = defaultConfirmDialog,
+  confirmDialog: confirmDialogProp,
 }: RetroPlayerProps) {
+  const { showConfirmDialog } = useDialog();
+  const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
+    ((opts) => showConfirmDialog({ ...opts, title: opts.title ?? "", body: opts.body ?? "" }).then((v) => v ?? false));
+
   // isHighResolution and isFitWidthEnabled live here because they are args to
   // usePixiVideoPlayer. Their toggle buttons are in RetroPreviewView.
   const persistedUiSettings = React.useMemo(

@@ -558,6 +558,7 @@ export function usePixiVideoPlayer(
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
       setIsRecording(false);
+      void ensureAudioContext();
       stopRecordingResolverRef.current?.(resolvedFilename);
       stopRecordingResolverRef.current = null;
     }, { once: true });
@@ -958,6 +959,7 @@ export function usePixiVideoPlayer(
     sharePendingRecording,
     startRecording,
     stopRecording,
+    ensureAudioContext,
     refreshLayout,
     toggleAudioFx: () => {
       setIsAudioFxEnabled((current) => !current);
