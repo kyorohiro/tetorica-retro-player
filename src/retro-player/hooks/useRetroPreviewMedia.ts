@@ -71,15 +71,13 @@ type UseRetroPreviewMediaParams = {
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
-// Static fallback for native audio suppression detection.
-// The behavioral probe in useRetroAudioEngine provides the authoritative result;
-// this is only used in playVideoWithAudio which runs before the probe completes.
+// navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
+// Chrome DevTools UA emulation does NOT change navigator.vendor, so this
+// correctly returns false even when the DevTools UA is set to iOS Safari.
 const staticNeedsNativeAudioSuppression = () => {
-  if (typeof navigator !== "undefined") {
-    const ua = navigator.userAgent;
-    return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS/i.test(ua);
-  }
-  return false;
+  if (typeof navigator === "undefined") return false;
+  if (navigator.vendor !== "Apple Computer, Inc.") return false;
+  return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
 };
 
 

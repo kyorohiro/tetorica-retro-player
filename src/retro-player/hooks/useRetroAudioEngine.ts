@@ -22,62 +22,24 @@ type UseRetroAudioEngineParams = {
   isPlayingRef: MutableRefObject<boolean>;
 };
 
-// Cached behavioral probe result.
-// true  = browser captures audio BEFORE volume scaling (Safari-like) → native output leaks, volume=0 suppresses it safely
-// false = browser captures audio AFTER volume scaling (Chrome-like) → native output already suppressed by Web Audio API
-// null  = probe not yet run
-let _needsNativeAudioSuppression: boolean | null = null;
-
-// Static detection used as initial fallback until the probe runs.
-function staticNeedsNativeAudioSuppression(): boolean {
-  if (typeof navigator !== "undefined") {
-    const ua = navigator.userAgent;
-    return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS/i.test(ua);
-  }
-  return false;
-}
-
-// Returns the current best answer: probe result if available, static fallback otherwise.
+// Safari's createMediaElementSource() does not suppress the element's native audio output,
+// causing double audio. Setting media.volume=0 suppresses native output while the Web Audio
+// graph (masterGain) controls the actual output level.
+// Chrome/Firefox suppress native output automatically, so media.volume must stay at the
+// user's value (setting it to 0 would also silence the Web Audio source).
+//
+// navigator.vendor is used as the primary discriminator because it is not affected by
+// Chrome DevTools' UA override (Chrome always reports "Google Inc." regardless of
+// the emulated UA, so spoofed iOS Safari UA strings don't trigger this path).
 function needsNativeAudioSuppression(): boolean {
-  return _needsNativeAudioSuppression ?? staticNeedsNativeAudioSuppression();
-}
-
-// Behavioral probe: sets volume=0 briefly and checks if the Web Audio source still has signal.
-// Signal present  → browser captures pre-volume (Safari) → needs suppression.
-// Signal absent   → browser captures post-volume (Chrome) → no suppression needed.
-// Returns null if the media content is silent and the probe is inconclusive.
-async function runNativeSuppressionProbe(
-  context: AudioContext,
-  sourceNode: MediaElementAudioSourceNode,
-  media: HTMLMediaElement,
-  mainAudioInput: AudioNode,
-): Promise<boolean | null> {
-  if (_needsNativeAudioSuppression !== null) return _needsNativeAudioSuppression;
-
-  const analyser = context.createAnalyser();
-  analyser.fftSize = 256;
-  const savedVolume = media.volume;
-
-  media.volume = 0;
-  sourceNode.connect(analyser);
-  await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-
-  const data = new Float32Array(analyser.fftSize);
-  analyser.getFloatTimeDomainData(data);
-
-  // Chrome bug: disconnect(specificNode) can silently drop ALL outputs from sourceNode,
-  // including the main audioEngine.input connection.
-  // Workaround: disconnect everything, then immediately restore the main audio path.
-  try { sourceNode.disconnect(); } catch { /* ignore */ }
-  try { sourceNode.connect(mainAudioInput); } catch { /* ignore */ }
-
-  media.volume = savedVolume;
-
-  const maxAmplitude = data.reduce((max, v) => Math.max(max, Math.abs(v)), 0);
-  if (maxAmplitude < 0.001) return null; // inconclusive: content is silent, retry later
-
-  _needsNativeAudioSuppression = maxAmplitude > 0.01;
-  return _needsNativeAudioSuppression;
+  if (typeof navigator === "undefined") return false;
+  // navigator.vendor === "Apple Computer, Inc." only in real Safari/WebKit.
+  // Chrome DevTools UA emulation does NOT change navigator.vendor.
+  if (navigator.vendor !== "Apple Computer, Inc.") return false;
+  // Exclude iOS Chrome (CriOS), Firefox for iOS (FxiOS), Opera for iOS (OPiOS)
+  // which also run on WebKit and share the same vendor string.
+  const ua = navigator.userAgent;
+  return !/CriOS|FxiOS|OPiOS/i.test(ua);
 }
 
 function createCurrentAccessor<T>(getValue: () => T): CurrentRef<T> {
@@ -365,33 +327,6 @@ export function useRetroAudioEngine({
       } else {
         media.muted = isMutedRef.current;
         media.volume = isMutedRef.current ? 0 : volumeRef.current;
-      }
-
-      // Schedule one-time behavioral probe to confirm/correct the static detection.
-      // Runs on the first 'playing' event; retries if content is silent (inconclusive).
-      if (_needsNativeAudioSuppression === null) {
-        const capturedSource = mediaSource;
-        const capturedInput = audioEngine.input;
-        const handlePlaying = () => {
-          void (async () => {
-            const result = await runNativeSuppressionProbe(context, capturedSource, media, capturedInput);
-            if (result === null) {
-              // Content was silent — retry on the next playing event
-              media.addEventListener("playing", handlePlaying, { once: true });
-              return;
-            }
-            if (mediaSourceRef.current !== capturedSource) return;
-            // Apply correct state now that we have a confirmed result
-            if (result) {
-              media.muted = false;
-              media.volume = 0;
-            } else {
-              media.muted = isMutedRef.current;
-              media.volume = isMutedRef.current ? 0 : volumeRef.current;
-            }
-          })();
-        };
-        media.addEventListener("playing", handlePlaying, { once: true });
       }
 
       debugAudio("connectMediaAudio:connected", {
