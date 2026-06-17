@@ -189,26 +189,6 @@ export function RetroPlayer({
     ],
   );
 
-  const refitPreview = React.useCallback(() => {
-    if (stream && player.isCaptureActive) {
-      window.setTimeout(() => {
-        void player.previewStream(
-          stream,
-          kind === "audio" ? "audio" : "video",
-          streamName,
-        );
-      }, 120);
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      player.refreshLayout();
-      window.requestAnimationFrame(() => {
-        player.refreshLayout();
-      });
-    });
-  }, [kind, player, stream, streamName]);
-
   // --- Effects ---
 
   // Sync target aspect when source dimensions become available.
@@ -316,7 +296,6 @@ export function RetroPlayer({
           confirmDialog={confirmDialog}
           onHighResolutionChange={setIsHighResolution}
           onFitWidthChange={setIsFitWidthEnabled}
-          onRefit={refitPreview}
           onError={onError}
         />
         <RetroControlPanel
