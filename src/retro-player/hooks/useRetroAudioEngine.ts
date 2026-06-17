@@ -335,8 +335,7 @@ export function useRetroAudioEngine({
     await disposeAudioEngine();
   };
 
-  const resetAudioSettings = () => {
-    const nextSettings = { ...DEFAULT_AUDIO_SETTINGS };
+  const applyAudioSettings = (nextSettings: RetroAudioSettings) => {
 
     isMutedRef.current = nextSettings.isMuted;
     volumeRef.current = nextSettings.volume;
@@ -398,6 +397,8 @@ export function useRetroAudioEngine({
     setParams(nextSettings);
     window.requestAnimationFrame(updateAudioNodes);
   };
+
+  const resetAudioSettings = () => applyAudioSettings({ ...DEFAULT_AUDIO_SETTINGS });
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -664,6 +665,7 @@ export function useRetroAudioEngine({
     connectSourceNode,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
+    applyAudioSettings,
     resetAudioSettings,
     disposeAudioEngine: disposeManagedAudioEngine,
   };

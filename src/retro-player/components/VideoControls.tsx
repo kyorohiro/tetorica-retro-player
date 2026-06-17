@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  FolderOpen,
   Gauge,
   Mic2,
   Pause,
   Play,
   RotateCcw,
+  Save,
   SkipBack,
   SkipForward,
   StepBack,
@@ -14,6 +16,11 @@ import {
   VolumeX,
   Waves,
 } from "lucide-react";
+import {
+  exportPresetFile,
+  importPresetFile,
+  type PresetFileData,
+} from "../hooks/presetFile";
 import {
   RETRO_AUDIO_PRESETS,
   type RetroAudioPresetDefinition,
@@ -83,6 +90,7 @@ type VideoControlsProps = {
   onResetSettings: () => void;
   onToggleVideoSettings: () => void;
   onToggleAudioSettings: () => void;
+  onImportSettings: (data: PresetFileData) => void;
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -162,10 +170,27 @@ export function VideoControls({
   onResetSettings,
   onToggleVideoSettings,
   onToggleAudioSettings,
+  onImportSettings,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
+
+  const handleSettingsFile = async (file: File) => {
+    if (!file.name.endsWith(".retro.json")) return;
+    const data = await importPresetFile(file);
+    if (data) onImportSettings(data);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void handleSettingsFile(file);
+  };
 
   const selectedAudioPreset = (
     Object.entries(RETRO_AUDIO_PRESETS).find(([, preset]) => {
@@ -674,7 +699,26 @@ export function VideoControls({
   }
 
   return (
-    <div className="mt-3 space-y-3">
+    <div
+      className={[
+        "mt-3 space-y-3 rounded-xl transition-colors",
+        isDragOver ? "bg-cyan-500/10 outline-dashed outline-1 outline-cyan-500/50" : "",
+      ].join(" ")}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={handleDrop}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleSettingsFile(file);
+          e.target.value = "";
+        }}
+      />
       {hasPlayback && (
         <>
           <div>
@@ -861,31 +905,49 @@ export function VideoControls({
         </>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={onToggleVideoSettings}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-2 py-2 text-xs text-cyan-50 hover:bg-cyan-500/30"
+          >
+            <SlidersHorizontal size={16} />
+            {isVideoSettingsOpen ? "Close Video" : "Video"}
+          </button>
+          <button
+            type="button"
+            onClick={onToggleAudioSettings}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30"
+          >
+            <Mic2 size={16} />
+            Audio
+          </button>
+          {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
+          <button
+            type="button"
+            onClick={onResetSettings}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-slate-100 hover:bg-rose-500/20"
+          >
+            <RotateCcw size={15} />
+            Reset
+          </button>
+        </div>
         <button
           type="button"
-          onClick={onToggleVideoSettings}
-          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-2 py-2 text-xs text-cyan-50 hover:bg-cyan-500/30"
+          onClick={exportPresetFile}
+          title="Save settings to file"
+          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-100"
         >
-          <SlidersHorizontal size={16} />
-          {isVideoSettingsOpen ? "Close Video" : "Video"}
+          <Save size={13} />
         </button>
         <button
           type="button"
-          onClick={onToggleAudioSettings}
-          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-2 py-2 text-xs text-fuchsia-50 hover:bg-fuchsia-500/30"
+          onClick={() => fileInputRef.current?.click()}
+          title="Load settings from .retro.json file"
+          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-100"
         >
-          <Mic2 size={16} />
-          Audio
-        </button>
-        {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
-        <button
-          type="button"
-          onClick={onResetSettings}
-          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-slate-100 hover:bg-rose-500/20"
-        >
-          <RotateCcw size={15} />
-          Reset
+          <FolderOpen size={13} />
         </button>
       </div>
       {hasPlayback && (
