@@ -43,6 +43,7 @@ export type RetroControlPlayerSlice = {
   chorusAmount: number;
   tapeSaturationAmount: number;
   compressorAmount: number;
+  fxOutputTrimAmount: number;
   playbackRate: number;
   volume: number;
   setLofiAmount: (v: number) => void;
@@ -146,6 +147,7 @@ export function RetroControlPanel({
               chorusAmount={player.chorusAmount}
               tapeSaturationAmount={player.tapeSaturationAmount}
               compressorAmount={player.compressorAmount}
+              fxOutputTrimAmount={player.fxOutputTrimAmount}
               playbackRate={player.playbackRate}
               volume={player.volume}
               onChangeLofiAmount={player.setLofiAmount}
