@@ -805,8 +805,8 @@ export const VideoControls = memo(function VideoControls({
                 <Gauge size={14} />
               </button>
               {isSpeedOpen && (
-                <div className="absolute bottom-full left-0 z-10 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
-                  {[0.5, 1, 2].map((rate) => (
+                <div className="absolute bottom-full left-0 z-200 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-lg">
+                  {[2, 1.5, 1.25, 1, 0.75, 0.5].map((rate) => (
                     <button
                       key={rate}
                       type="button"

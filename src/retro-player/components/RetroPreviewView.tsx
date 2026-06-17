@@ -7,7 +7,6 @@ import {
   Minimize2,
   Pin,
   Power,
-  RotateCcw,
   Square,
 } from "lucide-react";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
@@ -57,7 +56,6 @@ export type RetroPreviewViewProps = {
   confirmDialog: ConfirmDialogFn;
   onHighResolutionChange: (enabled: boolean) => void;
   onFitWidthChange: (enabled: boolean) => void;
-  onRefit: () => void;
   onError?: (error: Error) => void;
 };
 
@@ -72,7 +70,6 @@ export function RetroPreviewView({
   confirmDialog,
   onHighResolutionChange,
   onFitWidthChange,
-  onRefit,
   onError,
 }: RetroPreviewViewProps) {
   const tooltipText =
@@ -85,7 +82,6 @@ export function RetroPreviewView({
           hiRes: "Hi-res: よりシャープになりますが GPU 負荷は上がります。",
           fitWidthOn: "Fit width: 有効です。",
           fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
-          refit: "Refit: プレビュー配置を立て直します。",
           pinUnavailable: "Pin: 最大化中は使えません。",
           pinUnavailableFitWidth: "Pin: Fit Width 中は使えません。",
           pinOn: "Pin: プレビューを画面内に固定します。",
@@ -101,7 +97,6 @@ export function RetroPreviewView({
           hiRes: "Hi-res: sharper preview, higher GPU cost.",
           fitWidthOn: "Fit width: enabled.",
           fitWidthOff: "Fit width: stretch preview to the frame width.",
-          refit: "Refit: recover the preview layout.",
           pinUnavailable: "Pin: unavailable while maximize is active.",
           pinUnavailableFitWidth: "Pin: unavailable in fit-width mode.",
           pinOn: "Pin: keep preview fixed on screen.",
@@ -229,9 +224,9 @@ export function RetroPreviewView({
     setPinnedPreviewMetrics(null);
   }, [isFitWidthEnabled]);
 
-  // Auto-pin when the video-settings panel is open and user scrolls up.
+  // Auto-pin when the settings panel is open and user scrolls up.
   React.useEffect(() => {
-    if (controlPanelMode !== "video-settings" || isPreviewMaximized || isPreviewPinned || isFitWidthEnabled) {
+    if (controlPanelMode === "playback" || isPreviewMaximized || isPreviewPinned || isFitWidthEnabled) {
       setIsAutoPreviewPinned(false);
       setAutoPinnedHiddenOffset(0);
       return;
@@ -536,21 +531,6 @@ export function RetroPreviewView({
       <div className="relative">
         <button
           type="button"
-          aria-label="Refit preview"
-          onClick={() => { hideTooltip(); onRefit(); }}
-          onMouseEnter={() => scheduleTooltip("refit")}
-          onMouseLeave={hideTooltip}
-          onFocus={() => scheduleTooltip("refit")}
-          onBlur={hideTooltip}
-          className={[floatingButtonClass, idleFloatingButtonClass].join(" ")}
-        >
-          <RotateCcw size={16} />
-        </button>
-        {renderTooltip("refit", tooltipText.refit)}
-      </div>
-      <div className="relative">
-        <button
-          type="button"
           aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
           onClick={() => {
             hideTooltip();
@@ -699,8 +679,9 @@ export function RetroPreviewView({
                   ? {
                       aspectRatio: previewAspectRatio,
                       width: "100%",
-                      height: "min(60vh, calc(100vh - 12rem))",
-                      maxHeight: "calc(100vh - 12rem)",
+                      maxHeight: previewFrameHeight
+                        ? `${previewFrameHeight}px`
+                        : "min(60vh, calc(100vh - 12rem))",
                       minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
                     }
                   : {
