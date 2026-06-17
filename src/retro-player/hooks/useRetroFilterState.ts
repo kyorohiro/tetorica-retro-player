@@ -402,7 +402,10 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   };
 
   useEffect(() => {
-    savePersistedRetroFilterSettings(settings);
+    const id = setTimeout(() => {
+      savePersistedRetroFilterSettings(settings);
+    }, 300);
+    return () => clearTimeout(id);
   }, [settings]);
 
   useEffect(() => {
