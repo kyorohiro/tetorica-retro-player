@@ -175,6 +175,7 @@ export const VideoControls = memo(function VideoControls({
   onImportSettings,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
+  const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -769,15 +770,36 @@ export const VideoControls = memo(function VideoControls({
             >
               {isPlaying ? <Pause size={16} /> : <Play size={16} />}
             </button>
-            <button
-              type="button"
-              onClick={onToggleMute}
-              aria-label={isMuted ? "Unmute" : "Mute"}
-              title={isMuted ? "Unmute" : "Mute"}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
-            >
-              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsVolumeOpen((v) => !v)}
+                aria-label="Volume"
+                title="Volume"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 hover:bg-slate-800"
+              >
+                {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+              {isVolumeOpen && (
+                <div className="absolute bottom-full left-1/2 z-200 mb-1 flex -translate-x-1/2 flex-col items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 shadow-lg">
+                  <span className="text-[11px] text-slate-400">{Math.round((isMuted ? 0 : volume) * 100)}%</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={isMuted ? 0 : volume}
+                    onChange={(ev) => {
+                      const v = Number(ev.currentTarget.value);
+                      if (isMuted && v > 0) onToggleMute();
+                      onChangeVolume(v);
+                    }}
+                    style={{ writingMode: "vertical-lr", direction: "rtl", height: "96px" }}
+                    className="cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={onToggleLoop}
@@ -824,32 +846,6 @@ export const VideoControls = memo(function VideoControls({
                   ))}
                 </div>
               )}
-            </div>
-            <div className="col-span-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onToggleMute}
-                aria-label={isMuted ? "Unmute" : "Mute"}
-                className="shrink-0 text-slate-400 hover:text-slate-100"
-              >
-                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={isMuted ? 0 : volume}
-                onChange={(ev) => {
-                  const v = Number(ev.currentTarget.value);
-                  if (isMuted && v > 0) onToggleMute();
-                  onChangeVolume(v);
-                }}
-                className="w-full"
-              />
-              <span className="w-8 shrink-0 text-right text-[11px] text-slate-400">
-                {Math.round(volume * 100)}%
-              </span>
             </div>
 
             {hasVideo ? (
