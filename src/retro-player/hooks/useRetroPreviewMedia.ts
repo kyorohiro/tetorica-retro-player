@@ -71,6 +71,19 @@ type UseRetroPreviewMediaParams = {
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
+// Static fallback for native audio suppression detection.
+// The behavioral probe in useRetroAudioEngine provides the authoritative result;
+// this is only used in playVideoWithAudio which runs before the probe completes.
+const staticNeedsNativeAudioSuppression = () => {
+  if (typeof window !== "undefined" && "safari" in window) return true;
+  if (typeof navigator !== "undefined") {
+    const ua = navigator.userAgent;
+    return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS/i.test(ua);
+  }
+  return false;
+};
+
+
 export function useRetroPreviewMedia({
   appRef,
   spriteRef,
@@ -492,8 +505,13 @@ export function useRetroPreviewMedia({
 
     try {
       await ensureAudioContext();
-      mediaRef.current.muted = isMutedRef.current;
-      mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
+      if (staticNeedsNativeAudioSuppression() && mediaSourceRef.current) {
+        mediaRef.current.muted = false;
+        mediaRef.current.volume = 0;
+      } else {
+        mediaRef.current.muted = isMutedRef.current;
+        mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
+      }
       await mediaRef.current.play();
       isPlayingRef.current = true;
       setIsPlaying(true);

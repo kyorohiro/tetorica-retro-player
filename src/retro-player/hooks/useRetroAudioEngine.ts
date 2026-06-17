@@ -22,6 +22,58 @@ type UseRetroAudioEngineParams = {
   isPlayingRef: MutableRefObject<boolean>;
 };
 
+// Cached behavioral probe result.
+// true  = browser captures audio BEFORE volume scaling (Safari-like) → native output leaks, volume=0 suppresses it safely
+// false = browser captures audio AFTER volume scaling (Chrome-like) → native output already suppressed by Web Audio API
+// null  = probe not yet run
+let _needsNativeAudioSuppression: boolean | null = null;
+
+// Static detection used as initial fallback until the probe runs.
+function staticNeedsNativeAudioSuppression(): boolean {
+  if (typeof window !== "undefined" && "safari" in window) return true;
+  if (typeof navigator !== "undefined") {
+    const ua = navigator.userAgent;
+    return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS/i.test(ua);
+  }
+  return false;
+}
+
+// Returns the current best answer: probe result if available, static fallback otherwise.
+function needsNativeAudioSuppression(): boolean {
+  return _needsNativeAudioSuppression ?? staticNeedsNativeAudioSuppression();
+}
+
+// Behavioral probe: sets volume=0 briefly and checks if the Web Audio source still has signal.
+// Signal present  → browser captures pre-volume (Safari) → needs suppression.
+// Signal absent   → browser captures post-volume (Chrome) → no suppression needed.
+// Returns null if the media content is silent and the probe is inconclusive.
+async function runNativeSuppressionProbe(
+  context: AudioContext,
+  sourceNode: MediaElementAudioSourceNode,
+  media: HTMLMediaElement,
+): Promise<boolean | null> {
+  if (_needsNativeAudioSuppression !== null) return _needsNativeAudioSuppression;
+
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 256;
+  const savedVolume = media.volume;
+
+  media.volume = 0;
+  sourceNode.connect(analyser);
+  await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+  const data = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(data);
+  try { sourceNode.disconnect(analyser); } catch { /* ignore disconnect races */ }
+  media.volume = savedVolume;
+
+  const maxAmplitude = data.reduce((max, v) => Math.max(max, Math.abs(v)), 0);
+  if (maxAmplitude < 0.001) return null; // inconclusive: content is silent, retry later
+
+  _needsNativeAudioSuppression = maxAmplitude > 0.01;
+  return _needsNativeAudioSuppression;
+}
+
 function createCurrentAccessor<T>(getValue: () => T): CurrentRef<T> {
   return {
     get current() {
@@ -299,8 +351,42 @@ export function useRetroAudioEngine({
       const mediaSource = context.createMediaElementSource(media);
       mediaSource.connect(audioEngine.input);
       mediaSourceRef.current = mediaSource;
-      media.muted = isMutedRef.current;
-      media.volume = isMutedRef.current ? 0 : volumeRef.current;
+
+      // Apply initial state using best current knowledge (static fallback until probe runs)
+      if (needsNativeAudioSuppression()) {
+        media.muted = false;
+        media.volume = 0;
+      } else {
+        media.muted = isMutedRef.current;
+        media.volume = isMutedRef.current ? 0 : volumeRef.current;
+      }
+
+      // Schedule one-time behavioral probe to confirm/correct the static detection.
+      // Runs on the first 'playing' event; retries if content is silent (inconclusive).
+      if (_needsNativeAudioSuppression === null) {
+        const capturedSource = mediaSource;
+        const handlePlaying = () => {
+          void (async () => {
+            const result = await runNativeSuppressionProbe(context, capturedSource, media);
+            if (result === null) {
+              // Content was silent — retry on the next playing event
+              media.addEventListener("playing", handlePlaying, { once: true });
+              return;
+            }
+            if (mediaSourceRef.current !== capturedSource) return;
+            // Apply correct state now that we have a confirmed result
+            if (result) {
+              media.muted = false;
+              media.volume = 0;
+            } else {
+              media.muted = isMutedRef.current;
+              media.volume = isMutedRef.current ? 0 : volumeRef.current;
+            }
+          })();
+        };
+        media.addEventListener("playing", handlePlaying, { once: true });
+      }
+
       debugAudio("connectMediaAudio:connected", {
         audioContextState: context.state,
         mediaTag: media.tagName,
@@ -388,8 +474,13 @@ export function useRetroAudioEngine({
     setFxOutputTrimAmount(nextSettings.fxOutputTrimAmount);
 
     if (mediaRef.current) {
-      mediaRef.current.muted = nextSettings.isMuted;
-      mediaRef.current.volume = nextSettings.volume;
+      if (needsNativeAudioSuppression() && mediaSourceRef.current) {
+        mediaRef.current.muted = false;
+        mediaRef.current.volume = 0;
+      } else {
+        mediaRef.current.muted = nextSettings.isMuted;
+        mediaRef.current.volume = nextSettings.volume;
+      }
       mediaRef.current.playbackRate = nextSettings.playbackRate;
       mediaRef.current.loop = nextSettings.isLooping;
     }
@@ -463,8 +554,13 @@ export function useRetroAudioEngine({
     );
 
     if (mediaRef.current) {
-      mediaRef.current.muted = isMuted;
-      mediaRef.current.volume = isMuted ? 0 : volume;
+      if (needsNativeAudioSuppression() && mediaSourceRef.current) {
+        mediaRef.current.muted = false;
+        mediaRef.current.volume = 0;
+      } else {
+        mediaRef.current.muted = isMuted;
+        mediaRef.current.volume = isMuted ? 0 : volume;
+      }
       mediaRef.current.playbackRate = playbackRate;
       mediaRef.current.loop = isLooping;
     }
