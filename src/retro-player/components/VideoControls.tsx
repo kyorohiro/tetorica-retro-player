@@ -56,6 +56,7 @@ type VideoControlsProps = {
   chorusAmount: number;
   tapeSaturationAmount: number;
   compressorAmount: number;
+  fxOutputTrimAmount: number;
   playbackRate: number;
   volume: number;
   onChangeLofiAmount: (amount: number) => void;
@@ -136,6 +137,7 @@ export function VideoControls({
   chorusAmount,
   tapeSaturationAmount,
   compressorAmount,
+  fxOutputTrimAmount,
   playbackRate,
   volume,
   onChangeLofiAmount,
@@ -648,6 +650,24 @@ export function VideoControls({
                 value={smallSpeakerRoomAmount}
                 onChange={(ev) => {
                   onChangeSmallSpeakerRoomAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Output Gain</span>
+                <span>{Math.round(fxOutputTrimAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1.5"
+                step="0.01"
+                value={fxOutputTrimAmount}
+                onChange={(ev) => {
+                  onChangeFxOutputTrimAmount(Number(ev.currentTarget.value));
                 }}
                 className="w-full"
               />
