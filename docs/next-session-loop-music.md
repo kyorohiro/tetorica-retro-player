@@ -5,7 +5,7 @@
 ---
 
 `examples/demo-tonejs-vite/` に Tone.js + Vite のブラウザデモがあります。
-現在 3曲入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
+現在 6曲入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
 
 ### 現在の構成を確認してから作業してください
 
@@ -13,24 +13,28 @@
 examples/demo-tonejs-vite/
   src/
     main.ts     # UI管理・曲切り替え
-    song1.ts    # "Chill Loop"   C major 80BPM  sine pad + triangle melody
-    song2.ts    # "Rain Window"  A minor 75BPM  triangle pad + PluckSynth melody
-    song3.ts    # "Midnight Keys" F major 88BPM  sawtooth+chorus pad + FMSynth melody
+    song1.ts    # "Chill Loop"    C major  80BPM  PolySynth(sine) pad + Synth(triangle) mel + MonoSynth(triangle) bass
+    song2.ts    # "Rain Window"   A minor  75BPM  PolySynth(triangle) pad + PluckSynth mel + MonoSynth(sawtooth) bass
+    song3.ts    # "Midnight Keys" F major  88BPM  PolySynth(sawtooth)+Chorus pad + FMSynth mel + MonoSynth(square) bass
+    song4.ts    # "Duo Dusk"      D major  82BPM  PolySynth(AMSynth) pad + DuoSynth mel + AMSynth bass
+    song5.ts    # "8bit Blues"    G blues  78BPM  PolySynth(sine) pad + Synth(pulse)+BitCrusher+PingPongDelay mel + MonoSynth(square) bass
+    song6.ts    # "Dark Orbit"    C minor  76BPM  PolySynth(FMSynth)+Reverb pad + Synth(fatsawtooth)+Phaser mel + MonoSynth(fatsawtooth) bass
 ```
 
 ### やってほしいこと
 
-**song4.ts 〜 song6.ts を新規作成**して、main.ts と index.html に追加してください。
+**song7.ts 〜 song9.ts を新規作成**して、main.ts と index.html に追加してください。
 各曲で**まだ使っていない Tone.js の音色**を積極的に使ってください。
 
 ### 音色の方針 (まだ使っていないもの優先)
 
 | 楽器 | まだ使っていない音色の例 |
 |---|---|
-| Melody | `AMSynth` `DuoSynth` `MetalSynth` `Synth(oscillator:pulse)` `Synth(oscillator:fatsawtooth)` |
-| Pad | `DuoSynth` `AMSynth` `Synth(fat系)` |
-| Bass | `FMSynth` `AMSynth` |
-| Percussion | `MetalSynth` (Node.jsはNG、ブラウザならOK)、`Synth(oscillator:sine)` でトム風 |
+| Melody | `MetalSynth` (シンバル風リード)、`Synth(oscillator:amsine)` `Synth(oscillator:fmtriangle)` `Synth(oscillator:fatsquare)` |
+| Pad | `PolySynth(Tone.Synth, oscillator:fatsawtooth)` + Chorus、`PolySynth(Tone.DuoSynth)` |
+| Bass | `FMSynth`、`Synth(oscillator:fatsquare)` |
+| Percussion | `MetalSynth` (ブラウザならOK、hi-hat/シンバル代替)、クラップ (`NoiseSynth` 短め) |
+| Effects | `Tone.Tremolo`、`Tone.AutoFilter`、`Tone.Distortion`、`Tone.Chebyshev`、`Tone.FrequencyShifter` |
 
 ### 各曲のフォーマット (song1.ts を参考に)
 
@@ -51,18 +55,17 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
 `main.ts` の SONGS 配列に追加:
 ```typescript
-import * as Song4 from './song4';
+import * as Song7 from './song7';
 // ...
 const SONGS = [
-  { meta: Song1.META, create: Song1.create },
   // ... 既存
-  { meta: Song4.META, create: Song4.create },
+  { meta: Song7.META, create: Song7.create },
 ];
 ```
 
 `index.html` の `.song-tabs` に追加:
 ```html
-<button class="song-btn" data-song="3">曲名</button>
+<button class="song-btn" data-song="6">曲名</button>
 ```
 
 ### 確認方法
@@ -81,29 +84,28 @@ npm run dev
 
 | 曲 | Pad | Melody | Bass | ドラム特徴 |
 |---|---|---|---|---|
-| song1 Chill Loop | PolySynth(sine) | Synth(triangle) | MonoSynth(triangle) | half-time |
-| song2 Rain Window | PolySynth(triangle) | PluckSynth | MonoSynth(sawtooth) | sparse, pink noise snare |
-| song3 Midnight Keys | PolySynth(sawtooth)+Chorus | FMSynth | MonoSynth(square) | standard 2&4 |
+| song1 Chill Loop    | PolySynth(sine)             | Synth(triangle)                         | MonoSynth(triangle)    | half-time |
+| song2 Rain Window   | PolySynth(triangle)         | PluckSynth                              | MonoSynth(sawtooth)    | sparse, pink noise snare |
+| song3 Midnight Keys | PolySynth(sawtooth)+Chorus  | FMSynth                                 | MonoSynth(square)      | standard 2&4 |
+| song4 Duo Dusk      | PolySynth(AMSynth)          | DuoSynth                                | AMSynth                | half-time, open hat |
+| song5 8bit Blues    | PolySynth(sine)             | Synth(pulse 12.5%)+BitCrusher+PingPong  | MonoSynth(square)      | blues shuffle |
+| song6 Dark Orbit    | PolySynth(FMSynth)+Reverb   | Synth(fatsawtooth)+Phaser               | MonoSynth(fatsawtooth) | epic half-time, low tom |
 
 ### まだ試していない音色
 
-- `Tone.AMSynth` — AM変調、ベルやオルガン系
-- `Tone.DuoSynth` — デチューンした2音、ユニゾン感
-- `Tone.MetalSynth` — シンバル・金属系 (ブラウザのみ)
-- `Tone.Synth` oscillator: `pulse` — ファミコン風矩形波
-- `Tone.Synth` oscillator: `fatsawtooth` — 太いリード
-- `Tone.Synth` oscillator: `amsine` `fmtriangle` などFat/AM/FMバリアント
-- `Tone.PolySynth(Tone.AMSynth)` — AMコード
-- `Tone.PolySynth(Tone.FMSynth)` — FMパッド
-- `Tone.Reverb` — リバーブ (await reverb.ready が必要)
-- `Tone.PingPongDelay` — ステレオディレイ
-- `Tone.Phaser` — フェイザー
-- `Tone.BitCrusher` — デジタルクランチ
+- `Tone.MetalSynth` — 金属系 (ブラウザのみ)。リードやパーカッションとして使える
+- `Tone.Synth` oscillator: `amsine` `fmtriangle` `fatsquare` `amtriangle` などバリアント
+- `Tone.PolySynth(Tone.DuoSynth)` — デチューンポリフォニック
+- `Tone.FMSynth` as bass — まだメロディ+パッドのみ、ベースに未使用
+- `Tone.Tremolo` — ビブラート/AM系エフェクト
+- `Tone.AutoFilter` — LFOでフィルター変調 (ワウ)
+- `Tone.Distortion` / `Tone.Chebyshev` — ギターディストーション風
+- `Tone.FrequencyShifter` — ピッチシフト系エフェクト
 
-### コード進行のアイデア
+### コード進行のアイデア (未使用)
 
-- D major: D A Bm G (pop定番)
 - E minor: Em C G D (エモ/ロック)
 - Bb major: Bbmaj7 Gm7 Ebmaj7 F7 (ジャズ)
-- G blues: G7 C7 G7 D7 (ブルース)
-- C minor: Cm Ab Eb Bb (エピック)
+- A major: A E F#m D (明るいポップ)
+- B minor: Bm G D A (バラード)
+- F# minor: F#m D A E (ドラマティック)
