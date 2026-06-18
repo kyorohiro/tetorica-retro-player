@@ -638,13 +638,11 @@ export class TetoricaRetroAudioNode {
 
     const postCrushLowpass = this.nodes.postCrushLowpass;
     if (postCrushLowpass) {
-      const sampleRateAmount = settings.isAudioFxEnabled ? settings.sampleRateReductionAmount : 0;
       const bitCrushAmt = settings.isAudioFxEnabled ? settings.bitCrushAmount : 0;
-      // sampleRate reduction が主なエイリアシング源、bitCrush が量子化ノイズ源
-      postCrushLowpass.frequency.value = Math.max(
-        3500,
-        18000 - sampleRateAmount * 11000 - bitCrushAmt * 3000,
-      );
+      const sampleRateAmount = settings.isAudioFxEnabled ? settings.sampleRateReductionAmount : 0;
+      // bitCrush が主、sampleRate が副。軽いエフェクトには影響させない
+      const cutoff = Math.max(5000, 18000 - bitCrushAmt * 8000 - sampleRateAmount * 3000);
+      postCrushLowpass.frequency.value = cutoff;
     }
 
     if (bassEq && midEq && trebleEq) {

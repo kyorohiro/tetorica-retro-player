@@ -334,13 +334,13 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      lofiAmount: 0.42,        // pre-crush lowpass ~10100Hz でエイリアシング抑制
+      lofiAmount: 0.38,
       radioToneAmount: 0,
       bitCrushAmount: 0.88,
-      sampleRateReductionAmount: 0.55,
+      sampleRateReductionAmount: 0.30,
       bassAmount: -0.35,
       midAmount: 0.05,
-      trebleAmount: -0.45,     // post-crush 高域ノイズカット
+      trebleAmount: -0.35,
       stereoWidthAmount: -1.0,
       smallSpeakerRoomAmount: 0.08,
       wowFlutterAmount: 0,
@@ -359,13 +359,13 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
     settings: {
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
-      lofiAmount: 0.48,        // pre-crush lowpass ~9100Hz
+      lofiAmount: 0.35,
       radioToneAmount: 0,
       bitCrushAmount: 0.95,
-      sampleRateReductionAmount: 0.65,
+      sampleRateReductionAmount: 0.25,
       bassAmount: 0.05,
       midAmount: 0.18,
-      trebleAmount: -0.55,     // post-crush 高域ノイズカット
+      trebleAmount: -0.42,
       stereoWidthAmount: -1.0,
       smallSpeakerRoomAmount: 0.06,
       wowFlutterAmount: 0,
