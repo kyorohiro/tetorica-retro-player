@@ -252,6 +252,7 @@ export class TetoricaRetroAudioNode {
     lofiHighshelf: null as BiquadFilterNode | null,
     lofiDrive: null as WaveShaperNode | null,
     bitcrusher: null as AudioWorkletNode | null,
+    postCrushLowpass: null as BiquadFilterNode | null,
     bassEq: null as BiquadFilterNode | null,
     midEq: null as BiquadFilterNode | null,
     trebleEq: null as BiquadFilterNode | null,
@@ -506,6 +507,7 @@ export class TetoricaRetroAudioNode {
       lofiHighshelf: null,
       lofiDrive: null,
       bitcrusher: null,
+      postCrushLowpass: null,
       bassEq: null,
       midEq: null,
       trebleEq: null,
@@ -631,6 +633,17 @@ export class TetoricaRetroAudioNode {
       bitcrusher.parameters.get("mix")?.setValueAtTime(
         mix,
         bitcrusher.context.currentTime,
+      );
+    }
+
+    const postCrushLowpass = this.nodes.postCrushLowpass;
+    if (postCrushLowpass) {
+      const sampleRateAmount = settings.isAudioFxEnabled ? settings.sampleRateReductionAmount : 0;
+      const bitCrushAmt = settings.isAudioFxEnabled ? settings.bitCrushAmount : 0;
+      // sampleRate reduction が主なエイリアシング源、bitCrush が量子化ノイズ源
+      postCrushLowpass.frequency.value = Math.max(
+        3500,
+        18000 - sampleRateAmount * 11000 - bitCrushAmt * 3000,
       );
     }
 
@@ -785,6 +798,11 @@ export class TetoricaRetroAudioNode {
         });
       }
 
+      const postCrushLowpass = context.createBiquadFilter();
+      postCrushLowpass.type = "lowpass";
+      postCrushLowpass.frequency.value = 18000;
+      postCrushLowpass.Q.value = 0.5;
+
       const bassEq = context.createBiquadFilter();
       const midEq = context.createBiquadFilter();
       const trebleEq = context.createBiquadFilter();
@@ -828,10 +846,11 @@ export class TetoricaRetroAudioNode {
       highshelf.connect(drive);
       if (bitcrusher) {
         drive.connect(bitcrusher);
-        bitcrusher.connect(bassEq);
+        bitcrusher.connect(postCrushLowpass);
       } else {
-        drive.connect(bassEq);
+        drive.connect(postCrushLowpass);
       }
+      postCrushLowpass.connect(bassEq);
       bassEq.connect(midEq);
       midEq.connect(trebleEq);
 
@@ -1010,6 +1029,7 @@ export class TetoricaRetroAudioNode {
         lofiHighshelf: highshelf,
         lofiDrive: drive,
         bitcrusher,
+        postCrushLowpass,
         bassEq,
         midEq,
         trebleEq,

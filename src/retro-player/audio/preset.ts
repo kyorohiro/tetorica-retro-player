@@ -62,7 +62,9 @@ export type RetroAudioPresetKey =
   | "earphone"
   | "lofiTape"
   | "boombox"
-  | "club";
+  | "club"
+  | "gb"
+  | "fc";
 
 export type RetroAudioPresetDefinition = {
   label: string;
@@ -325,6 +327,56 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       tapeSaturationAmount: 0,
       compressorAmount: 0.45,
       fxOutputTrimAmount: 0.62,
+    },
+  },
+  gb: {
+    label: "Game Boy",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      lofiAmount: 0.42,        // pre-crush lowpass ~10100Hz でエイリアシング抑制
+      radioToneAmount: 0,
+      bitCrushAmount: 0.88,
+      sampleRateReductionAmount: 0.55,
+      bassAmount: -0.35,
+      midAmount: 0.05,
+      trebleAmount: -0.45,     // post-crush 高域ノイズカット
+      stereoWidthAmount: -1.0,
+      smallSpeakerRoomAmount: 0.08,
+      wowFlutterAmount: 0,
+      noiseLevel: 0.002,
+      vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0.10,
+      fxOutputTrimAmount: 0.72,
+    },
+  },
+  fc: {
+    label: "Famicom",
+    settings: {
+      isAudioFxEnabled: true,
+      isNoiseEnabled: true,
+      lofiAmount: 0.48,        // pre-crush lowpass ~9100Hz
+      radioToneAmount: 0,
+      bitCrushAmount: 0.95,
+      sampleRateReductionAmount: 0.65,
+      bassAmount: 0.05,
+      midAmount: 0.18,
+      trebleAmount: -0.55,     // post-crush 高域ノイズカット
+      stereoWidthAmount: -1.0,
+      smallSpeakerRoomAmount: 0.06,
+      wowFlutterAmount: 0,
+      noiseLevel: 0.003,
+      vinylDustAmount: 0,
+      delayAmount: 0,
+      reverbAmount: 0,
+      chorusAmount: 0,
+      tapeSaturationAmount: 0,
+      compressorAmount: 0.12,
+      fxOutputTrimAmount: 0.74,
     },
   },
 };
