@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chill Loop — Tone.js Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f13;
+      color: #c8c8d4;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+    }
+    h1 { font-size: 1.1rem; letter-spacing: 0.15em; color: #7878a8; }
+
+    #play-btn {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 2px solid #5555aa;
+      background: #1a1a2e;
+      color: #aaaaee;
+      font-size: 1.6rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #play-btn:hover { background: #252540; }
+    #play-btn.playing { border-color: #7777ff; color: #bbbbff; }
+
+    #chord-display {
+      font-size: 1.5rem;
+      letter-spacing: 0.1em;
+      color: #9999cc;
+      min-width: 120px;
+      text-align: center;
+    }
+    #bar-display {
+      font-size: 0.75rem;
+      color: #555577;
+      letter-spacing: 0.08em;
+    }
+
+    .steps {
+      display: flex; gap: 4px;
+    }
+    .step {
+      width: 14px; height: 14px;
+      border-radius: 2px;
+      background: #1e1e2e;
+      border: 1px solid #2a2a3e;
+      transition: background 0.05s;
+    }
+    .step.kick   { background: #553355; }
+    .step.snare  { background: #335555; }
+    .step.active { border-color: #6666bb; }
+
+    #bpm-row {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.78rem; color: #555577;
+    }
+    input[type=range] { accent-color: #6666aa; width: 120px; }
+  </style>
+</head>
+<body>
+  <h1>CHILL LOOP</h1>
+
+  <button id="play-btn">▶</button>
+
+  <div id="chord-display">—</div>
+  <div id="bar-display">bar — / 8</div>
+
+  <div class="steps" id="steps"></div>
+
+  <div id="bpm-row">
+    BPM <input type="range" id="bpm-slider" min="60" max="120" value="80" />
+    <span id="bpm-val">80</span>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
