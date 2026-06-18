@@ -78,6 +78,9 @@ export function useRetroAudioEngine({
       sampleRateReductionAmount:
         persisted?.sampleRateReductionAmount ??
         DEFAULT_AUDIO_SETTINGS.sampleRateReductionAmount,
+      noiseReductionAmount:
+        persisted?.noiseReductionAmount ??
+        DEFAULT_AUDIO_SETTINGS.noiseReductionAmount,
       bassAmount: persisted?.bassAmount ?? DEFAULT_AUDIO_SETTINGS.bassAmount,
       midAmount: persisted?.midAmount ?? DEFAULT_AUDIO_SETTINGS.midAmount,
       trebleAmount: persisted?.trebleAmount ?? DEFAULT_AUDIO_SETTINGS.trebleAmount,
@@ -118,6 +121,7 @@ export function useRetroAudioEngine({
   const sampleRateReductionAmountRef = useRef<number>(
     initialAudioSettings.sampleRateReductionAmount,
   );
+  const noiseReductionAmountRef = useRef<number>(initialAudioSettings.noiseReductionAmount);
   const bassAmountRef = useRef<number>(initialAudioSettings.bassAmount);
   const midAmountRef = useRef<number>(initialAudioSettings.midAmount);
   const trebleAmountRef = useRef<number>(initialAudioSettings.trebleAmount);
@@ -156,6 +160,9 @@ export function useRetroAudioEngine({
   );
   const [sampleRateReductionAmount, setSampleRateReductionAmount] = useState<number>(
     initialAudioSettings.sampleRateReductionAmount,
+  );
+  const [noiseReductionAmount, setNoiseReductionAmount] = useState<number>(
+    initialAudioSettings.noiseReductionAmount,
   );
   const [bassAmount, setBassAmount] = useState<number>(
     initialAudioSettings.bassAmount,
@@ -374,6 +381,7 @@ export function useRetroAudioEngine({
     radioToneAmountRef.current = nextSettings.radioToneAmount;
     bitCrushAmountRef.current = nextSettings.bitCrushAmount;
     sampleRateReductionAmountRef.current = nextSettings.sampleRateReductionAmount;
+    noiseReductionAmountRef.current = nextSettings.noiseReductionAmount;
     bassAmountRef.current = nextSettings.bassAmount;
     midAmountRef.current = nextSettings.midAmount;
     trebleAmountRef.current = nextSettings.trebleAmount;
@@ -399,6 +407,7 @@ export function useRetroAudioEngine({
     setRadioToneAmount(nextSettings.radioToneAmount);
     setBitCrushAmount(nextSettings.bitCrushAmount);
     setSampleRateReductionAmount(nextSettings.sampleRateReductionAmount);
+    setNoiseReductionAmount(nextSettings.noiseReductionAmount);
     setBassAmount(nextSettings.bassAmount);
     setMidAmount(nextSettings.midAmount);
     setTrebleAmount(nextSettings.trebleAmount);
@@ -443,6 +452,7 @@ export function useRetroAudioEngine({
     radioToneAmountRef.current = radioToneAmount;
     bitCrushAmountRef.current = bitCrushAmount;
     sampleRateReductionAmountRef.current = sampleRateReductionAmount;
+    noiseReductionAmountRef.current = noiseReductionAmount;
     bassAmountRef.current = bassAmount;
     midAmountRef.current = midAmount;
     trebleAmountRef.current = trebleAmount;
@@ -470,6 +480,7 @@ export function useRetroAudioEngine({
         radioToneAmount,
         bitCrushAmount,
         sampleRateReductionAmount,
+        noiseReductionAmount,
         bassAmount,
         midAmount,
         trebleAmount,
@@ -514,6 +525,7 @@ export function useRetroAudioEngine({
     radioToneAmount,
     bitCrushAmount,
     sampleRateReductionAmount,
+    noiseReductionAmount,
     bassAmount,
     midAmount,
     trebleAmount,
@@ -547,6 +559,7 @@ export function useRetroAudioEngine({
         radioToneAmount,
         bitCrushAmount,
         sampleRateReductionAmount,
+        noiseReductionAmount,
         bassAmount,
         midAmount,
         trebleAmount,
@@ -575,6 +588,7 @@ export function useRetroAudioEngine({
     radioToneAmount,
     bitCrushAmount,
     sampleRateReductionAmount,
+    noiseReductionAmount,
     bassAmount,
     midAmount,
     trebleAmount,
@@ -669,6 +683,8 @@ export function useRetroAudioEngine({
     setBitCrushAmount,
     sampleRateReductionAmount,
     setSampleRateReductionAmount,
+    noiseReductionAmount,
+    setNoiseReductionAmount,
     bassAmount,
     setBassAmount,
     midAmount,

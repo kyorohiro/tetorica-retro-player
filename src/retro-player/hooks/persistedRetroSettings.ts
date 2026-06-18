@@ -47,6 +47,7 @@ export type PersistedRetroAudioSettings = {
   radioToneAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  noiseReductionAmount: number;
   bassAmount: number;
   midAmount: number;
   trebleAmount: number;
