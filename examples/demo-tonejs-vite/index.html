@@ -59,6 +59,16 @@
     .step.snare  { background: #335555; }
     .step.active { border-color: #6666bb; }
 
+    .song-tabs { display: flex; gap: 6px; }
+    .song-btn {
+      padding: 5px 12px; border-radius: 6px;
+      border: 1px solid #333355; background: #1a1a2e;
+      color: #6666aa; font-family: monospace; font-size: 0.72rem;
+      cursor: pointer; letter-spacing: 0.06em; transition: background 0.12s;
+    }
+    .song-btn:hover  { background: #252540; color: #9999cc; }
+    .song-btn.active { border-color: #5555aa; color: #aaaaee; background: #222240; }
+
     #bpm-row {
       display: flex; align-items: center; gap: 10px;
       font-size: 0.78rem; color: #555577;
@@ -68,6 +78,12 @@
 </head>
 <body>
   <h1>CHILL LOOP</h1>
+
+  <div class="song-tabs">
+    <button class="song-btn" data-song="0">Chill Loop</button>
+    <button class="song-btn" data-song="1">Rain Window</button>
+    <button class="song-btn" data-song="2">Midnight Keys</button>
+  </div>
 
   <button id="play-btn">▶</button>
 
