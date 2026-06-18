@@ -92,8 +92,7 @@ function createOverlay(settings) {
   let pointerClientX = null;
   let pointerClientY = null;
   let detachPointerTracking = null;
-  let hoveredElement = null;
-  let previousHoveredElement = null;
+  let lastHoveredElement = null;
   const rejectedImages = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -209,21 +208,17 @@ function createOverlay(settings) {
   }
 
   function collectPreferredTargets() {
-    const nextHoveredElement = findPreferredHoverElement(pointerClientX, pointerClientY);
-    updateHoverHistory(nextHoveredElement);
-
-    if (hoveredElement && !isDrawableElement(hoveredElement)) {
-      hoveredElement = null;
+    const currentHover = findPreferredHoverElement(pointerClientX, pointerClientY);
+    if (currentHover && isDrawableElement(currentHover)) {
+      lastHoveredElement = currentHover;
     }
 
-    if (previousHoveredElement && !isDrawableElement(previousHoveredElement)) {
-      previousHoveredElement = null;
+    if (lastHoveredElement && (!isDrawableElement(lastHoveredElement) || !isInViewport(lastHoveredElement))) {
+      lastHoveredElement = null;
     }
 
     const targets = [];
-    appendUniqueDrawableTarget(targets, hoveredElement);
-    appendUniqueDrawableTarget(targets, findPrimaryDrawableElement());
-    appendUniqueDrawableTarget(targets, previousHoveredElement);
+    appendUniqueDrawableTarget(targets, lastHoveredElement);
 
     for (const candidate of findAutoDrawableTargets()) {
       appendUniqueDrawableTarget(targets, candidate);
@@ -233,25 +228,6 @@ function createOverlay(settings) {
     }
 
     return targets.slice(0, currentSettings.overlayTargetCount);
-  }
-
-  function updateHoverHistory(nextHoveredElement) {
-    if (hoveredElement === nextHoveredElement) {
-      return;
-    }
-
-    if (
-      hoveredElement &&
-      hoveredElement !== nextHoveredElement &&
-      isDrawableElement(hoveredElement)
-    ) {
-      previousHoveredElement = hoveredElement;
-    }
-
-    hoveredElement = nextHoveredElement;
-    if (previousHoveredElement === hoveredElement) {
-      previousHoveredElement = null;
-    }
   }
 
   function syncSurfaceCount(count) {
@@ -710,6 +686,16 @@ function findHoveredMediaElement(clientX, clientY, selector, isUsable) {
   }
 
   return null;
+}
+
+function isInViewport(element) {
+  const rect = element.getBoundingClientRect();
+  return (
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < window.innerHeight &&
+    rect.left < window.innerWidth
+  );
 }
 
 function isPointInsideElement(element, clientX, clientY) {
