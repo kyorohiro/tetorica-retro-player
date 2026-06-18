@@ -8,6 +8,7 @@ export type RetroAudioSettings = {
   radioToneAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  noiseReductionAmount: number;
   bassAmount: number;
   midAmount: number;
   trebleAmount: number;
@@ -35,6 +36,7 @@ export const DEFAULT_AUDIO_SETTINGS = {
   radioToneAmount: 0,
   bitCrushAmount: 0.10,
   sampleRateReductionAmount: 0.10,
+  noiseReductionAmount: 0,
   bassAmount: 0,
   midAmount: -0.25,
   trebleAmount: 0,
@@ -62,9 +64,7 @@ export type RetroAudioPresetKey =
   | "earphone"
   | "lofiTape"
   | "boombox"
-  | "club"
-  | "gb"
-  | "fc";
+  | "club";
 
 export type RetroAudioPresetDefinition = {
   label: string;
@@ -327,56 +327,6 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       tapeSaturationAmount: 0,
       compressorAmount: 0.45,
       fxOutputTrimAmount: 0.62,
-    },
-  },
-  gb: {
-    label: "Game Boy",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      lofiAmount: 0.38,
-      radioToneAmount: 0,
-      bitCrushAmount: 0.88,
-      sampleRateReductionAmount: 0.30,
-      bassAmount: -0.35,
-      midAmount: 0.05,
-      trebleAmount: -0.35,
-      stereoWidthAmount: -1.0,
-      smallSpeakerRoomAmount: 0.08,
-      wowFlutterAmount: 0,
-      noiseLevel: 0.002,
-      vinylDustAmount: 0,
-      delayAmount: 0,
-      reverbAmount: 0,
-      chorusAmount: 0,
-      tapeSaturationAmount: 0,
-      compressorAmount: 0.10,
-      fxOutputTrimAmount: 0.72,
-    },
-  },
-  fc: {
-    label: "Famicom",
-    settings: {
-      isAudioFxEnabled: true,
-      isNoiseEnabled: true,
-      lofiAmount: 0.35,
-      radioToneAmount: 0,
-      bitCrushAmount: 0.95,
-      sampleRateReductionAmount: 0.25,
-      bassAmount: 0.05,
-      midAmount: 0.18,
-      trebleAmount: -0.42,
-      stereoWidthAmount: -1.0,
-      smallSpeakerRoomAmount: 0.06,
-      wowFlutterAmount: 0,
-      noiseLevel: 0.003,
-      vinylDustAmount: 0,
-      delayAmount: 0,
-      reverbAmount: 0,
-      chorusAmount: 0,
-      tapeSaturationAmount: 0,
-      compressorAmount: 0.12,
-      fxOutputTrimAmount: 0.74,
     },
   },
 };

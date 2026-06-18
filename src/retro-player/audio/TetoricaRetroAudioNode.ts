@@ -638,11 +638,9 @@ export class TetoricaRetroAudioNode {
 
     const postCrushLowpass = this.nodes.postCrushLowpass;
     if (postCrushLowpass) {
-      const bitCrushAmt = settings.isAudioFxEnabled ? settings.bitCrushAmount : 0;
-      const sampleRateAmount = settings.isAudioFxEnabled ? settings.sampleRateReductionAmount : 0;
-      // bitCrush が主、sampleRate が副。軽いエフェクトには影響させない
-      const cutoff = Math.max(5000, 18000 - bitCrushAmt * 8000 - sampleRateAmount * 3000);
-      postCrushLowpass.frequency.value = cutoff;
+      const amount = settings.isAudioFxEnabled ? settings.noiseReductionAmount : 0;
+      // 0 = 18000Hz（素通り）、1 = 3000Hz（強めにカット）
+      postCrushLowpass.frequency.value = Math.max(3000, 18000 - amount * 15000);
     }
 
     if (bassEq && midEq && trebleEq) {
