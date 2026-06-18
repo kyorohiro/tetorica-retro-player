@@ -260,30 +260,75 @@ viewerButton.addEventListener("click", async () => {
   setStatus("Viewer opened.");
 });
 
+const OVERLAY_ACTIVE_KEY = "retro-overlay-active-tabs";
+let currentTabId = null;
+
+async function loadOverlayState() {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab?.id) return;
+  currentTabId = activeTab.id;
+
+  // Query actual page state as source of truth.
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: currentTabId },
+      args: [chrome.runtime.getURL("overlayRuntime.js")],
+      func: async (moduleUrl) => {
+        const runtime = await import(moduleUrl);
+        return runtime.isRetroOverlayActive();
+      },
+    });
+    const isOn = !!result?.result;
+    setOverlayButtonState(isOn);
+    await saveOverlayState(isOn);
+  } catch {
+    // Page may not be injectable (e.g. chrome:// URLs) — fall back to stored state.
+    const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
+    const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
+    setOverlayButtonState(!!activeTabs[currentTabId]);
+  }
+}
+
+function setOverlayButtonState(isOn) {
+  overlayButton.classList.toggle("is-on", isOn);
+}
+
+async function saveOverlayState(isOn) {
+  const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
+  const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
+  if (isOn) {
+    activeTabs[currentTabId] = true;
+  } else {
+    delete activeTabs[currentTabId];
+  }
+  await chrome.storage.local.set({ [OVERLAY_ACTIVE_KEY]: activeTabs });
+}
+
 overlayButton.addEventListener("click", async () => {
-  setStatus("Starting experimental video overlay on the active tab...");
-
-  const [activeTab] = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
-
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!activeTab?.id) {
     setStatus("No active tab found.");
     return;
   }
 
+  const nextState = !overlayButton.classList.contains("is-on");
+  const func = nextState
+    ? "startRetroOverlay"
+    : "stopRetroOverlay";
+
   try {
     await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
-      args: [chrome.runtime.getURL("overlayRuntime.js"), currentSettings],
-      func: async (moduleUrl, settings) => {
+      args: [chrome.runtime.getURL("overlayRuntime.js"), currentSettings, func],
+      func: async (moduleUrl, settings, fnName) => {
         const runtime = await import(moduleUrl);
-        await runtime.toggleRetroOverlay(settings);
+        await runtime[fnName](settings);
       },
     });
 
-    setStatus("Experimental overlay toggled on the current page.");
+    setOverlayButtonState(nextState);
+    await saveOverlayState(nextState);
+    setStatus(nextState ? "Overlay on." : "Overlay off.");
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error));
   }
@@ -661,6 +706,7 @@ async function init() {
   currentSettings = normalizeSettings(stored[SETTINGS_STORAGE_KEY]);
   renderSettings(currentSettings);
   await persistSettings();
+  await loadOverlayState();
 }
 
 function renderSettings(settings) {
