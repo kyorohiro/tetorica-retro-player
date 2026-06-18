@@ -4,6 +4,40 @@ import {
 } from "./shared/settings.js";
 
 const VIEWER_URL = chrome.runtime.getURL("viewer.html");
+const OVERLAY_ACTIVE_KEY = "retro-overlay-active-tabs";
+
+// Track tabs that navigated while overlay was active, waiting for page to complete.
+const pendingReinjection = new Set();
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  // URL changed → mark this tab as needing re-injection if overlay is active.
+  if (changeInfo.url) {
+    const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
+    const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
+    if (activeTabs[tabId]) {
+      pendingReinjection.add(tabId);
+    }
+  }
+
+  // Page fully loaded → re-inject if pending.
+  if (changeInfo.status === "complete" && pendingReinjection.has(tabId)) {
+    pendingReinjection.delete(tabId);
+    const stored = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+    const settings = stored[SETTINGS_STORAGE_KEY] ?? DEFAULT_SETTINGS;
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        args: [chrome.runtime.getURL("overlayRuntime.js"), settings],
+        func: async (moduleUrl, s) => {
+          const runtime = await import(moduleUrl);
+          await runtime.startRetroOverlay(s);
+        },
+      });
+    } catch (error) {
+      console.warn("Overlay re-injection failed:", error);
+    }
+  }
+});
 
 let currentSession = null;
 
