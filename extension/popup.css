@@ -63,19 +63,53 @@ button.secondary {
   font-size: 13px;
 }
 
+.tab-widget {
+  border: 1px solid rgba(196, 230, 125, 0.22);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(6, 8, 5, 0.7);
+}
+
+.tab-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 7px;
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(196, 230, 125, 0.16);
+}
+
+.tab-btn {
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  color: #5a7048;
+  transition: background 140ms, color 140ms;
+}
+
+.tab-btn[aria-selected="true"] {
+  background: rgba(150, 185, 85, 0.26);
+  color: #eff7ca;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.tab-btn:hover:not([aria-selected="true"]) {
+  color: #a8be78;
+}
+
 .controls {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  padding: 12px;
 }
 
 .control-group {
   display: grid;
   gap: 12px;
-  padding: 14px 14px 16px;
-  border: 1px solid rgba(196, 230, 125, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 1px 0 rgba(239, 247, 202, 0.04);
+  padding: 4px 2px 8px;
 }
 
 .control-group-header {

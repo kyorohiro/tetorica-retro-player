@@ -90,6 +90,27 @@ const vinylDustAmountInput = document.getElementById("vinylDustAmount");
 const vinylDustAmountValue = document.getElementById("vinylDustAmountValue");
 const statusText = document.getElementById("statusText");
 
+const TAB_KEY = "retro-popup-tab";
+const tabButtons = document.querySelectorAll(".tab-btn[data-tab]");
+const tabPanels = document.querySelectorAll("[data-tab-panel]");
+
+function switchTab(tabName) {
+  tabButtons.forEach((btn) => {
+    const active = btn.dataset.tab === tabName;
+    btn.setAttribute("aria-selected", String(active));
+  });
+  tabPanels.forEach((panel) => {
+    panel.style.display = panel.dataset.tabPanel === tabName ? "" : "none";
+  });
+  localStorage.setItem(TAB_KEY, tabName);
+}
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+switchTab(localStorage.getItem(TAB_KEY) ?? "video");
+
 let currentSettings = { ...DEFAULT_SETTINGS };
 
 const AUDIO_PRESET_OPTIONS = [
