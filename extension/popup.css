@@ -56,6 +56,38 @@ button.secondary {
   background: rgba(255, 255, 255, 0.06);
 }
 
+#overlayButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 200ms, border-color 200ms, box-shadow 200ms;
+}
+
+#overlayButton::before {
+  content: "";
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1e2a14;
+  box-shadow: 0 0 0 1px rgba(80, 110, 40, 0.3);
+  transition: background 200ms, box-shadow 200ms;
+}
+
+#overlayButton.is-on {
+  background: rgba(130, 185, 55, 0.42);
+  border-color: rgba(196, 230, 125, 0.75);
+  color: #f0ffcc;
+  box-shadow: 0 0 0 1px rgba(196, 230, 125, 0.3), 0 0 18px rgba(140, 200, 60, 0.35);
+  text-shadow: 0 0 10px rgba(200, 240, 120, 0.5);
+}
+
+#overlayButton.is-on::before {
+  background: #c2f040;
+  box-shadow: 0 0 8px rgba(190, 240, 60, 1), 0 0 16px rgba(168, 212, 80, 0.7), 0 0 0 1px rgba(220, 255, 140, 0.6);
+}
+
 .status {
   min-height: 18px;
   margin: 0 0 14px;

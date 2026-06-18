@@ -21,18 +21,29 @@ void main() {
 }
 `;
 
-export async function toggleRetroOverlay(settingsInput) {
-  const existing = globalThis[OVERLAY_KEY];
-  if (existing) {
-    existing.destroy();
-    delete globalThis[OVERLAY_KEY];
-    return { active: false };
-  }
+export function isRetroOverlayActive() {
+  return !!globalThis[OVERLAY_KEY];
+}
 
+export async function startRetroOverlay(settingsInput) {
+  if (globalThis[OVERLAY_KEY]) return { active: true };
   const overlay = createOverlay(normalizeSettings(settingsInput ?? DEFAULT_SETTINGS));
   globalThis[OVERLAY_KEY] = overlay;
   overlay.start();
   return { active: true };
+}
+
+export async function stopRetroOverlay() {
+  const existing = globalThis[OVERLAY_KEY];
+  if (!existing) return { active: false };
+  existing.destroy();
+  delete globalThis[OVERLAY_KEY];
+  return { active: false };
+}
+
+export async function toggleRetroOverlay(settingsInput) {
+  if (globalThis[OVERLAY_KEY]) return stopRetroOverlay();
+  return startRetroOverlay(settingsInput);
 }
 
 function createOverlay(settings) {
