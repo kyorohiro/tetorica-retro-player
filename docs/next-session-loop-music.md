@@ -5,7 +5,7 @@
 ---
 
 `examples/demo-tonejs-vite/` に Tone.js + Vite のブラウザデモがあります。
-現在 **23曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
+現在 **25曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
 
 ### 現在の構成を確認してから作業してください
 
@@ -36,11 +36,13 @@ examples/demo-tonejs-vite/
     song21.ts    # "COLD SYNTH"       E minor 126BPM  PolySynth(fmsquare)+Rev pad + MonoSynth(amsine) bass + Synth(pwm)+FeedbackDelay arp [ニューウェーブ]
     song22.ts    # "AMEN WAVE"        A minor 170BPM  PolySynth(fatsquare)+Rev pad + FMSynth(harm:0.25) sub + Synth(sine)+PingPong mel [DnB]
     song23.ts    # "STARFIELD"        C major  60BPM  PolySynth(pwm)+Rev(8s)+Delay pad + MonoSynth(pwm) drone + Synth(fmsine)+Rev mel [アンビエント]
+    song24.ts    # "HOUSE DRIVE"      A minor 128BPM  PolySynth(amsine)+Rev pad + MonoSynth(fattriangle) bass + Synth(sawtooth)+AutoWah mel [ハウス]
+    song25.ts    # "TRAP NIGHT"       F minor  72BPM  PolySynth(fattriangle)+Rev pad + DuoSynth(portamento) 808 bass + FMSynth(harm:2) mel [トラップ]
 ```
 
-### やってほしいこと
+### 現在の状態
 
-**song24.ts 〜 を新規作成**して、main.ts と index.html に追加してください。
+**song1〜song25 が実装済み**（25曲完成）。次に新しい曲を追加したい場合は song26.ts から。
 各曲で**まだ使っていない Tone.js の音色やエフェクト**を積極的に使ってください。
 
 ### 音色の方針 (まだ使っていないもの優先)
@@ -78,7 +80,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
 ### 追加後に main.ts と index.html を更新
 
-`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 18 から)
+`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 25 から)
 
 ### 確認方法
 
@@ -92,7 +94,7 @@ npm run dev
 
 ## 参考: Tone.js 音色メモ
 
-### 使い終わった組み合わせ (全18曲)
+### 使い終わった組み合わせ (全25曲)
 
 | 曲 | Pad | Melody | Bass | ドラム特徴 |
 |---|---|---|---|---|
@@ -114,8 +116,15 @@ npm run dev
 | song16 CITY GLOW        | PolySynth(amtriangle)+Reverb  | AMSynth (class)                      | MonoSynth(fmsawtooth)    | 80s clap+openhat |
 | song17 CANON LIGHT      | PolySynth(triangle)+Rev(4s)   | PluckSynth (harpsichord)             | MonoSynth(amsquare)      | timpani only |
 | song18 IPANEMA NIGHTS   | PolySynth(fmsine)+Reverb      | Synth(fatsine)+Tremolo               | MonoSynth(fatsine)       | bossa syncopated |
+| song19 ONE DROP         | PolySynth(fmsawtooth) skank   | Synth(amsquare) melodica             | MonoSynth(fatsquare)     | one-drop beat3 only |
+| song20 RIO BEAT         | PolySynth(amsawtooth)+Reverb  | Synth(fatsquare)+Chorus horn         | MonoSynth(pulse)         | samba 16th pandeiro |
+| song21 COLD SYNTH       | PolySynth(fmsquare)+Reverb    | Synth(pwm)+FeedbackDelay arp         | MonoSynth(amsine)        | TR-808 |
+| song22 AMEN WAVE        | PolySynth(fatsquare)+Reverb   | Synth(sine)+PingPong                 | FMSynth(harm:0.25)       | amen break |
+| song23 STARFIELD        | PolySynth(pwm)+Rev(8s)+Delay  | Synth(fmsine)+Reverb                 | MonoSynth(pwm) drone     | bell (MetalSynth) only |
+| song24 HOUSE DRIVE      | PolySynth(amsine)+Reverb      | Synth(sawtooth)+AutoWah              | MonoSynth(fattriangle)   | 4-on-floor house |
+| song25 TRAP NIGHT       | PolySynth(fattriangle)+Rev    | FMSynth(harm:2) bell                 | DuoSynth(portamento) 808 | 16th hi-hat rolls |
 
-### 実装済み18曲 コード進行一覧
+### 実装済み25曲 コード進行一覧
 
 - song1  Chill Loop:      Cmaj7 Em7 Am7 Fmaj7 (C major: I→IIIm→VIm→IV, 王道ポップ)
 - song2  Rain Window:     Am7 Dm7 G7 Cmaj7 Fmaj7 E7 Am7 (A minor: i→iv→VII→III→VI→V→i, 自然短調)
@@ -140,16 +149,17 @@ npm run dev
 - song21 COLD SYNTH:      Em G D A (E minor: i→III→VII→VI, ニューウェーブ PWM arpeggio)
 - song22 AMEN WAVE:       Am7 Fmaj7 Dm7 E7 (A minor: i→VI→iv→V7, jazz DnB 2bars each)
 - song23 STARFIELD:       Cmaj9 Fmaj9 Am9 G6/9 (C major: Imaj9→IVmaj9→VIm9→V6/9, アンビエント)
+- song24 HOUSE DRIVE:     Am7 Fmaj7 Cmaj7 G7 (A minor: i→VI→III→VII, ハウス 4-on-floor)
+- song25 TRAP NIGHT:      Fm7 Dbmaj7 Abmaj7 Eb7 (F minor: i→VI→III→VII, トラップ 16th hi-hat rolls)
 
 ### まだ試していない主な音色・エフェクト
 
-- Oscillator types: `fatsquare`(mel), `amsawtooth`(pad), `fmsawtooth`(pad), `fatsin`e(さらに別設定)
 - `Tone.StereoWidener` — ステレオ幅拡張
-- `Tone.Wah` / `Tone.AutoWah` — ワウ (pwmとVibrato違い)
+- `Tone.Wah` — オート (song24 で AutoWah を初使用済み)
 - `Tone.Oscillator` + `Tone.AmplitudeEnvelope` — 低レベル手動合成
-- `Tone.PolySynth(Tone.FMSynth)` — harmonicity 違いで全く異なる音
 - `Tone.FeedbackCombFilter` — コム音色
 - ドラム: MembraneSynth を高ピッチでコンガ/ボンゴとして使う
+- PolySynth pad 未使用: `amsine` (song24 で使用済み), `fattriangle` (song25 で使用済み)
 
 ### コード進行のアイデア (使っていないキー)
 
@@ -162,11 +172,18 @@ npm run dev
 
 ### 音楽ジャンルのアイデア (未実装)
 
-- レゲエ (Reggae): オフビートでコード、シンプルワンドロップドラム
-- サンバ (Samba): 速いBPM、シンコペーション
-- ニューウェーブ (New Wave): シンセリフ、エコー、コールドウェーブ感
-- ドラムンベース (DnB): 170BPM、ジャズコード over broken beat
-- アンビエント: ドラムなし、長い Reverb + Delay、ゆっくり変化
+- ~~レゲエ (Reggae)~~ → song19 ONE DROP 実装済み
+- ~~サンバ (Samba)~~ → song20 RIO BEAT 実装済み
+- ~~ニューウェーブ (New Wave)~~ → song21 COLD SYNTH 実装済み
+- ~~ドラムンベース (DnB)~~ → song22 AMEN WAVE 実装済み
+- ~~アンビエント~~ → song23 STARFIELD 実装済み
+- ~~ハウス / EDM~~ → song24 HOUSE DRIVE 実装済み
+- ~~トラップ / Hip Hop~~ → song25 TRAP NIGHT 実装済み
+- R&B/Soul: スロージャム、温かいコード
+- Disco: 120BPM、ダウンストローク、ストリングス
+- Flamenco: フリギアン旋法、ギター
+- K-pop: スタッカートシンセ、デジタル感
+- Jazz Fusion: 複雑なコード、7/8拍子など
 
 ### song17 (CANON LIGHT) の注意点
 
