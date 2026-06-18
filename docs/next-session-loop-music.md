@@ -5,7 +5,7 @@
 ---
 
 `examples/demo-tonejs-vite/` に Tone.js + Vite のブラウザデモがあります。
-現在 **18曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
+現在 **23曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
 
 ### 現在の構成を確認してから作業してください
 
@@ -31,11 +31,16 @@ examples/demo-tonejs-vite/
     song16.ts    # "CITY GLOW"        G major 108BPM  PolySynth(amtriangle)+Reverb pad + AMSynth mel + MonoSynth(fmsawtooth) bass [シティポップ]
     song17.ts    # "CANON LIGHT"      D major  66BPM  PolySynth(triangle)+Reverb pad + PluckSynth(harpsichord) mel + MonoSynth(amsquare) bass [クラシック]
     song18.ts    # "IPANEMA NIGHTS"   F major  88BPM  PolySynth(fmsine)+Reverb pad + Synth(fatsine)+Tremolo mel + MonoSynth(fatsine) bass [ボサノバ]
+    song19.ts    # "ONE DROP"         A minor  80BPM  PolySynth(fmsawtooth) skank stabs + MonoSynth(fatsquare) bass + Synth(amsquare) melodica [レゲエ]
+    song20.ts    # "RIO BEAT"         D major 120BPM  PolySynth(amsawtooth)+Rev pad + MonoSynth(pulse) bass + Synth(fatsquare)+Chorus horn [サンバ]
+    song21.ts    # "COLD SYNTH"       E minor 126BPM  PolySynth(fmsquare)+Rev pad + MonoSynth(amsine) bass + Synth(pwm)+FeedbackDelay arp [ニューウェーブ]
+    song22.ts    # "AMEN WAVE"        A minor 170BPM  PolySynth(fatsquare)+Rev pad + FMSynth(harm:0.25) sub + Synth(sine)+PingPong mel [DnB]
+    song23.ts    # "STARFIELD"        C major  60BPM  PolySynth(pwm)+Rev(8s)+Delay pad + MonoSynth(pwm) drone + Synth(fmsine)+Rev mel [アンビエント]
 ```
 
 ### やってほしいこと
 
-**song19.ts 〜 song21.ts を新規作成**して、main.ts と index.html に追加してください。
+**song24.ts 〜 を新規作成**して、main.ts と index.html に追加してください。
 各曲で**まだ使っていない Tone.js の音色やエフェクト**を積極的に使ってください。
 
 ### 音色の方針 (まだ使っていないもの優先)
@@ -130,6 +135,11 @@ npm run dev
 - song16 CITY GLOW:       Gmaj7 Em7 Am7 D7 (G major: I→VIm→IIm→V7, シティポップ定番)
 - song17 CANON LIGHT:     D A Bm F#m G D G A (D major: I→V→VIm→IIIm→IV→I→IV→V, パッヘルベル風)
 - song18 IPANEMA NIGHTS:  Fmaj7 Gm7 C7 Dm7 Em7b5 A7 Dm7 (F major/D minor: I→IIm→V7→VIm→iiø7→V7/vi, ボサノバ Jobim風)
+- song19 ONE DROP:        Am7 Fmaj7 G7 Em7 Dm7 E7 (A minor: i→VI→VII→v | i→iv→V, レゲエ one-drop)
+- song20 RIO BEAT:        Dmaj7 Bm7 Em7 A7 (D major: I→VIm→IIm→V7, サンバ horn samba)
+- song21 COLD SYNTH:      Em G D A (E minor: i→III→VII→VI, ニューウェーブ PWM arpeggio)
+- song22 AMEN WAVE:       Am7 Fmaj7 Dm7 E7 (A minor: i→VI→iv→V7, jazz DnB 2bars each)
+- song23 STARFIELD:       Cmaj9 Fmaj9 Am9 G6/9 (C major: Imaj9→IVmaj9→VIm9→V6/9, アンビエント)
 
 ### まだ試していない主な音色・エフェクト
 
