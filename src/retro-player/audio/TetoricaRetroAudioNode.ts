@@ -252,6 +252,7 @@ export class TetoricaRetroAudioNode {
     lofiHighshelf: null as BiquadFilterNode | null,
     lofiDrive: null as WaveShaperNode | null,
     bitcrusher: null as AudioWorkletNode | null,
+    postCrushLowpass: null as BiquadFilterNode | null,
     bassEq: null as BiquadFilterNode | null,
     midEq: null as BiquadFilterNode | null,
     trebleEq: null as BiquadFilterNode | null,
@@ -506,6 +507,7 @@ export class TetoricaRetroAudioNode {
       lofiHighshelf: null,
       lofiDrive: null,
       bitcrusher: null,
+      postCrushLowpass: null,
       bassEq: null,
       midEq: null,
       trebleEq: null,
@@ -632,6 +634,13 @@ export class TetoricaRetroAudioNode {
         mix,
         bitcrusher.context.currentTime,
       );
+    }
+
+    const postCrushLowpass = this.nodes.postCrushLowpass;
+    if (postCrushLowpass) {
+      const amount = settings.isAudioFxEnabled ? settings.noiseReductionAmount : 0;
+      // 0 = 18000Hz（素通り）、1 = 3000Hz（強めにカット）
+      postCrushLowpass.frequency.value = Math.max(3000, 18000 - amount * 15000);
     }
 
     if (bassEq && midEq && trebleEq) {
@@ -785,6 +794,11 @@ export class TetoricaRetroAudioNode {
         });
       }
 
+      const postCrushLowpass = context.createBiquadFilter();
+      postCrushLowpass.type = "lowpass";
+      postCrushLowpass.frequency.value = 18000;
+      postCrushLowpass.Q.value = 0.5;
+
       const bassEq = context.createBiquadFilter();
       const midEq = context.createBiquadFilter();
       const trebleEq = context.createBiquadFilter();
@@ -828,10 +842,11 @@ export class TetoricaRetroAudioNode {
       highshelf.connect(drive);
       if (bitcrusher) {
         drive.connect(bitcrusher);
-        bitcrusher.connect(bassEq);
+        bitcrusher.connect(postCrushLowpass);
       } else {
-        drive.connect(bassEq);
+        drive.connect(postCrushLowpass);
       }
+      postCrushLowpass.connect(bassEq);
       bassEq.connect(midEq);
       midEq.connect(trebleEq);
 
@@ -1010,6 +1025,7 @@ export class TetoricaRetroAudioNode {
         lofiHighshelf: highshelf,
         lofiDrive: drive,
         bitcrusher,
+        postCrushLowpass,
         bassEq,
         midEq,
         trebleEq,

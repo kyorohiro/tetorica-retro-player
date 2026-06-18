@@ -8,6 +8,7 @@ export type RetroAudioSettings = {
   radioToneAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  noiseReductionAmount: number;
   bassAmount: number;
   midAmount: number;
   trebleAmount: number;
@@ -35,6 +36,7 @@ export const DEFAULT_AUDIO_SETTINGS = {
   radioToneAmount: 0,
   bitCrushAmount: 0.10,
   sampleRateReductionAmount: 0.10,
+  noiseReductionAmount: 0,
   bassAmount: 0,
   midAmount: -0.25,
   trebleAmount: 0,

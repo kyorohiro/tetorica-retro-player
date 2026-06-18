@@ -43,6 +43,7 @@ type VideoControlsProps = {
   radioToneAmount: number;
   bitCrushAmount: number;
   sampleRateReductionAmount: number;
+  noiseReductionAmount: number;
   bassAmount: number;
   midAmount: number;
   trebleAmount: number;
@@ -63,6 +64,7 @@ type VideoControlsProps = {
   onChangeRadioToneAmount: (amount: number) => void;
   onChangeBitCrushAmount: (amount: number) => void;
   onChangeSampleRateReductionAmount: (amount: number) => void;
+  onChangeNoiseReductionAmount: (amount: number) => void;
   onChangeBassAmount: (amount: number) => void;
   onChangeMidAmount: (amount: number) => void;
   onChangeTrebleAmount: (amount: number) => void;
@@ -124,6 +126,7 @@ export const VideoControls = memo(function VideoControls({
   radioToneAmount,
   bitCrushAmount,
   sampleRateReductionAmount,
+  noiseReductionAmount,
   bassAmount,
   midAmount,
   trebleAmount,
@@ -144,6 +147,7 @@ export const VideoControls = memo(function VideoControls({
   onChangeRadioToneAmount,
   onChangeBitCrushAmount,
   onChangeSampleRateReductionAmount,
+  onChangeNoiseReductionAmount,
   onChangeBassAmount,
   onChangeMidAmount,
   onChangeTrebleAmount,
@@ -209,6 +213,7 @@ export const VideoControls = memo(function VideoControls({
           settings.sampleRateReductionAmount,
           sampleRateReductionAmount,
         ) &&
+        isNearlyEqual(settings.noiseReductionAmount, noiseReductionAmount) &&
         isNearlyEqual(settings.bassAmount, bassAmount) &&
         isNearlyEqual(settings.midAmount, midAmount) &&
         isNearlyEqual(settings.trebleAmount, trebleAmount) &&
@@ -246,6 +251,7 @@ export const VideoControls = memo(function VideoControls({
     onChangeRadioToneAmount(presetSettings.radioToneAmount);
     onChangeBitCrushAmount(presetSettings.bitCrushAmount);
     onChangeSampleRateReductionAmount(presetSettings.sampleRateReductionAmount);
+    onChangeNoiseReductionAmount(presetSettings.noiseReductionAmount);
     onChangeBassAmount(presetSettings.bassAmount);
     onChangeMidAmount(presetSettings.midAmount);
     onChangeTrebleAmount(presetSettings.trebleAmount);
@@ -408,6 +414,24 @@ export const VideoControls = memo(function VideoControls({
                 value={sampleRateReductionAmount}
                 onChange={(ev) => {
                   onChangeSampleRateReductionAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Noise reduction</span>
+                <span>{Math.round(noiseReductionAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={noiseReductionAmount}
+                onChange={(ev) => {
+                  onChangeNoiseReductionAmount(Number(ev.currentTarget.value));
                 }}
                 className="w-full"
               />
