@@ -7,7 +7,8 @@
     "audio:node": "node --experimental-strip-types ./audio/node-audio-sample.ts",
     "audio:node:silent": "NODE_AUDIO_SINK=none node --experimental-strip-types ./audio/node-audio-sample.ts",
     "video:webgl2:test": "node --experimental-strip-types ./video/playwright-webgl2-sample.ts",
-    "demo:drum": "node --experimental-strip-types ./demo/loop-music-ts.ts"
+    "demo:drum": "node --experimental-strip-types ./demo/loop-music-drum.ts",
+    "demo:loop": "node --experimental-strip-types ./demo/loop-music.ts"
   },
   "dependencies": {
     "node-web-audio-api": "^1.0.9",

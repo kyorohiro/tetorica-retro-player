@@ -1,22 +1,40 @@
-import 'web-audio-api/polyfill';
-const Tone = await import('tone');
+import * as Tone from 'tone';
 
-const audioCtx = new AudioContext();
-Tone.setContext(audioCtx);
-await Tone.start();
+// ============================================================
+// UI refs
+// ============================================================
+const playBtn      = document.getElementById('play-btn')!;
+const chordDisplay = document.getElementById('chord-display')!;
+const barDisplay   = document.getElementById('bar-display')!;
+const stepsEl      = document.getElementById('steps')!;
+const bpmSlider    = document.getElementById('bpm-slider') as HTMLInputElement;
+const bpmVal       = document.getElementById('bpm-val')!;
 
-// 80 BPM × 8 bars = 24 sec loop (Cmaj7 → Em7 → Am7 → Fmaj7 × 2 with variation)
+// 16-step indicator dots
+const stepEls: HTMLElement[] = [];
+for (let i = 0; i < 16; i++) {
+  const d = document.createElement('div');
+  d.className = 'step';
+  stepsEl.appendChild(d);
+  stepEls.push(d);
+}
+
+// ============================================================
+// Transport
+// ============================================================
 Tone.getTransport().bpm.value = 80;
 Tone.getTransport().swing = 0.10;
-// Transport 側でループ管理（Part ごとに loop させるとタイムラインが蓄積するため）
 Tone.getTransport().loop = true;
 Tone.getTransport().loopStart = 0;
 Tone.getTransport().loopEnd = '8m';
 
-// --- Master chain: compressor → warmth filter ---
-// Limiter (hard clip) ではなく Compressor (soft) でピーク制御
-const comp = new Tone.Compressor({ threshold: -14, ratio: 6, attack: 0.005, release: 0.15 }).toDestination();
-const warmFilter = new Tone.Filter({ frequency: 7500, type: 'lowpass', rolloff: -12 }).connect(comp);
+// ============================================================
+// Master chain  (compressor → destination)
+// ============================================================
+const comp = new Tone.Compressor({ threshold: -14, ratio: 6, attack: 0.005, release: 0.15 });
+comp.toDestination();
+const warmFilter = new Tone.Filter({ frequency: 7500, type: 'lowpass', rolloff: -12 });
+warmFilter.connect(comp);
 
 // ============================================================
 // DRUMS
@@ -49,12 +67,6 @@ const openhat = new Tone.NoiseSynth({
   volume: -24,
 }).connect(openHpf);
 
-// beat:  1     2     3     4
-// step:  0123  4567  89AB  CDEF
-// kick:  x...  ..x.  ...x  ....   stumble groove
-// snare: ....  ....  x...  ....   half-time
-// hhat:  x.x.  x.x.  x.x.  x.x.  8th notes (accent/ghost)
-// open:  ....  ...x  ....  ...x   before beat 3 & 1
 const dp = {
   kick:  [1,0,0,0, 0,0,1,0, 0,0,0,1, 0,0,0,0],
   snare: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
@@ -63,15 +75,26 @@ const dp = {
 };
 const hhV = [0.8,0,0.5,0, 0.7,0,0.5,0, 0.8,0,0.5,0, 0.7,0,0.5,0];
 
+let currentStep = 0;
 new Tone.Sequence((time, s) => {
-  if (dp.kick[s])  kick.triggerAttackRelease('C1', '8n', time);
-  if (dp.snare[s]) snare.triggerAttackRelease('16n', time);
-  if (dp.hhat[s])  hihat.triggerAttackRelease('32n', time, hhV[s]);
-  if (dp.open[s])  openhat.triggerAttackRelease('8n', time);
+  currentStep = s as number;
+  if (dp.kick[s as number])  kick.triggerAttackRelease('C1', '8n', time);
+  if (dp.snare[s as number]) snare.triggerAttackRelease('16n', time);
+  if (dp.hhat[s as number])  hihat.triggerAttackRelease('32n', time, hhV[s as number]);
+  if (dp.open[s as number])  openhat.triggerAttackRelease('8n', time);
+
+  // UI update (schedule on next animation frame to avoid audio thread contention)
+  Tone.getDraw().schedule(() => {
+    stepEls.forEach((el, i) => {
+      el.classList.toggle('active', i === (s as number));
+      el.classList.toggle('kick',  i === (s as number) && !!dp.kick[s as number]);
+      el.classList.toggle('snare', i === (s as number) && !!dp.snare[s as number]);
+    });
+  }, time);
 }, Array.from({ length: 16 }, (_, i) => i), '16n').start(0);
 
 // ============================================================
-// BASS  (triangle, warm low-end)
+// BASS
 // ============================================================
 const bass = new Tone.MonoSynth({
   oscillator: { type: 'triangle' },
@@ -85,7 +108,7 @@ const bass = new Tone.MonoSynth({
 }).toDestination();
 
 // ============================================================
-// PAD  (PolySynth sine — pillowy chords)
+// PAD
 // ============================================================
 const pad = new Tone.PolySynth(Tone.Synth, {
   oscillator: { type: 'sine' },
@@ -96,7 +119,7 @@ pad.maxPolyphony = 12;
 pad.connect(warmFilter);
 
 // ============================================================
-// MELODY  (triangle — soft lead)
+// MELODY
 // ============================================================
 const mel = new Tone.Synth({
   oscillator: { type: 'triangle' },
@@ -106,23 +129,21 @@ const mel = new Tone.Synth({
 
 // ============================================================
 // 8-bar chord progression
-//  bar 0: Cmaj7   bar 1: Em7
-//  bar 2: Am7     bar 3: Fmaj7
-//  bar 4: Cmaj7   bar 5: Em7
-//  bar 6: Dm7     bar 7: G7
 // ============================================================
-const chords: Array<{ time: string; notes: string[]; dur: string; vel: number }> = [
-  { time: '0:0:0', notes: ['C3','E3','G3','B3'], dur: '1m', vel: 0.35 }, // Cmaj7
-  { time: '1:0:0', notes: ['E3','G3','B3','D4'], dur: '1m', vel: 0.35 }, // Em7
-  { time: '2:0:0', notes: ['A2','C3','E3','G3'], dur: '1m', vel: 0.35 }, // Am7
-  { time: '3:0:0', notes: ['F2','A2','C3','E3'], dur: '1m', vel: 0.35 }, // Fmaj7
-  { time: '4:0:0', notes: ['C3','E3','G3','B3'], dur: '1m', vel: 0.33 }, // Cmaj7
-  { time: '5:0:0', notes: ['E3','G3','B3','D4'], dur: '1m', vel: 0.33 }, // Em7
-  { time: '6:0:0', notes: ['D3','F3','A3','C4'], dur: '1m', vel: 0.35 }, // Dm7
-  { time: '7:0:0', notes: ['G2','B2','D3','F3'], dur: '1m', vel: 0.38 }, // G7
+const CHORD_NAMES = ['Cmaj7','Em7','Am7','Fmaj7','Cmaj7','Em7','Dm7','G7'];
+
+const chords = [
+  { time: '0:0:0', notes: ['C3','E3','G3','B3'], dur: '1m', vel: 0.35 },
+  { time: '1:0:0', notes: ['E3','G3','B3','D4'], dur: '1m', vel: 0.35 },
+  { time: '2:0:0', notes: ['A2','C3','E3','G3'], dur: '1m', vel: 0.35 },
+  { time: '3:0:0', notes: ['F2','A2','C3','E3'], dur: '1m', vel: 0.35 },
+  { time: '4:0:0', notes: ['C3','E3','G3','B3'], dur: '1m', vel: 0.33 },
+  { time: '5:0:0', notes: ['E3','G3','B3','D4'], dur: '1m', vel: 0.33 },
+  { time: '6:0:0', notes: ['D3','F3','A3','C4'], dur: '1m', vel: 0.35 },
+  { time: '7:0:0', notes: ['G2','B2','D3','F3'], dur: '1m', vel: 0.38 },
 ];
 
-const bassLine: Array<{ time: string; pitch: string; dur: string }> = [
+const bassLine = [
   { time: '0:0:0', pitch: 'C2', dur: '4n' }, { time: '0:2:0', pitch: 'G1', dur: '4n' },
   { time: '1:0:0', pitch: 'E2', dur: '4n' }, { time: '1:2:0', pitch: 'B1', dur: '4n' },
   { time: '2:0:0', pitch: 'A1', dur: '4n' }, { time: '2:2:0', pitch: 'E2', dur: '4n' },
@@ -133,47 +154,38 @@ const bassLine: Array<{ time: string; pitch: string; dur: string }> = [
   { time: '7:0:0', pitch: 'G1', dur: '4n' }, { time: '7:2:0', pitch: 'D2', dur: '4n' },
 ];
 
-// Melody: C pentatonic (C D E G A) — 8 bars
-const melNotes: Array<{ time: string; pitch: string; dur: string; vel: number }> = [
-  // bar 0 Cmaj7
+const melNotes = [
   { time: '0:0:0', pitch: 'E4', dur: '8n',  vel: 0.7  },
   { time: '0:0:2', pitch: 'G4', dur: '8n',  vel: 0.55 },
   { time: '0:1:0', pitch: 'E4', dur: '4n',  vel: 0.6  },
   { time: '0:2:2', pitch: 'D4', dur: '8n',  vel: 0.5  },
   { time: '0:3:0', pitch: 'C4', dur: '4n',  vel: 0.6  },
-  // bar 1 Em7
   { time: '1:0:0', pitch: 'B4', dur: '8n',  vel: 0.65 },
   { time: '1:0:2', pitch: 'G4', dur: '8n',  vel: 0.5  },
   { time: '1:1:0', pitch: 'B4', dur: '4n',  vel: 0.6  },
   { time: '1:2:2', pitch: 'A4', dur: '4n.', vel: 0.55 },
-  // bar 2 Am7
   { time: '2:0:0', pitch: 'A4', dur: '8n',  vel: 0.7  },
   { time: '2:0:2', pitch: 'G4', dur: '8n',  vel: 0.55 },
   { time: '2:1:0', pitch: 'E4', dur: '4n',  vel: 0.6  },
   { time: '2:2:0', pitch: 'D4', dur: '4n',  vel: 0.5  },
   { time: '2:3:0', pitch: 'E4', dur: '4n',  vel: 0.5  },
-  // bar 3 Fmaj7
   { time: '3:0:0', pitch: 'C4', dur: '8n',  vel: 0.65 },
   { time: '3:0:2', pitch: 'E4', dur: '8n',  vel: 0.55 },
   { time: '3:1:0', pitch: 'C4', dur: '4n',  vel: 0.6  },
   { time: '3:2:2', pitch: 'A3', dur: '4n.', vel: 0.55 },
-  // bar 4 Cmaj7 (variation)
   { time: '4:0:0', pitch: 'G4', dur: '8n',  vel: 0.7  },
   { time: '4:0:2', pitch: 'E4', dur: '8n',  vel: 0.55 },
   { time: '4:1:0', pitch: 'G4', dur: '4n',  vel: 0.6  },
   { time: '4:2:0', pitch: 'A4', dur: '8n',  vel: 0.6  },
   { time: '4:2:2', pitch: 'G4', dur: '4n',  vel: 0.55 },
-  // bar 5 Em7
   { time: '5:0:0', pitch: 'B4', dur: '4n',  vel: 0.65 },
   { time: '5:1:0', pitch: 'A4', dur: '8n',  vel: 0.55 },
   { time: '5:1:2', pitch: 'G4', dur: '8n',  vel: 0.5  },
   { time: '5:2:0', pitch: 'E4', dur: '2n',  vel: 0.55 },
-  // bar 6 Dm7
   { time: '6:0:0', pitch: 'D4', dur: '8n',  vel: 0.65 },
   { time: '6:0:2', pitch: 'E4', dur: '8n',  vel: 0.55 },
   { time: '6:1:0', pitch: 'A4', dur: '4n',  vel: 0.6  },
   { time: '6:2:0', pitch: 'D4', dur: '2n',  vel: 0.6  },
-  // bar 7 G7 (descend → resolve to Cmaj7)
   { time: '7:0:0', pitch: 'D5', dur: '8n',  vel: 0.7  },
   { time: '7:0:2', pitch: 'B4', dur: '8n',  vel: 0.6  },
   { time: '7:1:0', pitch: 'G4', dur: '4n',  vel: 0.6  },
@@ -181,8 +193,14 @@ const melNotes: Array<{ time: string; pitch: string; dur: string; vel: number }>
   { time: '7:3:0', pitch: 'E4', dur: '4n',  vel: 0.6  },
 ];
 
+// chord UI update
 const chordPart = new Tone.Part((time, ev) => {
   pad.triggerAttackRelease(ev.notes, ev.dur, time, ev.vel);
+  const bar = parseInt((ev.time as string).split(':')[0]);
+  Tone.getDraw().schedule(() => {
+    chordDisplay.textContent = CHORD_NAMES[bar] ?? '—';
+    barDisplay.textContent = `bar ${bar + 1} / 8`;
+  }, time);
 }, chords);
 chordPart.start(0);
 
@@ -196,12 +214,31 @@ const melPart = new Tone.Part((time, ev) => {
 }, melNotes);
 melPart.start(0);
 
-Tone.getTransport().start();
+// ============================================================
+// Play / Stop
+// ============================================================
+let playing = false;
 
-const bpm = 80;
-const loopSec = (60 / bpm) * 4 * 8; // 8 bars
-console.log(`🎵 Chill loop — ${bpm} BPM, 8 bars (${loopSec.toFixed(1)}s per loop)`);
-console.log('   Cmaj7 → Em7 → Am7 → Fmaj7 → Cmaj7 → Em7 → Dm7 → G7');
-console.log('   Ctrl+C to stop');
+playBtn.addEventListener('click', async () => {
+  await Tone.start(); // resume AudioContext (browser requires user gesture)
+  if (playing) {
+    Tone.getTransport().stop();
+    playBtn.textContent = '▶';
+    playBtn.classList.remove('playing');
+    chordDisplay.textContent = '—';
+    barDisplay.textContent = 'bar — / 8';
+    stepEls.forEach(el => el.className = 'step');
+  } else {
+    Tone.getTransport().start();
+    playBtn.textContent = '■';
+    playBtn.classList.add('playing');
+  }
+  playing = !playing;
+});
 
-await new Promise(() => {});
+// BPM slider
+bpmSlider.addEventListener('input', () => {
+  const v = Number(bpmSlider.value);
+  Tone.getTransport().bpm.value = v;
+  bpmVal.textContent = String(v);
+});
