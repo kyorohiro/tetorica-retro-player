@@ -43,6 +43,7 @@ class RetroBitcrusherProcessor extends AudioWorkletProcessor {
       this.channelState.push({
         holdCounter: 0,
         heldSample: 0,
+        nsError: 0,  // noise shaping feedback
       });
     }
 
@@ -58,7 +59,13 @@ class RetroBitcrusherProcessor extends AudioWorkletProcessor {
         const source = inputChannel?.[index] ?? 0;
 
         if (state.holdCounter <= 0) {
-          state.heldSample = quantizeSample(source, bitDepth);
+          // 三角ディザリング: 量子化歪み → サラサラしたヒス音に変換
+          const lsb = 2 / Math.pow(2, bitDepth);
+          const dither = (Math.random() + Math.random() - 1) * lsb;
+          // 1次ノイズシェーピング: 前回の量子化誤差をフィードバックして高域へ押し出す
+          const shaped = Math.max(-1, Math.min(1, source + dither - state.nsError * 0.85));
+          state.heldSample = quantizeSample(shaped, bitDepth);
+          state.nsError = state.heldSample - shaped;
           state.holdCounter = holdFrames - 1;
         } else {
           state.holdCounter -= 1;

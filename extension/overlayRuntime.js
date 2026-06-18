@@ -21,18 +21,29 @@ void main() {
 }
 `;
 
-export async function toggleRetroOverlay(settingsInput) {
-  const existing = globalThis[OVERLAY_KEY];
-  if (existing) {
-    existing.destroy();
-    delete globalThis[OVERLAY_KEY];
-    return { active: false };
-  }
+export function isRetroOverlayActive() {
+  return !!globalThis[OVERLAY_KEY];
+}
 
+export async function startRetroOverlay(settingsInput) {
+  if (globalThis[OVERLAY_KEY]) return { active: true };
   const overlay = createOverlay(normalizeSettings(settingsInput ?? DEFAULT_SETTINGS));
   globalThis[OVERLAY_KEY] = overlay;
   overlay.start();
   return { active: true };
+}
+
+export async function stopRetroOverlay() {
+  const existing = globalThis[OVERLAY_KEY];
+  if (!existing) return { active: false };
+  existing.destroy();
+  delete globalThis[OVERLAY_KEY];
+  return { active: false };
+}
+
+export async function toggleRetroOverlay(settingsInput) {
+  if (globalThis[OVERLAY_KEY]) return stopRetroOverlay();
+  return startRetroOverlay(settingsInput);
 }
 
 function createOverlay(settings) {
@@ -81,8 +92,7 @@ function createOverlay(settings) {
   let pointerClientX = null;
   let pointerClientY = null;
   let detachPointerTracking = null;
-  let hoveredElement = null;
-  let previousHoveredElement = null;
+  let lastHoveredElement = null;
   const rejectedImages = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -170,9 +180,36 @@ function createOverlay(settings) {
       const surface = surfaces[index];
       const target = targets[index] ?? null;
       renderSurface(surface, target, index);
+      updateSurfaceSpotlight(surface);
     }
 
     rafId = requestAnimationFrame(draw);
+  }
+
+  function updateSurfaceSpotlight(surface) {
+    if (
+      typeof pointerClientX !== "number" ||
+      typeof pointerClientY !== "number" ||
+      !surface.targetElement ||
+      surface.canvas.style.display === "none"
+    ) {
+      surface.canvas.style.maskImage = "";
+      surface.canvas.style.webkitMaskImage = "";
+      return;
+    }
+
+    if (!isPointInsideElement(surface.targetElement, pointerClientX, pointerClientY)) {
+      surface.canvas.style.maskImage = "";
+      surface.canvas.style.webkitMaskImage = "";
+      return;
+    }
+
+    const rect = surface.targetElement.getBoundingClientRect();
+    const localX = pointerClientX - rect.left;
+    const localY = pointerClientY - rect.top;
+    const mask = `radial-gradient(circle at ${localX}px ${localY}px, transparent 60px, rgba(0,0,0,0.6) 90px, black 120px)`;
+    surface.canvas.style.maskImage = mask;
+    surface.canvas.style.webkitMaskImage = mask;
   }
 
   function attachPointerTracking() {
@@ -198,21 +235,17 @@ function createOverlay(settings) {
   }
 
   function collectPreferredTargets() {
-    const nextHoveredElement = findPreferredHoverElement(pointerClientX, pointerClientY);
-    updateHoverHistory(nextHoveredElement);
-
-    if (hoveredElement && !isDrawableElement(hoveredElement)) {
-      hoveredElement = null;
+    const currentHover = findPreferredHoverElement(pointerClientX, pointerClientY);
+    if (currentHover && isDrawableElement(currentHover)) {
+      lastHoveredElement = currentHover;
     }
 
-    if (previousHoveredElement && !isDrawableElement(previousHoveredElement)) {
-      previousHoveredElement = null;
+    if (lastHoveredElement && (!isDrawableElement(lastHoveredElement) || !isInViewport(lastHoveredElement))) {
+      lastHoveredElement = null;
     }
 
     const targets = [];
-    appendUniqueDrawableTarget(targets, hoveredElement);
-    appendUniqueDrawableTarget(targets, findPrimaryDrawableElement());
-    appendUniqueDrawableTarget(targets, previousHoveredElement);
+    appendUniqueDrawableTarget(targets, lastHoveredElement);
 
     for (const candidate of findAutoDrawableTargets()) {
       appendUniqueDrawableTarget(targets, candidate);
@@ -222,25 +255,6 @@ function createOverlay(settings) {
     }
 
     return targets.slice(0, currentSettings.overlayTargetCount);
-  }
-
-  function updateHoverHistory(nextHoveredElement) {
-    if (hoveredElement === nextHoveredElement) {
-      return;
-    }
-
-    if (
-      hoveredElement &&
-      hoveredElement !== nextHoveredElement &&
-      isDrawableElement(hoveredElement)
-    ) {
-      previousHoveredElement = hoveredElement;
-    }
-
-    hoveredElement = nextHoveredElement;
-    if (previousHoveredElement === hoveredElement) {
-      previousHoveredElement = null;
-    }
   }
 
   function syncSurfaceCount(count) {
@@ -699,6 +713,16 @@ function findHoveredMediaElement(clientX, clientY, selector, isUsable) {
   }
 
   return null;
+}
+
+function isInViewport(element) {
+  const rect = element.getBoundingClientRect();
+  return (
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < window.innerHeight &&
+    rect.left < window.innerWidth
+  );
 }
 
 function isPointInsideElement(element, clientX, clientY) {

@@ -27,8 +27,15 @@
 
       <p id="statusText" class="status">Ready.</p>
 
-      <section class="controls">
-        <section class="control-group" aria-labelledby="videoControlsTitle">
+      <div class="tab-widget">
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn" role="tab" data-tab="video" aria-selected="true">Video</button>
+          <button class="tab-btn" role="tab" data-tab="audio" aria-selected="false">Audio</button>
+          <button class="tab-btn" role="tab" data-tab="overlay" aria-selected="false">Overlay</button>
+        </div>
+
+        <section class="controls">
+        <section class="control-group" data-tab-panel="video" aria-labelledby="videoControlsTitle">
           <div class="control-group-header">
             <p class="control-group-kicker">Video</p>
             <h2 id="videoControlsTitle">Screen and CRT filter</h2>
@@ -226,7 +233,7 @@
           </section>
         </section>
 
-        <section class="control-group" aria-labelledby="audioControlsTitle">
+        <section class="control-group" data-tab-panel="audio" aria-labelledby="audioControlsTitle">
           <div class="control-group-header">
             <p class="control-group-kicker">Audio</p>
             <h2 id="audioControlsTitle">Retro sound effects</h2>
@@ -356,7 +363,7 @@
           </label>
         </section>
 
-        <section class="control-group" aria-labelledby="overlayControlsTitle">
+        <section class="control-group" data-tab-panel="overlay" aria-labelledby="overlayControlsTitle">
           <div class="control-group-header">
             <p class="control-group-kicker">Overlay</p>
             <h2 id="overlayControlsTitle">Multiple target behavior</h2>
@@ -374,7 +381,8 @@
             </small>
           </label>
         </section>
-      </section>
+        </section>
+      </div>
 
       <footer class="footer">
         <a
