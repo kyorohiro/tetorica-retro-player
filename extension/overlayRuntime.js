@@ -180,9 +180,36 @@ function createOverlay(settings) {
       const surface = surfaces[index];
       const target = targets[index] ?? null;
       renderSurface(surface, target, index);
+      updateSurfaceSpotlight(surface);
     }
 
     rafId = requestAnimationFrame(draw);
+  }
+
+  function updateSurfaceSpotlight(surface) {
+    if (
+      typeof pointerClientX !== "number" ||
+      typeof pointerClientY !== "number" ||
+      !surface.targetElement ||
+      surface.canvas.style.display === "none"
+    ) {
+      surface.canvas.style.maskImage = "";
+      surface.canvas.style.webkitMaskImage = "";
+      return;
+    }
+
+    if (!isPointInsideElement(surface.targetElement, pointerClientX, pointerClientY)) {
+      surface.canvas.style.maskImage = "";
+      surface.canvas.style.webkitMaskImage = "";
+      return;
+    }
+
+    const rect = surface.targetElement.getBoundingClientRect();
+    const localX = pointerClientX - rect.left;
+    const localY = pointerClientY - rect.top;
+    const mask = `radial-gradient(circle at ${localX}px ${localY}px, transparent 60px, rgba(0,0,0,0.6) 90px, black 120px)`;
+    surface.canvas.style.maskImage = mask;
+    surface.canvas.style.webkitMaskImage = mask;
   }
 
   function attachPointerTracking() {
