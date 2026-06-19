@@ -389,15 +389,19 @@ vec3 nearestColorAnime(vec3 color)
     smoothstep(0.90, 0.95, h)
   ) * smoothstep(0.08, 0.20, s);
 
-  // Uniform 3 steps for all hues — fewest artifacts, strongest cel look
-  float vQ = round(v * 2.0) / 2.0;
+  // 3 steps shifted to {0.22, 0.58, 0.94} — black reserved for edge lines only
+  float vQ = 0.22 + round(v * 2.0) / 2.0 * 0.72;
 
   // Skin shadow: drift hue slightly toward cool pink/purple
   float shadowDepth = max(0.0, v - vQ);
   float hQ = fract(h + skinWeight * shadowDepth * 0.12);
 
-  // S stays continuous — no quantization to avoid gradient noise
-  return hsv2rgb(vec3(hQ, s, vQ));
+  // Saturation modulation by V step: anime shadows are vivid, highlights soften
+  // shadow (vQ=0): boost S, highlight (vQ=1): reduce S slightly
+  float satScale = mix(1.35, 0.85, vQ);
+  float sQ = clamp(s * satScale, 0.0, 1.0);
+
+  return hsv2rgb(vec3(hQ, sQ, vQ));
 }
 
 vec3 monochromePalette(vec3 color, float levels, vec3 tint)
@@ -986,7 +990,7 @@ void main(void)
 
   float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
   if (edgeBoost > 0.001) {
-    if (uToonSteps >= 2.0) {
+    if (uToonSteps >= 1.0) {
       float edge = computeAnimeEdge(pixelatedUv, texel);
       float edgeMix = smoothstep(uAnimeEdgeLow, uAnimeEdgeHigh, edge) * edgeBoost;
       color.rgb = mix(color.rgb, vec3(0.0), clamp(edgeMix, 0.0, 1.0));

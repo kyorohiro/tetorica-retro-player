@@ -767,7 +767,7 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
-            {toonSteps >= 2 && (
+            {toonSteps >= 1 && (
               <>
                 <label className="block">
                   <span className="text-slate-100">
