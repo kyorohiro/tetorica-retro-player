@@ -332,20 +332,12 @@ vec3 color32Palette(float index)
 
 vec3 nearestColor32(vec3 color)
 {
-  vec3 best = color32Palette(0.0);
-  float bestDistance = distance(color, best);
-
-  for (int i = 1; i < 32; i++) {
-    vec3 candidate = color32Palette(float(i));
-    float candidateDistance = distance(color, candidate);
-
-    if (candidateDistance < bestDistance) {
-      bestDistance = candidateDistance;
-      best = candidate;
-    }
-  }
-
-  return best;
+  // 4x4x2 uniform grid: r,g in {0, 1/3, 2/3, 1}, b in {0, 1}
+  return vec3(
+    round(color.r * 3.0) / 3.0,
+    round(color.g * 3.0) / 3.0,
+    round(color.b)
+  );
 }
 
 vec3 color64Palette(float index)
@@ -359,20 +351,8 @@ vec3 color64Palette(float index)
 
 vec3 nearestColor64(vec3 color)
 {
-  vec3 best = color64Palette(0.0);
-  float bestDistance = distance(color, best);
-
-  for (int i = 1; i < 64; i++) {
-    vec3 candidate = color64Palette(float(i));
-    float candidateDistance = distance(color, candidate);
-
-    if (candidateDistance < bestDistance) {
-      bestDistance = candidateDistance;
-      best = candidate;
-    }
-  }
-
-  return best;
+  // 4x4x4 uniform grid: each channel independently snaps to nearest of {0, 1/3, 2/3, 1}
+  return round(color * 3.0) / 3.0;
 }
 
 vec3 monochromePalette(vec3 color, float levels, vec3 tint)
