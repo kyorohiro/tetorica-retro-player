@@ -484,6 +484,7 @@ export const DEFAULT_SETTINGS = {
   neonDetail: 1.0,
   colorLevels: 32,
   overlayTargetCount: 1,
+  showOverlayButtons: true,
   isAudioFxEnabled: true,
   lofiAmount: 0.65,
   radioToneAmount: 0.0,
@@ -654,6 +655,10 @@ export function normalizeSettings(candidate) {
             OVERLAY_TARGET_LIMITS.max,
           )
         : DEFAULT_SETTINGS.overlayTargetCount,
+    showOverlayButtons:
+      typeof candidate?.showOverlayButtons === "boolean"
+        ? candidate.showOverlayButtons
+        : DEFAULT_SETTINGS.showOverlayButtons,
     isAudioFxEnabled:
       typeof candidate?.isAudioFxEnabled === "boolean"
         ? candidate.isAudioFxEnabled
