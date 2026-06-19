@@ -21,6 +21,8 @@ uniform float uGlowStrength;
 uniform float uSmoothStrength;
 uniform float uToonSteps;
 uniform float uEdgeBoost;
+uniform float uAnimeEdgeLow;
+uniform float uAnimeEdgeHigh;
 uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
@@ -769,6 +771,22 @@ float sampleProcessedLuminance(vec2 sampleUv, vec2 sampleCell, vec2 texel)
   );
 }
 
+float computeAnimeEdge(vec2 uv, vec2 texel)
+{
+  vec3 tl = texture(uTexture, clamp(uv + vec2(-texel.x, -texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 tc = texture(uTexture, clamp(uv + vec2( 0.0,     -texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 tr = texture(uTexture, clamp(uv + vec2( texel.x, -texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 ml = texture(uTexture, clamp(uv + vec2(-texel.x,  0.0    ), vec2(0.0), vec2(1.0))).rgb;
+  vec3 mr = texture(uTexture, clamp(uv + vec2( texel.x,  0.0    ), vec2(0.0), vec2(1.0))).rgb;
+  vec3 bl = texture(uTexture, clamp(uv + vec2(-texel.x,  texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 bc = texture(uTexture, clamp(uv + vec2( 0.0,      texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 br = texture(uTexture, clamp(uv + vec2( texel.x,  texel.y), vec2(0.0), vec2(1.0))).rgb;
+
+  vec3 gx = -tl + tr - 2.0*ml + 2.0*mr - bl + br;
+  vec3 gy = -tl - 2.0*tc - tr + bl + 2.0*bc + br;
+  return clamp(length(vec2(length(gx), length(gy))) * 0.4, 0.0, 1.0);
+}
+
 float computeEdgeBoost(vec2 uv, vec2 texel, vec2 cell)
 {
   float tl = sampleProcessedLuminance(
@@ -886,17 +904,23 @@ void main(void)
 
   float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
   if (edgeBoost > 0.001) {
-    float edge = computeEdgeBoost(pixelatedUv, texel, cell);
-    float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    float darkPreference = 1.0 - smoothstep(0.45, 0.92, luminance);
-    float edgeMix = smoothstep(0.04, 0.75, edge) * min(edgeBoost, 1.0) * (0.55 + darkPreference * 0.45);
-    float edgeShade = edge * (0.12 + edgeBoost * 0.34) * (0.65 + darkPreference * 0.55);
-    vec3 edgeColor = color.rgb * (1.0 - edgeShade);
-    color.rgb = clamp(
-      mix(color.rgb, edgeColor, edgeMix),
-      0.0,
-      1.0
-    );
+    if (uToonSteps >= 2.0) {
+      float edge = computeAnimeEdge(pixelatedUv, texel);
+      float edgeMix = smoothstep(uAnimeEdgeLow, uAnimeEdgeHigh, edge) * edgeBoost;
+      color.rgb = mix(color.rgb, vec3(0.0), clamp(edgeMix, 0.0, 1.0));
+    } else {
+      float edge = computeEdgeBoost(pixelatedUv, texel, cell);
+      float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float darkPreference = 1.0 - smoothstep(0.45, 0.92, luminance);
+      float edgeMix = smoothstep(0.04, 0.75, edge) * min(edgeBoost, 1.0) * (0.55 + darkPreference * 0.45);
+      float edgeShade = edge * (0.12 + edgeBoost * 0.34) * (0.65 + darkPreference * 0.55);
+      vec3 edgeColor = color.rgb * (1.0 - edgeShade);
+      color.rgb = clamp(
+        mix(color.rgb, edgeColor, edgeMix),
+        0.0,
+        1.0
+      );
+    }
   }
 
   if (uPhosphorDotMode > 0.5) {
