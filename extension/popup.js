@@ -62,6 +62,7 @@ const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength"
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
 const overlayTargetCountValue = document.getElementById("overlayTargetCountValue");
+const showOverlayButtonsInput = document.getElementById("showOverlayButtons");
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
 const lofiAmountInput = document.getElementById("lofiAmount");
 const lofiAmountValue = document.getElementById("lofiAmountValue");
@@ -589,6 +590,10 @@ overlayTargetCountInput.addEventListener("input", () => {
   });
 });
 
+showOverlayButtonsInput.addEventListener("change", () => {
+  updateSettings({ showOverlayButtons: showOverlayButtonsInput.checked });
+});
+
 audioFxEnabledInput.addEventListener("change", () => {
   updateAudioSettings({ isAudioFxEnabled: audioFxEnabledInput.checked });
 });
@@ -773,6 +778,7 @@ function renderSettings(settings) {
   overlayTargetCountInput.max = String(OVERLAY_TARGET_LIMITS.max);
   overlayTargetCountInput.value = String(settings.overlayTargetCount);
   overlayTargetCountValue.textContent = `${settings.overlayTargetCount} target${settings.overlayTargetCount === 1 ? "" : "s"}`;
+  showOverlayButtonsInput.checked = settings.showOverlayButtons;
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);
   lofiAmountValue.textContent = settings.lofiAmount.toFixed(2);

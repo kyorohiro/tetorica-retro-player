@@ -48,23 +48,27 @@ export async function toggleRetroOverlay(settingsInput) {
 
 function createOverlay(settings) {
   let currentSettings = settings;
-  const badge = document.createElement("button");
   const recordButton = document.createElement("button");
-  badge.type = "button";
-  badge.textContent = "Retro";
-  badge.style.position = "fixed";
-  badge.style.right = "16px";
-  badge.style.top = "16px";
-  badge.style.zIndex = "2147483647";
-  badge.style.padding = "8px 12px";
-  badge.style.border = "1px solid rgba(196, 230, 125, 0.35)";
-  badge.style.borderRadius = "999px";
-  badge.style.background = "rgba(9, 10, 8, 0.82)";
-  badge.style.color = "#eff7ca";
-  badge.style.font = '12px "IBM Plex Sans", "Segoe UI", sans-serif';
-  badge.style.cursor = "pointer";
-  badge.style.backdropFilter = "blur(8px)";
-  badge.style.boxShadow = "0 0 18px rgba(110, 147, 58, 0.22)";
+  const opacityButton = document.createElement("button");
+  opacityButton.type = "button";
+  opacityButton.setAttribute("aria-label", "Overlay opacity");
+  opacityButton.title = "Overlay opacity";
+  opacityButton.style.position = "fixed";
+  opacityButton.style.left = "-9999px";
+  opacityButton.style.top = "-9999px";
+  opacityButton.style.zIndex = "2147483647";
+  opacityButton.style.width = "28px";
+  opacityButton.style.height = "28px";
+  opacityButton.style.padding = "0";
+  opacityButton.style.border = "1px solid rgba(196, 230, 125, 0.35)";
+  opacityButton.style.borderRadius = "50%";
+  opacityButton.style.background = "rgba(9, 10, 8, 0.82)";
+  opacityButton.style.cursor = "pointer";
+  opacityButton.style.backdropFilter = "blur(8px)";
+  opacityButton.style.boxShadow = "0 0 14px rgba(110, 147, 58, 0.22)";
+  opacityButton.style.display = "flex";
+  opacityButton.style.alignItems = "center";
+  opacityButton.style.justifyContent = "center";
 
   recordButton.type = "button";
   recordButton.setAttribute("aria-label", "Start recording");
@@ -86,30 +90,50 @@ function createOverlay(settings) {
   recordButton.style.alignItems = "center";
   recordButton.style.justifyContent = "center";
 
-  const speedButton = document.createElement("button");
-  speedButton.type = "button";
-  speedButton.setAttribute("aria-label", "Playback speed");
-  speedButton.title = "Playback speed";
-  speedButton.style.position = "fixed";
-  speedButton.style.left = "-9999px";
-  speedButton.style.top = "-9999px";
-  speedButton.style.zIndex = "2147483647";
-  speedButton.style.padding = "0 8px";
-  speedButton.style.height = "28px";
-  speedButton.style.border = "1px solid rgba(147, 197, 253, 0.35)";
-  speedButton.style.borderRadius = "999px";
-  speedButton.style.background = "rgba(8, 12, 24, 0.82)";
-  speedButton.style.color = "#bfdbfe";
-  speedButton.style.font = '11px "IBM Plex Sans", "Segoe UI", sans-serif';
-  speedButton.style.cursor = "pointer";
-  speedButton.style.backdropFilter = "blur(8px)";
-  speedButton.style.boxShadow = "0 0 14px rgba(147, 197, 253, 0.18)";
-  speedButton.style.whiteSpace = "nowrap";
+  const speedGroup = document.createElement("div");
+  speedGroup.style.position = "fixed";
+  speedGroup.style.left = "-9999px";
+  speedGroup.style.top = "-9999px";
+  speedGroup.style.zIndex = "2147483647";
+  speedGroup.style.display = "flex";
+  speedGroup.style.alignItems = "center";
+  speedGroup.style.height = "28px";
+  speedGroup.style.border = "1px solid rgba(147, 197, 253, 0.35)";
+  speedGroup.style.borderRadius = "999px";
+  speedGroup.style.background = "rgba(8, 12, 24, 0.82)";
+  speedGroup.style.backdropFilter = "blur(8px)";
+  speedGroup.style.boxShadow = "0 0 14px rgba(147, 197, 253, 0.18)";
+  speedGroup.style.overflow = "hidden";
+
+  const speedDownButton = document.createElement("button");
+  speedDownButton.type = "button";
+  speedDownButton.textContent = "−";
+  speedDownButton.setAttribute("aria-label", "Decrease speed");
+  speedDownButton.style.cssText =
+    "background:transparent;border:none;color:#bfdbfe;cursor:pointer;font:14px sans-serif;padding:0 8px;height:100%;line-height:1;";
+
+  const speedLabel = document.createElement("span");
+  speedLabel.textContent = "1×";
+  speedLabel.style.cssText =
+    'color:#bfdbfe;font:11px "IBM Plex Sans","Segoe UI",sans-serif;min-width:32px;text-align:center;user-select:none;pointer-events:none;';
+
+  const speedUpButton = document.createElement("button");
+  speedUpButton.type = "button";
+  speedUpButton.textContent = "+";
+  speedUpButton.setAttribute("aria-label", "Increase speed");
+  speedUpButton.style.cssText =
+    "background:transparent;border:none;color:#bfdbfe;cursor:pointer;font:14px sans-serif;padding:0 8px;height:100%;line-height:1;";
+
+  speedGroup.append(speedDownButton, speedLabel, speedUpButton);
 
   const surfaces = [];
   let rafId = 0;
   let frameCount = 0;
-  let isVisible = true;
+  const OPACITY_PRESETS = [1, 0.5, 0];
+  let overlayOpacity = 1;
+  let lastButtonRectKey = "";
+  let lastOpacityIdx = -1;
+  let lastIsRecording = null;
   let detachStorageListener = null;
   let pointerClientX = null;
   let pointerClientY = null;
@@ -121,16 +145,13 @@ function createOverlay(settings) {
   let recordingStream = null;
   let recordingAudioStream = null;
 
-  badge.addEventListener("click", async () => {
-    isVisible = !isVisible;
-
-    if (isVisible) {
-      currentSettings = await loadLatestSettings(currentSettings);
-      applySettingsToSurfaces();
+  opacityButton.addEventListener("click", () => {
+    const idx = OPACITY_PRESETS.findIndex((v) => Math.abs(v - overlayOpacity) < 0.01);
+    overlayOpacity = OPACITY_PRESETS[(idx + 1) % OPACITY_PRESETS.length];
+    for (const surface of surfaces) {
+      surface.canvas.style.opacity = String(overlayOpacity);
     }
-
-    setSurfaceVisibility();
-    badge.textContent = isVisible ? "Orig" : "Retro";
+    updateOpacityButton();
   });
 
   const SPEED_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4];
@@ -144,16 +165,23 @@ function createOverlay(settings) {
     startRecording();
   });
 
-  speedButton.addEventListener("click", () => {
+  speedDownButton.addEventListener("click", () => {
     const targetEl = surfaces[0]?.targetElement;
     if (!(targetEl instanceof HTMLVideoElement)) return;
-    const current = targetEl.playbackRate;
-    const idx = SPEED_PRESETS.findIndex((s) => Math.abs(s - current) < 0.01);
-    targetEl.playbackRate = SPEED_PRESETS[(idx + 1) % SPEED_PRESETS.length];
+    const idx = SPEED_PRESETS.findIndex((s) => Math.abs(s - targetEl.playbackRate) < 0.01);
+    if (idx > 0) targetEl.playbackRate = SPEED_PRESETS[idx - 1];
+  });
+
+  speedUpButton.addEventListener("click", () => {
+    const targetEl = surfaces[0]?.targetElement;
+    if (!(targetEl instanceof HTMLVideoElement)) return;
+    const idx = SPEED_PRESETS.findIndex((s) => Math.abs(s - targetEl.playbackRate) < 0.01);
+    if (idx !== -1 && idx < SPEED_PRESETS.length - 1) targetEl.playbackRate = SPEED_PRESETS[idx + 1];
   });
 
   function start() {
-    document.body.append(badge, recordButton, speedButton);
+    document.body.append(recordButton, opacityButton, speedGroup);
+    updateOpacityButton();
     attachSettingsSync();
     attachPointerTracking();
     updateRecordButton();
@@ -178,9 +206,9 @@ function createOverlay(settings) {
 
     stopRecording({ save: false });
     destroySurfaces();
-    badge.remove();
     recordButton.remove();
-    speedButton.remove();
+    opacityButton.remove();
+    speedGroup.remove();
   }
 
   function attachSettingsSync() {
@@ -216,8 +244,9 @@ function createOverlay(settings) {
       updateSurfaceSpotlight(surface);
     }
 
-    updateRecordButtonPosition();
-    updateSpeedButton();
+    updateButtonPositions();
+    updateOpacityButton();
+    updateSpeedButtonLabel();
     rafId = requestAnimationFrame(draw);
   }
 
@@ -295,6 +324,7 @@ function createOverlay(settings) {
   function syncSurfaceCount(count) {
     while (surfaces.length < count) {
       const surface = createOverlaySurface(surfaces.length);
+      surface.canvas.style.opacity = String(overlayOpacity);
       surfaces.push(surface);
       applySettings(surface.gl, surface.renderer.program, surface.renderer.uniformLocations, currentSettings);
       if (document.body) {
@@ -320,25 +350,6 @@ function createOverlay(settings) {
     }
   }
 
-  function setSurfaceVisibility() {
-    for (const surface of surfaces) {
-      if (isVisible) {
-        surface.canvas.style.display = surface.targetElement ? "block" : "none";
-      } else {
-        surface.canvas.style.display = "none";
-      }
-
-      if (!isVisible) {
-        surface.hideFailureOverlay();
-      }
-    }
-
-    if (!isVisible) {
-      recordButton.style.left = "-9999px";
-      speedButton.style.left = "-9999px";
-    }
-  }
-
   function renderSurface(surface, targetElement, priorityIndex) {
     if (!targetElement || !isDrawableElement(targetElement)) {
       surface.updateTarget(null);
@@ -355,11 +366,6 @@ function createOverlay(settings) {
 
     surface.updateTarget(targetElement);
     surface.syncRect(rect);
-
-    if (!isVisible) {
-      surface.hide();
-      return;
-    }
 
     if (targetElement instanceof HTMLImageElement && rejectedImages.has(targetElement)) {
       surface.canvas.style.display = "none";
@@ -523,6 +529,8 @@ function createOverlay(settings) {
 
   function updateRecordButton() {
     const isRecording = mediaRecorder?.state === "recording";
+    if (isRecording === lastIsRecording) return;
+    lastIsRecording = isRecording;
     recordButton.innerHTML = isRecording
       ? `<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" rx="1" fill="#fca5a5"/></svg>`
       : `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="#f87171"/></svg>`;
@@ -539,41 +547,80 @@ function createOverlay(settings) {
     recordButton.title = isRecording ? "Stop recording" : "Start recording";
   }
 
-  function updateRecordButtonPosition() {
-    if (!isVisible) return;
-    const targetEl = surfaces[0]?.targetElement;
-    if (!targetEl) {
-      recordButton.style.left = "-9999px";
-      return;
-    }
-    const rect = targetEl.getBoundingClientRect();
-    const size = 28;
-    recordButton.style.left = `${rect.right - size + Math.round(size / 3)}px`;
-    recordButton.style.top = `${rect.top - Math.round(size * 2 / 3)}px`;
+  function updateOpacityButton() {
+    const idx = OPACITY_PRESETS.findIndex((v) => Math.abs(v - overlayOpacity) < 0.01);
+    if (idx === lastOpacityIdx) return;
+    lastOpacityIdx = idx;
+    const icons = [
+      `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="#c4e67d"/></svg>`,
+      `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="#c4e67d" opacity="0.5"/><circle cx="6" cy="6" r="5.5" fill="none" stroke="#c4e67d" stroke-width="1"/></svg>`,
+      `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="none" stroke="#c4e67d" stroke-width="1.5"/></svg>`,
+    ];
+    opacityButton.innerHTML = icons[idx] ?? icons[0];
   }
 
-  function updateSpeedButton() {
-    if (!isVisible) return;
+  function updateSpeedButtonLabel() {
     const targetEl = surfaces[0]?.targetElement;
-    if (!(targetEl instanceof HTMLVideoElement)) {
-      speedButton.style.left = "-9999px";
+    if (!(targetEl instanceof HTMLVideoElement)) return;
+    const rate = targetEl.playbackRate;
+    speedLabel.textContent = `${rate}×`;
+    const isModified = Math.abs(rate - 1) > 0.01;
+    const color = isModified ? "#a7f3d0" : "#bfdbfe";
+    speedLabel.style.color = color;
+    speedGroup.style.borderColor = isModified
+      ? "rgba(167, 243, 208, 0.55)"
+      : "rgba(147, 197, 253, 0.35)";
+    const idx = SPEED_PRESETS.findIndex((s) => Math.abs(s - rate) < 0.01);
+    speedDownButton.style.opacity = idx <= 0 ? "0.3" : "1";
+    speedUpButton.style.opacity = idx >= SPEED_PRESETS.length - 1 ? "0.3" : "1";
+  }
+
+  function updateButtonPositions() {
+    if (!currentSettings.showOverlayButtons) {
+      if (lastButtonRectKey !== "") {
+        recordButton.style.left = "-9999px";
+        opacityButton.style.left = "-9999px";
+        speedGroup.style.left = "-9999px";
+        lastButtonRectKey = "";
+      }
       return;
     }
 
-    const rate = targetEl.playbackRate;
-    speedButton.textContent = `${rate}×`;
-    const isModified = Math.abs(rate - 1) > 0.01;
-    speedButton.style.borderColor = isModified
-      ? "rgba(167, 243, 208, 0.55)"
-      : "rgba(147, 197, 253, 0.35)";
-    speedButton.style.color = isModified ? "#a7f3d0" : "#bfdbfe";
+    const targetEl = surfaces[0]?.targetElement;
+    if (!targetEl) {
+      if (lastButtonRectKey !== "") {
+        recordButton.style.left = "-9999px";
+        opacityButton.style.left = "-9999px";
+        speedGroup.style.left = "-9999px";
+        lastButtonRectKey = "";
+      }
+      return;
+    }
 
     const rect = targetEl.getBoundingClientRect();
-    const recSize = 28;
+    const rectKey = `${Math.round(rect.right)}:${Math.round(rect.top)}:${Math.round(rect.width)}`;
+    if (rectKey === lastButtonRectKey) return;
+    lastButtonRectKey = rectKey;
+
+    const size = 28;
     const gap = 6;
-    const speedWidth = speedButton.offsetWidth || 42;
-    speedButton.style.left = `${rect.right - recSize + Math.round(recSize / 3) - speedWidth - gap}px`;
-    speedButton.style.top = `${rect.top - Math.round(recSize * 2 / 3)}px`;
+    const topY = rect.top - Math.round(size * 2 / 3);
+    const recLeft = rect.right - size + Math.round(size / 3);
+
+    recordButton.style.left = `${recLeft}px`;
+    recordButton.style.top = `${topY}px`;
+
+    opacityButton.style.left = `${recLeft - size - gap}px`;
+    opacityButton.style.top = `${topY}px`;
+
+    const isVideo = targetEl instanceof HTMLVideoElement;
+    if (isVideo) {
+      const groupWidth = speedGroup.offsetWidth || 92;
+      speedGroup.style.left = `${recLeft - size - gap - groupWidth - gap * 3}px`;
+      speedGroup.style.top = `${topY}px`;
+    } else {
+      speedGroup.style.left = "-9999px";
+    }
   }
 }
 
