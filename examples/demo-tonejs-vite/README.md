@@ -1,7 +1,7 @@
 # demo-tonejs-vite
 
 Tone.js + Vite によるブラウザ内ループミュージックデモ。  
-28曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
+32曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
 
 ## 起動
 
@@ -44,6 +44,10 @@ npm run dev
 | 26 | GROOVE MACHINE  | Ab major|118  | ディスコ/R&B  | Abmaj7 Fm7 Dbmaj7 Eb7 (×2) |
 | 27 | FLAMENCO FUEGO  | A Phrygian|155| フラメンコ   | Am G F E7 (アンダルシア ×2) |
 | 28 | SPAIN NIGHTS    | D major |138  | ラテンジャズ  | Dmaj7 C#7 F#m7 Bm7 Em7 A7 Dmaj7 A7 |
+| 29 | SEVEN PULSE     | F# minor|132  | 7/8 変拍子    | F#m7 A E7 D (各2bars of 7/8) |
+| 30 | POLY GROOVE     | Bb minor| 92  | ポリリズム    | Bbm7 (3bars) → Ebm7 (3bars) |
+| 31 | SOUL GROOVE     | Eb major| 72  | R&B/ソウル    | Ebmaj9 Cm9 Abmaj9 Bb7 (×2) |
+| 32 | PRAISE SONG     | C major | 84  | ゴスペル      | Cmaj7 F9 G13 Am7 Cmaj7 F9 Dm7 G7 |
 
 ## 音色・エフェクト一覧
 
@@ -79,6 +83,10 @@ npm run dev
 | 26 | GROOVE MACHINE  | PolySynth(sawtooth) stabs            | PolySynth(fatsawtooth)+**StereoWidener** | MonoSynth(fmsine) | 4-on-floor disco |
 | 27 | FLAMENCO FUEGO  | PluckSynth (flamenco)                | PolySynth(**pulse**) rasgueado | cajon only           | Rumba cajon |
 | 28 | SPAIN NIGHTS    | DuoSynth (portamento, vibrato)       | PolySynth(**pulse**)+**JCReverb** | PluckSynth (upright) | clave+bongo+shaker |
+| 29 | SEVEN PULSE     | Synth(amtriangle)+**PitchShift**     | PolySynth(fmsquare)+Reverb    | MonoSynth(sawtooth)    | 7/8 Sequence (3+2+2) |
+| 30 | POLY GROOVE     | Synth(amsine) 3-feel Seq             | PolySynth(fmtriangle)+Reverb  | MonoSynth(fmsawtooth) 3-feel | 4-feel Afrobeat |
+| 31 | SOUL GROOVE     | PolySynth(triangle)+Tremolo+**Freeverb** | — (EP兼用)               | FMSynth(harmonicity:1) | half-time Soul |
+| 32 | PRAISE SONG     | **PolySynth(MonoSynth)**+**Freeverb** | PolySynth(fatsawtooth) choir | MonoSynth(sawtooth)   | NoiseSynth tambourine |
 
 ## アーキテクチャ
 
@@ -87,7 +95,7 @@ src/
   main.ts       UI管理、曲切り替え、BPMスライダー
   song1.ts      各曲モジュール (META + create関数)
   ...
-  song28.ts
+  song32.ts
 index.html      タブUI、ステップインジケーター
 ```
 
