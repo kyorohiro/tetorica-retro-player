@@ -358,12 +358,8 @@ vec3 nearestColorAnime(vec3 color)
     smoothstep(0.90, 0.95, h)
   ) * smoothstep(0.08, 0.20, s);
 
-  // Sharpen V before quantizing: push gradient areas decisively to one step
-  // S-curve boosts contrast around each step boundary
-  float vSharp = clamp((v - 0.5) * 1.8 + 0.5, 0.0, 1.0);
-
   // 3 steps shifted to {0.22, 0.58, 0.94} — black reserved for edge lines only
-  float vQ = 0.22 + round(vSharp * 2.0) / 2.0 * 0.72;
+  float vQ = 0.22 + round(v * 2.0) / 2.0 * 0.72;
 
   // Skin shadow: drift hue slightly toward cool pink/purple
   float shadowDepth = max(0.0, v - vQ);
