@@ -1,7 +1,7 @@
 {
   "name": "tetorica-retro-player",
   "private": true,
-  "version": "0.23.10",
+  "version": "0.23.11",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && vite",
