@@ -507,7 +507,7 @@ export const COLOR_LEVEL_LIMITS = {
 
 export const OVERLAY_TARGET_LIMITS = {
   min: 1,
-  max: 6,
+  max: 12,
 };
 
 export function normalizeSettings(candidate) {
