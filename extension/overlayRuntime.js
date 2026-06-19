@@ -630,7 +630,7 @@ function createOverlay(settings) {
 
     const size = 28;
     const gap = 6;
-    const topY = activeRect.top - Math.round(size * 2 / 3);
+    const topY = Math.max(0, activeRect.top - Math.round(size * 2 / 3));
     const recLeft = activeRect.right - size + Math.round(size / 3);
 
     if (isDRM) {
