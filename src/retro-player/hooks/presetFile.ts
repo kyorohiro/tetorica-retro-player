@@ -30,6 +30,8 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   smoothStrength: 0,
   toonSteps: 0,
   edgeBoost: 0,
+  animeEdgeLow: 0.08,
+  animeEdgeHigh: 0.55,
   phosphorStrength: DEFAULT_PRESET.phosphor,
   spotMaskStrength: DEFAULT_PRESET.spotMask,
   bulbRadius: DEFAULT_PRESET.bulbRadius,

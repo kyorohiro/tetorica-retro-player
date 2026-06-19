@@ -29,6 +29,8 @@ export type RetroFilterInitialState = Partial<{
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
+  animeEdgeLow: number;
+  animeEdgeHigh: number;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;
@@ -73,6 +75,8 @@ const doesPresetMatchState = (
     (preset.smoothStrength ?? 0) === state.smoothStrength &&
     (preset.toonSteps ?? 0) === state.toonSteps &&
     (preset.edgeBoost ?? 0) === state.edgeBoost &&
+    (preset.animeEdgeLow ?? 0.08) === state.animeEdgeLow &&
+    (preset.animeEdgeHigh ?? 0.55) === state.animeEdgeHigh &&
     preset.phosphor === state.phosphorStrength &&
     preset.spotMask === state.spotMaskStrength &&
     preset.bulbRadius === state.bulbRadius &&
@@ -149,6 +153,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     smoothStrength: initialState.smoothStrength ?? (DEFAULT_PRESET.smoothStrength ?? 0),
     toonSteps: initialState.toonSteps ?? (DEFAULT_PRESET.toonSteps ?? 0),
     edgeBoost: initialState.edgeBoost ?? (DEFAULT_PRESET.edgeBoost ?? 0),
+    animeEdgeLow: initialState.animeEdgeLow ?? (DEFAULT_PRESET.animeEdgeLow ?? 0.08),
+    animeEdgeHigh: initialState.animeEdgeHigh ?? (DEFAULT_PRESET.animeEdgeHigh ?? 0.55),
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
@@ -275,6 +281,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, edgeBoost }));
   };
 
+  const setAnimeEdgeLow = (animeEdgeLow: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, animeEdgeLow }));
+  };
+
+  const setAnimeEdgeHigh = (animeEdgeHigh: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, animeEdgeHigh }));
+  };
+
   const setPhosphorStrength = (phosphorStrength: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, phosphorStrength }));
@@ -373,6 +389,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       smoothStrength: presetSettings.smoothStrength ?? 0,
       toonSteps: presetSettings.toonSteps ?? 0,
       edgeBoost: presetSettings.edgeBoost ?? 0,
+      animeEdgeLow: presetSettings.animeEdgeLow ?? 0.08,
+      animeEdgeHigh: presetSettings.animeEdgeHigh ?? 0.55,
       phosphorStrength: presetSettings.phosphor,
       spotMaskStrength: presetSettings.spotMask,
       bulbRadius: presetSettings.bulbRadius,
@@ -431,6 +449,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSmoothStrength,
     setToonSteps,
     setEdgeBoost,
+    setAnimeEdgeLow,
+    setAnimeEdgeHigh,
     setPhosphorStrength,
     setSpotMaskStrength,
     setBulbRadius,

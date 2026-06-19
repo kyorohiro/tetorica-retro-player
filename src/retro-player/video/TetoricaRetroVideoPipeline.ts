@@ -22,6 +22,8 @@ export type RetroVideoFilterState = {
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
+  animeEdgeLow: number;
+  animeEdgeHigh: number;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;
@@ -67,6 +69,8 @@ type RendererUniformLocations = {
   uSmoothStrength: WebGLUniformLocation | null;
   uToonSteps: WebGLUniformLocation | null;
   uEdgeBoost: WebGLUniformLocation | null;
+  uAnimeEdgeLow: WebGLUniformLocation | null;
+  uAnimeEdgeHigh: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
@@ -418,6 +422,8 @@ export class TetoricaRetroVideoPipeline {
       uSmoothStrength: gl.getUniformLocation(this.filterProgram, "uSmoothStrength"),
       uToonSteps: gl.getUniformLocation(this.filterProgram, "uToonSteps"),
       uEdgeBoost: gl.getUniformLocation(this.filterProgram, "uEdgeBoost"),
+      uAnimeEdgeLow: gl.getUniformLocation(this.filterProgram, "uAnimeEdgeLow"),
+      uAnimeEdgeHigh: gl.getUniformLocation(this.filterProgram, "uAnimeEdgeHigh"),
       uPhosphorStrength: gl.getUniformLocation(this.filterProgram, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(this.filterProgram, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(this.filterProgram, "uBulbRadius"),
@@ -660,6 +666,8 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.uniformLocations.uSmoothStrength, filterState.smoothStrength);
     gl.uniform1f(this.uniformLocations.uToonSteps, filterState.toonSteps);
     gl.uniform1f(this.uniformLocations.uEdgeBoost, filterState.edgeBoost);
+    gl.uniform1f(this.uniformLocations.uAnimeEdgeLow, filterState.animeEdgeLow);
+    gl.uniform1f(this.uniformLocations.uAnimeEdgeHigh, filterState.animeEdgeHigh);
     gl.uniform1f(this.uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(this.uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.uniformLocations.uBulbRadius, filterState.bulbRadius);

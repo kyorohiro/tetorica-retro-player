@@ -225,6 +225,8 @@ export function RetroControlPanel({
               smoothStrength={filterState.smoothStrength}
               toonSteps={filterState.toonSteps}
               edgeBoost={filterState.edgeBoost}
+              animeEdgeLow={filterState.animeEdgeLow}
+              animeEdgeHigh={filterState.animeEdgeHigh}
               isFilterEnabled={filterState.isFilterEnabled}
               monoTint={filterState.monoTint}
               neonBoost={filterState.neonBoost}
@@ -259,6 +261,8 @@ export function RetroControlPanel({
               onSetSmoothStrength={filterState.setSmoothStrength}
               onSetToonSteps={filterState.setToonSteps}
               onSetEdgeBoost={filterState.setEdgeBoost}
+              onSetAnimeEdgeLow={filterState.setAnimeEdgeLow}
+              onSetAnimeEdgeHigh={filterState.setAnimeEdgeHigh}
               onSetIsFilterEnabled={filterState.setIsFilterEnabled}
               onSetMonoTint={filterState.setMonoTint}
               onSetNeonBoost={filterState.setNeonBoost}
