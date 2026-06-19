@@ -36,6 +36,8 @@ export type RetroPresetDefinition = {
   smoothStrength?: number;
   toonSteps?: number;
   edgeBoost?: number;
+  animeEdgeLow?: number;
+  animeEdgeHigh?: number;
   phosphor: number;
   spotMask: number;
   bulbRadius: number;
@@ -451,8 +453,10 @@ export const RETRO_PRESETS = {
     vignette: 0.0,
     glow: 0.0,
     smoothStrength: 0.35,
-    toonSteps: 4,
-    edgeBoost: 1.5,
+    toonSteps: 8,
+    edgeBoost: 0.22,
+    animeEdgeLow: 0.08,
+    animeEdgeHigh: 0.55,
     phosphor: 0.0,
     spotMask: 0.0,
     bulbRadius: 0.3,

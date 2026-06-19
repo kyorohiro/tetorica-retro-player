@@ -19,6 +19,8 @@ export type PersistedRetroFilterSettings = {
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
+  animeEdgeLow: number;
+  animeEdgeHigh: number;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;

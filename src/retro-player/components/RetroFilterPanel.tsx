@@ -48,6 +48,8 @@ type RetroFilterPanelProps = {
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
+  animeEdgeLow: number;
+  animeEdgeHigh: number;
   isFilterEnabled: boolean;
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
@@ -83,6 +85,8 @@ type RetroFilterPanelProps = {
   onSetSmoothStrength: (value: number) => void;
   onSetToonSteps: (value: number) => void;
   onSetEdgeBoost: (value: number) => void;
+  onSetAnimeEdgeLow: (value: number) => void;
+  onSetAnimeEdgeHigh: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
@@ -117,6 +121,8 @@ export function RetroFilterPanel({
   smoothStrength,
   toonSteps,
   edgeBoost,
+  animeEdgeLow,
+  animeEdgeHigh,
   isFilterEnabled,
   monoTint,
   paletteMode,
@@ -152,6 +158,8 @@ export function RetroFilterPanel({
   onSetSmoothStrength,
   onSetToonSteps,
   onSetEdgeBoost,
+  onSetAnimeEdgeLow,
+  onSetAnimeEdgeHigh,
   onSetMonoTint,
   onSetPaletteMode,
   onSetPhosphorStrength,
@@ -377,61 +385,6 @@ export function RetroFilterPanel({
           </label>
         )}
 
-        {paletteMode === "neon" && (
-          <>
-            <label className="block">
-              <span className="text-slate-100">
-                Neon Boost: {neonBoost.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="2.5"
-                step="0.01"
-                value={neonBoost}
-                onChange={(ev) => {
-                  onSetNeonBoost(Number(ev.currentTarget.value));
-                }}
-                className="mt-2 w-full"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-slate-100">
-                Neon Saturation: {neonSaturation.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="2.0"
-                step="0.01"
-                value={neonSaturation}
-                onChange={(ev) => {
-                  onSetNeonSaturation(Number(ev.currentTarget.value));
-                }}
-                className="mt-2 w-full"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-slate-100">
-                Neon Detail: {neonDetail.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min="0.2"
-                max="2.0"
-                step="0.01"
-                value={neonDetail}
-                onChange={(ev) => {
-                  onSetNeonDetail(Number(ev.currentTarget.value));
-                }}
-                className="mt-2 w-full"
-              />
-            </label>
-          </>
-        )}
-
         <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
           <input
             type="checkbox"
@@ -526,27 +479,6 @@ export function RetroFilterPanel({
         <label className="block">
           <span className="text-slate-100">
             <InfoTip
-              label={`Curvature: ${curvature.toFixed(2)}`}
-              text={helpText.curvature}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.2"
-            step="0.01"
-            value={curvature}
-            onChange={(ev) => {
-              onSetCurvature(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
               label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
               text={helpText.bayerDither}
               helpSuffix={helpText.helpSuffix}
@@ -568,90 +500,6 @@ export function RetroFilterPanel({
         <label className="block">
           <span className="text-slate-100">
             <InfoTip
-              label={`Scanline: ${scanlineStrength.toFixed(2)}`}
-              text={helpText.scanline}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.4"
-            step="0.01"
-            value={scanlineStrength}
-            onChange={(ev) => {
-              onSetScanlineStrength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Scanline2: ${scanline2Strength.toFixed(2)}`}
-              text={helpText.scanline2}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.2"
-            step="0.01"
-            value={scanline2Strength}
-            onChange={(ev) => {
-              onSetScanline2Strength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Scanline bright fade: ${scanlineBrightnessFade.toFixed(2)}`}
-              text={helpText.scanlineBrightFade}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={scanlineBrightnessFade}
-            onChange={(ev) => {
-              onSetScanlineBrightnessFade(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Vignette: ${vignetteStrength.toFixed(2)}`}
-              text={helpText.vignette}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.6"
-            step="0.01"
-            value={vignetteStrength}
-            onChange={(ev) => {
-              onSetVignetteStrength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
               label={`Glow: ${glowStrength.toFixed(2)}`}
               text={helpText.glow}
               helpSuffix={helpText.helpSuffix}
@@ -663,9 +511,7 @@ export function RetroFilterPanel({
             max="0.5"
             step="0.01"
             value={glowStrength}
-            onChange={(ev) => {
-              onSetGlowStrength(Number(ev.currentTarget.value));
-            }}
+            onChange={(ev) => onSetGlowStrength(Number(ev.currentTarget.value))}
             className="mt-2 w-full"
           />
         </label>
@@ -684,80 +530,277 @@ export function RetroFilterPanel({
             max="1"
             step="0.01"
             value={smoothStrength}
-            onChange={(ev) => {
-              onSetSmoothStrength(Number(ev.currentTarget.value));
-            }}
+            onChange={(ev) => onSetSmoothStrength(Number(ev.currentTarget.value))}
             className="mt-2 w-full"
           />
         </label>
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Toon steps: ${toonSteps.toFixed(0)}`}
-              text={helpText.toonSteps}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="8"
-            step="1"
-            value={toonSteps}
-            onChange={(ev) => {
-              onSetToonSteps(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
+        {paletteMode === "neon" && (
+          <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-3">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-violet-200/90">
+              Neon
+            </div>
+            <div className="flex flex-col gap-3">
+              <label className="block">
+                <span className="text-slate-100">
+                  Neon Boost: {neonBoost.toFixed(2)}
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.5"
+                  step="0.01"
+                  value={neonBoost}
+                  onChange={(ev) => onSetNeonBoost(Number(ev.currentTarget.value))}
+                  className="mt-2 w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="text-slate-100">
+                  Neon Saturation: {neonSaturation.toFixed(2)}
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.0"
+                  step="0.01"
+                  value={neonSaturation}
+                  onChange={(ev) => onSetNeonSaturation(Number(ev.currentTarget.value))}
+                  className="mt-2 w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="text-slate-100">
+                  Neon Detail: {neonDetail.toFixed(2)}
+                </span>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="2.0"
+                  step="0.01"
+                  value={neonDetail}
+                  onChange={(ev) => onSetNeonDetail(Number(ev.currentTarget.value))}
+                  className="mt-2 w-full"
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Edge boost: ${edgeBoost.toFixed(2)}`}
-              text={helpText.edgeBoost}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="1.5"
-            step="0.01"
-            value={edgeBoost}
-            onChange={(ev) => {
-              onSetEdgeBoost(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-amber-200/90">
+            CRT / LCD
+          </div>
+          <div className="flex flex-col gap-3">
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Curvature: ${curvature.toFixed(2)}`}
+                  text={helpText.curvature}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.2"
+                step="0.01"
+                value={curvature}
+                onChange={(ev) => onSetCurvature(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Scanline: ${scanlineStrength.toFixed(2)}`}
+                  text={helpText.scanline}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.4"
+                step="0.01"
+                value={scanlineStrength}
+                onChange={(ev) => onSetScanlineStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Scanline2: ${scanline2Strength.toFixed(2)}`}
+                  text={helpText.scanline2}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.2"
+                step="0.01"
+                value={scanline2Strength}
+                onChange={(ev) => onSetScanline2Strength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Scanline bright fade: ${scanlineBrightnessFade.toFixed(2)}`}
+                  text={helpText.scanlineBrightFade}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={scanlineBrightnessFade}
+                onChange={(ev) => onSetScanlineBrightnessFade(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Vignette: ${vignetteStrength.toFixed(2)}`}
+                  text={helpText.vignette}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.6"
+                step="0.01"
+                value={vignetteStrength}
+                onChange={(ev) => onSetVignetteStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
+                  text={helpText.phosphor}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.01"
+                value={phosphorStrength}
+                onChange={(ev) => onSetPhosphorStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+              {isPhosphorDotModeActive ? (
+                <span className="mt-2 block text-[11px] text-slate-400">
+                  Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
+                </span>
+              ) : null}
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
+                  text={helpText.closeUpNoise}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={closeUpNoiseStrength}
+                onChange={(ev) => onSetCloseUpNoiseStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+          </div>
+        </div>
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
-              text={helpText.phosphor}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.5"
-            step="0.01"
-            value={phosphorStrength}
-            onChange={(ev) => {
-              onSetPhosphorStrength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-          {isPhosphorDotModeActive ? (
-            <span className="mt-2 block text-[11px] text-slate-400">
-              Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
-            </span>
-          ) : null}
-        </label>
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-200/90">
+            Anime Toon / Edge
+          </div>
+          <div className="flex flex-col gap-3">
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Toon steps: ${toonSteps.toFixed(0)}`}
+                  text={helpText.toonSteps}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="8"
+                step="1"
+                value={toonSteps}
+                onChange={(ev) => onSetToonSteps(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Edge boost: ${edgeBoost.toFixed(2)}`}
+                  text={helpText.edgeBoost}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1.5"
+                step="0.01"
+                value={edgeBoost}
+                onChange={(ev) => onSetEdgeBoost(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            {toonSteps >= 2 && (
+              <>
+                <label className="block">
+                  <span className="text-slate-100">
+                    Edge threshold low: {animeEdgeLow.toFixed(2)}
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={animeEdgeLow}
+                    onChange={(ev) => onSetAnimeEdgeLow(Number(ev.currentTarget.value))}
+                    className="mt-2 w-full"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-slate-100">
+                    Edge threshold high: {animeEdgeHigh.toFixed(2)}
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={animeEdgeHigh}
+                    onChange={(ev) => onSetAnimeEdgeHigh(Number(ev.currentTarget.value))}
+                    className="mt-2 w-full"
+                  />
+                </label>
+              </>
+            )}
+          </div>
+        </div>
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
           <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-200/90">
@@ -929,26 +972,6 @@ export function RetroFilterPanel({
           </label>
         </div>
 
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
-              label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
-              text={helpText.closeUpNoise}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="2"
-            step="0.01"
-            value={closeUpNoiseStrength}
-            onChange={(ev) => {
-              onSetCloseUpNoiseStrength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
       </div>
     </>
   );
