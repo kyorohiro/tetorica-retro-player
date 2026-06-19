@@ -67,22 +67,24 @@ function createOverlay(settings) {
   badge.style.boxShadow = "0 0 18px rgba(110, 147, 58, 0.22)";
 
   recordButton.type = "button";
-  recordButton.textContent = "Rec";
   recordButton.setAttribute("aria-label", "Start recording");
   recordButton.title = "Start recording";
   recordButton.style.position = "fixed";
-  recordButton.style.right = "78px";
-  recordButton.style.top = "16px";
+  recordButton.style.left = "-9999px";
+  recordButton.style.top = "-9999px";
   recordButton.style.zIndex = "2147483647";
-  recordButton.style.padding = "8px 12px";
+  recordButton.style.width = "28px";
+  recordButton.style.height = "28px";
+  recordButton.style.padding = "0";
   recordButton.style.border = "1px solid rgba(248, 113, 113, 0.35)";
-  recordButton.style.borderRadius = "999px";
+  recordButton.style.borderRadius = "50%";
   recordButton.style.background = "rgba(24, 9, 10, 0.82)";
-  recordButton.style.color = "#ffe5e5";
-  recordButton.style.font = '12px "IBM Plex Sans", "Segoe UI", sans-serif';
   recordButton.style.cursor = "pointer";
   recordButton.style.backdropFilter = "blur(8px)";
   recordButton.style.boxShadow = "0 0 18px rgba(248, 113, 113, 0.22)";
+  recordButton.style.display = "flex";
+  recordButton.style.alignItems = "center";
+  recordButton.style.justifyContent = "center";
 
   const surfaces = [];
   let rafId = 0;
@@ -183,6 +185,7 @@ function createOverlay(settings) {
       updateSurfaceSpotlight(surface);
     }
 
+    updateRecordButtonPosition();
     rafId = requestAnimationFrame(draw);
   }
 
@@ -298,7 +301,9 @@ function createOverlay(settings) {
       }
     }
 
-    recordButton.style.display = isVisible ? "block" : "none";
+    if (!isVisible) {
+      recordButton.style.left = "-9999px";
+    }
   }
 
   function renderSurface(surface, targetElement, priorityIndex) {
@@ -485,7 +490,9 @@ function createOverlay(settings) {
 
   function updateRecordButton() {
     const isRecording = mediaRecorder?.state === "recording";
-    recordButton.textContent = isRecording ? "Stop" : "Rec";
+    recordButton.innerHTML = isRecording
+      ? `<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" rx="1" fill="#fca5a5"/></svg>`
+      : `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="#f87171"/></svg>`;
     recordButton.style.borderColor = isRecording
       ? "rgba(251, 113, 133, 0.75)"
       : "rgba(248, 113, 113, 0.35)";
@@ -497,6 +504,20 @@ function createOverlay(settings) {
       : "0 0 18px rgba(248, 113, 113, 0.22)";
     recordButton.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
     recordButton.title = isRecording ? "Stop recording" : "Start recording";
+  }
+
+  function updateRecordButtonPosition() {
+    if (!isVisible) return;
+    const targetEl = surfaces[0]?.targetElement;
+    if (!targetEl) {
+      recordButton.style.left = "-9999px";
+      return;
+    }
+    const rect = targetEl.getBoundingClientRect();
+    const margin = 8;
+    const size = 28;
+    recordButton.style.left = `${rect.right - size + Math.round(size / 3)}px`;
+    recordButton.style.top = `${rect.top - Math.round(size * 2 / 3)}px`;
   }
 }
 
