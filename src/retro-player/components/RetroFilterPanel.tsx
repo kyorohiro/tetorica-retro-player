@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   MONO_TINTS,
   RETRO_PRESETS,
@@ -175,6 +176,12 @@ export function RetroFilterPanel({
   onSetMatchTargetAspect,
   onSetVignetteStrength,
 }: RetroFilterPanelProps) {
+  const [localTargetWidth, setLocalTargetWidth] = useState(targetWidth);
+  const [localTargetHeight, setLocalTargetHeight] = useState(targetHeight);
+  const [realtimeTargetSize, setRealtimeTargetSize] = useState(false);
+  useEffect(() => setLocalTargetWidth(targetWidth), [targetWidth]);
+  useEffect(() => setLocalTargetHeight(targetHeight), [targetHeight]);
+
   const helpText =
     locale === "ja"
       ? {
@@ -425,32 +432,50 @@ export function RetroFilterPanel({
           </>
         )}
 
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+          <input
+            type="checkbox"
+            checked={realtimeTargetSize}
+            onChange={(ev) => setRealtimeTargetSize(ev.currentTarget.checked)}
+            className="accent-sky-400"
+          />
+          Live update
+        </label>
+
         <label className="block">
-          <span className="text-slate-100">Target width: {targetWidth}px</span>
+          <span className="text-slate-100">Target width: {localTargetWidth}px</span>
           <input
             type="range"
             min="1"
             max="2560"
             step="1"
-            value={targetWidth}
+            value={localTargetWidth}
             onChange={(ev) => {
-              onSetTargetWidth(Number(ev.currentTarget.value));
+              const v = Number(ev.currentTarget.value);
+              setLocalTargetWidth(v);
+              if (realtimeTargetSize) onSetTargetWidth(v);
             }}
+            onPointerUp={(ev) => onSetTargetWidth(Number(ev.currentTarget.value))}
+            onKeyUp={(ev) => onSetTargetWidth(Number(ev.currentTarget.value))}
             className="mt-2 w-full"
           />
         </label>
 
         <label className="block">
-          <span className="text-slate-100">Target height: {targetHeight}px</span>
+          <span className="text-slate-100">Target height: {localTargetHeight}px</span>
           <input
             type="range"
             min="1"
             max="2560"
             step="1"
-            value={targetHeight}
+            value={localTargetHeight}
             onChange={(ev) => {
-              onSetTargetHeight(Number(ev.currentTarget.value));
+              const v = Number(ev.currentTarget.value);
+              setLocalTargetHeight(v);
+              if (realtimeTargetSize) onSetTargetHeight(v);
             }}
+            onPointerUp={(ev) => onSetTargetHeight(Number(ev.currentTarget.value))}
+            onKeyUp={(ev) => onSetTargetHeight(Number(ev.currentTarget.value))}
             className="mt-2 w-full"
           />
         </label>
