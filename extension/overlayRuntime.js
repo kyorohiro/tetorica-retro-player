@@ -126,6 +126,63 @@ function createOverlay(settings) {
 
   speedGroup.append(speedDownButton, speedLabel, speedUpButton);
 
+  const brightnessGroup = document.createElement("div");
+  brightnessGroup.style.position = "fixed";
+  brightnessGroup.style.left = "-9999px";
+  brightnessGroup.style.top = "-9999px";
+  brightnessGroup.style.zIndex = "2147483647";
+  brightnessGroup.style.display = "flex";
+  brightnessGroup.style.alignItems = "center";
+  brightnessGroup.style.height = "28px";
+  brightnessGroup.style.border = "1px solid rgba(251, 191, 36, 0.35)";
+  brightnessGroup.style.borderRadius = "999px";
+  brightnessGroup.style.background = "rgba(18, 12, 4, 0.82)";
+  brightnessGroup.style.backdropFilter = "blur(8px)";
+  brightnessGroup.style.boxShadow = "0 0 14px rgba(251, 191, 36, 0.18)";
+  brightnessGroup.style.overflow = "hidden";
+
+  const brightnessDownButton = document.createElement("button");
+  brightnessDownButton.type = "button";
+  brightnessDownButton.textContent = "−";
+  brightnessDownButton.setAttribute("aria-label", "Decrease brightness");
+  brightnessDownButton.style.cssText =
+    "background:transparent;border:none;color:#fde68a;cursor:pointer;font:14px sans-serif;padding:0 8px;height:100%;line-height:1;";
+
+  const brightnessLabel = document.createElement("span");
+  brightnessLabel.textContent = "1.0";
+  brightnessLabel.style.cssText =
+    'color:#fde68a;font:11px "IBM Plex Sans","Segoe UI",sans-serif;min-width:28px;text-align:center;user-select:none;pointer-events:none;';
+
+  const brightnessUpButton = document.createElement("button");
+  brightnessUpButton.type = "button";
+  brightnessUpButton.textContent = "+";
+  brightnessUpButton.setAttribute("aria-label", "Increase brightness");
+  brightnessUpButton.style.cssText =
+    "background:transparent;border:none;color:#fde68a;cursor:pointer;font:14px sans-serif;padding:0 8px;height:100%;line-height:1;";
+
+  brightnessGroup.append(brightnessDownButton, brightnessLabel, brightnessUpButton);
+
+  const loopButton = document.createElement("button");
+  loopButton.type = "button";
+  loopButton.setAttribute("aria-label", "Loop 10s");
+  loopButton.title = "Loop 10s";
+  loopButton.style.position = "fixed";
+  loopButton.style.left = "-9999px";
+  loopButton.style.top = "-9999px";
+  loopButton.style.zIndex = "2147483647";
+  loopButton.style.height = "28px";
+  loopButton.style.padding = "0 8px";
+  loopButton.style.border = "1px solid rgba(167, 243, 208, 0.35)";
+  loopButton.style.borderRadius = "999px";
+  loopButton.style.background = "rgba(4, 14, 10, 0.82)";
+  loopButton.style.cursor = "pointer";
+  loopButton.style.backdropFilter = "blur(8px)";
+  loopButton.style.boxShadow = "0 0 14px rgba(167, 243, 208, 0.18)";
+  loopButton.style.color = "#a7f3d0";
+  loopButton.style.font = '11px "IBM Plex Sans","Segoe UI",sans-serif';
+  loopButton.style.whiteSpace = "nowrap";
+  loopButton.textContent = "↺10";
+
   const surfaces = [];
   let rafId = 0;
   let frameCount = 0;
@@ -140,6 +197,15 @@ function createOverlay(settings) {
   let detachPointerTracking = null;
   let lastHoveredElement = null;
   let lastHoveredDRMVideo = null;
+
+  const BRIGHTNESS_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 2.0];
+  const BRIGHTNESS_DEFAULT_IDX = 5; // 1.0
+  let brightnessIdx = BRIGHTNESS_DEFAULT_IDX;
+  let loopActive = false;
+  let loopStart = 0;
+  let loopEnd = 0;
+  let loopTimeupdateListener = null;
+  let loopTargetEl = null;
   const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -180,8 +246,31 @@ function createOverlay(settings) {
     if (idx !== -1 && idx < SPEED_PRESETS.length - 1) targetEl.playbackRate = SPEED_PRESETS[idx + 1];
   });
 
+  brightnessDownButton.addEventListener("click", () => {
+    if (brightnessIdx > 0) {
+      brightnessIdx -= 1;
+      applyBrightness();
+    }
+  });
+
+  brightnessUpButton.addEventListener("click", () => {
+    if (brightnessIdx < BRIGHTNESS_PRESETS.length - 1) {
+      brightnessIdx += 1;
+      applyBrightness();
+    }
+  });
+
+  loopButton.addEventListener("click", () => {
+    if (loopActive) {
+      clearLoop();
+    } else {
+      activateLoop();
+    }
+    updateLoopButton();
+  });
+
   function start() {
-    document.body.append(recordButton, opacityButton, speedGroup);
+    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopButton);
     updateOpacityButton();
     attachSettingsSync();
     attachPointerTracking();
@@ -206,10 +295,13 @@ function createOverlay(settings) {
     }
 
     stopRecording({ save: false });
+    clearLoop();
     destroySurfaces();
     recordButton.remove();
     opacityButton.remove();
     speedGroup.remove();
+    brightnessGroup.remove();
+    loopButton.remove();
   }
 
   function attachSettingsSync() {
@@ -348,6 +440,8 @@ function createOverlay(settings) {
     while (surfaces.length < count) {
       const surface = createOverlaySurface(surfaces.length);
       surface.canvas.style.opacity = String(overlayOpacity);
+      const bLevel = BRIGHTNESS_PRESETS[brightnessIdx];
+      surface.canvas.style.filter = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${bLevel})` : "";
       surfaces.push(surface);
       applySettings(surface.gl, surface.renderer.program, surface.renderer.uniformLocations, currentSettings);
       if (document.body) {
@@ -609,6 +703,70 @@ function createOverlay(settings) {
     speedUpButton.style.opacity = idx >= SPEED_PRESETS.length - 1 ? "0.3" : "1";
   }
 
+  function applyBrightness() {
+    const level = BRIGHTNESS_PRESETS[brightnessIdx];
+    const isModified = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX;
+    brightnessLabel.textContent = level.toFixed(1);
+    brightnessLabel.style.color = isModified ? "#fcd34d" : "#fde68a";
+    brightnessGroup.style.borderColor = isModified
+      ? "rgba(252, 211, 77, 0.55)"
+      : "rgba(251, 191, 36, 0.35)";
+    brightnessDownButton.style.opacity = brightnessIdx <= 0 ? "0.3" : "1";
+    brightnessUpButton.style.opacity = brightnessIdx >= BRIGHTNESS_PRESETS.length - 1 ? "0.3" : "1";
+    syncBrightnessFilter();
+  }
+
+  function syncBrightnessFilter() {
+    const level = BRIGHTNESS_PRESETS[brightnessIdx];
+    const filterValue = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${level})` : "";
+    for (const surface of surfaces) {
+      surface.canvas.style.filter = filterValue;
+      if (surface.targetElement instanceof HTMLVideoElement) {
+        surface.targetElement.style.filter = filterValue;
+      }
+    }
+    if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
+      lastHoveredDRMVideo.style.filter = filterValue;
+    }
+  }
+
+  function activateLoop() {
+    const targetEl = getActiveVideoForSpeed();
+    if (!targetEl) return;
+    loopTargetEl = targetEl;
+    loopEnd = targetEl.currentTime;
+    loopStart = Math.max(0, loopEnd - 10);
+    loopActive = true;
+    loopTimeupdateListener = () => {
+      if (loopTargetEl && loopTargetEl.currentTime >= loopEnd) {
+        loopTargetEl.currentTime = loopStart;
+      }
+    };
+    loopTargetEl.addEventListener("timeupdate", loopTimeupdateListener);
+  }
+
+  function clearLoop() {
+    if (loopTargetEl && loopTimeupdateListener) {
+      loopTargetEl.removeEventListener("timeupdate", loopTimeupdateListener);
+    }
+    loopTargetEl = null;
+    loopTimeupdateListener = null;
+    loopActive = false;
+  }
+
+  function updateLoopButton() {
+    loopButton.style.borderColor = loopActive
+      ? "rgba(167, 243, 208, 0.75)"
+      : "rgba(167, 243, 208, 0.35)";
+    loopButton.style.background = loopActive
+      ? "rgba(4, 60, 30, 0.9)"
+      : "rgba(4, 14, 10, 0.82)";
+    loopButton.style.boxShadow = loopActive
+      ? "0 0 18px rgba(167, 243, 208, 0.38)"
+      : "0 0 14px rgba(167, 243, 208, 0.18)";
+    loopButton.style.color = loopActive ? "#6ee7b7" : "#a7f3d0";
+  }
+
   function updateButtonPositions(rect) {
     const isDRM = !surfaces[0]?.targetElement && lastHoveredDRMVideo != null;
     const drmRect = isDRM ? lastHoveredDRMVideo.getBoundingClientRect() : null;
@@ -619,6 +777,8 @@ function createOverlay(settings) {
         recordButton.style.left = "-9999px";
         opacityButton.style.left = "-9999px";
         speedGroup.style.left = "-9999px";
+        brightnessGroup.style.left = "-9999px";
+        loopButton.style.left = "-9999px";
         lastButtonRectKey = "";
       }
       return;
@@ -634,11 +794,19 @@ function createOverlay(settings) {
     const recLeft = activeRect.right - size + Math.round(size / 3);
 
     if (isDRM) {
-      // DRM: speed button only
+      // DRM: speed, brightness, loop buttons only (no opacity/record)
       recordButton.style.left = "-9999px";
       opacityButton.style.left = "-9999px";
-      const groupWidth = speedGroup.offsetWidth || 92;
-      speedGroup.style.left = `${recLeft - groupWidth + size}px`;
+      const loopW = loopButton.offsetWidth || 38;
+      const brightnessW = brightnessGroup.offsetWidth || 92;
+      const speedW = speedGroup.offsetWidth || 92;
+      const loopLeft = recLeft + size - loopW;
+      loopButton.style.left = `${loopLeft}px`;
+      loopButton.style.top = `${topY}px`;
+      const brightnessLeft = loopLeft - gap - brightnessW;
+      brightnessGroup.style.left = `${brightnessLeft}px`;
+      brightnessGroup.style.top = `${topY}px`;
+      speedGroup.style.left = `${brightnessLeft - gap - speedW}px`;
       speedGroup.style.top = `${topY}px`;
       return;
     }
@@ -651,11 +819,21 @@ function createOverlay(settings) {
 
     const isVideo = surfaces[0]?.targetElement instanceof HTMLVideoElement;
     if (isVideo) {
-      const groupWidth = speedGroup.offsetWidth || 92;
-      speedGroup.style.left = `${recLeft - size - gap - groupWidth - gap * 3}px`;
+      const loopW = loopButton.offsetWidth || 38;
+      const brightnessW = brightnessGroup.offsetWidth || 92;
+      const speedW = speedGroup.offsetWidth || 92;
+      const loopLeft = recLeft - size - gap - loopW - gap;
+      loopButton.style.left = `${loopLeft}px`;
+      loopButton.style.top = `${topY}px`;
+      const brightnessLeft = loopLeft - gap - brightnessW;
+      brightnessGroup.style.left = `${brightnessLeft}px`;
+      brightnessGroup.style.top = `${topY}px`;
+      speedGroup.style.left = `${brightnessLeft - gap - speedW}px`;
       speedGroup.style.top = `${topY}px`;
     } else {
       speedGroup.style.left = "-9999px";
+      brightnessGroup.style.left = "-9999px";
+      loopButton.style.left = "-9999px";
     }
   }
 }
