@@ -676,14 +676,27 @@ export function RetroPreviewView({
                     width: "100%",
                   }
                 : previewAspectRatio
-                  ? {
-                      aspectRatio: previewAspectRatio,
-                      width: "100%",
-                      maxHeight: previewFrameHeight
-                        ? `${previewFrameHeight}px`
-                        : "min(60vh, calc(100vh - 12rem))",
-                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
-                    }
+                  ? player.sourceDimensions && player.sourceDimensions.height > player.sourceDimensions.width
+                    ? {
+                        // Portrait: constrain by height so Safari respects aspect-ratio
+                        aspectRatio: previewAspectRatio,
+                        height: previewFrameHeight
+                          ? `${previewFrameHeight}px`
+                          : "min(60vh, calc(100vh - 12rem))",
+                        maxHeight: "min(60vh, calc(100vh - 12rem))",
+                        maxWidth: "100%",
+                        minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                        margin: "0 auto",
+                      }
+                    : {
+                        // Landscape: constrain by width, height follows aspect-ratio
+                        aspectRatio: previewAspectRatio,
+                        width: "100%",
+                        maxHeight: previewFrameHeight
+                          ? `${previewFrameHeight}px`
+                          : "min(60vh, calc(100vh - 12rem))",
+                        minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                      }
                   : {
                       height: normalPreviewHeight,
                       minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",

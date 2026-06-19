@@ -5,7 +5,7 @@
 ---
 
 `examples/demo-tonejs-vite/` に Tone.js + Vite のブラウザデモがあります。
-現在 **28曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
+現在 **32曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
 
 ### 現在の構成を確認してから作業してください
 
@@ -41,11 +41,15 @@ examples/demo-tonejs-vite/
     song26.ts    # "GROOVE MACHINE"   Ab major 118BPM PolySynth(fatsawtooth)+StereoWidener strings + MonoSynth(fmsine) bass [ディスコ]
     song27.ts    # "FLAMENCO FUEGO"   A Phrygian 155BPM PluckSynth(flamenco) + PolySynth(pulse) rasgueado + cajon [フラメンコ]
     song28.ts    # "SPAIN NIGHTS"     D major 138BPM  PolySynth(pulse)+JCReverb piano + DuoSynth mel + PluckSynth(bass) + clave/bongo [スペイン風]
+    song29.ts    # "SEVEN PULSE"      F# minor 132BPM Synth(amtriangle)+PitchShift mel + PolySynth(fmsquare) pad + MonoSynth(sawtooth) bass [7/8変拍子]
+    song30.ts    # "POLY GROOVE"      Bb minor 92BPM  PolySynth(fmtriangle) pad + MonoSynth(fmsawtooth) 3-feel bass + Synth(amsine) 3-feel mel [3:4ポリリズム]
+    song31.ts    # "SOUL GROOVE"      Eb major 72BPM  PolySynth(triangle)+Tremolo+Freeverb EP + FMSynth bass [R&B/Soul half-time]
+    song32.ts    # "PRAISE SONG"      C major 84BPM   PolySynth(MonoSynth)+Freeverb piano + PolySynth(fatsawtooth) choir + MonoSynth(saw) bass [ゴスペル]
 ```
 
 ### 現在の状態
 
-**song1〜song28 が実装済み**（28曲完成）。次に新しい曲を追加したい場合は song29.ts から。
+**song1〜song32 が実装済み**（32曲完成）。次に新しい曲を追加したい場合は song33.ts から。
 各曲で**まだ使っていない Tone.js の音色やエフェクト**を積極的に使ってください。
 
 ### 音色の方針 (まだ使っていないもの優先)
@@ -83,7 +87,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
 ### 追加後に main.ts と index.html を更新
 
-`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 28 から)
+`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 32 から)
 
 ### 確認方法
 
@@ -97,7 +101,7 @@ npm run dev
 
 ## 参考: Tone.js 音色メモ
 
-### 使い終わった組み合わせ (全28曲)
+### 使い終わった組み合わせ (全32曲)
 
 | 曲 | Pad | Melody | Bass | ドラム特徴 |
 |---|---|---|---|---|
@@ -129,8 +133,12 @@ npm run dev
 | song26 GROOVE MACHINE   | PolySynth(fatsawtooth)+**StereoWidener** | PolySynth(sawtooth) stabs | MonoSynth(fmsine) | 4-on-floor disco |
 | song27 FLAMENCO FUEGO   | PolySynth(**pulse**) rasgueado | PluckSynth (flamenco)              | cajon(body+slap)         | Rumba cajon |
 | song28 SPAIN NIGHTS     | PolySynth(**pulse**)+**JCReverb** | DuoSynth (portamento, vibrato) | PluckSynth (upright) | clave+bongo+shaker |
+| song29 SEVEN PULSE      | PolySynth(fmsquare)+Reverb    | Synth(amtriangle)+**PitchShift**     | MonoSynth(sawtooth)    | 7/8 Sequence (3+2+2) |
+| song30 POLY GROOVE      | PolySynth(fmtriangle)+Reverb  | Synth(amsine) 3-feel                 | MonoSynth(fmsawtooth) 3-feel | 4-feel Afrobeat |
+| song31 SOUL GROOVE      | PolySynth(triangle)+Tremolo+**Freeverb** | —                          | FMSynth(harm:1.0) triangle | half-time Soul |
+| song32 PRAISE SONG      | PolySynth(fatsawtooth)+**Freeverb** choir | **PolySynth(MonoSynth)**+Freeverb | MonoSynth(sawtooth) | NoiseSynth tambourine |
 
-### 実装済み28曲 コード進行一覧
+### 実装済み32曲 コード進行一覧
 
 - song1  Chill Loop:      Cmaj7 Em7 Am7 Fmaj7 (C major: I→IIIm→VIm→IV, 王道ポップ)
 - song2  Rain Window:     Am7 Dm7 G7 Cmaj7 Fmaj7 E7 Am7 (A minor: i→iv→VII→III→VI→V→i, 自然短調)
@@ -160,6 +168,10 @@ npm run dev
 - song26 GROOVE MACHINE:  Abmaj7 Fm7 Dbmaj7 Eb7 (Ab major: I→VIm→IVmaj7→V7, ディスコ StereoWidener)
 - song27 FLAMENCO FUEGO:  Am G F E7 (A Phrygian: i→VII→VI→V7, アンダルシアカデンス フラメンコRumba)
 - song28 SPAIN NIGHTS:    Dmaj7 C#7 F#m7 Bm7 Em7 A7 Dmaj7 A7 (D major: I→V7/iii→IIIm→VIm→IIm→V7, JCReverb)
+- song29 SEVEN PULSE:     F#m7 A E7 D (F# minor: i→III→V7→VII, 7/8拍子 PitchShift自動ハーモニー)
+- song30 POLY GROOVE:     Bbm7 (3bars) → Ebm7 (3bars) (Bb minor: loopEnd='6m', 3:4ポリリズム Afrobeat)
+- song31 SOUL GROOVE:     Ebmaj9 Cm9 Abmaj9 Bb7 (Eb major: Imaj9→VIm9→IVmaj9→V7, R&B half-time Freeverb)
+- song32 PRAISE SONG:     Cmaj7 F9 G13 Am7 Cmaj7 F9 Dm7 G7 (C major: I→IV9→V13→VIm, ゴスペル PolySynth(MonoSynth))
 
 ### まだ試していない主な音色・エフェクト
 
@@ -167,20 +179,17 @@ npm run dev
 - ~~PolySynth(pulse)~~ → song27/28 で使用済み
 - ~~`Tone.JCReverb`~~ → song28 で使用済み
 - ~~MembraneSynth 高音 (clave/bongo)~~ → song28 で使用済み
-- `Tone.Freeverb` — JCReverb と異なる別リバーブアルゴリズム
-- `Tone.PitchShift` — リアルタイムピッチシフト (ハーモナイザー的使い方)
+- ~~`Tone.PitchShift`~~ → song29 で使用済み
+- ~~`Tone.Freeverb`~~ → song31/32 で使用済み
+- ~~`PolySynth(Tone.MonoSynth)`~~ → song32 で使用済み
 - `Tone.Wah` — 手動ワウ (AutoWah は song24 で使用済み)
 - `Tone.Oscillator` + `Tone.AmplitudeEnvelope` — 低レベル手動合成
 - `Tone.FeedbackCombFilter` — コム音色
 
 ### コード進行のアイデア (使っていないキー)
 
-- F# minor: F#m D A E (ドラマティック)
-- Ab major: Abmaj7 Fm7 Dbmaj7 Eb7 (ジャズ感)
 - C# minor: C#m A E B (エモ)
-- Eb major: Ebmaj7 Cm7 Abmaj7 Bb7
-- レゲエ: Am Dm G Am (オフビートでコード)
-- サンバ: 速めBPM(120+), Dm Gm A7 Dm
+- Gb major: Gbmaj7 Ebm7 Cbmaj7 Db7 (ジャズ感)
 
 ### 音楽ジャンルのアイデア (未実装)
 
@@ -194,9 +203,13 @@ npm run dev
 - ~~ディスコ / R&B~~ → song26 GROOVE MACHINE 実装済み
 - ~~フラメンコ~~ → song27 FLAMENCO FUEGO 実装済み
 - ~~Latin Jazz / Spain~~ → song28 SPAIN NIGHTS 実装済み
-- K-pop: スタッカートシンセ、デジタル感 (Freeverb + PitchShift 試用候補)
-- R&B/Soul: スロージャム (song29 候補)
-- Jazz Fusion: 変拍子 (7/8 etc.) (song30 候補)
+- ~~変拍子 (7/8)~~ → song29 SEVEN PULSE 実装済み
+- ~~ポリリズム (3:4)~~ → song30 POLY GROOVE 実装済み
+- ~~R&B/Soul~~ → song31 SOUL GROOVE 実装済み
+- ~~ゴスペル~~ → song32 PRAISE SONG 実装済み
+- K-pop: スタッカートシンセ、デジタル感
+- Jazz Fusion: 5/4拍子
+- Celtic/Folk: ドローン + モーダルハーモニー
 
 ### song17 (CANON LIGHT) の注意点
 
