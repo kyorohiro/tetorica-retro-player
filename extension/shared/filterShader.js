@@ -358,10 +358,12 @@ vec3 nearestColorAnime(vec3 color)
     smoothstep(0.90, 0.95, h)
   ) * smoothstep(0.08, 0.20, s);
 
-  // Skin: 2 steps (lit/shadow only) for flat anime look
-  // Others: 3 steps
-  float vSteps = mix(3.0, 2.0, skinWeight);
-  float vQ = round(v * (vSteps - 1.0)) / (vSteps - 1.0);
+  // Sharpen V before quantizing: push gradient areas decisively to one step
+  // S-curve boosts contrast around each step boundary
+  float vSharp = clamp((v - 0.5) * 1.8 + 0.5, 0.0, 1.0);
+
+  // 3 steps shifted to {0.22, 0.58, 0.94} — black reserved for edge lines only
+  float vQ = 0.22 + round(vSharp * 2.0) / 2.0 * 0.72;
 
   // Skin shadow: drift hue slightly toward cool pink/purple
   float shadowDepth = max(0.0, v - vQ);
@@ -963,7 +965,10 @@ void main(void)
   if (edgeBoost > 0.001) {
     if (uToonSteps >= 1.0) {
       float edge = computeAnimeEdge(pixelatedUv, texel);
-      float edgeMix = smoothstep(uAnimeEdgeLow, uAnimeEdgeHigh, edge) * edgeBoost;
+      // Shadow areas get thicker lines: lower threshold in dark zones
+      float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float adaptedLow = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, lum));
+      float edgeMix = smoothstep(adaptedLow, uAnimeEdgeHigh, edge) * edgeBoost;
       color.rgb = mix(color.rgb, vec3(0.0), clamp(edgeMix, 0.0, 1.0));
     } else {
       float edge = computeEdgeBoost(pixelatedUv, texel, cell);
