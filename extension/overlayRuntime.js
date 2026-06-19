@@ -162,26 +162,74 @@ function createOverlay(settings) {
 
   brightnessGroup.append(brightnessDownButton, brightnessLabel, brightnessUpButton);
 
-  const loopButton = document.createElement("button");
-  loopButton.type = "button";
-  loopButton.setAttribute("aria-label", "Loop 10s");
-  loopButton.title = "Loop 10s";
-  loopButton.style.position = "fixed";
-  loopButton.style.left = "-9999px";
-  loopButton.style.top = "-9999px";
-  loopButton.style.zIndex = "2147483647";
-  loopButton.style.height = "28px";
-  loopButton.style.padding = "0 8px";
-  loopButton.style.border = "1px solid rgba(167, 243, 208, 0.35)";
-  loopButton.style.borderRadius = "999px";
-  loopButton.style.background = "rgba(4, 14, 10, 0.82)";
-  loopButton.style.cursor = "pointer";
-  loopButton.style.backdropFilter = "blur(8px)";
-  loopButton.style.boxShadow = "0 0 14px rgba(167, 243, 208, 0.18)";
-  loopButton.style.color = "#a7f3d0";
-  loopButton.style.font = '11px "IBM Plex Sans","Segoe UI",sans-serif';
-  loopButton.style.whiteSpace = "nowrap";
-  loopButton.textContent = "↺10";
+  const frameGroup = document.createElement("div");
+  frameGroup.style.position = "fixed";
+  frameGroup.style.left = "-9999px";
+  frameGroup.style.top = "-9999px";
+  frameGroup.style.zIndex = "2147483647";
+  frameGroup.style.display = "flex";
+  frameGroup.style.alignItems = "center";
+  frameGroup.style.height = "28px";
+  frameGroup.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+  frameGroup.style.borderRadius = "999px";
+  frameGroup.style.background = "rgba(10, 12, 18, 0.82)";
+  frameGroup.style.backdropFilter = "blur(8px)";
+  frameGroup.style.boxShadow = "0 0 14px rgba(148, 163, 184, 0.12)";
+  frameGroup.style.overflow = "hidden";
+
+  const framePrevButton = document.createElement("button");
+  framePrevButton.type = "button";
+  framePrevButton.textContent = "‹";
+  framePrevButton.setAttribute("aria-label", "Previous frame");
+  framePrevButton.style.cssText =
+    "background:transparent;border:none;color:#94a3b8;cursor:pointer;font:16px sans-serif;padding:0 9px;height:100%;line-height:1;";
+
+  const frameNextButton = document.createElement("button");
+  frameNextButton.type = "button";
+  frameNextButton.textContent = "›";
+  frameNextButton.setAttribute("aria-label", "Next frame");
+  frameNextButton.style.cssText =
+    "background:transparent;border:none;color:#94a3b8;cursor:pointer;font:16px sans-serif;padding:0 9px;height:100%;line-height:1;border-left:1px solid rgba(148,163,184,0.2);";
+
+  frameGroup.append(framePrevButton, frameNextButton);
+
+  const loopGroup = document.createElement("div");
+  loopGroup.style.position = "fixed";
+  loopGroup.style.left = "-9999px";
+  loopGroup.style.top = "-9999px";
+  loopGroup.style.zIndex = "2147483647";
+  loopGroup.style.display = "flex";
+  loopGroup.style.alignItems = "center";
+  loopGroup.style.height = "28px";
+  loopGroup.style.border = "1px solid rgba(167, 243, 208, 0.35)";
+  loopGroup.style.borderRadius = "999px";
+  loopGroup.style.background = "rgba(4, 14, 10, 0.82)";
+  loopGroup.style.backdropFilter = "blur(8px)";
+  loopGroup.style.boxShadow = "0 0 14px rgba(167, 243, 208, 0.18)";
+  loopGroup.style.overflow = "hidden";
+
+  const loopDownButton = document.createElement("button");
+  loopDownButton.type = "button";
+  loopDownButton.textContent = "−";
+  loopDownButton.setAttribute("aria-label", "Decrease loop duration");
+  loopDownButton.style.cssText =
+    "background:transparent;border:none;color:#a7f3d0;cursor:pointer;font:14px sans-serif;padding:0 8px;height:100%;line-height:1;";
+
+  const loopLabel = document.createElement("button");
+  loopLabel.type = "button";
+  loopLabel.setAttribute("aria-label", "Toggle loop");
+  loopLabel.style.cssText =
+    'background:transparent;border:none;color:#a7f3d0;cursor:pointer;font:11px "IBM Plex Sans","Segoe UI",sans-serif;min-width:32px;text-align:center;padding:0;height:100%;line-height:1;white-space:nowrap;';
+  loopLabel.textContent = "↺10";
+
+  const loopUpButton = document.createElement("button");
+  loopUpButton.type = "button";
+  loopUpButton.textContent = "+";
+  loopUpButton.setAttribute("aria-label", "Increase loop duration");
+  loopUpButton.style.cssText =
+    "background:transparent;border:none;color:#a7f3d0;cursor:pointer;font:14px sans-serif;padding:0 8px;height:100%;line-height:1;";
+
+  loopGroup.append(loopDownButton, loopLabel, loopUpButton);
 
   const surfaces = [];
   let rafId = 0;
@@ -201,6 +249,7 @@ function createOverlay(settings) {
   const BRIGHTNESS_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 2.0];
   const BRIGHTNESS_DEFAULT_IDX = 5; // 1.0
   let brightnessIdx = BRIGHTNESS_DEFAULT_IDX;
+  let loopSecs = 10;
   let loopActive = false;
   let loopStart = 0;
   let loopEnd = 0;
@@ -260,7 +309,37 @@ function createOverlay(settings) {
     }
   });
 
-  loopButton.addEventListener("click", () => {
+  framePrevButton.addEventListener("click", () => {
+    const targetEl = getActiveVideoForSpeed();
+    if (!targetEl) return;
+    if (!targetEl.paused) targetEl.pause();
+    targetEl.currentTime = Math.max(0, targetEl.currentTime - 1 / 30);
+  });
+
+  frameNextButton.addEventListener("click", () => {
+    const targetEl = getActiveVideoForSpeed();
+    if (!targetEl) return;
+    if (!targetEl.paused) targetEl.pause();
+    targetEl.currentTime = Math.min(targetEl.duration || Infinity, targetEl.currentTime + 1 / 30);
+  });
+
+  loopDownButton.addEventListener("click", () => {
+    if (loopSecs > 1) {
+      loopSecs -= 1;
+      if (loopActive) activateLoop();
+      updateLoopButton();
+    }
+  });
+
+  loopUpButton.addEventListener("click", () => {
+    if (loopSecs < 300) {
+      loopSecs += 1;
+      if (loopActive) activateLoop();
+      updateLoopButton();
+    }
+  });
+
+  loopLabel.addEventListener("click", () => {
     if (loopActive) {
       clearLoop();
     } else {
@@ -270,7 +349,7 @@ function createOverlay(settings) {
   });
 
   function start() {
-    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopButton);
+    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, frameGroup);
     updateOpacityButton();
     attachSettingsSync();
     attachPointerTracking();
@@ -301,7 +380,8 @@ function createOverlay(settings) {
     opacityButton.remove();
     speedGroup.remove();
     brightnessGroup.remove();
-    loopButton.remove();
+    loopGroup.remove();
+    frameGroup.remove();
   }
 
   function attachSettingsSync() {
@@ -733,9 +813,12 @@ function createOverlay(settings) {
   function activateLoop() {
     const targetEl = getActiveVideoForSpeed();
     if (!targetEl) return;
+    if (loopTargetEl && loopTimeupdateListener) {
+      loopTargetEl.removeEventListener("timeupdate", loopTimeupdateListener);
+    }
     loopTargetEl = targetEl;
     loopEnd = targetEl.currentTime;
-    loopStart = Math.max(0, loopEnd - 10);
+    loopStart = Math.max(0, loopEnd - loopSecs);
     loopActive = true;
     loopTimeupdateListener = () => {
       if (loopTargetEl && loopTargetEl.currentTime >= loopEnd) {
@@ -755,16 +838,19 @@ function createOverlay(settings) {
   }
 
   function updateLoopButton() {
-    loopButton.style.borderColor = loopActive
+    loopLabel.textContent = `↺${loopSecs}`;
+    loopLabel.style.color = loopActive ? "#6ee7b7" : "#a7f3d0";
+    loopDownButton.style.opacity = loopSecs <= 1 ? "0.3" : "1";
+    loopUpButton.style.opacity = loopSecs >= 300 ? "0.3" : "1";
+    loopGroup.style.borderColor = loopActive
       ? "rgba(167, 243, 208, 0.75)"
       : "rgba(167, 243, 208, 0.35)";
-    loopButton.style.background = loopActive
+    loopGroup.style.background = loopActive
       ? "rgba(4, 60, 30, 0.9)"
       : "rgba(4, 14, 10, 0.82)";
-    loopButton.style.boxShadow = loopActive
+    loopGroup.style.boxShadow = loopActive
       ? "0 0 18px rgba(167, 243, 208, 0.38)"
       : "0 0 14px rgba(167, 243, 208, 0.18)";
-    loopButton.style.color = loopActive ? "#6ee7b7" : "#a7f3d0";
   }
 
   function updateButtonPositions(rect) {
@@ -778,7 +864,8 @@ function createOverlay(settings) {
         opacityButton.style.left = "-9999px";
         speedGroup.style.left = "-9999px";
         brightnessGroup.style.left = "-9999px";
-        loopButton.style.left = "-9999px";
+        loopGroup.style.left = "-9999px";
+        frameGroup.style.left = "-9999px";
         lastButtonRectKey = "";
       }
       return;
@@ -794,20 +881,25 @@ function createOverlay(settings) {
     const recLeft = activeRect.right - size + Math.round(size / 3);
 
     if (isDRM) {
-      // DRM: speed, brightness, loop buttons only (no opacity/record)
+      // DRM: loop, speed, brightness, frame buttons only (no opacity/record)
+      // order left→right: [↺] [−s+] [−b+] [‹›]
       recordButton.style.left = "-9999px";
       opacityButton.style.left = "-9999px";
-      const loopW = loopButton.offsetWidth || 38;
+      const frameW = frameGroup.offsetWidth || 54;
       const brightnessW = brightnessGroup.offsetWidth || 92;
       const speedW = speedGroup.offsetWidth || 92;
-      const loopLeft = recLeft + size - loopW;
-      loopButton.style.left = `${loopLeft}px`;
-      loopButton.style.top = `${topY}px`;
-      const brightnessLeft = loopLeft - gap - brightnessW;
+      const loopW = loopGroup.offsetWidth || 80;
+      const frameLeft = recLeft + size - frameW;
+      frameGroup.style.left = `${frameLeft}px`;
+      frameGroup.style.top = `${topY}px`;
+      const brightnessLeft = frameLeft - gap - brightnessW;
       brightnessGroup.style.left = `${brightnessLeft}px`;
       brightnessGroup.style.top = `${topY}px`;
-      speedGroup.style.left = `${brightnessLeft - gap - speedW}px`;
+      const speedLeft = brightnessLeft - gap - speedW;
+      speedGroup.style.left = `${speedLeft}px`;
       speedGroup.style.top = `${topY}px`;
+      loopGroup.style.left = `${speedLeft - gap - loopW}px`;
+      loopGroup.style.top = `${topY}px`;
       return;
     }
 
@@ -819,21 +911,27 @@ function createOverlay(settings) {
 
     const isVideo = surfaces[0]?.targetElement instanceof HTMLVideoElement;
     if (isVideo) {
-      const loopW = loopButton.offsetWidth || 38;
+      // order left→right: [↺] [−s+] [−b+] [‹›] [R] [REC]
+      const frameW = frameGroup.offsetWidth || 54;
       const brightnessW = brightnessGroup.offsetWidth || 92;
       const speedW = speedGroup.offsetWidth || 92;
-      const loopLeft = recLeft - size - gap - loopW - gap;
-      loopButton.style.left = `${loopLeft}px`;
-      loopButton.style.top = `${topY}px`;
-      const brightnessLeft = loopLeft - gap - brightnessW;
+      const loopW = loopGroup.offsetWidth || 80;
+      const frameLeft = recLeft - size - gap - frameW - gap;
+      frameGroup.style.left = `${frameLeft}px`;
+      frameGroup.style.top = `${topY}px`;
+      const brightnessLeft = frameLeft - gap - brightnessW;
       brightnessGroup.style.left = `${brightnessLeft}px`;
       brightnessGroup.style.top = `${topY}px`;
-      speedGroup.style.left = `${brightnessLeft - gap - speedW}px`;
+      const speedLeft = brightnessLeft - gap - speedW;
+      speedGroup.style.left = `${speedLeft}px`;
       speedGroup.style.top = `${topY}px`;
+      loopGroup.style.left = `${speedLeft - gap - loopW}px`;
+      loopGroup.style.top = `${topY}px`;
     } else {
       speedGroup.style.left = "-9999px";
       brightnessGroup.style.left = "-9999px";
-      loopButton.style.left = "-9999px";
+      loopGroup.style.left = "-9999px";
+      frameGroup.style.left = "-9999px";
     }
   }
 }
