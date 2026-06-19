@@ -1,7 +1,7 @@
 # demo-tonejs-vite
 
 Tone.js + Vite によるブラウザ内ループミュージックデモ。  
-25曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
+28曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
 
 ## 起動
 
@@ -41,6 +41,9 @@ npm run dev
 | 23 | STARFIELD       | C major | 60  | アンビエント  | Cmaj9 Fmaj9 Am9 G6/9 |
 | 24 | HOUSE DRIVE     | A minor |128  | ハウス/EDM    | Am7 Fmaj7 Cmaj7 G7 (×2) |
 | 25 | TRAP NIGHT      | F minor | 72  | トラップ      | Fm7 Dbmaj7 Abmaj7 Eb7 (×2) |
+| 26 | GROOVE MACHINE  | Ab major|118  | ディスコ/R&B  | Abmaj7 Fm7 Dbmaj7 Eb7 (×2) |
+| 27 | FLAMENCO FUEGO  | A Phrygian|155| フラメンコ   | Am G F E7 (アンダルシア ×2) |
+| 28 | SPAIN NIGHTS    | D major |138  | ラテンジャズ  | Dmaj7 C#7 F#m7 Bm7 Em7 A7 Dmaj7 A7 |
 
 ## 音色・エフェクト一覧
 
@@ -73,6 +76,9 @@ npm run dev
 | 23 | STARFIELD       | Synth(fmsine)+Reverb(5s)             | PolySynth(pwm)+Rev(8s)+Delay  | MonoSynth(pwm) drone   | bell only |
 | 24 | HOUSE DRIVE     | Synth(sawtooth)+AutoWah              | PolySynth(amsine)+Reverb      | MonoSynth(fattriangle) | 4-on-floor house |
 | 25 | TRAP NIGHT      | FMSynth(harm:2) bell+Rev             | PolySynth(fattriangle)+Rev    | DuoSynth(portamento)   | 16th hi-hat rolls |
+| 26 | GROOVE MACHINE  | PolySynth(sawtooth) stabs            | PolySynth(fatsawtooth)+**StereoWidener** | MonoSynth(fmsine) | 4-on-floor disco |
+| 27 | FLAMENCO FUEGO  | PluckSynth (flamenco)                | PolySynth(**pulse**) rasgueado | cajon only           | Rumba cajon |
+| 28 | SPAIN NIGHTS    | DuoSynth (portamento, vibrato)       | PolySynth(**pulse**)+**JCReverb** | PluckSynth (upright) | clave+bongo+shaker |
 
 ## アーキテクチャ
 
@@ -81,7 +87,7 @@ src/
   main.ts       UI管理、曲切り替え、BPMスライダー
   song1.ts      各曲モジュール (META + create関数)
   ...
-  song25.ts
+  song28.ts
 index.html      タブUI、ステップインジケーター
 ```
 

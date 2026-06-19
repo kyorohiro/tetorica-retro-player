@@ -24,6 +24,9 @@ import * as Song22 from './song22';
 import * as Song23 from './song23';
 import * as Song24 from './song24';
 import * as Song25 from './song25';
+import * as Song26 from './song26';
+import * as Song27 from './song27';
+import * as Song28 from './song28';
 
 // ============================================================
 // UI refs
@@ -74,6 +77,9 @@ const SONGS = [
   { meta: Song23.META, create: Song23.create },
   { meta: Song24.META, create: Song24.create },
   { meta: Song25.META, create: Song25.create },
+  { meta: Song26.META, create: Song26.create },
+  { meta: Song27.META, create: Song27.create },
+  { meta: Song28.META, create: Song28.create },
 ];
 
 // ============================================================
