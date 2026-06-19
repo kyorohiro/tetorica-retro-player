@@ -992,7 +992,10 @@ void main(void)
   if (edgeBoost > 0.001) {
     if (uToonSteps >= 1.0) {
       float edge = computeAnimeEdge(pixelatedUv, texel);
-      float edgeMix = smoothstep(uAnimeEdgeLow, uAnimeEdgeHigh, edge) * edgeBoost;
+      // Shadow areas get thicker lines: lower threshold in dark zones
+      float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float adaptedLow = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, lum));
+      float edgeMix = smoothstep(adaptedLow, uAnimeEdgeHigh, edge) * edgeBoost;
       color.rgb = mix(color.rgb, vec3(0.0), clamp(edgeMix, 0.0, 1.0));
     } else {
       float edge = computeEdgeBoost(pixelatedUv, texel, cell);
