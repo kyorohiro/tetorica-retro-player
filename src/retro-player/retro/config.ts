@@ -232,7 +232,7 @@ export const RETRO_PRESETS = {
     scanline: 0.06,
     scanline2: 0.0,
     vignette: 0.05,
-    glow: 0.04,
+    glow: 0,
     phosphor: 0.03,
     spotMask: 0.0,
     bulbRadius: 0.3,
