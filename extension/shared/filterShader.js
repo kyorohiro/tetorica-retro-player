@@ -326,6 +326,49 @@ vec3 nearestColor64(vec3 color)
   return round(color * 3.0) / 3.0;
 }
 
+vec3 rgb2hsv(vec3 c)
+{
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1.0e-10)), d / (q.x + 1.0e-10), q.x);
+}
+
+vec3 hsv2rgb(vec3 c)
+{
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+// Anime cel palette: quantize V only, keep H/S continuous.
+// Smooth hue zone boundaries prevent checkerboard artifacts.
+// Skin shadows get a subtle cool hue shift.
+vec3 nearestColorAnime(vec3 color)
+{
+  vec3 hsv = rgb2hsv(color);
+  float h = hsv.x;
+  float s = hsv.y;
+  float v = hsv.z;
+
+  // Skin zone weight for shadow hue shift only
+  float skinWeight = max(
+    smoothstep(0.10, 0.05, h),
+    smoothstep(0.90, 0.95, h)
+  ) * smoothstep(0.08, 0.20, s);
+
+  // Uniform 3 steps for all hues — fewest artifacts, strongest cel look
+  float vQ = round(v * 2.0) / 2.0;
+
+  // Skin shadow: drift hue slightly toward cool pink/purple
+  float shadowDepth = max(0.0, v - vQ);
+  float hQ = fract(h + skinWeight * shadowDepth * 0.12);
+
+  // S stays continuous — no quantization to avoid gradient noise
+  return hsv2rgb(vec3(hQ, s, vQ));
+}
+
 vec3 monochromePalette(vec3 color, float levels, vec3 tint)
 {
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
@@ -598,6 +641,14 @@ vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint, ve
     return nearestColor64(color);
   }
 
+  if (paletteMode < 8.5) {
+    return monochromePalette(color, max(levels, 2.0), monoTint);
+  }
+
+  if (paletteMode < 10.5) {
+    return nearestColorAnime(color);
+  }
+
   return monochromePalette(color, max(levels, 2.0), monoTint);
 }
 
@@ -748,7 +799,7 @@ vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
   float dither = (bayer4x4(sampleCell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   sampleColor.rgb = clamp(sampleColor.rgb + dither, 0.0, 1.0);
   sampleColor.rgb = applyToonShading(sampleColor.rgb, uToonSteps);
-  bool isNeon = uPaletteMode > 8.5;
+  bool isNeon = uPaletteMode > 8.5 && uPaletteMode < 9.5;
 
   if (isNeon) {
     return applyNeonLinePalette(
@@ -869,7 +920,7 @@ void main(void)
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color.rgb = clamp(color.rgb + dither, 0.0, 1.0);
   color.rgb = applyToonShading(color.rgb, uToonSteps);
-  bool isNeon = uPaletteMode > 8.5;
+  bool isNeon = uPaletteMode > 8.5 && uPaletteMode < 9.5;
 
   if (isNeon) {
     color.rgb = applyNeonLinePalette(uTexture, pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);

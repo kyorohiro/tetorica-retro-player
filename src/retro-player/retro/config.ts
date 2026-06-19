@@ -8,7 +8,8 @@ export type PaletteMode =
   | "color32"
   | "color64"
   | "mono"
-  | "neon";
+  | "neon"
+  | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 
 export const MONO_TINTS: Record<
@@ -440,6 +441,32 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
   },
+  animeCel: {
+    label: "Anime Cel",
+    width: 640,
+    height: 360,
+    colors: 16,
+    dither: 0.0,
+    palette: "anime",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.0,
+    glow: 0.0,
+    smoothStrength: 0.15,
+    toonSteps: 0,
+    edgeBoost: 0.3,
+    animeEdgeLow: 0.08,
+    animeEdgeHigh: 0.55,
+    phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.0,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
   animeToon: {
     label: "Anime Toon",
     width: 640,
@@ -483,6 +510,7 @@ export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "color64") return 7;
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
+  if (mode === "anime") return 10;
 
   return 0;
 };
