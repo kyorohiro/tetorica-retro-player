@@ -5,7 +5,7 @@
 ---
 
 `examples/demo-tonejs-vite/` に Tone.js + Vite のブラウザデモがあります。
-現在 **25曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
+現在 **28曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
 
 ### 現在の構成を確認してから作業してください
 
@@ -38,11 +38,14 @@ examples/demo-tonejs-vite/
     song23.ts    # "STARFIELD"        C major  60BPM  PolySynth(pwm)+Rev(8s)+Delay pad + MonoSynth(pwm) drone + Synth(fmsine)+Rev mel [アンビエント]
     song24.ts    # "HOUSE DRIVE"      A minor 128BPM  PolySynth(amsine)+Rev pad + MonoSynth(fattriangle) bass + Synth(sawtooth)+AutoWah mel [ハウス]
     song25.ts    # "TRAP NIGHT"       F minor  72BPM  PolySynth(fattriangle)+Rev pad + DuoSynth(portamento) 808 bass + FMSynth(harm:2) mel [トラップ]
+    song26.ts    # "GROOVE MACHINE"   Ab major 118BPM PolySynth(fatsawtooth)+StereoWidener strings + MonoSynth(fmsine) bass [ディスコ]
+    song27.ts    # "FLAMENCO FUEGO"   A Phrygian 155BPM PluckSynth(flamenco) + PolySynth(pulse) rasgueado + cajon [フラメンコ]
+    song28.ts    # "SPAIN NIGHTS"     D major 138BPM  PolySynth(pulse)+JCReverb piano + DuoSynth mel + PluckSynth(bass) + clave/bongo [スペイン風]
 ```
 
 ### 現在の状態
 
-**song1〜song25 が実装済み**（25曲完成）。次に新しい曲を追加したい場合は song26.ts から。
+**song1〜song28 が実装済み**（28曲完成）。次に新しい曲を追加したい場合は song29.ts から。
 各曲で**まだ使っていない Tone.js の音色やエフェクト**を積極的に使ってください。
 
 ### 音色の方針 (まだ使っていないもの優先)
@@ -80,7 +83,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
 ### 追加後に main.ts と index.html を更新
 
-`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 25 から)
+`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 28 から)
 
 ### 確認方法
 
@@ -94,7 +97,7 @@ npm run dev
 
 ## 参考: Tone.js 音色メモ
 
-### 使い終わった組み合わせ (全25曲)
+### 使い終わった組み合わせ (全28曲)
 
 | 曲 | Pad | Melody | Bass | ドラム特徴 |
 |---|---|---|---|---|
@@ -123,8 +126,11 @@ npm run dev
 | song23 STARFIELD        | PolySynth(pwm)+Rev(8s)+Delay  | Synth(fmsine)+Reverb                 | MonoSynth(pwm) drone     | bell (MetalSynth) only |
 | song24 HOUSE DRIVE      | PolySynth(amsine)+Reverb      | Synth(sawtooth)+AutoWah              | MonoSynth(fattriangle)   | 4-on-floor house |
 | song25 TRAP NIGHT       | PolySynth(fattriangle)+Rev    | FMSynth(harm:2) bell                 | DuoSynth(portamento) 808 | 16th hi-hat rolls |
+| song26 GROOVE MACHINE   | PolySynth(fatsawtooth)+**StereoWidener** | PolySynth(sawtooth) stabs | MonoSynth(fmsine) | 4-on-floor disco |
+| song27 FLAMENCO FUEGO   | PolySynth(**pulse**) rasgueado | PluckSynth (flamenco)              | cajon(body+slap)         | Rumba cajon |
+| song28 SPAIN NIGHTS     | PolySynth(**pulse**)+**JCReverb** | DuoSynth (portamento, vibrato) | PluckSynth (upright) | clave+bongo+shaker |
 
-### 実装済み25曲 コード進行一覧
+### 実装済み28曲 コード進行一覧
 
 - song1  Chill Loop:      Cmaj7 Em7 Am7 Fmaj7 (C major: I→IIIm→VIm→IV, 王道ポップ)
 - song2  Rain Window:     Am7 Dm7 G7 Cmaj7 Fmaj7 E7 Am7 (A minor: i→iv→VII→III→VI→V→i, 自然短調)
@@ -151,15 +157,21 @@ npm run dev
 - song23 STARFIELD:       Cmaj9 Fmaj9 Am9 G6/9 (C major: Imaj9→IVmaj9→VIm9→V6/9, アンビエント)
 - song24 HOUSE DRIVE:     Am7 Fmaj7 Cmaj7 G7 (A minor: i→VI→III→VII, ハウス 4-on-floor)
 - song25 TRAP NIGHT:      Fm7 Dbmaj7 Abmaj7 Eb7 (F minor: i→VI→III→VII, トラップ 16th hi-hat rolls)
+- song26 GROOVE MACHINE:  Abmaj7 Fm7 Dbmaj7 Eb7 (Ab major: I→VIm→IVmaj7→V7, ディスコ StereoWidener)
+- song27 FLAMENCO FUEGO:  Am G F E7 (A Phrygian: i→VII→VI→V7, アンダルシアカデンス フラメンコRumba)
+- song28 SPAIN NIGHTS:    Dmaj7 C#7 F#m7 Bm7 Em7 A7 Dmaj7 A7 (D major: I→V7/iii→IIIm→VIm→IIm→V7, JCReverb)
 
 ### まだ試していない主な音色・エフェクト
 
-- `Tone.StereoWidener` — ステレオ幅拡張
-- `Tone.Wah` — オート (song24 で AutoWah を初使用済み)
+- ~~`Tone.StereoWidener`~~ → song26 で使用済み
+- ~~PolySynth(pulse)~~ → song27/28 で使用済み
+- ~~`Tone.JCReverb`~~ → song28 で使用済み
+- ~~MembraneSynth 高音 (clave/bongo)~~ → song28 で使用済み
+- `Tone.Freeverb` — JCReverb と異なる別リバーブアルゴリズム
+- `Tone.PitchShift` — リアルタイムピッチシフト (ハーモナイザー的使い方)
+- `Tone.Wah` — 手動ワウ (AutoWah は song24 で使用済み)
 - `Tone.Oscillator` + `Tone.AmplitudeEnvelope` — 低レベル手動合成
 - `Tone.FeedbackCombFilter` — コム音色
-- ドラム: MembraneSynth を高ピッチでコンガ/ボンゴとして使う
-- PolySynth pad 未使用: `amsine` (song24 で使用済み), `fattriangle` (song25 で使用済み)
 
 ### コード進行のアイデア (使っていないキー)
 
@@ -179,11 +191,12 @@ npm run dev
 - ~~アンビエント~~ → song23 STARFIELD 実装済み
 - ~~ハウス / EDM~~ → song24 HOUSE DRIVE 実装済み
 - ~~トラップ / Hip Hop~~ → song25 TRAP NIGHT 実装済み
-- R&B/Soul: スロージャム、温かいコード
-- Disco: 120BPM、ダウンストローク、ストリングス
-- Flamenco: フリギアン旋法、ギター
-- K-pop: スタッカートシンセ、デジタル感
-- Jazz Fusion: 複雑なコード、7/8拍子など
+- ~~ディスコ / R&B~~ → song26 GROOVE MACHINE 実装済み
+- ~~フラメンコ~~ → song27 FLAMENCO FUEGO 実装済み
+- ~~Latin Jazz / Spain~~ → song28 SPAIN NIGHTS 実装済み
+- K-pop: スタッカートシンセ、デジタル感 (Freeverb + PitchShift 試用候補)
+- R&B/Soul: スロージャム (song29 候補)
+- Jazz Fusion: 変拍子 (7/8 etc.) (song30 候補)
 
 ### song17 (CANON LIGHT) の注意点
 

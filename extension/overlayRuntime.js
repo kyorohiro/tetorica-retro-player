@@ -139,7 +139,7 @@ function createOverlay(settings) {
   let pointerClientY = null;
   let detachPointerTracking = null;
   let lastHoveredElement = null;
-  const rejectedImages = new WeakSet();
+  const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
   let recordingStream = null;
@@ -237,24 +237,29 @@ function createOverlay(settings) {
     const targets = collectPreferredTargets();
     syncSurfaceCount(currentSettings.overlayTargetCount);
 
+    // Read all rects first (batch reads before any DOM writes to avoid forced reflow)
+    const targetRects = targets.map((t) => t?.getBoundingClientRect() ?? null);
+
     for (let index = 0; index < surfaces.length; index += 1) {
       const surface = surfaces[index];
       const target = targets[index] ?? null;
-      renderSurface(surface, target, index);
-      updateSurfaceSpotlight(surface);
+      const rect = targetRects[index] ?? null;
+      renderSurface(surface, target, rect, index);
+      updateSurfaceSpotlight(surface, rect);
     }
 
-    updateButtonPositions();
+    updateButtonPositions(targetRects[0] ?? null);
     updateOpacityButton();
     updateSpeedButtonLabel();
     rafId = requestAnimationFrame(draw);
   }
 
-  function updateSurfaceSpotlight(surface) {
+  function updateSurfaceSpotlight(surface, rect) {
     if (
       typeof pointerClientX !== "number" ||
       typeof pointerClientY !== "number" ||
       !surface.targetElement ||
+      !rect ||
       surface.canvas.style.display === "none"
     ) {
       surface.canvas.style.maskImage = "";
@@ -262,13 +267,12 @@ function createOverlay(settings) {
       return;
     }
 
-    if (!isPointInsideElement(surface.targetElement, pointerClientX, pointerClientY)) {
+    if (!isPointInsideRect(rect, pointerClientX, pointerClientY)) {
       surface.canvas.style.maskImage = "";
       surface.canvas.style.webkitMaskImage = "";
       return;
     }
 
-    const rect = surface.targetElement.getBoundingClientRect();
     const localX = pointerClientX - rect.left;
     const localY = pointerClientY - rect.top;
     const mask = `radial-gradient(circle at ${localX}px ${localY}px, transparent 60px, rgba(0,0,0,0.6) 90px, black 120px)`;
@@ -298,13 +302,19 @@ function createOverlay(settings) {
     };
   }
 
+  function isTargetTypeEnabled(element) {
+    if (element instanceof HTMLVideoElement) return currentSettings.overlayVideo;
+    if (element instanceof HTMLImageElement) return currentSettings.overlayImage;
+    return false;
+  }
+
   function collectPreferredTargets() {
     const currentHover = findPreferredHoverElement(pointerClientX, pointerClientY);
-    if (currentHover && isDrawableElement(currentHover)) {
+    if (currentHover && isDrawableElement(currentHover) && isTargetTypeEnabled(currentHover)) {
       lastHoveredElement = currentHover;
     }
 
-    if (lastHoveredElement && (!isDrawableElement(lastHoveredElement) || !isInViewport(lastHoveredElement))) {
+    if (lastHoveredElement && (!isDrawableElement(lastHoveredElement) || !isInViewport(lastHoveredElement) || !isTargetTypeEnabled(lastHoveredElement))) {
       lastHoveredElement = null;
     }
 
@@ -312,6 +322,7 @@ function createOverlay(settings) {
     appendUniqueDrawableTarget(targets, lastHoveredElement);
 
     for (const candidate of findAutoDrawableTargets()) {
+      if (!isTargetTypeEnabled(candidate)) continue;
       appendUniqueDrawableTarget(targets, candidate);
       if (targets.length >= currentSettings.overlayTargetCount) {
         break;
@@ -350,14 +361,13 @@ function createOverlay(settings) {
     }
   }
 
-  function renderSurface(surface, targetElement, priorityIndex) {
-    if (!targetElement || !isDrawableElement(targetElement)) {
+  function renderSurface(surface, targetElement, rect, priorityIndex) {
+    if (!targetElement || !rect || !isDrawableElement(targetElement)) {
       surface.updateTarget(null);
       surface.hide();
       return;
     }
 
-    const rect = targetElement.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) {
       surface.updateTarget(null);
       surface.hide();
@@ -367,7 +377,7 @@ function createOverlay(settings) {
     surface.updateTarget(targetElement);
     surface.syncRect(rect);
 
-    if (targetElement instanceof HTMLImageElement && rejectedImages.has(targetElement)) {
+    if (rejectedElements.has(targetElement)) {
       surface.canvas.style.display = "none";
       surface.showFailureOverlay(rect);
       return;
@@ -396,6 +406,7 @@ function createOverlay(settings) {
     surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
 
     try {
+      const uploadStart = performance.now();
       surface.gl.texImage2D(
         surface.gl.TEXTURE_2D,
         0,
@@ -404,21 +415,26 @@ function createOverlay(settings) {
         surface.gl.UNSIGNED_BYTE,
         targetElement,
       );
+      const uploadMs = performance.now() - uploadStart;
       surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
       surface.didTargetChange = false;
+      if (uploadMs > 50) {
+        rejectedElements.add(targetElement);
+        surface.canvas.style.display = "none";
+        surface.showFailureOverlay(rect);
+      }
     } catch (error) {
-      if (
-        targetElement instanceof HTMLImageElement &&
-        error instanceof DOMException &&
-        error.name === "SecurityError"
-      ) {
-        rejectedImages.add(targetElement);
+      if (error instanceof DOMException && error.name === "SecurityError") {
+        rejectedElements.add(targetElement);
         surface.canvas.style.display = "none";
         surface.showFailureOverlay(rect);
         return;
       }
 
-      console.warn("Failed to upload overlay source to WebGL texture.", error);
+      if (!rejectedElements.has(targetElement)) {
+        console.warn("Failed to upload overlay source to WebGL texture.", error);
+      }
+      rejectedElements.add(targetElement);
       surface.hide();
     }
   }
@@ -575,8 +591,8 @@ function createOverlay(settings) {
     speedUpButton.style.opacity = idx >= SPEED_PRESETS.length - 1 ? "0.3" : "1";
   }
 
-  function updateButtonPositions() {
-    if (!currentSettings.showOverlayButtons) {
+  function updateButtonPositions(rect) {
+    if (!currentSettings.showOverlayButtons || !rect || !surfaces[0]?.targetElement) {
       if (lastButtonRectKey !== "") {
         recordButton.style.left = "-9999px";
         opacityButton.style.left = "-9999px";
@@ -586,18 +602,6 @@ function createOverlay(settings) {
       return;
     }
 
-    const targetEl = surfaces[0]?.targetElement;
-    if (!targetEl) {
-      if (lastButtonRectKey !== "") {
-        recordButton.style.left = "-9999px";
-        opacityButton.style.left = "-9999px";
-        speedGroup.style.left = "-9999px";
-        lastButtonRectKey = "";
-      }
-      return;
-    }
-
-    const rect = targetEl.getBoundingClientRect();
     const rectKey = `${Math.round(rect.right)}:${Math.round(rect.top)}:${Math.round(rect.width)}`;
     if (rectKey === lastButtonRectKey) return;
     lastButtonRectKey = rectKey;
@@ -613,7 +617,7 @@ function createOverlay(settings) {
     opacityButton.style.left = `${recLeft - size - gap}px`;
     opacityButton.style.top = `${topY}px`;
 
-    const isVideo = targetEl instanceof HTMLVideoElement;
+    const isVideo = surfaces[0]?.targetElement instanceof HTMLVideoElement;
     if (isVideo) {
       const groupWidth = speedGroup.offsetWidth || 92;
       speedGroup.style.left = `${recLeft - size - gap - groupWidth - gap * 3}px`;
@@ -850,7 +854,10 @@ function isInViewport(element) {
 }
 
 function isPointInsideElement(element, clientX, clientY) {
-  const rect = element.getBoundingClientRect();
+  return isPointInsideRect(element.getBoundingClientRect(), clientX, clientY);
+}
+
+function isPointInsideRect(rect, clientX, clientY) {
   return (
     clientX >= rect.left &&
     clientX <= rect.right &&

@@ -62,6 +62,8 @@ const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength"
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
 const overlayTargetCountValue = document.getElementById("overlayTargetCountValue");
+const overlayVideoInput = document.getElementById("overlayVideo");
+const overlayImageInput = document.getElementById("overlayImage");
 const showOverlayButtonsInput = document.getElementById("showOverlayButtons");
 const audioFxEnabledInput = document.getElementById("audioFxEnabled");
 const lofiAmountInput = document.getElementById("lofiAmount");
@@ -590,6 +592,14 @@ overlayTargetCountInput.addEventListener("input", () => {
   });
 });
 
+overlayVideoInput.addEventListener("change", () => {
+  updateSettings({ overlayVideo: overlayVideoInput.checked });
+});
+
+overlayImageInput.addEventListener("change", () => {
+  updateSettings({ overlayImage: overlayImageInput.checked });
+});
+
 showOverlayButtonsInput.addEventListener("change", () => {
   updateSettings({ showOverlayButtons: showOverlayButtonsInput.checked });
 });
@@ -778,6 +788,8 @@ function renderSettings(settings) {
   overlayTargetCountInput.max = String(OVERLAY_TARGET_LIMITS.max);
   overlayTargetCountInput.value = String(settings.overlayTargetCount);
   overlayTargetCountValue.textContent = `${settings.overlayTargetCount} target${settings.overlayTargetCount === 1 ? "" : "s"}`;
+  overlayVideoInput.checked = settings.overlayVideo;
+  overlayImageInput.checked = settings.overlayImage;
   showOverlayButtonsInput.checked = settings.showOverlayButtons;
   audioFxEnabledInput.checked = settings.isAudioFxEnabled;
   lofiAmountInput.value = String(settings.lofiAmount);

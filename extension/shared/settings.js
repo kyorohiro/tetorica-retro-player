@@ -484,6 +484,8 @@ export const DEFAULT_SETTINGS = {
   neonDetail: 1.0,
   colorLevels: 32,
   overlayTargetCount: 1,
+  overlayVideo: true,
+  overlayImage: true,
   showOverlayButtons: true,
   isAudioFxEnabled: true,
   lofiAmount: 0.65,
@@ -655,6 +657,14 @@ export function normalizeSettings(candidate) {
             OVERLAY_TARGET_LIMITS.max,
           )
         : DEFAULT_SETTINGS.overlayTargetCount,
+    overlayVideo:
+      typeof candidate?.overlayVideo === "boolean"
+        ? candidate.overlayVideo
+        : DEFAULT_SETTINGS.overlayVideo,
+    overlayImage:
+      typeof candidate?.overlayImage === "boolean"
+        ? candidate.overlayImage
+        : DEFAULT_SETTINGS.overlayImage,
     showOverlayButtons:
       typeof candidate?.showOverlayButtons === "boolean"
         ? candidate.showOverlayButtons
