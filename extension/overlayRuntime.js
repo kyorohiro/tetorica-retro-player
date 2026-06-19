@@ -552,9 +552,9 @@ function createOverlay(settings) {
     if (idx === lastOpacityIdx) return;
     lastOpacityIdx = idx;
     const icons = [
-      `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="#c4e67d"/></svg>`,
-      `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="#c4e67d" opacity="0.5"/><circle cx="6" cy="6" r="5.5" fill="none" stroke="#c4e67d" stroke-width="1"/></svg>`,
-      `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5.5" fill="none" stroke="#c4e67d" stroke-width="1.5"/></svg>`,
+      `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8" fill="#c4e67d"/><text x="9" y="13.5" text-anchor="middle" font-size="11" font-weight="bold" font-family="sans-serif" fill="#1a2a00">R</text></svg>`,
+      `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8" fill="#c4e67d" opacity="0.35"/><circle cx="9" cy="9" r="8" fill="none" stroke="#c4e67d" stroke-width="1.5"/><text x="9" y="13.5" text-anchor="middle" font-size="11" font-weight="bold" font-family="sans-serif" fill="#c4e67d">R</text></svg>`,
+      `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8" fill="none" stroke="#c4e67d" stroke-width="1.5" stroke-dasharray="3 2"/><text x="9" y="13.5" text-anchor="middle" font-size="11" font-weight="bold" font-family="sans-serif" fill="#c4e67d" opacity="0.5">R</text></svg>`,
     ];
     opacityButton.innerHTML = icons[idx] ?? icons[0];
   }
