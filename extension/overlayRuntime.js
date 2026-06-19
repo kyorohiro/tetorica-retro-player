@@ -139,6 +139,7 @@ function createOverlay(settings) {
   let pointerClientY = null;
   let detachPointerTracking = null;
   let lastHoveredElement = null;
+  let lastHoveredDRMVideo = null;
   const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -166,15 +167,15 @@ function createOverlay(settings) {
   });
 
   speedDownButton.addEventListener("click", () => {
-    const targetEl = surfaces[0]?.targetElement;
-    if (!(targetEl instanceof HTMLVideoElement)) return;
+    const targetEl = getActiveVideoForSpeed();
+    if (!targetEl) return;
     const idx = SPEED_PRESETS.findIndex((s) => Math.abs(s - targetEl.playbackRate) < 0.01);
     if (idx > 0) targetEl.playbackRate = SPEED_PRESETS[idx - 1];
   });
 
   speedUpButton.addEventListener("click", () => {
-    const targetEl = surfaces[0]?.targetElement;
-    if (!(targetEl instanceof HTMLVideoElement)) return;
+    const targetEl = getActiveVideoForSpeed();
+    if (!targetEl) return;
     const idx = SPEED_PRESETS.findIndex((s) => Math.abs(s - targetEl.playbackRate) < 0.01);
     if (idx !== -1 && idx < SPEED_PRESETS.length - 1) targetEl.playbackRate = SPEED_PRESETS[idx + 1];
   });
@@ -236,6 +237,17 @@ function createOverlay(settings) {
     frameCount += 1;
     const targets = collectPreferredTargets();
     syncSurfaceCount(currentSettings.overlayTargetCount);
+
+    // Track hovered DRM video separately
+    const drmHovered = findHoveredDRMVideoElement(pointerClientX, pointerClientY);
+    if (drmHovered) {
+      lastHoveredDRMVideo = drmHovered;
+    } else if (lastHoveredDRMVideo) {
+      const r = lastHoveredDRMVideo.getBoundingClientRect();
+      if (!isPointInsideRect(r, pointerClientX, pointerClientY)) {
+        lastHoveredDRMVideo = null;
+      }
+    }
 
     // Read all rects first (batch reads before any DOM writes to avoid forced reflow)
     const targetRects = targets.map((t) => t?.getBoundingClientRect() ?? null);
@@ -575,14 +587,20 @@ function createOverlay(settings) {
     opacityButton.innerHTML = icons[idx] ?? icons[0];
   }
 
+  function getActiveVideoForSpeed() {
+    const el = surfaces[0]?.targetElement;
+    if (el instanceof HTMLVideoElement) return el;
+    if (lastHoveredDRMVideo instanceof HTMLVideoElement) return lastHoveredDRMVideo;
+    return null;
+  }
+
   function updateSpeedButtonLabel() {
-    const targetEl = surfaces[0]?.targetElement;
-    if (!(targetEl instanceof HTMLVideoElement)) return;
+    const targetEl = getActiveVideoForSpeed();
+    if (!targetEl) return;
     const rate = targetEl.playbackRate;
     speedLabel.textContent = `${rate}×`;
     const isModified = Math.abs(rate - 1) > 0.01;
-    const color = isModified ? "#a7f3d0" : "#bfdbfe";
-    speedLabel.style.color = color;
+    speedLabel.style.color = isModified ? "#a7f3d0" : "#bfdbfe";
     speedGroup.style.borderColor = isModified
       ? "rgba(167, 243, 208, 0.55)"
       : "rgba(147, 197, 253, 0.35)";
@@ -592,7 +610,11 @@ function createOverlay(settings) {
   }
 
   function updateButtonPositions(rect) {
-    if (!currentSettings.showOverlayButtons || !rect || !surfaces[0]?.targetElement) {
+    const isDRM = !surfaces[0]?.targetElement && lastHoveredDRMVideo != null;
+    const drmRect = isDRM ? lastHoveredDRMVideo.getBoundingClientRect() : null;
+    const activeRect = rect ?? drmRect;
+
+    if (!currentSettings.showOverlayButtons || !activeRect) {
       if (lastButtonRectKey !== "") {
         recordButton.style.left = "-9999px";
         opacityButton.style.left = "-9999px";
@@ -602,14 +624,24 @@ function createOverlay(settings) {
       return;
     }
 
-    const rectKey = `${Math.round(rect.right)}:${Math.round(rect.top)}:${Math.round(rect.width)}`;
+    const rectKey = `${Math.round(activeRect.right)}:${Math.round(activeRect.top)}:${Math.round(activeRect.width)}:${isDRM ? "drm" : ""}`;
     if (rectKey === lastButtonRectKey) return;
     lastButtonRectKey = rectKey;
 
     const size = 28;
     const gap = 6;
-    const topY = rect.top - Math.round(size * 2 / 3);
-    const recLeft = rect.right - size + Math.round(size / 3);
+    const topY = activeRect.top - Math.round(size * 2 / 3);
+    const recLeft = activeRect.right - size + Math.round(size / 3);
+
+    if (isDRM) {
+      // DRM: speed button only
+      recordButton.style.left = "-9999px";
+      opacityButton.style.left = "-9999px";
+      const groupWidth = speedGroup.offsetWidth || 92;
+      speedGroup.style.left = `${recLeft - groupWidth + size}px`;
+      speedGroup.style.top = `${topY}px`;
+      return;
+    }
 
     recordButton.style.left = `${recLeft}px`;
     recordButton.style.top = `${topY}px`;
@@ -806,6 +838,18 @@ function findHoveredVideo(clientX, clientY) {
   );
 }
 
+function findHoveredDRMVideoElement(clientX, clientY) {
+  if (typeof clientX !== "number" || typeof clientY !== "number") {
+    return null;
+  }
+  return findHoveredMediaElement(
+    clientX,
+    clientY,
+    "video",
+    (el) => el instanceof HTMLVideoElement && el.mediaKeys != null,
+  );
+}
+
 function findHoveredImage(clientX, clientY) {
   if (typeof clientX !== "number" || typeof clientY !== "number") {
     return null;
@@ -880,6 +924,7 @@ function isDrawableElement(candidate) {
 
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
+  if (candidate.mediaKeys != null) return false;
   if (candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
   const rect = candidate.getBoundingClientRect();
   return rect.width > 32 && rect.height > 32;
