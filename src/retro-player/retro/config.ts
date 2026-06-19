@@ -456,7 +456,7 @@ export const RETRO_PRESETS = {
     smoothStrength: 0.15,
     toonSteps: 1,
     edgeBoost: 0.3,
-    animeEdgeLow: 0.022,
+    animeEdgeLow: 0.22,
     animeEdgeHigh: 0.66,
     phosphor: 0.0,
     spotMask: 0.0,
