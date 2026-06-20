@@ -74,6 +74,36 @@
       font-size: 0.78rem; color: #555577;
     }
     input[type=range] { accent-color: #6666aa; width: 120px; }
+
+    /* ---- frequency band circles ---- */
+    #freq-bands {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .freq-band {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .freq-dot {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      transition: transform 0.05s ease, box-shadow 0.05s ease, opacity 0.05s ease;
+      opacity: 0.18;
+    }
+    .freq-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      opacity: 0.4;
+    }
+    .freq-band:nth-child(1) .freq-dot { color: #ff6b8a; background: #ff6b8a22; }
+    .freq-band:nth-child(2) .freq-dot { color: #ffd93d; background: #ffd93d22; }
+    .freq-band:nth-child(3) .freq-dot { color: #6bcb77; background: #6bcb7722; }
+    .freq-band:nth-child(4) .freq-dot { color: #4d96ff; background: #4d96ff22; }
   </style>
 </head>
 <body>
@@ -118,6 +148,25 @@
 
   <div id="chord-display">—</div>
   <div id="bar-display">bar — / 8</div>
+
+  <div id="freq-bands">
+    <div class="freq-band">
+      <div class="freq-dot" id="band-kick"></div>
+      <span class="freq-label">KICK</span>
+    </div>
+    <div class="freq-band">
+      <div class="freq-dot" id="band-snare"></div>
+      <span class="freq-label">SNARE</span>
+    </div>
+    <div class="freq-band">
+      <div class="freq-dot" id="band-mid"></div>
+      <span class="freq-label">MID</span>
+    </div>
+    <div class="freq-band">
+      <div class="freq-dot" id="band-hi"></div>
+      <span class="freq-label">HI</span>
+    </div>
+  </div>
 
   <div class="steps" id="steps"></div>
 
