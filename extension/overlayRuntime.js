@@ -5,6 +5,7 @@ import {
   normalizeSettings,
   toShaderMonoTint,
 } from "./shared/settings.js";
+import { buildAudioChain, updateAudioChainNodes, disposeAudioChain } from "./shared/audioEngine.js";
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 
@@ -277,6 +278,29 @@ function createOverlay(settings) {
 
   flipGroup.append(flipHButton, flipVButton);
 
+  const audioFxButton = document.createElement("button");
+  audioFxButton.type = "button";
+  audioFxButton.setAttribute("aria-label", "Toggle retro audio effects");
+  audioFxButton.title = "Retro lofi audio FX";
+  audioFxButton.style.position = "fixed";
+  audioFxButton.style.left = "-9999px";
+  audioFxButton.style.top = "-9999px";
+  audioFxButton.style.zIndex = "2147483647";
+  audioFxButton.style.display = "flex";
+  audioFxButton.style.alignItems = "center";
+  audioFxButton.style.height = "28px";
+  audioFxButton.style.border = "1px solid rgba(216, 180, 254, 0.35)";
+  audioFxButton.style.borderRadius = "999px";
+  audioFxButton.style.background = "rgba(14, 10, 22, 0.82)";
+  audioFxButton.style.backdropFilter = "blur(8px)";
+  audioFxButton.style.overflow = "hidden";
+  audioFxButton.style.cursor = "pointer";
+  audioFxButton.style.color = "#d8b4fe";
+  audioFxButton.style.font = '11px "IBM Plex Sans","Segoe UI",sans-serif';
+  audioFxButton.style.padding = "0 12px";
+  audioFxButton.style.whiteSpace = "nowrap";
+  audioFxButton.textContent = "♩ lofi";
+
   const moreButton = document.createElement("button");
   moreButton.type = "button";
   moreButton.setAttribute("aria-label", "More controls");
@@ -326,6 +350,11 @@ function createOverlay(settings) {
   let loopEnd = 0;
   let loopTimeupdateListener = null;
   let loopTargetEl = null;
+  let audioFxEnabled = false;
+  let overlayAudioCtx = null;
+  let overlayAudioSource = null;
+  let overlayChainNodes = null;
+  let overlayAudioHookedEl = null;
   const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -400,6 +429,33 @@ function createOverlay(settings) {
     lastButtonRectKey = "";
   });
 
+  audioFxButton.addEventListener("click", async () => {
+    audioFxEnabled = !audioFxEnabled;
+    if (audioFxEnabled) {
+      const targetEl = getActiveVideoForSpeed();
+      if (!targetEl) {
+        audioFxEnabled = false;
+      } else if (overlayAudioHookedEl === targetEl && overlayAudioSource && overlayChainNodes) {
+        // Already hooked — just reconnect to chain
+        try {
+          overlayAudioSource.disconnect();
+          overlayAudioSource.connect(overlayChainNodes.entryNode);
+        } catch {}
+      } else {
+        await hookOverlayAudio(targetEl);
+      }
+    } else {
+      // Bypass: keep AudioContext alive, route directly to destination (no gap in audio)
+      if (overlayAudioSource && overlayAudioCtx) {
+        try {
+          overlayAudioSource.disconnect();
+          overlayAudioSource.connect(overlayAudioCtx.destination);
+        } catch {}
+      }
+    }
+    updateAudioFxButton();
+  });
+
   flipHButton.addEventListener("click", () => {
     flipH = !flipH;
     syncFlipToTargets();
@@ -438,7 +494,7 @@ function createOverlay(settings) {
   });
 
   function start() {
-    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, moreButton, expandedPanel, frameGroup);
+    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup);
     updateOpacityButton();
     attachSettingsSync();
     attachPointerTracking();
@@ -464,6 +520,7 @@ function createOverlay(settings) {
 
     stopRecording({ save: false });
     clearLoop();
+    releaseOverlayAudio();
     destroySurfaces();
     recordButton.remove();
     opacityButton.remove();
@@ -471,6 +528,7 @@ function createOverlay(settings) {
     brightnessGroup.remove();
     loopGroup.remove();
     flipGroup.remove();
+    audioFxButton.remove();
     moreButton.remove();
     expandedPanel.remove();
     frameGroup.remove();
@@ -489,6 +547,7 @@ function createOverlay(settings) {
       currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
       applySettingsToSurfaces();
       syncSurfaceCount(currentSettings.overlayTargetCount);
+      if (overlayChainNodes) updateAudioChainNodes(overlayChainNodes, currentSettings);
     };
 
     chrome.storage.onChanged.addListener(handleStorageChanged);
@@ -527,6 +586,12 @@ function createOverlay(settings) {
     updateButtonPositions(targetRects[0] ?? null);
     updateOpacityButton();
     updateSpeedButtonLabel();
+    if (audioFxEnabled && overlayAudioHookedEl) {
+      const activeVideo = getActiveVideoForSpeed();
+      if (activeVideo && activeVideo !== overlayAudioHookedEl) {
+        hookOverlayAudio(activeVideo);
+      }
+    }
     rafId = requestAnimationFrame(draw);
   }
 
@@ -921,6 +986,65 @@ function createOverlay(settings) {
     moreButton.style.color = panelOpen ? "#e2e8f0" : "#94a3b8";
   }
 
+  function updateAudioFxButton() {
+    audioFxButton.textContent = audioFxEnabled ? "♪ lofi" : "♩ lofi";
+    audioFxButton.style.borderColor = audioFxEnabled
+      ? "rgba(216,180,254,0.75)"
+      : "rgba(216,180,254,0.35)";
+    audioFxButton.style.background = audioFxEnabled
+      ? "rgba(60,20,100,0.9)"
+      : "rgba(14,10,22,0.82)";
+    audioFxButton.style.color = audioFxEnabled ? "#f0e6ff" : "#d8b4fe";
+    audioFxButton.style.boxShadow = audioFxEnabled
+      ? "0 0 18px rgba(216,180,254,0.38)"
+      : "none";
+  }
+
+  async function hookOverlayAudio(videoElement) {
+    if (overlayAudioHookedEl === videoElement && overlayAudioCtx?.state !== "closed") return;
+
+    // Set immediately so draw loop doesn't re-enter while we await
+    overlayAudioHookedEl = videoElement;
+
+    if (overlayAudioCtx) {
+      if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
+      try { await overlayAudioCtx.close(); } catch {}
+      overlayAudioCtx = null;
+      overlayAudioSource = null;
+    }
+
+    try {
+      const ctx = new AudioContext();
+      overlayAudioCtx = ctx;
+      // Resume before the async chain build so the context is running
+      if (ctx.state !== "running") await ctx.resume();
+
+      overlayChainNodes = await buildAudioChain(
+        ctx,
+        (name) => chrome.runtime.getURL(`shared/${name}`),
+      );
+      updateAudioChainNodes(overlayChainNodes, currentSettings);
+
+      overlayAudioSource = ctx.createMediaElementSource(videoElement);
+      overlayAudioSource.connect(overlayChainNodes.entryNode);
+    } catch (err) {
+      console.warn("[overlay audio] hook failed:", err);
+      overlayAudioHookedEl = null;
+      releaseOverlayAudio();
+    }
+  }
+
+  function releaseOverlayAudio() {
+    if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
+    if (overlayAudioCtx) {
+      try { overlayAudioCtx.close(); } catch {}
+      overlayAudioCtx = null;
+    }
+    overlayAudioSource = null;
+    overlayAudioHookedEl = null;
+    audioFxEnabled = false;
+  }
+
   function applyBrightness() {
     const level = BRIGHTNESS_PRESETS[brightnessIdx];
     const isModified = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX;
@@ -1003,6 +1127,7 @@ function createOverlay(settings) {
       brightnessGroup.style.left = "-9999px";
       loopGroup.style.left = "-9999px";
       flipGroup.style.left = "-9999px";
+      audioFxButton.style.left = "-9999px";
       moreButton.style.left = "-9999px";
       expandedPanel.style.left = "-9999px";
       frameGroup.style.left = "-9999px";
@@ -1079,13 +1204,14 @@ function createOverlay(settings) {
     // Panel
     if (panelOpen) {
       const panelItems = isNarrow
-        ? [speedGroup, brightnessGroup, loopGroup, flipGroup]
-        : [loopGroup, flipGroup];
+        ? [speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton]
+        : [loopGroup, flipGroup, audioFxButton];
       const contentW = Math.max(
         speedGroup.offsetWidth || 92,
         brightnessGroup.offsetWidth || 92,
         loopGroup.offsetWidth || 80,
         flipGroup.offsetWidth || 54,
+        audioFxButton.offsetWidth || 72,
       );
       const panelW = contentW + padding * 2;
       const panelH = panelItems.length * 28 + (panelItems.length - 1) * gap + padding * 2;
@@ -1106,6 +1232,7 @@ function createOverlay(settings) {
       expandedPanel.style.left = "-9999px";
       loopGroup.style.left = "-9999px";
       flipGroup.style.left = "-9999px";
+      audioFxButton.style.left = "-9999px";
       if (isNarrow) {
         speedGroup.style.left = "-9999px";
         brightnessGroup.style.left = "-9999px";

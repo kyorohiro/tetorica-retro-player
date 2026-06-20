@@ -7,6 +7,12 @@ import {
   normalizeSettings,
   toShaderMonoTint,
 } from "./shared/settings.js";
+import {
+  createDriveCurve,
+  createSmallRoomImpulse,
+  createTintedNoiseBuffer,
+  createVinylDustBuffer,
+} from "./shared/audioEngine.js";
 
 const statusText = document.getElementById("statusText");
 const canvas = document.getElementById("glCanvas");
@@ -518,125 +524,6 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uNeonBoost, currentSettings.neonBoost ?? 1);
   gl.uniform1f(uniformLocations.uNeonSaturation, currentSettings.neonSaturation ?? 1);
   gl.uniform1f(uniformLocations.uNeonDetail, currentSettings.neonDetail ?? 1);
-}
-
-function createDriveCurve(amount) {
-  const samples = 256;
-  const curve = new Float32Array(samples);
-  const drive = 1 + amount * 5;
-
-  for (let index = 0; index < samples; index += 1) {
-    const x = (index * 2) / (samples - 1) - 1;
-    curve[index] = Math.tanh(x * drive);
-  }
-
-  return curve;
-}
-
-function createSmallRoomImpulse(context) {
-  const duration = 0.22;
-  const length = Math.max(1, Math.floor(context.sampleRate * duration));
-  const impulse = context.createBuffer(2, length, context.sampleRate);
-
-  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
-    const channelData = impulse.getChannelData(channel);
-    for (let index = 0; index < channelData.length; index += 1) {
-      const t = index / channelData.length;
-      const decay = (1 - t) ** 1.85;
-      const flutter = 0.78 + 0.22 * Math.sin(t * 42 + channel * 0.9);
-      const earlyReflection = Math.sin(t * 130 + channel * 0.35) * 0.08;
-      channelData[index] =
-        ((Math.random() * 2 - 1) + earlyReflection) * decay * flutter * 0.28;
-    }
-  }
-
-  return impulse;
-}
-
-function createTintedNoiseBuffer(context) {
-  const length = context.sampleRate * 2;
-  const buffer = context.createBuffer(2, length, context.sampleRate);
-  let brownState = 0;
-  let airState = 0;
-
-  for (let index = 0; index < length; index += 1) {
-    const white = Math.random() * 2 - 1;
-    brownState = (brownState + white * 0.045) / 1.045;
-    airState = airState * 0.82 + white * 0.18;
-    const body = brownState * 1.35;
-    const air = (white - airState) * 0.55;
-    const sample = Math.max(-1, Math.min(1, body + air));
-
-    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-      const channelData = buffer.getChannelData(channel);
-      const channelJitter = (Math.random() * 2 - 1) * 0.012;
-      channelData[index] = Math.max(-1, Math.min(1, sample + channelJitter));
-    }
-  }
-
-  return buffer;
-}
-
-function createVinylDustBuffer(context) {
-  const length = context.sampleRate * 2;
-  const monoData = new Float32Array(length);
-  let index = 0;
-  let dustState = 0;
-
-  while (index < length) {
-    const white = Math.random() * 2 - 1;
-    dustState = dustState * 0.72 + white * 0.28;
-    monoData[index] += (white - dustState) * 0.018;
-
-    const random = Math.random();
-
-    if (random < 0.0034) {
-      const crackleLength = 8 + Math.floor(Math.random() * 42);
-      const crackleAmplitude = 0.11 + Math.random() * 0.28;
-      const polarity = Math.random() < 0.5 ? -1 : 1;
-
-      for (let offset = 0; offset < crackleLength && index + offset < length; offset += 1) {
-        const decay = Math.exp(-offset / (2.4 + Math.random() * 5));
-        monoData[index + offset] +=
-          polarity * crackleAmplitude * decay * (0.7 + Math.random() * 0.3);
-      }
-
-      index += crackleLength + Math.floor(Math.random() * 640);
-      continue;
-    }
-
-    if (random < 0.0038) {
-      const popLength = 90 + Math.floor(Math.random() * 260);
-      const popAmplitude = 0.055 + Math.random() * 0.11;
-      const phase = Math.random() * Math.PI * 2;
-
-      for (let offset = 0; offset < popLength && index + offset < length; offset += 1) {
-        const decay = Math.exp(-offset / (18 + Math.random() * 40));
-        const wobble = Math.sin(phase + offset * (0.22 + Math.random() * 0.06));
-        monoData[index + offset] += popAmplitude * decay * wobble;
-      }
-
-      index += popLength + Math.floor(Math.random() * 2200);
-      continue;
-    }
-
-    index += 1;
-  }
-
-  const buffer = context.createBuffer(2, length, context.sampleRate);
-  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-    const channelData = buffer.getChannelData(channel);
-
-    for (let sampleIndex = 0; sampleIndex < length; sampleIndex += 1) {
-      const channelJitter = (Math.random() * 2 - 1) * 0.0035;
-      channelData[sampleIndex] = Math.max(
-        -1,
-        Math.min(1, monoData[sampleIndex] + channelJitter),
-      );
-    }
-  }
-
-  return buffer;
 }
 
 function updateAudioNodes() {
