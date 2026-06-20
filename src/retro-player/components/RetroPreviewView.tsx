@@ -3,11 +3,15 @@ import {
   Aperture,
   ArrowLeftRight,
   Circle,
+  FlipHorizontal,
+  FlipVertical,
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   Pin,
   Power,
   Square,
+  Sun,
 } from "lucide-react";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import {
@@ -118,6 +122,19 @@ export function RetroPreviewView({
   const [isAutoPreviewPinned, setIsAutoPreviewPinned] = React.useState(false);
   const [autoPinnedHiddenOffset, setAutoPinnedHiddenOffset] = React.useState(0);
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
+  const [brightness, setBrightness] = React.useState<number>(
+    persistedUiSettings?.brightness ?? 1.0,
+  );
+  const [flipH, setFlipH] = React.useState<boolean>(
+    persistedUiSettings?.flipH ?? false,
+  );
+  const [flipV, setFlipV] = React.useState<boolean>(
+    persistedUiSettings?.flipV ?? false,
+  );
+  const [isMoreOpen, setIsMoreOpen] = React.useState(false);
+  const [isNarrow, setIsNarrow] = React.useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 360,
+  );
   const [pinnedPreviewMetrics, setPinnedPreviewMetrics] = React.useState<{
     left: number;
     width: number;
@@ -171,8 +188,8 @@ export function RetroPreviewView({
   // Persist UI settings. isHighResolution is owned by RetroPlayer but
   // persisted here since we know both values.
   React.useEffect(() => {
-    savePersistedRetroUiSettings({ isPreviewMaximized, isHighResolution });
-  }, [isHighResolution, isPreviewMaximized]);
+    savePersistedRetroUiSettings({ isPreviewMaximized, isHighResolution, brightness, flipH, flipV });
+  }, [isHighResolution, isPreviewMaximized, brightness, flipH, flipV]);
 
   // Tooltip timer cleanup on unmount.
   React.useEffect(() => {
@@ -181,6 +198,13 @@ export function RetroPreviewView({
         window.clearTimeout(tooltipTimerRef.current);
       }
     };
+  }, []);
+
+  // Narrow-screen detection (< 360px): record button moves into More popover.
+  React.useEffect(() => {
+    const handler = () => { setIsNarrow(window.innerWidth < 360); };
+    window.addEventListener('resize', handler, { passive: true });
+    return () => { window.removeEventListener('resize', handler); };
   }, []);
 
   // Maximize: lock body scroll + ESC key to close.
@@ -383,56 +407,139 @@ export function RetroPreviewView({
 
   // --- Render ---
 
+  // Shared record handler — used in both the button bar and the More popover.
+  const handleRecordClick = () => {
+    hideTooltip();
+    void (async () => {
+      if (player.isRecording) {
+        try {
+          const filename = await player.stopRecording();
+          if (!filename) return;
+          const confirmed = await confirmDialog({
+            title: "Recording ready",
+            body: player.prefersShareExport
+              ? "Share the recorded clip now?"
+              : "Save the recorded clip now?",
+            okText: player.prefersShareExport ? "Share" : "Save",
+            cancelText: "Cancel",
+          });
+          void player.ensureAudioContext();
+          if (!confirmed) return;
+          if (player.prefersShareExport) {
+            const shared = await player.sharePendingRecording();
+            if (!shared) player.downloadPendingRecording();
+            return;
+          }
+          player.downloadPendingRecording();
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+        return;
+      }
+      try {
+        await player.startRecording();
+      } catch (error) {
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
+    })();
+  };
+
   // Extracted so the same buttons can be placed inside the canvas area (normal
   // mode) or below it in document flow (fit-width / manga reading mode).
   const renderButtonBar = (): React.ReactNode => (
     <>
-      {player.canRecord && (
+      {/* More: brightness + flip — leftmost so popover opens right */}
+      <div className="relative">
+        <button
+          type="button"
+          aria-label="More options"
+          onClick={() => { hideTooltip(); setIsMoreOpen((v) => !v); }}
+          className={[
+            floatingButtonClass,
+            isMoreOpen || brightness !== 1.0 || flipH || flipV
+              ? glowingFloatingButtonClass
+              : idleFloatingButtonClass,
+          ].join(" ")}
+        >
+          <MoreHorizontal size={16} />
+        </button>
+        {isMoreOpen && (
+          <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl border border-slate-600/80 bg-slate-950/96 p-3 shadow-xl backdrop-blur-sm">
+            {isNarrow && player.canRecord && (
+              <div className="mb-3 border-b border-slate-700 pb-3">
+                <button
+                  type="button"
+                  onClick={handleRecordClick}
+                  className={[
+                    "inline-flex w-full min-h-9 items-center justify-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition",
+                    player.isRecording
+                      ? "border-rose-300/80 bg-rose-500/20 text-rose-50"
+                      : "border-rose-400/55 bg-slate-900/78 text-rose-200 hover:bg-rose-500/12",
+                  ].join(" ")}
+                >
+                  {player.isRecording
+                    ? <Square size={13} className="fill-current animate-pulse" />
+                    : <Circle size={13} className="text-rose-300" />}
+                  {player.isRecording ? "Stop REC" : "Record"}
+                </button>
+              </div>
+            )}
+            <div className="mb-3">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Sun size={11} />
+                  Brightness
+                </span>
+                <span>{Math.round(brightness * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.4"
+                max="2.0"
+                step="0.05"
+                value={brightness}
+                onChange={(e) => { setBrightness(Number(e.currentTarget.value)); }}
+                className="w-full"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setFlipH((v) => !v); }}
+                className={[
+                  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs transition",
+                  flipH
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                    : "border-slate-600 bg-slate-900 text-slate-200 hover:bg-slate-800",
+                ].join(" ")}
+              >
+                <FlipHorizontal size={13} />
+                Flip H
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFlipV((v) => !v); }}
+                className={[
+                  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs transition",
+                  flipV
+                    ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                    : "border-slate-600 bg-slate-900 text-slate-200 hover:bg-slate-800",
+                ].join(" ")}
+              >
+                <FlipVertical size={13} />
+                Flip V
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {player.canRecord && !isNarrow && (
         <div className="relative">
           <button
             type="button"
             aria-label={player.isRecording ? "Stop recording" : "Start recording"}
-            onClick={() => {
-              hideTooltip();
-              void (async () => {
-                if (player.isRecording) {
-                  try {
-                    const filename = await player.stopRecording();
-                    if (!filename) return;
-
-                    const confirmed = await confirmDialog({
-                      title: "Recording ready",
-                      body: player.prefersShareExport
-                        ? "Share the recorded clip now?"
-                        : "Save the recorded clip now?",
-                      okText: player.prefersShareExport ? "Share" : "Save",
-                      cancelText: "Cancel",
-                    });
-
-                    void player.ensureAudioContext();
-
-                    if (!confirmed) return;
-
-                    if (player.prefersShareExport) {
-                      const shared = await player.sharePendingRecording();
-                      if (!shared) player.downloadPendingRecording();
-                      return;
-                    }
-
-                    player.downloadPendingRecording();
-                  } catch (error) {
-                    onError?.(error instanceof Error ? error : new Error(String(error)));
-                  }
-                  return;
-                }
-
-                try {
-                  await player.startRecording();
-                } catch (error) {
-                  onError?.(error instanceof Error ? error : new Error(String(error)));
-                }
-              })();
-            }}
+            onClick={handleRecordClick}
             onMouseEnter={() => scheduleTooltip("record")}
             onMouseLeave={hideTooltip}
             onFocus={() => scheduleTooltip("record")}
@@ -499,104 +606,102 @@ export function RetroPreviewView({
         </button>
         {renderTooltip("hi-res", tooltipText.hiRes)}
       </div>
-      <div className="relative">
-        <button
-          type="button"
-          aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
-          onClick={() => {
-            hideTooltip();
-            onFitWidthChange(!isFitWidthEnabled);
-            // onRefit() is intentionally NOT called here.
-            // RetroPlayer already calls refreshLayout() via useEffect when
-            // isFitWidthEnabled changes.  In capture mode, onRefit() would
-            // trigger a full previewStream() reinit with a stale fitMode
-            // closure, leaving the canvas locked at the expanded size.
-          }}
-          onMouseEnter={() => scheduleTooltip("fit-width")}
-          onMouseLeave={hideTooltip}
-          onFocus={() => scheduleTooltip("fit-width")}
-          onBlur={hideTooltip}
-          className={[
-            floatingButtonClass,
-            isFitWidthEnabled ? glowingFloatingButtonClass : idleFloatingButtonClass,
-          ].join(" ")}
-        >
-          <ArrowLeftRight size={16} />
-        </button>
-        {renderTooltip(
-          "fit-width",
-          isFitWidthEnabled ? tooltipText.fitWidthOn : tooltipText.fitWidthOff,
-        )}
-      </div>
-      <div className="relative">
-        <button
-          type="button"
-          aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
-          onClick={() => {
-            hideTooltip();
-            if (isPreviewMaximized || isFitWidthEnabled) return;
-            setIsPreviewPinned((current) => {
-              const next = !current;
-              if (next) {
-                const nextMetrics = measurePinnedPreviewMetrics();
-                if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                return true;
-              }
-
-              setIsAutoPreviewPinned(false);
-              setAutoPinnedHiddenOffset(0);
-              setPinnedPreviewMetrics(null);
-              return false;
-            });
-          }}
-          onMouseEnter={() => scheduleTooltip("pin")}
-          onMouseLeave={hideTooltip}
-          onFocus={() => scheduleTooltip("pin")}
-          onBlur={hideTooltip}
-          className={[
-            floatingButtonClass,
-            isPreviewMaximized || isFitWidthEnabled
-              ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
+      {/* FitWidth + PIN + Maximize: pill group (mutually exclusive, no gap) */}
+      <div className="flex items-center">
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
+            onClick={() => {
+              hideTooltip();
+              onFitWidthChange(!isFitWidthEnabled);
+            }}
+            onMouseEnter={() => scheduleTooltip("fit-width")}
+            onMouseLeave={hideTooltip}
+            onFocus={() => scheduleTooltip("fit-width")}
+            onBlur={hideTooltip}
+            className={[
+              "inline-flex h-9 w-9 items-center justify-center rounded-l-full border-t border-b border-l border-r-0 text-sm transition backdrop-blur-sm",
+              isFitWidthEnabled ? glowingFloatingButtonClass : idleFloatingButtonClass,
+            ].join(" ")}
+          >
+            <ArrowLeftRight size={16} />
+          </button>
+          {renderTooltip(
+            "fit-width",
+            isFitWidthEnabled ? tooltipText.fitWidthOn : tooltipText.fitWidthOff,
+          )}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
+            onClick={() => {
+              hideTooltip();
+              if (isPreviewMaximized || isFitWidthEnabled) return;
+              setIsPreviewPinned((current) => {
+                const next = !current;
+                if (next) {
+                  const nextMetrics = measurePinnedPreviewMetrics();
+                  if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
+                  return true;
+                }
+                setIsAutoPreviewPinned(false);
+                setAutoPinnedHiddenOffset(0);
+                setPinnedPreviewMetrics(null);
+                return false;
+              });
+            }}
+            onMouseEnter={() => scheduleTooltip("pin")}
+            onMouseLeave={hideTooltip}
+            onFocus={() => scheduleTooltip("pin")}
+            onBlur={hideTooltip}
+            className={[
+              "inline-flex h-9 w-9 items-center justify-center rounded-none border-t border-b border-l-0 border-r-0 text-sm transition backdrop-blur-sm",
+              isPreviewMaximized || isFitWidthEnabled
+                ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
+                : isPinnedPreview
+                ? glowingFloatingButtonClass
+                : idleFloatingButtonClass,
+            ].join(" ")}
+            disabled={isPreviewMaximized || isFitWidthEnabled}
+          >
+            <Pin size={16} />
+          </button>
+          {renderTooltip(
+            "pin",
+            isPreviewMaximized
+              ? tooltipText.pinUnavailable
+              : isFitWidthEnabled
+              ? tooltipText.pinUnavailableFitWidth
               : isPinnedPreview
-              ? glowingFloatingButtonClass
-              : idleFloatingButtonClass,
-          ].join(" ")}
-          disabled={isPreviewMaximized || isFitWidthEnabled}
-        >
-          <Pin size={16} />
-        </button>
-        {renderTooltip(
-          "pin",
-          isPreviewMaximized
-            ? tooltipText.pinUnavailable
-            : isFitWidthEnabled
-            ? tooltipText.pinUnavailableFitWidth
-            : isPinnedPreview
-            ? tooltipText.pinOn
-            : tooltipText.pinOff,
-        )}
+              ? tooltipText.pinOn
+              : tooltipText.pinOff,
+          )}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
+            onClick={() => { hideTooltip(); setIsPreviewMaximized((c) => !c); }}
+            onMouseEnter={() => scheduleTooltip("maximize")}
+            onMouseLeave={hideTooltip}
+            onFocus={() => scheduleTooltip("maximize")}
+            onBlur={hideTooltip}
+            className={[
+              "inline-flex h-9 w-9 items-center justify-center rounded-r-full border-t border-b border-r border-l-0 text-sm transition backdrop-blur-sm",
+              isPreviewMaximized ? glowingFloatingButtonClass : idleFloatingButtonClass,
+            ].join(" ")}
+          >
+            {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+          {renderTooltip(
+            "maximize",
+            isPreviewMaximized ? tooltipText.maximizeOn : tooltipText.maximizeOff,
+          )}
+        </div>
       </div>
-      <div className="relative">
-        <button
-          type="button"
-          aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
-          onClick={() => { hideTooltip(); setIsPreviewMaximized((c) => !c); }}
-          onMouseEnter={() => scheduleTooltip("maximize")}
-          onMouseLeave={hideTooltip}
-          onFocus={() => scheduleTooltip("maximize")}
-          onBlur={hideTooltip}
-          className={[
-            floatingButtonClass,
-            isPreviewMaximized ? glowingFloatingButtonClass : idleFloatingButtonClass,
-          ].join(" ")}
-        >
-          {isPreviewMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
-        {renderTooltip(
-          "maximize",
-          isPreviewMaximized ? tooltipText.maximizeOn : tooltipText.maximizeOff,
-        )}
-      </div>
+
     </>
   );
 
@@ -704,7 +809,13 @@ export function RetroPreviewView({
           }
         >
           {/* Canvas area + overlays */}
-          <div className="relative h-full w-full overflow-visible rounded-xl bg-slate-950">
+          <div
+            className="relative h-full w-full overflow-visible rounded-xl bg-slate-950"
+            style={{
+              filter: brightness !== 1.0 ? `brightness(${brightness})` : undefined,
+              transform: (flipH || flipV) ? `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` : undefined,
+            }}
+          >
             {showImagePlaceholder && (
               <img
                 src={src}
@@ -776,7 +887,7 @@ export function RetroPreviewView({
 
           {/* Floating buttons: overlaid below canvas in normal mode */}
           {!isFitWidthEnabled && (
-            <div className="absolute -bottom-8 right-3 z-50 flex items-center gap-2">
+            <div className="absolute -bottom-8 -right-4 z-50 flex items-center gap-2">
               {renderButtonBar()}
             </div>
           )}
@@ -785,7 +896,7 @@ export function RetroPreviewView({
         {/* Fit-width maximize: buttons live inside the scrollable shell so
             they are reachable after scrolling through tall content. */}
         {isFitWidthEnabled && isPreviewMaximized && (
-          <div className="flex items-center justify-end gap-2 pt-2 pr-1">
+          <div className="flex items-center justify-end gap-2 pt-2 pr-0">
             {renderButtonBar()}
           </div>
         )}
@@ -794,7 +905,7 @@ export function RetroPreviewView({
       {/* Fit-width normal mode: buttons below the shell in document flow.
           Excluded when maximized — the shell's internal button bar handles it. */}
       {isFitWidthEnabled && !isPreviewMaximized && (
-        <div className="flex items-center justify-end gap-2 pt-2 pr-1">
+        <div className="flex items-center justify-end gap-2 pt-2 pr-0">
           {renderButtonBar()}
         </div>
       )}
