@@ -9,6 +9,16 @@ export const META = { name: 'AMEN WAVE', bpm: 170 };
 type StepCb  = (s: number, kick: boolean, snare: boolean) => void;
 type ChordCb = (name: string, bar: number) => void;
 
+// ---- volume mixer (dB) — set to -Infinity to mute ----
+const VOL = {
+  kick:   -4,
+  snare: -16,
+  hihat:  -24,
+  bass:   -11,
+  pad:    -24,
+  mel:    -12,
+};
+
 export function create(onStep: StepCb, onChord: ChordCb): () => void {
   const comp = new Tone.Compressor({ threshold: -10, ratio: 6, attack: 0.002, release: 0.08 });
   comp.toDestination();
@@ -18,26 +28,26 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   // --- drums: amen-style break beat (fast 16th hats with groove, syncopated kick) ---
   const kick = new Tone.MembraneSynth({
     pitchDecay: 0.06, octaves: 6,
-    envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.1 }, volume: -4,
+    envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.1 }, volume: VOL.kick,
   }).toDestination();
   const snare = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.03 }, volume: -7,
-  }).toDestination();
-  const hhHpf = new Tone.Filter({ frequency: 10000, type: 'highpass' });
+    noise: { type: 'pink' },
+    envelope: { attack: 0.002, decay: 0.09, sustain: 0, release: 0.04 }, volume: VOL.snare,
+  }).connect(warm);
+  const hhHpf = new Tone.Filter({ frequency: 8000, type: 'highpass' });
   hhHpf.connect(warm);
   const hihat = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.008 }, volume: -17,
+    noise: { type: 'pink' },
+    envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }, volume: VOL.hihat,
   }).connect(hhHpf);
 
   // DnB break: classic syncopated kick, 2&4 snare, 16th hat with ghost accents
   const dp = {
     kick:  [1,0,0,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-    hhat:  [1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,1],
+    hhat:  [1,0,0,1, 1,0,0,1, 1,0,0,1, 1,0,1,0],
   };
-  const hhV = [0.75,0.35,0,0.45, 0.70,0,0.40,0.65, 0.75,0.35,0,0.45, 0.70,0,0.40,0.65];
+  const hhV = [0.70,0,0,0.40, 0.65,0,0,0.50, 0.70,0,0,0.40, 0.60,0,0.45,0];
 
   const drumSeq = new Tone.Sequence((time, s) => {
     const i = s as number;
@@ -49,14 +59,14 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
   // --- bass: FMSynth(harmonicity:0.25) — deep sub-bass rumble ---
   const bass = new Tone.FMSynth({
-    harmonicity: 0.25,  // very low modulation ratio = sub-bass character
-    modulationIndex: 3,
-    oscillator: { type: 'sawtooth' },
-    envelope: { attack: 0.01, decay: 0.12, sustain: 0.8, release: 0.15 },
-    modulation: { type: 'square' },
-    modulationEnvelope: { attack: 0.01, decay: 0.08, sustain: 0.5, release: 0.1 },
-    volume: -9,
-  }).toDestination();
+    harmonicity: 1,
+    modulationIndex: 0.5,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.02, decay: 0.15, sustain: 0.7, release: 0.2 },
+    modulation: { type: 'sine' },
+    modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.4, release: 0.1 },
+    volume: VOL.bass,
+  }).connect(warm);
 
   // --- pad: PolySynth(fatsquare) + Reverb — beefy jazz chord voicings ---
   const reverb = new Tone.Reverb({ decay: 2.0, preDelay: 0.03 });
@@ -65,7 +75,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   const pad = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'fatsquare', count: 2, spread: 15 } as any,
     envelope: { attack: 0.1, decay: 0.4, sustain: 0.5, release: 0.8 },
-    volume: -24,
+    volume: VOL.pad,
   });
   pad.maxPolyphony = 10;
   pad.connect(reverb);
@@ -76,7 +86,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   const mel = new Tone.Synth({
     oscillator: { type: 'sine' },
     envelope: { attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.8 },
-    volume: -12,
+    volume: VOL.mel,
   }).connect(pingPong);
 
   // 2-bar chord changes (harmonic rhythm slower than the beat)
