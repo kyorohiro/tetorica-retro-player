@@ -687,23 +687,27 @@ function createOverlay(settings) {
     surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
 
     try {
-      const uploadStart = performance.now();
-      surface.gl.texImage2D(
-        surface.gl.TEXTURE_2D,
-        0,
-        surface.gl.RGBA,
-        surface.gl.RGBA,
-        surface.gl.UNSIGNED_BYTE,
-        targetElement,
-      );
-      const uploadMs = performance.now() - uploadStart;
-      surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
-      surface.didTargetChange = false;
-      if (uploadMs > 50) {
-        rejectedElements.add(targetElement);
-        surface.canvas.style.display = "none";
-        surface.showFailureOverlay(rect);
+      const isSeeking = targetElement instanceof HTMLVideoElement && targetElement.seeking;
+      if (!isSeeking) {
+        const uploadStart = performance.now();
+        surface.gl.texImage2D(
+          surface.gl.TEXTURE_2D,
+          0,
+          surface.gl.RGBA,
+          surface.gl.RGBA,
+          surface.gl.UNSIGNED_BYTE,
+          targetElement,
+        );
+        const uploadMs = performance.now() - uploadStart;
+        surface.didTargetChange = false;
+        if (uploadMs > 50) {
+          rejectedElements.add(targetElement);
+          surface.canvas.style.display = "none";
+          surface.showFailureOverlay(rect);
+          return;
+        }
       }
+      surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
     } catch (error) {
       if (error instanceof DOMException && error.name === "SecurityError") {
         rejectedElements.add(targetElement);
@@ -1375,7 +1379,7 @@ function isDrawableElement(candidate) {
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
   if (candidate.mediaKeys != null) return false;
-  if (candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+  if (!candidate.seeking && candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
   const rect = candidate.getBoundingClientRect();
   return rect.width > 32 && rect.height > 32;
 }
