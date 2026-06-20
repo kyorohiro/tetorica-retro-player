@@ -357,6 +357,7 @@ function createOverlay(settings) {
   let overlayAudioSource = null;
   let overlayChainNodes = null;
   let overlayAudioHookedEl = null;
+  let _hookSeq = 0;
   const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -523,6 +524,12 @@ function createOverlay(settings) {
     stopRecording({ save: false });
     clearLoop();
     releaseOverlayAudio();
+    if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
+      lastHoveredDRMVideo.style.filter = "";
+      lastHoveredDRMVideo.style.transform = "";
+      lastHoveredDRMVideo.style.transformOrigin = "";
+      lastHoveredDRMVideo = null;
+    }
     destroySurfaces();
     recordButton.remove();
     opacityButton.remove();
@@ -1011,6 +1018,7 @@ function createOverlay(settings) {
 
     // Set immediately so draw loop doesn't re-enter while we await
     overlayAudioHookedEl = videoElement;
+    const seq = ++_hookSeq;
 
     if (overlayAudioCtx) {
       if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
@@ -1019,24 +1027,36 @@ function createOverlay(settings) {
       overlayAudioSource = null;
     }
 
+    // A newer call superseded us during the close await — bail out
+    if (seq !== _hookSeq) return;
+
     try {
       const ctx = new AudioContext();
       overlayAudioCtx = ctx;
-      // Resume before the async chain build so the context is running
       if (ctx.state !== "running") await ctx.resume();
 
-      overlayChainNodes = await buildAudioChain(
+      const nodes = await buildAudioChain(
         ctx,
         (name) => chrome.runtime.getURL(`shared/${name}`),
       );
-      updateAudioChainNodes(overlayChainNodes, overlayAudioSettings());
 
+      // A newer call superseded us during the chain build — discard and exit
+      if (seq !== _hookSeq) {
+        disposeAudioChain(nodes);
+        try { ctx.close(); } catch {}
+        return;
+      }
+
+      overlayChainNodes = nodes;
+      updateAudioChainNodes(overlayChainNodes, overlayAudioSettings());
       overlayAudioSource = ctx.createMediaElementSource(videoElement);
       overlayAudioSource.connect(overlayChainNodes.entryNode);
     } catch (err) {
-      console.warn("[overlay audio] hook failed:", err);
-      overlayAudioHookedEl = null;
-      releaseOverlayAudio();
+      if (seq === _hookSeq) {
+        console.warn("[overlay audio] hook failed:", err);
+        overlayAudioHookedEl = null;
+        releaseOverlayAudio();
+      }
     }
   }
 
@@ -1363,6 +1383,12 @@ function createOverlaySurface(index) {
     lastRectKey: "",
     didTargetChange: true,
     destroy() {
+      if (this.targetElement instanceof HTMLVideoElement) {
+        this.targetElement.style.filter = "";
+        this.targetElement.style.transform = "";
+        this.targetElement.style.transformOrigin = "";
+      }
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
       canvas.remove();
       failureOverlay.remove();
     },
@@ -1371,6 +1397,11 @@ function createOverlaySurface(index) {
         return;
       }
 
+      if (this.targetElement instanceof HTMLVideoElement) {
+        this.targetElement.style.filter = "";
+        this.targetElement.style.transform = "";
+        this.targetElement.style.transformOrigin = "";
+      }
       this.targetElement = nextTarget;
       this.startedAt = performance.now();
       this.lastRectKey = "";
