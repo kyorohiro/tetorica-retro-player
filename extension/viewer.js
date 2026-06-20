@@ -524,6 +524,11 @@ function applyPreset(presetKey) {
   gl.uniform1f(uniformLocations.uNeonBoost, currentSettings.neonBoost ?? 1);
   gl.uniform1f(uniformLocations.uNeonSaturation, currentSettings.neonSaturation ?? 1);
   gl.uniform1f(uniformLocations.uNeonDetail, currentSettings.neonDetail ?? 1);
+  gl.uniform1f(uniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
+  gl.uniform1f(uniformLocations.uToonSteps, currentSettings.toonSteps ?? 0);
+  gl.uniform1f(uniformLocations.uEdgeBoost, currentSettings.edgeBoost ?? 0);
+  gl.uniform1f(uniformLocations.uAnimeEdgeLow, currentSettings.animeEdgeLow ?? 0.08);
+  gl.uniform1f(uniformLocations.uAnimeEdgeHigh, currentSettings.animeEdgeHigh ?? 0.55);
 }
 
 function updateAudioNodes() {
@@ -1006,6 +1011,11 @@ function setupRenderer(webgl) {
     uNeonBoost: webgl.getUniformLocation(program, "uNeonBoost"),
     uNeonSaturation: webgl.getUniformLocation(program, "uNeonSaturation"),
     uNeonDetail: webgl.getUniformLocation(program, "uNeonDetail"),
+    uSmoothStrength: webgl.getUniformLocation(program, "uSmoothStrength"),
+    uToonSteps: webgl.getUniformLocation(program, "uToonSteps"),
+    uEdgeBoost: webgl.getUniformLocation(program, "uEdgeBoost"),
+    uAnimeEdgeLow: webgl.getUniformLocation(program, "uAnimeEdgeLow"),
+    uAnimeEdgeHigh: webgl.getUniformLocation(program, "uAnimeEdgeHigh"),
     uTime: webgl.getUniformLocation(program, "uTime"),
   };
 }
@@ -1070,5 +1080,6 @@ function paletteModeToUniform(mode) {
   if (mode === "color64") return 7;
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
+  if (mode === "anime") return 10;
   return 0;
 }

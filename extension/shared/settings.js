@@ -12,6 +12,7 @@ export const PALETTE_OPTIONS = [
   { value: "color64", label: "Color 64" },
   { value: "mono", label: "Mono" },
   { value: "neon", label: "Neon" },
+  { value: "anime", label: "Anime" },
 ];
 
 export const MONO_TINT_OPTIONS = [
@@ -449,6 +450,89 @@ export const PRESETS = {
     isNoiseEnabled: false,
     noiseLevel: 0.0,
   },
+  crtEdge: {
+    label: "CRT Edge",
+    targetWidth: 1280,
+    targetHeight: 800,
+    colorLevels: 256,
+    ditherStrength: 0.12,
+    paletteMode: 0,
+    curvature: 0.03,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.16,
+    vignetteStrength: 0.48,
+    glowStrength: 0.42,
+    phosphorStrength: 0.48,
+    spotMaskStrength: 0.0,
+    closeUpNoiseStrength: 1.8,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    isAudioFxEnabled: true,
+    lofiAmount: 0.2,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
+  },
+  animeCel: {
+    label: "Anime Cel",
+    targetWidth: 640,
+    targetHeight: 360,
+    colorLevels: 16,
+    ditherStrength: 0.0,
+    paletteMode: 10,
+    curvature: 0.0,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.0,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
+    smoothStrength: 0.15,
+    toonSteps: 1,
+    edgeBoost: 0.3,
+    animeEdgeLow: 0.22,
+    animeEdgeHigh: 0.66,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    isAudioFxEnabled: false,
+    lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
+  },
+  animeToon: {
+    label: "Anime Toon",
+    targetWidth: 640,
+    targetHeight: 360,
+    colorLevels: 8,
+    ditherStrength: 0.0,
+    paletteMode: 0,
+    curvature: 0.0,
+    scanlineStrength: 0.0,
+    scanline2Strength: 0.0,
+    vignetteStrength: 0.0,
+    glowStrength: 0.0,
+    phosphorStrength: 0.0,
+    spotMaskStrength: 0.0,
+    smoothStrength: 0.35,
+    toonSteps: 8,
+    edgeBoost: 0.22,
+    animeEdgeLow: 0.08,
+    animeEdgeHigh: 0.55,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    isAudioFxEnabled: false,
+    lofiAmount: 0.0,
+    wowFlutterAmount: 0.0,
+    isNoiseEnabled: false,
+    noiseLevel: 0.0,
+  },
 };
 
 export const DEFAULT_SETTINGS = {
@@ -479,6 +563,11 @@ export const DEFAULT_SETTINGS = {
   phosphorDotFlatDisc: false,
   phosphorDotNeighborBlend: false,
   closeUpNoiseStrength: 0.0,
+  smoothStrength: 0.0,
+  toonSteps: 0,
+  edgeBoost: 0.0,
+  animeEdgeLow: 0.08,
+  animeEdgeHigh: 0.55,
   neonBoost: 1.0,
   neonSaturation: 1.0,
   neonDetail: 1.0,
@@ -636,6 +725,26 @@ export function normalizeSettings(candidate) {
       typeof candidate?.closeUpNoiseStrength === "number"
         ? clamp(candidate.closeUpNoiseStrength, 0, 2)
         : basePresetSettings.closeUpNoiseStrength ?? DEFAULT_SETTINGS.closeUpNoiseStrength,
+    smoothStrength:
+      typeof candidate?.smoothStrength === "number"
+        ? clamp(candidate.smoothStrength, 0, 1)
+        : basePresetSettings.smoothStrength ?? DEFAULT_SETTINGS.smoothStrength,
+    toonSteps:
+      typeof candidate?.toonSteps === "number"
+        ? Math.max(0, Math.round(candidate.toonSteps))
+        : basePresetSettings.toonSteps ?? DEFAULT_SETTINGS.toonSteps,
+    edgeBoost:
+      typeof candidate?.edgeBoost === "number"
+        ? clamp(candidate.edgeBoost, 0, 1.5)
+        : basePresetSettings.edgeBoost ?? DEFAULT_SETTINGS.edgeBoost,
+    animeEdgeLow:
+      typeof candidate?.animeEdgeLow === "number"
+        ? clamp(candidate.animeEdgeLow, 0, 1)
+        : basePresetSettings.animeEdgeLow ?? DEFAULT_SETTINGS.animeEdgeLow,
+    animeEdgeHigh:
+      typeof candidate?.animeEdgeHigh === "number"
+        ? clamp(candidate.animeEdgeHigh, 0, 1)
+        : basePresetSettings.animeEdgeHigh ?? DEFAULT_SETTINGS.animeEdgeHigh,
     neonBoost:
       typeof candidate?.neonBoost === "number"
         ? clamp(candidate.neonBoost, 0, 2)
@@ -812,6 +921,30 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.neonDetail === "number"
         ? preset.neonDetail
         : DEFAULT_SETTINGS.neonDetail,
+    closeUpNoiseStrength:
+      typeof preset.closeUpNoiseStrength === "number"
+        ? preset.closeUpNoiseStrength
+        : DEFAULT_SETTINGS.closeUpNoiseStrength,
+    smoothStrength:
+      typeof preset.smoothStrength === "number"
+        ? preset.smoothStrength
+        : DEFAULT_SETTINGS.smoothStrength,
+    toonSteps:
+      typeof preset.toonSteps === "number"
+        ? preset.toonSteps
+        : DEFAULT_SETTINGS.toonSteps,
+    edgeBoost:
+      typeof preset.edgeBoost === "number"
+        ? preset.edgeBoost
+        : DEFAULT_SETTINGS.edgeBoost,
+    animeEdgeLow:
+      typeof preset.animeEdgeLow === "number"
+        ? preset.animeEdgeLow
+        : DEFAULT_SETTINGS.animeEdgeLow,
+    animeEdgeHigh:
+      typeof preset.animeEdgeHigh === "number"
+        ? preset.animeEdgeHigh
+        : DEFAULT_SETTINGS.animeEdgeHigh,
     isAudioFxEnabled:
       typeof preset.isAudioFxEnabled === "boolean"
         ? preset.isAudioFxEnabled
@@ -897,6 +1030,7 @@ export function getDefaultColorLevelsForPalette(paletteMode) {
   if (paletteMode === "color32") return 32;
   if (paletteMode === "color64") return 64;
   if (paletteMode === "neon") return 24;
+  if (paletteMode === "anime") return 16;
 
   return DEFAULT_SETTINGS.colorLevels;
 }
@@ -919,5 +1053,6 @@ function paletteModeFromUniform(value) {
   if (value === 7) return "color64";
   if (value === 8) return "mono";
   if (value === 9) return "neon";
+  if (value === 10) return "anime";
   return "free";
 }

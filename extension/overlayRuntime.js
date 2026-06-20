@@ -1670,6 +1670,11 @@ function applySettings(gl, program, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uNeonBoost, settings.neonBoost ?? 1);
   gl.uniform1f(uniformLocations.uNeonSaturation, settings.neonSaturation ?? 1);
   gl.uniform1f(uniformLocations.uNeonDetail, settings.neonDetail ?? 1);
+  gl.uniform1f(uniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
+  gl.uniform1f(uniformLocations.uToonSteps, settings.toonSteps ?? 0);
+  gl.uniform1f(uniformLocations.uEdgeBoost, settings.edgeBoost ?? 0);
+  gl.uniform1f(uniformLocations.uAnimeEdgeLow, settings.animeEdgeLow ?? 0.08);
+  gl.uniform1f(uniformLocations.uAnimeEdgeHigh, settings.animeEdgeHigh ?? 0.55);
 }
 
 async function loadLatestSettings(fallbackSettings) {
@@ -1695,6 +1700,7 @@ function paletteModeToUniform(mode) {
   if (mode === "color64") return 7;
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
+  if (mode === "anime") return 10;
   return 0;
 }
 
@@ -1777,6 +1783,11 @@ function setupRenderer(webgl) {
       uNeonBoost: webgl.getUniformLocation(program, "uNeonBoost"),
       uNeonSaturation: webgl.getUniformLocation(program, "uNeonSaturation"),
       uNeonDetail: webgl.getUniformLocation(program, "uNeonDetail"),
+      uSmoothStrength: webgl.getUniformLocation(program, "uSmoothStrength"),
+      uToonSteps: webgl.getUniformLocation(program, "uToonSteps"),
+      uEdgeBoost: webgl.getUniformLocation(program, "uEdgeBoost"),
+      uAnimeEdgeLow: webgl.getUniformLocation(program, "uAnimeEdgeLow"),
+      uAnimeEdgeHigh: webgl.getUniformLocation(program, "uAnimeEdgeHigh"),
       uTime: webgl.getUniformLocation(program, "uTime"),
       uFlipH: webgl.getUniformLocation(program, "uFlipH"),
       uFlipV: webgl.getUniformLocation(program, "uFlipV"),
