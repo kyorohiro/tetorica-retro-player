@@ -5,7 +5,7 @@
 ---
 
 `examples/demo-tonejs-vite/` に Tone.js + Vite のブラウザデモがあります。
-現在 **32曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
+現在 **35曲**入っています。Tone.js の色々な音色を試したいので、新しいループ曲を追加してください。
 
 ### 現在の構成を確認してから作業してください
 
@@ -45,11 +45,14 @@ examples/demo-tonejs-vite/
     song30.ts    # "POLY GROOVE"      Bb minor 92BPM  PolySynth(fmtriangle) pad + MonoSynth(fmsawtooth) 3-feel bass + Synth(amsine) 3-feel mel [3:4ポリリズム]
     song31.ts    # "SOUL GROOVE"      Eb major 72BPM  PolySynth(triangle)+Tremolo+Freeverb EP + FMSynth bass [R&B/Soul half-time]
     song32.ts    # "PRAISE SONG"      C major 84BPM   PolySynth(MonoSynth)+Freeverb piano + PolySynth(fatsawtooth) choir + MonoSynth(saw) bass [ゴスペル]
+    song33.ts    # "NEON SEOUL"       C# minor 120BPM PolySynth(fmsawtooth) pad + Synth(fatsquare)+BPF LFO wah mel + Oscillator+AmplitudeEnvelope bass [K-pop]
+    song34.ts    # "FUSION FIVE"      Gb major 138BPM PolySynth(amsawtooth)+FeedbackCombFilter+Rev pad + Synth(triangle) mel + Synth(sawtooth) bass [Jazz Fusion 5/4, loopEnd='5m']
+    song35.ts    # "MISTY GLEN"       D Dorian 96BPM  Oscillator drone (D+A) + Synth(triangle)+LowpassCombFilter mel + PolySynth(triangle) pad + bodhran [Celtic/Folk]
 ```
 
 ### 現在の状態
 
-**song1〜song32 が実装済み**（32曲完成）。次に新しい曲を追加したい場合は song33.ts から。
+**song1〜song35 が実装済み**（35曲完成）。次に新しい曲を追加したい場合は song36.ts から。
 各曲で**まだ使っていない Tone.js の音色やエフェクト**を積極的に使ってください。
 
 ### 音色の方針 (まだ使っていないもの優先)
@@ -87,7 +90,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
 ### 追加後に main.ts と index.html を更新
 
-`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 32 から)
+`main.ts` の SONGS 配列に追加、`index.html` の `.song-tabs` に追加 (data-song は 35 から)
 
 ### 確認方法
 
@@ -137,6 +140,9 @@ npm run dev
 | song30 POLY GROOVE      | PolySynth(fmtriangle)+Reverb  | Synth(amsine) 3-feel                 | MonoSynth(fmsawtooth) 3-feel | 4-feel Afrobeat |
 | song31 SOUL GROOVE      | PolySynth(triangle)+Tremolo+**Freeverb** | —                          | FMSynth(harm:1.0) triangle | half-time Soul |
 | song32 PRAISE SONG      | PolySynth(fatsawtooth)+**Freeverb** choir | **PolySynth(MonoSynth)**+Freeverb | MonoSynth(sawtooth) | NoiseSynth tambourine |
+| song33 NEON SEOUL       | PolySynth(fmsawtooth)+Reverb | Synth(fatsquare)+Filter(BPF)+LFO wah | Oscillator+AmplitudeEnvelope | 4-on-floor K-pop |
+| song34 FUSION FIVE      | PolySynth(amsawtooth)+**FeedbackCombFilter**+Reverb | Synth(triangle)+FeedbackDelay | **Synth(sawtooth)** シンプルbass | 5/4 Take Five |
+| song35 MISTY GLEN       | PolySynth(triangle)+Reverb | Synth(triangle)+**LowpassCombFilter** | **Oscillator** drone (D+A) | bodhran frame drum |
 
 ### 実装済み32曲 コード進行一覧
 
@@ -172,6 +178,9 @@ npm run dev
 - song30 POLY GROOVE:     Bbm7 (3bars) → Ebm7 (3bars) (Bb minor: loopEnd='6m', 3:4ポリリズム Afrobeat)
 - song31 SOUL GROOVE:     Ebmaj9 Cm9 Abmaj9 Bb7 (Eb major: Imaj9→VIm9→IVmaj9→V7, R&B half-time Freeverb)
 - song32 PRAISE SONG:     Cmaj7 F9 G13 Am7 Cmaj7 F9 Dm7 G7 (C major: I→IV9→V13→VIm, ゴスペル PolySynth(MonoSynth))
+- song33 NEON SEOUL:      C#m7 Amaj7 E7 B7 (C# minor: i→VI→III→VII, K-pop Synth fatsquare+LFO wah)
+- song34 FUSION FIVE:     Gbmaj7 Ebm7 Cbmaj7 Db7 (Gb major: I→VIm→IVmaj7→V7, Jazz Fusion 5/4 loopEnd='5m' FeedbackCombFilter)
+- song35 MISTY GLEN:      Dm7 C G Am (D Dorian: i→VII→IV→Vm, Celtic/Folk drone+LowpassCombFilter)
 
 ### まだ試していない主な音色・エフェクト
 
@@ -182,9 +191,12 @@ npm run dev
 - ~~`Tone.PitchShift`~~ → song29 で使用済み
 - ~~`Tone.Freeverb`~~ → song31/32 で使用済み
 - ~~`PolySynth(Tone.MonoSynth)`~~ → song32 で使用済み
-- `Tone.Wah` — 手動ワウ (AutoWah は song24 で使用済み)
-- `Tone.Oscillator` + `Tone.AmplitudeEnvelope` — 低レベル手動合成
-- `Tone.FeedbackCombFilter` — コム音色
+- ~~`Tone.Wah`~~ → song33 で Filter(BPF)+LFO で代替実装済み (Tone.Wah は v15 に存在しない)
+- ~~`Tone.Oscillator` + `Tone.AmplitudeEnvelope`~~ → song33/35 で使用済み
+- ~~`Tone.FeedbackCombFilter`~~ → song34 で使用済み
+- ~~`Tone.LowpassCombFilter`~~ → song35 で使用済み
+- `Tone.EQ3` — 3バンドEQ (未使用)
+- `Tone.OnePoleFilter` — シンプルな1ポールフィルター (未使用)
 
 ### コード進行のアイデア (使っていないキー)
 
@@ -207,9 +219,12 @@ npm run dev
 - ~~ポリリズム (3:4)~~ → song30 POLY GROOVE 実装済み
 - ~~R&B/Soul~~ → song31 SOUL GROOVE 実装済み
 - ~~ゴスペル~~ → song32 PRAISE SONG 実装済み
-- K-pop: スタッカートシンセ、デジタル感
-- Jazz Fusion: 5/4拍子
-- Celtic/Folk: ドローン + モーダルハーモニー
+- ~~K-pop~~ → song33 NEON SEOUL 実装済み
+- ~~Jazz Fusion 5/4~~ → song34 FUSION FIVE 実装済み
+- ~~Celtic/Folk ドローン~~ → song35 MISTY GLEN 実装済み
+- Afrobeats / Amapiano: 軽快なローカルドラム、ログドラム感
+- Bossa Nova 2 / MPB: 別キーで (今は F major 実装済み)
+- Minimalist: Philip Glass 風、音が少ないループ
 
 ### song17 (CANON LIGHT) の注意点
 
