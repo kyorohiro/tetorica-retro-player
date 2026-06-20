@@ -549,7 +549,7 @@ function createOverlay(settings) {
       currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
       applySettingsToSurfaces();
       syncSurfaceCount(currentSettings.overlayTargetCount);
-      if (overlayChainNodes) updateAudioChainNodes(overlayChainNodes, currentSettings);
+      if (overlayChainNodes) updateAudioChainNodes(overlayChainNodes, overlayAudioSettings());
     };
 
     chrome.storage.onChanged.addListener(handleStorageChanged);
@@ -988,6 +988,10 @@ function createOverlay(settings) {
     moreButton.style.color = panelOpen ? "#e2e8f0" : "#94a3b8";
   }
 
+  function overlayAudioSettings() {
+    return { ...currentSettings, isNoiseEnabled: false, vinylDustAmount: 0 };
+  }
+
   function updateAudioFxButton() {
     audioFxButton.textContent = audioFxEnabled ? "♪" : "♩";
     audioFxButton.style.borderColor = audioFxEnabled
@@ -1025,7 +1029,7 @@ function createOverlay(settings) {
         ctx,
         (name) => chrome.runtime.getURL(`shared/${name}`),
       );
-      updateAudioChainNodes(overlayChainNodes, currentSettings);
+      updateAudioChainNodes(overlayChainNodes, overlayAudioSettings());
 
       overlayAudioSource = ctx.createMediaElementSource(videoElement);
       overlayAudioSource.connect(overlayChainNodes.entryNode);
