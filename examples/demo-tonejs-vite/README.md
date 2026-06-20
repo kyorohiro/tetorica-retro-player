@@ -1,7 +1,7 @@
 # demo-tonejs-vite
 
 Tone.js + Vite によるブラウザ内ループミュージックデモ。  
-32曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
+33曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
 
 ## 起動
 
@@ -48,6 +48,7 @@ npm run dev
 | 30 | POLY GROOVE     | Bb minor| 92  | ポリリズム    | Bbm7 (3bars) → Ebm7 (3bars) |
 | 31 | SOUL GROOVE     | Eb major| 72  | R&B/ソウル    | Ebmaj9 Cm9 Abmaj9 Bb7 (×2) |
 | 32 | PRAISE SONG     | C major | 84  | ゴスペル      | Cmaj7 F9 G13 Am7 Cmaj7 F9 Dm7 G7 |
+| 33 | NEON SEOUL      | C# minor|120  | K-pop        | C#m7 Amaj7 E7 B7 (×2) |
 
 ## 音色・エフェクト一覧
 
@@ -87,6 +88,7 @@ npm run dev
 | 30 | POLY GROOVE     | Synth(amsine) 3-feel Seq             | PolySynth(fmtriangle)+Reverb  | MonoSynth(fmsawtooth) 3-feel | 4-feel Afrobeat |
 | 31 | SOUL GROOVE     | PolySynth(triangle)+Tremolo+**Freeverb** | — (EP兼用)               | FMSynth(harmonicity:1) | half-time Soul |
 | 32 | PRAISE SONG     | **PolySynth(MonoSynth)**+**Freeverb** | PolySynth(fatsawtooth) choir | MonoSynth(sawtooth)   | NoiseSynth tambourine |
+| 33 | NEON SEOUL      | Synth(fatsquare)+**Filter(BPF+LFO wah)** | PolySynth(fmsawtooth)+Reverb | **Oscillator+AmplitudeEnvelope** | 4-on-floor K-pop |
 
 ## アーキテクチャ
 
@@ -95,7 +97,7 @@ src/
   main.ts       UI管理、曲切り替え、BPMスライダー
   song1.ts      各曲モジュール (META + create関数)
   ...
-  song32.ts
+  song33.ts
 index.html      タブUI、ステップインジケーター
 ```
 
