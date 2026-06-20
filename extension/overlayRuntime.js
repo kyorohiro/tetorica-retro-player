@@ -5,6 +5,7 @@ import {
   normalizeSettings,
   toShaderMonoTint,
 } from "./shared/settings.js";
+import { buildAudioChain, updateAudioChainNodes, disposeAudioChain } from "./shared/audioEngine.js";
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 
@@ -12,9 +13,13 @@ const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
 out vec2 vTextureCoord;
 out vec2 vMaskCoord;
+uniform float uFlipH;
+uniform float uFlipV;
 
 void main() {
   vec2 uv = (aPosition + 1.0) * 0.5;
+  if (uFlipH > 0.5) uv.x = 1.0 - uv.x;
+  if (uFlipV > 0.5) uv.y = 1.0 - uv.y;
   vTextureCoord = uv;
   vMaskCoord = uv;
   gl_Position = vec4(aPosition, 0.0, 1.0);
@@ -204,8 +209,6 @@ function createOverlay(settings) {
   loopGroup.style.border = "1px solid rgba(167, 243, 208, 0.35)";
   loopGroup.style.borderRadius = "999px";
   loopGroup.style.background = "rgba(4, 14, 10, 0.82)";
-  loopGroup.style.backdropFilter = "blur(8px)";
-  loopGroup.style.boxShadow = "0 0 14px rgba(167, 243, 208, 0.18)";
   loopGroup.style.overflow = "hidden";
 
   const loopDownButton = document.createElement("button");
@@ -231,6 +234,97 @@ function createOverlay(settings) {
 
   loopGroup.append(loopDownButton, loopLabel, loopUpButton);
 
+  const expandedPanel = document.createElement("div");
+  expandedPanel.style.position = "fixed";
+  expandedPanel.style.left = "-9999px";
+  expandedPanel.style.top = "-9999px";
+  expandedPanel.style.zIndex = "2147483646";
+  expandedPanel.style.display = "flex";
+  expandedPanel.style.flexDirection = "column";
+  expandedPanel.style.gap = "6px";
+  expandedPanel.style.padding = "8px";
+  expandedPanel.style.border = "1px solid rgba(148, 163, 184, 0.2)";
+  expandedPanel.style.borderRadius = "12px";
+  expandedPanel.style.background = "rgba(8, 10, 16, 0.92)";
+  expandedPanel.style.backdropFilter = "blur(12px)";
+  expandedPanel.style.boxShadow = "0 4px 24px rgba(0,0,0,0.5)";
+
+  const flipGroup = document.createElement("div");
+  flipGroup.style.position = "fixed";
+  flipGroup.style.left = "-9999px";
+  flipGroup.style.top = "-9999px";
+  flipGroup.style.zIndex = "2147483647";
+  flipGroup.style.display = "flex";
+  flipGroup.style.alignItems = "center";
+  flipGroup.style.height = "28px";
+  flipGroup.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+  flipGroup.style.borderRadius = "999px";
+  flipGroup.style.background = "rgba(10, 12, 18, 0.82)";
+  flipGroup.style.overflow = "hidden";
+
+  const flipHButton = document.createElement("button");
+  flipHButton.type = "button";
+  flipHButton.textContent = "↔";
+  flipHButton.setAttribute("aria-label", "Flip horizontal");
+  flipHButton.style.cssText =
+    "background:transparent;border:none;color:#94a3b8;cursor:pointer;font:14px sans-serif;padding:0 9px;height:100%;line-height:1;";
+
+  const flipVButton = document.createElement("button");
+  flipVButton.type = "button";
+  flipVButton.textContent = "↕";
+  flipVButton.setAttribute("aria-label", "Flip vertical");
+  flipVButton.style.cssText =
+    "background:transparent;border:none;color:#94a3b8;cursor:pointer;font:14px sans-serif;padding:0 9px;height:100%;line-height:1;border-left:1px solid rgba(148,163,184,0.2);";
+
+  flipGroup.append(flipHButton, flipVButton);
+
+  const audioFxButton = document.createElement("button");
+  audioFxButton.type = "button";
+  audioFxButton.setAttribute("aria-label", "Toggle retro audio effects");
+  audioFxButton.title = "Retro lofi audio FX";
+  audioFxButton.style.position = "fixed";
+  audioFxButton.style.left = "-9999px";
+  audioFxButton.style.top = "-9999px";
+  audioFxButton.style.zIndex = "2147483647";
+  audioFxButton.style.width = "28px";
+  audioFxButton.style.height = "28px";
+  audioFxButton.style.padding = "0";
+  audioFxButton.style.border = "1px solid rgba(216, 180, 254, 0.35)";
+  audioFxButton.style.borderRadius = "50%";
+  audioFxButton.style.background = "rgba(14, 10, 22, 0.82)";
+  audioFxButton.style.cursor = "pointer";
+  audioFxButton.style.backdropFilter = "blur(8px)";
+  audioFxButton.style.boxShadow = "0 0 14px rgba(216, 180, 254, 0.12)";
+  audioFxButton.style.color = "#d8b4fe";
+  audioFxButton.style.fontSize = "14px";
+  audioFxButton.style.lineHeight = "1";
+  audioFxButton.style.display = "flex";
+  audioFxButton.style.alignItems = "center";
+  audioFxButton.style.justifyContent = "center";
+  audioFxButton.textContent = "♩";
+
+  const moreButton = document.createElement("button");
+  moreButton.type = "button";
+  moreButton.setAttribute("aria-label", "More controls");
+  moreButton.title = "More controls";
+  moreButton.style.position = "fixed";
+  moreButton.style.left = "-9999px";
+  moreButton.style.top = "-9999px";
+  moreButton.style.zIndex = "2147483647";
+  moreButton.style.width = "28px";
+  moreButton.style.height = "28px";
+  moreButton.style.padding = "0";
+  moreButton.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+  moreButton.style.borderRadius = "50%";
+  moreButton.style.background = "rgba(10, 12, 18, 0.82)";
+  moreButton.style.cursor = "pointer";
+  moreButton.style.backdropFilter = "blur(8px)";
+  moreButton.style.boxShadow = "0 0 14px rgba(148, 163, 184, 0.12)";
+  moreButton.style.color = "#94a3b8";
+  moreButton.style.fontSize = "16px";
+  moreButton.style.lineHeight = "1";
+  moreButton.textContent = "⋯";
+
   const surfaces = [];
   let rafId = 0;
   let frameCount = 0;
@@ -251,10 +345,18 @@ function createOverlay(settings) {
   let brightnessIdx = BRIGHTNESS_DEFAULT_IDX;
   let loopSecs = 10;
   let loopActive = false;
+  let panelOpen = false;
+  let flipH = false;
+  let flipV = false;
   let loopStart = 0;
   let loopEnd = 0;
   let loopTimeupdateListener = null;
   let loopTargetEl = null;
+  let audioFxEnabled = false;
+  let overlayAudioCtx = null;
+  let overlayAudioSource = null;
+  let overlayChainNodes = null;
+  let overlayAudioHookedEl = null;
   const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -323,6 +425,51 @@ function createOverlay(settings) {
     targetEl.currentTime = Math.min(targetEl.duration || Infinity, targetEl.currentTime + 1 / 30);
   });
 
+  moreButton.addEventListener("click", () => {
+    panelOpen = !panelOpen;
+    updateMoreButton();
+    lastButtonRectKey = "";
+  });
+
+  audioFxButton.addEventListener("click", async () => {
+    audioFxEnabled = !audioFxEnabled;
+    if (audioFxEnabled) {
+      const targetEl = getActiveVideoForSpeed();
+      if (!targetEl) {
+        audioFxEnabled = false;
+      } else if (overlayAudioHookedEl === targetEl && overlayAudioSource && overlayChainNodes) {
+        // Already hooked — just reconnect to chain
+        try {
+          overlayAudioSource.disconnect();
+          overlayAudioSource.connect(overlayChainNodes.entryNode);
+        } catch {}
+      } else {
+        await hookOverlayAudio(targetEl);
+      }
+    } else {
+      // Bypass: keep AudioContext alive, route directly to destination (no gap in audio)
+      if (overlayAudioSource && overlayAudioCtx) {
+        try {
+          overlayAudioSource.disconnect();
+          overlayAudioSource.connect(overlayAudioCtx.destination);
+        } catch {}
+      }
+    }
+    updateAudioFxButton();
+  });
+
+  flipHButton.addEventListener("click", () => {
+    flipH = !flipH;
+    syncFlipToTargets();
+    updateFlipButtons();
+  });
+
+  flipVButton.addEventListener("click", () => {
+    flipV = !flipV;
+    syncFlipToTargets();
+    updateFlipButtons();
+  });
+
   loopDownButton.addEventListener("click", () => {
     if (loopSecs > 1) {
       loopSecs -= 1;
@@ -349,7 +496,7 @@ function createOverlay(settings) {
   });
 
   function start() {
-    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, frameGroup);
+    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup);
     updateOpacityButton();
     attachSettingsSync();
     attachPointerTracking();
@@ -375,12 +522,17 @@ function createOverlay(settings) {
 
     stopRecording({ save: false });
     clearLoop();
+    releaseOverlayAudio();
     destroySurfaces();
     recordButton.remove();
     opacityButton.remove();
     speedGroup.remove();
     brightnessGroup.remove();
     loopGroup.remove();
+    flipGroup.remove();
+    audioFxButton.remove();
+    moreButton.remove();
+    expandedPanel.remove();
     frameGroup.remove();
   }
 
@@ -397,6 +549,7 @@ function createOverlay(settings) {
       currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
       applySettingsToSurfaces();
       syncSurfaceCount(currentSettings.overlayTargetCount);
+      if (overlayChainNodes) updateAudioChainNodes(overlayChainNodes, currentSettings);
     };
 
     chrome.storage.onChanged.addListener(handleStorageChanged);
@@ -435,6 +588,12 @@ function createOverlay(settings) {
     updateButtonPositions(targetRects[0] ?? null);
     updateOpacityButton();
     updateSpeedButtonLabel();
+    if (audioFxEnabled && overlayAudioHookedEl) {
+      const activeVideo = getActiveVideoForSpeed();
+      if (activeVideo && activeVideo !== overlayAudioHookedEl) {
+        hookOverlayAudio(activeVideo);
+      }
+    }
     rafId = requestAnimationFrame(draw);
   }
 
@@ -522,6 +681,9 @@ function createOverlay(settings) {
       surface.canvas.style.opacity = String(overlayOpacity);
       const bLevel = BRIGHTNESS_PRESETS[brightnessIdx];
       surface.canvas.style.filter = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${bLevel})` : "";
+      surface.gl.useProgram(surface.renderer.program);
+      surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
+      surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
       surfaces.push(surface);
       applySettings(surface.gl, surface.renderer.program, surface.renderer.uniformLocations, currentSettings);
       if (document.body) {
@@ -592,23 +754,27 @@ function createOverlay(settings) {
     surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
 
     try {
-      const uploadStart = performance.now();
-      surface.gl.texImage2D(
-        surface.gl.TEXTURE_2D,
-        0,
-        surface.gl.RGBA,
-        surface.gl.RGBA,
-        surface.gl.UNSIGNED_BYTE,
-        targetElement,
-      );
-      const uploadMs = performance.now() - uploadStart;
-      surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
-      surface.didTargetChange = false;
-      if (uploadMs > 50) {
-        rejectedElements.add(targetElement);
-        surface.canvas.style.display = "none";
-        surface.showFailureOverlay(rect);
+      const isSeeking = targetElement instanceof HTMLVideoElement && targetElement.seeking;
+      if (!isSeeking) {
+        const uploadStart = performance.now();
+        surface.gl.texImage2D(
+          surface.gl.TEXTURE_2D,
+          0,
+          surface.gl.RGBA,
+          surface.gl.RGBA,
+          surface.gl.UNSIGNED_BYTE,
+          targetElement,
+        );
+        const uploadMs = performance.now() - uploadStart;
+        surface.didTargetChange = false;
+        if (uploadMs > 50) {
+          rejectedElements.add(targetElement);
+          surface.canvas.style.display = "none";
+          surface.showFailureOverlay(rect);
+          return;
+        }
       }
+      surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
     } catch (error) {
       if (error instanceof DOMException && error.name === "SecurityError") {
         rejectedElements.add(targetElement);
@@ -783,6 +949,104 @@ function createOverlay(settings) {
     speedUpButton.style.opacity = idx >= SPEED_PRESETS.length - 1 ? "0.3" : "1";
   }
 
+  function syncFlipToTargets() {
+    const sx = flipH ? -1 : 1;
+    const sy = flipV ? -1 : 1;
+    const t = sx === 1 && sy === 1 ? "" : `scale(${sx},${sy})`;
+    for (const surface of surfaces) {
+      surface.gl.useProgram(surface.renderer.program);
+      surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
+      surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
+      if (surface.targetElement instanceof HTMLVideoElement) {
+        surface.targetElement.style.transformOrigin = "center";
+        surface.targetElement.style.transform = t;
+      }
+    }
+    if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
+      lastHoveredDRMVideo.style.transformOrigin = "center";
+      lastHoveredDRMVideo.style.transform = t;
+    }
+  }
+
+  function updateFlipButtons() {
+    flipHButton.style.color = flipH ? "#e2e8f0" : "#94a3b8";
+    flipHButton.style.background = flipH ? "rgba(148,163,184,0.2)" : "transparent";
+    flipVButton.style.color = flipV ? "#e2e8f0" : "#94a3b8";
+    flipVButton.style.background = flipV ? "rgba(148,163,184,0.2)" : "transparent";
+    flipGroup.style.borderColor = (flipH || flipV)
+      ? "rgba(148,163,184,0.65)"
+      : "rgba(148,163,184,0.35)";
+  }
+
+  function updateMoreButton() {
+    moreButton.style.borderColor = panelOpen
+      ? "rgba(148,163,184,0.65)"
+      : "rgba(148,163,184,0.35)";
+    moreButton.style.background = panelOpen
+      ? "rgba(30,34,48,0.92)"
+      : "rgba(10,12,18,0.82)";
+    moreButton.style.color = panelOpen ? "#e2e8f0" : "#94a3b8";
+  }
+
+  function updateAudioFxButton() {
+    audioFxButton.textContent = audioFxEnabled ? "♪" : "♩";
+    audioFxButton.style.borderColor = audioFxEnabled
+      ? "rgba(216,180,254,0.75)"
+      : "rgba(216,180,254,0.35)";
+    audioFxButton.style.background = audioFxEnabled
+      ? "rgba(60,20,100,0.9)"
+      : "rgba(14,10,22,0.82)";
+    audioFxButton.style.color = audioFxEnabled ? "#f0e6ff" : "#d8b4fe";
+    audioFxButton.style.boxShadow = audioFxEnabled
+      ? "0 0 18px rgba(216,180,254,0.38)"
+      : "none";
+  }
+
+  async function hookOverlayAudio(videoElement) {
+    if (overlayAudioHookedEl === videoElement && overlayAudioCtx?.state !== "closed") return;
+
+    // Set immediately so draw loop doesn't re-enter while we await
+    overlayAudioHookedEl = videoElement;
+
+    if (overlayAudioCtx) {
+      if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
+      try { await overlayAudioCtx.close(); } catch {}
+      overlayAudioCtx = null;
+      overlayAudioSource = null;
+    }
+
+    try {
+      const ctx = new AudioContext();
+      overlayAudioCtx = ctx;
+      // Resume before the async chain build so the context is running
+      if (ctx.state !== "running") await ctx.resume();
+
+      overlayChainNodes = await buildAudioChain(
+        ctx,
+        (name) => chrome.runtime.getURL(`shared/${name}`),
+      );
+      updateAudioChainNodes(overlayChainNodes, currentSettings);
+
+      overlayAudioSource = ctx.createMediaElementSource(videoElement);
+      overlayAudioSource.connect(overlayChainNodes.entryNode);
+    } catch (err) {
+      console.warn("[overlay audio] hook failed:", err);
+      overlayAudioHookedEl = null;
+      releaseOverlayAudio();
+    }
+  }
+
+  function releaseOverlayAudio() {
+    if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
+    if (overlayAudioCtx) {
+      try { overlayAudioCtx.close(); } catch {}
+      overlayAudioCtx = null;
+    }
+    overlayAudioSource = null;
+    overlayAudioHookedEl = null;
+    audioFxEnabled = false;
+  }
+
   function applyBrightness() {
     const level = BRIGHTNESS_PRESETS[brightnessIdx];
     const isModified = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX;
@@ -858,80 +1122,125 @@ function createOverlay(settings) {
     const drmRect = isDRM ? lastHoveredDRMVideo.getBoundingClientRect() : null;
     const activeRect = rect ?? drmRect;
 
+    const hideAll = () => {
+      recordButton.style.left = "-9999px";
+      opacityButton.style.left = "-9999px";
+      speedGroup.style.left = "-9999px";
+      brightnessGroup.style.left = "-9999px";
+      loopGroup.style.left = "-9999px";
+      flipGroup.style.left = "-9999px";
+      audioFxButton.style.left = "-9999px";
+      moreButton.style.left = "-9999px";
+      expandedPanel.style.left = "-9999px";
+      frameGroup.style.left = "-9999px";
+    };
+
     if (!currentSettings.showOverlayButtons || !activeRect) {
-      if (lastButtonRectKey !== "") {
-        recordButton.style.left = "-9999px";
-        opacityButton.style.left = "-9999px";
-        speedGroup.style.left = "-9999px";
-        brightnessGroup.style.left = "-9999px";
-        loopGroup.style.left = "-9999px";
-        frameGroup.style.left = "-9999px";
-        lastButtonRectKey = "";
-      }
+      if (lastButtonRectKey !== "") { hideAll(); lastButtonRectKey = ""; }
       return;
     }
 
-    const rectKey = `${Math.round(activeRect.right)}:${Math.round(activeRect.top)}:${Math.round(activeRect.width)}:${isDRM ? "drm" : ""}`;
+    const isVideo = isDRM || surfaces[0]?.targetElement instanceof HTMLVideoElement;
+    const isNarrow = activeRect.width < 320;
+    const rectKey = `${Math.round(activeRect.right)}:${Math.round(activeRect.top)}:${Math.round(activeRect.width)}:${isDRM ? "d" : ""}:${panelOpen ? "o" : ""}`;
     if (rectKey === lastButtonRectKey) return;
     lastButtonRectKey = rectKey;
 
     const size = 28;
     const gap = 6;
+    const padding = 8;
     const topY = Math.max(0, activeRect.top - Math.round(size * 2 / 3));
     const recLeft = activeRect.right - size + Math.round(size / 3);
 
+    // Anchor for ⋯ button
+    let moreLeft;
     if (isDRM) {
-      // DRM: loop, speed, brightness, frame buttons only (no opacity/record)
-      // order left→right: [↺] [−s+] [−b+] [‹›]
       recordButton.style.left = "-9999px";
       opacityButton.style.left = "-9999px";
-      const frameW = frameGroup.offsetWidth || 54;
-      const brightnessW = brightnessGroup.offsetWidth || 92;
-      const speedW = speedGroup.offsetWidth || 92;
-      const loopW = loopGroup.offsetWidth || 80;
-      const frameLeft = recLeft + size - frameW;
-      frameGroup.style.left = `${frameLeft}px`;
-      frameGroup.style.top = `${topY}px`;
-      const brightnessLeft = frameLeft - gap - brightnessW;
-      brightnessGroup.style.left = `${brightnessLeft}px`;
-      brightnessGroup.style.top = `${topY}px`;
-      const speedLeft = brightnessLeft - gap - speedW;
-      speedGroup.style.left = `${speedLeft}px`;
-      speedGroup.style.top = `${topY}px`;
-      loopGroup.style.left = `${speedLeft - gap - loopW}px`;
-      loopGroup.style.top = `${topY}px`;
+      audioFxButton.style.left = `${recLeft}px`;
+      audioFxButton.style.top = `${topY}px`;
+      moreLeft = recLeft - size - gap;
+    } else {
+      recordButton.style.left = `${recLeft}px`;
+      recordButton.style.top = `${topY}px`;
+      opacityButton.style.left = `${recLeft - size - gap}px`;
+      opacityButton.style.top = `${topY}px`;
+      audioFxButton.style.left = `${recLeft - size - gap - size - gap}px`;
+      audioFxButton.style.top = `${topY}px`;
+      moreLeft = recLeft - size - gap - size - gap - size - gap;
+    }
+
+    if (!isVideo) {
+      hideAll();
+      if (!isDRM) {
+        recordButton.style.left = `${recLeft}px`;
+        recordButton.style.top = `${topY}px`;
+        opacityButton.style.left = `${recLeft - size - gap}px`;
+        opacityButton.style.top = `${topY}px`;
+      }
       return;
     }
 
-    recordButton.style.left = `${recLeft}px`;
-    recordButton.style.top = `${topY}px`;
+    moreButton.style.left = `${moreLeft}px`;
+    moreButton.style.top = `${topY}px`;
 
-    opacityButton.style.left = `${recLeft - size - gap}px`;
-    opacityButton.style.top = `${topY}px`;
+    // Frame step is always in bar
+    const frameW = frameGroup.offsetWidth || 54;
 
-    const isVideo = surfaces[0]?.targetElement instanceof HTMLVideoElement;
-    if (isVideo) {
-      // order left→right: [↺] [−s+] [−b+] [‹›] [R] [REC]
-      const frameW = frameGroup.offsetWidth || 54;
+    if (!isNarrow) {
+      // Wide: [‹›] [−s+] [−b+] [⋯] (loop/flip in panel only)
       const brightnessW = brightnessGroup.offsetWidth || 92;
-      const speedW = speedGroup.offsetWidth || 92;
-      const loopW = loopGroup.offsetWidth || 80;
-      const frameLeft = recLeft - size - gap - frameW - gap;
-      frameGroup.style.left = `${frameLeft}px`;
-      frameGroup.style.top = `${topY}px`;
-      const brightnessLeft = frameLeft - gap - brightnessW;
+      const brightnessLeft = moreLeft - gap - brightnessW;
       brightnessGroup.style.left = `${brightnessLeft}px`;
       brightnessGroup.style.top = `${topY}px`;
+      const speedW = speedGroup.offsetWidth || 92;
       const speedLeft = brightnessLeft - gap - speedW;
       speedGroup.style.left = `${speedLeft}px`;
       speedGroup.style.top = `${topY}px`;
-      loopGroup.style.left = `${speedLeft - gap - loopW}px`;
-      loopGroup.style.top = `${topY}px`;
+      frameGroup.style.left = `${speedLeft - gap - frameW}px`;
+      frameGroup.style.top = `${topY}px`;
     } else {
+      // Narrow: [‹›] [⋯] only (speed/brightness/loop/flip all in panel)
       speedGroup.style.left = "-9999px";
       brightnessGroup.style.left = "-9999px";
+      frameGroup.style.left = `${moreLeft - gap - frameW}px`;
+      frameGroup.style.top = `${topY}px`;
+    }
+
+    // Panel
+    if (panelOpen) {
+      const panelItems = isNarrow
+        ? [speedGroup, brightnessGroup, loopGroup, flipGroup]
+        : [loopGroup, flipGroup];
+      const contentW = Math.max(
+        speedGroup.offsetWidth || 92,
+        brightnessGroup.offsetWidth || 92,
+        loopGroup.offsetWidth || 80,
+        flipGroup.offsetWidth || 54,
+      );
+      const panelW = contentW + padding * 2;
+      const panelH = panelItems.length * 28 + (panelItems.length - 1) * gap + padding * 2;
+      const panelX = moreLeft + size - panelW;
+      const panelY = topY + size + gap;
+      expandedPanel.style.left = `${panelX}px`;
+      expandedPanel.style.top = `${panelY}px`;
+      expandedPanel.style.width = `${panelW}px`;
+      expandedPanel.style.height = `${panelH}px`;
+      const itemX = panelX + padding;
+      let itemY = panelY + padding;
+      for (const item of panelItems) {
+        item.style.left = `${itemX}px`;
+        item.style.top = `${itemY}px`;
+        itemY += 28 + gap;
+      }
+    } else {
+      expandedPanel.style.left = "-9999px";
       loopGroup.style.left = "-9999px";
-      frameGroup.style.left = "-9999px";
+      flipGroup.style.left = "-9999px";
+      if (isNarrow) {
+        speedGroup.style.left = "-9999px";
+        brightnessGroup.style.left = "-9999px";
+      }
     }
   }
 }
@@ -1201,7 +1510,7 @@ function isDrawableElement(candidate) {
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
   if (candidate.mediaKeys != null) return false;
-  if (candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+  if (!candidate.seeking && candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
   const rect = candidate.getBoundingClientRect();
   return rect.width > 32 && rect.height > 32;
 }
@@ -1415,6 +1724,8 @@ function setupRenderer(webgl) {
       uNeonSaturation: webgl.getUniformLocation(program, "uNeonSaturation"),
       uNeonDetail: webgl.getUniformLocation(program, "uNeonDetail"),
       uTime: webgl.getUniformLocation(program, "uTime"),
+      uFlipH: webgl.getUniformLocation(program, "uFlipH"),
+      uFlipV: webgl.getUniformLocation(program, "uFlipV"),
     },
   };
 }
