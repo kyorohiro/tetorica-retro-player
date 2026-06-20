@@ -203,3 +203,81 @@ bpmSlider.addEventListener('input', () => {
 
 // Initial highlight
 songBtns[0]?.classList.add('active');
+
+// ============================================================
+// Frequency band visualizer
+// ============================================================
+const dotKick  = document.getElementById('band-kick')!;
+const dotSnare = document.getElementById('band-snare')!;
+const dotMid   = document.getElementById('band-mid')!;
+const dotHi    = document.getElementById('band-hi')!;
+const bandDots = [dotKick, dotSnare, dotMid, dotHi];
+
+// fftSize 256 → 128 bins, each bin ≈ 172 Hz (at 44100 Hz)
+// Kick:  0–200 Hz  → bins 0–1
+// Snare: 200–700 Hz → bins 1–4
+// Mid:   700–3500 Hz → bins 4–20
+// Hi:    3500–10000 Hz → bins 20–58
+const BAND_RANGES = [[0, 2], [2, 5], [5, 21], [21, 59]] as const;
+const BAND_COLORS = [
+  [255, 107, 138],  // pink  – kick
+  [255, 217,  61],  // yellow – snare
+  [107, 203, 119],  // green  – mid
+  [ 77, 150, 255],  // blue   – hi
+] as const;
+
+const analyser = new Tone.Analyser('fft', 256);
+analyser.smoothing = 0.75;
+Tone.getDestination().connect(analyser);
+
+// Envelope per band — slow decay so dots don't flicker
+const envelope = [0, 0, 0, 0];
+const ATTACK = 0.8;
+const DECAY  = 0.12;
+
+function avgBand(data: Float32Array, lo: number, hi: number): number {
+  let sum = 0;
+  for (let i = lo; i < hi; i++) sum += data[i];
+  return sum / (hi - lo);
+}
+
+function dbToLevel(db: number): number {
+  // Tone.Analyser returns dB; map -90..0 → 0..1
+  return Math.max(0, Math.min(1, (db + 90) / 90));
+}
+
+function tickVisualizer() {
+  requestAnimationFrame(tickVisualizer);
+  if (!playing) {
+    // fade out when stopped
+    for (let i = 0; i < 4; i++) {
+      envelope[i] *= 0.9;
+      applyDot(i, envelope[i]);
+    }
+    return;
+  }
+
+  const data = analyser.getValue() as Float32Array;
+
+  for (let i = 0; i < 4; i++) {
+    const [lo, hi] = BAND_RANGES[i];
+    const level = dbToLevel(avgBand(data, lo, hi));
+    envelope[i] = level > envelope[i]
+      ? envelope[i] + (level - envelope[i]) * ATTACK
+      : envelope[i] * (1 - DECAY);
+    applyDot(i, envelope[i]);
+  }
+}
+
+function applyDot(i: number, level: number) {
+  const dot = bandDots[i];
+  const [r, g, b] = BAND_COLORS[i];
+  const opacity = 0.18 + level * 0.82;
+  const scale   = 1 + level * 0.35;
+  const glow    = Math.round(level * 24);
+  dot.style.opacity   = String(opacity.toFixed(3));
+  dot.style.transform = `scale(${scale.toFixed(3)})`;
+  dot.style.boxShadow = glow > 1 ? `0 0 ${glow}px rgba(${r},${g},${b},${(level * 0.8).toFixed(2)})` : '';
+}
+
+tickVisualizer();
