@@ -664,7 +664,7 @@ function createOverlay(settings) {
     const targets = [];
     appendUniqueDrawableTarget(targets, lastHoveredElement);
 
-    for (const candidate of findAutoDrawableTargets()) {
+    for (const candidate of findAutoDrawableTargets(frameCount)) {
       if (!isTargetTypeEnabled(candidate)) continue;
       appendUniqueDrawableTarget(targets, candidate);
       if (targets.length >= currentSettings.overlayTargetCount) {
@@ -1250,7 +1250,7 @@ function createOverlay(settings) {
 }
 
 function findPrimaryDrawableElement() {
-  return findAutoDrawableTargets()[0] ?? null;
+  return findAutoDrawableTargets(_autoDrawableCacheFrame)[0] ?? null;
 }
 
 function findPreferredHoverElement(clientX, clientY) {
@@ -1262,14 +1262,22 @@ function findPreferredHoverElement(clientX, clientY) {
   return findHoveredVideo(clientX, clientY);
 }
 
-function findAutoDrawableTargets() {
-  return [...document.querySelectorAll("video, img")]
-    .filter(isDrawableElement)
-    .sort((left, right) => {
-      const leftRect = left.getBoundingClientRect();
-      const rightRect = right.getBoundingClientRect();
-      return rightRect.width * rightRect.height - leftRect.width * leftRect.height;
-    });
+let _autoDrawableCache = [];
+let _autoDrawableCacheFrame = -999;
+
+function findAutoDrawableTargets(frameCount) {
+  if (frameCount - _autoDrawableCacheFrame < 30) return _autoDrawableCache;
+  _autoDrawableCacheFrame = frameCount;
+  _hoveredMediaCache.clear();
+  const elements = [...document.querySelectorAll("video, img")].filter(isDrawableElement);
+  // Pre-compute rects once so the sort comparator never forces layout
+  const withArea = elements.map((el) => {
+    const r = el.getBoundingClientRect();
+    return { el, area: r.width * r.height };
+  });
+  withArea.sort((a, b) => b.area - a.area);
+  _autoDrawableCache = withArea.map((x) => x.el);
+  return _autoDrawableCache;
 }
 
 function appendUniqueDrawableTarget(targets, candidate) {
@@ -1452,6 +1460,8 @@ function findHoveredImage(clientX, clientY) {
   );
 }
 
+const _hoveredMediaCache = new Map();
+
 function findHoveredMediaElement(clientX, clientY, selector, isUsable) {
   const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
   for (const element of elementsAtPoint) {
@@ -1461,7 +1471,9 @@ function findHoveredMediaElement(clientX, clientY, selector, isUsable) {
   }
 
   // `elementsFromPoint()` can skip opacity:0 media after we hide the source element.
-  const candidates = [...document.querySelectorAll(selector)];
+  // Use cached querySelectorAll result (shared with findAutoDrawableTargets cache).
+  const candidates = _hoveredMediaCache.get(selector) ?? [...document.querySelectorAll(selector)];
+  _hoveredMediaCache.set(selector, candidates);
   for (let index = candidates.length - 1; index >= 0; index -= 1) {
     const candidate = candidates[index];
     if (!isUsable(candidate)) {
