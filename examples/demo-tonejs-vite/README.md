@@ -1,7 +1,7 @@
 # demo-tonejs-vite
 
 Tone.js + Vite によるブラウザ内ループミュージックデモ。  
-33曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
+35曲のループ曲を収録。様々な Tone.js の音色・エフェクトを試している。
 
 ## 起動
 
@@ -49,6 +49,8 @@ npm run dev
 | 31 | SOUL GROOVE     | Eb major| 72  | R&B/ソウル    | Ebmaj9 Cm9 Abmaj9 Bb7 (×2) |
 | 32 | PRAISE SONG     | C major | 84  | ゴスペル      | Cmaj7 F9 G13 Am7 Cmaj7 F9 Dm7 G7 |
 | 33 | NEON SEOUL      | C# minor|120  | K-pop        | C#m7 Amaj7 E7 B7 (×2) |
+| 34 | FUSION FIVE     | Gb major|138  | Jazz Fusion 5/4 | Gbmaj7 Ebm7 Cbmaj7 Db7 (4 bars of 5/4) |
+| 35 | MISTY GLEN      | D Dorian| 96  | Celtic/Folk  | Dm7 C G Am (×2, Dorian) |
 
 ## 音色・エフェクト一覧
 
@@ -89,6 +91,8 @@ npm run dev
 | 31 | SOUL GROOVE     | PolySynth(triangle)+Tremolo+**Freeverb** | — (EP兼用)               | FMSynth(harmonicity:1) | half-time Soul |
 | 32 | PRAISE SONG     | **PolySynth(MonoSynth)**+**Freeverb** | PolySynth(fatsawtooth) choir | MonoSynth(sawtooth)   | NoiseSynth tambourine |
 | 33 | NEON SEOUL      | Synth(fatsquare)+**Filter(BPF+LFO wah)** | PolySynth(fmsawtooth)+Reverb | **Oscillator+AmplitudeEnvelope** | 4-on-floor K-pop |
+| 34 | FUSION FIVE     | Synth(triangle)+FeedbackDelay jazz line  | PolySynth(amsawtooth)+**FeedbackCombFilter**+Reverb | **Synth(sawtooth)** シンプルbass | 5/4 Take Five feel |
+| 35 | MISTY GLEN      | Synth(triangle)+**LowpassCombFilter** tin whistle | PolySynth(triangle)+Reverb | — (drone) | bodhran frame drum |
 
 ## アーキテクチャ
 
@@ -97,7 +101,7 @@ src/
   main.ts       UI管理、曲切り替え、BPMスライダー
   song1.ts      各曲モジュール (META + create関数)
   ...
-  song33.ts
+  song35.ts
 index.html      タブUI、ステップインジケーター
 ```
 
@@ -117,7 +121,7 @@ export function create(
 ```
 
 **ルール:**
-- Transport ループ (`loopEnd = '8m'`) は `main.ts` で一元管理
+- Transport ループは `main.ts` で `loopEnd = '8m'` を設定。変拍子曲は create() で上書き・dispose() で復元 (例: song34 は `'5m'`)
 - UI 更新は `Tone.getDraw().schedule()` 経由で安全に行う
 - `PolySynth` は `maxPolyphony = 10` を設定 (Max polyphony exceeded 防止)
 - カスタム oscillator type は `as any` キャスト: `{ type: 'fmsawtooth' } as any`
