@@ -401,6 +401,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
+      closeUpNoiseStrength: presetSettings.closeUpNoiseStrength ?? 0,
+      scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
       neonSaturation: presetSettings.neonSaturation,

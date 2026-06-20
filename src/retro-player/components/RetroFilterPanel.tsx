@@ -500,25 +500,6 @@ export function RetroFilterPanel({
         <label className="block">
           <span className="text-slate-100">
             <InfoTip
-              label={`Glow: ${glowStrength.toFixed(2)}`}
-              text={helpText.glow}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="0.5"
-            step="0.01"
-            value={glowStrength}
-            onChange={(ev) => onSetGlowStrength(Number(ev.currentTarget.value))}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-slate-100">
-            <InfoTip
               label={`Smooth: ${smoothStrength.toFixed(2)}`}
               text={helpText.smooth}
               helpSuffix={helpText.helpSuffix}
@@ -592,6 +573,24 @@ export function RetroFilterPanel({
             CRT / LCD
           </div>
           <div className="flex flex-col gap-3">
+            <label className="block">
+              <span className="text-slate-100">
+                <InfoTip
+                  label={`Glow: ${glowStrength.toFixed(2)}`}
+                  text={helpText.glow}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.01"
+                value={glowStrength}
+                onChange={(ev) => onSetGlowStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
             <label className="block">
               <span className="text-slate-100">
                 <InfoTip

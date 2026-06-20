@@ -49,6 +49,8 @@ export type RetroPresetDefinition = {
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
+  closeUpNoiseStrength?: number;
+  scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -428,11 +430,11 @@ export const RETRO_PRESETS = {
     palette: "free",
     curvature: 0.03,
     scanline: 0.00,
-    scanline2: 0.08,
-    vignette: 0.05,
-    glow: 0.06,
+    scanline2: 0.16,
+    vignette: 0.48,
+    glow: 0.42,
     edgeBoost: 1.5,
-    phosphor: 0.03,
+    phosphor: 0.48,
     spotMask: 0.0,
     bulbRadius: 0.3,
     blackFloor: 0.008,
@@ -440,6 +442,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
+    closeUpNoiseStrength: 1.8,
   },
   animeCel: {
     label: "Anime Cel",
