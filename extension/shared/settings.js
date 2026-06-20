@@ -590,6 +590,13 @@ export const DEFAULT_SETTINGS = {
   isNoiseEnabled: true,
   noiseLevel: 0.015,
   vinylDustAmount: 0.0,
+  noiseReductionAmount: 0.0,
+  delayAmount: 0.0,
+  reverbAmount: 0.0,
+  chorusAmount: 0.0,
+  tapeSaturationAmount: 0.0,
+  compressorAmount: 0.0,
+  fxOutputTrimAmount: 0.66,
 };
 
 export const COLOR_LEVEL_LIMITS = {
@@ -835,6 +842,34 @@ export function normalizeSettings(candidate) {
       typeof candidate?.vinylDustAmount === "number"
         ? clamp(candidate.vinylDustAmount, 0, 1)
         : basePresetSettings.vinylDustAmount ?? DEFAULT_SETTINGS.vinylDustAmount,
+    noiseReductionAmount:
+      typeof candidate?.noiseReductionAmount === "number"
+        ? clamp(candidate.noiseReductionAmount, 0, 1)
+        : DEFAULT_SETTINGS.noiseReductionAmount,
+    delayAmount:
+      typeof candidate?.delayAmount === "number"
+        ? clamp(candidate.delayAmount, 0, 1)
+        : DEFAULT_SETTINGS.delayAmount,
+    reverbAmount:
+      typeof candidate?.reverbAmount === "number"
+        ? clamp(candidate.reverbAmount, 0, 1)
+        : DEFAULT_SETTINGS.reverbAmount,
+    chorusAmount:
+      typeof candidate?.chorusAmount === "number"
+        ? clamp(candidate.chorusAmount, 0, 1)
+        : DEFAULT_SETTINGS.chorusAmount,
+    tapeSaturationAmount:
+      typeof candidate?.tapeSaturationAmount === "number"
+        ? clamp(candidate.tapeSaturationAmount, 0, 1)
+        : DEFAULT_SETTINGS.tapeSaturationAmount,
+    compressorAmount:
+      typeof candidate?.compressorAmount === "number"
+        ? clamp(candidate.compressorAmount, 0, 1)
+        : DEFAULT_SETTINGS.compressorAmount,
+    fxOutputTrimAmount:
+      typeof candidate?.fxOutputTrimAmount === "number"
+        ? clamp(candidate.fxOutputTrimAmount, 0, 1)
+        : DEFAULT_SETTINGS.fxOutputTrimAmount,
   };
 }
 
@@ -1001,6 +1036,34 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.vinylDustAmount === "number"
         ? preset.vinylDustAmount
         : DEFAULT_SETTINGS.vinylDustAmount,
+    noiseReductionAmount:
+      typeof preset.noiseReductionAmount === "number"
+        ? preset.noiseReductionAmount
+        : DEFAULT_SETTINGS.noiseReductionAmount,
+    delayAmount:
+      typeof preset.delayAmount === "number"
+        ? preset.delayAmount
+        : DEFAULT_SETTINGS.delayAmount,
+    reverbAmount:
+      typeof preset.reverbAmount === "number"
+        ? preset.reverbAmount
+        : DEFAULT_SETTINGS.reverbAmount,
+    chorusAmount:
+      typeof preset.chorusAmount === "number"
+        ? preset.chorusAmount
+        : DEFAULT_SETTINGS.chorusAmount,
+    tapeSaturationAmount:
+      typeof preset.tapeSaturationAmount === "number"
+        ? preset.tapeSaturationAmount
+        : DEFAULT_SETTINGS.tapeSaturationAmount,
+    compressorAmount:
+      typeof preset.compressorAmount === "number"
+        ? preset.compressorAmount
+        : DEFAULT_SETTINGS.compressorAmount,
+    fxOutputTrimAmount:
+      typeof preset.fxOutputTrimAmount === "number"
+        ? preset.fxOutputTrimAmount
+        : DEFAULT_SETTINGS.fxOutputTrimAmount,
   };
 }
 

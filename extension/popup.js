@@ -101,6 +101,20 @@ const noiseLevelInput = document.getElementById("noiseLevel");
 const noiseLevelValue = document.getElementById("noiseLevelValue");
 const vinylDustAmountInput = document.getElementById("vinylDustAmount");
 const vinylDustAmountValue = document.getElementById("vinylDustAmountValue");
+const noiseReductionAmountInput = document.getElementById("noiseReductionAmount");
+const noiseReductionAmountValue = document.getElementById("noiseReductionAmountValue");
+const delayAmountInput = document.getElementById("delayAmount");
+const delayAmountValue = document.getElementById("delayAmountValue");
+const reverbAmountInput = document.getElementById("reverbAmount");
+const reverbAmountValue = document.getElementById("reverbAmountValue");
+const chorusAmountInput = document.getElementById("chorusAmount");
+const chorusAmountValue = document.getElementById("chorusAmountValue");
+const tapeSaturationAmountInput = document.getElementById("tapeSaturationAmount");
+const tapeSaturationAmountValue = document.getElementById("tapeSaturationAmountValue");
+const compressorAmountInput = document.getElementById("compressorAmount");
+const compressorAmountValue = document.getElementById("compressorAmountValue");
+const fxOutputTrimAmountInput = document.getElementById("fxOutputTrimAmount");
+const fxOutputTrimAmountValue = document.getElementById("fxOutputTrimAmountValue");
 const statusText = document.getElementById("statusText");
 
 const TAB_KEY = "retro-popup-tab";
@@ -134,6 +148,9 @@ const AUDIO_PRESET_OPTIONS = [
   { key: "vinyl", label: "Vinyl" },
   { key: "vintage-mic", label: "Vintage Mic" },
   { key: "earphone", label: "Earphone" },
+  { key: "lofiTape", label: "Lo-Fi Tape" },
+  { key: "boombox", label: "Boom Box" },
+  { key: "club", label: "Club" },
   { key: "custom", label: "Custom" },
 ];
 
@@ -153,42 +170,63 @@ const AUDIO_PRESETS = {
     wowFlutterAmount: 0,
     noiseLevel: 0,
     vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0,
+    compressorAmount: 0,
+    fxOutputTrimAmount: 1.0,
   },
   lofi: {
     isAudioFxEnabled: true,
-    isNoiseEnabled: true,
-    lofiAmount: 0.7,
-    radioToneAmount: 0.18,
-    bitCrushAmount: 0.22,
-    sampleRateReductionAmount: 0.24,
-    bassAmount: 0.08,
-    midAmount: -0.08,
-    trebleAmount: -0.18,
-    stereoWidthAmount: -0.08,
-    smallSpeakerRoomAmount: 0.08,
-    wowFlutterAmount: 0.12,
+    isNoiseEnabled: false,
+    lofiAmount: 0.58,
+    radioToneAmount: 0.0,
+    bitCrushAmount: 0.10,
+    sampleRateReductionAmount: 0.10,
+    bassAmount: 0.0,
+    midAmount: -0.25,
+    trebleAmount: 0.0,
+    stereoWidthAmount: 0.0,
+    smallSpeakerRoomAmount: 0.0,
+    wowFlutterAmount: 0.00,
     noiseLevel: 0.005,
     vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0.00,
+    compressorAmount: 0.00,
+    fxOutputTrimAmount: 0.66,
   },
   radio: {
     isAudioFxEnabled: true,
-    isNoiseEnabled: true,
-    lofiAmount: 0.4,
-    radioToneAmount: 0.9,
+    isNoiseEnabled: false,
+    lofiAmount: 0.2,
+    radioToneAmount: 0.7,
     bitCrushAmount: 0.12,
-    sampleRateReductionAmount: 0.38,
+    sampleRateReductionAmount: 0.28,
     bassAmount: -0.4,
-    midAmount: 0.18,
+    midAmount: 0.13,
     trebleAmount: -0.32,
     stereoWidthAmount: -0.55,
     smallSpeakerRoomAmount: 0.12,
-    wowFlutterAmount: 0.08,
-    noiseLevel: 0.01,
+    wowFlutterAmount: 0,
+    noiseLevel: 0.007,
     vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0,
+    compressorAmount: 0.00,
+    fxOutputTrimAmount: 0.74,
   },
   tape: {
     isAudioFxEnabled: true,
-    isNoiseEnabled: true,
+    isNoiseEnabled: false,
     lofiAmount: 0.22,
     radioToneAmount: 0.1,
     bitCrushAmount: 0.04,
@@ -196,15 +234,22 @@ const AUDIO_PRESETS = {
     bassAmount: 0.12,
     midAmount: 0,
     trebleAmount: -0.14,
-    stereoWidthAmount: 0.06,
+    stereoWidthAmount: 0.10,
     smallSpeakerRoomAmount: 0.18,
-    wowFlutterAmount: 0.42,
+    wowFlutterAmount: 0.48,
     noiseLevel: 0.0075,
     vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0.05,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0.18,
+    compressorAmount: 0.25,
+    fxOutputTrimAmount: 0.58,
   },
   vinyl: {
     isAudioFxEnabled: true,
-    isNoiseEnabled: true,
+    isNoiseEnabled: false,
     lofiAmount: 0.14,
     radioToneAmount: 0.06,
     bitCrushAmount: 0.01,
@@ -213,26 +258,40 @@ const AUDIO_PRESETS = {
     midAmount: -0.02,
     trebleAmount: -0.16,
     stereoWidthAmount: -0.18,
-    smallSpeakerRoomAmount: 0.03,
-    wowFlutterAmount: 0.18,
+    smallSpeakerRoomAmount: 0,
+    wowFlutterAmount: 0.09,
     noiseLevel: 0.0035,
-    vinylDustAmount: 0.58,
+    vinylDustAmount: 0.29,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0.05,
+    compressorAmount: 0.15,
+    fxOutputTrimAmount: 0.75,
   },
   "vintage-mic": {
     isAudioFxEnabled: true,
-    isNoiseEnabled: true,
+    isNoiseEnabled: false,
     lofiAmount: 0.34,
     radioToneAmount: 0.28,
     bitCrushAmount: 0,
     sampleRateReductionAmount: 0.02,
     bassAmount: -0.24,
-    midAmount: 0.32,
+    midAmount: 0.24,
     trebleAmount: -0.68,
     stereoWidthAmount: -0.32,
     smallSpeakerRoomAmount: 0.12,
-    wowFlutterAmount: 0.04,
+    wowFlutterAmount: 0,
     noiseLevel: 0.0025,
-    vinylDustAmount: 0.08,
+    vinylDustAmount: 0.04,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0.08,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0.08,
+    compressorAmount: 0.12,
+    fxOutputTrimAmount: 0.46,
   },
   earphone: {
     isAudioFxEnabled: true,
@@ -249,6 +308,82 @@ const AUDIO_PRESETS = {
     wowFlutterAmount: 0,
     noiseLevel: 0,
     vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0,
+    compressorAmount: 0,
+    fxOutputTrimAmount: 1.0,
+  },
+  lofiTape: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: false,
+    lofiAmount: 0.48,
+    radioToneAmount: 0.1,
+    bitCrushAmount: 0.1,
+    sampleRateReductionAmount: 0.12,
+    bassAmount: 0.1,
+    midAmount: -0.02,
+    trebleAmount: -0.14,
+    stereoWidthAmount: -0.02,
+    smallSpeakerRoomAmount: 0.1,
+    wowFlutterAmount: 0.08,
+    noiseLevel: 0.005,
+    vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0.05,
+    reverbAmount: 0.05,
+    chorusAmount: 0.05,
+    tapeSaturationAmount: 0.13,
+    compressorAmount: 0.25,
+    fxOutputTrimAmount: 0.50,
+  },
+  boombox: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: false,
+    lofiAmount: 0.30,
+    radioToneAmount: 0.06,
+    bitCrushAmount: 0.06,
+    sampleRateReductionAmount: 0.06,
+    bassAmount: 0.20,
+    midAmount: -0.55,
+    trebleAmount: 0.05,
+    stereoWidthAmount: -0.10,
+    smallSpeakerRoomAmount: 0.14,
+    wowFlutterAmount: 0.04,
+    noiseLevel: 0.004,
+    vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0.10,
+    compressorAmount: 0.40,
+    fxOutputTrimAmount: 0.58,
+  },
+  club: {
+    isAudioFxEnabled: true,
+    isNoiseEnabled: false,
+    lofiAmount: 0,
+    radioToneAmount: 0,
+    bitCrushAmount: 0,
+    sampleRateReductionAmount: 0,
+    bassAmount: 0.30,
+    midAmount: -0.65,
+    trebleAmount: 0.15,
+    stereoWidthAmount: 0.15,
+    smallSpeakerRoomAmount: 0,
+    wowFlutterAmount: 0,
+    noiseLevel: 0,
+    vinylDustAmount: 0,
+    noiseReductionAmount: 0,
+    delayAmount: 0,
+    reverbAmount: 0.05,
+    chorusAmount: 0,
+    tapeSaturationAmount: 0,
+    compressorAmount: 0.45,
+    fxOutputTrimAmount: 0.62,
   },
 };
 
@@ -724,6 +859,48 @@ vinylDustAmountInput.addEventListener("input", () => {
   updateAudioSettings({ vinylDustAmount });
 });
 
+noiseReductionAmountInput?.addEventListener("input", () => {
+  const noiseReductionAmount = Number(noiseReductionAmountInput.value);
+  noiseReductionAmountValue.textContent = `${Math.round(noiseReductionAmount * 100)}%`;
+  updateAudioSettings({ noiseReductionAmount });
+});
+
+delayAmountInput?.addEventListener("input", () => {
+  const delayAmount = Number(delayAmountInput.value);
+  delayAmountValue.textContent = delayAmount.toFixed(2);
+  updateAudioSettings({ delayAmount });
+});
+
+reverbAmountInput?.addEventListener("input", () => {
+  const reverbAmount = Number(reverbAmountInput.value);
+  reverbAmountValue.textContent = reverbAmount.toFixed(2);
+  updateAudioSettings({ reverbAmount });
+});
+
+chorusAmountInput?.addEventListener("input", () => {
+  const chorusAmount = Number(chorusAmountInput.value);
+  chorusAmountValue.textContent = chorusAmount.toFixed(2);
+  updateAudioSettings({ chorusAmount });
+});
+
+tapeSaturationAmountInput?.addEventListener("input", () => {
+  const tapeSaturationAmount = Number(tapeSaturationAmountInput.value);
+  tapeSaturationAmountValue.textContent = tapeSaturationAmount.toFixed(2);
+  updateAudioSettings({ tapeSaturationAmount });
+});
+
+compressorAmountInput?.addEventListener("input", () => {
+  const compressorAmount = Number(compressorAmountInput.value);
+  compressorAmountValue.textContent = compressorAmount.toFixed(2);
+  updateAudioSettings({ compressorAmount });
+});
+
+fxOutputTrimAmountInput?.addEventListener("input", () => {
+  const fxOutputTrimAmount = Number(fxOutputTrimAmountInput.value);
+  fxOutputTrimAmountValue.textContent = fxOutputTrimAmount.toFixed(2);
+  updateAudioSettings({ fxOutputTrimAmount });
+});
+
 async function init() {
   for (const [presetKey, preset] of Object.entries(PRESETS)) {
     const option = document.createElement("option");
@@ -873,6 +1050,34 @@ function renderSettings(settings) {
   noiseLevelValue.textContent = `${(settings.noiseLevel * 100).toFixed(2)}%`;
   vinylDustAmountInput.value = String(settings.vinylDustAmount ?? 0);
   vinylDustAmountValue.textContent = `${Math.round((settings.vinylDustAmount ?? 0) * 100)}%`;
+  if (noiseReductionAmountInput) {
+    noiseReductionAmountInput.value = String(settings.noiseReductionAmount ?? 0);
+    noiseReductionAmountValue.textContent = `${Math.round((settings.noiseReductionAmount ?? 0) * 100)}%`;
+  }
+  if (delayAmountInput) {
+    delayAmountInput.value = String(settings.delayAmount ?? 0);
+    delayAmountValue.textContent = (settings.delayAmount ?? 0).toFixed(2);
+  }
+  if (reverbAmountInput) {
+    reverbAmountInput.value = String(settings.reverbAmount ?? 0);
+    reverbAmountValue.textContent = (settings.reverbAmount ?? 0).toFixed(2);
+  }
+  if (chorusAmountInput) {
+    chorusAmountInput.value = String(settings.chorusAmount ?? 0);
+    chorusAmountValue.textContent = (settings.chorusAmount ?? 0).toFixed(2);
+  }
+  if (tapeSaturationAmountInput) {
+    tapeSaturationAmountInput.value = String(settings.tapeSaturationAmount ?? 0);
+    tapeSaturationAmountValue.textContent = (settings.tapeSaturationAmount ?? 0).toFixed(2);
+  }
+  if (compressorAmountInput) {
+    compressorAmountInput.value = String(settings.compressorAmount ?? 0);
+    compressorAmountValue.textContent = (settings.compressorAmount ?? 0).toFixed(2);
+  }
+  if (fxOutputTrimAmountInput) {
+    fxOutputTrimAmountInput.value = String(settings.fxOutputTrimAmount ?? 0.66);
+    fxOutputTrimAmountValue.textContent = (settings.fxOutputTrimAmount ?? 0.66).toFixed(2);
+  }
 }
 
 async function updateSettings(patch) {

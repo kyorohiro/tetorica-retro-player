@@ -420,6 +420,69 @@
             <input id="vinylDustAmount" type="range" min="0" max="1" step="0.01" />
             <output id="vinylDustAmountValue"></output>
           </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Noise Reduction</span>
+              <span class="info-tip" tabindex="0" data-tip="Applies a post-process low-pass to reduce high-frequency noise after bit-crushing.">?</span>
+            </span>
+            <input id="noiseReductionAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="noiseReductionAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Tape Saturation</span>
+              <span class="info-tip" tabindex="0" data-tip="Applies warm tape-style harmonic saturation after the EQ stage.">?</span>
+            </span>
+            <input id="tapeSaturationAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="tapeSaturationAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Delay</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds an echo delay effect with feedback.">?</span>
+            </span>
+            <input id="delayAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="delayAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Reverb</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds hall reverb for a spacious, roomy sound.">?</span>
+            </span>
+            <input id="reverbAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="reverbAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Chorus</span>
+              <span class="info-tip" tabindex="0" data-tip="Adds a chorus modulation effect for a richer, wider sound.">?</span>
+            </span>
+            <input id="chorusAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="chorusAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Compressor</span>
+              <span class="info-tip" tabindex="0" data-tip="Bus compressor: controls dynamic range and adds punch.">?</span>
+            </span>
+            <input id="compressorAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="compressorAmountValue"></output>
+          </label>
+
+          <label class="control">
+            <span class="label-with-tip">
+              <span>FX Output Trim</span>
+              <span class="info-tip" tabindex="0" data-tip="Final output gain trim after all effects processing.">?</span>
+            </span>
+            <input id="fxOutputTrimAmount" type="range" min="0" max="1" step="0.01" />
+            <output id="fxOutputTrimAmountValue"></output>
+          </label>
         </section>
 
         <section class="control-group" data-tab-panel="overlay" aria-labelledby="overlayControlsTitle">
