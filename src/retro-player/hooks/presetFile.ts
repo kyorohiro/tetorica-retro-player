@@ -53,6 +53,9 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
 const DEFAULT_UI_SETTINGS: PersistedRetroUiSettings = {
   isPreviewMaximized: false,
   isHighResolution: false,
+  brightness: 1.0,
+  flipH: false,
+  flipV: false,
 };
 
 type PresetFileContent = {
