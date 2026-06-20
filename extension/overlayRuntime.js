@@ -286,20 +286,22 @@ function createOverlay(settings) {
   audioFxButton.style.left = "-9999px";
   audioFxButton.style.top = "-9999px";
   audioFxButton.style.zIndex = "2147483647";
+  audioFxButton.style.width = "28px";
+  audioFxButton.style.height = "28px";
+  audioFxButton.style.padding = "0";
+  audioFxButton.style.border = "1px solid rgba(216, 180, 254, 0.35)";
+  audioFxButton.style.borderRadius = "50%";
+  audioFxButton.style.background = "rgba(14, 10, 22, 0.82)";
+  audioFxButton.style.cursor = "pointer";
+  audioFxButton.style.backdropFilter = "blur(8px)";
+  audioFxButton.style.boxShadow = "0 0 14px rgba(216, 180, 254, 0.12)";
+  audioFxButton.style.color = "#d8b4fe";
+  audioFxButton.style.fontSize = "14px";
+  audioFxButton.style.lineHeight = "1";
   audioFxButton.style.display = "flex";
   audioFxButton.style.alignItems = "center";
-  audioFxButton.style.height = "28px";
-  audioFxButton.style.border = "1px solid rgba(216, 180, 254, 0.35)";
-  audioFxButton.style.borderRadius = "999px";
-  audioFxButton.style.background = "rgba(14, 10, 22, 0.82)";
-  audioFxButton.style.backdropFilter = "blur(8px)";
-  audioFxButton.style.overflow = "hidden";
-  audioFxButton.style.cursor = "pointer";
-  audioFxButton.style.color = "#d8b4fe";
-  audioFxButton.style.font = '11px "IBM Plex Sans","Segoe UI",sans-serif';
-  audioFxButton.style.padding = "0 12px";
-  audioFxButton.style.whiteSpace = "nowrap";
-  audioFxButton.textContent = "♩ lofi";
+  audioFxButton.style.justifyContent = "center";
+  audioFxButton.textContent = "♩";
 
   const moreButton = document.createElement("button");
   moreButton.type = "button";
@@ -987,7 +989,7 @@ function createOverlay(settings) {
   }
 
   function updateAudioFxButton() {
-    audioFxButton.textContent = audioFxEnabled ? "♪ lofi" : "♩ lofi";
+    audioFxButton.textContent = audioFxEnabled ? "♪" : "♩";
     audioFxButton.style.borderColor = audioFxEnabled
       ? "rgba(216,180,254,0.75)"
       : "rgba(216,180,254,0.35)";
@@ -1155,13 +1157,17 @@ function createOverlay(settings) {
     if (isDRM) {
       recordButton.style.left = "-9999px";
       opacityButton.style.left = "-9999px";
-      moreLeft = recLeft;
+      audioFxButton.style.left = `${recLeft}px`;
+      audioFxButton.style.top = `${topY}px`;
+      moreLeft = recLeft - size - gap;
     } else {
       recordButton.style.left = `${recLeft}px`;
       recordButton.style.top = `${topY}px`;
       opacityButton.style.left = `${recLeft - size - gap}px`;
       opacityButton.style.top = `${topY}px`;
-      moreLeft = recLeft - size - gap - size - gap;
+      audioFxButton.style.left = `${recLeft - size - gap - size - gap}px`;
+      audioFxButton.style.top = `${topY}px`;
+      moreLeft = recLeft - size - gap - size - gap - size - gap;
     }
 
     if (!isVideo) {
@@ -1204,14 +1210,13 @@ function createOverlay(settings) {
     // Panel
     if (panelOpen) {
       const panelItems = isNarrow
-        ? [speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton]
-        : [loopGroup, flipGroup, audioFxButton];
+        ? [speedGroup, brightnessGroup, loopGroup, flipGroup]
+        : [loopGroup, flipGroup];
       const contentW = Math.max(
         speedGroup.offsetWidth || 92,
         brightnessGroup.offsetWidth || 92,
         loopGroup.offsetWidth || 80,
         flipGroup.offsetWidth || 54,
-        audioFxButton.offsetWidth || 72,
       );
       const panelW = contentW + padding * 2;
       const panelH = panelItems.length * 28 + (panelItems.length - 1) * gap + padding * 2;
@@ -1232,7 +1237,6 @@ function createOverlay(settings) {
       expandedPanel.style.left = "-9999px";
       loopGroup.style.left = "-9999px";
       flipGroup.style.left = "-9999px";
-      audioFxButton.style.left = "-9999px";
       if (isNarrow) {
         speedGroup.style.left = "-9999px";
         brightnessGroup.style.left = "-9999px";
