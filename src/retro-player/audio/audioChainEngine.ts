@@ -1,6 +1,91 @@
-export function createTapeSaturationCurve(amount) {
+export type AudioChainSettings = {
+  isAudioFxEnabled: boolean;
+  lofiAmount: number;
+  radioToneAmount: number;
+  bitCrushAmount: number;
+  sampleRateReductionAmount: number;
+  noiseReductionAmount: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
+  stereoWidthAmount: number;
+  smallSpeakerRoomAmount: number;
+  wowFlutterAmount: number;
+  isNoiseEnabled: boolean;
+  noiseLevel: number;
+  vinylDustAmount: number;
+  delayAmount: number;
+  reverbAmount: number;
+  chorusAmount: number;
+  tapeSaturationAmount: number;
+  compressorAmount: number;
+  fxOutputTrimAmount: number;
+};
+
+export type AudioChainNodes = {
+  entryNode: DelayNode;
+  masterGainNode: GainNode;
+  radioToneHighpassNode: BiquadFilterNode;
+  radioToneLowpassNode: BiquadFilterNode;
+  radioTonePresenceNode: BiquadFilterNode;
+  lofiLowpassNode: BiquadFilterNode;
+  lofiHighshelfNode: BiquadFilterNode;
+  lofiDriveNode: WaveShaperNode;
+  bitcrusherNode: AudioWorkletNode | null;
+  postCrushLowpassNode: BiquadFilterNode;
+  bassEqNode: BiquadFilterNode;
+  midEqNode: BiquadFilterNode;
+  trebleEqNode: BiquadFilterNode;
+  tapeSaturatorNode: WaveShaperNode;
+  stereoWidthNode: AudioWorkletNode | null;
+  roomDryGainNode: GainNode;
+  roomConvolverNode: ConvolverNode;
+  roomWetGainNode: GainNode;
+  wowFlutterDelayNode: DelayNode;
+  wowLfoNode: OscillatorNode;
+  wowLfoGainNode: GainNode;
+  flutterLfoNode: OscillatorNode;
+  flutterLfoGainNode: GainNode;
+  outputBusNode: GainNode;
+  echoDelayLineNode: DelayNode;
+  echoFeedbackGainNode: GainNode;
+  echoWetGainNode: GainNode;
+  hallReverbConvolverNode: ConvolverNode;
+  hallReverbWetGainNode: GainNode;
+  chorusDelay1Node: DelayNode;
+  chorusDelay2Node: DelayNode;
+  chorusLfo1Node: OscillatorNode;
+  chorusLfo2Node: OscillatorNode;
+  chorusLfoGain1Node: GainNode;
+  chorusLfoGain2Node: GainNode;
+  chorusWetGainNode: GainNode;
+  busCompressorNode: DynamicsCompressorNode;
+  fxOutputGainNode: GainNode;
+  noiseSourceNode: AudioBufferSourceNode;
+  noiseGainNode: GainNode;
+  noiseLfoNode: OscillatorNode;
+  noiseLfoGainNode: GainNode;
+  crackleSourceNode: AudioBufferSourceNode;
+  crackleFilterNode: BiquadFilterNode;
+  vinylDustBedFilterNode: BiquadFilterNode;
+  vinylDustBedGainNode: GainNode;
+  crackleGainNode: GainNode;
+};
+
+export function createDriveCurve(amount: number): Float32Array<ArrayBuffer> {
   const samples = 256;
-  const curve = new Float32Array(samples);
+  const curve = new Float32Array(samples) as Float32Array<ArrayBuffer>;
+  const drive = 1 + amount * 5;
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / (samples - 1) - 1;
+    curve[i] = Math.tanh(x * drive);
+  }
+  return curve;
+}
+
+export function createTapeSaturationCurve(amount: number): Float32Array<ArrayBuffer> {
+  const samples = 256;
+  const curve = new Float32Array(samples) as Float32Array<ArrayBuffer>;
   const k = amount * 8;
   for (let i = 0; i < samples; i++) {
     const x = (i * 2) / (samples - 1) - 1;
@@ -13,14 +98,31 @@ export function createTapeSaturationCurve(amount) {
   return curve;
 }
 
-export function createHallReverbImpulse(context) {
+export function createSmallRoomImpulse(context: BaseAudioContext): AudioBuffer {
+  const duration = 0.22;
+  const length = Math.max(1, Math.floor(context.sampleRate * duration));
+  const impulse = context.createBuffer(2, length, context.sampleRate);
+  for (let channel = 0; channel < impulse.numberOfChannels; channel++) {
+    const channelData = impulse.getChannelData(channel);
+    for (let i = 0; i < channelData.length; i++) {
+      const t = i / channelData.length;
+      const decay = (1 - t) ** 1.85;
+      const flutter = 0.78 + 0.22 * Math.sin(t * 42 + channel * 0.9);
+      const earlyReflection = Math.sin(t * 130 + channel * 0.35) * 0.08;
+      channelData[i] = ((Math.random() * 2 - 1) + earlyReflection) * decay * flutter * 0.28;
+    }
+  }
+  return impulse;
+}
+
+export function createHallReverbImpulse(context: BaseAudioContext): AudioBuffer {
   const duration = 2.2;
   const length = Math.max(1, Math.floor(context.sampleRate * duration));
   const impulse = context.createBuffer(2, length, context.sampleRate);
   const predelaySamples = Math.floor(context.sampleRate * 0.012);
-  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+  for (let channel = 0; channel < impulse.numberOfChannels; channel++) {
     const channelData = impulse.getChannelData(channel);
-    for (let i = 0; i < length; i += 1) {
+    for (let i = 0; i < length; i++) {
       if (i < predelaySamples) continue;
       const t = (i - predelaySamples) / (length - predelaySamples);
       const decay = (1 - t) ** 1.8;
@@ -32,85 +134,53 @@ export function createHallReverbImpulse(context) {
   return impulse;
 }
 
-export function createDriveCurve(amount) {
-  const samples = 256;
-  const curve = new Float32Array(samples);
-  const drive = 1 + amount * 5;
-  for (let index = 0; index < samples; index += 1) {
-    const x = (index * 2) / (samples - 1) - 1;
-    curve[index] = Math.tanh(x * drive);
-  }
-  return curve;
-}
-
-export function createSmallRoomImpulse(context) {
-  const duration = 0.22;
-  const length = Math.max(1, Math.floor(context.sampleRate * duration));
-  const impulse = context.createBuffer(2, length, context.sampleRate);
-  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
-    const channelData = impulse.getChannelData(channel);
-    for (let index = 0; index < channelData.length; index += 1) {
-      const t = index / channelData.length;
-      const decay = (1 - t) ** 1.85;
-      const flutter = 0.78 + 0.22 * Math.sin(t * 42 + channel * 0.9);
-      const earlyReflection = Math.sin(t * 130 + channel * 0.35) * 0.08;
-      channelData[index] = ((Math.random() * 2 - 1) + earlyReflection) * decay * flutter * 0.28;
-    }
-  }
-  return impulse;
-}
-
-export function createTintedNoiseBuffer(context) {
+export function createTintedNoiseBuffer(context: BaseAudioContext): AudioBuffer {
   const length = context.sampleRate * 2;
   const buffer = context.createBuffer(2, length, context.sampleRate);
   let brownState = 0;
   let airState = 0;
-  for (let index = 0; index < length; index += 1) {
+  for (let i = 0; i < length; i++) {
     const white = Math.random() * 2 - 1;
     brownState = (brownState + white * 0.045) / 1.045;
     airState = airState * 0.82 + white * 0.18;
     const body = brownState * 1.35;
     const air = (white - airState) * 0.55;
     const sample = Math.max(-1, Math.min(1, body + air));
-    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
       const channelData = buffer.getChannelData(channel);
       const channelJitter = (Math.random() * 2 - 1) * 0.012;
-      channelData[index] = Math.max(-1, Math.min(1, sample + channelJitter));
+      channelData[i] = Math.max(-1, Math.min(1, sample + channelJitter));
     }
   }
   return buffer;
 }
 
-export function createVinylDustBuffer(context) {
+export function createVinylDustBuffer(context: BaseAudioContext): AudioBuffer {
   const length = context.sampleRate * 2;
   const monoData = new Float32Array(length);
   let index = 0;
   let dustState = 0;
-
   while (index < length) {
     const white = Math.random() * 2 - 1;
     dustState = dustState * 0.72 + white * 0.28;
     monoData[index] += (white - dustState) * 0.018;
-
     const random = Math.random();
-
     if (random < 0.0034) {
       const crackleLength = 8 + Math.floor(Math.random() * 42);
       const crackleAmplitude = 0.11 + Math.random() * 0.28;
       const polarity = Math.random() < 0.5 ? -1 : 1;
-      for (let offset = 0; offset < crackleLength && index + offset < length; offset += 1) {
+      for (let offset = 0; offset < crackleLength && index + offset < length; offset++) {
         const decay = Math.exp(-offset / (2.4 + Math.random() * 5));
         monoData[index + offset] += polarity * crackleAmplitude * decay * (0.7 + Math.random() * 0.3);
       }
       index += crackleLength + Math.floor(Math.random() * 640);
       continue;
     }
-
     if (random < 0.0038) {
       const popLength = 90 + Math.floor(Math.random() * 260);
       const popAmplitude = 0.055 + Math.random() * 0.11;
       const phase = Math.random() * Math.PI * 2;
-      for (let offset = 0; offset < popLength && index + offset < length; offset += 1) {
+      for (let offset = 0; offset < popLength && index + offset < length; offset++) {
         const decay = Math.exp(-offset / (18 + Math.random() * 40));
         const wobble = Math.sin(phase + offset * (0.22 + Math.random() * 0.06));
         monoData[index + offset] += popAmplitude * decay * wobble;
@@ -118,22 +188,23 @@ export function createVinylDustBuffer(context) {
       index += popLength + Math.floor(Math.random() * 2200);
       continue;
     }
-
-    index += 1;
+    index++;
   }
-
   const buffer = context.createBuffer(2, length, context.sampleRate);
-  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let sampleIndex = 0; sampleIndex < length; sampleIndex += 1) {
+    for (let i = 0; i < length; i++) {
       const channelJitter = (Math.random() * 2 - 1) * 0.0035;
-      channelData[sampleIndex] = Math.max(-1, Math.min(1, monoData[sampleIndex] + channelJitter));
+      channelData[i] = Math.max(-1, Math.min(1, monoData[i] + channelJitter));
     }
   }
   return buffer;
 }
 
-export async function buildAudioChain(audioCtx, getWorkletUrl) {
+export async function buildAudioChain(
+  audioCtx: AudioContext,
+  getWorkletUrl?: (name: string) => string,
+): Promise<AudioChainNodes> {
   const masterGainNode = audioCtx.createGain();
   const radioToneHighpassNode = audioCtx.createBiquadFilter();
   const radioToneLowpassNode = audioCtx.createBiquadFilter();
@@ -141,12 +212,6 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   const lofiLowpassNode = audioCtx.createBiquadFilter();
   const lofiHighshelfNode = audioCtx.createBiquadFilter();
   const lofiDriveNode = audioCtx.createWaveShaper();
-  const bassEqNode = audioCtx.createBiquadFilter();
-  const midEqNode = audioCtx.createBiquadFilter();
-  const trebleEqNode = audioCtx.createBiquadFilter();
-  const roomDryGainNode = audioCtx.createGain();
-  const roomConvolverNode = audioCtx.createConvolver();
-  const roomWetGainNode = audioCtx.createGain();
   const wowFlutterDelayNode = audioCtx.createDelay(0.05);
   const wowLfoNode = audioCtx.createOscillator();
   const wowLfoGainNode = audioCtx.createGain();
@@ -158,14 +223,6 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   radioTonePresenceNode.type = "peaking";
   lofiLowpassNode.type = "lowpass";
   lofiHighshelfNode.type = "highshelf";
-  bassEqNode.type = "lowshelf";
-  bassEqNode.frequency.value = 180;
-  midEqNode.type = "peaking";
-  midEqNode.frequency.value = 1200;
-  midEqNode.Q.value = 0.9;
-  trebleEqNode.type = "highshelf";
-  trebleEqNode.frequency.value = 3200;
-  roomConvolverNode.buffer = createSmallRoomImpulse(audioCtx);
   lofiHighshelfNode.frequency.value = 2800;
   lofiDriveNode.oversample = "4x";
   wowFlutterDelayNode.delayTime.value = 0.006;
@@ -184,8 +241,8 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   lofiLowpassNode.connect(lofiHighshelfNode);
   lofiHighshelfNode.connect(lofiDriveNode);
 
-  let bitcrusherNode = null;
-  let stereoWidthNode = null;
+  let bitcrusherNode: AudioWorkletNode | null = null;
+  let stereoWidthNode: AudioWorkletNode | null = null;
   if ("audioWorklet" in audioCtx && getWorkletUrl) {
     try {
       await audioCtx.audioWorklet.addModule(getWorkletUrl("bitcrusherWorklet.js"));
@@ -211,6 +268,17 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   postCrushLowpassNode.frequency.value = 18000;
   postCrushLowpassNode.Q.value = 0.5;
 
+  const bassEqNode = audioCtx.createBiquadFilter();
+  const midEqNode = audioCtx.createBiquadFilter();
+  const trebleEqNode = audioCtx.createBiquadFilter();
+  bassEqNode.type = "lowshelf";
+  bassEqNode.frequency.value = 180;
+  midEqNode.type = "peaking";
+  midEqNode.frequency.value = 1200;
+  midEqNode.Q.value = 0.5;
+  trebleEqNode.type = "highshelf";
+  trebleEqNode.frequency.value = 2800;
+
   if (bitcrusherNode) {
     lofiDriveNode.connect(bitcrusherNode);
     bitcrusherNode.connect(postCrushLowpassNode);
@@ -226,6 +294,11 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   tapeSaturatorNode.oversample = "4x";
   trebleEqNode.connect(tapeSaturatorNode);
 
+  const roomDryGainNode = audioCtx.createGain();
+  const roomConvolverNode = audioCtx.createConvolver();
+  const roomWetGainNode = audioCtx.createGain();
+  roomConvolverNode.buffer = createSmallRoomImpulse(audioCtx);
+
   if (stereoWidthNode) {
     tapeSaturatorNode.connect(stereoWidthNode);
     stereoWidthNode.connect(roomDryGainNode);
@@ -238,7 +311,7 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   roomDryGainNode.connect(masterGainNode);
   roomWetGainNode.connect(masterGainNode);
 
-  // Spatial effects: echo, hall reverb, chorus
+  // Spatial effects
   const outputBusNode = audioCtx.createGain();
   outputBusNode.gain.value = 1;
 
@@ -323,6 +396,7 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   noiseFilterNode.gain.value = -2.5;
   const noisePannerNode = audioCtx.createStereoPanner();
   const noiseGainNode = audioCtx.createGain();
+  noiseGainNode.gain.value = 0;
   const noiseLfoNode = audioCtx.createOscillator();
   const noiseLfoGainNode = audioCtx.createGain();
   noiseLfoNode.type = "sine";
@@ -338,7 +412,7 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   noiseLfoNode.connect(noiseLfoGainNode);
   noiseLfoGainNode.connect(noisePannerNode.pan);
 
-  // Crackle / vinyl dust chain
+  // Crackle/vinyl dust chain
   const crackleSourceNode = audioCtx.createBufferSource();
   crackleSourceNode.buffer = createVinylDustBuffer(audioCtx);
   crackleSourceNode.loop = true;
@@ -397,7 +471,7 @@ export async function buildAudioChain(audioCtx, getWorkletUrl) {
   };
 }
 
-export function updateAudioChainNodes(nodes, settings) {
+export function updateAudioChainNodes(nodes: AudioChainNodes, settings: AudioChainSettings): void {
   const {
     radioToneHighpassNode, radioToneLowpassNode, radioTonePresenceNode,
     lofiLowpassNode, lofiHighshelfNode, lofiDriveNode,
@@ -416,7 +490,7 @@ export function updateAudioChainNodes(nodes, settings) {
     vinylDustBedFilterNode, vinylDustBedGainNode,
   } = nodes;
 
-  if (radioToneHighpassNode && radioToneLowpassNode && radioTonePresenceNode) {
+  {
     const amount = settings.isAudioFxEnabled ? settings.radioToneAmount : 0;
     radioToneHighpassNode.frequency.value = 20 + amount * 430;
     radioToneHighpassNode.Q.value = 0.4 + amount * 0.35;
@@ -427,7 +501,7 @@ export function updateAudioChainNodes(nodes, settings) {
     radioTonePresenceNode.gain.value = amount * 6;
   }
 
-  if (lofiLowpassNode && lofiHighshelfNode && lofiDriveNode) {
+  {
     const amount = settings.isAudioFxEnabled ? settings.lofiAmount : 0;
     lofiLowpassNode.frequency.value = 16000 - amount * 14200;
     lofiLowpassNode.Q.value = 0.3 + amount * 1.8;
@@ -442,16 +516,30 @@ export function updateAudioChainNodes(nodes, settings) {
     const mix = isEnabled
       ? Math.max(settings.bitCrushAmount, settings.sampleRateReductionAmount)
       : 0;
-    bitcrusherNode.parameters.get("bitDepth")?.setValueAtTime(bitDepth, bitcrusherNode.context.currentTime);
-    bitcrusherNode.parameters.get("holdFrames")?.setValueAtTime(holdFrames, bitcrusherNode.context.currentTime);
-    bitcrusherNode.parameters.get("mix")?.setValueAtTime(mix, bitcrusherNode.context.currentTime);
+    const t = bitcrusherNode.context.currentTime;
+    bitcrusherNode.parameters.get("bitDepth")?.setValueAtTime(bitDepth, t);
+    bitcrusherNode.parameters.get("holdFrames")?.setValueAtTime(holdFrames, t);
+    bitcrusherNode.parameters.get("mix")?.setValueAtTime(mix, t);
   }
 
-  if (bassEqNode && midEqNode && trebleEqNode) {
+  {
+    const amount = settings.isAudioFxEnabled ? settings.noiseReductionAmount : 0;
+    postCrushLowpassNode.frequency.value = Math.max(3000, 18000 - amount * 15000);
+  }
+
+  {
     const eqScale = settings.isAudioFxEnabled ? 15 : 0;
     bassEqNode.gain.value = settings.bassAmount * eqScale;
     midEqNode.gain.value = settings.midAmount * eqScale;
     trebleEqNode.gain.value = settings.trebleAmount * eqScale;
+  }
+
+  try {
+    tapeSaturatorNode.curve = createTapeSaturationCurve(
+      settings.isAudioFxEnabled ? settings.tapeSaturationAmount : 0,
+    );
+  } catch {
+    // Some non-browser Web Audio implementations reject reassigning curve.
   }
 
   if (stereoWidthNode) {
@@ -459,85 +547,72 @@ export function updateAudioChainNodes(nodes, settings) {
     stereoWidthNode.parameters.get("width")?.setValueAtTime(width, stereoWidthNode.context.currentTime);
   }
 
-  if (roomDryGainNode && roomWetGainNode) {
+  {
     const amount = settings.isAudioFxEnabled ? settings.smallSpeakerRoomAmount : 0;
     roomDryGainNode.gain.value = Math.max(0.52, 1 - amount * 0.42);
     roomWetGainNode.gain.value = amount * 0.95;
   }
 
-  if (wowFlutterDelayNode && wowLfoNode && wowLfoGainNode && flutterLfoNode && flutterLfoGainNode) {
+  {
     const amount = settings.isAudioFxEnabled ? settings.wowFlutterAmount : 0;
     wowFlutterDelayNode.delayTime.value = 0.006 + amount * 0.004;
     wowLfoNode.frequency.value = 0.18 + amount * 0.42;
-    wowLfoGainNode.gain.value = amount * 0.0035;
+    wowLfoGainNode.gain.value = amount * 0.0023;
     flutterLfoNode.frequency.value = 5.2 + amount * 6.5;
-    flutterLfoGainNode.gain.value = amount * 0.0009;
+    flutterLfoGainNode.gain.value = amount * 0.0006;
   }
 
-  if (noiseGainNode) {
-    noiseGainNode.gain.value = settings.isNoiseEnabled
-      ? Math.min(0.24, settings.noiseLevel * 5.5)
-      : 0;
-  }
-
-  if (crackleGainNode) {
-    crackleGainNode.gain.value = settings.isNoiseEnabled
-      ? Math.min(0.24, settings.vinylDustAmount * 0.22 + settings.noiseLevel * 0.25)
-      : 0;
-  }
-
-  if (vinylDustBedFilterNode && vinylDustBedGainNode) {
-    const amount = settings.isNoiseEnabled ? settings.vinylDustAmount : 0;
-    vinylDustBedFilterNode.frequency.value = 2100 + amount * 2600;
-    vinylDustBedFilterNode.Q.value = 0.35 + amount * 0.25;
-    vinylDustBedGainNode.gain.value = amount * 0.11;
-  }
-
-  if (postCrushLowpassNode) {
-    const amount = settings.isAudioFxEnabled ? (settings.noiseReductionAmount ?? 0) : 0;
-    postCrushLowpassNode.frequency.value = Math.max(3000, 18000 - amount * 15000);
-  }
-
-  if (tapeSaturatorNode) {
-    const amount = settings.isAudioFxEnabled ? (settings.tapeSaturationAmount ?? 0) : 0;
-    tapeSaturatorNode.curve = createTapeSaturationCurve(amount);
-  }
-
-  if (echoDelayLineNode && echoFeedbackGainNode && echoWetGainNode) {
-    const amount = settings.isAudioFxEnabled ? (settings.delayAmount ?? 0) : 0;
+  {
+    const amount = settings.isAudioFxEnabled ? settings.delayAmount : 0;
     echoDelayLineNode.delayTime.value = 0.32;
-    echoFeedbackGainNode.gain.value = amount * 0.42;
-    echoWetGainNode.gain.value = amount * 0.75;
+    echoFeedbackGainNode.gain.value = amount * 0.5;
+    echoWetGainNode.gain.value = amount * 0.55;
   }
 
-  if (hallReverbWetGainNode) {
-    const amount = settings.isAudioFxEnabled ? (settings.reverbAmount ?? 0) : 0;
-    hallReverbWetGainNode.gain.value = amount * 2.0;
-  }
+  hallReverbWetGainNode.gain.value =
+    settings.isAudioFxEnabled ? settings.reverbAmount * 2.0 : 0;
 
-  if (chorusLfoGain1Node && chorusLfoGain2Node && chorusWetGainNode) {
-    const amount = settings.isAudioFxEnabled ? (settings.chorusAmount ?? 0) : 0;
+  {
+    const amount = settings.isAudioFxEnabled ? settings.chorusAmount : 0;
     chorusWetGainNode.gain.value = amount * 0.6;
     chorusLfoGain1Node.gain.value = amount * 0.005;
     chorusLfoGain2Node.gain.value = amount * 0.006;
   }
 
-  if (busCompressorNode) {
-    const amount = settings.isAudioFxEnabled ? (settings.compressorAmount ?? 0) : 0;
+  {
+    const amount = settings.isAudioFxEnabled ? settings.compressorAmount : 0;
     busCompressorNode.threshold.value = -36 * amount;
     busCompressorNode.ratio.value = 1 + 9 * amount;
   }
 
-  if (fxOutputGainNode) {
-    fxOutputGainNode.gain.value = settings.isAudioFxEnabled
-      ? (settings.fxOutputTrimAmount ?? 1.0)
-      : 1.0;
+  fxOutputGainNode.gain.value = settings.isAudioFxEnabled ? settings.fxOutputTrimAmount : 1;
+
+  noiseGainNode.gain.value = settings.isNoiseEnabled
+    ? Math.min(0.24, settings.noiseLevel * 5.5)
+    : 0;
+
+  crackleGainNode.gain.value = settings.isNoiseEnabled
+    ? Math.min(0.24, settings.vinylDustAmount * 0.22 + settings.noiseLevel * 0.25)
+    : 0;
+
+  {
+    const amount = settings.isNoiseEnabled ? settings.vinylDustAmount : 0;
+    vinylDustBedFilterNode.frequency.value = 2100 + amount * 2600;
+    vinylDustBedFilterNode.Q.value = 0.35 + amount * 0.25;
+    vinylDustBedGainNode.gain.value = amount * 0.11;
   }
 }
 
-export function disposeAudioChain(nodes) {
-  const { noiseSourceNode, noiseLfoNode, crackleSourceNode, wowLfoNode, flutterLfoNode, chorusLfo1Node, chorusLfo2Node } = nodes;
-  for (const osc of [noiseSourceNode, noiseLfoNode, crackleSourceNode, wowLfoNode, flutterLfoNode, chorusLfo1Node, chorusLfo2Node]) {
-    try { osc?.stop(); } catch {}
+export function disposeAudioChain(nodes: AudioChainNodes): void {
+  for (const source of [
+    nodes.noiseSourceNode,
+    nodes.noiseLfoNode,
+    nodes.crackleSourceNode,
+    nodes.wowLfoNode,
+    nodes.flutterLfoNode,
+    nodes.chorusLfo1Node,
+    nodes.chorusLfo2Node,
+  ]) {
+    try { source.stop(); } catch { /* ignore repeated stop */ }
   }
 }

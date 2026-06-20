@@ -5,7 +5,7 @@ import {
   normalizeSettings,
   toShaderMonoTint,
 } from "./shared/settings.js";
-import { buildAudioChain, updateAudioChainNodes, disposeAudioChain } from "./shared/audioEngine.js";
+import { buildAudioChain, updateAudioChainNodes, disposeAudioChain } from "./shared/audioChainEngine.js";
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 

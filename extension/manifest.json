@@ -31,7 +31,7 @@
         "viewer.css",
         "viewer.js",
         "overlayRuntime.js",
-        "shared/audioEngine.js",
+        "shared/audioChainEngine.js",
         "shared/bitcrusherWorklet.js",
         "shared/filterShader.js",
         "shared/stereoWidthWorklet.js",
