@@ -88,6 +88,15 @@
             <output id="ditherStrengthValue"></output>
           </label>
 
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Smooth</span>
+              <span class="info-tip" tabindex="0" data-tip="Blurs the source image before pixelating, softening pixel edges for a smoother, cel-like look.">?</span>
+            </span>
+            <input id="smoothStrength" type="range" min="0" max="1" step="0.01" />
+            <output id="smoothStrengthValue"></output>
+          </label>
+
           <section class="subsection crt-lcd-section" aria-labelledby="crtLcdTitle">
             <div class="subsection-header">
               <p class="subsection-kicker">Effects</p>
@@ -168,15 +177,6 @@
 
           <label class="control">
             <span class="label-with-tip">
-              <span>Spot mask</span>
-              <span class="info-tip" tabindex="0" data-tip="Shapes each pixel into a darker-backed phosphor dot. Brighter pixels stay larger, so black gaps remain visible while highlights feel hotter.">?</span>
-            </span>
-            <input id="spotMaskStrength" type="range" min="0" max="1.0" step="0.01" />
-            <output id="spotMaskStrengthValue"></output>
-          </label>
-
-          <label class="control">
-            <span class="label-with-tip">
               <span>Close-up noise</span>
               <span class="info-tip" tabindex="0" data-tip="Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT.">?</span>
             </span>
@@ -190,6 +190,15 @@
               <p class="subsection-kicker">Phosphor Dot only</p>
               <h3 id="phosphorDotTitle">Dot mask tuning</h3>
             </div>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Spot mask</span>
+                <span class="info-tip" tabindex="0" data-tip="Shapes each pixel into a darker-backed phosphor dot. Brighter pixels stay larger, so black gaps remain visible while highlights feel hotter.">?</span>
+              </span>
+              <input id="spotMaskStrength" type="range" min="0" max="1.0" step="0.01" />
+              <output id="spotMaskStrengthValue"></output>
+            </label>
 
             <label class="control control-toggle">
               <span>2x internal resolution</span>
@@ -236,6 +245,49 @@
               </span>
               <input id="phosphorDotLightBalance" type="range" min="0" max="2" step="0.01" />
               <output id="phosphorDotLightBalanceValue"></output>
+            </label>
+          </section>
+
+          <section class="subsection anime-toon-section" aria-labelledby="animeToonTitle">
+            <div class="subsection-header">
+              <p class="subsection-kicker">Anime / Toon</p>
+              <h3 id="animeToonTitle">Edge</h3>
+            </div>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Toon steps</span>
+                <span class="info-tip" tabindex="0" data-tip="Posterizes shading into flat bands. 0 = off, higher values give stronger cartoon banding.">?</span>
+              </span>
+              <input id="toonSteps" type="range" min="0" max="16" step="1" />
+              <output id="toonStepsValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Edge boost</span>
+                <span class="info-tip" tabindex="0" data-tip="Darkens detected edges for an ink-line effect. Works with Toon steps for anime outlines, or alone for a subtle CRT edge enhancement.">?</span>
+              </span>
+              <input id="edgeBoost" type="range" min="0" max="1.5" step="0.01" />
+              <output id="edgeBoostValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Edge low</span>
+                <span class="info-tip" tabindex="0" data-tip="Lower threshold for anime edge detection. Edges weaker than this are ignored.">?</span>
+              </span>
+              <input id="animeEdgeLow" type="range" min="0" max="1" step="0.01" />
+              <output id="animeEdgeLowValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Edge high</span>
+                <span class="info-tip" tabindex="0" data-tip="Upper threshold for anime edge detection. Edges stronger than this are fully drawn.">?</span>
+              </span>
+              <input id="animeEdgeHigh" type="range" min="0" max="1" step="0.01" />
+              <output id="animeEdgeHighValue"></output>
             </label>
           </section>
         </section>

@@ -60,6 +60,16 @@ const phosphorDotLightBalanceInput = document.getElementById("phosphorDotLightBa
 const phosphorDotLightBalanceValue = document.getElementById("phosphorDotLightBalanceValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
+const smoothStrengthInput = document.getElementById("smoothStrength");
+const smoothStrengthValue = document.getElementById("smoothStrengthValue");
+const toonStepsInput = document.getElementById("toonSteps");
+const toonStepsValue = document.getElementById("toonStepsValue");
+const edgeBoostInput = document.getElementById("edgeBoost");
+const edgeBoostValue = document.getElementById("edgeBoostValue");
+const animeEdgeLowInput = document.getElementById("animeEdgeLow");
+const animeEdgeLowValue = document.getElementById("animeEdgeLowValue");
+const animeEdgeHighInput = document.getElementById("animeEdgeHigh");
+const animeEdgeHighValue = document.getElementById("animeEdgeHighValue");
 const overlayTargetCountInput = document.getElementById("overlayTargetCount");
 const overlayTargetCountValue = document.getElementById("overlayTargetCountValue");
 const overlayVideoInput = document.getElementById("overlayVideo");
@@ -586,6 +596,36 @@ closeUpNoiseStrengthInput.addEventListener("input", () => {
   });
 });
 
+smoothStrengthInput.addEventListener("input", () => {
+  const smoothStrength = Number(smoothStrengthInput.value);
+  smoothStrengthValue.textContent = smoothStrength.toFixed(2);
+  updateSettings({ presetKey: CUSTOM_PRESET_KEY, smoothStrength });
+});
+
+toonStepsInput.addEventListener("input", () => {
+  const toonSteps = Number(toonStepsInput.value);
+  toonStepsValue.textContent = toonSteps === 0 ? "off" : String(toonSteps);
+  updateSettings({ presetKey: CUSTOM_PRESET_KEY, toonSteps });
+});
+
+edgeBoostInput.addEventListener("input", () => {
+  const edgeBoost = Number(edgeBoostInput.value);
+  edgeBoostValue.textContent = edgeBoost.toFixed(2);
+  updateSettings({ presetKey: CUSTOM_PRESET_KEY, edgeBoost });
+});
+
+animeEdgeLowInput.addEventListener("input", () => {
+  const animeEdgeLow = Number(animeEdgeLowInput.value);
+  animeEdgeLowValue.textContent = animeEdgeLow.toFixed(2);
+  updateSettings({ presetKey: CUSTOM_PRESET_KEY, animeEdgeLow });
+});
+
+animeEdgeHighInput.addEventListener("input", () => {
+  const animeEdgeHigh = Number(animeEdgeHighInput.value);
+  animeEdgeHighValue.textContent = animeEdgeHigh.toFixed(2);
+  updateSettings({ presetKey: CUSTOM_PRESET_KEY, animeEdgeHigh });
+});
+
 overlayTargetCountInput.addEventListener("input", () => {
   updateSettings({
     overlayTargetCount: Number(overlayTargetCountInput.value),
@@ -784,6 +824,16 @@ function renderSettings(settings) {
   phosphorDotLightBalanceValue.textContent = (settings.phosphorDotLightBalance ?? 1).toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
+  smoothStrengthInput.value = String(settings.smoothStrength ?? 0);
+  smoothStrengthValue.textContent = (settings.smoothStrength ?? 0).toFixed(2);
+  toonStepsInput.value = String(settings.toonSteps ?? 0);
+  toonStepsValue.textContent = (settings.toonSteps ?? 0) === 0 ? "off" : String(settings.toonSteps);
+  edgeBoostInput.value = String(settings.edgeBoost ?? 0);
+  edgeBoostValue.textContent = (settings.edgeBoost ?? 0).toFixed(2);
+  animeEdgeLowInput.value = String(settings.animeEdgeLow ?? 0.08);
+  animeEdgeLowValue.textContent = (settings.animeEdgeLow ?? 0.08).toFixed(2);
+  animeEdgeHighInput.value = String(settings.animeEdgeHigh ?? 0.55);
+  animeEdgeHighValue.textContent = (settings.animeEdgeHigh ?? 0.55).toFixed(2);
   overlayTargetCountInput.min = String(OVERLAY_TARGET_LIMITS.min);
   overlayTargetCountInput.max = String(OVERLAY_TARGET_LIMITS.max);
   overlayTargetCountInput.value = String(settings.overlayTargetCount);
