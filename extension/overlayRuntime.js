@@ -605,29 +605,33 @@ function createOverlay(settings) {
   }
 
   function updateSurfaceSpotlight(surface, rect) {
-    if (
-      typeof pointerClientX !== "number" ||
-      typeof pointerClientY !== "number" ||
-      !surface.targetElement ||
-      !rect ||
-      surface.canvas.style.display === "none"
-    ) {
-      surface.canvas.style.maskImage = "";
-      surface.canvas.style.webkitMaskImage = "";
+    const inside =
+      typeof pointerClientX === "number" &&
+      typeof pointerClientY === "number" &&
+      !!surface.targetElement &&
+      !!rect &&
+      surface.canvas.style.display !== "none" &&
+      isPointInsideRect(rect, pointerClientX, pointerClientY);
+
+    if (!inside) {
+      if (surface._spotlightActive) {
+        surface._spotlightActive = false;
+        surface.canvas.style.maskImage = "";
+        surface.canvas.style.webkitMaskImage = "";
+      }
       return;
     }
 
-    if (!isPointInsideRect(rect, pointerClientX, pointerClientY)) {
-      surface.canvas.style.maskImage = "";
-      surface.canvas.style.webkitMaskImage = "";
-      return;
+    const localX = Math.round(pointerClientX - rect.left);
+    const localY = Math.round(pointerClientY - rect.top);
+    const key = `${localX},${localY}`;
+    if (!surface._spotlightActive || surface._spotlightKey !== key) {
+      surface._spotlightActive = true;
+      surface._spotlightKey = key;
+      const mask = `radial-gradient(circle at ${localX}px ${localY}px, transparent 60px, rgba(0,0,0,0.6) 90px, black 120px)`;
+      surface.canvas.style.maskImage = mask;
+      surface.canvas.style.webkitMaskImage = mask;
     }
-
-    const localX = pointerClientX - rect.left;
-    const localY = pointerClientY - rect.top;
-    const mask = `radial-gradient(circle at ${localX}px ${localY}px, transparent 60px, rgba(0,0,0,0.6) 90px, black 120px)`;
-    surface.canvas.style.maskImage = mask;
-    surface.canvas.style.webkitMaskImage = mask;
   }
 
   function attachPointerTracking() {
@@ -1329,6 +1333,7 @@ function createOverlaySurface(index) {
   canvas.style.pointerEvents = "none";
   canvas.style.display = "none";
   canvas.style.transformOrigin = "top left";
+  canvas.style.willChange = "mask-image";
   canvas.dataset.tetoricaOverlay = "true";
 
   const failureOverlay = document.createElement("div");
@@ -1382,6 +1387,8 @@ function createOverlaySurface(index) {
     startedAt: performance.now(),
     lastRectKey: "",
     didTargetChange: true,
+    _spotlightActive: false,
+    _spotlightKey: "",
     destroy() {
       if (this.targetElement instanceof HTMLVideoElement) {
         this.targetElement.style.filter = "";
