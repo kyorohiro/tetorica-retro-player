@@ -12,7 +12,13 @@ const zipPath = path.join(releaseDir, zipName);
 fs.mkdirSync(releaseDir, { recursive: true });
 fs.rmSync(zipPath, { force: true });
 
-execFileSync("npx", ["tsc", "-p", "tsconfig.extension.json"], {
+execFileSync("npx", [
+  "esbuild",
+  "src/retro-player/audio/TetoricaRetroAudioNode.ts",
+  "--bundle",
+  "--format=esm",
+  "--outfile=extension/shared/TetoricaRetroAudioNode.js",
+], {
   stdio: "inherit",
 });
 

@@ -5,7 +5,7 @@ import {
   normalizeSettings,
   toShaderMonoTint,
 } from "./shared/settings.js";
-import { buildAudioChain, updateAudioChainNodes, disposeAudioChain } from "./shared/audioChainEngine.js";
+import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js";
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 
@@ -355,7 +355,7 @@ function createOverlay(settings) {
   let audioFxEnabled = false;
   let overlayAudioCtx = null;
   let overlayAudioSource = null;
-  let overlayChainNodes = null;
+  let overlayAudioEngine = null;
   let overlayAudioHookedEl = null;
   let _hookSeq = 0;
   const rejectedElements = new WeakSet();
@@ -438,11 +438,11 @@ function createOverlay(settings) {
       const targetEl = getActiveVideoForSpeed();
       if (!targetEl) {
         audioFxEnabled = false;
-      } else if (overlayAudioHookedEl === targetEl && overlayAudioSource && overlayChainNodes) {
+      } else if (overlayAudioHookedEl === targetEl && overlayAudioSource && overlayAudioEngine?.input) {
         // Already hooked — just reconnect to chain
         try {
           overlayAudioSource.disconnect();
-          overlayAudioSource.connect(overlayChainNodes.entryNode);
+          overlayAudioSource.connect(overlayAudioEngine.input);
         } catch {}
       } else {
         await hookOverlayAudio(targetEl);
@@ -556,7 +556,7 @@ function createOverlay(settings) {
       currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
       applySettingsToSurfaces();
       syncSurfaceCount(currentSettings.overlayTargetCount);
-      if (overlayChainNodes) updateAudioChainNodes(overlayChainNodes, overlayAudioSettings());
+      if (overlayAudioEngine) overlayAudioEngine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
     };
 
     chrome.storage.onChanged.addListener(handleStorageChanged);
@@ -1025,7 +1025,7 @@ function createOverlay(settings) {
     const seq = ++_hookSeq;
 
     if (overlayAudioCtx) {
-      if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
+      if (overlayAudioEngine) { await overlayAudioEngine.disposeAudioEngine(); overlayAudioEngine = null; }
       try { await overlayAudioCtx.close(); } catch {}
       overlayAudioCtx = null;
       overlayAudioSource = null;
@@ -1039,22 +1039,21 @@ function createOverlay(settings) {
       overlayAudioCtx = ctx;
       if (ctx.state !== "running") await ctx.resume();
 
-      const nodes = await buildAudioChain(
-        ctx,
-        (name) => chrome.runtime.getURL(`shared/${name}`),
-      );
+      const engine = createTetoricaRetroAudioNode(ctx, { instanceLabel: "overlay" });
+      await engine.ensureInitialized();
+      await engine.connect(ctx.destination);
 
       // A newer call superseded us during the chain build — discard and exit
       if (seq !== _hookSeq) {
-        disposeAudioChain(nodes);
+        await engine.disposeAudioEngine();
         try { ctx.close(); } catch {}
         return;
       }
 
-      overlayChainNodes = nodes;
-      updateAudioChainNodes(overlayChainNodes, overlayAudioSettings());
+      overlayAudioEngine = engine;
+      engine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
       overlayAudioSource = ctx.createMediaElementSource(videoElement);
-      overlayAudioSource.connect(overlayChainNodes.entryNode);
+      overlayAudioSource.connect(overlayAudioEngine.input);
     } catch (err) {
       if (seq === _hookSeq) {
         console.warn("[overlay audio] hook failed:", err);
@@ -1065,7 +1064,7 @@ function createOverlay(settings) {
   }
 
   function releaseOverlayAudio() {
-    if (overlayChainNodes) { disposeAudioChain(overlayChainNodes); overlayChainNodes = null; }
+    if (overlayAudioEngine) { void overlayAudioEngine.disposeAudioEngine(); overlayAudioEngine = null; }
     if (overlayAudioCtx) {
       try { overlayAudioCtx.close(); } catch {}
       overlayAudioCtx = null;

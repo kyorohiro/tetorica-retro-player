@@ -7,11 +7,7 @@ import {
   normalizeSettings,
   toShaderMonoTint,
 } from "./shared/settings.js";
-import {
-  buildAudioChain,
-  updateAudioChainNodes,
-  disposeAudioChain,
-} from "./shared/audioChainEngine.js";
+import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js";
 
 const statusText = document.getElementById("statusText");
 const canvas = document.getElementById("glCanvas");
@@ -39,7 +35,7 @@ let animationFrameId = 0;
 let mediaStream = null;
 let audioContext = null;
 let mediaSourceNode = null;
-let audioChainNodes = null;
+let audioEngine = null;
 let uniformLocations = null;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
@@ -501,8 +497,8 @@ function applyPreset(presetKey) {
 }
 
 function updateAudioNodes() {
-  if (audioChainNodes) {
-    updateAudioChainNodes(audioChainNodes, currentSettings);
+  if (audioEngine) {
+    audioEngine.setParams({ volume: 1.0, isMuted: false, ...currentSettings }, true);
   }
 }
 
@@ -510,15 +506,14 @@ async function ensureAudioContext() {
   if (audioContext?.state === "closed") {
     audioContext = null;
     mediaSourceNode = null;
-    audioChainNodes = null;
+    audioEngine = null;
   }
 
   if (!audioContext) {
     audioContext = new AudioContext();
-    audioChainNodes = await buildAudioChain(
-      audioContext,
-      (name) => new URL(`./shared/${name}`, import.meta.url).href,
-    );
+    audioEngine = createTetoricaRetroAudioNode(audioContext, { instanceLabel: "viewer" });
+    await audioEngine.ensureInitialized();
+    await audioEngine.connect(audioContext.destination);
     updateAudioNodes();
   }
 
@@ -538,7 +533,7 @@ async function connectStreamAudio(stream) {
   if (audioTracks.length === 0) return;
 
   const context = await ensureAudioContext();
-  if (!context || !audioChainNodes) return;
+  if (!context || !audioEngine?.input) return;
 
   if (mediaSourceNode) {
     mediaSourceNode.disconnect();
@@ -546,7 +541,7 @@ async function connectStreamAudio(stream) {
   }
 
   mediaSourceNode = context.createMediaStreamSource(stream);
-  mediaSourceNode.connect(audioChainNodes.entryNode);
+  mediaSourceNode.connect(audioEngine.input);
   updateAudioNodes();
 }
 
@@ -554,9 +549,9 @@ async function disposeAudioEngine() {
   mediaSourceNode?.disconnect();
   mediaSourceNode = null;
 
-  if (audioChainNodes) {
-    disposeAudioChain(audioChainNodes);
-    audioChainNodes = null;
+  if (audioEngine) {
+    await audioEngine.disposeAudioEngine();
+    audioEngine = null;
   }
 
   const context = audioContext;
