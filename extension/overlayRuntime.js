@@ -10,11 +10,17 @@ import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
-// createMediaElementSource は同じ要素に対して1度しか呼べないため。
+// 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
+//       ctx を close すると async close が完了する前に次の hook が走り
+//       "already connected to a different MediaElementSourceNode" エラーになる。
+// 方針: ctx は close せず、source は常にどこかに接続しておく（lo-fi off 時は destination 直結）。
 let _sharedAudioCtx = null;
 let _sharedAudioSource = null;
 let _sharedAudioSourceEl = null;
-// lo-fi の ON/OFF 状態もオーバーレイをまたいで維持する
+// lo-fi ボタンの ON/OFF 状態をオーバーレイをまたいで保持する。
+// isAudioFxEnabled（settings の effects on/off）とは独立した制御:
+//   _sharedAudioFxEnabled = "audio chain を使うか"（source の routing 先）
+//   isAudioFxEnabled      = "chain 内の effect を適用するか"（engine のパラメータ）
 let _sharedAudioFxEnabled = false;
 
 const vertexShaderSource = `#version 300 es
@@ -507,6 +513,7 @@ function createOverlay(settings) {
   function start() {
     document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup);
     updateOpacityButton();
+    updateAudioFxButton();
     attachSettingsSync();
     attachPointerTracking();
     updateRecordButton();
@@ -1062,11 +1069,17 @@ function createOverlay(settings) {
       overlayAudioEngine = engine;
       engine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
 
-      // 同じ video element なら source を再利用
+      // 同じ video element なら source を再利用（createMediaElementSource は1度しか呼べないため）。
+      // どちらの場合も必ず disconnect してから engine に繋ぐ。
+      // 理由: destroyOverlayAudio が source を destination 直結（bypass）にするため、
+      //       disconnect せずに connect すると source が destination と engine.input の
+      //       両方に繋がり二重出力になる。
       if (_sharedAudioSourceEl !== videoElement || !_sharedAudioSource) {
         try { _sharedAudioSource?.disconnect(); } catch {}
         _sharedAudioSource = ctx.createMediaElementSource(videoElement);
         _sharedAudioSourceEl = videoElement;
+      } else {
+        try { _sharedAudioSource.disconnect(); } catch {}
       }
       _sharedAudioSource.connect(overlayAudioEngine.input);
     } catch (err) {
