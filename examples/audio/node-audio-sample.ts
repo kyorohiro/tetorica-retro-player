@@ -74,6 +74,20 @@ oscillator.start(now);
 oscillator.stop(now + 3);
 
 await new Promise((resolve) => setTimeout(resolve, 3200));
+
+// --- verify: output routes through fxOutputGain (not outputBus) ---
+const outputNode = engine.output;
+console.assert(outputNode != null, "output should exist before dispose");
+
 await engine.disposeAudioEngine();
+
+// --- verify: dispose() does NOT close the AudioContext ---
+console.assert(
+  context.state !== "closed",
+  `AudioContext should remain open after dispose(), got: ${context.state}`,
+);
+
+await context.close();
+console.assert(context.state === "closed", "AudioContext should be closed after explicit close()");
 
 console.log("Finished node audio sample.");

@@ -353,19 +353,7 @@ export function RetroPreviewView({
     !player.previewError &&
     (!player.isRendererReady || player.isLoading);
 
-  // In fit-width mode the container grows to natural content height via CSS
-  // aspect-ratio, so we don't force a pixel height from the viewport rect.
-  const previewFrameHeight =
-    !isPreviewMaximized &&
-    !isFitWidthEnabled &&
-    player.viewportRect &&
-    player.sourceDimensions &&
-    player.sourceDimensions.width > player.sourceDimensions.height
-      ? Math.max(280, Math.ceil(player.viewportRect.height + 24))
-      : null;
-  const normalPreviewHeight = previewFrameHeight
-    ? `${previewFrameHeight}px`
-    : "60vh";
+  const normalPreviewHeight = "60vh";
 
   const previewAspectRatio = React.useMemo(() => {
     if (!player.sourceDimensions) return undefined;
@@ -785,22 +773,22 @@ export function RetroPreviewView({
                     ? {
                         // Portrait: constrain by height so Safari respects aspect-ratio
                         aspectRatio: previewAspectRatio,
-                        height: previewFrameHeight
-                          ? `${previewFrameHeight}px`
-                          : "min(60vh, calc(100vh - 12rem))",
+                        height: "min(60vh, calc(100vh - 12rem))",
                         maxHeight: "min(60vh, calc(100vh - 12rem))",
                         maxWidth: "100%",
                         minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
                         margin: "0 auto",
                       }
                     : {
-                        // Landscape: constrain by width, height follows aspect-ratio
+                        // Landscape: height-first (same as portrait) so max-height caps the video
+                        // within the viewport. width: 100% alone doesn't shrink when max-height
+                        // kicks in, but an explicit height lets aspect-ratio auto-size the width.
                         aspectRatio: previewAspectRatio,
-                        width: "100%",
-                        maxHeight: previewFrameHeight
-                          ? `${previewFrameHeight}px`
-                          : "min(60vh, calc(100vh - 12rem))",
+                        height: "min(60vh, calc(100vh - 12rem))",
+                        maxHeight: "min(60vh, calc(100vh - 12rem))",
+                        maxWidth: "100%",
                         minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                        margin: "0 auto",
                       }
                   : {
                       height: normalPreviewHeight,
