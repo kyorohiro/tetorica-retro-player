@@ -9,6 +9,14 @@ import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 
+// AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
+// createMediaElementSource は同じ要素に対して1度しか呼べないため。
+let _sharedAudioCtx = null;
+let _sharedAudioSource = null;
+let _sharedAudioSourceEl = null;
+// lo-fi の ON/OFF 状態もオーバーレイをまたいで維持する
+let _sharedAudioFxEnabled = false;
+
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
 out vec2 vTextureCoord;
@@ -352,9 +360,7 @@ function createOverlay(settings) {
   let loopEnd = 0;
   let loopTimeupdateListener = null;
   let loopTargetEl = null;
-  let audioFxEnabled = false;
-  let overlayAudioCtx = null;
-  let overlayAudioSource = null;
+  let audioFxEnabled = _sharedAudioFxEnabled;
   let overlayAudioEngine = null;
   let overlayAudioHookedEl = null;
   let _hookSeq = 0;
@@ -434,25 +440,27 @@ function createOverlay(settings) {
 
   audioFxButton.addEventListener("click", async () => {
     audioFxEnabled = !audioFxEnabled;
+    _sharedAudioFxEnabled = audioFxEnabled;
     if (audioFxEnabled) {
       const targetEl = getActiveVideoForSpeed();
       if (!targetEl) {
         audioFxEnabled = false;
-      } else if (overlayAudioHookedEl === targetEl && overlayAudioSource && overlayAudioEngine?.input) {
+        _sharedAudioFxEnabled = false;
+      } else if (overlayAudioHookedEl === targetEl && _sharedAudioSource && overlayAudioEngine?.input) {
         // Already hooked — just reconnect to chain
         try {
-          overlayAudioSource.disconnect();
-          overlayAudioSource.connect(overlayAudioEngine.input);
+          _sharedAudioSource.disconnect();
+          _sharedAudioSource.connect(overlayAudioEngine.input);
         } catch {}
       } else {
         await hookOverlayAudio(targetEl);
       }
     } else {
       // Bypass: keep AudioContext alive, route directly to destination (no gap in audio)
-      if (overlayAudioSource && overlayAudioCtx) {
+      if (_sharedAudioSource && _sharedAudioCtx) {
         try {
-          overlayAudioSource.disconnect();
-          overlayAudioSource.connect(overlayAudioCtx.destination);
+          _sharedAudioSource.disconnect();
+          _sharedAudioSource.connect(_sharedAudioCtx.destination);
         } catch {}
       }
     }
@@ -523,7 +531,7 @@ function createOverlay(settings) {
 
     stopRecording({ save: false });
     clearLoop();
-    releaseOverlayAudio();
+    destroyOverlayAudio();
     if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
       lastHoveredDRMVideo.style.filter = "";
       lastHoveredDRMVideo.style.transform = "";
@@ -595,9 +603,9 @@ function createOverlay(settings) {
     updateButtonPositions(targetRects[0] ?? null);
     updateOpacityButton();
     updateSpeedButtonLabel();
-    if (audioFxEnabled && overlayAudioHookedEl) {
+    if (audioFxEnabled) {
       const activeVideo = getActiveVideoForSpeed();
-      if (activeVideo && activeVideo !== overlayAudioHookedEl) {
+      if (activeVideo && (activeVideo !== overlayAudioHookedEl || !overlayAudioEngine)) {
         hookOverlayAudio(activeVideo);
       }
     }
@@ -1018,42 +1026,49 @@ function createOverlay(settings) {
   }
 
   async function hookOverlayAudio(videoElement) {
-    if (overlayAudioHookedEl === videoElement && overlayAudioCtx?.state !== "closed") return;
+    if (overlayAudioHookedEl === videoElement && _sharedAudioCtx?.state === "running") return;
 
-    // Set immediately so draw loop doesn't re-enter while we await
     overlayAudioHookedEl = videoElement;
     const seq = ++_hookSeq;
 
-    if (overlayAudioCtx) {
-      if (overlayAudioEngine) { await overlayAudioEngine.disposeAudioEngine(); overlayAudioEngine = null; }
-      try { await overlayAudioCtx.close(); } catch {}
-      overlayAudioCtx = null;
-      overlayAudioSource = null;
+    // 既存エンジンチェーンだけ解体（ctx と source はモジュールレベルで維持）
+    if (overlayAudioEngine) {
+      try { _sharedAudioSource?.disconnect(); } catch {}
+      await overlayAudioEngine.disposeAudioEngine();
+      overlayAudioEngine = null;
     }
 
-    // A newer call superseded us during the close await — bail out
     if (seq !== _hookSeq) return;
 
     try {
-      const ctx = new AudioContext();
-      overlayAudioCtx = ctx;
-      if (ctx.state !== "running") await ctx.resume();
+      // ctx は一度作ったら閉じない
+      if (!_sharedAudioCtx || _sharedAudioCtx.state === "closed") {
+        _sharedAudioCtx = new AudioContext();
+        _sharedAudioSource = null;
+        _sharedAudioSourceEl = null;
+      }
+      const ctx = _sharedAudioCtx;
+      if (ctx.state === "suspended") await ctx.resume();
 
       const engine = createTetoricaRetroAudioNode(ctx, { instanceLabel: "overlay" });
       await engine.ensureInitialized();
       await engine.connect(ctx.destination);
 
-      // A newer call superseded us during the chain build — discard and exit
       if (seq !== _hookSeq) {
         await engine.disposeAudioEngine();
-        try { ctx.close(); } catch {}
         return;
       }
 
       overlayAudioEngine = engine;
       engine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
-      overlayAudioSource = ctx.createMediaElementSource(videoElement);
-      overlayAudioSource.connect(overlayAudioEngine.input);
+
+      // 同じ video element なら source を再利用
+      if (_sharedAudioSourceEl !== videoElement || !_sharedAudioSource) {
+        try { _sharedAudioSource?.disconnect(); } catch {}
+        _sharedAudioSource = ctx.createMediaElementSource(videoElement);
+        _sharedAudioSourceEl = videoElement;
+      }
+      _sharedAudioSource.connect(overlayAudioEngine.input);
     } catch (err) {
       if (seq === _hookSeq) {
         console.warn("[overlay audio] hook failed:", err);
@@ -1064,14 +1079,27 @@ function createOverlay(settings) {
   }
 
   function releaseOverlayAudio() {
-    if (overlayAudioEngine) { void overlayAudioEngine.disposeAudioEngine(); overlayAudioEngine = null; }
-    if (overlayAudioCtx) {
-      try { overlayAudioCtx.close(); } catch {}
-      overlayAudioCtx = null;
+    // エラー時のリカバリ: source を bypass に戻してエンジンを解体
+    if (_sharedAudioSource && _sharedAudioCtx && _sharedAudioCtx.state !== "closed") {
+      try { _sharedAudioSource.disconnect(); } catch {}
+      try { _sharedAudioSource.connect(_sharedAudioCtx.destination); } catch {}
     }
-    overlayAudioSource = null;
+    if (overlayAudioEngine) { overlayAudioEngine.disposeAudioEngine().catch(() => {}); overlayAudioEngine = null; }
     overlayAudioHookedEl = null;
     audioFxEnabled = false;
+    _sharedAudioFxEnabled = false;
+  }
+
+  function destroyOverlayAudio() {
+    // ctx と source はモジュールレベルで維持する。
+    // source は必ず bypass (destination 直結) にしておく。disconnect するとビデオが無音になる。
+    if (_sharedAudioSource && _sharedAudioCtx && _sharedAudioCtx.state !== "closed") {
+      try { _sharedAudioSource.disconnect(); } catch {}
+      try { _sharedAudioSource.connect(_sharedAudioCtx.destination); } catch {}
+    }
+    if (overlayAudioEngine) { overlayAudioEngine.disposeAudioEngine().catch(() => {}); overlayAudioEngine = null; }
+    overlayAudioHookedEl = null;
+    // audioFxEnabled は _sharedAudioFxEnabled で次の overlay に引き継ぐためリセットしない
   }
 
   function applyBrightness() {

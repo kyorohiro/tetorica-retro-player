@@ -447,11 +447,14 @@ function resolveRetroAudioSettings({
 var TetoricaRetroAudioNode = class {
   context;
   instanceLabel;
+  // Deprecated: prefer await engine.connect(context.destination) instead.
   connectOutputToDestination;
   connectOutputToRecordingDestination;
   enableAudioWorklet;
   runtimeState;
   currentSettings;
+  // Tracks external destinations added via connect() for selective disconnect.
+  externalConnections = /* @__PURE__ */ new Set();
   nodes = {
     audioContext: null,
     masterGain: null,
@@ -509,8 +512,8 @@ var TetoricaRetroAudioNode = class {
     context,
     instanceLabel,
     runtimeState,
-    connectOutputToDestination = true,
-    connectOutputToRecordingDestination = true,
+    connectOutputToDestination = false,
+    connectOutputToRecordingDestination = false,
     enableAudioWorklet = true
   }) {
     this.context = context;
@@ -525,7 +528,7 @@ var TetoricaRetroAudioNode = class {
     return this.nodes.wowFlutterDelay ?? this.nodes.lofiLowpass;
   }
   get output() {
-    return this.nodes.outputBus ?? this.nodes.masterGain;
+    return this.nodes.fxOutputGain ?? this.nodes.outputBus ?? this.nodes.masterGain;
   }
   get audioContext() {
     return this.nodes.audioContext;
@@ -869,289 +872,317 @@ var TetoricaRetroAudioNode = class {
       fxOutputGain.gain.value = settings.isAudioFxEnabled ? settings.fxOutputTrimAmount : 1;
     }
   }
+  // ---------------------------------------------------------------------------
+  // Private initialization helpers
+  // ---------------------------------------------------------------------------
+  async loadWorklets(context) {
+    let bitcrusher = null;
+    let stereoWidth = null;
+    const AudioWorkletNodeCtor = this.resolveAudioWorkletNodeCtor();
+    if (this.enableAudioWorklet && "audioWorklet" in context && AudioWorkletNodeCtor) {
+      const bitcrusherModuleUrl = new URL("./bitcrusherWorklet.js", import.meta.url);
+      await context.audioWorklet.addModule(bitcrusherModuleUrl.href);
+      bitcrusher = new AudioWorkletNodeCtor(context, "retro-bitcrusher", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2]
+      });
+      const stereoWidthModuleUrl = new URL("./stereoWidthWorklet.js", import.meta.url);
+      await context.audioWorklet.addModule(stereoWidthModuleUrl.href);
+      stereoWidth = new AudioWorkletNodeCtor(context, "retro-stereo-width", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2]
+      });
+    }
+    return { bitcrusher, stereoWidth };
+  }
+  buildAndWireNodes(context, worklets) {
+    const masterGain = context.createGain();
+    let recordingDestination = null;
+    if ("createMediaStreamDestination" in context) {
+      try {
+        recordingDestination = context.createMediaStreamDestination();
+      } catch {
+        recordingDestination = null;
+      }
+    }
+    const radioToneHighpass = context.createBiquadFilter();
+    const radioToneLowpass = context.createBiquadFilter();
+    const radioTonePresence = context.createBiquadFilter();
+    const lowpass = context.createBiquadFilter();
+    const highshelf = context.createBiquadFilter();
+    const drive = context.createWaveShaper();
+    const postCrushLowpass = context.createBiquadFilter();
+    const bassEq = context.createBiquadFilter();
+    const midEq = context.createBiquadFilter();
+    const trebleEq = context.createBiquadFilter();
+    const roomDryGain = context.createGain();
+    const roomConvolver = context.createConvolver();
+    const roomWetGain = context.createGain();
+    const wowFlutterDelay = context.createDelay(0.05);
+    const wowLfo = context.createOscillator();
+    const wowLfoGain = context.createGain();
+    const flutterLfo = context.createOscillator();
+    const flutterLfoGain = context.createGain();
+    const tapeSaturator = context.createWaveShaper();
+    const outputBus = context.createGain();
+    const busCompressor = context.createDynamicsCompressor();
+    const echoDelayLine = context.createDelay(1);
+    const echoFeedbackGain = context.createGain();
+    const echoWetGain = context.createGain();
+    const hallReverbConvolver = context.createConvolver();
+    const hallReverbWetGain = context.createGain();
+    const chorusDelay1 = context.createDelay(0.05);
+    const chorusDelay2 = context.createDelay(0.05);
+    const chorusLfo1 = context.createOscillator();
+    const chorusLfo2 = context.createOscillator();
+    const chorusLfoGain1 = context.createGain();
+    const chorusLfoGain2 = context.createGain();
+    const chorusWetGain = context.createGain();
+    const fxOutputGain = context.createGain();
+    const noiseSource = context.createBufferSource();
+    const noiseHighpass = context.createBiquadFilter();
+    const noiseLowpass = context.createBiquadFilter();
+    const noisePresence = context.createBiquadFilter();
+    const noisePanner = context.createStereoPanner();
+    const noiseGain = context.createGain();
+    const noiseLfo = context.createOscillator();
+    const noiseLfoGain = context.createGain();
+    const crackleSource = context.createBufferSource();
+    const crackleFilter = context.createBiquadFilter();
+    const vinylDustBedFilter = context.createBiquadFilter();
+    const vinylDustBedGain = context.createGain();
+    const crackleGain = context.createGain();
+    radioToneHighpass.type = "highpass";
+    radioToneLowpass.type = "lowpass";
+    radioTonePresence.type = "peaking";
+    lowpass.type = "lowpass";
+    highshelf.type = "highshelf";
+    highshelf.frequency.value = 2800;
+    drive.oversample = "4x";
+    postCrushLowpass.type = "lowpass";
+    postCrushLowpass.frequency.value = 18e3;
+    postCrushLowpass.Q.value = 0.5;
+    bassEq.type = "lowshelf";
+    bassEq.frequency.value = 180;
+    midEq.type = "peaking";
+    midEq.frequency.value = 1200;
+    midEq.Q.value = 0.5;
+    trebleEq.type = "highshelf";
+    trebleEq.frequency.value = 2800;
+    roomConvolver.buffer = createSmallRoomImpulse(context);
+    wowFlutterDelay.delayTime.value = 6e-3;
+    wowLfo.type = "sine";
+    flutterLfo.type = "sine";
+    tapeSaturator.curve = createTapeSaturationCurve(0);
+    tapeSaturator.oversample = "4x";
+    outputBus.gain.value = 1;
+    busCompressor.knee.value = 10;
+    busCompressor.attack.value = 3e-3;
+    busCompressor.release.value = 0.12;
+    busCompressor.threshold.value = 0;
+    busCompressor.ratio.value = 1;
+    echoDelayLine.delayTime.value = 0.32;
+    echoFeedbackGain.gain.value = 0;
+    echoWetGain.gain.value = 0;
+    hallReverbConvolver.buffer = createHallReverbImpulse(context);
+    hallReverbWetGain.gain.value = 0;
+    chorusDelay1.delayTime.value = 0.018;
+    chorusDelay2.delayTime.value = 0.023;
+    chorusLfo1.type = "sine";
+    chorusLfo2.type = "sine";
+    chorusLfo1.frequency.value = 0.8;
+    chorusLfo2.frequency.value = 1.3;
+    chorusLfoGain1.gain.value = 0;
+    chorusLfoGain2.gain.value = 0;
+    chorusWetGain.gain.value = 0;
+    fxOutputGain.gain.value = 1;
+    masterGain.gain.value = 0;
+    noiseGain.gain.value = 0;
+    noiseSource.buffer = createTintedNoiseBuffer(context);
+    noiseSource.loop = true;
+    noiseHighpass.type = "highpass";
+    noiseHighpass.frequency.value = 1100;
+    noiseHighpass.Q.value = 0.25;
+    noiseLowpass.type = "lowpass";
+    noiseLowpass.frequency.value = 5600;
+    noiseLowpass.Q.value = 0.18;
+    noisePresence.type = "peaking";
+    noisePresence.frequency.value = 2400;
+    noisePresence.Q.value = 0.7;
+    noisePresence.gain.value = -2.5;
+    noiseLfo.type = "sine";
+    noiseLfo.frequency.value = 0.021;
+    noiseLfoGain.gain.value = 0.08;
+    crackleSource.buffer = createVinylDustBuffer(context);
+    crackleSource.loop = true;
+    crackleFilter.type = "highpass";
+    crackleFilter.frequency.value = 1250;
+    crackleFilter.Q.value = 0.35;
+    vinylDustBedFilter.type = "bandpass";
+    vinylDustBedFilter.frequency.value = 2400;
+    vinylDustBedFilter.Q.value = 0.4;
+    vinylDustBedGain.gain.value = 0;
+    crackleGain.gain.value = 0;
+    const { bitcrusher, stereoWidth } = worklets;
+    wowLfo.connect(wowLfoGain);
+    wowLfoGain.connect(wowFlutterDelay.delayTime);
+    flutterLfo.connect(flutterLfoGain);
+    flutterLfoGain.connect(wowFlutterDelay.delayTime);
+    wowFlutterDelay.connect(radioToneHighpass);
+    radioToneHighpass.connect(radioToneLowpass);
+    radioToneLowpass.connect(radioTonePresence);
+    radioTonePresence.connect(lowpass);
+    lowpass.connect(highshelf);
+    highshelf.connect(drive);
+    if (bitcrusher) {
+      drive.connect(bitcrusher);
+      bitcrusher.connect(postCrushLowpass);
+    } else {
+      drive.connect(postCrushLowpass);
+    }
+    postCrushLowpass.connect(bassEq);
+    bassEq.connect(midEq);
+    midEq.connect(trebleEq);
+    trebleEq.connect(tapeSaturator);
+    if (stereoWidth) {
+      tapeSaturator.connect(stereoWidth);
+      stereoWidth.connect(roomDryGain);
+      stereoWidth.connect(roomConvolver);
+    } else {
+      tapeSaturator.connect(roomDryGain);
+      tapeSaturator.connect(roomConvolver);
+    }
+    roomConvolver.connect(roomWetGain);
+    roomDryGain.connect(masterGain);
+    roomWetGain.connect(masterGain);
+    masterGain.connect(outputBus);
+    masterGain.connect(echoDelayLine);
+    echoDelayLine.connect(echoFeedbackGain);
+    echoFeedbackGain.connect(echoDelayLine);
+    echoDelayLine.connect(echoWetGain);
+    echoWetGain.connect(outputBus);
+    masterGain.connect(hallReverbConvolver);
+    hallReverbConvolver.connect(hallReverbWetGain);
+    hallReverbWetGain.connect(outputBus);
+    masterGain.connect(chorusDelay1);
+    masterGain.connect(chorusDelay2);
+    chorusLfo1.connect(chorusLfoGain1);
+    chorusLfoGain1.connect(chorusDelay1.delayTime);
+    chorusLfo2.connect(chorusLfoGain2);
+    chorusLfoGain2.connect(chorusDelay2.delayTime);
+    chorusDelay1.connect(chorusWetGain);
+    chorusDelay2.connect(chorusWetGain);
+    chorusWetGain.connect(outputBus);
+    outputBus.connect(busCompressor);
+    busCompressor.connect(fxOutputGain);
+    noiseSource.connect(noiseHighpass);
+    noiseHighpass.connect(noiseLowpass);
+    noiseLowpass.connect(noisePresence);
+    noisePresence.connect(noisePanner);
+    noisePanner.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noiseLfo.connect(noiseLfoGain);
+    noiseLfoGain.connect(noisePanner.pan);
+    crackleSource.connect(crackleFilter);
+    crackleFilter.connect(crackleGain);
+    crackleGain.connect(masterGain);
+    crackleSource.connect(vinylDustBedFilter);
+    vinylDustBedFilter.connect(vinylDustBedGain);
+    vinylDustBedGain.connect(masterGain);
+    return {
+      masterGain,
+      recordingDestination,
+      radioToneHighpass,
+      radioToneLowpass,
+      radioTonePresence,
+      lofiLowpass: lowpass,
+      lofiHighshelf: highshelf,
+      lofiDrive: drive,
+      bitcrusher,
+      postCrushLowpass,
+      bassEq,
+      midEq,
+      trebleEq,
+      stereoWidth,
+      roomDryGain,
+      roomConvolver,
+      roomWetGain,
+      wowFlutterDelay,
+      wowLfo,
+      wowLfoGain,
+      flutterLfo,
+      flutterLfoGain,
+      noiseSource,
+      noiseFilter: noisePresence,
+      noisePanner,
+      noiseGain,
+      noiseLfo,
+      noiseLfoGain,
+      crackleSource,
+      crackleFilter,
+      vinylDustBedFilter,
+      vinylDustBedGain,
+      crackleGain,
+      outputBus,
+      echoDelayLine,
+      echoFeedbackGain,
+      echoWetGain,
+      hallReverbConvolver,
+      hallReverbWetGain,
+      chorusDelay1,
+      chorusDelay2,
+      chorusLfo1,
+      chorusLfo2,
+      chorusLfoGain1,
+      chorusLfoGain2,
+      chorusWetGain,
+      tapeSaturator,
+      busCompressor,
+      fxOutputGain
+    };
+  }
+  startSources() {
+    this.nodes.noiseSource?.start();
+    this.nodes.noiseLfo?.start();
+    this.nodes.crackleSource?.start();
+    this.nodes.wowLfo?.start();
+    this.nodes.flutterLfo?.start();
+    this.nodes.chorusLfo1?.start();
+    this.nodes.chorusLfo2?.start();
+  }
+  applyAutoConnect() {
+    const fxOutputGain = this.nodes.fxOutputGain;
+    if (!fxOutputGain) return;
+    if (this.connectOutputToDestination) {
+      fxOutputGain.connect(this.context.destination);
+      this.externalConnections.add(this.context.destination);
+    }
+    const recordingDestination = this.nodes.recordingDestination;
+    if (recordingDestination && this.connectOutputToRecordingDestination) {
+      fxOutputGain.connect(recordingDestination);
+      this.externalConnections.add(recordingDestination);
+    }
+  }
+  async initNodes() {
+    const context = this.context;
+    const worklets = await this.loadWorklets(context);
+    const built = this.buildAndWireNodes(context, worklets);
+    Object.assign(this.nodes, { audioContext: context, ...built });
+    this.startSources();
+    this.applyAutoConnect();
+  }
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
   async ensureInitialized() {
     if (this.context.state === "closed") {
       this.resetNodes();
       return null;
     }
     if (!this.nodes.audioContext || !this.nodes.masterGain) {
-      const context = this.context;
-      const masterGain = context.createGain();
-      let recordingDestination = null;
-      if ("createMediaStreamDestination" in context) {
-        try {
-          recordingDestination = context.createMediaStreamDestination();
-        } catch {
-          recordingDestination = null;
-        }
-      }
-      const radioToneHighpass = context.createBiquadFilter();
-      const radioToneLowpass = context.createBiquadFilter();
-      const radioTonePresence = context.createBiquadFilter();
-      const lowpass = context.createBiquadFilter();
-      const highshelf = context.createBiquadFilter();
-      const drive = context.createWaveShaper();
-      let bitcrusher = null;
-      let stereoWidth = null;
-      const AudioWorkletNodeCtor = this.resolveAudioWorkletNodeCtor();
-      if (this.enableAudioWorklet && "audioWorklet" in context && AudioWorkletNodeCtor) {
-        const bitcrusherModuleUrl = new URL("./bitcrusherWorklet.js", import.meta.url);
-        await context.audioWorklet.addModule(bitcrusherModuleUrl.href);
-        bitcrusher = new AudioWorkletNodeCtor(context, "retro-bitcrusher", {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [2]
-        });
-        const stereoWidthModuleUrl = new URL("./stereoWidthWorklet.js", import.meta.url);
-        await context.audioWorklet.addModule(stereoWidthModuleUrl.href);
-        stereoWidth = new AudioWorkletNodeCtor(context, "retro-stereo-width", {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [2]
-        });
-      }
-      const postCrushLowpass = context.createBiquadFilter();
-      postCrushLowpass.type = "lowpass";
-      postCrushLowpass.frequency.value = 18e3;
-      postCrushLowpass.Q.value = 0.5;
-      const bassEq = context.createBiquadFilter();
-      const midEq = context.createBiquadFilter();
-      const trebleEq = context.createBiquadFilter();
-      const roomDryGain = context.createGain();
-      const roomConvolver = context.createConvolver();
-      const roomWetGain = context.createGain();
-      const wowFlutterDelay = context.createDelay(0.05);
-      const wowLfo = context.createOscillator();
-      const wowLfoGain = context.createGain();
-      const flutterLfo = context.createOscillator();
-      const flutterLfoGain = context.createGain();
-      radioToneHighpass.type = "highpass";
-      radioToneLowpass.type = "lowpass";
-      radioTonePresence.type = "peaking";
-      lowpass.type = "lowpass";
-      highshelf.type = "highshelf";
-      bassEq.type = "lowshelf";
-      bassEq.frequency.value = 180;
-      midEq.type = "peaking";
-      midEq.frequency.value = 1200;
-      midEq.Q.value = 0.5;
-      trebleEq.type = "highshelf";
-      trebleEq.frequency.value = 2800;
-      roomConvolver.buffer = createSmallRoomImpulse(context);
-      highshelf.frequency.value = 2800;
-      drive.oversample = "4x";
-      wowFlutterDelay.delayTime.value = 6e-3;
-      wowLfo.type = "sine";
-      flutterLfo.type = "sine";
-      wowLfo.connect(wowLfoGain);
-      wowLfoGain.connect(wowFlutterDelay.delayTime);
-      flutterLfo.connect(flutterLfoGain);
-      flutterLfoGain.connect(wowFlutterDelay.delayTime);
-      wowFlutterDelay.connect(radioToneHighpass);
-      radioToneHighpass.connect(radioToneLowpass);
-      radioToneLowpass.connect(radioTonePresence);
-      radioTonePresence.connect(lowpass);
-      lowpass.connect(highshelf);
-      highshelf.connect(drive);
-      if (bitcrusher) {
-        drive.connect(bitcrusher);
-        bitcrusher.connect(postCrushLowpass);
-      } else {
-        drive.connect(postCrushLowpass);
-      }
-      postCrushLowpass.connect(bassEq);
-      bassEq.connect(midEq);
-      midEq.connect(trebleEq);
-      const tapeSaturator = context.createWaveShaper();
-      tapeSaturator.curve = createTapeSaturationCurve(0);
-      tapeSaturator.oversample = "4x";
-      trebleEq.connect(tapeSaturator);
-      if (stereoWidth) {
-        tapeSaturator.connect(stereoWidth);
-        stereoWidth.connect(roomDryGain);
-        stereoWidth.connect(roomConvolver);
-      } else {
-        tapeSaturator.connect(roomDryGain);
-        tapeSaturator.connect(roomConvolver);
-      }
-      roomConvolver.connect(roomWetGain);
-      roomDryGain.connect(masterGain);
-      roomWetGain.connect(masterGain);
-      const outputBus = context.createGain();
-      outputBus.gain.value = 1;
-      const busCompressor = context.createDynamicsCompressor();
-      busCompressor.knee.value = 10;
-      busCompressor.attack.value = 3e-3;
-      busCompressor.release.value = 0.12;
-      busCompressor.threshold.value = 0;
-      busCompressor.ratio.value = 1;
-      const echoDelayLine = context.createDelay(1);
-      echoDelayLine.delayTime.value = 0.32;
-      const echoFeedbackGain = context.createGain();
-      echoFeedbackGain.gain.value = 0;
-      const echoWetGain = context.createGain();
-      echoWetGain.gain.value = 0;
-      const hallReverbConvolver = context.createConvolver();
-      hallReverbConvolver.buffer = createHallReverbImpulse(context);
-      const hallReverbWetGain = context.createGain();
-      hallReverbWetGain.gain.value = 0;
-      const chorusDelay1 = context.createDelay(0.05);
-      const chorusDelay2 = context.createDelay(0.05);
-      chorusDelay1.delayTime.value = 0.018;
-      chorusDelay2.delayTime.value = 0.023;
-      const chorusLfo1 = context.createOscillator();
-      const chorusLfo2 = context.createOscillator();
-      chorusLfo1.type = "sine";
-      chorusLfo2.type = "sine";
-      chorusLfo1.frequency.value = 0.8;
-      chorusLfo2.frequency.value = 1.3;
-      const chorusLfoGain1 = context.createGain();
-      const chorusLfoGain2 = context.createGain();
-      chorusLfoGain1.gain.value = 0;
-      chorusLfoGain2.gain.value = 0;
-      const chorusWetGain = context.createGain();
-      chorusWetGain.gain.value = 0;
-      masterGain.connect(outputBus);
-      masterGain.connect(echoDelayLine);
-      echoDelayLine.connect(echoFeedbackGain);
-      echoFeedbackGain.connect(echoDelayLine);
-      echoDelayLine.connect(echoWetGain);
-      echoWetGain.connect(outputBus);
-      masterGain.connect(hallReverbConvolver);
-      hallReverbConvolver.connect(hallReverbWetGain);
-      hallReverbWetGain.connect(outputBus);
-      masterGain.connect(chorusDelay1);
-      masterGain.connect(chorusDelay2);
-      chorusLfo1.connect(chorusLfoGain1);
-      chorusLfoGain1.connect(chorusDelay1.delayTime);
-      chorusLfo2.connect(chorusLfoGain2);
-      chorusLfoGain2.connect(chorusDelay2.delayTime);
-      chorusDelay1.connect(chorusWetGain);
-      chorusDelay2.connect(chorusWetGain);
-      chorusWetGain.connect(outputBus);
-      chorusLfo1.start();
-      chorusLfo2.start();
-      const fxOutputGain = context.createGain();
-      fxOutputGain.gain.value = 1;
-      outputBus.connect(busCompressor);
-      busCompressor.connect(fxOutputGain);
-      if (this.connectOutputToDestination) {
-        fxOutputGain.connect(context.destination);
-      }
-      if (recordingDestination && this.connectOutputToRecordingDestination) {
-        fxOutputGain.connect(recordingDestination);
-      }
-      const noiseSource = context.createBufferSource();
-      noiseSource.buffer = createTintedNoiseBuffer(context);
-      noiseSource.loop = true;
-      const noiseHighpass = context.createBiquadFilter();
-      noiseHighpass.type = "highpass";
-      noiseHighpass.frequency.value = 1100;
-      noiseHighpass.Q.value = 0.25;
-      const noiseLowpass = context.createBiquadFilter();
-      noiseLowpass.type = "lowpass";
-      noiseLowpass.frequency.value = 5600;
-      noiseLowpass.Q.value = 0.18;
-      const noisePresence = context.createBiquadFilter();
-      noisePresence.type = "peaking";
-      noisePresence.frequency.value = 2400;
-      noisePresence.Q.value = 0.7;
-      noisePresence.gain.value = -2.5;
-      const noisePanner = context.createStereoPanner();
-      const noiseGain = context.createGain();
-      const noiseLfo = context.createOscillator();
-      const noiseLfoGain = context.createGain();
-      const crackleSource = context.createBufferSource();
-      const crackleFilter = context.createBiquadFilter();
-      const vinylDustBedFilter = context.createBiquadFilter();
-      const vinylDustBedGain = context.createGain();
-      const crackleGain = context.createGain();
-      masterGain.gain.value = 0;
-      noiseGain.gain.value = 0;
-      noiseLfo.type = "sine";
-      noiseLfo.frequency.value = 0.021;
-      noiseLfoGain.gain.value = 0.08;
-      crackleSource.buffer = createVinylDustBuffer(context);
-      crackleSource.loop = true;
-      crackleFilter.type = "highpass";
-      crackleFilter.frequency.value = 1250;
-      crackleFilter.Q.value = 0.35;
-      vinylDustBedFilter.type = "bandpass";
-      vinylDustBedFilter.frequency.value = 2400;
-      vinylDustBedFilter.Q.value = 0.4;
-      vinylDustBedGain.gain.value = 0;
-      crackleGain.gain.value = 0;
-      noiseSource.connect(noiseHighpass);
-      noiseHighpass.connect(noiseLowpass);
-      noiseLowpass.connect(noisePresence);
-      noisePresence.connect(noisePanner);
-      noisePanner.connect(noiseGain);
-      noiseGain.connect(masterGain);
-      noiseLfo.connect(noiseLfoGain);
-      noiseLfoGain.connect(noisePanner.pan);
-      crackleSource.connect(crackleFilter);
-      crackleFilter.connect(crackleGain);
-      crackleGain.connect(masterGain);
-      crackleSource.connect(vinylDustBedFilter);
-      vinylDustBedFilter.connect(vinylDustBedGain);
-      vinylDustBedGain.connect(masterGain);
-      noiseSource.start();
-      noiseLfo.start();
-      crackleSource.start();
-      wowLfo.start();
-      flutterLfo.start();
-      Object.assign(this.nodes, {
-        audioContext: context,
-        masterGain,
-        radioToneHighpass,
-        radioToneLowpass,
-        radioTonePresence,
-        recordingDestination,
-        lofiLowpass: lowpass,
-        lofiHighshelf: highshelf,
-        lofiDrive: drive,
-        bitcrusher,
-        postCrushLowpass,
-        bassEq,
-        midEq,
-        trebleEq,
-        stereoWidth,
-        roomDryGain,
-        roomConvolver,
-        roomWetGain,
-        wowFlutterDelay,
-        wowLfo,
-        wowLfoGain,
-        flutterLfo,
-        flutterLfoGain,
-        noiseSource,
-        noiseFilter: noisePresence,
-        noisePanner,
-        noiseGain,
-        noiseLfo,
-        noiseLfoGain,
-        crackleSource,
-        crackleFilter,
-        vinylDustBedFilter,
-        vinylDustBedGain,
-        crackleGain,
-        outputBus,
-        echoDelayLine,
-        echoFeedbackGain,
-        echoWetGain,
-        hallReverbConvolver,
-        hallReverbWetGain,
-        chorusDelay1,
-        chorusDelay2,
-        chorusLfo1,
-        chorusLfo2,
-        chorusLfoGain1,
-        chorusLfoGain2,
-        chorusWetGain,
-        tapeSaturator,
-        busCompressor,
-        fxOutputGain
-      });
+      await this.initNodes();
     }
     const activeContext = this.nodes.audioContext;
     if (activeContext?.state === "suspended") {
@@ -1198,58 +1229,117 @@ var TetoricaRetroAudioNode = class {
     }
     if (isAudioParamLike(destinationNode)) {
       outputNode.connect(destinationNode, outputIndex);
+      this.externalConnections.add(destinationNode);
+      return;
+    }
+    if (this.connectOutputToDestination && destinationNode === context.destination) {
+      this.debugAudio("connect:skipped-double-destination");
       return;
     }
     outputNode.connect(destinationNode, outputIndex, inputIndex);
+    this.externalConnections.add(destinationNode);
   }
-  disconnect() {
+  disconnect(destination) {
     const outputNode = this.output;
-    if (!outputNode) {
-      return;
-    }
-    try {
-      outputNode.disconnect();
-    } catch {
+    if (!outputNode) return;
+    if (destination !== void 0) {
+      try {
+        if (isAudioParamLike(destination)) {
+          outputNode.disconnect(destination);
+        } else {
+          outputNode.disconnect(destination);
+        }
+      } catch {
+      }
+      this.externalConnections.delete(destination);
+    } else {
+      for (const dest of this.externalConnections) {
+        try {
+          if (isAudioParamLike(dest)) {
+            outputNode.disconnect(dest);
+          } else {
+            outputNode.disconnect(dest);
+          }
+        } catch {
+        }
+      }
+      this.externalConnections.clear();
     }
   }
   async dispose() {
-    try {
-      this.nodes.noiseSource?.stop();
-    } catch {
+    const scheduledNodes = [
+      this.nodes.noiseSource,
+      this.nodes.noiseLfo,
+      this.nodes.crackleSource,
+      this.nodes.wowLfo,
+      this.nodes.flutterLfo,
+      this.nodes.chorusLfo1,
+      this.nodes.chorusLfo2
+    ];
+    for (const node of scheduledNodes) {
+      try {
+        node?.stop();
+      } catch {
+      }
+      try {
+        node?.disconnect();
+      } catch {
+      }
     }
     try {
-      this.nodes.noiseLfo?.stop();
+      this.nodes.sourceNode?.disconnect();
     } catch {
     }
-    try {
-      this.nodes.crackleSource?.stop();
-    } catch {
+    this.disconnect();
+    const internalNodes = [
+      this.nodes.wowFlutterDelay,
+      this.nodes.wowLfoGain,
+      this.nodes.flutterLfoGain,
+      this.nodes.radioToneHighpass,
+      this.nodes.radioToneLowpass,
+      this.nodes.radioTonePresence,
+      this.nodes.lofiLowpass,
+      this.nodes.lofiHighshelf,
+      this.nodes.lofiDrive,
+      this.nodes.bitcrusher,
+      this.nodes.postCrushLowpass,
+      this.nodes.bassEq,
+      this.nodes.midEq,
+      this.nodes.trebleEq,
+      this.nodes.tapeSaturator,
+      this.nodes.stereoWidth,
+      this.nodes.roomDryGain,
+      this.nodes.roomConvolver,
+      this.nodes.roomWetGain,
+      this.nodes.echoDelayLine,
+      this.nodes.echoFeedbackGain,
+      this.nodes.echoWetGain,
+      this.nodes.hallReverbConvolver,
+      this.nodes.hallReverbWetGain,
+      this.nodes.chorusDelay1,
+      this.nodes.chorusDelay2,
+      this.nodes.chorusLfoGain1,
+      this.nodes.chorusLfoGain2,
+      this.nodes.chorusWetGain,
+      this.nodes.noisePanner,
+      this.nodes.noiseGain,
+      this.nodes.noiseFilter,
+      this.nodes.noiseLfoGain,
+      this.nodes.crackleFilter,
+      this.nodes.vinylDustBedFilter,
+      this.nodes.vinylDustBedGain,
+      this.nodes.crackleGain,
+      this.nodes.masterGain,
+      this.nodes.outputBus,
+      this.nodes.busCompressor
+    ];
+    for (const node of internalNodes) {
+      try {
+        node?.disconnect();
+      } catch {
+      }
     }
-    try {
-      this.nodes.wowLfo?.stop();
-    } catch {
-    }
-    try {
-      this.nodes.flutterLfo?.stop();
-    } catch {
-    }
-    try {
-      this.nodes.chorusLfo1?.stop();
-    } catch {
-    }
-    try {
-      this.nodes.chorusLfo2?.stop();
-    } catch {
-    }
-    const context = this.nodes.audioContext;
     this.resetNodes();
-    if (!context || context.state === "closed") {
-      return;
-    }
-    try {
-      await context.close();
-    } catch {
-    }
   }
   async disposeAudioEngine() {
     await this.dispose();
