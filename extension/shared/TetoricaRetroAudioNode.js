@@ -482,6 +482,8 @@ var TetoricaRetroAudioNode = class {
     flutterLfo: null,
     flutterLfoGain: null,
     noiseSource: null,
+    noiseHighpass: null,
+    noiseLowpass: null,
     noiseFilter: null,
     noisePanner: null,
     noiseGain: null,
@@ -640,7 +642,7 @@ var TetoricaRetroAudioNode = class {
   getParams() {
     return { ...this.currentSettings };
   }
-  setParams(nextParams, isPartialUpdate = false) {
+  setParams(nextParams, isPartialUpdate = true) {
     const nextSettings = isPartialUpdate ? { ...this.currentSettings, ...nextParams } : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
     Object.assign(this.currentSettings, nextSettings);
     this.updateAudioNodes();
@@ -687,6 +689,8 @@ var TetoricaRetroAudioNode = class {
       flutterLfo: null,
       flutterLfoGain: null,
       noiseSource: null,
+      noiseHighpass: null,
+      noiseLowpass: null,
       noiseFilter: null,
       noisePanner: null,
       noiseGain: null,
@@ -812,7 +816,7 @@ var TetoricaRetroAudioNode = class {
     }
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
       const amount = settings.isAudioFxEnabled ? settings.wowFlutterAmount : 0;
-      wowFlutterDelay.delayTime.value = 6e-3 + amount * 4e-3;
+      wowFlutterDelay.delayTime.value = amount > 0 ? 6e-3 + amount * 4e-3 : 0;
       wowLfo.frequency.value = 0.18 + amount * 0.42;
       wowLfoGain.gain.value = amount * 23e-4;
       flutterLfo.frequency.value = 5.2 + amount * 6.5;
@@ -974,7 +978,7 @@ var TetoricaRetroAudioNode = class {
     trebleEq.type = "highshelf";
     trebleEq.frequency.value = 2800;
     roomConvolver.buffer = createSmallRoomImpulse(context);
-    wowFlutterDelay.delayTime.value = 6e-3;
+    wowFlutterDelay.delayTime.value = 0;
     wowLfo.type = "sine";
     flutterLfo.type = "sine";
     tapeSaturator.curve = createTapeSaturationCurve(0);
@@ -1117,6 +1121,8 @@ var TetoricaRetroAudioNode = class {
       flutterLfo,
       flutterLfoGain,
       noiseSource,
+      noiseHighpass,
+      noiseLowpass,
       noiseFilter: noisePresence,
       noisePanner,
       noiseGain,
@@ -1339,6 +1345,8 @@ var TetoricaRetroAudioNode = class {
       this.nodes.chorusWetGain,
       this.nodes.noisePanner,
       this.nodes.noiseGain,
+      this.nodes.noiseHighpass,
+      this.nodes.noiseLowpass,
       this.nodes.noiseFilter,
       this.nodes.noiseLfoGain,
       this.nodes.crackleFilter,
@@ -1357,9 +1365,6 @@ var TetoricaRetroAudioNode = class {
       }
     }
     this.resetNodes();
-  }
-  async disposeAudioEngine() {
-    await this.dispose();
   }
   async ensureAudioContext() {
     return this.ensureInitialized();
