@@ -525,7 +525,8 @@ export class TetoricaRetroAudioNode {
 
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
       const amount = settings.isAudioFxEnabled ? settings.wowFlutterAmount : 0;
-      wowFlutterDelay.delayTime.value = 0.006 + amount * 0.004;
+      // amount=0 のとき delayTime=0 にして透過にする（再配線不要、render quantum 分のみ残る）
+      wowFlutterDelay.delayTime.value = amount > 0 ? 0.006 + amount * 0.004 : 0;
       wowLfo.frequency.value = 0.18 + amount * 0.42;
       wowLfoGain.gain.value = amount * 0.0023;
       flutterLfo.frequency.value = 5.2 + amount * 6.5;
@@ -721,7 +722,7 @@ export class TetoricaRetroAudioNode {
     trebleEq.type = "highshelf";
     trebleEq.frequency.value = 2800;
     roomConvolver.buffer = createSmallRoomImpulse(context);
-    wowFlutterDelay.delayTime.value = 0.006;
+    wowFlutterDelay.delayTime.value = 0;
     wowLfo.type = "sine";
     flutterLfo.type = "sine";
     tapeSaturator.curve = createTapeSaturationCurve(0);
