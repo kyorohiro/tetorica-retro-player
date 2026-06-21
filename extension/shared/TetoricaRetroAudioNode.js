@@ -453,7 +453,9 @@ var TetoricaRetroAudioNode = class {
   enableAudioWorklet;
   runtimeState;
   currentSettings;
-  // Tracks external destinations added via connect() for selective disconnect.
+  // Destinations wired by applyAutoConnect() (constructor option-driven, managed internally).
+  autoConnections = /* @__PURE__ */ new Set();
+  // Destinations added by explicit connect() calls (caller-managed, cleared by disconnect()).
   externalConnections = /* @__PURE__ */ new Set();
   nodes = {
     audioContext: null,
@@ -1157,12 +1159,12 @@ var TetoricaRetroAudioNode = class {
     if (!fxOutputGain) return;
     if (this.connectOutputToDestination) {
       fxOutputGain.connect(this.context.destination);
-      this.externalConnections.add(this.context.destination);
+      this.autoConnections.add(this.context.destination);
     }
     const recordingDestination = this.nodes.recordingDestination;
     if (recordingDestination && this.connectOutputToRecordingDestination) {
       fxOutputGain.connect(recordingDestination);
-      this.externalConnections.add(recordingDestination);
+      this.autoConnections.add(recordingDestination);
     }
   }
   async initNodes() {
@@ -1291,6 +1293,20 @@ var TetoricaRetroAudioNode = class {
     } catch {
     }
     this.disconnect();
+    const outputNode = this.output;
+    if (outputNode) {
+      for (const dest of this.autoConnections) {
+        try {
+          if (isAudioParamLike(dest)) {
+            outputNode.disconnect(dest);
+          } else {
+            outputNode.disconnect(dest);
+          }
+        } catch {
+        }
+      }
+    }
+    this.autoConnections.clear();
     const internalNodes = [
       this.nodes.wowFlutterDelay,
       this.nodes.wowLfoGain,
@@ -1331,7 +1347,8 @@ var TetoricaRetroAudioNode = class {
       this.nodes.crackleGain,
       this.nodes.masterGain,
       this.nodes.outputBus,
-      this.nodes.busCompressor
+      this.nodes.busCompressor,
+      this.nodes.fxOutputGain
     ];
     for (const node of internalNodes) {
       try {

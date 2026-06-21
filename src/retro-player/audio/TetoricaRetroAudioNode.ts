@@ -96,7 +96,9 @@ export class TetoricaRetroAudioNode {
   private readonly enableAudioWorklet: boolean;
   private readonly runtimeState: CreateManagedRetroAudioEngineParams["runtimeState"];
   private readonly currentSettings: RetroAudioSettings;
-  // Tracks external destinations added via connect() for selective disconnect.
+  // Destinations wired by applyAutoConnect() (constructor option-driven, managed internally).
+  private readonly autoConnections = new Set<AudioNode | AudioParam>();
+  // Destinations added by explicit connect() calls (caller-managed, cleared by disconnect()).
   private readonly externalConnections = new Set<AudioNode | AudioParam>();
   private readonly nodes = {
     audioContext: null as AudioContext | null,
@@ -916,13 +918,13 @@ export class TetoricaRetroAudioNode {
 
     if (this.connectOutputToDestination) {
       fxOutputGain.connect(this.context.destination);
-      this.externalConnections.add(this.context.destination);
+      this.autoConnections.add(this.context.destination);
     }
 
     const recordingDestination = this.nodes.recordingDestination;
     if (recordingDestination && this.connectOutputToRecordingDestination) {
       fxOutputGain.connect(recordingDestination);
-      this.externalConnections.add(recordingDestination);
+      this.autoConnections.add(recordingDestination);
     }
   }
 
@@ -950,6 +952,9 @@ export class TetoricaRetroAudioNode {
     }
 
     const activeContext = this.nodes.audioContext;
+
+    // resume はここで行う（利便性のため）。
+    // 将来的には build と resume を分離し resumeContext() を独立させる候補。
     if (activeContext?.state === "suspended") {
       try {
         await activeContext.resume();
@@ -1072,8 +1077,23 @@ export class TetoricaRetroAudioNode {
     // Disconnect external input (sourceNode)
     try { this.nodes.sourceNode?.disconnect(); } catch {}
 
-    // Disconnect all tracked external output connections without touching internal graph
+    // Disconnect explicit connect() destinations (externalConnections only; keeps internal graph)
     this.disconnect();
+
+    // Disconnect auto-connected destinations (connectOutputToDestination etc.)
+    const outputNode = this.output;
+    if (outputNode) {
+      for (const dest of this.autoConnections) {
+        try {
+          if (isAudioParamLike(dest)) {
+            outputNode.disconnect(dest);
+          } else {
+            outputNode.disconnect(dest as AudioNode);
+          }
+        } catch {}
+      }
+    }
+    this.autoConnections.clear();
 
     // Disconnect all remaining internal routing nodes
     const internalNodes: (AudioNode | null)[] = [
@@ -1092,6 +1112,7 @@ export class TetoricaRetroAudioNode {
       this.nodes.noiseLfoGain, this.nodes.crackleFilter,
       this.nodes.vinylDustBedFilter, this.nodes.vinylDustBedGain, this.nodes.crackleGain,
       this.nodes.masterGain, this.nodes.outputBus, this.nodes.busCompressor,
+      this.nodes.fxOutputGain,
     ];
     for (const node of internalNodes) {
       try { node?.disconnect(); } catch {}
