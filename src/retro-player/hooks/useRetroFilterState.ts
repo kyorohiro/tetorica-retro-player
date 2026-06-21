@@ -11,7 +11,7 @@ import {
   savePersistedRetroFilterSettings,
 } from "./persistedRetroSettings";
 
-const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.pc98_512;
+const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.tetorica;
 
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;
