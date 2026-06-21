@@ -29,14 +29,14 @@ export type TetoricaRetroAudioNodeOptions = {
 };
 
 export type CreateRetroAudioEngineParams = {
-  context: AudioContextLike;
+  context: AudioContext;
   // Deprecated: prefer `await engine.connect(context.destination)` for explicit lifecycle control.
   connectOutputToDestination?: boolean;
   connectOutputToRecordingDestination?: boolean;
 } & TetoricaRetroAudioNodeOptions;
 
 type CreateManagedRetroAudioEngineParams = {
-  context: AudioContextLike;
+  context: AudioContext;
   instanceLabel: string;
   runtimeState: {
     settings: RetroAudioSettings;
@@ -47,8 +47,6 @@ type CreateManagedRetroAudioEngineParams = {
   connectOutputToRecordingDestination?: boolean;
   enableAudioWorklet?: boolean;
 };
-
-type AudioContextLike = AudioContext;
 
 const isRetroPlayerDebugEnabled = () =>
   Boolean(
@@ -88,7 +86,7 @@ function resolveRetroAudioSettings({
 }
 
 export class TetoricaRetroAudioNode {
-  private readonly context: AudioContextLike;
+  private readonly context: AudioContext;
   private readonly instanceLabel: string;
   // Deprecated: prefer await engine.connect(context.destination) instead.
   private readonly connectOutputToDestination: boolean;
@@ -125,6 +123,8 @@ export class TetoricaRetroAudioNode {
     flutterLfo: null as OscillatorNode | null,
     flutterLfoGain: null as GainNode | null,
     noiseSource: null as AudioBufferSourceNode | null,
+    noiseHighpass: null as BiquadFilterNode | null,
+    noiseLowpass: null as BiquadFilterNode | null,
     noiseFilter: null as BiquadFilterNode | null,
     noisePanner: null as StereoPannerNode | null,
     noiseGain: null as GainNode | null,
@@ -323,7 +323,7 @@ export class TetoricaRetroAudioNode {
     return { ...this.currentSettings };
   }
 
-  setParams(nextParams: Partial<RetroAudioSettings>, isPartialUpdate = false) {
+  setParams(nextParams: Partial<RetroAudioSettings>, isPartialUpdate = true) {
     const nextSettings = isPartialUpdate
       ? { ...this.currentSettings, ...nextParams }
       : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
@@ -380,6 +380,8 @@ export class TetoricaRetroAudioNode {
       flutterLfo: null,
       flutterLfoGain: null,
       noiseSource: null,
+      noiseHighpass: null,
+      noiseLowpass: null,
       noiseFilter: null,
       noisePanner: null,
       noiseGain: null,
@@ -874,6 +876,8 @@ export class TetoricaRetroAudioNode {
       flutterLfo,
       flutterLfoGain,
       noiseSource,
+      noiseHighpass,
+      noiseLowpass,
       noiseFilter: noisePresence,
       noisePanner,
       noiseGain,
@@ -1109,7 +1113,7 @@ export class TetoricaRetroAudioNode {
       this.nodes.hallReverbConvolver, this.nodes.hallReverbWetGain,
       this.nodes.chorusDelay1, this.nodes.chorusDelay2,
       this.nodes.chorusLfoGain1, this.nodes.chorusLfoGain2, this.nodes.chorusWetGain,
-      this.nodes.noisePanner, this.nodes.noiseGain, this.nodes.noiseFilter,
+      this.nodes.noisePanner, this.nodes.noiseGain, this.nodes.noiseHighpass, this.nodes.noiseLowpass, this.nodes.noiseFilter,
       this.nodes.noiseLfoGain, this.nodes.crackleFilter,
       this.nodes.vinylDustBedFilter, this.nodes.vinylDustBedGain, this.nodes.crackleGain,
       this.nodes.masterGain, this.nodes.outputBus, this.nodes.busCompressor,
@@ -1121,10 +1125,6 @@ export class TetoricaRetroAudioNode {
 
     this.resetNodes();
     // AudioContext は呼び出し元が管理する。ここでは close しない。
-  }
-
-  async disposeAudioEngine() {
-    await this.dispose();
   }
 
   async ensureAudioContext() {
@@ -1162,7 +1162,7 @@ export function createRetroAudioEngine({
 }
 
 export function createTetoricaRetroAudioNode(
-  context: AudioContextLike,
+  context: AudioContext,
   options: TetoricaRetroAudioNodeOptions = {},
 ) {
   return createRetroAudioEngine({
