@@ -295,7 +295,7 @@ export function useRetroAudioEngine({
   const updateAudioNodes = () => audioEngine.updateAudioNodes();
   const connectSourceNode = (sourceNode: AudioNode) =>
     audioEngine.connectSourceNode(sourceNode);
-  const disposeAudioEngine = () => audioEngine.disposeAudioEngine();
+  const disposeAudioEngine = () => audioEngine.dispose();
   const setParams = (
     nextParams: Partial<RetroAudioSettings>,
     isPartialUpdate?: boolean,

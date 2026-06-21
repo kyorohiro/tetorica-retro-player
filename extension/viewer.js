@@ -550,7 +550,7 @@ async function disposeAudioEngine() {
   mediaSourceNode = null;
 
   if (audioEngine) {
-    await audioEngine.disposeAudioEngine();
+    await audioEngine.dispose();
     audioEngine = null;
   }
 

@@ -1041,7 +1041,7 @@ function createOverlay(settings) {
     // 既存エンジンチェーンだけ解体（ctx と source はモジュールレベルで維持）
     if (overlayAudioEngine) {
       try { _sharedAudioSource?.disconnect(); } catch {}
-      await overlayAudioEngine.disposeAudioEngine();
+      await overlayAudioEngine.dispose();
       overlayAudioEngine = null;
     }
 
@@ -1062,7 +1062,7 @@ function createOverlay(settings) {
       await engine.connect(ctx.destination);
 
       if (seq !== _hookSeq) {
-        await engine.disposeAudioEngine();
+        await engine.dispose();
         return;
       }
 
@@ -1097,7 +1097,7 @@ function createOverlay(settings) {
       try { _sharedAudioSource.disconnect(); } catch {}
       try { _sharedAudioSource.connect(_sharedAudioCtx.destination); } catch {}
     }
-    if (overlayAudioEngine) { overlayAudioEngine.disposeAudioEngine().catch(() => {}); overlayAudioEngine = null; }
+    if (overlayAudioEngine) { overlayAudioEngine.dispose().catch(() => {}); overlayAudioEngine = null; }
     overlayAudioHookedEl = null;
     audioFxEnabled = false;
     _sharedAudioFxEnabled = false;
@@ -1110,7 +1110,7 @@ function createOverlay(settings) {
       try { _sharedAudioSource.disconnect(); } catch {}
       try { _sharedAudioSource.connect(_sharedAudioCtx.destination); } catch {}
     }
-    if (overlayAudioEngine) { overlayAudioEngine.disposeAudioEngine().catch(() => {}); overlayAudioEngine = null; }
+    if (overlayAudioEngine) { overlayAudioEngine.dispose().catch(() => {}); overlayAudioEngine = null; }
     overlayAudioHookedEl = null;
     // audioFxEnabled は _sharedAudioFxEnabled で次の overlay に引き継ぐためリセットしない
   }
