@@ -5,7 +5,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: #eceef4;
+  background: #eae6df;
   color: #12141c;
   font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
@@ -56,18 +56,18 @@ button {
 }
 
 button:hover {
-  background: #2a2a32;
+  background: #2a241e;
 }
 
 button.secondary {
-  background: #eceef4;
-  color: #2c3550;
-  border-color: #b8c0d4;
+  background: #eae6df;
+  color: #2c2418;
+  border-color: #bcb4a6;
 }
 
 button.secondary:hover {
-  background: #e2e5ee;
-  border-color: #94a0bc;
+  background: #e2ddd5;
+  border-color: #9a948c;
 }
 
 #overlayButton {
@@ -84,7 +84,7 @@ button.secondary:hover {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #c0c6d8;
+  background: #c0b8ae;
   transition: background 200ms, box-shadow 200ms;
 }
 
@@ -102,15 +102,15 @@ button.secondary:hover {
 .status {
   min-height: 16px;
   margin: 0 0 10px;
-  color: #5a6480;
+  color: #5a5650;
   font-size: 12px;
 }
 
 .tab-widget {
-  border: 1px solid #c8cede;
+  border: 1px solid #cac0b2;
   border-radius: 8px;
   overflow: hidden;
-  background: #f8f9fc;
+  background: #f5f1ea;
 }
 
 .tab-bar {
@@ -118,8 +118,8 @@ button.secondary:hover {
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   padding: 5px;
-  background: #eceef4;
-  border-bottom: 1px solid #c8cede;
+  background: #eae6df;
+  border-bottom: 1px solid #cac0b2;
 }
 
 .tab-btn {
@@ -129,7 +129,7 @@ button.secondary:hover {
   font-weight: 600;
   background: transparent;
   border: none;
-  color: #7a88a8;
+  color: #7a7268;
   transition: background 120ms, color 120ms;
 }
 
@@ -142,7 +142,7 @@ button.secondary:hover {
 }
 
 .tab-btn:hover:not([aria-selected="true"]) {
-  color: #2a2a32;
+  color: #2a241e;
   background: rgba(255, 255, 255, 0.5);
 }
 
@@ -163,13 +163,13 @@ button.secondary:hover {
   gap: 2px;
   padding-bottom: 8px;
   padding-left: 8px;
-  border-bottom: 1px solid #d4d8e8;
+  border-bottom: 1px solid #d4ccc0;
   border-left: 3px solid #000000;
 }
 
 .control-group-kicker {
   margin: 0;
-  color: #7a88a8;
+  color: #7a7268;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -193,21 +193,21 @@ button.secondary:hover {
   gap: 10px;
   margin-top: 2px;
   padding: 10px;
-  border: 1px solid #d4d8e8;
+  border: 1px solid #d4ccc0;
   border-radius: 6px;
-  background: #f0f2f8;
+  background: #ede8e2;
 }
 
 .subsection-header {
   display: grid;
   gap: 2px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #d4d8e8;
+  border-bottom: 1px solid #d4ccc0;
 }
 
 .subsection-kicker {
   margin: 0;
-  color: #8892aa;
+  color: #88827a;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -216,7 +216,7 @@ button.secondary:hover {
 
 .subsection-header h3 {
   margin: 0;
-  color: #1e2a48;
+  color: #1e1a10;
   font-size: 12px;
   font-weight: 600;
 }
@@ -234,7 +234,7 @@ button.secondary:hover {
 
 .control span {
   font-size: 12px;
-  color: #2c3858;
+  color: #2c2418;
 }
 
 .info-tip {
@@ -244,10 +244,10 @@ button.secondary:hover {
   justify-content: center;
   inline-size: 14px;
   block-size: 14px;
-  border: 1px solid #b0bace;
+  border: 1px solid #b0a89e;
   border-radius: 999px;
-  background: #eceef4;
-  color: #6878a0;
+  background: #eae6df;
+  color: #686058;
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
@@ -263,10 +263,10 @@ button.secondary:hover {
   z-index: 10;
   inline-size: 190px;
   padding: 8px 10px;
-  border: 1px solid #c0c8dc;
+  border: 1px solid #c0b8aa;
   border-radius: 6px;
-  background: #f8f9fc;
-  color: #1a2038;
+  background: #f5f1ea;
+  color: #1a1610;
   font-size: 11px;
   font-weight: 400;
   line-height: 1.4;
@@ -286,7 +286,7 @@ button.secondary:hover {
 }
 
 .control-hint {
-  color: #7888a8;
+  color: #78726a;
   font-size: 11px;
   line-height: 1.4;
 }
@@ -297,7 +297,7 @@ input[type="range"] {
 }
 
 select {
-  border: 1px solid #c0c8dc;
+  border: 1px solid #c0b8aa;
   border-radius: 6px;
   background: #ffffff;
   color: #12141c;
@@ -330,7 +330,7 @@ input[type="range"]:focus {
 
 output {
   font-size: 11px;
-  color: #5a6480;
+  color: #5a5650;
 }
 
 .footer {
@@ -342,13 +342,13 @@ output {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #5a6890;
+  color: #5a5650;
   font-size: 12px;
   text-decoration: none;
 }
 
 .store-link:hover {
-  color: #2c3858;
+  color: #2c2418;
 }
 
 .store-link-footer {
@@ -371,9 +371,9 @@ output {
   background: linear-gradient(
     90deg,
     transparent,
-    #b8c0d8 20%,
-    #c8d0e4 50%,
-    #b8c0d8 80%,
+    #b8b0a4 20%,
+    #c8c0b2 50%,
+    #b8b0a4 80%,
     transparent
   );
 }
@@ -387,7 +387,7 @@ output {
 }
 
 .store-link-footer:hover {
-  color: #1a2440;
+  color: #1a1a10;
 }
 
 .experimental-badge {
@@ -408,7 +408,7 @@ output {
 .alarm-status {
   margin: 0 0 10px;
   font-size: 12px;
-  color: #4a5070;
+  color: #4a4640;
 }
 
 .alarm-time-row {
@@ -419,7 +419,7 @@ output {
 
 .alarm-time-input {
   flex: 1;
-  border: 1px solid #c0c8dc;
+  border: 1px solid #c0b8aa;
   border-radius: 6px;
   background: #ffffff;
   color: #12141c;
