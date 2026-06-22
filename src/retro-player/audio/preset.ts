@@ -28,7 +28,7 @@ export type RetroAudioSettings = {
 
 export const DEFAULT_AUDIO_SETTINGS = {
   isMuted: false,
-  volume: 0.3,
+  volume: 0.72,
   playbackRate: 1,
   isLooping: true,
   isAudioFxEnabled: true,
@@ -269,7 +269,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       stereoWidthAmount: -0.02,
       smallSpeakerRoomAmount: 0.1,
       wowFlutterAmount: 0.08,
-  noiseLevel: 0.002,
+      noiseLevel: 0.002,
       vinylDustAmount: 0,
       delayAmount: 0.05,
       reverbAmount: 0.05,

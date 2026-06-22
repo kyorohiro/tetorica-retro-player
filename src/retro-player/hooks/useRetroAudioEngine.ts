@@ -456,7 +456,8 @@ export function useRetroAudioEngine({
 
   const ensureAudioContextWithRecovery = async (reason: string) => {
     const context = await ensureInitialized();
-    if (context && context.state === "running") {
+    if (context) {
+      // "suspended" はユーザーアクション待ちで復帰可能。再生成は "closed" (null) の時だけ。
       debugAudio("ensureAudioContextWithRecovery:healthy", {
         audioContextState: context.state,
         reason,
@@ -465,7 +466,7 @@ export function useRetroAudioEngine({
     }
 
     debugAudio("ensureAudioContextWithRecovery:recreate-needed", {
-      audioContextState: context?.state ?? audioContextOwnedRef.current.state,
+      audioContextState: audioContextOwnedRef.current.state,
       reason,
     });
 
