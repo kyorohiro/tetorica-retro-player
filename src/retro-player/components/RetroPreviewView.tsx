@@ -1168,7 +1168,7 @@ export function RetroPreviewView({
                 ].join(" ")}
               >
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
-                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#c8cede] border-t-[#111014]" />
+                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
                   <p className="font-medium">
                     {player.loadingLabel || "Loading preview..."}
                   </p>

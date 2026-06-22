@@ -7,13 +7,16 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
-  background: #eceef4;
+  background: #e8e3dc;
 }
 
 body {
   overflow-x: hidden;
   overflow-y: auto;
-  background: #eceef4;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(240, 232, 218, 0.7) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 100%, rgba(228, 222, 210, 0.5) 0%, transparent 50%),
+    #e8e3dc;
   color: #12141c;
   font-family:
     Inter,
