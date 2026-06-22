@@ -24,13 +24,13 @@ function InfoTip({
         <button
           type="button"
           aria-label={`${label}${helpSuffix}`}
-          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-500/80 bg-slate-900/90 text-[10px] font-bold leading-none text-slate-200 transition hover:border-sky-400 hover:text-sky-100 focus:outline-none focus:ring-1 focus:ring-sky-400"
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#a8b4c8]/80 bg-[#eceef4] text-[10px] font-bold leading-none text-[#1a2038] transition hover:border-[#000000] hover:text-[#ffffff] focus:outline-none focus:ring-1 focus:ring-[#000000]"
         >
           ?
         </button>
         <span
           role="tooltip"
-          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-slate-600/80 bg-slate-950/95 px-3 py-2 text-[11px] leading-4 text-slate-100 opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-[#b8c0d4]/80 bg-[#f8f9fc] px-3 py-2 text-[11px] leading-4 text-[#12141c] opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
         >
           {text}
         </span>
@@ -285,10 +285,10 @@ export function RetroFilterPanel({
             onSetIsFilterEnabled(!isFilterEnabled);
           }}
           className={[
-            "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+            "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
             isFilterEnabled
               ? "border-emerald-400 bg-emerald-500/20"
-              : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+              : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
           ].join(" ")}
         >
           {isFilterEnabled ? "Filter on" : "Filter off"}
@@ -301,9 +301,9 @@ export function RetroFilterPanel({
               onApplyPreset(key as RetroPresetKey);
             }}
             className={[
-              "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+              "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
               selectedPreset === key
-                ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50 shadow-[0_0_14px_rgba(74,222,128,0.45)]"
+                ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
                 : "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20",
             ].join(" ")}
           >
@@ -314,7 +314,7 @@ export function RetroFilterPanel({
 
       <div className="mt-4 space-y-3">
         <label className="block">
-          <span className="text-slate-100">Palette</span>
+          <span className="text-[#12141c]">Palette</span>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(
               ["free", "pc98", "pc98_tile", "pc98_512", "pc98_512_sat", "pc98_4096", "color32", "color64", "mono", "neon"] as const
@@ -327,10 +327,10 @@ export function RetroFilterPanel({
                   onSetPaletteMode(mode);
                 }}
                 className={[
-                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                   paletteMode === mode
-                    ? "border-sky-400 bg-sky-500/20"
-                    : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                    ? "border-[#000000] bg-[#111014]/20"
+                    : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
                 ].join(" ")}
               >
                 {mode === "free"
@@ -360,7 +360,7 @@ export function RetroFilterPanel({
 
         {(paletteMode === "mono" || paletteMode === "neon") && (
           <label className="block">
-            <span className="text-slate-100">
+            <span className="text-[#12141c]">
               {paletteMode === "neon" ? "Neon tint" : "Mono tint"}
             </span>
             <div className="mt-2 grid grid-cols-3 gap-2">
@@ -372,10 +372,10 @@ export function RetroFilterPanel({
                     onSetMonoTint(key as MonoTintMode);
                   }}
                   className={[
-                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                     monoTint === key
-                      ? "border-sky-400 bg-sky-500/20"
-                      : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                      ? "border-[#000000] bg-[#111014]/20"
+                      : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
                   ].join(" ")}
                 >
                   {tint.label}
@@ -385,7 +385,7 @@ export function RetroFilterPanel({
           </label>
         )}
 
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-[#2c3550]">
           <input
             type="checkbox"
             checked={realtimeTargetSize}
@@ -396,7 +396,7 @@ export function RetroFilterPanel({
         </label>
 
         <label className="block">
-          <span className="text-slate-100">Target width: {localTargetWidth}px</span>
+          <span className="text-[#12141c]">Target width: {localTargetWidth}px</span>
           <input
             type="range"
             min="1"
@@ -415,7 +415,7 @@ export function RetroFilterPanel({
         </label>
 
         <label className="block">
-          <span className="text-slate-100">Target height: {localTargetHeight}px</span>
+          <span className="text-[#12141c]">Target height: {localTargetHeight}px</span>
           <input
             type="range"
             min="1"
@@ -433,13 +433,13 @@ export function RetroFilterPanel({
           />
         </label>
 
-        <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-3">
-          <div className="text-[11px] leading-5 text-slate-400">
+        <div className="flex flex-col gap-3 rounded-lg border border-[#c8cede] bg-[#f0f2f7] px-3 py-3">
+          <div className="text-[11px] leading-5 text-[#7a88a8]">
             {sourceDimensions
               ? `Source aspect: ${sourceDimensions.width} x ${sourceDimensions.height}`
               : "Source aspect: unavailable for audio-only preview"}
           </div>
-          <label className="flex min-h-11 items-center justify-between rounded-lg border border-sky-400/35 bg-sky-500/10 px-3 py-2 text-slate-100">
+          <label className="flex min-h-11 items-center justify-between rounded-lg border border-[#000000]/35 bg-[#111014]/10 px-3 py-2 text-[#12141c]">
             <span>Match aspect</span>
             <input
               type="checkbox"
@@ -453,7 +453,7 @@ export function RetroFilterPanel({
         </div>
 
         <label className="block">
-          <span className="text-slate-100">Color levels: {colorLevels}</span>
+          <span className="text-[#12141c]">Color levels: {colorLevels}</span>
           <input
             type="range"
             min="2"
@@ -477,7 +477,7 @@ export function RetroFilterPanel({
         </label>
 
         <label className="block">
-          <span className="text-slate-100">
+          <span className="text-[#12141c]">
             <InfoTip
               label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
               text={helpText.bayerDither}
@@ -498,7 +498,7 @@ export function RetroFilterPanel({
         </label>
 
         <label className="block">
-          <span className="text-slate-100">
+          <span className="text-[#12141c]">
             <InfoTip
               label={`Smooth: ${smoothStrength.toFixed(2)}`}
               text={helpText.smooth}
@@ -523,7 +523,7 @@ export function RetroFilterPanel({
             </div>
             <div className="flex flex-col gap-3">
               <label className="block">
-                <span className="text-slate-100">
+                <span className="text-[#12141c]">
                   Neon Boost: {neonBoost.toFixed(2)}
                 </span>
                 <input
@@ -537,7 +537,7 @@ export function RetroFilterPanel({
                 />
               </label>
               <label className="block">
-                <span className="text-slate-100">
+                <span className="text-[#12141c]">
                   Neon Saturation: {neonSaturation.toFixed(2)}
                 </span>
                 <input
@@ -551,7 +551,7 @@ export function RetroFilterPanel({
                 />
               </label>
               <label className="block">
-                <span className="text-slate-100">
+                <span className="text-[#12141c]">
                   Neon Detail: {neonDetail.toFixed(2)}
                 </span>
                 <input
@@ -574,7 +574,7 @@ export function RetroFilterPanel({
           </div>
           <div className="flex flex-col gap-3">
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Glow: ${glowStrength.toFixed(2)}`}
                   text={helpText.glow}
@@ -592,7 +592,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Curvature: ${curvature.toFixed(2)}`}
                   text={helpText.curvature}
@@ -610,7 +610,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Scanline: ${scanlineStrength.toFixed(2)}`}
                   text={helpText.scanline}
@@ -628,7 +628,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Scanline2: ${scanline2Strength.toFixed(2)}`}
                   text={helpText.scanline2}
@@ -646,7 +646,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Scanline bright fade: ${scanlineBrightnessFade.toFixed(2)}`}
                   text={helpText.scanlineBrightFade}
@@ -664,7 +664,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Vignette: ${vignetteStrength.toFixed(2)}`}
                   text={helpText.vignette}
@@ -682,7 +682,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
                   text={helpText.phosphor}
@@ -699,13 +699,13 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
               {isPhosphorDotModeActive ? (
-                <span className="mt-2 block text-[11px] text-slate-400">
+                <span className="mt-2 block text-[11px] text-[#7a88a8]">
                   Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
                 </span>
               ) : null}
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
                   text={helpText.closeUpNoise}
@@ -725,13 +725,13 @@ export function RetroFilterPanel({
           </div>
         </div>
 
-        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-200/90">
+        <div className="rounded-lg border border-[#000000]/30 bg-[#111014]/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#e8eaf0]/90">
             Anime Toon / Edge
           </div>
           <div className="flex flex-col gap-3">
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Toon steps: ${toonSteps.toFixed(0)}`}
                   text={helpText.toonSteps}
@@ -749,7 +749,7 @@ export function RetroFilterPanel({
               />
             </label>
             <label className="block">
-              <span className="text-slate-100">
+              <span className="text-[#12141c]">
                 <InfoTip
                   label={`Edge boost: ${edgeBoost.toFixed(2)}`}
                   text={helpText.edgeBoost}
@@ -769,7 +769,7 @@ export function RetroFilterPanel({
             {toonSteps >= 1 && (
               <>
                 <label className="block">
-                  <span className="text-slate-100">
+                  <span className="text-[#12141c]">
                     Edge threshold low: {animeEdgeLow.toFixed(2)}
                   </span>
                   <input
@@ -783,7 +783,7 @@ export function RetroFilterPanel({
                   />
                 </label>
                 <label className="block">
-                  <span className="text-slate-100">
+                  <span className="text-[#12141c]">
                     Edge threshold high: {animeEdgeHigh.toFixed(2)}
                   </span>
                   <input
@@ -813,10 +813,10 @@ export function RetroFilterPanel({
                 onSetPhosphorDotInternalScale(!phosphorDotInternalScale);
               }}
               className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotInternalScale
-                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
               ].join(" ")}
             >
               2x internal resolution
@@ -827,10 +827,10 @@ export function RetroFilterPanel({
                 onSetPhosphorDotBrightCore(!phosphorDotBrightCore);
               }}
               className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotBrightCore
-                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
               ].join(" ")}
             >
               Bright core
@@ -841,10 +841,10 @@ export function RetroFilterPanel({
                 onSetPhosphorDotFlatDisc(!phosphorDotFlatDisc);
               }}
               className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotFlatDisc
-                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
               ].join(" ")}
             >
               Flat disc
@@ -855,10 +855,10 @@ export function RetroFilterPanel({
                 onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
               }}
               className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-slate-100",
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotNeighborBlend
-                  ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
-                  : "border-slate-600 bg-slate-900 hover:bg-slate-800",
+                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
               ].join(" ")}
             >
               Neighbor blend
@@ -866,7 +866,7 @@ export function RetroFilterPanel({
           </div>
 
           <label className="mt-3 block">
-            <span className="text-slate-100">
+            <span className="text-[#12141c]">
               <InfoTip
                 label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
                 text={helpText.spotMask}
@@ -887,7 +887,7 @@ export function RetroFilterPanel({
           </label>
 
           <label className="mt-3 block">
-            <span className="text-slate-100">
+            <span className="text-[#12141c]">
               <InfoTip
                 label={`Cell fill: ${phosphorDotCellFill.toFixed(3)}`}
                 text={helpText.cellFill}
@@ -908,7 +908,7 @@ export function RetroFilterPanel({
           </label>
 
           <label className="mt-3 block">
-            <span className="text-slate-100">
+            <span className="text-[#12141c]">
               <InfoTip
                 label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
                 text={helpText.bulbRadius}
@@ -929,7 +929,7 @@ export function RetroFilterPanel({
           </label>
 
           <label className="mt-3 block">
-            <span className="text-slate-100">
+            <span className="text-[#12141c]">
               <InfoTip
                 label={`Black floor: ${blackFloor.toFixed(3)}`}
                 text={helpText.blackFloor}
@@ -950,7 +950,7 @@ export function RetroFilterPanel({
           </label>
 
           <label className="mt-3 block">
-            <span className="text-slate-100">
+            <span className="text-[#12141c]">
               <InfoTip
                 label={`Light level: ${phosphorDotLightBalance.toFixed(2)}`}
                 text={helpText.lightLevel}
