@@ -2,6 +2,7 @@ import {
   applyPresetToSettings,
   COLOR_LEVEL_LIMITS,
   CUSTOM_PRESET_KEY,
+  DEFAULT_PRESET_KEY,
   DEFAULT_SETTINGS,
   getDefaultColorLevelsForPalette,
   MONO_TINT_OPTIONS,
@@ -116,6 +117,7 @@ const compressorAmountValue = document.getElementById("compressorAmountValue");
 const fxOutputTrimAmountInput = document.getElementById("fxOutputTrimAmount");
 const fxOutputTrimAmountValue = document.getElementById("fxOutputTrimAmountValue");
 const statusText = document.getElementById("statusText");
+const resetButton = document.getElementById("resetButton");
 
 const TAB_KEY = "retro-popup-tab";
 const tabButtons = document.querySelectorAll(".tab-btn[data-tab]");
@@ -1100,6 +1102,14 @@ function updateAudioSettings(patch) {
     ...patch,
   });
 }
+
+resetButton.addEventListener("click", async () => {
+  if (!confirm("Reset all settings to defaults?")) return;
+  currentSettings = normalizeSettings({ presetKey: DEFAULT_PRESET_KEY });
+  renderSettings(currentSettings);
+  await persistSettings();
+  setStatus("Settings reset to defaults.");
+});
 
 function setStatus(message) {
   statusText.textContent = message;

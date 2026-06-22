@@ -358,3 +358,18 @@ output {
   color: #ffffff;
   text-shadow: 0 0 12px rgba(234, 252, 186, 0.28);
 }
+
+.reset-btn {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-color: rgba(230, 100, 100, 0.22);
+  background: rgba(200, 60, 60, 0.10);
+  color: #d8a8a8;
+}
+
+.reset-btn:hover {
+  background: rgba(200, 60, 60, 0.22);
+  color: #f0c0c0;
+}
