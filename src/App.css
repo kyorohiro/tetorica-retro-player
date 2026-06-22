@@ -29,6 +29,10 @@ button {
   cursor: pointer;
 }
 
+input[type="range"] {
+  accent-color: #111014;
+}
+
 .safe-top-pad {
   padding-top: max(0.0rem, env(safe-area-inset-top));
 }
