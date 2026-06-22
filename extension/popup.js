@@ -118,10 +118,74 @@ const fxOutputTrimAmountInput = document.getElementById("fxOutputTrimAmount");
 const fxOutputTrimAmountValue = document.getElementById("fxOutputTrimAmountValue");
 const statusText = document.getElementById("statusText");
 const resetButton = document.getElementById("resetButton");
+const alarmStatusText = document.getElementById("alarmStatusText");
+const alarmOffButton = document.getElementById("alarmOffButton");
+const alarmTimeInput = document.getElementById("alarmTimeInput");
+const alarmSetButton = document.getElementById("alarmSetButton");
+const alarmQuickButtons = document.querySelectorAll(".alarm-quick-btn[data-minutes]");
+
+const ALARM_STORAGE_KEY = "retro-alarm-state";
 
 const TAB_KEY = "retro-popup-tab";
 const tabButtons = document.querySelectorAll(".tab-btn[data-tab]");
 const tabPanels = document.querySelectorAll("[data-tab-panel]");
+
+function renderAlarmState(state) {
+  const isArmed = state?.status === "armed" && state?.targetAt;
+  if (isArmed) {
+    const targetTime = new Date(state.targetAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    alarmStatusText.textContent = `Alarm set for ${targetTime}`;
+    alarmOffButton.style.display = "";
+  } else {
+    alarmStatusText.textContent = "No alarm set.";
+    alarmOffButton.style.display = "none";
+  }
+}
+
+alarmSetButton.addEventListener("click", async () => {
+  const timeStr = alarmTimeInput.value;
+  if (!timeStr) {
+    setStatus("Please select a time.");
+    return;
+  }
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const target = new Date();
+  target.setHours(hours, minutes, 0, 0);
+  if (target.getTime() <= Date.now()) {
+    target.setDate(target.getDate() + 1);
+  }
+  const targetAt = target.getTime();
+  const response = await chrome.runtime.sendMessage({ type: "ARM_ALARM", targetAt });
+  if (response?.ok) {
+    renderAlarmState({ status: "armed", targetAt });
+    setStatus(`Alarm set for ${timeStr}.`);
+  } else {
+    setStatus("Failed to set alarm.");
+  }
+});
+
+alarmQuickButtons.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const minutes = Number(btn.dataset.minutes);
+    const targetAt = Date.now() + minutes * 60 * 1000;
+    const response = await chrome.runtime.sendMessage({ type: "ARM_ALARM", targetAt });
+    if (response?.ok) {
+      renderAlarmState({ status: "armed", targetAt });
+      setStatus(`Alarm set for ${minutes}m.`);
+    } else {
+      setStatus("Failed to set alarm.");
+    }
+  });
+});
+
+alarmOffButton.addEventListener("click", async () => {
+  await chrome.runtime.sendMessage({ type: "CLEAR_ALARM" });
+  renderAlarmState(null);
+  setStatus("Alarm cleared.");
+});
 
 function switchTab(tabName) {
   tabButtons.forEach((btn) => {
@@ -936,11 +1000,12 @@ async function init() {
     monoTintSelect.append(option);
   }
 
-  const stored = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+  const stored = await chrome.storage.local.get([SETTINGS_STORAGE_KEY, ALARM_STORAGE_KEY]);
   currentSettings = normalizeSettings(stored[SETTINGS_STORAGE_KEY]);
   renderSettings(currentSettings);
   await persistSettings();
   await loadOverlayState();
+  renderAlarmState(stored[ALARM_STORAGE_KEY]);
 }
 
 function renderSettings(settings) {
@@ -1113,6 +1178,14 @@ resetButton.addEventListener("click", async () => {
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+if (chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[ALARM_STORAGE_KEY]) {
+      renderAlarmState(changes[ALARM_STORAGE_KEY].newValue);
+    }
+  });
 }
 
 function formatEqAmount(value) {

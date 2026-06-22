@@ -4,7 +4,84 @@ import {
 } from "./shared/settings.js";
 
 const VIEWER_URL = chrome.runtime.getURL("viewer.html");
+const ALARM_STORAGE_KEY = "retro-alarm-state";
+
+let currentSession = null;
+
+async function sendMessageToViewer(message) {
+  const tabs = await chrome.tabs.query({ url: VIEWER_URL });
+  const viewerTab = tabs[0];
+  if (viewerTab?.id) {
+    try {
+      await chrome.tabs.sendMessage(viewerTab.id, message);
+    } catch {
+      // viewer tab may not be ready to receive messages
+    }
+  }
+}
+
+async function pauseSourceTabVideos(tabId) {
+  // Browser-level mute (works even if page JS fights back)
+  try { await chrome.tabs.update(tabId, { muted: true }); } catch {}
+  // Pause HTML5 video elements + YouTube player API
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        document.querySelectorAll("video").forEach((v) => {
+          if (!v.paused) {
+            v._retroAlarmPaused = true;
+            v.pause();
+          }
+        });
+      },
+    });
+  } catch (e) {
+    console.warn("[retro-alarm] Could not pause source tab videos:", e);
+  }
+}
+
+async function resumeSourceTabVideos(tabId) {
+  // Resume HTML5 video elements + YouTube player API
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        document.querySelectorAll("video").forEach((v) => {
+          if (v._retroAlarmPaused) {
+            v._retroAlarmPaused = false;
+            v.play().catch(() => {});
+          }
+        });
+      },
+    });
+  } catch (e) {
+    console.warn("[retro-alarm] Could not resume source tab videos:", e);
+  }
+  // Unmute after resume so the stream audio comes back
+  try { await chrome.tabs.update(tabId, { muted: false }); } catch {}
+}
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== "retroPlayerAlarm") return;
+  const stored = await chrome.storage.local.get(ALARM_STORAGE_KEY);
+  const sourceTabId = stored[ALARM_STORAGE_KEY]?.sourceTabId;
+  await chrome.storage.local.set({ [ALARM_STORAGE_KEY]: { status: "idle", targetAt: null } });
+  if (sourceTabId) {
+    await resumeSourceTabVideos(sourceTabId);
+  }
+  await sendMessageToViewer({ type: "ALARM_TRIGGERED" });
+});
+
 const OVERLAY_ACTIVE_KEY = "retro-overlay-active-tabs";
+const SESSION_CACHE_KEY = "retro-capture-session-cache";
+
+// Restore currentSession from session storage on service worker restart.
+chrome.storage.session.get(SESSION_CACHE_KEY).then((stored) => {
+  if (stored[SESSION_CACHE_KEY]) {
+    currentSession = stored[SESSION_CACHE_KEY];
+  }
+}).catch(() => {});
 
 // Track tabs that navigated while overlay was active, waiting for page to complete.
 const pendingReinjection = new Set();
@@ -38,8 +115,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
     }
   }
 });
-
-let currentSession = null;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "START_CAPTURE") {
@@ -97,6 +172,49 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     currentSession = null;
     sendResponse({ ok: true });
   }
+
+  if (message?.type === "ARM_ALARM") {
+    const { targetAt } = message;
+    void (async () => {
+      // Prefer the captured tab; fall back to whatever tab is active right now.
+      let sourceTabId = currentSession?.sourceTabId ?? null;
+      if (!sourceTabId) {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        sourceTabId = activeTab?.id ?? null;
+      }
+      await chrome.alarms.clear("retroPlayerAlarm");
+      await chrome.alarms.create("retroPlayerAlarm", { when: targetAt });
+      await chrome.storage.local.set({ [ALARM_STORAGE_KEY]: { status: "armed", targetAt, sourceTabId } });
+      if (sourceTabId) {
+        await pauseSourceTabVideos(sourceTabId);
+      }
+      await sendMessageToViewer({ type: "ARM_ALARM", targetAt });
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+
+  if (message?.type === "CLEAR_ALARM") {
+    void (async () => {
+      const stored = await chrome.storage.local.get(ALARM_STORAGE_KEY);
+      const sourceTabId = stored[ALARM_STORAGE_KEY]?.sourceTabId;
+      await chrome.alarms.clear("retroPlayerAlarm");
+      await chrome.storage.local.set({ [ALARM_STORAGE_KEY]: { status: "idle", targetAt: null } });
+      if (sourceTabId) {
+        await resumeSourceTabVideos(sourceTabId);
+      }
+      await sendMessageToViewer({ type: "CLEAR_ALARM" });
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+
+  if (message?.type === "GET_ALARM_STATE") {
+    void chrome.storage.local.get(ALARM_STORAGE_KEY).then((stored) => {
+      sendResponse({ ok: true, state: stored[ALARM_STORAGE_KEY] ?? { status: "idle", targetAt: null } });
+    });
+    return true;
+  }
 });
 
 async function startCaptureForActiveTab() {
@@ -123,6 +241,7 @@ async function startCaptureForActiveTab() {
     sourceOuterHeight: sourceViewport?.outerHeight ?? null,
     createdAt: Date.now(),
   };
+  chrome.storage.session.set({ [SESSION_CACHE_KEY]: currentSession }).catch(() => {});
 
   await chrome.runtime.sendMessage({
     type: "CAPTURE_SESSION_UPDATED",
