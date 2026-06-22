@@ -451,7 +451,7 @@ function createOverlay(settings) {
       }
     }
 
-    if (context.state !== "running") {
+    if (context.state === "closed") {
       logOverlayAudioRecovery("ensure-context:recreate-needed", {
         audioContextState: context.state,
         reason,
@@ -459,6 +459,7 @@ function createOverlay(settings) {
       return recreateOverlayAudioContext(reason);
     }
 
+    // "suspended" はユーザーアクション待ちで復帰可能。closed の時だけ recreate する。
     return context;
   }
 
@@ -795,6 +796,7 @@ function createOverlay(settings) {
 
   function attachRecoveryListeners() {
     const handleVisibilityChange = () => {
+      logOverlayAudioRecovery("visibility:change", { to: document.visibilityState });
       if (document.visibilityState !== "visible" || !audioFxEnabled || !overlayAudioHookedEl) {
         return;
       }
@@ -803,6 +805,7 @@ function createOverlay(settings) {
     };
 
     const handleWindowFocus = () => {
+      logOverlayAudioRecovery("window:focus");
       if (!audioFxEnabled || !overlayAudioHookedEl) {
         return;
       }
