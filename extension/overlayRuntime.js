@@ -351,6 +351,7 @@ function createOverlay(settings) {
   let pointerClientX = null;
   let pointerClientY = null;
   let detachPointerTracking = null;
+  let detachRecoveryListener = null;
   let lastHoveredElement = null;
   let lastHoveredDRMVideo = null;
 
@@ -375,6 +376,127 @@ function createOverlay(settings) {
   let recordedChunks = [];
   let recordingStream = null;
   let recordingAudioStream = null;
+
+  function logOverlayAudioRecovery(label, payload = {}, level = "info") {
+    const details = {
+      audioContextState: _sharedAudioCtx?.state ?? null,
+      audioFxEnabled,
+      currentSrc:
+        overlayAudioHookedEl?.currentSrc || overlayAudioHookedEl?.src || null,
+      currentTime: overlayAudioHookedEl?.currentTime ?? null,
+      hasEngine: Boolean(overlayAudioEngine),
+      hasSource: Boolean(_sharedAudioSource),
+      hasTarget: Boolean(overlayAudioHookedEl),
+      visibilityState: document.visibilityState,
+      ...payload,
+    };
+    const prefix = `[overlay audio recovery] ${label}`;
+    if (level === "warn") {
+      console.warn(prefix, details);
+      return;
+    }
+    console.info(prefix, details);
+  }
+
+  async function closeSharedAudioContext() {
+    const context = _sharedAudioCtx;
+    if (!context || context.state === "closed") {
+      return;
+    }
+
+    try {
+      await context.close();
+    } catch (error) {
+      logOverlayAudioRecovery(
+        "close-context-failed",
+        { error: error instanceof Error ? error.message : String(error) },
+        "warn",
+      );
+    }
+  }
+
+  async function recreateOverlayAudioContext(reason) {
+    logOverlayAudioRecovery("recreate-context:start", { reason });
+    if (overlayAudioEngine) {
+      try { await overlayAudioEngine.dispose(); } catch {}
+      overlayAudioEngine = null;
+    }
+    try { _sharedAudioSource?.disconnect(); } catch {}
+    _sharedAudioSource = null;
+    _sharedAudioSourceEl = null;
+    await closeSharedAudioContext();
+    _sharedAudioCtx = new AudioContext();
+    logOverlayAudioRecovery("recreate-context:done", { reason });
+    return _sharedAudioCtx;
+  }
+
+  async function ensureOverlayAudioContext(reason) {
+    if (!_sharedAudioCtx || _sharedAudioCtx.state === "closed") {
+      _sharedAudioCtx = new AudioContext();
+      _sharedAudioSource = null;
+      _sharedAudioSourceEl = null;
+      logOverlayAudioRecovery("ensure-context:created", { reason });
+    }
+
+    const context = _sharedAudioCtx;
+    if (context.state === "suspended") {
+      try {
+        await context.resume();
+      } catch (error) {
+        logOverlayAudioRecovery(
+          "ensure-context:resume-failed",
+          { error: error instanceof Error ? error.message : String(error), reason },
+          "warn",
+        );
+      }
+    }
+
+    if (context.state !== "running") {
+      logOverlayAudioRecovery("ensure-context:recreate-needed", {
+        audioContextState: context.state,
+        reason,
+      });
+      return recreateOverlayAudioContext(reason);
+    }
+
+    return context;
+  }
+
+  async function recoverOverlayAudioOutput(videoElement, reason) {
+    if (!videoElement) {
+      return null;
+    }
+
+    try {
+      const context = await ensureOverlayAudioContext(reason);
+      if (!context) {
+        return null;
+      }
+
+      if (!overlayAudioEngine || overlayAudioHookedEl !== videoElement) {
+        await hookOverlayAudio(videoElement, `${reason}:hook`);
+        logOverlayAudioRecovery("recover:hooked", { reason });
+        return _sharedAudioCtx;
+      }
+
+      overlayAudioEngine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
+      try { _sharedAudioSource?.disconnect(); } catch {}
+      if (_sharedAudioSource && overlayAudioEngine.input) {
+        _sharedAudioSource.connect(overlayAudioEngine.input);
+      }
+      logOverlayAudioRecovery("recover:reconnected", { reason });
+      return context;
+    } catch (error) {
+      logOverlayAudioRecovery(
+        "recover:failed-rehooking",
+        { error: error instanceof Error ? error.message : String(error), reason },
+        "warn",
+      );
+      await hookOverlayAudio(videoElement, `${reason}:rebuild`);
+      logOverlayAudioRecovery("recover:rehooked", { reason });
+      return _sharedAudioCtx;
+    }
+  }
 
   opacityButton.addEventListener("click", () => {
     const idx = OPACITY_PRESETS.findIndex((v) => Math.abs(v - overlayOpacity) < 0.01);
@@ -452,14 +574,8 @@ function createOverlay(settings) {
       if (!targetEl) {
         audioFxEnabled = false;
         _sharedAudioFxEnabled = false;
-      } else if (overlayAudioHookedEl === targetEl && _sharedAudioSource && overlayAudioEngine?.input) {
-        // Already hooked — just reconnect to chain
-        try {
-          _sharedAudioSource.disconnect();
-          _sharedAudioSource.connect(overlayAudioEngine.input);
-        } catch {}
       } else {
-        await hookOverlayAudio(targetEl);
+        await recoverOverlayAudioOutput(targetEl, "audio-fx-toggle:on");
       }
     } else {
       // Bypass: keep AudioContext alive, route directly to destination (no gap in audio)
@@ -516,6 +632,7 @@ function createOverlay(settings) {
     updateAudioFxButton();
     attachSettingsSync();
     attachPointerTracking();
+    attachRecoveryListeners();
     updateRecordButton();
     draw();
   }
@@ -534,6 +651,11 @@ function createOverlay(settings) {
     if (detachPointerTracking) {
       detachPointerTracking();
       detachPointerTracking = null;
+    }
+
+    if (detachRecoveryListener) {
+      detachRecoveryListener();
+      detachRecoveryListener = null;
     }
 
     stopRecording({ save: false });
@@ -668,6 +790,31 @@ function createOverlay(settings) {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("blur", clearPointerFocus);
       document.removeEventListener("pointerleave", clearPointerFocus);
+    };
+  }
+
+  function attachRecoveryListeners() {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible" || !audioFxEnabled || !overlayAudioHookedEl) {
+        return;
+      }
+
+      void recoverOverlayAudioOutput(overlayAudioHookedEl, "visibility:visible");
+    };
+
+    const handleWindowFocus = () => {
+      if (!audioFxEnabled || !overlayAudioHookedEl) {
+        return;
+      }
+
+      void recoverOverlayAudioOutput(overlayAudioHookedEl, "window:focus");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleWindowFocus);
+    detachRecoveryListener = () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }
 
@@ -1032,8 +1179,12 @@ function createOverlay(settings) {
       : "none";
   }
 
-  async function hookOverlayAudio(videoElement) {
-    if (overlayAudioHookedEl === videoElement && _sharedAudioCtx?.state === "running") return;
+  async function hookOverlayAudio(videoElement, reason = "hook") {
+    if (
+      overlayAudioHookedEl === videoElement &&
+      _sharedAudioCtx?.state === "running" &&
+      overlayAudioEngine
+    ) return;
 
     overlayAudioHookedEl = videoElement;
     const seq = ++_hookSeq;
@@ -1048,14 +1199,10 @@ function createOverlay(settings) {
     if (seq !== _hookSeq) return;
 
     try {
-      // ctx は一度作ったら閉じない
-      if (!_sharedAudioCtx || _sharedAudioCtx.state === "closed") {
-        _sharedAudioCtx = new AudioContext();
-        _sharedAudioSource = null;
-        _sharedAudioSourceEl = null;
+      const ctx = await ensureOverlayAudioContext(reason);
+      if (!ctx) {
+        return;
       }
-      const ctx = _sharedAudioCtx;
-      if (ctx.state === "suspended") await ctx.resume();
 
       const engine = createTetoricaRetroAudioNode(ctx, { instanceLabel: "overlay" });
       await engine.ensureInitialized();
@@ -1068,6 +1215,7 @@ function createOverlay(settings) {
 
       overlayAudioEngine = engine;
       engine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
+      logOverlayAudioRecovery("hook:engine-ready", { reason });
 
       // 同じ video element なら source を再利用（createMediaElementSource は1度しか呼べないため）。
       // どちらの場合も必ず disconnect してから engine に繋ぐ。
@@ -1082,9 +1230,15 @@ function createOverlay(settings) {
         try { _sharedAudioSource.disconnect(); } catch {}
       }
       _sharedAudioSource.connect(overlayAudioEngine.input);
+      logOverlayAudioRecovery("hook:source-connected", { reason });
     } catch (err) {
       if (seq === _hookSeq) {
         console.warn("[overlay audio] hook failed:", err);
+        logOverlayAudioRecovery(
+          "hook:failed",
+          { error: err instanceof Error ? err.message : String(err), reason },
+          "warn",
+        );
         overlayAudioHookedEl = null;
         releaseOverlayAudio();
       }

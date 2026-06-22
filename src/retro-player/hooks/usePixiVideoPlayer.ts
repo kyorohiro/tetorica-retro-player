@@ -44,6 +44,7 @@ export function usePixiVideoPlayer(
   const isPlayingRef = useRef<boolean>(false);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
   const wasPlayingBeforeBackgroundRef = useRef(false);
+  const wasPlayingBeforePowerOffRef = useRef(false);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
@@ -71,6 +72,38 @@ export function usePixiVideoPlayer(
 
     const suffix = payload ? ` ${JSON.stringify(payload)}` : "";
     console.log(`[retro-player video][${instanceLabelRef.current}] ${label}${suffix}`);
+  };
+
+  const logAudioRecovery = (
+    label: string,
+    payload?: Record<string, unknown>,
+    level: "info" | "warn" = "info",
+  ) => {
+    const media = mediaRef.current;
+    const details = {
+      audioContextState: audioContextRef.current?.state ?? null,
+      currentSrc: media?.currentSrc || media?.src || null,
+      currentTime: media?.currentTime ?? null,
+      ended: media?.ended ?? null,
+      hasMedia: Boolean(media),
+      hasMediaSource: Boolean(mediaSourceRef.current),
+      isPoweredOn,
+      mediaMuted: media?.muted ?? null,
+      mediaPaused: media?.paused ?? null,
+      mediaReadyState: media?.readyState ?? null,
+      mediaVolume: media?.volume ?? null,
+      previewKind: previewKindRef.current,
+      visibilityState:
+        typeof document === "undefined" ? null : document.visibilityState,
+      ...payload,
+    };
+
+    if (level === "warn") {
+      console.warn(`[retro-player audio recovery][${instanceLabelRef.current}] ${label}`, details);
+      return;
+    }
+
+    console.info(`[retro-player audio recovery][${instanceLabelRef.current}] ${label}`, details);
   };
 
   const stage = useRetroPixiStage({
@@ -180,9 +213,11 @@ export function usePixiVideoPlayer(
     setFxOutputTrimAmount,
     debugAudio,
     ensureAudioContext,
+    ensureAudioContextWithRecovery,
     updateAudioNodes,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
+    rebuildAudioGraphForCurrentMedia,
     applyAudioSettings,
     resetAudioSettings,
     disposeAudioEngine,
@@ -210,12 +245,114 @@ export function usePixiVideoPlayer(
     setLoadingLabel("");
   };
 
+  const recoverAudioOutput = async (reason: string) => {
+    const media = mediaRef.current;
+    const context = await ensureAudioContextWithRecovery(reason);
+    if (!context) {
+      logAudioRecovery(`${reason}:no-audio-context`, undefined, "warn");
+      return null;
+    }
+
+    try {
+      if (media) {
+        if (mediaSourceRef.current) {
+          reconnectCurrentMediaAudio();
+          logAudioRecovery(`${reason}:reconnected-media-source`, {
+            audioContextState: context.state,
+          });
+        } else {
+          await connectMediaAudio(media);
+          logAudioRecovery(`${reason}:connected-media-source`, {
+            audioContextState: context.state,
+          });
+        }
+      }
+
+      updateAudioNodes();
+      return context;
+    } catch (error) {
+      logAudioRecovery(
+        `${reason}:reconnect-failed-rebuilding`,
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "warn",
+      );
+
+      const rebuiltContext = await rebuildAudioGraphForCurrentMedia(`${reason}:rebuild`);
+      if (!rebuiltContext) {
+        logAudioRecovery(`${reason}:rebuild-returned-null`, undefined, "warn");
+        return null;
+      }
+
+      logAudioRecovery(`${reason}:rebuild-complete`, {
+        audioContextState: rebuiltContext.state,
+      });
+      return rebuiltContext;
+    }
+  };
+
   const powerOn = () => {
     setIsPoweredOn(true);
     appRef.current?.ticker.start();
+
+    window.setTimeout(() => {
+      void (async () => {
+        const media = mediaRef.current;
+        const shouldResumePlayback =
+          wasPlayingBeforePowerOffRef.current && Boolean(media);
+        logAudioRecovery("powerOn:start", {
+          shouldResumePlayback,
+        });
+
+        try {
+          const context = await recoverAudioOutput("powerOn");
+          if (!context) {
+            return;
+          }
+
+          if (shouldResumePlayback && mediaRef.current) {
+            try {
+              await mediaRef.current.play();
+              setNeedsUserPlay(false);
+            } catch (error) {
+              if (error instanceof DOMException && error.name === "NotAllowedError") {
+                setNeedsUserPlay(true);
+              }
+              logAudioRecovery(
+                "powerOn:play-failed",
+                {
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                "warn",
+              );
+            }
+          }
+        } catch (error) {
+          logAudioRecovery(
+            "powerOn:recover-failed",
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "warn",
+          );
+        } finally {
+          syncVideoState();
+          wasPlayingBeforePowerOffRef.current = false;
+          logAudioRecovery("powerOn:done", {
+            shouldResumePlayback,
+          });
+        }
+      })();
+    }, 0);
   };
 
   const powerOff = () => {
+    wasPlayingBeforePowerOffRef.current = Boolean(mediaRef.current && !mediaRef.current.paused);
+    logAudioRecovery("powerOff", {
+      wasPlayingBeforePowerOff: wasPlayingBeforePowerOffRef.current,
+    });
+
     if (mediaRef.current) {
       mediaRef.current.pause();
     }
@@ -695,6 +832,9 @@ export function usePixiVideoPlayer(
         media.pause();
         isPlayingRef.current = false;
         setIsPlaying(false);
+        logAudioRecovery("visibility:hidden", {
+          wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
+        });
 
         if (noiseGainRef.current) {
           noiseGainRef.current.gain.value = 0;
@@ -716,9 +856,13 @@ export function usePixiVideoPlayer(
       window.setTimeout(() => {
         void (async () => {
           try {
-            await ensureAudioContext();
-            reconnectCurrentMediaAudio();
-            updateAudioNodes();
+            logAudioRecovery("visibility:visible:start", {
+              wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
+            });
+            const context = await recoverAudioOutput("visibility:visible");
+            if (!context) {
+              return;
+            }
 
             if (wasPlayingBeforeBackgroundRef.current && mediaRef.current) {
               try {
@@ -728,11 +872,19 @@ export function usePixiVideoPlayer(
                 if (error instanceof DOMException && error.name === "NotAllowedError") {
                   setNeedsUserPlay(true);
                 }
+                logAudioRecovery(
+                  "visibility:visible:play-failed",
+                  {
+                    error: error instanceof Error ? error.message : String(error),
+                  },
+                  "warn",
+                );
               }
             }
           } finally {
             syncVideoState();
             wasPlayingBeforeBackgroundRef.current = false;
+            logAudioRecovery("visibility:visible:done");
           }
         })();
       }, 80);
@@ -745,12 +897,12 @@ export function usePixiVideoPlayer(
     };
   }, [
     audioContextRef,
-    ensureAudioContext,
+    ensureAudioContextWithRecovery,
     masterGainRef,
     noiseGainRef,
-    reconnectCurrentMediaAudio,
+    mediaSourceRef,
+    recoverAudioOutput,
     syncVideoState,
-    updateAudioNodes,
   ]);
 
   useLayoutEffect(() => {
