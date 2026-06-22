@@ -518,7 +518,7 @@ export function RetroFilterPanel({
 
         {paletteMode === "neon" && (
           <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-3">
-            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-violet-200/90">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
               Neon
             </div>
             <div className="flex flex-col gap-3">
@@ -569,7 +569,7 @@ export function RetroFilterPanel({
         )}
 
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-amber-200/90">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
             CRT / LCD
           </div>
           <div className="flex flex-col gap-3">
@@ -726,7 +726,7 @@ export function RetroFilterPanel({
         </div>
 
         <div className="rounded-lg border border-[#000000]/30 bg-[#111014]/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#e8eaf0]/90">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
             Anime Toon / Edge
           </div>
           <div className="flex flex-col gap-3">
@@ -802,7 +802,7 @@ export function RetroFilterPanel({
         </div>
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-200/90">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
             Phosphor Dot / Spot Mask
           </div>
 
