@@ -16,6 +16,10 @@ import {
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
 
+const isTauriRuntime = () =>
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 export type CanvasStageApp = {
@@ -113,6 +117,7 @@ export function useRetroPixiStage({
     isTickerRunningRef.current = false;
     if (animationFrameRef.current !== null) {
       window.cancelAnimationFrame(animationFrameRef.current);
+      window.clearTimeout(animationFrameRef.current);
       animationFrameRef.current = null;
     }
   }, []);
@@ -137,7 +142,13 @@ export function useRetroPixiStage({
         return;
       }
 
-      animationFrameRef.current = window.requestAnimationFrame(tick);
+      // Tauri on macOS throttles rAF when the window is fully covered (document.hidden).
+      // Fall back to setTimeout so playback continues behind other windows.
+      if (isTauriRuntime() && document.hidden) {
+        animationFrameRef.current = window.setTimeout(tick, 16) as unknown as number;
+      } else {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      }
     };
 
     animationFrameRef.current = window.requestAnimationFrame(tick);

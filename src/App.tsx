@@ -304,28 +304,30 @@ function App() {
       <div className="relative mx-auto max-w-5xl px-4 py-4">
         <header className="mb-3">
           <div className="relative">
-            <button
-              type="button"
-              aria-label={t(locale, "reloadApp")}
-              title={t(locale, "reloadApp")}
-              onClick={handleReloadApp}
-              className="safe-top-offset fixed left-[3.85rem] z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-            >
-              <RefreshCw size={18} />
-            </button>
-            <button
-              type="button"
-              aria-expanded={isMobileMenuOpen}
-              aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
-              onClick={() => {
-                setIsMobileMenuOpen((current) => !current);
-              }}
-              className="safe-top-offset fixed left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-            >
-              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
+            <div className="safe-top-offset fixed left-3 z-100 flex items-center gap-1">
+              <button
+                type="button"
+                aria-expanded={isMobileMenuOpen}
+                aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
+                onClick={() => {
+                  setIsMobileMenuOpen((current) => !current);
+                }}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+              >
+                {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
+              <button
+                type="button"
+                aria-label={t(locale, "reloadApp")}
+                title={t(locale, "reloadApp")}
+                onClick={handleReloadApp}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+              >
+                <RefreshCw size={18} />
+              </button>
+            </div>
             {isMobileMenuOpen && (
-              <div className="safe-top-menu fixed left-3 z-30 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+              <div className="safe-top-menu fixed left-3 z-100 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"
