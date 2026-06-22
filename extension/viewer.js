@@ -43,6 +43,9 @@ let currentSession = null;
 let isFitModeEnabled = false;
 let mediaRecorder = null;
 let recordedChunks = [];
+let isAlarmArmed = false;
+let alarmOverlayEl = null;
+let alarmClockIntervalId = null;
 
 function logViewerAudioRecovery(label, payload = {}, level = "info") {
   const details = {
@@ -63,6 +66,109 @@ function logViewerAudioRecovery(label, payload = {}, level = "info") {
   console.info(prefix, details);
 }
 
+function createAlarmOverlay(targetAt) {
+  if (alarmOverlayEl) alarmOverlayEl.remove();
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = [
+    "position:fixed;inset:0;background:rgba(0,0,5,0.90);",
+    "display:flex;flex-direction:column;align-items:center;justify-content:center;",
+    "z-index:9999;color:#e8eaf0;font-family:monospace,sans-serif;user-select:none;",
+  ].join("");
+
+  const clockEl = document.createElement("div");
+  clockEl.id = "alarmViewerClock";
+  clockEl.style.cssText = "font-size:clamp(3rem,18vw,8rem);font-weight:700;letter-spacing:0.06em;line-height:1;";
+
+  const targetEl = document.createElement("div");
+  targetEl.style.cssText = "margin-top:1.2rem;font-size:1rem;opacity:0.55;letter-spacing:0.04em;";
+  const targetTime = new Date(targetAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  targetEl.textContent = `Alarm • ${targetTime}`;
+
+  const offBtn = document.createElement("button");
+  offBtn.textContent = "Alarm Off";
+  offBtn.style.cssText = [
+    "margin-top:2rem;padding:12px 32px;font-size:0.95rem;font-weight:700;",
+    "border:2px solid rgba(232,234,240,0.6);border-radius:8px;",
+    "background:transparent;color:#e8eaf0;cursor:pointer;",
+    "font-family:monospace,sans-serif;letter-spacing:0.06em;",
+  ].join("");
+  offBtn.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "CLEAR_ALARM" });
+  });
+
+  overlay.appendChild(clockEl);
+  overlay.appendChild(targetEl);
+  overlay.appendChild(offBtn);
+  document.body.appendChild(overlay);
+  alarmOverlayEl = overlay;
+
+  function updateClock() {
+    clockEl.textContent = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+  updateClock();
+  alarmClockIntervalId = setInterval(updateClock, 1000);
+}
+
+function removeAlarmOverlay() {
+  if (alarmClockIntervalId) {
+    clearInterval(alarmClockIntervalId);
+    alarmClockIntervalId = null;
+  }
+  if (alarmOverlayEl) {
+    alarmOverlayEl.remove();
+    alarmOverlayEl = null;
+  }
+}
+
+function armAlarm(targetAt) {
+  isAlarmArmed = true;
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = 0;
+  }
+  if (mediaSourceNode) {
+    try { mediaSourceNode.disconnect(); } catch {}
+  }
+  video.pause();
+  createAlarmOverlay(targetAt);
+}
+
+function resumeViewerPlayback() {
+  if (mediaSourceNode && audioEngine?.input) {
+    try { mediaSourceNode.connect(audioEngine.input); } catch {}
+  }
+  if (mediaStream) {
+    void video.play().catch(() => {});
+    if (!animationFrameId) {
+      drawFrame();
+    }
+  }
+}
+
+function triggerAlarm() {
+  isAlarmArmed = false;
+  removeAlarmOverlay();
+  resumeViewerPlayback();
+  setStatus("Alarm fired!");
+  setTimeout(() => {
+    if (!isAlarmArmed) {
+      setStatus(currentSession ? `Rendering tab ${currentSession.sourceTabId}.` : "Ready.");
+    }
+  }, 3000);
+}
+
+function clearAlarm() {
+  if (!isAlarmArmed) return;
+  isAlarmArmed = false;
+  removeAlarmOverlay();
+  resumeViewerPlayback();
+}
+
 init().catch((error) => {
   console.error(error);
   setStatus(`Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
@@ -70,20 +176,33 @@ init().catch((error) => {
 
 if (chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type !== "CAPTURE_SESSION_UPDATED" || !message.session?.streamId) {
+    if (message?.type === "CAPTURE_SESSION_UPDATED" && message.session?.streamId) {
+      currentSession = message.session;
+      void startCapture(message.session.streamId)
+        .then(() => {
+          applyCurrentSettings();
+          setStatus(`Rendering tab ${message.session.sourceTabId}.`);
+        })
+        .catch((error) => {
+          setStatus(error instanceof Error ? error.message : String(error));
+        });
       return;
     }
 
-    currentSession = message.session;
+    if (message?.type === "ARM_ALARM") {
+      armAlarm(message.targetAt);
+      return;
+    }
 
-    void startCapture(message.session.streamId)
-      .then(() => {
-        applyCurrentSettings();
-        setStatus(`Rendering tab ${message.session.sourceTabId}.`);
-      })
-      .catch((error) => {
-        setStatus(error instanceof Error ? error.message : String(error));
-      });
+    if (message?.type === "ALARM_TRIGGERED") {
+      triggerAlarm();
+      return;
+    }
+
+    if (message?.type === "CLEAR_ALARM") {
+      clearAlarm();
+      return;
+    }
   });
 }
 
@@ -99,7 +218,7 @@ async function init() {
   window.addEventListener("resize", handleWindowResize);
   document.addEventListener("visibilitychange", () => {
     logViewerAudioRecovery("visibility:change", { to: document.visibilityState });
-    if (document.visibilityState !== "visible" || !mediaStream) {
+    if (document.visibilityState !== "visible" || !mediaStream || isAlarmArmed) {
       return;
     }
 
@@ -107,7 +226,7 @@ async function init() {
   });
   window.addEventListener("focus", () => {
     logViewerAudioRecovery("window:focus");
-    if (!mediaStream) {
+    if (!mediaStream || isAlarmArmed) {
       return;
     }
 
@@ -577,7 +696,7 @@ async function rebuildViewerAudioGraph(reason) {
   audioContext = new AudioContext();
   await createViewerAudioEngine(audioContext);
 
-  if (mediaStream) {
+  if (mediaStream && !isAlarmArmed) {
     mediaSourceNode = audioContext.createMediaStreamSource(mediaStream);
     mediaSourceNode.connect(audioEngine.input);
   }
@@ -643,7 +762,7 @@ async function connectStreamAudio(stream) {
 }
 
 async function recoverViewerAudioOutput(reason) {
-  if (!mediaStream) {
+  if (!mediaStream || isAlarmArmed) {
     return null;
   }
 

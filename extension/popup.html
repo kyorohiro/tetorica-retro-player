@@ -32,6 +32,7 @@
           <button class="tab-btn" role="tab" data-tab="video" aria-selected="true">Video</button>
           <button class="tab-btn" role="tab" data-tab="audio" aria-selected="false">Audio</button>
           <button class="tab-btn" role="tab" data-tab="overlay" aria-selected="false">Overlay</button>
+          <button class="tab-btn" role="tab" data-tab="alarm" aria-selected="false">Alarm</button>
         </div>
 
         <section class="controls">
@@ -517,6 +518,30 @@
               Order: current hover, default [0], previous hover, then auto-picked videos.
             </small>
           </label>
+        </section>
+
+        <section class="control-group" data-tab-panel="alarm" aria-labelledby="alarmControlsTitle">
+          <div class="control-group-header">
+            <p class="control-group-kicker">Alarm <span class="experimental-badge">Experimental</span></p>
+            <h2 id="alarmControlsTitle">Wake-up timer</h2>
+          </div>
+
+          <p id="alarmStatusText" class="alarm-status">No alarm set.</p>
+
+          <div class="alarm-time-row">
+            <input id="alarmTimeInput" type="time" class="alarm-time-input" />
+            <button id="alarmSetButton" type="button">Set</button>
+          </div>
+
+          <div class="alarm-quick-grid">
+            <button type="button" class="alarm-quick-btn" data-minutes="3">3m</button>
+            <button type="button" class="alarm-quick-btn" data-minutes="5">5m</button>
+            <button type="button" class="alarm-quick-btn" data-minutes="10">10m</button>
+            <button type="button" class="alarm-quick-btn" data-minutes="25">25m</button>
+            <button type="button" class="alarm-quick-btn" data-minutes="50">50m</button>
+          </div>
+
+          <button id="alarmOffButton" type="button" class="secondary" style="display:none; width:100%; margin-top:6px;">Alarm Off</button>
         </section>
         </section>
       </div>
