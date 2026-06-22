@@ -38,6 +38,9 @@ export type RetroPreviewPlayerSlice = {
   canRecord: boolean;
   isRecording: boolean;
   prefersShareExport: boolean;
+  isPlaying: boolean;
+  togglePlayback: () => Promise<void>;
+  setLoopingEnabled: (nextLooping: boolean) => void;
   powerOn: () => void;
   powerOff: () => void;
   playVideoWithAudio: () => Promise<void>;
@@ -142,6 +145,8 @@ export function RetroPreviewView({
   const [alarmTime, setAlarmTime] = React.useState("07:00");
   const [alarmTargetAt, setAlarmTargetAt] = React.useState<number | null>(null);
   const [alarmStatus, setAlarmStatus] = React.useState<"idle" | "armed" | "triggered">("idle");
+  const [clockTime, setClockTime] = React.useState(() => new Date());
+  const [showSeconds, setShowSeconds] = React.useState(false);
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== 'undefined' && window.innerWidth < 360,
   );
@@ -157,6 +162,7 @@ export function RetroPreviewView({
   const tooltipTimerRef = React.useRef<number | null>(null);
   const alarmTimeoutRef = React.useRef<number | null>(null);
   const alarmAudioContextRef = React.useRef<AudioContext | null>(null);
+  const alarmRingingRef = React.useRef(false);
 
   // --- Stable callbacks (defined before effects that use them) ---
 
@@ -287,7 +293,7 @@ export function RetroPreviewView({
       isPoweredOn: player.isPoweredOn,
     });
 
-    if (player.hasAudibleMedia) {
+    if (player.hasPlayableMedia) {
       try {
         if (!player.isPoweredOn) {
           player.powerOn();
@@ -302,6 +308,7 @@ export function RetroPreviewView({
       }
     }
 
+    // Fallback: no playable media, or playback failed — play a tone.
     const didPlayTone = await playAlarmTone();
     console.info("[retro-player alarm] fallback tone", { didPlayTone });
   }, [playAlarmTone, player]);
@@ -363,6 +370,32 @@ export function RetroPreviewView({
       }
     };
   }, [alarmStatus, alarmTargetAt, triggerAlarm]);
+
+  // Clock tick: update every second while alarm is armed or ringing.
+  React.useEffect(() => {
+    if (alarmStatus !== "armed" && alarmStatus !== "triggered") return;
+    const id = window.setInterval(() => setClockTime(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, [alarmStatus]);
+
+  // Tone loop: ring repeatedly when triggered with no playable media (image etc.).
+  React.useEffect(() => {
+    const shouldRing = alarmStatus === "triggered" && !player.hasPlayableMedia;
+    if (!shouldRing) {
+      alarmRingingRef.current = false;
+      return;
+    }
+    alarmRingingRef.current = true;
+    const ring = async () => {
+      if (!alarmRingingRef.current) return;
+      await playAlarmTone();
+      if (alarmRingingRef.current) {
+        window.setTimeout(ring, 400);
+      }
+    };
+    void ring();
+    return () => { alarmRingingRef.current = false; };
+  }, [alarmStatus, player.hasPlayableMedia, playAlarmTone]);
 
   // Narrow-screen detection (< 360px): record button moves into More popover.
   React.useEffect(() => {
@@ -611,9 +644,15 @@ export function RetroPreviewView({
       nextTarget.setDate(nextTarget.getDate() + 1);
     }
 
+    setIsMoreOpen(false);
     setAlarmTargetAt(nextTarget.getTime());
     setAlarmStatus("armed");
+    setClockTime(new Date());
     void (async () => {
+      if (player.isPlaying) {
+        await player.togglePlayback();
+      }
+      player.setLoopingEnabled(true);
       const alarmContext = await ensureAlarmAudioContext();
       void player.ensureAudioContext();
       console.info("[retro-player alarm] armed", {
@@ -629,7 +668,30 @@ export function RetroPreviewView({
   const handleClearAlarm = () => {
     setAlarmTargetAt(null);
     setAlarmStatus("idle");
+    setShowSeconds(false);
     console.info("[retro-player alarm] cleared");
+  };
+
+  const handleArmAlarmIn = (minutes: number) => {
+    const targetAt = Date.now() + minutes * 60 * 1000;
+    setIsMoreOpen(false);
+    setAlarmTargetAt(targetAt);
+    setAlarmStatus("armed");
+    setShowSeconds(true);
+    setClockTime(new Date());
+    void (async () => {
+      if (player.isPlaying) {
+        await player.togglePlayback();
+      }
+      player.setLoopingEnabled(true);
+      const alarmContext = await ensureAlarmAudioContext();
+      void player.ensureAudioContext();
+      console.info("[retro-player alarm] armed (relative)", {
+        alarmContextState: alarmContext.state,
+        minutes,
+        targetAt: new Date(targetAt).toISOString(),
+      });
+    })();
   };
 
   const handleTestAlarm = () => {
@@ -702,6 +764,18 @@ export function RetroPreviewView({
                 >
                   Clear
                 </button>
+              </div>
+              <div className="mt-2 grid grid-cols-5 gap-1">
+                {([3, 5, 10, 25, 50] as const).map((min) => (
+                  <button
+                    key={min}
+                    type="button"
+                    onClick={() => handleArmAlarmIn(min)}
+                    className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-1 py-1 text-[11px] text-slate-300 transition hover:bg-slate-700"
+                  >
+                    {min}m
+                  </button>
+                ))}
               </div>
               <p className="mt-2 text-[11px] leading-4 text-slate-400">
                 {alarmTargetAt
@@ -1161,6 +1235,84 @@ export function RetroPreviewView({
       {/* Spacer that holds layout space while the shell is fixed/pinned */}
       {isPinnedPreview && pinnedPreviewMetrics && (
         <div style={{ height: `${pinnedPreviewMetrics.height}px` }} />
+      )}
+
+      {/* Alarm overlay:
+            - "armed"    → clock / waiting screen, locks all controls
+            - "triggered" + no playable media → ringing tone, locks until stopped */}
+      {(alarmStatus === "armed" || (alarmStatus === "triggered" && !player.hasPlayableMedia)) && (
+        <div
+          className="fixed inset-0 z-200 flex flex-col items-center justify-center bg-slate-950/96 backdrop-blur-md"
+          onClick={handleClearAlarm}
+        >
+          {alarmStatus === "armed" ? (
+            /* ── Waiting state ── */
+            <>
+              <div className="pointer-events-none select-none text-center">
+                <div className={showSeconds ? "text-[min(14vw,5.5rem)] font-thin leading-none tracking-[-0.02em] text-slate-50 tabular-nums" : "text-[min(22vw,9rem)] font-thin leading-none tracking-[-0.02em] text-slate-50 tabular-nums"}>
+                  {clockTime.toLocaleTimeString(locale === "ja" ? "ja-JP" : "en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    ...(showSeconds ? { second: "2-digit" } : {}),
+                  })}
+                </div>
+                <div className="mt-3 text-sm text-slate-400">
+                  {clockTime.toLocaleDateString(locale === "ja" ? "ja-JP" : "en-US", {
+                    month: "long",
+                    day: "numeric",
+                    weekday: "long",
+                  })}
+                </div>
+                <div className="mt-8 flex items-center justify-center gap-2 text-slate-500">
+                  <Bell size={13} />
+                  <span className="text-sm">
+                    {alarmTargetAt ? formatAlarmTarget(alarmTargetAt) : "—"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleClearAlarm(); }}
+                className="pointer-events-auto mt-12 rounded-full border border-slate-500/60 bg-slate-800/80 px-8 py-3 text-sm text-slate-300 transition hover:bg-slate-700 active:scale-95"
+              >
+                Alarm Off
+              </button>
+              <p className="pointer-events-none mt-5 text-xs text-slate-600">
+                {locale === "ja" ? "タップして解除" : "Tap anywhere to dismiss"}
+              </p>
+            </>
+          ) : (
+            /* ── Ringing state (image / no media) ── */
+            <>
+              <div className="pointer-events-none select-none text-center">
+                <div className={`animate-pulse ${showSeconds ? "text-[min(14vw,5.5rem)]" : "text-[min(22vw,9rem)]"} font-thin leading-none tracking-[-0.02em] text-slate-50 tabular-nums`}>
+                  {clockTime.toLocaleTimeString(locale === "ja" ? "ja-JP" : "en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    ...(showSeconds ? { second: "2-digit" } : {}),
+                  })}
+                </div>
+                <div className="mt-6 flex items-center justify-center gap-2 text-amber-300/80">
+                  <Bell size={18} />
+                  <span className="text-lg font-medium tracking-widest uppercase">
+                    {locale === "ja" ? "アラーム" : "Alarm"}
+                  </span>
+                  <Bell size={18} />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleClearAlarm(); }}
+                className="pointer-events-auto mt-12 rounded-full border border-amber-400/40 bg-amber-500/15 px-8 py-3 text-sm text-amber-200 transition hover:bg-amber-500/25 active:scale-95"
+              >
+                {locale === "ja" ? "アラームを止める" : "Stop Alarm"}
+              </button>
+              <p className="pointer-events-none mt-5 text-xs text-slate-600">
+                {locale === "ja" ? "タップして止める" : "Tap anywhere to stop"}
+              </p>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
