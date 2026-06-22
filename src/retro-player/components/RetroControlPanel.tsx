@@ -95,7 +95,7 @@ export type RetroControlPanelProps = {
 };
 
 const controlsFallback = (
-  <div className="flex min-h-24 items-center justify-center text-sm text-[#7a88a8]">
+  <div className="flex min-h-24 items-center justify-center text-sm text-[#7a7268]">
     Preparing controls...
   </div>
 );
@@ -114,7 +114,7 @@ export function RetroControlPanel({
   onImportSettings,
 }: RetroControlPanelProps) {
   return (
-    <div className="rounded-2xl border border-[#c8cede] bg-[#eceef4] p-3 text-xs text-[#2c3550]">
+    <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
       {(player.hasPlayableMedia || player.hasImage) &&
         controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
@@ -205,12 +205,12 @@ export function RetroControlPanel({
       )}
 
       {controlPanelMode === "video-settings" && (
-        <div className="mt-4 border-t border-[#c8cede] pt-4">
+        <div className="mt-4 border-t border-[#cac0b2] pt-4">
           <div className="mb-3 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => { onControlPanelModeChange("playback"); }}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
             >
               Back to Playback
             </button>
