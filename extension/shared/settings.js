@@ -564,8 +564,10 @@ export const PRESETS = {
   },
 };
 
+export const DEFAULT_PRESET_KEY = "tetorica";
+
 export const DEFAULT_SETTINGS = {
-  presetKey: "tetorica",
+  presetKey: DEFAULT_PRESET_KEY,
   audioPresetKey: "custom",
   crtAspect: 1.0,
   paletteMode: "mono",
@@ -643,11 +645,11 @@ export function normalizeSettings(candidate) {
     ? candidate.presetKey
     : candidate?.presetKey === CUSTOM_PRESET_KEY
       ? CUSTOM_PRESET_KEY
-      : DEFAULT_SETTINGS.presetKey;
+      : DEFAULT_PRESET_KEY;
   const basePresetSettings =
     presetKey !== CUSTOM_PRESET_KEY
       ? applyPresetToSettings(presetKey)
-      : DEFAULT_SETTINGS;
+      : applyPresetToSettings(DEFAULT_PRESET_KEY);
   const paletteMode = isPaletteMode(candidate?.paletteMode)
     ? candidate.paletteMode
     : basePresetSettings.paletteMode;
@@ -903,7 +905,7 @@ export function normalizeSettings(candidate) {
 }
 
 export function applyPresetToSettings(presetKey) {
-  const preset = PRESETS[presetKey] ?? PRESETS[DEFAULT_SETTINGS.presetKey];
+  const preset = PRESETS[presetKey] ?? PRESETS[DEFAULT_PRESET_KEY];
 
   return {
     ...DEFAULT_SETTINGS,
