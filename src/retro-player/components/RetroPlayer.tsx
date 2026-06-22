@@ -281,7 +281,7 @@ export function RetroPlayer({
     <section
       className={
         className ??
-        "rounded-2xl border border-slate-800 bg-slate-900/70 p-3 shadow-lg"
+        "rounded-2xl border border-[#c8cede] bg-[#eceef4] p-3 shadow-sm"
       }
     >
       <div className="space-y-4">
