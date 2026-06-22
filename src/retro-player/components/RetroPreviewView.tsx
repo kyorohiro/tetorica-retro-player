@@ -2,6 +2,7 @@ import React from "react";
 import {
   Aperture,
   ArrowLeftRight,
+  Bell,
   Circle,
   FlipHorizontal,
   FlipVertical,
@@ -32,6 +33,8 @@ export type RetroPreviewPlayerSlice = {
   isRendererReady: boolean;
   sourceDimensions: { width: number; height: number } | null;
   viewportRect: { width: number; height: number; x: number; y: number } | null;
+  hasPlayableMedia: boolean;
+  hasAudibleMedia: boolean;
   canRecord: boolean;
   isRecording: boolean;
   prefersShareExport: boolean;
@@ -92,6 +95,8 @@ export function RetroPreviewView({
           pinOff: "Pin: スクロール中も見えるようにします。",
           maximizeOn: "Maximize: 通常表示に戻します。",
           maximizeOff: "Maximize: プレビューを全画面表示します。",
+          alarmIdle: "Alarm: 指定時刻にメディア再生か通知音を鳴らします。",
+          alarmArmed: "Alarm: 時刻を待っています。",
         }
       : {
           recordIdle: "Record: capture the current retro output.",
@@ -107,6 +112,8 @@ export function RetroPreviewView({
           pinOff: "Pin: keep preview visible while you scroll.",
           maximizeOn: "Maximize: return to normal view.",
           maximizeOff: "Maximize: open the preview full screen.",
+          alarmIdle: "Alarm: play media or a fallback tone at the selected time.",
+          alarmArmed: "Alarm: armed and waiting for the selected time.",
         };
 
   // --- Internal UI state: everything layout/pin/maximize lives here ---
@@ -132,6 +139,9 @@ export function RetroPreviewView({
     persistedUiSettings?.flipV ?? false,
   );
   const [isMoreOpen, setIsMoreOpen] = React.useState(false);
+  const [alarmTime, setAlarmTime] = React.useState("07:00");
+  const [alarmTargetAt, setAlarmTargetAt] = React.useState<number | null>(null);
+  const [alarmStatus, setAlarmStatus] = React.useState<"idle" | "armed" | "triggered">("idle");
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== 'undefined' && window.innerWidth < 360,
   );
@@ -145,6 +155,8 @@ export function RetroPreviewView({
   const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
+  const alarmTimeoutRef = React.useRef<number | null>(null);
+  const alarmAudioContextRef = React.useRef<AudioContext | null>(null);
 
   // --- Stable callbacks (defined before effects that use them) ---
 
@@ -183,6 +195,117 @@ export function RetroPreviewView({
     setActiveTooltipKey(null);
   }, []);
 
+  const formatAlarmTarget = React.useCallback((targetAt: number) => {
+    const date = new Date(targetAt);
+    return date.toLocaleString(locale === "ja" ? "ja-JP" : "en-US", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [locale]);
+
+  const ensureAlarmAudioContext = React.useCallback(async () => {
+    let context = alarmAudioContextRef.current;
+    if (!context || context.state === "closed") {
+      context = new AudioContext();
+      alarmAudioContextRef.current = context;
+    }
+
+    if (context.state === "suspended") {
+      try {
+        await context.resume();
+      } catch (error) {
+        console.warn("[retro-player alarm] resume alarm context failed", {
+          message: error instanceof Error ? error.message : String(error),
+          state: context.state,
+        });
+      }
+    }
+
+    return context;
+  }, []);
+
+  const playAlarmTone = React.useCallback(async () => {
+    let audioContext = await ensureAlarmAudioContext();
+    if (audioContext.state !== "running") {
+      audioContext = (await player.ensureAudioContext()) ?? audioContext;
+    }
+    if (!audioContext || audioContext.state !== "running") {
+      console.warn("[retro-player alarm] no running audio context for fallback tone", {
+        alarmContextState: alarmAudioContextRef.current?.state ?? null,
+        playerContextState: audioContext?.state ?? null,
+      });
+      return false;
+    }
+
+    const startAt = audioContext.currentTime + 0.02;
+    const outputGain = audioContext.createGain();
+    outputGain.gain.setValueAtTime(0.9, startAt);
+    outputGain.connect(audioContext.destination);
+
+    const playBeep = (offset: number, frequency: number, duration: number) => {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const toneStart = startAt + offset;
+      const toneEnd = toneStart + duration;
+
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(frequency, toneStart);
+      gain.gain.setValueAtTime(0.0001, toneStart);
+      gain.gain.exponentialRampToValueAtTime(0.16, toneStart + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, toneEnd);
+
+      oscillator.connect(gain);
+      gain.connect(outputGain);
+      oscillator.start(toneStart);
+      oscillator.stop(toneEnd + 0.02);
+    };
+
+    playBeep(0.0, 740, 0.22);
+    playBeep(0.28, 988, 0.24);
+    playBeep(0.60, 1318, 0.5);
+
+    window.setTimeout(() => {
+      try {
+        outputGain.disconnect();
+      } catch {
+        // Ignore disconnect failures during cleanup.
+      }
+    }, 1600);
+
+    return true;
+  }, [ensureAlarmAudioContext, player]);
+
+  const triggerAlarm = React.useCallback(async () => {
+    setAlarmTargetAt(null);
+    setAlarmStatus("triggered");
+
+    console.info("[retro-player alarm] trigger", {
+      hasAudibleMedia: player.hasAudibleMedia,
+      hasPlayableMedia: player.hasPlayableMedia,
+      isPoweredOn: player.isPoweredOn,
+    });
+
+    if (player.hasAudibleMedia) {
+      try {
+        if (!player.isPoweredOn) {
+          player.powerOn();
+        }
+        await player.playVideoWithAudio();
+        console.info("[retro-player alarm] media playback started");
+        return;
+      } catch (error) {
+        console.warn("[retro-player alarm] media playback failed; using fallback tone", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const didPlayTone = await playAlarmTone();
+    console.info("[retro-player alarm] fallback tone", { didPlayTone });
+  }, [playAlarmTone, player]);
+
   // --- Effects ---
 
   // Persist UI settings. isHighResolution is owned by RetroPlayer but
@@ -197,8 +320,49 @@ export function RetroPreviewView({
       if (tooltipTimerRef.current !== null) {
         window.clearTimeout(tooltipTimerRef.current);
       }
+      if (alarmTimeoutRef.current !== null) {
+        window.clearTimeout(alarmTimeoutRef.current);
+      }
+      if (alarmAudioContextRef.current && alarmAudioContextRef.current.state !== "closed") {
+        void alarmAudioContextRef.current.close().catch(() => {
+          // Ignore close failures during unmount cleanup.
+        });
+      }
     };
   }, []);
+
+  React.useEffect(() => {
+    if (alarmTimeoutRef.current !== null) {
+      window.clearTimeout(alarmTimeoutRef.current);
+      alarmTimeoutRef.current = null;
+    }
+
+    if (!alarmTargetAt) {
+      if (alarmStatus === "armed") {
+        setAlarmStatus("idle");
+      }
+      return;
+    }
+
+    const delay = alarmTargetAt - Date.now();
+    if (delay <= 0) {
+      void triggerAlarm();
+      return;
+    }
+
+    setAlarmStatus("armed");
+    alarmTimeoutRef.current = window.setTimeout(() => {
+      alarmTimeoutRef.current = null;
+      void triggerAlarm();
+    }, delay);
+
+    return () => {
+      if (alarmTimeoutRef.current !== null) {
+        window.clearTimeout(alarmTimeoutRef.current);
+        alarmTimeoutRef.current = null;
+      }
+    };
+  }, [alarmStatus, alarmTargetAt, triggerAlarm]);
 
   // Narrow-screen detection (< 360px): record button moves into More popover.
   React.useEffect(() => {
@@ -432,6 +596,47 @@ export function RetroPreviewView({
     })();
   };
 
+  const handleArmAlarm = () => {
+    const [hoursRaw, minutesRaw] = alarmTime.split(":");
+    const hours = Number(hoursRaw);
+    const minutes = Number(minutesRaw);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return;
+    }
+
+    const now = new Date();
+    const nextTarget = new Date(now);
+    nextTarget.setHours(hours, minutes, 0, 0);
+    if (nextTarget.getTime() <= now.getTime()) {
+      nextTarget.setDate(nextTarget.getDate() + 1);
+    }
+
+    setAlarmTargetAt(nextTarget.getTime());
+    setAlarmStatus("armed");
+    void (async () => {
+      const alarmContext = await ensureAlarmAudioContext();
+      void player.ensureAudioContext();
+      console.info("[retro-player alarm] armed", {
+        alarmContextState: alarmContext.state,
+        alarmTime,
+        targetAt: nextTarget.toISOString(),
+        hasAudibleMedia: player.hasAudibleMedia,
+        hasPlayableMedia: player.hasPlayableMedia,
+      });
+    })();
+  };
+
+  const handleClearAlarm = () => {
+    setAlarmTargetAt(null);
+    setAlarmStatus("idle");
+    console.info("[retro-player alarm] cleared");
+  };
+
+  const handleTestAlarm = () => {
+    console.info("[retro-player alarm] manual test");
+    void triggerAlarm();
+  };
+
   // Extracted so the same buttons can be placed inside the canvas area (normal
   // mode) or below it in document flow (fit-width / manga reading mode).
   const renderButtonBar = (): React.ReactNode => (
@@ -453,6 +658,61 @@ export function RetroPreviewView({
         </button>
         {isMoreOpen && (
           <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl border border-slate-600/80 bg-slate-950/96 p-3 shadow-xl backdrop-blur-sm">
+            <div className="mb-3 border-b border-slate-700 pb-3">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Bell size={11} />
+                  Alarm
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  {alarmStatus === "armed" ? "Armed" : alarmStatus === "triggered" ? "Done" : "Off"}
+                </span>
+              </div>
+              <input
+                type="time"
+                value={alarmTime}
+                onChange={(e) => { setAlarmTime(e.currentTarget.value); }}
+                className="mb-2 w-full rounded-lg border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 outline-none transition focus:border-slate-400"
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={handleArmAlarm}
+                  className={[
+                    "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs transition",
+                    alarmTargetAt
+                      ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50 hover:bg-cyan-400/24"
+                      : "border-slate-500 bg-slate-800 text-slate-100 hover:bg-slate-700",
+                  ].join(" ")}
+                >
+                  <Bell size={12} />
+                  Set
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestAlarm}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-500 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 transition hover:bg-slate-700"
+                >
+                  Test
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAlarm}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
+                >
+                  Clear
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-slate-400">
+                {alarmTargetAt
+                  ? locale === "ja"
+                    ? `次回: ${formatAlarmTarget(alarmTargetAt)}`
+                    : `Next: ${formatAlarmTarget(alarmTargetAt)}`
+                  : alarmStatus === "armed"
+                    ? tooltipText.alarmArmed
+                    : tooltipText.alarmIdle}
+              </p>
+            </div>
             {isNarrow && player.canRecord && (
               <div className="mb-3 border-b border-slate-700 pb-3">
                 <button

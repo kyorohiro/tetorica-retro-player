@@ -23,6 +23,39 @@ const isRetroPlayerDebugEnabled = () =>
     Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
   );
 
+const hasAudibleMediaTrack = (
+  media: HTMLMediaElement | null,
+  previewKind: "video" | "audio" | "image" | "capture" | null,
+) => {
+  if (previewKind === "audio") {
+    return true;
+  }
+
+  if (previewKind !== "video" || !media) {
+    return false;
+  }
+
+  const mediaWithAudioHints = media as HTMLMediaElement & {
+    audioTracks?: { length: number };
+    mozHasAudio?: boolean;
+    webkitAudioDecodedByteCount?: number;
+  };
+
+  if (typeof mediaWithAudioHints.audioTracks?.length === "number") {
+    return mediaWithAudioHints.audioTracks.length > 0;
+  }
+
+  if (typeof mediaWithAudioHints.mozHasAudio === "boolean") {
+    return mediaWithAudioHints.mozHasAudio;
+  }
+
+  if (typeof mediaWithAudioHints.webkitAudioDecodedByteCount === "number") {
+    return mediaWithAudioHints.webkitAudioDecodedByteCount > 0;
+  }
+
+  return false;
+};
+
 export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
@@ -73,6 +106,8 @@ export function usePixiVideoPlayer(
     const suffix = payload ? ` ${JSON.stringify(payload)}` : "";
     console.log(`[retro-player video][${instanceLabelRef.current}] ${label}${suffix}`);
   };
+
+  const hasAudibleMedia = hasAudibleMediaTrack(mediaRef.current, previewKind);
 
   const logAudioRecovery = (
     label: string,
@@ -1087,6 +1122,7 @@ export function usePixiVideoPlayer(
     setFxOutputTrimAmount,
     hasPlayableMedia:
       previewKind === "video" || previewKind === "audio" || previewKind === "capture",
+    hasAudibleMedia,
     hasVideo: previewKind === "video" || previewKind === "capture",
     hasAudioOnly: previewKind === "audio",
     hasImage: previewKind === "image",
