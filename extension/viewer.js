@@ -44,6 +44,25 @@ let isFitModeEnabled = false;
 let mediaRecorder = null;
 let recordedChunks = [];
 
+function logViewerAudioRecovery(label, payload = {}, level = "info") {
+  const details = {
+    audioContextState: audioContext?.state ?? null,
+    currentTime: video?.currentTime ?? null,
+    hasAudioEngine: Boolean(audioEngine),
+    hasMediaSourceNode: Boolean(mediaSourceNode),
+    hasMediaStream: Boolean(mediaStream),
+    readyState: video?.readyState ?? null,
+    visibilityState: document.visibilityState,
+    ...payload,
+  };
+  const prefix = `[viewer audio recovery] ${label}`;
+  if (level === "warn") {
+    console.warn(prefix, details);
+    return;
+  }
+  console.info(prefix, details);
+}
+
 init().catch((error) => {
   console.error(error);
   setStatus(`Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
@@ -78,6 +97,20 @@ async function init() {
   setupRenderer(gl);
   resizeCanvas();
   window.addEventListener("resize", handleWindowResize);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !mediaStream) {
+      return;
+    }
+
+    void recoverViewerAudioOutput("visibility:visible");
+  });
+  window.addEventListener("focus", () => {
+    if (!mediaStream) {
+      return;
+    }
+
+    void recoverViewerAudioOutput("window:focus");
+  });
   fitButton?.addEventListener("click", toggleFitMode);
   recordButton?.addEventListener("click", handleRecordButtonClick);
   currentSettings = await loadSettings();
@@ -502,7 +535,57 @@ function updateAudioNodes() {
   }
 }
 
-async function ensureAudioContext() {
+async function createViewerAudioEngine(context) {
+  audioEngine = createTetoricaRetroAudioNode(context, { instanceLabel: "viewer" });
+  await audioEngine.ensureInitialized();
+  await audioEngine.connect(context.destination);
+  updateAudioNodes();
+}
+
+async function closeViewerAudioContext(context) {
+  if (!context || context.state === "closed") {
+    return;
+  }
+
+  try {
+    await context.close();
+  } catch (error) {
+    logViewerAudioRecovery(
+      "close-context-failed",
+      { error: error instanceof Error ? error.message : String(error) },
+      "warn",
+    );
+  }
+}
+
+async function rebuildViewerAudioGraph(reason) {
+  logViewerAudioRecovery("rebuild:start", { reason });
+  mediaSourceNode?.disconnect();
+  mediaSourceNode = null;
+
+  if (audioEngine) {
+    await audioEngine.dispose();
+    audioEngine = null;
+  }
+
+  const previousContext = audioContext;
+  audioContext = null;
+  await closeViewerAudioContext(previousContext);
+
+  audioContext = new AudioContext();
+  await createViewerAudioEngine(audioContext);
+
+  if (mediaStream) {
+    mediaSourceNode = audioContext.createMediaStreamSource(mediaStream);
+    mediaSourceNode.connect(audioEngine.input);
+  }
+
+  updateAudioNodes();
+  logViewerAudioRecovery("rebuild:done", { reason });
+  return audioContext;
+}
+
+async function ensureAudioContext(reason = "ensure") {
   if (audioContext?.state === "closed") {
     audioContext = null;
     mediaSourceNode = null;
@@ -511,20 +594,31 @@ async function ensureAudioContext() {
 
   if (!audioContext) {
     audioContext = new AudioContext();
-    audioEngine = createTetoricaRetroAudioNode(audioContext, { instanceLabel: "viewer" });
-    await audioEngine.ensureInitialized();
-    await audioEngine.connect(audioContext.destination);
-    updateAudioNodes();
+    await createViewerAudioEngine(audioContext);
+    logViewerAudioRecovery("ensure:created", { reason });
   }
 
   if (audioContext.state === "suspended") {
     try {
       await audioContext.resume();
-    } catch {
-      // Resume can still be blocked until the next user gesture.
+    } catch (error) {
+      logViewerAudioRecovery(
+        "ensure:resume-failed",
+        { error: error instanceof Error ? error.message : String(error), reason },
+        "warn",
+      );
     }
   }
 
+  if (audioContext.state !== "running") {
+    logViewerAudioRecovery("ensure:rebuild-needed", {
+      audioContextState: audioContext.state,
+      reason,
+    });
+    return rebuildViewerAudioGraph(reason);
+  }
+
+  logViewerAudioRecovery("ensure:healthy", { reason });
   return audioContext;
 }
 
@@ -532,7 +626,7 @@ async function connectStreamAudio(stream) {
   const audioTracks = stream.getAudioTracks();
   if (audioTracks.length === 0) return;
 
-  const context = await ensureAudioContext();
+  const context = await ensureAudioContext("connect-stream");
   if (!context || !audioEngine?.input) return;
 
   if (mediaSourceNode) {
@@ -543,6 +637,37 @@ async function connectStreamAudio(stream) {
   mediaSourceNode = context.createMediaStreamSource(stream);
   mediaSourceNode.connect(audioEngine.input);
   updateAudioNodes();
+}
+
+async function recoverViewerAudioOutput(reason) {
+  if (!mediaStream) {
+    return null;
+  }
+
+  const context = await ensureAudioContext(reason);
+  if (!context || !audioEngine?.input) {
+    return null;
+  }
+
+  try {
+    if (mediaSourceNode) {
+      mediaSourceNode.disconnect();
+    } else {
+      mediaSourceNode = context.createMediaStreamSource(mediaStream);
+    }
+
+    mediaSourceNode.connect(audioEngine.input);
+    updateAudioNodes();
+    logViewerAudioRecovery("recover:reconnected", { reason });
+    return context;
+  } catch (error) {
+    logViewerAudioRecovery(
+      "recover:rebuild-needed",
+      { error: error instanceof Error ? error.message : String(error), reason },
+      "warn",
+    );
+    return rebuildViewerAudioGraph(`${reason}:rebuild`);
+  }
 }
 
 async function disposeAudioEngine() {
@@ -556,16 +681,7 @@ async function disposeAudioEngine() {
 
   const context = audioContext;
   audioContext = null;
-
-  if (!context || context.state === "closed") {
-    return;
-  }
-
-  try {
-    await context.close();
-  } catch {
-    // ignore double-close races
-  }
+  await closeViewerAudioContext(context);
 }
 
 function setupRenderer(webgl) {

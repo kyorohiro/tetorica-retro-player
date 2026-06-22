@@ -56,10 +56,8 @@ export function useRetroAudioEngine({
   previewKindRef,
   mediaRef,
   isPlaying,
-  isPlayingRef: _isPlayingRef,
+  isPlayingRef,
 }: UseRetroAudioEngineParams) {
-  void _isPlayingRef;
-  const [audioContext] = useState(() => new AudioContext());
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
 
@@ -206,9 +204,10 @@ export function useRetroAudioEngine({
     initialAudioSettings.fxOutputTrimAmount,
   );
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const [audioEngine] = useState(() =>
+  const audioContextOwnedRef = useRef<AudioContext>(new AudioContext());
+  const audioEngineRef = useRef(
     createRetroAudioEngine({
-      context: audioContext,
+      context: audioContextOwnedRef.current,
       instanceLabel,
       params: initialAudioSettings,
       isPlaying,
@@ -217,39 +216,39 @@ export function useRetroAudioEngine({
     }),
   );
   const [audioNodeRefs] = useState(() => ({
-    audioContextRef: createCurrentAccessor(() => audioEngine.audioContext),
-    masterGainRef: createCurrentAccessor(() => audioEngine.masterGain),
-    radioToneHighpassRef: createCurrentAccessor(() => audioEngine.radioToneHighpass),
-    radioToneLowpassRef: createCurrentAccessor(() => audioEngine.radioToneLowpass),
-    radioTonePresenceRef: createCurrentAccessor(() => audioEngine.radioTonePresence),
-    recordingDestinationRef: createCurrentAccessor(() => audioEngine.recordingDestination),
-    lofiLowpassRef: createCurrentAccessor(() => audioEngine.lofiLowpass),
-    lofiHighshelfRef: createCurrentAccessor(() => audioEngine.lofiHighshelf),
-    lofiDriveRef: createCurrentAccessor(() => audioEngine.lofiDrive),
-    bitcrusherRef: createCurrentAccessor(() => audioEngine.bitcrusher),
-    bassEqRef: createCurrentAccessor(() => audioEngine.bassEq),
-    midEqRef: createCurrentAccessor(() => audioEngine.midEq),
-    trebleEqRef: createCurrentAccessor(() => audioEngine.trebleEq),
-    stereoWidthRef: createCurrentAccessor(() => audioEngine.stereoWidth),
-    roomDryGainRef: createCurrentAccessor(() => audioEngine.roomDryGain),
-    roomConvolverRef: createCurrentAccessor(() => audioEngine.roomConvolver),
-    roomWetGainRef: createCurrentAccessor(() => audioEngine.roomWetGain),
-    wowFlutterDelayRef: createCurrentAccessor(() => audioEngine.wowFlutterDelay),
-    wowLfoRef: createCurrentAccessor(() => audioEngine.wowLfo),
-    wowLfoGainRef: createCurrentAccessor(() => audioEngine.wowLfoGain),
-    flutterLfoRef: createCurrentAccessor(() => audioEngine.flutterLfo),
-    flutterLfoGainRef: createCurrentAccessor(() => audioEngine.flutterLfoGain),
-    noiseSourceRef: createCurrentAccessor(() => audioEngine.noiseSource),
-    noiseFilterRef: createCurrentAccessor(() => audioEngine.noiseFilter),
-    noisePannerRef: createCurrentAccessor(() => audioEngine.noisePanner),
-    noiseGainRef: createCurrentAccessor(() => audioEngine.noiseGain),
-    noiseLfoRef: createCurrentAccessor(() => audioEngine.noiseLfo),
-    noiseLfoGainRef: createCurrentAccessor(() => audioEngine.noiseLfoGain),
-    crackleSourceRef: createCurrentAccessor(() => audioEngine.crackleSource),
-    crackleFilterRef: createCurrentAccessor(() => audioEngine.crackleFilter),
-    vinylDustBedFilterRef: createCurrentAccessor(() => audioEngine.vinylDustBedFilter),
-    vinylDustBedGainRef: createCurrentAccessor(() => audioEngine.vinylDustBedGain),
-    crackleGainRef: createCurrentAccessor(() => audioEngine.crackleGain),
+    audioContextRef: createCurrentAccessor(() => audioEngineRef.current.audioContext),
+    masterGainRef: createCurrentAccessor(() => audioEngineRef.current.masterGain),
+    radioToneHighpassRef: createCurrentAccessor(() => audioEngineRef.current.radioToneHighpass),
+    radioToneLowpassRef: createCurrentAccessor(() => audioEngineRef.current.radioToneLowpass),
+    radioTonePresenceRef: createCurrentAccessor(() => audioEngineRef.current.radioTonePresence),
+    recordingDestinationRef: createCurrentAccessor(() => audioEngineRef.current.recordingDestination),
+    lofiLowpassRef: createCurrentAccessor(() => audioEngineRef.current.lofiLowpass),
+    lofiHighshelfRef: createCurrentAccessor(() => audioEngineRef.current.lofiHighshelf),
+    lofiDriveRef: createCurrentAccessor(() => audioEngineRef.current.lofiDrive),
+    bitcrusherRef: createCurrentAccessor(() => audioEngineRef.current.bitcrusher),
+    bassEqRef: createCurrentAccessor(() => audioEngineRef.current.bassEq),
+    midEqRef: createCurrentAccessor(() => audioEngineRef.current.midEq),
+    trebleEqRef: createCurrentAccessor(() => audioEngineRef.current.trebleEq),
+    stereoWidthRef: createCurrentAccessor(() => audioEngineRef.current.stereoWidth),
+    roomDryGainRef: createCurrentAccessor(() => audioEngineRef.current.roomDryGain),
+    roomConvolverRef: createCurrentAccessor(() => audioEngineRef.current.roomConvolver),
+    roomWetGainRef: createCurrentAccessor(() => audioEngineRef.current.roomWetGain),
+    wowFlutterDelayRef: createCurrentAccessor(() => audioEngineRef.current.wowFlutterDelay),
+    wowLfoRef: createCurrentAccessor(() => audioEngineRef.current.wowLfo),
+    wowLfoGainRef: createCurrentAccessor(() => audioEngineRef.current.wowLfoGain),
+    flutterLfoRef: createCurrentAccessor(() => audioEngineRef.current.flutterLfo),
+    flutterLfoGainRef: createCurrentAccessor(() => audioEngineRef.current.flutterLfoGain),
+    noiseSourceRef: createCurrentAccessor(() => audioEngineRef.current.noiseSource),
+    noiseFilterRef: createCurrentAccessor(() => audioEngineRef.current.noiseFilter),
+    noisePannerRef: createCurrentAccessor(() => audioEngineRef.current.noisePanner),
+    noiseGainRef: createCurrentAccessor(() => audioEngineRef.current.noiseGain),
+    noiseLfoRef: createCurrentAccessor(() => audioEngineRef.current.noiseLfo),
+    noiseLfoGainRef: createCurrentAccessor(() => audioEngineRef.current.noiseLfoGain),
+    crackleSourceRef: createCurrentAccessor(() => audioEngineRef.current.crackleSource),
+    crackleFilterRef: createCurrentAccessor(() => audioEngineRef.current.crackleFilter),
+    vinylDustBedFilterRef: createCurrentAccessor(() => audioEngineRef.current.vinylDustBedFilter),
+    vinylDustBedGainRef: createCurrentAccessor(() => audioEngineRef.current.vinylDustBedGain),
+    crackleGainRef: createCurrentAccessor(() => audioEngineRef.current.crackleGain),
   }));
 
   const {
@@ -288,26 +287,116 @@ export function useRetroAudioEngine({
     crackleGainRef,
   } = audioNodeRefs;
 
+  const getCurrentAudioSettings = (): RetroAudioSettings => ({
+    isMuted: isMutedRef.current,
+    volume: volumeRef.current,
+    playbackRate: playbackRateRef.current,
+    isLooping: isLoopingRef.current,
+    isAudioFxEnabled: isAudioFxEnabledRef.current,
+    lofiAmount: lofiAmountRef.current,
+    radioToneAmount: radioToneAmountRef.current,
+    bitCrushAmount: bitCrushAmountRef.current,
+    sampleRateReductionAmount: sampleRateReductionAmountRef.current,
+    noiseReductionAmount: noiseReductionAmountRef.current,
+    bassAmount: bassAmountRef.current,
+    midAmount: midAmountRef.current,
+    trebleAmount: trebleAmountRef.current,
+    stereoWidthAmount: stereoWidthAmountRef.current,
+    smallSpeakerRoomAmount: smallSpeakerRoomAmountRef.current,
+    wowFlutterAmount: wowFlutterAmountRef.current,
+    isNoiseEnabled: isNoiseEnabledRef.current,
+    noiseLevel: noiseLevelRef.current,
+    vinylDustAmount: vinylDustAmountRef.current,
+    delayAmount: delayAmountRef.current,
+    reverbAmount: reverbAmountRef.current,
+    chorusAmount: chorusAmountRef.current,
+    tapeSaturationAmount: tapeSaturationAmountRef.current,
+    compressorAmount: compressorAmountRef.current,
+    fxOutputTrimAmount: fxOutputTrimAmountRef.current,
+  });
   const debugAudio = (label: string, payload?: Record<string, unknown>) =>
-    audioEngine.debugAudio(label, payload);
-  const ensureInitialized = () => audioEngine.ensureInitialized();
-  const ensureAudioContext = () => audioEngine.ensureInitialized();
-  const updateAudioNodes = () => audioEngine.updateAudioNodes();
+    audioEngineRef.current.debugAudio(label, payload);
+  const ensureInitialized = () => audioEngineRef.current.ensureInitialized();
+  const ensureAudioContext = () => audioEngineRef.current.ensureInitialized();
+  const updateAudioNodes = () => audioEngineRef.current.updateAudioNodes();
   const connectSourceNode = (sourceNode: AudioNode) =>
-    audioEngine.connectSourceNode(sourceNode);
-  const disposeAudioEngine = () => audioEngine.dispose();
+    audioEngineRef.current.connectSourceNode(sourceNode);
+  const disposeAudioEngine = () => audioEngineRef.current.dispose();
   const setParams = (
     nextParams: Partial<RetroAudioSettings>,
     isPartialUpdate?: boolean,
-  ) => audioEngine.setParams(nextParams, isPartialUpdate);
+  ) => audioEngineRef.current.setParams(nextParams, isPartialUpdate);
   const setEngineIsPlaying = (nextIsPlaying: boolean) =>
-    audioEngine.setIsPlaying(nextIsPlaying);
+    audioEngineRef.current.setIsPlaying(nextIsPlaying);
   const setOutputEnabled = (isEnabled: boolean) =>
-    audioEngine.setOutputEnabled(isEnabled);
+    audioEngineRef.current.setOutputEnabled(isEnabled);
+
+  const closeOwnedAudioContext = async (context: AudioContext) => {
+    if (context.state === "closed") {
+      return;
+    }
+
+    try {
+      await context.close();
+    } catch (error) {
+      debugAudio("closeOwnedAudioContext:error", {
+        audioContextState: context.state,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const recreateAudioEngine = async (reason: string) => {
+    const previousContext = audioContextOwnedRef.current;
+    const previousEngine = audioEngineRef.current;
+    const nextSettings = getCurrentAudioSettings();
+
+    debugAudio("recreateAudioEngine:start", {
+      audioContextState: previousContext.state,
+      hasMedia: Boolean(mediaRef.current),
+      reason,
+    });
+
+    mediaSourceRef.current?.disconnect();
+    mediaSourceRef.current = null;
+    await previousEngine.dispose();
+    await closeOwnedAudioContext(previousContext);
+
+    const nextContext = new AudioContext();
+    const nextEngine = createRetroAudioEngine({
+      context: nextContext,
+      instanceLabel,
+      params: nextSettings,
+      isPlaying: isPlayingRef.current,
+      connectOutputToDestination: true,
+      connectOutputToRecordingDestination: true,
+    });
+
+    audioContextOwnedRef.current = nextContext;
+    audioEngineRef.current = nextEngine;
+
+    const initializedContext = await nextEngine.ensureInitialized();
+    nextEngine.setParams(nextSettings, true);
+    nextEngine.setIsPlaying(isPlayingRef.current);
+    nextEngine.setOutputEnabled(
+      previewKindRef.current === "video" ||
+        previewKindRef.current === "audio" ||
+        previewKindRef.current === "capture",
+    );
+
+    debugAudio("recreateAudioEngine:ready", {
+      audioContextState: initializedContext?.state ?? nextContext.state,
+      hasMedia: Boolean(mediaRef.current),
+      reason,
+    });
+
+    return initializedContext;
+  };
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
     const context = await ensureInitialized();
-    if (!context || !audioEngine.input) {
+    const engine = audioEngineRef.current;
+    if (!context || !engine.input) {
       debugAudio("connectMediaAudio:no-context", {
         mediaTag: media.tagName,
       });
@@ -324,7 +413,7 @@ export function useRetroAudioEngine({
 
     try {
       const mediaSource = context.createMediaElementSource(media);
-      mediaSource.connect(audioEngine.input);
+      mediaSource.connect(engine.input);
       mediaSourceRef.current = mediaSource;
 
       // Apply initial state using best current knowledge (static fallback until probe runs)
@@ -355,19 +444,60 @@ export function useRetroAudioEngine({
 
   const reconnectCurrentMediaAudio = () => {
     const mediaSource = mediaSourceRef.current;
-    if (!mediaSource || !audioEngine.input) {
+    const engine = audioEngineRef.current;
+    if (!mediaSource || !engine.input) {
       return;
     }
 
     mediaSource.disconnect();
-    mediaSource.connect(audioEngine.input);
+    mediaSource.connect(engine.input);
     updateAudioNodes();
+  };
+
+  const ensureAudioContextWithRecovery = async (reason: string) => {
+    const context = await ensureInitialized();
+    if (context && context.state === "running") {
+      debugAudio("ensureAudioContextWithRecovery:healthy", {
+        audioContextState: context.state,
+        reason,
+      });
+      return context;
+    }
+
+    debugAudio("ensureAudioContextWithRecovery:recreate-needed", {
+      audioContextState: context?.state ?? audioContextOwnedRef.current.state,
+      reason,
+    });
+
+    return recreateAudioEngine(reason);
+  };
+
+  const rebuildAudioGraphForCurrentMedia = async (reason: string) => {
+    const media = mediaRef.current;
+    const context = await recreateAudioEngine(reason);
+
+    if (!context) {
+      return null;
+    }
+
+    if (media) {
+      await connectMediaAudio(media);
+    }
+
+    updateAudioNodes();
+    debugAudio("rebuildAudioGraphForCurrentMedia:done", {
+      audioContextState: context.state,
+      hasMedia: Boolean(media),
+      reason,
+    });
+    return context;
   };
 
   const disposeManagedAudioEngine = async () => {
     mediaSourceRef.current?.disconnect();
     mediaSourceRef.current = null;
     await disposeAudioEngine();
+    await closeOwnedAudioContext(audioContextOwnedRef.current);
   };
 
   const applyAudioSettings = (nextSettings: RetroAudioSettings) => {
@@ -717,11 +847,13 @@ export function useRetroAudioEngine({
     setFxOutputTrimAmount,
     debugAudio,
     ensureAudioContext,
+    ensureAudioContextWithRecovery,
     ensureInitialized,
     updateAudioNodes,
     connectSourceNode,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
+    rebuildAudioGraphForCurrentMedia,
     applyAudioSettings,
     resetAudioSettings,
     disposeAudioEngine: disposeManagedAudioEngine,
