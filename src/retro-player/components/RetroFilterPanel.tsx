@@ -24,13 +24,13 @@ function InfoTip({
         <button
           type="button"
           aria-label={`${label}${helpSuffix}`}
-          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#a8b4c8]/80 bg-[#eceef4] text-[10px] font-bold leading-none text-[#1a2038] transition hover:border-[#000000] hover:text-[#ffffff] focus:outline-none focus:ring-1 focus:ring-[#000000]"
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#a8a29a]/80 bg-[#eae6df] text-[10px] font-bold leading-none text-[#1a1610] transition hover:border-[#000000] hover:text-[#ffffff] focus:outline-none focus:ring-1 focus:ring-[#000000]"
         >
           ?
         </button>
         <span
           role="tooltip"
-          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-[#b8c0d4]/80 bg-[#f8f9fc] px-3 py-2 text-[11px] leading-4 text-[#12141c] opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-[#bcb4a6]/80 bg-[#f5f1ea] px-3 py-2 text-[11px] leading-4 text-[#12141c] opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
         >
           {text}
         </span>
@@ -288,7 +288,7 @@ export function RetroFilterPanel({
             "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
             isFilterEnabled
               ? "border-emerald-400 bg-emerald-500/20"
-              : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+              : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
           ].join(" ")}
         >
           {isFilterEnabled ? "Filter on" : "Filter off"}
@@ -330,7 +330,7 @@ export function RetroFilterPanel({
                   "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                   paletteMode === mode
                     ? "border-[#000000] bg-[#111014]/20"
-                    : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
                 ].join(" ")}
               >
                 {mode === "free"
@@ -375,7 +375,7 @@ export function RetroFilterPanel({
                     "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                     monoTint === key
                       ? "border-[#000000] bg-[#111014]/20"
-                      : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
                   ].join(" ")}
                 >
                   {tint.label}
@@ -385,7 +385,7 @@ export function RetroFilterPanel({
           </label>
         )}
 
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-[#2c3550]">
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-[#2c2418]">
           <input
             type="checkbox"
             checked={realtimeTargetSize}
@@ -433,8 +433,8 @@ export function RetroFilterPanel({
           />
         </label>
 
-        <div className="flex flex-col gap-3 rounded-lg border border-[#c8cede] bg-[#f0f2f7] px-3 py-3">
-          <div className="text-[11px] leading-5 text-[#7a88a8]">
+        <div className="flex flex-col gap-3 rounded-lg border border-[#cac0b2] bg-[#ede8e2] px-3 py-3">
+          <div className="text-[11px] leading-5 text-[#7a7268]">
             {sourceDimensions
               ? `Source aspect: ${sourceDimensions.width} x ${sourceDimensions.height}`
               : "Source aspect: unavailable for audio-only preview"}
@@ -518,7 +518,7 @@ export function RetroFilterPanel({
 
         {paletteMode === "neon" && (
           <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-3">
-            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
               Neon
             </div>
             <div className="flex flex-col gap-3">
@@ -569,7 +569,7 @@ export function RetroFilterPanel({
         )}
 
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
             CRT / LCD
           </div>
           <div className="flex flex-col gap-3">
@@ -699,7 +699,7 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
               {isPhosphorDotModeActive ? (
-                <span className="mt-2 block text-[11px] text-[#7a88a8]">
+                <span className="mt-2 block text-[11px] text-[#7a7268]">
                   Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
                 </span>
               ) : null}
@@ -726,7 +726,7 @@ export function RetroFilterPanel({
         </div>
 
         <div className="rounded-lg border border-[#000000]/30 bg-[#111014]/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
             Anime Toon / Edge
           </div>
           <div className="flex flex-col gap-3">
@@ -802,7 +802,7 @@ export function RetroFilterPanel({
         </div>
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a88a8]">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
             Phosphor Dot / Spot Mask
           </div>
 
@@ -816,7 +816,7 @@ export function RetroFilterPanel({
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotInternalScale
                   ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
               2x internal resolution
@@ -830,7 +830,7 @@ export function RetroFilterPanel({
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotBrightCore
                   ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
               Bright core
@@ -844,7 +844,7 @@ export function RetroFilterPanel({
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotFlatDisc
                   ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
               Flat disc
@@ -858,7 +858,7 @@ export function RetroFilterPanel({
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 phosphorDotNeighborBlend
                   ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
               Neighbor blend

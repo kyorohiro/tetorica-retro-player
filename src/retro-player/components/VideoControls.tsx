@@ -270,16 +270,16 @@ export const VideoControls = memo(function VideoControls({
 
   if (mode === "audio-settings") {
     return (
-      <div className="mt-3 space-y-3 rounded-xl border border-[#c8cede] bg-[#f0f2f7] p-3">
+      <div className="mt-3 space-y-3 rounded-xl border border-[#cac0b2] bg-[#ede8e2] p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[#12141c]">Audio settings</p>
-            <p className="text-[11px] text-[#7a88a8]">Shape the sound with effects, noise, and space.</p>
+            <p className="text-[11px] text-[#7a7268]">Shape the sound with effects, noise, and space.</p>
           </div>
           <button
             type="button"
             onClick={onBackToPlayback}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
           >
             Back to Playback
           </button>
@@ -293,7 +293,7 @@ export const VideoControls = memo(function VideoControls({
               "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
               isAudioFxEnabled
                 ? "border-amber-400 bg-amber-500/20"
-                : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
             ].join(" ")}
           >
             <Waves size={16} />
@@ -306,7 +306,7 @@ export const VideoControls = memo(function VideoControls({
               "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
               isNoiseEnabled
                 ? "border-fuchsia-400 bg-fuchsia-500/20"
-                : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
             ].join(" ")}
           >
             <Mic2 size={16} />
@@ -314,8 +314,8 @@ export const VideoControls = memo(function VideoControls({
           </button>
         </div>
 
-        <div className="rounded-xl border border-[#c8cede] bg-[#eceef4] p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a88a8]">
+        <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
             Presets
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -333,7 +333,7 @@ export const VideoControls = memo(function VideoControls({
                   "inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm transition",
                   selectedAudioPreset === key
                     ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                    : "border-[#b8c0d4] bg-[#f8f9fc] text-[#2c3550] hover:bg-[#e2e5ee]",
+                    : "border-[#bcb4a6] bg-[#f5f1ea] text-[#2c2418] hover:bg-[#e2ddd5]",
                 ].join(" ")}
               >
                 {preset.label}
@@ -342,13 +342,13 @@ export const VideoControls = memo(function VideoControls({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#c8cede] bg-[#eceef4] p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a88a8]">
+        <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
             Effects
           </p>
           <div className="space-y-3">
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Lo-Fi amount</span>
                 <span>{Math.round(lofiAmount * 100)}%</span>
               </div>
@@ -366,7 +366,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Radio tone</span>
                 <span>{Math.round(radioToneAmount * 100)}%</span>
               </div>
@@ -384,7 +384,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Bit crush</span>
                 <span>{Math.round(bitCrushAmount * 100)}%</span>
               </div>
@@ -402,7 +402,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Sample rate</span>
                 <span>{Math.round(sampleRateReductionAmount * 100)}%</span>
               </div>
@@ -420,7 +420,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Noise reduction</span>
                 <span>{Math.round(noiseReductionAmount * 100)}%</span>
               </div>
@@ -438,7 +438,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Wow & Flutter</span>
                 <span>{Math.round(wowFlutterAmount * 100)}%</span>
               </div>
@@ -456,7 +456,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Bass</span>
                 <span>{bassAmount >= 0 ? "+" : ""}{(bassAmount * 15).toFixed(1)} dB</span>
               </div>
@@ -474,7 +474,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Mid</span>
                 <span>{midAmount >= 0 ? "+" : ""}{(midAmount * 15).toFixed(1)} dB</span>
               </div>
@@ -492,7 +492,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Treble</span>
                 <span>{trebleAmount >= 0 ? "+" : ""}{(trebleAmount * 15).toFixed(1)} dB</span>
               </div>
@@ -511,13 +511,13 @@ export const VideoControls = memo(function VideoControls({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#c8cede] bg-[#eceef4] p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a88a8]">
+        <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
             Space
           </p>
           <div className="space-y-3">
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Delay</span>
                 <span>{Math.round(delayAmount * 100)}%</span>
               </div>
@@ -535,7 +535,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Reverb</span>
                 <span>{Math.round(reverbAmount * 100)}%</span>
               </div>
@@ -553,7 +553,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Chorus</span>
                 <span>{Math.round(chorusAmount * 100)}%</span>
               </div>
@@ -572,13 +572,13 @@ export const VideoControls = memo(function VideoControls({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#c8cede] bg-[#eceef4] p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a88a8]">
+        <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
             Dynamics
           </p>
           <div className="space-y-3">
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Tape Saturation</span>
                 <span>{Math.round(tapeSaturationAmount * 100)}%</span>
               </div>
@@ -596,7 +596,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Compressor</span>
                 <span>{Math.round(compressorAmount * 100)}%</span>
               </div>
@@ -615,13 +615,13 @@ export const VideoControls = memo(function VideoControls({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#c8cede] bg-[#eceef4] p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a88a8]">
+        <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
             Output
           </p>
           <div className="space-y-3">
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Volume</span>
                 <span>{Math.round(volume * 100)}%</span>
               </div>
@@ -639,7 +639,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Stereo width</span>
                 <span>
                   {stereoWidthAmount < 0
@@ -663,7 +663,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Small room</span>
                 <span>{Math.round(smallSpeakerRoomAmount * 100)}%</span>
               </div>
@@ -681,7 +681,7 @@ export const VideoControls = memo(function VideoControls({
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
                 <span>Output Gain</span>
                 <span>{Math.round(fxOutputTrimAmount * 100)}%</span>
               </div>
@@ -700,12 +700,12 @@ export const VideoControls = memo(function VideoControls({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#c8cede] bg-[#eceef4] p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a88a8]">
+        <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
             Noise
           </p>
           <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
               <span>Surface hiss</span>
               <span>{(noiseLevel * 100).toFixed(2)}%</span>
             </div>
@@ -722,7 +722,7 @@ export const VideoControls = memo(function VideoControls({
             />
           </div>
           <div className="mt-3">
-            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
               <span>Vinyl dust</span>
               <span>{Math.round(vinylDustAmount * 100)}%</span>
             </div>
@@ -767,7 +767,7 @@ export const VideoControls = memo(function VideoControls({
       {hasPlayback && (
         <>
           <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a88a8]">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
@@ -799,7 +799,7 @@ export const VideoControls = memo(function VideoControls({
               onClick={() => setIsVolumeOpen((v) => !v)}
               aria-label="Volume"
               title="Volume"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
             >
               {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
             </button>
@@ -812,7 +812,7 @@ export const VideoControls = memo(function VideoControls({
                   "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
                   isLooping
                     ? "border-[#000000] bg-[#111014]/20"
-                    : "border-[#b8c0d4] bg-[#f8f9fc] hover:bg-[#e2e5ee]",
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
               <RotateCcw size={16} />
@@ -825,12 +825,12 @@ export const VideoControls = memo(function VideoControls({
                 }}
                 aria-label={`Speed ${playbackRate}x`}
                 title={`Speed ${playbackRate}x`}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
               >
                 <Gauge size={14} />
               </button>
               {isSpeedOpen && (
-                <div className="absolute bottom-full left-0 z-200 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-[#c8cede] bg-[#eceef4] p-2 shadow-lg">
+                <div className="absolute bottom-full left-0 z-200 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-[#cac0b2] bg-[#eae6df] p-2 shadow-lg">
                   {[2, 1.5, 1.25, 1, 0.75, 0.5].map((rate) => (
                     <button
                       key={rate}
@@ -840,7 +840,7 @@ export const VideoControls = memo(function VideoControls({
                         setIsSpeedOpen(false);
                       }}
                       className={[
-                        "rounded-md px-3 py-2 text-left text-[#12141c] hover:bg-[#e2e5ee]",
+                        "rounded-md px-3 py-2 text-left text-[#12141c] hover:bg-[#e2ddd5]",
                         playbackRate === rate ? "bg-[#111014]/20 text-[#000000] font-bold" : "",
                       ].join(" ")}
                     >
@@ -860,7 +860,7 @@ export const VideoControls = memo(function VideoControls({
                   }}
                   aria-label="Previous frame"
                   title="Previous frame"
-                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-2 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 >
                   <StepBack size={16} />
                 </button>
@@ -869,7 +869,7 @@ export const VideoControls = memo(function VideoControls({
                   onClick={() => {
                     onSeek(Math.max(currentTime - 5, 0));
                   }}
-                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 >
                   <SkipBack size={16} />
                   -5s
@@ -879,7 +879,7 @@ export const VideoControls = memo(function VideoControls({
                   onClick={() => {
                     onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
                   }}
-                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 >
                   <SkipForward size={16} />
                   +5s
@@ -891,7 +891,7 @@ export const VideoControls = memo(function VideoControls({
                   }}
                   aria-label="Next frame"
                   title="Next frame"
-                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-2 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 >
                   <StepForward size={16} />
                 </button>
@@ -903,7 +903,7 @@ export const VideoControls = memo(function VideoControls({
                   onClick={() => {
                     onSeek(Math.max(currentTime - 5, 0));
                   }}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 >
                   <SkipBack size={16} />
                   -5s
@@ -913,7 +913,7 @@ export const VideoControls = memo(function VideoControls({
                   onClick={() => {
                     onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
                   }}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#b8c0d4] bg-[#f8f9fc] px-3 py-2 text-[#12141c] hover:bg-[#e2e5ee]"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 >
                   <SkipForward size={16} />
                   +5s
@@ -922,13 +922,13 @@ export const VideoControls = memo(function VideoControls({
             )}
           </div>
           {isVolumeOpen && (
-            <div className="flex items-center gap-2 rounded-lg border border-[#c8cede] bg-[#f8f9fc] px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-[#cac0b2] bg-[#f5f1ea] px-3 py-2">
               <button
                 type="button"
                 onClick={onToggleMute}
                 aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"}
                 title={isMuted || volume === 0 ? "Unmute" : "Mute"}
-                className="shrink-0 text-[#7a88a8] hover:text-[#12141c]"
+                className="shrink-0 text-[#7a7268] hover:text-[#12141c]"
               >
                 {isMuted || volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
               </button>
@@ -945,7 +945,7 @@ export const VideoControls = memo(function VideoControls({
                 }}
                 className="w-full cursor-pointer"
               />
-              <span className="w-8 shrink-0 text-right text-[11px] text-[#7a88a8]">
+              <span className="w-8 shrink-0 text-right text-[11px] text-[#7a7268]">
                 {Math.round((isMuted ? 0 : volume) * 100)}%
               </span>
             </div>
@@ -985,7 +985,7 @@ export const VideoControls = memo(function VideoControls({
           type="button"
           onClick={exportPresetFile}
           title="Save settings to file"
-          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#b8c0d4] bg-[#e8eaf0] text-[#7a88a8] hover:bg-[#d8dce8] hover:text-[#12141c]"
+          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]"
         >
           <Save size={13} />
         </button>
@@ -993,13 +993,13 @@ export const VideoControls = memo(function VideoControls({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           title="Load settings from .retro.json file"
-          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#b8c0d4] bg-[#e8eaf0] text-[#7a88a8] hover:bg-[#d8dce8] hover:text-[#12141c]"
+          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]"
         >
           <FolderOpen size={13} />
         </button>
       </div>
       {hasPlayback && (
-        <p className="hidden text-[11px] text-[#9aa2b8]">
+        <p className="hidden text-[11px] text-[#9a948c]">
           Shortcuts: `Space`/`K` play-pause, `Left/Right` seek 5s, `J/L` seek 10s
         </p>
       )}
