@@ -98,6 +98,7 @@ async function init() {
   resizeCanvas();
   window.addEventListener("resize", handleWindowResize);
   document.addEventListener("visibilitychange", () => {
+    logViewerAudioRecovery("visibility:change", { to: document.visibilityState });
     if (document.visibilityState !== "visible" || !mediaStream) {
       return;
     }
@@ -105,6 +106,7 @@ async function init() {
     void recoverViewerAudioOutput("visibility:visible");
   });
   window.addEventListener("focus", () => {
+    logViewerAudioRecovery("window:focus");
     if (!mediaStream) {
       return;
     }
@@ -610,7 +612,7 @@ async function ensureAudioContext(reason = "ensure") {
     }
   }
 
-  if (audioContext.state !== "running") {
+  if (audioContext.state === "closed") {
     logViewerAudioRecovery("ensure:rebuild-needed", {
       audioContextState: audioContext.state,
       reason,
@@ -618,6 +620,7 @@ async function ensureAudioContext(reason = "ensure") {
     return rebuildViewerAudioGraph(reason);
   }
 
+  // "suspended" はユーザーアクション待ちで復帰可能。closed の時だけ rebuild する。
   logViewerAudioRecovery("ensure:healthy", { reason });
   return audioContext;
 }
