@@ -390,7 +390,7 @@ export function RetroFilterPanel({
             type="checkbox"
             checked={realtimeTargetSize}
             onChange={(ev) => setRealtimeTargetSize(ev.currentTarget.checked)}
-            className="accent-sky-400"
+            className="accent-[#111014]"
           />
           Live update
         </label>

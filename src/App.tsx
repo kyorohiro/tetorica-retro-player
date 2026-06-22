@@ -297,7 +297,7 @@ function App() {
 
   return (
     <main
-      className="safe-top-pad min-h-screen overflow-x-hidden overflow-y-auto bg-slate-200 text-slate-800"
+      className="safe-top-pad min-h-screen overflow-x-hidden overflow-y-auto bg-slate-700 text-slate-800"
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
