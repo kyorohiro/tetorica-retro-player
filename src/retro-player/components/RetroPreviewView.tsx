@@ -317,6 +317,17 @@ export function RetroPreviewView({
     return `${player.sourceDimensions.width} / ${player.sourceDimensions.height}`;
   }, [player.sourceDimensions]);
 
+  // For pin mode: compute explicit pixel width from JS to avoid Safari
+  // aspect-ratio + vh interaction issues.
+  const pinnedContentWidth = React.useMemo(() => {
+    if (!player.sourceDimensions || !pinnedPreviewMetrics) return undefined;
+    const { width: srcW, height: srcH } = player.sourceDimensions;
+    const ar = srcW / Math.max(srcH, 1);
+    const maxH = typeof window !== "undefined" ? window.innerHeight * 0.5 : 300;
+    const idealW = maxH * ar;
+    return `${Math.floor(Math.min(idealW, pinnedPreviewMetrics.width))}px`;
+  }, [player.sourceDimensions, pinnedPreviewMetrics]);
+
   const isPinnedPreview =
     (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
   const pinnedPreviewTop = isAutoPreviewPinned
@@ -455,32 +466,31 @@ export function RetroPreviewView({
                     aspectRatio: previewAspectRatio,
                     width: "100%",
                   }
-                : previewAspectRatio
+                : isPinnedPreview
                   ? {
-                      aspectRatio: previewAspectRatio,
-                      // Pinned portrait video on Safari behaves more reliably when
-                      // the height cap is explicit instead of relying on max-height
-                      // plus derived max-width.
-                      height: isPinnedPreview
-                        ? "50vh"
-                        : undefined,
-                      maxWidth: fillHeight
-                        ? "100%"
-                        : isPinnedPreview
+                      // Pin mode: use JS-computed pixel width to avoid Safari
+                      // aspect-ratio + vh interaction expanding beyond window.
+                      height: "50vh",
+                      width: pinnedContentWidth ?? "100%",
+                      maxWidth: "100%",
+                      margin: "0 auto",
+                    }
+                  : previewAspectRatio
+                    ? {
+                        aspectRatio: previewAspectRatio,
+                        maxWidth: fillHeight
                           ? "100%"
-                        : controlPanelMode === "playback"
-                          ? `min(100%, calc(min(60dvh, calc(100dvh - 260px)) * ${previewAspectRatio}))`
-                          : `min(100%, calc(70dvh * ${previewAspectRatio}))`,
-                      maxHeight: isPinnedPreview
-                        ? "50vh"
-                        : fillHeight
+                          : controlPanelMode === "playback"
+                            ? `min(100%, calc(min(60dvh, calc(100dvh - 260px)) * ${previewAspectRatio}))`
+                            : `min(100%, calc(70dvh * ${previewAspectRatio}))`,
+                        maxHeight: fillHeight
                           ? "100%"
                           : controlPanelMode === "playback"
                             ? "min(60dvh, calc(100dvh - 260px))"
                             : "70dvh",
-                      margin: "0 auto",
-                    }
-                  : undefined
+                        margin: "0 auto",
+                      }
+                    : undefined
           }
         >
           {/* Canvas area + overlays */}
