@@ -297,12 +297,12 @@ function App() {
 
   return (
     <main
-      className="safe-top-pad min-h-screen overflow-x-hidden overflow-y-auto bg-slate-700 text-slate-800"
+      className="safe-top-pad overflow-x-hidden bg-slate-700 text-slate-800"
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
-      <div className="relative mx-auto max-w-5xl px-4 py-4">
-        <header className="mb-3">
+      <div className="relative w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
+        <header className="shrink-0 mb-3">
           <div className="relative">
             <div className="safe-top-offset fixed left-3 z-100 flex items-center gap-1">
               <button
@@ -463,6 +463,7 @@ function App() {
           </div>
         )}
 
+        <div>
         {isRetroPreviewDialogActive ? (
           <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500">
             {t(locale, "retroPreviewActive")}
@@ -501,6 +502,7 @@ function App() {
             />
           </React.Suspense>
         )}
+        </div>
 
         <input
           ref={fileInputRef}
