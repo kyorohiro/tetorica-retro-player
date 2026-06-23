@@ -18,6 +18,7 @@ import {
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import { RetroPreviewView } from "./RetroPreviewView";
 import { RetroControlPanel } from "./RetroControlPanel";
+import { RetroPlayerLayout, type RetroLayoutMode } from "./RetroPlayerLayout";
 import { useDialog } from "../../useDialog";
 
 type RetroPlayerProps = {
@@ -62,6 +63,7 @@ export function RetroPlayer({
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
+  const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
 
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
@@ -277,53 +279,7 @@ export function RetroPlayer({
 
   // --- Render ---
 
-  // playback mode (no fitWidth): flex layout so controls take natural height
-  // and preview fills the rest — no page scroll, no controls clipped.
-  // Other modes: space-y-4 + page scroll (settings panel can be tall; fitWidth needs scroll).
-  // Wrapper divs are always present to keep React tree stable across mode switches.
-  const useFlexLayout = controlPanelMode === "playback" && !isFitWidthEnabled;
-
-  const content = (
-    <div
-      className={useFlexLayout ? "flex flex-col gap-4" : "space-y-4"}
-      style={useFlexLayout ? {
-        height: "calc(100dvh - max(0px, env(safe-area-inset-top)) - 74px)",
-      } : undefined}
-    >
-      <div className={useFlexLayout ? "flex-1 min-h-0" : undefined}>
-        <RetroPreviewView
-          locale={locale}
-          src={src}
-          kind={kind}
-          player={player}
-          isHighResolution={isHighResolution}
-          isFitWidthEnabled={isFitWidthEnabled}
-          controlPanelMode={controlPanelMode}
-          confirmDialog={confirmDialog}
-          fillHeight={useFlexLayout}
-          onHighResolutionChange={setIsHighResolution}
-          onFitWidthChange={setIsFitWidthEnabled}
-          onError={onError}
-        />
-      </div>
-      <div className={useFlexLayout ? "shrink-0" : undefined}>
-        <RetroControlPanel
-          locale={locale}
-          player={player}
-          filterState={filterState}
-          controlPanelMode={controlPanelMode}
-          onControlPanelModeChange={setControlPanelMode}
-          onApplyPreset={applyPresetWithAspect}
-          onSetTargetWidth={handleSetTargetWidth}
-          onSetTargetHeight={handleSetTargetHeight}
-          onSetMatchTargetAspect={handleSetMatchTargetAspect}
-          onResetSettings={resetAllSettings}
-          onImportSettings={handleImportSettings}
-        />
-      </div>
-    </div>
-  );
-
+  // Dialog path (className provided): simple inline layout, all modes work normally.
   if (className) {
     return (
       <section className={className}>
@@ -359,15 +315,66 @@ export function RetroPlayer({
     );
   }
 
+  // Main path: RetroPlayerLayout handles layout per mode.
+  // fitwidth takes priority — opening settings in fitwidth keeps the scrollable layout.
+  const layoutMode: RetroLayoutMode =
+    isFitWidthEnabled
+      ? "fitwidth"
+      : controlPanelMode !== "playback"
+        ? "settings"
+        : "playback";
+
+  // settings mode also uses fillHeight: preview fills the fixed 33dvh wrapper
+  const fillHeight = layoutMode === "playback" || layoutMode === "settings";
+
+  const controlPanelProps = {
+    locale,
+    player,
+    filterState,
+    onControlPanelModeChange: setControlPanelMode,
+    onApplyPreset: applyPresetWithAspect,
+    onSetTargetWidth: handleSetTargetWidth,
+    onSetTargetHeight: handleSetTargetHeight,
+    onSetMatchTargetAspect: handleSetMatchTargetAspect,
+    onResetSettings: resetAllSettings,
+    onImportSettings: handleImportSettings,
+  } as const;
+
   return (
     <div
-      className="rounded-2xl p-0.75 shadow-md"
+      className="flex flex-col h-full rounded-2xl p-0.75 shadow-md"
       style={{
         background: "linear-gradient(135deg, #555 0%, #111 30%, #333 65%, #111 100%)",
       }}
     >
-      <section className="rounded-[13px] bg-[rgba(245,241,234,0.78)] p-3">
-        {content}
+      <section className={`relative flex flex-col flex-1 min-h-0 ${layoutMode === "fitwidth" ? "overflow-y-auto" : "overflow-hidden"} rounded-[13px] bg-[rgba(245,241,234,0.78)] p-3`}>
+        <RetroPlayerLayout
+          mode={layoutMode}
+          preview={
+            <RetroPreviewView
+              locale={locale}
+              src={src}
+              kind={kind}
+              player={player}
+              isHighResolution={isHighResolution}
+              isFitWidthEnabled={isFitWidthEnabled}
+              controlPanelMode={controlPanelMode}
+              confirmDialog={confirmDialog}
+              fillHeight={fillHeight}
+              onHighResolutionChange={setIsHighResolution}
+              onFitWidthChange={setIsFitWidthEnabled}
+              onError={onError}
+              onIsPinnedPreviewChange={setIsPinnedInPreview}
+            />
+          }
+          playbackControls={
+            <RetroControlPanel {...controlPanelProps} controlPanelMode={layoutMode === "fitwidth" ? controlPanelMode : "playback"} />
+          }
+          settingsOverlay={
+            <RetroControlPanel {...controlPanelProps} controlPanelMode={controlPanelMode} />
+          }
+          isPinnedInSettings={isPinnedInPreview && layoutMode === "settings"}
+        />
       </section>
     </div>
   );
