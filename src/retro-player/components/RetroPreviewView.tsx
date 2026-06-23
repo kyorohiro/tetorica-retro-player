@@ -68,6 +68,7 @@ export type RetroPreviewViewProps = {
   onFitWidthChange: (enabled: boolean) => void;
   onError?: (error: Error) => void;
   fillHeight?: boolean;
+  onIsPinnedPreviewChange?: (isPinned: boolean) => void;
 };
 
 export function RetroPreviewView({
@@ -83,6 +84,7 @@ export function RetroPreviewView({
   onFitWidthChange,
   onError,
   fillHeight = false,
+  onIsPinnedPreviewChange,
 }: RetroPreviewViewProps) {
   const tooltipText =
     locale === "ja"
@@ -525,6 +527,7 @@ export function RetroPreviewView({
       window.removeEventListener("scroll", updatePinnedMetrics);
     };
   }, [
+    controlPanelMode,
     isAutoPreviewPinned,
     isPreviewMaximized,
     isPreviewPinned,
@@ -562,6 +565,11 @@ export function RetroPreviewView({
   const pinnedPreviewTop = isAutoPreviewPinned
     ? `calc(max(0.0rem, env(safe-area-inset-top)) - ${autoPinnedHiddenOffset}px)`
     : undefined;
+
+  // Notify parent when pin state changes so it can adjust the layout slot height.
+  React.useEffect(() => {
+    onIsPinnedPreviewChange?.(isPinnedPreview);
+  }, [isPinnedPreview, onIsPinnedPreviewChange]);
 
   // --- CSS helpers (stable strings, not derived from state) ---
 
@@ -936,6 +944,7 @@ export function RetroPreviewView({
             aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
             onClick={() => {
               hideTooltip();
+              if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);
             }}
             onMouseEnter={() => scheduleTooltip("fit-width")}
@@ -1005,7 +1014,11 @@ export function RetroPreviewView({
           <button
             type="button"
             aria-label={isPreviewMaximized ? "Exit maximize" : "Maximize preview"}
-            onClick={() => { hideTooltip(); setIsPreviewMaximized((c) => !c); }}
+            onClick={() => {
+              hideTooltip();
+              if (!isPreviewMaximized) onFitWidthChange(false);
+              setIsPreviewMaximized((c) => !c);
+            }}
             onMouseEnter={() => scheduleTooltip("maximize")}
             onMouseLeave={hideTooltip}
             onFocus={() => scheduleTooltip("maximize")}
@@ -1105,11 +1118,13 @@ export function RetroPreviewView({
                   ? {
                       aspectRatio: previewAspectRatio,
                       maxWidth: "100%",
-                      maxHeight: fillHeight
-                        ? "100%"
-                        : controlPanelMode === "playback"
-                          ? "min(60dvh, calc(100dvh - 260px))"
-                          : "70dvh",
+                      maxHeight: isPinnedPreview
+                        ? "50dvh"
+                        : fillHeight
+                          ? "100%"
+                          : controlPanelMode === "playback"
+                            ? "min(60dvh, calc(100dvh - 260px))"
+                            : "70dvh",
                       margin: "0 auto",
                     }
                   : undefined
