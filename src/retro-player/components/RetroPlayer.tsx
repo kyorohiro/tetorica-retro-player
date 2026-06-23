@@ -277,14 +277,20 @@ export function RetroPlayer({
 
   // --- Render ---
 
-  return (
-    <section
-      className={
-        className ??
-        "rounded-2xl border border-[rgba(180,168,152,0.5)] bg-[rgba(245,241,234,0.78)] p-3 shadow-md"
-      }
+  // playback mode (no fitWidth): flex layout so controls take natural height
+  // and preview fills the rest — no page scroll, no controls clipped.
+  // Other modes: space-y-4 + page scroll (settings panel can be tall; fitWidth needs scroll).
+  // Wrapper divs are always present to keep React tree stable across mode switches.
+  const useFlexLayout = controlPanelMode === "playback" && !isFitWidthEnabled;
+
+  const content = (
+    <div
+      className={useFlexLayout ? "flex flex-col gap-4" : "space-y-4"}
+      style={useFlexLayout ? {
+        height: "calc(100dvh - max(0px, env(safe-area-inset-top)) - 74px)",
+      } : undefined}
     >
-      <div className="space-y-4">
+      <div className={useFlexLayout ? "flex-1 min-h-0" : undefined}>
         <RetroPreviewView
           locale={locale}
           src={src}
@@ -294,10 +300,13 @@ export function RetroPlayer({
           isFitWidthEnabled={isFitWidthEnabled}
           controlPanelMode={controlPanelMode}
           confirmDialog={confirmDialog}
+          fillHeight={useFlexLayout}
           onHighResolutionChange={setIsHighResolution}
           onFitWidthChange={setIsFitWidthEnabled}
           onError={onError}
         />
+      </div>
+      <div className={useFlexLayout ? "shrink-0" : undefined}>
         <RetroControlPanel
           locale={locale}
           player={player}
@@ -312,7 +321,55 @@ export function RetroPlayer({
           onImportSettings={handleImportSettings}
         />
       </div>
-    </section>
+    </div>
+  );
+
+  if (className) {
+    return (
+      <section className={className}>
+        <div className="space-y-4">
+          <RetroPreviewView
+            locale={locale}
+            src={src}
+            kind={kind}
+            player={player}
+            isHighResolution={isHighResolution}
+            isFitWidthEnabled={isFitWidthEnabled}
+            controlPanelMode={controlPanelMode}
+            confirmDialog={confirmDialog}
+            onHighResolutionChange={setIsHighResolution}
+            onFitWidthChange={setIsFitWidthEnabled}
+            onError={onError}
+          />
+          <RetroControlPanel
+            locale={locale}
+            player={player}
+            filterState={filterState}
+            controlPanelMode={controlPanelMode}
+            onControlPanelModeChange={setControlPanelMode}
+            onApplyPreset={applyPresetWithAspect}
+            onSetTargetWidth={handleSetTargetWidth}
+            onSetTargetHeight={handleSetTargetHeight}
+            onSetMatchTargetAspect={handleSetMatchTargetAspect}
+            onResetSettings={resetAllSettings}
+            onImportSettings={handleImportSettings}
+          />
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-0.75 shadow-md"
+      style={{
+        background: "linear-gradient(135deg, #555 0%, #111 30%, #333 65%, #111 100%)",
+      }}
+    >
+      <section className="rounded-[13px] bg-[rgba(245,241,234,0.78)] p-3">
+        {content}
+      </section>
+    </div>
   );
 }
 

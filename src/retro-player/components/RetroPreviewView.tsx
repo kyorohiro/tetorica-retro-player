@@ -67,6 +67,7 @@ export type RetroPreviewViewProps = {
   onHighResolutionChange: (enabled: boolean) => void;
   onFitWidthChange: (enabled: boolean) => void;
   onError?: (error: Error) => void;
+  fillHeight?: boolean;
 };
 
 export function RetroPreviewView({
@@ -81,6 +82,7 @@ export function RetroPreviewView({
   onHighResolutionChange,
   onFitWidthChange,
   onError,
+  fillHeight = false,
 }: RetroPreviewViewProps) {
   const tooltipText =
     locale === "ja"
@@ -549,8 +551,6 @@ export function RetroPreviewView({
     Boolean(src) &&
     !player.previewError &&
     (!player.isRendererReady || player.isLoading);
-
-  const normalPreviewHeight = "60vh";
 
   const previewAspectRatio = React.useMemo(() => {
     if (!player.sourceDimensions) return undefined;
@@ -1028,7 +1028,7 @@ export function RetroPreviewView({
   );
 
   return (
-    <div ref={previewFrameRef} className="space-y-4">
+    <div ref={previewFrameRef} className={isPinnedPreview || isPreviewMaximized || !fillHeight ? "space-y-4" : "h-full flex flex-col"}>
       <div ref={previewAnchorRef} aria-hidden="true" />
       <div
         ref={previewShellRef}
@@ -1041,7 +1041,7 @@ export function RetroPreviewView({
               : "fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-visible flex items-stretch justify-stretch"
             : isPinnedPreview
               ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
-              : "overflow-visible"
+              : fillHeight ? "flex-1 min-h-0 overflow-visible" : "overflow-visible"
         }`}
         style={
           isPinnedPreview && pinnedPreviewMetrics
@@ -1086,12 +1086,11 @@ export function RetroPreviewView({
         <div
           className={`relative ${
             isPreviewMaximized ? "w-full" : "max-w-full min-w-0 overflow-visible"
-          }`}
+          } ${fillHeight && !isPreviewMaximized && !isPinnedPreview && !isFitWidthEnabled ? "h-full" : ""}`}
           style={
             isPreviewMaximized
               ? isFitWidthEnabled && previewAspectRatio
                 ? {
-                    // Scrollable maximize: no height cap so all content is reachable
                     aspectRatio: previewAspectRatio,
                     width: "100%",
                   }
@@ -1103,31 +1102,17 @@ export function RetroPreviewView({
                     width: "100%",
                   }
                 : previewAspectRatio
-                  ? player.sourceDimensions && player.sourceDimensions.height > player.sourceDimensions.width
-                    ? {
-                        // Portrait: constrain by height so Safari respects aspect-ratio
-                        aspectRatio: previewAspectRatio,
-                        height: "min(60vh, calc(100vh - 12rem))",
-                        maxHeight: "min(60vh, calc(100vh - 12rem))",
-                        maxWidth: "100%",
-                        minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
-                        margin: "0 auto",
-                      }
-                    : {
-                        // Landscape: height-first (same as portrait) so max-height caps the video
-                        // within the viewport. width: 100% alone doesn't shrink when max-height
-                        // kicks in, but an explicit height lets aspect-ratio auto-size the width.
-                        aspectRatio: previewAspectRatio,
-                        height: "min(60vh, calc(100vh - 12rem))",
-                        maxHeight: "min(60vh, calc(100vh - 12rem))",
-                        maxWidth: "100%",
-                        minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
-                        margin: "0 auto",
-                      }
-                  : {
-                      height: normalPreviewHeight,
-                      minHeight: "min(220px, max(120px, calc(100vh - 12rem)))",
+                  ? {
+                      aspectRatio: previewAspectRatio,
+                      maxWidth: "100%",
+                      maxHeight: fillHeight
+                        ? "100%"
+                        : controlPanelMode === "playback"
+                          ? "min(60dvh, calc(100dvh - 260px))"
+                          : "70dvh",
+                      margin: "0 auto",
                     }
+                  : undefined
           }
         >
           {/* Canvas area + overlays */}
