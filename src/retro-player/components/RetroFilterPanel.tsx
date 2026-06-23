@@ -57,6 +57,9 @@ type RetroFilterPanelProps = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  lumaLow: number;
+  lumaHigh: number;
+  lumaKnee: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -93,6 +96,9 @@ type RetroFilterPanelProps = {
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
+  onSetLumaLow: (value: number) => void;
+  onSetLumaHigh: (value: number) => void;
+  onSetLumaKnee: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotInternalScale: (value: boolean) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
@@ -130,6 +136,9 @@ export function RetroFilterPanel({
   spotMaskStrength,
   bulbRadius,
   blackFloor,
+  lumaLow,
+  lumaHigh,
+  lumaKnee,
   phosphorDotLightBalance,
   phosphorDotInternalScale,
   phosphorDotBrightCore,
@@ -166,6 +175,9 @@ export function RetroFilterPanel({
   onSetSpotMaskStrength,
   onSetBulbRadius,
   onSetBlackFloor,
+  onSetLumaLow,
+  onSetLumaHigh,
+  onSetLumaKnee,
   onSetPhosphorDotLightBalance,
   onSetPhosphorDotInternalScale,
   onSetPhosphorDotBrightCore,
@@ -224,6 +236,12 @@ export function RetroFilterPanel({
             "各 phosphor セル内で光るバルブの大きさを決めます。下げるほど明るい芯が小さくなり、周囲の黒が増えます。",
           blackFloor:
             "phosphor バルブ周囲の黒背景へどれだけ光が漏れるかを決めます。下げるほど未点灯部分が純黒に近づきます。",
+          lumaLow:
+            "これより暗い輝度を持ち上げ始めます。黒つぶれを減らして、暗部を見やすくします。",
+          lumaHigh:
+            "これより明るい輝度を圧縮し始めます。白飛びや強すぎる発光を丸めます。",
+          lumaKnee:
+            "Luma Low / High の効き始めを柔らかくします。下げると硬く、上げると自然に移行します。",
           lightLevel:
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
           closeUpNoise:
@@ -261,6 +279,12 @@ export function RetroFilterPanel({
             "Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it.",
           blackFloor:
             "Sets how much light leaks into the black background around each phosphor bulb. Lower values keep the unlit area closer to pure black.",
+          lumaLow:
+            "Starts lifting luminance below this point. Use it to reduce crushed shadows and recover dark detail.",
+          lumaHigh:
+            "Starts compressing luminance above this point. Use it to tame clipped highlights and overly hot glow.",
+          lumaKnee:
+            "Softens how Luma Low and Luma High engage. Lower values feel harder; higher values transition more gently.",
           lightLevel:
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
           closeUpNoise:
@@ -719,6 +743,68 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={closeUpNoiseStrength}
                 onChange={(ev) => onSetCloseUpNoiseStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#6b7688]">
+            Luma / Tone
+          </div>
+          <div className="flex flex-col gap-3">
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Luma Low: ${lumaLow.toFixed(2)}`}
+                  text={helpText.lumaLow}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.01"
+                value={lumaLow}
+                onChange={(ev) => onSetLumaLow(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Luma High: ${lumaHigh.toFixed(2)}`}
+                  text={helpText.lumaHigh}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.5"
+                max="1"
+                step="0.01"
+                value={lumaHigh}
+                onChange={(ev) => onSetLumaHigh(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Luma Knee: ${lumaKnee.toFixed(2)}`}
+                  text={helpText.lumaKnee}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.02"
+                max="0.5"
+                step="0.01"
+                value={lumaKnee}
+                onChange={(ev) => onSetLumaKnee(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

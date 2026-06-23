@@ -28,6 +28,9 @@ export type RetroVideoFilterState = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  lumaLow: number;
+  lumaHigh: number;
+  lumaKnee: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -75,6 +78,9 @@ type RendererUniformLocations = {
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
+  uLumaLow: WebGLUniformLocation | null;
+  uLumaHigh: WebGLUniformLocation | null;
+  uLumaKnee: WebGLUniformLocation | null;
   uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
@@ -428,6 +434,9 @@ export class TetoricaRetroVideoPipeline {
       uSpotMaskStrength: gl.getUniformLocation(this.filterProgram, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(this.filterProgram, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(this.filterProgram, "uBlackFloor"),
+      uLumaLow: gl.getUniformLocation(this.filterProgram, "uLumaLow"),
+      uLumaHigh: gl.getUniformLocation(this.filterProgram, "uLumaHigh"),
+      uLumaKnee: gl.getUniformLocation(this.filterProgram, "uLumaKnee"),
       uPhosphorDotLightBalance: gl.getUniformLocation(this.filterProgram, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(this.filterProgram, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(this.filterProgram, "uPhosphorDotMode"),
@@ -672,6 +681,9 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.uniformLocations.uBulbRadius, filterState.bulbRadius);
     gl.uniform1f(this.uniformLocations.uBlackFloor, filterState.blackFloor);
+    gl.uniform1f(this.uniformLocations.uLumaLow, filterState.lumaLow);
+    gl.uniform1f(this.uniformLocations.uLumaHigh, filterState.lumaHigh);
+    gl.uniform1f(this.uniformLocations.uLumaKnee, filterState.lumaKnee);
     gl.uniform1f(
       this.uniformLocations.uPhosphorDotLightBalance,
       filterState.phosphorDotLightBalance,

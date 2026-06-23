@@ -27,6 +27,9 @@ uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
 uniform float uBlackFloor;
+uniform float uLumaLow;
+uniform float uLumaHigh;
+uniform float uLumaKnee;
 uniform float uPhosphorDotLightBalance;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
@@ -891,6 +894,32 @@ float computeEdgeBoost(vec2 uv, vec2 texel, vec2 cell)
   return clamp(pow(clamp(gradient * 0.85, 0.0, 1.0), 0.9), 0.0, 1.0);
 }
 
+vec3 applyLumaToneCompression(vec3 color)
+{
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float low = clamp(uLumaLow, 0.0, 1.0);
+  float high = clamp(uLumaHigh, 0.0, 1.0);
+  float knee = max(uLumaKnee, 0.0001);
+  high = max(high, low + 0.0001);
+
+  float adjustedLuma = luma;
+
+  if (adjustedLuma < low) {
+    float lowSpan = max(low, 0.0001);
+    float lowAmount = smoothstep(0.0, knee, (low - adjustedLuma) / lowSpan);
+    adjustedLuma = mix(adjustedLuma, low, lowAmount);
+  }
+
+  if (adjustedLuma > high) {
+    float over = adjustedLuma - high;
+    float compressedOver = (over * knee) / (over + knee);
+    adjustedLuma = high + compressedOver;
+  }
+
+  color += vec3(adjustedLuma - luma);
+  return clamp(color, 0.0, 1.0);
+}
+
 void main(void)
 {
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
@@ -1133,6 +1162,7 @@ void main(void)
     )
   );
 
+  color.rgb = applyLumaToneCompression(color.rgb);
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   finalColor = color;

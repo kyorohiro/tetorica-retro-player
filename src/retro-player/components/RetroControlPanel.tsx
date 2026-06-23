@@ -237,6 +237,9 @@ export function RetroControlPanel({
               spotMaskStrength={filterState.spotMaskStrength}
               bulbRadius={filterState.bulbRadius}
               blackFloor={filterState.blackFloor}
+              lumaLow={filterState.lumaLow}
+              lumaHigh={filterState.lumaHigh}
+              lumaKnee={filterState.lumaKnee}
               phosphorDotLightBalance={filterState.phosphorDotLightBalance}
               phosphorDotInternalScale={filterState.phosphorDotInternalScale}
               phosphorDotBrightCore={filterState.phosphorDotBrightCore}
@@ -273,6 +276,9 @@ export function RetroControlPanel({
               onSetSpotMaskStrength={filterState.setSpotMaskStrength}
               onSetBulbRadius={filterState.setBulbRadius}
               onSetBlackFloor={filterState.setBlackFloor}
+              onSetLumaLow={filterState.setLumaLow}
+              onSetLumaHigh={filterState.setLumaHigh}
+              onSetLumaKnee={filterState.setLumaKnee}
               onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
               onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
               onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}

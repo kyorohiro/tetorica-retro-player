@@ -59,6 +59,12 @@ const blackFloorInput = document.getElementById("blackFloor");
 const blackFloorValue = document.getElementById("blackFloorValue");
 const phosphorDotLightBalanceInput = document.getElementById("phosphorDotLightBalance");
 const phosphorDotLightBalanceValue = document.getElementById("phosphorDotLightBalanceValue");
+const lumaLowInput = document.getElementById("lumaLow");
+const lumaLowValue = document.getElementById("lumaLowValue");
+const lumaHighInput = document.getElementById("lumaHigh");
+const lumaHighValue = document.getElementById("lumaHighValue");
+const lumaKneeInput = document.getElementById("lumaKnee");
+const lumaKneeValue = document.getElementById("lumaKneeValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const smoothStrengthInput = document.getElementById("smoothStrength");
@@ -788,6 +794,27 @@ phosphorDotLightBalanceInput.addEventListener("input", () => {
   });
 });
 
+lumaLowInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    lumaLow: Number(lumaLowInput.value),
+  });
+});
+
+lumaHighInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    lumaHigh: Number(lumaHighInput.value),
+  });
+});
+
+lumaKneeInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    lumaKnee: Number(lumaKneeInput.value),
+  });
+});
+
 closeUpNoiseStrengthInput.addEventListener("input", () => {
   const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
   closeUpNoiseStrengthValue.textContent = closeUpNoiseStrength.toFixed(2);
@@ -1066,6 +1093,12 @@ function renderSettings(settings) {
   blackFloorValue.textContent = settings.blackFloor.toFixed(3);
   phosphorDotLightBalanceInput.value = String(settings.phosphorDotLightBalance ?? 1);
   phosphorDotLightBalanceValue.textContent = (settings.phosphorDotLightBalance ?? 1).toFixed(2);
+  lumaLowInput.value = String(settings.lumaLow ?? 0);
+  lumaLowValue.textContent = (settings.lumaLow ?? 0).toFixed(2);
+  lumaHighInput.value = String(settings.lumaHigh ?? 1);
+  lumaHighValue.textContent = (settings.lumaHigh ?? 1).toFixed(2);
+  lumaKneeInput.value = String(settings.lumaKnee ?? 0.2);
+  lumaKneeValue.textContent = (settings.lumaKnee ?? 0.2).toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   smoothStrengthInput.value = String(settings.smoothStrength ?? 0);
