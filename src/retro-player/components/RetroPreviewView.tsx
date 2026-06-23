@@ -19,6 +19,7 @@ import {
   loadPersistedRetroSettings,
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
+import { useRetroAlarm } from "../hooks/useRetroAlarm";
 
 // Subset of the player object that RetroPreviewView needs.
 // Add new player capabilities here, not in RetroPlayer.
@@ -146,11 +147,6 @@ export function RetroPreviewView({
     persistedUiSettings?.flipV ?? false,
   );
   const [isMoreOpen, setIsMoreOpen] = React.useState(false);
-  const [alarmTime, setAlarmTime] = React.useState("07:00");
-  const [alarmTargetAt, setAlarmTargetAt] = React.useState<number | null>(null);
-  const [alarmStatus, setAlarmStatus] = React.useState<"idle" | "armed" | "triggered">("idle");
-  const [clockTime, setClockTime] = React.useState(() => new Date());
-  const [showSeconds, setShowSeconds] = React.useState(false);
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== 'undefined' && window.innerWidth < 360,
   );
@@ -164,9 +160,6 @@ export function RetroPreviewView({
   const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
-  const alarmTimeoutRef = React.useRef<number | null>(null);
-  const alarmAudioContextRef = React.useRef<AudioContext | null>(null);
-  const alarmRingingRef = React.useRef(false);
 
   // --- Stable callbacks (defined before effects that use them) ---
 
@@ -205,120 +198,31 @@ export function RetroPreviewView({
     setActiveTooltipKey(null);
   }, []);
 
-  const formatAlarmTarget = React.useCallback((targetAt: number) => {
-    const date = new Date(targetAt);
-    return date.toLocaleString(locale === "ja" ? "ja-JP" : "en-US", {
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }, [locale]);
-
-  const ensureAlarmAudioContext = React.useCallback(async () => {
-    let context = alarmAudioContextRef.current;
-    if (!context || context.state === "closed") {
-      context = new AudioContext();
-      alarmAudioContextRef.current = context;
-    }
-
-    if (context.state === "suspended") {
-      try {
-        await context.resume();
-      } catch (error) {
-        console.warn("[retro-player alarm] resume alarm context failed", {
-          message: error instanceof Error ? error.message : String(error),
-          state: context.state,
-        });
-      }
-    }
-
-    return context;
-  }, []);
-
-  const playAlarmTone = React.useCallback(async () => {
-    let audioContext = await ensureAlarmAudioContext();
-    if (audioContext.state !== "running") {
-      audioContext = (await player.ensureAudioContext()) ?? audioContext;
-    }
-    if (!audioContext || audioContext.state !== "running") {
-      console.warn("[retro-player alarm] no running audio context for fallback tone", {
-        alarmContextState: alarmAudioContextRef.current?.state ?? null,
-        playerContextState: audioContext?.state ?? null,
-      });
-      return false;
-    }
-
-    const startAt = audioContext.currentTime + 0.02;
-    const outputGain = audioContext.createGain();
-    outputGain.gain.setValueAtTime(0.9, startAt);
-    outputGain.connect(audioContext.destination);
-
-    const playBeep = (offset: number, frequency: number, duration: number) => {
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      const toneStart = startAt + offset;
-      const toneEnd = toneStart + duration;
-
-      oscillator.type = "triangle";
-      oscillator.frequency.setValueAtTime(frequency, toneStart);
-      gain.gain.setValueAtTime(0.0001, toneStart);
-      gain.gain.exponentialRampToValueAtTime(0.16, toneStart + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, toneEnd);
-
-      oscillator.connect(gain);
-      gain.connect(outputGain);
-      oscillator.start(toneStart);
-      oscillator.stop(toneEnd + 0.02);
-    };
-
-    playBeep(0.0, 740, 0.22);
-    playBeep(0.28, 988, 0.24);
-    playBeep(0.60, 1318, 0.5);
-
-    window.setTimeout(() => {
-      try {
-        outputGain.disconnect();
-      } catch {
-        // Ignore disconnect failures during cleanup.
-      }
-    }, 1600);
-
-    return true;
-  }, [ensureAlarmAudioContext, player]);
-
-  const triggerAlarm = React.useCallback(async () => {
-    setAlarmTargetAt(null);
-    setAlarmStatus("triggered");
-
-    console.info("[retro-player alarm] trigger", {
-      hasAudibleMedia: player.hasAudibleMedia,
-      hasPlayableMedia: player.hasPlayableMedia,
-      isPoweredOn: player.isPoweredOn,
-    });
-
-    if (player.hasPlayableMedia) {
-      try {
-        if (!player.isPoweredOn) {
-          player.powerOn();
-        }
-        await player.playVideoWithAudio();
-        console.info("[retro-player alarm] media playback started");
-        // Alarm handled via video — clear triggered state so the tone loop
-        // doesn't restart if the user replaces the media via drag & drop.
-        setAlarmStatus("idle");
-        return;
-      } catch (error) {
-        console.warn("[retro-player alarm] media playback failed; using fallback tone", {
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    // Fallback: no playable media, or playback failed — play a tone.
-    const didPlayTone = await playAlarmTone();
-    console.info("[retro-player alarm] fallback tone", { didPlayTone });
-  }, [playAlarmTone, player]);
+  const {
+    alarmTime,
+    setAlarmTime,
+    alarmTargetAt,
+    alarmStatus,
+    clockTime,
+    showSeconds,
+    formatAlarmTarget,
+    armAlarmAtTime,
+    armAlarmIn,
+    clearAlarm,
+    testAlarm,
+    isAlarmOverlayVisible,
+  } = useRetroAlarm({
+    locale,
+    hasAudibleMedia: player.hasAudibleMedia,
+    hasPlayableMedia: player.hasPlayableMedia,
+    isPlaying: player.isPlaying,
+    isPoweredOn: player.isPoweredOn,
+    ensureAudioContext: player.ensureAudioContext,
+    playVideoWithAudio: player.playVideoWithAudio,
+    powerOn: player.powerOn,
+    setLoopingEnabled: player.setLoopingEnabled,
+    togglePlayback: player.togglePlayback,
+  });
 
   // --- Effects ---
 
@@ -334,75 +238,8 @@ export function RetroPreviewView({
       if (tooltipTimerRef.current !== null) {
         window.clearTimeout(tooltipTimerRef.current);
       }
-      if (alarmTimeoutRef.current !== null) {
-        window.clearTimeout(alarmTimeoutRef.current);
-      }
-      if (alarmAudioContextRef.current && alarmAudioContextRef.current.state !== "closed") {
-        void alarmAudioContextRef.current.close().catch(() => {
-          // Ignore close failures during unmount cleanup.
-        });
-      }
     };
   }, []);
-
-  React.useEffect(() => {
-    if (alarmTimeoutRef.current !== null) {
-      window.clearTimeout(alarmTimeoutRef.current);
-      alarmTimeoutRef.current = null;
-    }
-
-    if (!alarmTargetAt) {
-      if (alarmStatus === "armed") {
-        setAlarmStatus("idle");
-      }
-      return;
-    }
-
-    const delay = alarmTargetAt - Date.now();
-    if (delay <= 0) {
-      void triggerAlarm();
-      return;
-    }
-
-    setAlarmStatus("armed");
-    alarmTimeoutRef.current = window.setTimeout(() => {
-      alarmTimeoutRef.current = null;
-      void triggerAlarm();
-    }, delay);
-
-    return () => {
-      if (alarmTimeoutRef.current !== null) {
-        window.clearTimeout(alarmTimeoutRef.current);
-        alarmTimeoutRef.current = null;
-      }
-    };
-  }, [alarmStatus, alarmTargetAt, triggerAlarm]);
-
-  // Clock tick: update every second while alarm is armed or ringing.
-  React.useEffect(() => {
-    if (alarmStatus !== "armed" && alarmStatus !== "triggered") return;
-    const id = window.setInterval(() => setClockTime(new Date()), 1000);
-    return () => window.clearInterval(id);
-  }, [alarmStatus]);
-
-  // Tone loop: ring repeatedly when triggered with no playable media (image etc.).
-  React.useEffect(() => {
-    const shouldRing = alarmStatus === "triggered" && !player.hasPlayableMedia;
-    if (!shouldRing) {
-      alarmRingingRef.current = false;
-      return;
-    }
-    alarmRingingRef.current = true;
-    const ring = async () => {
-      if (!alarmRingingRef.current) return;
-      await playAlarmTone();
-      if (alarmRingingRef.current) {
-        window.setTimeout(ring, 400);
-      }
-    };
-    void ring();
-    return () => { alarmRingingRef.current = false; };
-  }, [alarmStatus, player.hasPlayableMedia, playAlarmTone]);
 
   // Narrow-screen detection (< 360px): record button moves into More popover.
   React.useEffect(() => {
@@ -641,73 +478,21 @@ export function RetroPreviewView({
   };
 
   const handleArmAlarm = () => {
-    const [hoursRaw, minutesRaw] = alarmTime.split(":");
-    const hours = Number(hoursRaw);
-    const minutes = Number(minutesRaw);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-      return;
-    }
-
-    const now = new Date();
-    const nextTarget = new Date(now);
-    nextTarget.setHours(hours, minutes, 0, 0);
-    if (nextTarget.getTime() <= now.getTime()) {
-      nextTarget.setDate(nextTarget.getDate() + 1);
-    }
-
     setIsMoreOpen(false);
-    setAlarmTargetAt(nextTarget.getTime());
-    setAlarmStatus("armed");
-    setClockTime(new Date());
-    void (async () => {
-      if (player.isPlaying) {
-        await player.togglePlayback();
-      }
-      player.setLoopingEnabled(true);
-      const alarmContext = await ensureAlarmAudioContext();
-      void player.ensureAudioContext();
-      console.info("[retro-player alarm] armed", {
-        alarmContextState: alarmContext.state,
-        alarmTime,
-        targetAt: nextTarget.toISOString(),
-        hasAudibleMedia: player.hasAudibleMedia,
-        hasPlayableMedia: player.hasPlayableMedia,
-      });
-    })();
+    void armAlarmAtTime(alarmTime);
   };
 
   const handleClearAlarm = () => {
-    setAlarmTargetAt(null);
-    setAlarmStatus("idle");
-    setShowSeconds(false);
-    console.info("[retro-player alarm] cleared");
+    clearAlarm();
   };
 
   const handleArmAlarmIn = (minutes: number) => {
-    const targetAt = Date.now() + minutes * 60 * 1000;
     setIsMoreOpen(false);
-    setAlarmTargetAt(targetAt);
-    setAlarmStatus("armed");
-    setShowSeconds(true);
-    setClockTime(new Date());
-    void (async () => {
-      if (player.isPlaying) {
-        await player.togglePlayback();
-      }
-      player.setLoopingEnabled(true);
-      const alarmContext = await ensureAlarmAudioContext();
-      void player.ensureAudioContext();
-      console.info("[retro-player alarm] armed (relative)", {
-        alarmContextState: alarmContext.state,
-        minutes,
-        targetAt: new Date(targetAt).toISOString(),
-      });
-    })();
+    void armAlarmIn(minutes);
   };
 
   const handleTestAlarm = () => {
-    console.info("[retro-player alarm] manual test");
-    void triggerAlarm();
+    testAlarm();
   };
 
   // Extracted so the same buttons can be placed inside the canvas area (normal
@@ -1259,8 +1044,8 @@ export function RetroPreviewView({
 
       {/* Alarm overlay:
             - "armed"    → clock / waiting screen, locks all controls
-            - "triggered" + no playable media → ringing tone, locks until stopped */}
-      {(alarmStatus === "armed" || (alarmStatus === "triggered" && !player.hasPlayableMedia)) && (
+            - "triggered" + no audible media → ringing tone, locks until stopped */}
+      {isAlarmOverlayVisible && (
         <div
           className="fixed inset-0 z-200 flex flex-col items-center justify-center bg-slate-950/96 backdrop-blur-md"
         >
