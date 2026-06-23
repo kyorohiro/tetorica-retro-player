@@ -797,6 +797,11 @@ export function RetroPreviewView({
                     ? tooltipText.alarmArmed
                     : tooltipText.alarmIdle}
               </p>
+              <p className="mt-1.5 text-[10px] leading-[1.45] text-slate-500">
+                {locale === "ja"
+                  ? "※ バックグラウンド動作はブラウザ依存。他のウィンドウが前面にある場合など、正常に動作しないことがあります。"
+                  : "※ Background behavior depends on the browser and may not work reliably when another window is in front."}
+              </p>
             </div>
             {isNarrow && player.canRecord && (
               <div className="mb-3 border-b border-slate-700 pb-3">
@@ -1246,7 +1251,6 @@ export function RetroPreviewView({
       {(alarmStatus === "armed" || (alarmStatus === "triggered" && !player.hasPlayableMedia)) && (
         <div
           className="fixed inset-0 z-200 flex flex-col items-center justify-center bg-slate-950/96 backdrop-blur-md"
-          onClick={handleClearAlarm}
         >
           {alarmStatus === "armed" ? (
             /* ── Waiting state ── */
@@ -1281,7 +1285,12 @@ export function RetroPreviewView({
                 Alarm Off
               </button>
               <p className="pointer-events-none mt-5 text-xs text-slate-600">
-                {locale === "ja" ? "タップして解除" : "Tap anywhere to dismiss"}
+                {locale === "ja" ? "ボタンを押して解除" : "Press the button to dismiss"}
+              </p>
+              <p className="pointer-events-none mt-3 max-w-xs text-center text-[10px] leading-relaxed text-slate-700">
+                {locale === "ja"
+                  ? "※ バックグラウンド動作はブラウザ依存。他のウィンドウが前面にある場合など、正常に動作しないことがあります。"
+                  : "※ Background behavior depends on the browser and may not work reliably when another window is in front."}
               </p>
             </>
           ) : (
@@ -1305,13 +1314,13 @@ export function RetroPreviewView({
               </div>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); handleClearAlarm(); }}
+                onClick={handleClearAlarm}
                 className="pointer-events-auto mt-12 rounded-full border border-amber-400/40 bg-amber-500/15 px-8 py-3 text-sm text-amber-200 transition hover:bg-amber-500/25 active:scale-95"
               >
                 {locale === "ja" ? "アラームを止める" : "Stop Alarm"}
               </button>
               <p className="pointer-events-none mt-5 text-xs text-slate-600">
-                {locale === "ja" ? "タップして止める" : "Tap anywhere to stop"}
+                {locale === "ja" ? "ボタンを押して止める" : "Press the button to stop"}
               </p>
             </>
           )}
