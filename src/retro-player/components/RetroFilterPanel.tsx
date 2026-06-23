@@ -263,7 +263,7 @@ export function RetroFilterPanel({
           lumaHigh:
             "これより明るい輝度を圧縮し始めます。白飛びや強すぎる発光を丸めます。",
           lumaKnee:
-            "Luma Low / High の効き始めを柔らかくします。下げると硬く、上げると自然に移行します。",
+            "Luma Low / High の閾値外で圧縮できる余裕幅です。上げると閾値を超えた先まで緩やかに追従し、下げるとタイトに切れます。",
           saturationAmount:
             "Saturation compressor 全体の効き量です。0 で無効、1 で通常、上げると彩度補正が強く出ます。",
           saturationLow:
@@ -271,7 +271,7 @@ export function RetroFilterPanel({
           saturationHigh:
             "これより高い彩度を圧縮し始めます。派手すぎる色や色飽和を丸めます。",
           saturationKnee:
-            "Saturation Low / High の効き始めを柔らかくします。下げると硬く、上げると自然に移行します。",
+            "Saturation Low / High の閾値外で圧縮できる余裕幅です。上げると閾値を超えた先まで緩やかに追従し、下げるとタイトに切れます。",
           lightLevel:
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
           closeUpNoise:
@@ -316,7 +316,7 @@ export function RetroFilterPanel({
           lumaHigh:
             "Starts compressing luminance above this point. Use it to tame clipped highlights and overly hot glow.",
           lumaKnee:
-            "Softens how Luma Low and Luma High engage. Lower values feel harder; higher values transition more gently.",
+            "Sets the headroom beyond the Low and High thresholds before the compressor clips. Higher values allow more range; lower values are tighter.",
           saturationAmount:
             "Overall strength of the saturation compressor. 0 disables it, 1 is normal, and higher values push the color shaping harder.",
           saturationLow:
@@ -324,7 +324,7 @@ export function RetroFilterPanel({
           saturationHigh:
             "Starts compressing saturation above this point. Useful for taming overly vivid color and saturation clipping.",
           saturationKnee:
-            "Softens how Saturation Low and Saturation High engage. Lower values feel harder; higher values transition more gently.",
+            "Sets the headroom beyond the Low and High thresholds before the compressor clips. Higher values allow more range; lower values are tighter.",
           lightLevel:
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
           closeUpNoise:
