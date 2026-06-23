@@ -359,7 +359,15 @@ export function useRetroPreviewMedia({
     media.addEventListener("loadstart", quietAudioOutputImmediately);
     media.addEventListener("seeking", quietAudioOutputImmediately);
     media.addEventListener("stalled", quietAudioOutputImmediately);
-    media.addEventListener("suspend", quietAudioOutputImmediately);
+    media.addEventListener("suspend", () => {
+      // Safari fires "suspend" when the browser stops buffering, which also
+      // happens when the window is covered or the tab is hidden. Silencing audio
+      // in that case breaks playback permanently until recovery. Only quiet on
+      // suspend when the document is still visible (network stall / buffer full).
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        quietAudioOutputImmediately();
+      }
+    });
     media.addEventListener("waiting", quietAudioOutputImmediately);
     media.addEventListener("volumechange", syncVideoState);
     media.addEventListener("timeupdate", syncVideoState);
@@ -412,9 +420,17 @@ export function useRetroPreviewMedia({
       return;
     }
 
-    isPlayingRef.current = !mediaRef.current.paused;
-    setIsPlaying(!mediaRef.current.paused);
-    if (!mediaRef.current.paused) {
+    // During a loop transition Safari may briefly fire "pause" even though the
+    // video is about to restart. Treat ended+loop as still-playing so that
+    // blur/visibilitychange captures the correct intended state.
+    const isLoopTransition =
+      mediaRef.current.paused &&
+      mediaRef.current.ended &&
+      mediaRef.current.loop;
+    const effectivelyPlaying = !mediaRef.current.paused || isLoopTransition;
+    isPlayingRef.current = effectivelyPlaying;
+    setIsPlaying(effectivelyPlaying);
+    if (effectivelyPlaying) {
       finishLoading();
     }
     setCurrentTime(mediaRef.current.currentTime);
@@ -501,7 +517,18 @@ export function useRetroPreviewMedia({
     if (!mediaRef.current) return;
 
     try {
-      await ensureAudioContext();
+      // Skip audio context setup when the tab is hidden and AudioContext is already
+      // suspended. Calling resume() or createMediaElementSource() while hidden can
+      // corrupt the audio graph (MediaElementSourceNode is one-per-element and the
+      // old context still claims it). The visibilitychange:visible handler will
+      // call recoverAudioOutput when the tab returns.
+      const isHiddenWithSuspendedContext =
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden" &&
+        audioContextRef.current?.state === "suspended";
+      if (!isHiddenWithSuspendedContext) {
+        await ensureAudioContext();
+      }
       if (staticNeedsNativeAudioSuppression() && mediaSourceRef.current) {
         mediaRef.current.muted = false;
         mediaRef.current.volume = 0;

@@ -304,6 +304,9 @@ export function RetroPreviewView({
         }
         await player.playVideoWithAudio();
         console.info("[retro-player alarm] media playback started");
+        // Alarm handled via video — clear triggered state so the tone loop
+        // doesn't restart if the user replaces the media via drag & drop.
+        setAlarmStatus("idle");
         return;
       } catch (error) {
         console.warn("[retro-player alarm] media playback failed; using fallback tone", {
