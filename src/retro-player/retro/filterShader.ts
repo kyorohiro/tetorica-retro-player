@@ -933,11 +933,19 @@ float computeEdgeBoost(vec2 uv, vec2 texel, vec2 cell)
 vec3 applyLumaToneCompression(vec3 color)
 {
   float amount = max(uLumaAmount, 0.0);
+  if (amount <= 0.0001) {
+    return color;
+  }
+
   float luma = dot(color, vec3(0.299, 0.587, 0.114));
   float low = clamp(uLumaLow, 0.0, 1.0);
   float high = clamp(uLumaHigh, 0.0, 1.0);
   float knee = max(uLumaKnee, 0.0001);
   high = max(high, low + 0.0001);
+
+  if (low <= 0.0001 && high >= 0.9999) {
+    return color;
+  }
 
   float adjustedLuma = luma;
 
@@ -960,11 +968,19 @@ vec3 applyLumaToneCompression(vec3 color)
 vec3 applySaturationToneCompression(vec3 color)
 {
   float amount = max(uSaturationAmount, 0.0);
+  if (amount <= 0.0001) {
+    return color;
+  }
+
   float sat = max(max(color.r, color.g), color.b) - min(min(color.r, color.g), color.b);
   float low = clamp(uSaturationLow, 0.0, 1.0);
   float high = clamp(uSaturationHigh, 0.1, 1.0);
   float knee = max(uSaturationKnee, 0.0001);
   high = max(high, low + 0.0001);
+
+  if (low <= 0.0001 && high >= 0.9999) {
+    return color;
+  }
 
   float adjustedSat = sat;
 
