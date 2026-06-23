@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tetorica Retro Player",
-  "version": "0.25.5",
+  "version": "0.25.6",
   "description": "Capture the current tab and preview it with retro CRT video and lo-fi audio effects.",
   "homepage_url": "https://kyorohiro.itch.io/tetorica-retro-player",
   "icons": {
