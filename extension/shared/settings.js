@@ -587,6 +587,9 @@ export const DEFAULT_SETTINGS = {
   phosphorDotMode: false,
   bulbRadius: 0.22,
   blackFloor: 0.01,
+  lumaLow: 0.0,
+  lumaHigh: 1.0,
+  lumaKnee: 0.2,
   phosphorDotLightBalance: 1.0,
   phosphorDotInternalScale: false,
   phosphorDotBrightCore: false,
@@ -735,6 +738,18 @@ export function normalizeSettings(candidate) {
       typeof candidate?.blackFloor === "number"
         ? clamp(candidate.blackFloor, 0, 0.5)
         : basePresetSettings.blackFloor ?? DEFAULT_SETTINGS.blackFloor,
+    lumaLow:
+      typeof candidate?.lumaLow === "number"
+        ? clamp(candidate.lumaLow, 0, 0.5)
+        : basePresetSettings.lumaLow ?? DEFAULT_SETTINGS.lumaLow,
+    lumaHigh:
+      typeof candidate?.lumaHigh === "number"
+        ? clamp(candidate.lumaHigh, 0.5, 1)
+        : basePresetSettings.lumaHigh ?? DEFAULT_SETTINGS.lumaHigh,
+    lumaKnee:
+      typeof candidate?.lumaKnee === "number"
+        ? clamp(candidate.lumaKnee, 0.02, 0.5)
+        : basePresetSettings.lumaKnee ?? DEFAULT_SETTINGS.lumaKnee,
     phosphorDotLightBalance:
       typeof candidate?.phosphorDotLightBalance === "number"
         ? clamp(candidate.phosphorDotLightBalance, 0, 2)
@@ -950,6 +965,18 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.blackFloor === "number"
         ? preset.blackFloor
         : DEFAULT_SETTINGS.blackFloor,
+    lumaLow:
+      typeof preset.lumaLow === "number"
+        ? preset.lumaLow
+        : DEFAULT_SETTINGS.lumaLow,
+    lumaHigh:
+      typeof preset.lumaHigh === "number"
+        ? preset.lumaHigh
+        : DEFAULT_SETTINGS.lumaHigh,
+    lumaKnee:
+      typeof preset.lumaKnee === "number"
+        ? preset.lumaKnee
+        : DEFAULT_SETTINGS.lumaKnee,
     phosphorDotLightBalance:
       typeof preset.phosphorDotLightBalance === "number"
         ? preset.phosphorDotLightBalance

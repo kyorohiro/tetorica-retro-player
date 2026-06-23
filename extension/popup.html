@@ -186,6 +186,40 @@
           </label>
           </section>
 
+          <section class="subsection luma-tone-section" aria-labelledby="lumaToneTitle">
+            <div class="subsection-header">
+              <p class="subsection-kicker">Global tone</p>
+              <h3 id="lumaToneTitle">Luma / Tone</h3>
+            </div>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Luma low</span>
+                <span class="info-tip" tabindex="0" data-tip="Starts lifting darker areas below this luma range. Useful when shadows are crushed too hard.">?</span>
+              </span>
+              <input id="lumaLow" type="range" min="0" max="0.5" step="0.01" />
+              <output id="lumaLowValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Luma high</span>
+                <span class="info-tip" tabindex="0" data-tip="Starts compressing brighter areas above this luma range, helping highlights roll off more gently.">?</span>
+              </span>
+              <input id="lumaHigh" type="range" min="0.5" max="1" step="0.01" />
+              <output id="lumaHighValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Luma knee</span>
+                <span class="info-tip" tabindex="0" data-tip="Controls how hard or soft the luma transition feels. Lower is harder, higher is smoother.">?</span>
+              </span>
+              <input id="lumaKnee" type="range" min="0.02" max="0.5" step="0.01" />
+              <output id="lumaKneeValue"></output>
+            </label>
+          </section>
+
           <section class="subsection phosphor-dot-section" aria-labelledby="phosphorDotTitle">
             <div class="subsection-header">
               <p class="subsection-kicker">Phosphor Dot only</p>
