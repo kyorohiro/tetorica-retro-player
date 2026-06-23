@@ -16,6 +16,13 @@ const isTauriRuntime = () =>
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
+// Safari (macOS / iOS browser) natively pauses video on tab-hide and does not
+// auto-resume, so we need the same visibility-recovery logic as Android.
+const isSafariBrowser = () =>
+  typeof navigator !== "undefined" &&
+  /safari/i.test(navigator.userAgent) &&
+  !/chrome|chromium|crios|opr|android/i.test(navigator.userAgent);
+
 const isRetroPlayerDebugEnabled = () =>
   typeof window !== "undefined" &&
   (
@@ -848,12 +855,85 @@ export function usePixiVideoPlayer(
   }, [syncVideoState]);
 
   useEffect(() => {
-    if (!isAndroidRuntime()) {
+    if (!isAndroidRuntime() && !isSafariBrowser()) {
       return;
     }
 
     const isPlayableKind = (kind: typeof previewKindRef.current) =>
       kind === "video" || kind === "audio" || kind === "capture";
+
+    const doResume = async (reason: string) => {
+      try {
+        logAudioRecovery(`${reason}:start`, {
+          wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
+        });
+        const context = await recoverAudioOutput(reason);
+        if (!context) return;
+
+        const shouldResume = wasPlayingBeforeBackgroundRef.current;
+        if (shouldResume && mediaRef.current?.paused) {
+          try {
+            await mediaRef.current.play();
+            setNeedsUserPlay(false);
+          } catch (error) {
+            if (error instanceof DOMException && error.name === "NotAllowedError") {
+              setNeedsUserPlay(true);
+            }
+            logAudioRecovery(`${reason}:play-failed`, {
+              error: error instanceof Error ? error.message : String(error),
+            }, "warn");
+          }
+        }
+      } catch (error) {
+        logAudioRecovery(`${reason}:recover-failed`, {
+          error: error instanceof Error ? error.message : String(error),
+        }, "warn");
+      } finally {
+        syncVideoState();
+        wasPlayingBeforeBackgroundRef.current = false;
+        logAudioRecovery(`${reason}:done`);
+      }
+    };
+
+    // Safari fires window.blur BEFORE the native media.pause event, so we can
+    // capture the intended playing state here, before isPlayingRef is updated
+    // by syncVideoState in response to the browser-initiated pause.
+    const handleWindowBlur = () => {
+      if (!isPlayableKind(previewKindRef.current)) return;
+      wasPlayingBeforeBackgroundRef.current = isPlayingRef.current;
+      logAudioRecovery("window:blur:safari", {
+        wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
+      });
+    };
+
+    // window.focus fires when the window regains focus. If visibilityState
+    // stayed "visible" (another window was in front but this tab was never
+    // hidden), visibilitychange:visible won't fire, so we handle recovery here.
+    const handleWindowFocus = () => {
+      if (!isPlayableKind(previewKindRef.current)) return;
+      // If the tab is still hidden, let visibilitychange:visible handle it.
+      if (document.visibilityState === "hidden") return;
+
+      const media = mediaRef.current;
+      if (!media) {
+        wasPlayingBeforeBackgroundRef.current = false;
+        return;
+      }
+
+      const shouldResume = wasPlayingBeforeBackgroundRef.current && media.paused;
+      logAudioRecovery("window:focus:safari", {
+        wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
+        mediaPaused: media.paused,
+        shouldResume,
+      });
+
+      if (!shouldResume) {
+        wasPlayingBeforeBackgroundRef.current = false;
+        return;
+      }
+
+      window.setTimeout(() => { void doResume("window:focus"); }, 80);
+    };
 
     const handleVisibilityChange = () => {
       const media = mediaRef.current;
@@ -862,80 +942,61 @@ export function usePixiVideoPlayer(
       }
 
       if (document.visibilityState === "hidden") {
-        wasPlayingBeforeBackgroundRef.current = !media.paused;
+        // Android: actively pause to free resources (OS may kill background processes).
+        // Safari desktop: just record state — don't pause. The user may want audio to
+        // continue while another window is in front. Recovery happens on visible.
+        if (isAndroidRuntime()) {
+          wasPlayingBeforeBackgroundRef.current = !media.paused;
 
-        media.pause();
-        isPlayingRef.current = false;
-        setIsPlaying(false);
-        logAudioRecovery("visibility:hidden", {
-          wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
-        });
+          media.pause();
+          isPlayingRef.current = false;
+          setIsPlaying(false);
+          logAudioRecovery("visibility:hidden:android", {
+            wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
+          });
 
-        if (noiseGainRef.current) {
-          noiseGainRef.current.gain.value = 0;
-        }
+          if (noiseGainRef.current) {
+            noiseGainRef.current.gain.value = 0;
+          }
 
-        if (masterGainRef.current) {
-          masterGainRef.current.gain.value = 0;
-        }
+          if (masterGainRef.current) {
+            masterGainRef.current.gain.value = 0;
+          }
 
-        if (audioContextRef.current?.state === "running") {
-          void audioContextRef.current.suspend().catch(() => {
-            // Ignore background suspension failures.
+          if (audioContextRef.current?.state === "running") {
+            void audioContextRef.current.suspend().catch(() => {
+              // Ignore background suspension failures.
+            });
+          }
+        } else {
+          // Safari: blur handler already captured the intended state race-free
+          // (before Safari fires the native pause event). Only update here as
+          // a fallback for cases where blur didn't fire before visibility change.
+          if (!wasPlayingBeforeBackgroundRef.current) {
+            wasPlayingBeforeBackgroundRef.current = isPlayingRef.current;
+          }
+          logAudioRecovery("visibility:hidden:safari", {
+            wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
           });
         }
 
         return;
       }
 
-      window.setTimeout(() => {
-        void (async () => {
-          try {
-            logAudioRecovery("visibility:visible:start", {
-              wasPlayingBeforeBackground: wasPlayingBeforeBackgroundRef.current,
-            });
-            const context = await recoverAudioOutput("visibility:visible");
-            if (!context) {
-              return;
-            }
-
-            if (wasPlayingBeforeBackgroundRef.current && mediaRef.current) {
-              try {
-                await mediaRef.current.play();
-                setNeedsUserPlay(false);
-              } catch (error) {
-                if (error instanceof DOMException && error.name === "NotAllowedError") {
-                  setNeedsUserPlay(true);
-                }
-                logAudioRecovery(
-                  "visibility:visible:play-failed",
-                  {
-                    error: error instanceof Error ? error.message : String(error),
-                  },
-                  "warn",
-                );
-              }
-            }
-          } catch (error) {
-            logAudioRecovery(
-              "visibility:visible:recover-failed",
-              {
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "warn",
-            );
-          } finally {
-            syncVideoState();
-            wasPlayingBeforeBackgroundRef.current = false;
-            logAudioRecovery("visibility:visible:done");
-          }
-        })();
-      }, 80);
+      window.setTimeout(() => { void doResume("visibility:visible"); }, 80);
     };
 
+    if (isSafariBrowser()) {
+      window.addEventListener("blur", handleWindowBlur);
+      window.addEventListener("focus", handleWindowFocus);
+    }
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      if (isSafariBrowser()) {
+        window.removeEventListener("blur", handleWindowBlur);
+        window.removeEventListener("focus", handleWindowFocus);
+      }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [
