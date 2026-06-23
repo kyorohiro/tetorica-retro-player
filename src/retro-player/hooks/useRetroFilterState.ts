@@ -35,9 +35,14 @@ export type RetroFilterInitialState = Partial<{
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  lumaAmount: number;
   lumaLow: number;
   lumaHigh: number;
   lumaKnee: number;
+  saturationAmount: number;
+  saturationLow: number;
+  saturationHigh: number;
+  saturationKnee: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -84,9 +89,14 @@ const doesPresetMatchState = (
     preset.spotMask === state.spotMaskStrength &&
     preset.bulbRadius === state.bulbRadius &&
     preset.blackFloor === state.blackFloor &&
+    (preset.lumaAmount ?? 1) === state.lumaAmount &&
     (preset.lumaLow ?? 0) === state.lumaLow &&
     (preset.lumaHigh ?? 1) === state.lumaHigh &&
     (preset.lumaKnee ?? 0.2) === state.lumaKnee &&
+    (preset.saturationAmount ?? 1) === state.saturationAmount &&
+    (preset.saturationLow ?? 0) === state.saturationLow &&
+    (preset.saturationHigh ?? 1) === state.saturationHigh &&
+    (preset.saturationKnee ?? 0.2) === state.saturationKnee &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
@@ -165,9 +175,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
     blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
+    lumaAmount: initialState.lumaAmount ?? (DEFAULT_PRESET.lumaAmount ?? 1),
     lumaLow: initialState.lumaLow ?? (DEFAULT_PRESET.lumaLow ?? 0),
     lumaHigh: initialState.lumaHigh ?? (DEFAULT_PRESET.lumaHigh ?? 1),
     lumaKnee: initialState.lumaKnee ?? (DEFAULT_PRESET.lumaKnee ?? 0.2),
+    saturationAmount: initialState.saturationAmount ?? (DEFAULT_PRESET.saturationAmount ?? 1),
+    saturationLow: initialState.saturationLow ?? (DEFAULT_PRESET.saturationLow ?? 0),
+    saturationHigh: initialState.saturationHigh ?? (DEFAULT_PRESET.saturationHigh ?? 1),
+    saturationKnee: initialState.saturationKnee ?? (DEFAULT_PRESET.saturationKnee ?? 0.2),
     phosphorDotLightBalance:
       initialState.phosphorDotLightBalance ?? (DEFAULT_PRESET.phosphorDotLightBalance ?? 1),
     phosphorDotInternalScale:
@@ -320,6 +335,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, blackFloor }));
   };
 
+  const setLumaAmount = (lumaAmount: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, lumaAmount }));
+  };
+
   const setLumaLow = (lumaLow: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, lumaLow }));
@@ -333,6 +353,26 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setLumaKnee = (lumaKnee: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, lumaKnee }));
+  };
+
+  const setSaturationAmount = (saturationAmount: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, saturationAmount }));
+  };
+
+  const setSaturationLow = (saturationLow: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, saturationLow }));
+  };
+
+  const setSaturationHigh = (saturationHigh: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, saturationHigh }));
+  };
+
+  const setSaturationKnee = (saturationKnee: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, saturationKnee }));
   };
 
   const setPhosphorDotLightBalance = (phosphorDotLightBalance: number) => {
@@ -419,9 +459,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       spotMaskStrength: presetSettings.spotMask,
       bulbRadius: presetSettings.bulbRadius,
       blackFloor: presetSettings.blackFloor,
+      lumaAmount: presetSettings.lumaAmount ?? 1,
       lumaLow: presetSettings.lumaLow ?? 0,
       lumaHigh: presetSettings.lumaHigh ?? 1,
       lumaKnee: presetSettings.lumaKnee ?? 0.2,
+      saturationAmount: presetSettings.saturationAmount ?? 1,
+      saturationLow: presetSettings.saturationLow ?? 0,
+      saturationHigh: presetSettings.saturationHigh ?? 1,
+      saturationKnee: presetSettings.saturationKnee ?? 0.2,
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? false,
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
@@ -484,9 +529,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSpotMaskStrength,
     setBulbRadius,
     setBlackFloor,
+    setLumaAmount,
     setLumaLow,
     setLumaHigh,
     setLumaKnee,
+    setSaturationAmount,
+    setSaturationLow,
+    setSaturationHigh,
+    setSaturationKnee,
     setPhosphorDotLightBalance,
     setPhosphorDotInternalScale,
     setPhosphorDotBrightCore,

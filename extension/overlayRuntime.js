@@ -1832,9 +1832,14 @@ function applySettings(gl, program, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
   gl.uniform1f(uniformLocations.uBulbRadius, settings.bulbRadius ?? 0.22);
   gl.uniform1f(uniformLocations.uBlackFloor, settings.blackFloor ?? 0.01);
+  gl.uniform1f(uniformLocations.uLumaAmount, settings.lumaAmount ?? 1);
   gl.uniform1f(uniformLocations.uLumaLow, settings.lumaLow ?? 0);
   gl.uniform1f(uniformLocations.uLumaHigh, settings.lumaHigh ?? 1);
   gl.uniform1f(uniformLocations.uLumaKnee, settings.lumaKnee ?? 0.2);
+  gl.uniform1f(uniformLocations.uSaturationAmount, settings.saturationAmount ?? 1);
+  gl.uniform1f(uniformLocations.uSaturationLow, settings.saturationLow ?? 0);
+  gl.uniform1f(uniformLocations.uSaturationHigh, settings.saturationHigh ?? 1);
+  gl.uniform1f(uniformLocations.uSaturationKnee, settings.saturationKnee ?? 0.2);
   gl.uniform1f(
     uniformLocations.uPhosphorDotLightBalance,
     settings.phosphorDotLightBalance ?? 1,
@@ -1970,9 +1975,14 @@ function setupRenderer(webgl) {
       uSpotMaskStrength: webgl.getUniformLocation(program, "uSpotMaskStrength"),
       uBulbRadius: webgl.getUniformLocation(program, "uBulbRadius"),
       uBlackFloor: webgl.getUniformLocation(program, "uBlackFloor"),
+      uLumaAmount: webgl.getUniformLocation(program, "uLumaAmount"),
       uLumaLow: webgl.getUniformLocation(program, "uLumaLow"),
       uLumaHigh: webgl.getUniformLocation(program, "uLumaHigh"),
       uLumaKnee: webgl.getUniformLocation(program, "uLumaKnee"),
+      uSaturationAmount: webgl.getUniformLocation(program, "uSaturationAmount"),
+      uSaturationLow: webgl.getUniformLocation(program, "uSaturationLow"),
+      uSaturationHigh: webgl.getUniformLocation(program, "uSaturationHigh"),
+      uSaturationKnee: webgl.getUniformLocation(program, "uSaturationKnee"),
       uPhosphorDotLightBalance: webgl.getUniformLocation(program, "uPhosphorDotLightBalance"),
       uPixelAspect: webgl.getUniformLocation(program, "uPixelAspect"),
       uPhosphorDotMode: webgl.getUniformLocation(program, "uPhosphorDotMode"),

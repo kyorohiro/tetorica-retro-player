@@ -57,9 +57,14 @@ type RetroFilterPanelProps = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  lumaAmount: number;
   lumaLow: number;
   lumaHigh: number;
   lumaKnee: number;
+  saturationAmount: number;
+  saturationLow: number;
+  saturationHigh: number;
+  saturationKnee: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -96,9 +101,14 @@ type RetroFilterPanelProps = {
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
+  onSetLumaAmount: (value: number) => void;
   onSetLumaLow: (value: number) => void;
   onSetLumaHigh: (value: number) => void;
   onSetLumaKnee: (value: number) => void;
+  onSetSaturationAmount: (value: number) => void;
+  onSetSaturationLow: (value: number) => void;
+  onSetSaturationHigh: (value: number) => void;
+  onSetSaturationKnee: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotInternalScale: (value: boolean) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
@@ -136,9 +146,14 @@ export function RetroFilterPanel({
   spotMaskStrength,
   bulbRadius,
   blackFloor,
+  lumaAmount,
   lumaLow,
   lumaHigh,
   lumaKnee,
+  saturationAmount,
+  saturationLow,
+  saturationHigh,
+  saturationKnee,
   phosphorDotLightBalance,
   phosphorDotInternalScale,
   phosphorDotBrightCore,
@@ -175,9 +190,14 @@ export function RetroFilterPanel({
   onSetSpotMaskStrength,
   onSetBulbRadius,
   onSetBlackFloor,
+  onSetLumaAmount,
   onSetLumaLow,
   onSetLumaHigh,
   onSetLumaKnee,
+  onSetSaturationAmount,
+  onSetSaturationLow,
+  onSetSaturationHigh,
+  onSetSaturationKnee,
   onSetPhosphorDotLightBalance,
   onSetPhosphorDotInternalScale,
   onSetPhosphorDotBrightCore,
@@ -236,12 +256,22 @@ export function RetroFilterPanel({
             "各 phosphor セル内で光るバルブの大きさを決めます。下げるほど明るい芯が小さくなり、周囲の黒が増えます。",
           blackFloor:
             "phosphor バルブ周囲の黒背景へどれだけ光が漏れるかを決めます。下げるほど未点灯部分が純黒に近づきます。",
+          lumaAmount:
+            "Luma compressor 全体の効き量です。0 で無効、1 で通常、上げると明暗補正が強く出ます。",
           lumaLow:
             "これより暗い輝度を持ち上げ始めます。黒つぶれを減らして、暗部を見やすくします。",
           lumaHigh:
             "これより明るい輝度を圧縮し始めます。白飛びや強すぎる発光を丸めます。",
           lumaKnee:
             "Luma Low / High の効き始めを柔らかくします。下げると硬く、上げると自然に移行します。",
+          saturationAmount:
+            "Saturation compressor 全体の効き量です。0 で無効、1 で通常、上げると彩度補正が強く出ます。",
+          saturationLow:
+            "これより低い彩度を持ち上げ始めます。くすんだ色を少し起こして、色味を見やすくします。",
+          saturationHigh:
+            "これより高い彩度を圧縮し始めます。派手すぎる色や色飽和を丸めます。",
+          saturationKnee:
+            "Saturation Low / High の効き始めを柔らかくします。下げると硬く、上げると自然に移行します。",
           lightLevel:
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
           closeUpNoise:
@@ -279,12 +309,22 @@ export function RetroFilterPanel({
             "Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it.",
           blackFloor:
             "Sets how much light leaks into the black background around each phosphor bulb. Lower values keep the unlit area closer to pure black.",
+          lumaAmount:
+            "Overall strength of the luma compressor. 0 disables it, 1 is normal, and higher values push the tone shaping harder.",
           lumaLow:
             "Starts lifting luminance below this point. Use it to reduce crushed shadows and recover dark detail.",
           lumaHigh:
             "Starts compressing luminance above this point. Use it to tame clipped highlights and overly hot glow.",
           lumaKnee:
             "Softens how Luma Low and Luma High engage. Lower values feel harder; higher values transition more gently.",
+          saturationAmount:
+            "Overall strength of the saturation compressor. 0 disables it, 1 is normal, and higher values push the color shaping harder.",
+          saturationLow:
+            "Starts lifting saturation below this point. Useful for waking up dull, muted color without pushing everything harder.",
+          saturationHigh:
+            "Starts compressing saturation above this point. Useful for taming overly vivid color and saturation clipping.",
+          saturationKnee:
+            "Softens how Saturation Low and Saturation High engage. Lower values feel harder; higher values transition more gently.",
           lightLevel:
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
           closeUpNoise:
@@ -757,6 +797,24 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
+                  label={`Luma Amount: ${lumaAmount.toFixed(2)}`}
+                  text={helpText.lumaAmount}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={lumaAmount}
+                onChange={(ev) => onSetLumaAmount(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
                   label={`Luma Low: ${lumaLow.toFixed(2)}`}
                   text={helpText.lumaLow}
                   helpSuffix={helpText.helpSuffix}
@@ -805,6 +863,78 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={lumaKnee}
                 onChange={(ev) => onSetLumaKnee(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Saturation Amount: ${saturationAmount.toFixed(2)}`}
+                  text={helpText.saturationAmount}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={saturationAmount}
+                onChange={(ev) => onSetSaturationAmount(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Saturation Low: ${saturationLow.toFixed(2)}`}
+                  text={helpText.saturationLow}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.01"
+                value={saturationLow}
+                onChange={(ev) => onSetSaturationLow(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Saturation High: ${saturationHigh.toFixed(2)}`}
+                  text={helpText.saturationHigh}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.1"
+                max="1"
+                step="0.01"
+                value={saturationHigh}
+                onChange={(ev) => onSetSaturationHigh(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Saturation Knee: ${saturationKnee.toFixed(2)}`}
+                  text={helpText.saturationKnee}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.02"
+                max="1"
+                step="0.01"
+                value={saturationKnee}
+                onChange={(ev) => onSetSaturationKnee(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>
