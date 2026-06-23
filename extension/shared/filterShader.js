@@ -27,9 +27,14 @@ uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
 uniform float uBlackFloor;
+uniform float uLumaAmount;
 uniform float uLumaLow;
 uniform float uLumaHigh;
 uniform float uLumaKnee;
+uniform float uSaturationAmount;
+uniform float uSaturationLow;
+uniform float uSaturationHigh;
+uniform float uSaturationKnee;
 uniform float uPhosphorDotLightBalance;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
@@ -896,6 +901,7 @@ float computeEdgeBoost(vec2 uv, vec2 texel, vec2 cell)
 
 vec3 applyLumaToneCompression(vec3 color)
 {
+  float amount = max(uLumaAmount, 0.0);
   float luma = dot(color, vec3(0.299, 0.587, 0.114));
   float low = clamp(uLumaLow, 0.0, 1.0);
   float high = clamp(uLumaHigh, 0.0, 1.0);
@@ -916,8 +922,43 @@ vec3 applyLumaToneCompression(vec3 color)
     adjustedLuma = high + compressedOver;
   }
 
-  color += vec3(adjustedLuma - luma);
-  return clamp(color, 0.0, 1.0);
+  vec3 adjustedColor = clamp(color + vec3(adjustedLuma - luma), 0.0, 1.0);
+  return clamp(mix(color, adjustedColor, amount), 0.0, 1.0);
+}
+
+vec3 applySaturationToneCompression(vec3 color)
+{
+  float amount = max(uSaturationAmount, 0.0);
+  float sat = max(max(color.r, color.g), color.b) - min(min(color.r, color.g), color.b);
+  float low = clamp(uSaturationLow, 0.0, 1.0);
+  float high = clamp(uSaturationHigh, 0.1, 1.0);
+  float knee = max(uSaturationKnee, 0.0001);
+  high = max(high, low + 0.0001);
+
+  float adjustedSat = sat;
+
+  if (adjustedSat < low) {
+    float lowSpan = max(low, 0.0001);
+    float lowAmount = smoothstep(0.0, knee, (low - adjustedSat) / lowSpan);
+    adjustedSat = mix(adjustedSat, low, lowAmount);
+  }
+
+  if (adjustedSat > high) {
+    float over = adjustedSat - high;
+    float compressedOver = (over * knee) / (over + knee);
+    adjustedSat = high + compressedOver;
+  }
+
+  if (sat <= 0.0001) {
+    return clamp(color, 0.0, 1.0);
+  }
+
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  vec3 neutral = vec3(luma);
+  vec3 chroma = color - neutral;
+  float scale = adjustedSat / sat;
+  vec3 adjustedColor = clamp(neutral + chroma * scale, 0.0, 1.0);
+  return clamp(mix(color, adjustedColor, amount), 0.0, 1.0);
 }
 
 void main(void)
@@ -1163,6 +1204,7 @@ void main(void)
   );
 
   color.rgb = applyLumaToneCompression(color.rgb);
+  color.rgb = applySaturationToneCompression(color.rgb);
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   finalColor = color;

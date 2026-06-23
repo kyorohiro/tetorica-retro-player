@@ -59,12 +59,22 @@ const blackFloorInput = document.getElementById("blackFloor");
 const blackFloorValue = document.getElementById("blackFloorValue");
 const phosphorDotLightBalanceInput = document.getElementById("phosphorDotLightBalance");
 const phosphorDotLightBalanceValue = document.getElementById("phosphorDotLightBalanceValue");
+const lumaAmountInput = document.getElementById("lumaAmount");
+const lumaAmountValue = document.getElementById("lumaAmountValue");
 const lumaLowInput = document.getElementById("lumaLow");
 const lumaLowValue = document.getElementById("lumaLowValue");
 const lumaHighInput = document.getElementById("lumaHigh");
 const lumaHighValue = document.getElementById("lumaHighValue");
 const lumaKneeInput = document.getElementById("lumaKnee");
 const lumaKneeValue = document.getElementById("lumaKneeValue");
+const saturationAmountInput = document.getElementById("saturationAmount");
+const saturationAmountValue = document.getElementById("saturationAmountValue");
+const saturationLowInput = document.getElementById("saturationLow");
+const saturationLowValue = document.getElementById("saturationLowValue");
+const saturationHighInput = document.getElementById("saturationHigh");
+const saturationHighValue = document.getElementById("saturationHighValue");
+const saturationKneeInput = document.getElementById("saturationKnee");
+const saturationKneeValue = document.getElementById("saturationKneeValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const smoothStrengthInput = document.getElementById("smoothStrength");
@@ -794,6 +804,13 @@ phosphorDotLightBalanceInput.addEventListener("input", () => {
   });
 });
 
+lumaAmountInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    lumaAmount: Number(lumaAmountInput.value),
+  });
+});
+
 lumaLowInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
@@ -812,6 +829,34 @@ lumaKneeInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
     lumaKnee: Number(lumaKneeInput.value),
+  });
+});
+
+saturationAmountInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    saturationAmount: Number(saturationAmountInput.value),
+  });
+});
+
+saturationLowInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    saturationLow: Number(saturationLowInput.value),
+  });
+});
+
+saturationHighInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    saturationHigh: Number(saturationHighInput.value),
+  });
+});
+
+saturationKneeInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    saturationKnee: Number(saturationKneeInput.value),
   });
 });
 
@@ -1093,12 +1138,22 @@ function renderSettings(settings) {
   blackFloorValue.textContent = settings.blackFloor.toFixed(3);
   phosphorDotLightBalanceInput.value = String(settings.phosphorDotLightBalance ?? 1);
   phosphorDotLightBalanceValue.textContent = (settings.phosphorDotLightBalance ?? 1).toFixed(2);
+  lumaAmountInput.value = String(settings.lumaAmount ?? 1);
+  lumaAmountValue.textContent = (settings.lumaAmount ?? 1).toFixed(2);
   lumaLowInput.value = String(settings.lumaLow ?? 0);
   lumaLowValue.textContent = (settings.lumaLow ?? 0).toFixed(2);
   lumaHighInput.value = String(settings.lumaHigh ?? 1);
   lumaHighValue.textContent = (settings.lumaHigh ?? 1).toFixed(2);
   lumaKneeInput.value = String(settings.lumaKnee ?? 0.2);
   lumaKneeValue.textContent = (settings.lumaKnee ?? 0.2).toFixed(2);
+  saturationAmountInput.value = String(settings.saturationAmount ?? 1);
+  saturationAmountValue.textContent = (settings.saturationAmount ?? 1).toFixed(2);
+  saturationLowInput.value = String(settings.saturationLow ?? 0);
+  saturationLowValue.textContent = (settings.saturationLow ?? 0).toFixed(2);
+  saturationHighInput.value = String(settings.saturationHigh ?? 1);
+  saturationHighValue.textContent = (settings.saturationHigh ?? 1).toFixed(2);
+  saturationKneeInput.value = String(settings.saturationKnee ?? 0.2);
+  saturationKneeValue.textContent = (settings.saturationKnee ?? 0.2).toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   smoothStrengthInput.value = String(settings.smoothStrength ?? 0);

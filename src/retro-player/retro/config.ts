@@ -43,9 +43,14 @@ export type RetroPresetDefinition = {
   spotMask: number;
   bulbRadius: number;
   blackFloor: number;
+  lumaAmount?: number;
   lumaLow?: number;
   lumaHigh?: number;
   lumaKnee?: number;
+  saturationAmount?: number;
+  saturationLow?: number;
+  saturationHigh?: number;
+  saturationKnee?: number;
   phosphorDotLightBalance?: number;
   phosphorDotInternalScale?: boolean;
   phosphorDotBrightCore?: boolean;

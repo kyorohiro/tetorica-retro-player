@@ -194,6 +194,15 @@
 
             <label class="control">
               <span class="label-with-tip">
+                <span>Luma amount</span>
+                <span class="info-tip" tabindex="0" data-tip="Overall strength of the luma compressor. 0 disables it, 1 is normal, and higher values push it harder.">?</span>
+              </span>
+              <input id="lumaAmount" type="range" min="0" max="2" step="0.01" />
+              <output id="lumaAmountValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
                 <span>Luma low</span>
                 <span class="info-tip" tabindex="0" data-tip="Starts lifting darker areas below this luma range. Useful when shadows are crushed too hard.">?</span>
               </span>
@@ -217,6 +226,42 @@
               </span>
               <input id="lumaKnee" type="range" min="0.02" max="0.5" step="0.01" />
               <output id="lumaKneeValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Saturation amount</span>
+                <span class="info-tip" tabindex="0" data-tip="Overall strength of the saturation compressor. 0 disables it, 1 is normal, and higher values push it harder.">?</span>
+              </span>
+              <input id="saturationAmount" type="range" min="0" max="2" step="0.01" />
+              <output id="saturationAmountValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Saturation low</span>
+                <span class="info-tip" tabindex="0" data-tip="Starts lifting saturation below this range. Useful for waking up dull, muted color.">?</span>
+              </span>
+              <input id="saturationLow" type="range" min="0" max="0.5" step="0.01" />
+              <output id="saturationLowValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Saturation high</span>
+                <span class="info-tip" tabindex="0" data-tip="Starts compressing saturation above this range, helping tame overly vivid color.">?</span>
+              </span>
+              <input id="saturationHigh" type="range" min="0.1" max="1" step="0.01" />
+              <output id="saturationHighValue"></output>
+            </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Saturation knee</span>
+                <span class="info-tip" tabindex="0" data-tip="Controls how hard or soft the saturation transition feels. Lower is harder, higher is smoother.">?</span>
+              </span>
+              <input id="saturationKnee" type="range" min="0.02" max="1" step="0.01" />
+              <output id="saturationKneeValue"></output>
             </label>
           </section>
 

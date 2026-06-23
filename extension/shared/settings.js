@@ -587,9 +587,14 @@ export const DEFAULT_SETTINGS = {
   phosphorDotMode: false,
   bulbRadius: 0.22,
   blackFloor: 0.01,
+  lumaAmount: 1.0,
   lumaLow: 0.0,
   lumaHigh: 1.0,
   lumaKnee: 0.2,
+  saturationAmount: 1.0,
+  saturationLow: 0.0,
+  saturationHigh: 1.0,
+  saturationKnee: 0.2,
   phosphorDotLightBalance: 1.0,
   phosphorDotInternalScale: false,
   phosphorDotBrightCore: false,
@@ -738,6 +743,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.blackFloor === "number"
         ? clamp(candidate.blackFloor, 0, 0.5)
         : basePresetSettings.blackFloor ?? DEFAULT_SETTINGS.blackFloor,
+    lumaAmount:
+      typeof candidate?.lumaAmount === "number"
+        ? clamp(candidate.lumaAmount, 0, 2)
+        : basePresetSettings.lumaAmount ?? DEFAULT_SETTINGS.lumaAmount,
     lumaLow:
       typeof candidate?.lumaLow === "number"
         ? clamp(candidate.lumaLow, 0, 0.5)
@@ -750,6 +759,22 @@ export function normalizeSettings(candidate) {
       typeof candidate?.lumaKnee === "number"
         ? clamp(candidate.lumaKnee, 0.02, 0.5)
         : basePresetSettings.lumaKnee ?? DEFAULT_SETTINGS.lumaKnee,
+    saturationAmount:
+      typeof candidate?.saturationAmount === "number"
+        ? clamp(candidate.saturationAmount, 0, 2)
+        : basePresetSettings.saturationAmount ?? DEFAULT_SETTINGS.saturationAmount,
+    saturationLow:
+      typeof candidate?.saturationLow === "number"
+        ? clamp(candidate.saturationLow, 0, 0.5)
+        : basePresetSettings.saturationLow ?? DEFAULT_SETTINGS.saturationLow,
+    saturationHigh:
+      typeof candidate?.saturationHigh === "number"
+        ? clamp(candidate.saturationHigh, 0.1, 1)
+        : basePresetSettings.saturationHigh ?? DEFAULT_SETTINGS.saturationHigh,
+    saturationKnee:
+      typeof candidate?.saturationKnee === "number"
+        ? clamp(candidate.saturationKnee, 0.02, 1)
+        : basePresetSettings.saturationKnee ?? DEFAULT_SETTINGS.saturationKnee,
     phosphorDotLightBalance:
       typeof candidate?.phosphorDotLightBalance === "number"
         ? clamp(candidate.phosphorDotLightBalance, 0, 2)
@@ -965,6 +990,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.blackFloor === "number"
         ? preset.blackFloor
         : DEFAULT_SETTINGS.blackFloor,
+    lumaAmount:
+      typeof preset.lumaAmount === "number"
+        ? preset.lumaAmount
+        : DEFAULT_SETTINGS.lumaAmount,
     lumaLow:
       typeof preset.lumaLow === "number"
         ? preset.lumaLow
@@ -977,6 +1006,22 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.lumaKnee === "number"
         ? preset.lumaKnee
         : DEFAULT_SETTINGS.lumaKnee,
+    saturationAmount:
+      typeof preset.saturationAmount === "number"
+        ? preset.saturationAmount
+        : DEFAULT_SETTINGS.saturationAmount,
+    saturationLow:
+      typeof preset.saturationLow === "number"
+        ? preset.saturationLow
+        : DEFAULT_SETTINGS.saturationLow,
+    saturationHigh:
+      typeof preset.saturationHigh === "number"
+        ? preset.saturationHigh
+        : DEFAULT_SETTINGS.saturationHigh,
+    saturationKnee:
+      typeof preset.saturationKnee === "number"
+        ? preset.saturationKnee
+        : DEFAULT_SETTINGS.saturationKnee,
     phosphorDotLightBalance:
       typeof preset.phosphorDotLightBalance === "number"
         ? preset.phosphorDotLightBalance

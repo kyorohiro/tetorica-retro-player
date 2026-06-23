@@ -28,9 +28,14 @@ export type RetroVideoFilterState = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  lumaAmount: number;
   lumaLow: number;
   lumaHigh: number;
   lumaKnee: number;
+  saturationAmount: number;
+  saturationLow: number;
+  saturationHigh: number;
+  saturationKnee: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -78,9 +83,14 @@ type RendererUniformLocations = {
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
+  uLumaAmount: WebGLUniformLocation | null;
   uLumaLow: WebGLUniformLocation | null;
   uLumaHigh: WebGLUniformLocation | null;
   uLumaKnee: WebGLUniformLocation | null;
+  uSaturationAmount: WebGLUniformLocation | null;
+  uSaturationLow: WebGLUniformLocation | null;
+  uSaturationHigh: WebGLUniformLocation | null;
+  uSaturationKnee: WebGLUniformLocation | null;
   uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
@@ -434,9 +444,14 @@ export class TetoricaRetroVideoPipeline {
       uSpotMaskStrength: gl.getUniformLocation(this.filterProgram, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(this.filterProgram, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(this.filterProgram, "uBlackFloor"),
+      uLumaAmount: gl.getUniformLocation(this.filterProgram, "uLumaAmount"),
       uLumaLow: gl.getUniformLocation(this.filterProgram, "uLumaLow"),
       uLumaHigh: gl.getUniformLocation(this.filterProgram, "uLumaHigh"),
       uLumaKnee: gl.getUniformLocation(this.filterProgram, "uLumaKnee"),
+      uSaturationAmount: gl.getUniformLocation(this.filterProgram, "uSaturationAmount"),
+      uSaturationLow: gl.getUniformLocation(this.filterProgram, "uSaturationLow"),
+      uSaturationHigh: gl.getUniformLocation(this.filterProgram, "uSaturationHigh"),
+      uSaturationKnee: gl.getUniformLocation(this.filterProgram, "uSaturationKnee"),
       uPhosphorDotLightBalance: gl.getUniformLocation(this.filterProgram, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(this.filterProgram, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(this.filterProgram, "uPhosphorDotMode"),
@@ -681,9 +696,14 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.uniformLocations.uBulbRadius, filterState.bulbRadius);
     gl.uniform1f(this.uniformLocations.uBlackFloor, filterState.blackFloor);
+    gl.uniform1f(this.uniformLocations.uLumaAmount, filterState.lumaAmount);
     gl.uniform1f(this.uniformLocations.uLumaLow, filterState.lumaLow);
     gl.uniform1f(this.uniformLocations.uLumaHigh, filterState.lumaHigh);
     gl.uniform1f(this.uniformLocations.uLumaKnee, filterState.lumaKnee);
+    gl.uniform1f(this.uniformLocations.uSaturationAmount, filterState.saturationAmount);
+    gl.uniform1f(this.uniformLocations.uSaturationLow, filterState.saturationLow);
+    gl.uniform1f(this.uniformLocations.uSaturationHigh, filterState.saturationHigh);
+    gl.uniform1f(this.uniformLocations.uSaturationKnee, filterState.saturationKnee);
     gl.uniform1f(
       this.uniformLocations.uPhosphorDotLightBalance,
       filterState.phosphorDotLightBalance,
