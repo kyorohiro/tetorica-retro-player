@@ -358,7 +358,6 @@ export function useRetroPreviewMedia({
     media.addEventListener("emptied", quietAudioOutputImmediately);
     media.addEventListener("loadstart", quietAudioOutputImmediately);
     media.addEventListener("seeking", quietAudioOutputImmediately);
-    media.addEventListener("stalled", quietAudioOutputImmediately);
     media.addEventListener("suspend", () => {
       // Safari fires "suspend" when the browser stops buffering, which also
       // happens when the window is covered or the tab is hidden. Silencing audio
@@ -368,7 +367,9 @@ export function useRetroPreviewMedia({
         quietAudioOutputImmediately();
       }
     });
-    media.addEventListener("waiting", quietAudioOutputImmediately);
+    // "stalled" and "waiting" are transient network/buffer states that resolve
+    // on their own. Silencing on these and immediately restoring on "playing"
+    // caused repeated click noise during media loading and file switching.
     media.addEventListener("volumechange", syncVideoState);
     media.addEventListener("timeupdate", syncVideoState);
     media.addEventListener("durationchange", syncVideoState);
