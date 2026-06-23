@@ -1125,22 +1125,21 @@ export function RetroPreviewView({
                 : previewAspectRatio
                   ? {
                       aspectRatio: previewAspectRatio,
-                      // Safari does not reliably honour max-height with aspect-ratio
-                      // (aspect-ratio wins, causing portrait content to overflow).
-                      // Workaround: derive an equivalent max-width so the height
-                      // constraint is satisfied implicitly:
-                      //   maxWidth = min(100%, maxHeight * aspectRatio)
-                      // For the fillHeight case the parent has an explicit height so
-                      // max-height: 100% works correctly — no maxWidth override needed.
+                      // Pinned portrait video on Safari behaves more reliably when
+                      // the height cap is explicit instead of relying on max-height
+                      // plus derived max-width.
+                      height: isPinnedPreview
+                        ? "50vh"
+                        : undefined,
                       maxWidth: fillHeight
                         ? "100%"
                         : isPinnedPreview
-                          ? `min(100%, calc(50dvh * ${previewAspectRatio}))`
-                          : controlPanelMode === "playback"
-                            ? `min(100%, calc(min(60dvh, calc(100dvh - 260px)) * ${previewAspectRatio}))`
-                            : `min(100%, calc(70dvh * ${previewAspectRatio}))`,
+                          ? "100%"
+                        : controlPanelMode === "playback"
+                          ? `min(100%, calc(min(60dvh, calc(100dvh - 260px)) * ${previewAspectRatio}))`
+                          : `min(100%, calc(70dvh * ${previewAspectRatio}))`,
                       maxHeight: isPinnedPreview
-                        ? "50dvh"
+                        ? "50vh"
                         : fillHeight
                           ? "100%"
                           : controlPanelMode === "playback"
@@ -1255,7 +1254,7 @@ export function RetroPreviewView({
 
       {/* Spacer that holds layout space while the shell is fixed/pinned */}
       {isPinnedPreview && pinnedPreviewMetrics && (
-        <div style={{ height: `min(${pinnedPreviewMetrics.height}px, 50dvh)` }} />
+        <div style={{ height: `min(${pinnedPreviewMetrics.height}px, 50vh)` }} />
       )}
 
       {/* Alarm overlay:
