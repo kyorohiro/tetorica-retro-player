@@ -54,7 +54,9 @@ type UseRetroPreviewMediaParams = {
   finishLoading: () => void;
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
+  setEngineIsPlaying: (nextIsPlaying: boolean) => void;
   connectMediaAudio: (media: HTMLMediaElement) => Promise<void>;
+  rebuildAudioGraphForCurrentMedia: (reason: string) => Promise<AudioContext | null>;
   fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) =>
     | { width: number; height: number; x: number; y: number }
     | undefined;
@@ -76,10 +78,15 @@ const isAndroidRuntime = () =>
 // correctly returns false even when the DevTools UA is set to iOS Safari.
 const staticNeedsNativeAudioSuppression = () => {
   if (typeof navigator === "undefined") return false;
+  if (
+    typeof window !== "undefined" &&
+    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
+  ) {
+    return false;
+  }
   if (navigator.vendor !== "Apple Computer, Inc.") return false;
   return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
 };
-
 
 export function useRetroPreviewMedia({
   appRef,
@@ -129,7 +136,9 @@ export function useRetroPreviewMedia({
   finishLoading,
   ensureAudioContext,
   updateAudioNodes,
+  setEngineIsPlaying,
   connectMediaAudio,
+  rebuildAudioGraphForCurrentMedia,
   fitSprite,
   refreshLayout,
   scheduleRefreshLayout,
@@ -209,6 +218,24 @@ export function useRetroPreviewMedia({
     syncVideoState();
     safeRender();
     return true;
+  };
+
+  const resetAudioGraphAfterPreviewFailure = async (
+    reason: string,
+    error: unknown,
+  ) => {
+    try {
+      await rebuildAudioGraphForCurrentMedia(`${reason}:audio-reset`);
+      debugAudio(`${reason}:audio-reset:done`, {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } catch (resetError) {
+      debugAudio(`${reason}:audio-reset:failed`, {
+        message: error instanceof Error ? error.message : String(error),
+        resetMessage:
+          resetError instanceof Error ? resetError.message : String(resetError),
+      });
+    }
   };
 
   const releaseDetachedMedia = (
@@ -367,18 +394,35 @@ export function useRetroPreviewMedia({
   };
 
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
-    media.addEventListener("play", syncVideoState);
-    media.addEventListener("pause", syncVideoState);
+    const isCurrentMedia = () => mediaRef.current === media;
+    const syncIfCurrentMedia = () => {
+      if (!isCurrentMedia()) {
+        return;
+      }
+      syncVideoState();
+    };
+    const quietIfCurrentMedia = () => {
+      if (!isCurrentMedia()) {
+        return;
+      }
+      quietAudioOutputImmediately();
+    };
+
+    media.addEventListener("play", syncIfCurrentMedia);
+    media.addEventListener("pause", syncIfCurrentMedia);
     media.addEventListener("pause", () => {
+      if (!isCurrentMedia()) {
+        return;
+      }
       // Safari can briefly fire "pause" around a loop boundary before restarting.
       // Don't silence during that transition — audio is effectively uninterrupted.
       if (isLikelyLoopTransition(media)) return;
       quietAudioOutputImmediately();
     });
-    media.addEventListener("abort", quietAudioOutputImmediately);
-    media.addEventListener("emptied", quietAudioOutputImmediately);
-    media.addEventListener("loadstart", quietAudioOutputImmediately);
-    media.addEventListener("seeking", quietAudioOutputImmediately);
+    media.addEventListener("abort", quietIfCurrentMedia);
+    media.addEventListener("emptied", quietIfCurrentMedia);
+    media.addEventListener("loadstart", quietIfCurrentMedia);
+    media.addEventListener("seeking", quietIfCurrentMedia);
     // "suspend" intentionally NOT handled here.
     // abort/emptied/loadstart/seeking/pause already cover every case where we
     // need to silence. The "suspend" event fires when the browser buffer fills
@@ -389,7 +433,7 @@ export function useRetroPreviewMedia({
     // "stalled" and "waiting" are transient network/buffer states that resolve
     // on their own. Silencing on these and immediately restoring on "playing"
     // caused repeated click noise during media loading and file switching.
-    media.addEventListener("volumechange", syncVideoState);
+    media.addEventListener("volumechange", syncIfCurrentMedia);
 
     // Lightweight timeupdate handler: only update the scrubber position.
     // syncVideoState (5x setState + updateAudioNodes) is too heavy to run at
@@ -406,10 +450,10 @@ export function useRetroPreviewMedia({
     };
     media.addEventListener("timeupdate", handleTimeUpdate);
 
-    media.addEventListener("durationchange", syncVideoState);
-    media.addEventListener("seeked", syncVideoState);
-    media.addEventListener("ended", syncVideoState);
-    media.addEventListener("ratechange", syncVideoState);
+    media.addEventListener("durationchange", syncIfCurrentMedia);
+    media.addEventListener("seeked", syncIfCurrentMedia);
+    media.addEventListener("ended", syncIfCurrentMedia);
+    media.addEventListener("ratechange", syncIfCurrentMedia);
 
     // The "resize" event fires on <video> when the video's intrinsic size
     // changes — this happens for capture streams when the captured window is
@@ -553,14 +597,15 @@ export function useRetroPreviewMedia({
     if (!mediaRef.current) return;
 
     try {
+      const media = mediaRef.current;
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
-      await ensureAudioContext();
+      const context = await ensureAudioContext();
       if (staticNeedsNativeAudioSuppression() && mediaSourceRef.current) {
-        mediaRef.current.muted = false;
-        mediaRef.current.volume = 0;
+        media.muted = false;
+        media.volume = 0;
       } else {
-        mediaRef.current.muted = isMutedRef.current;
-        mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
+        media.muted = isMutedRef.current;
+        media.volume = isMutedRef.current ? 0 : volumeRef.current;
       }
       // Restore gain immediately before play in case a "suspend" event fired
       // during ensureAudioContext() and scheduled a ramp-to-0.
@@ -573,14 +618,28 @@ export function useRetroPreviewMedia({
       if (contextWasSuspended && !isHiddenDoc) {
         await new Promise<void>((resolve) => { setTimeout(resolve, 30); });
       }
-      await mediaRef.current.play();
+      await media.play();
       isPlayingRef.current = true;
+      setEngineIsPlaying(true);
       setIsPlaying(true);
       setPreviewError("");
       setNeedsUserPlay(false);
+      const audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
+      if (
+        audioContextState !== "running" &&
+        staticNeedsNativeAudioSuppression() &&
+        mediaSourceRef.current
+      ) {
+        media.muted = isMutedRef.current;
+        media.volume = isMutedRef.current ? 0 : volumeRef.current;
+        debugAudio("playVideoWithAudio:native-audio-fallback", {
+          audioContextState,
+          currentTime: media.currentTime,
+        });
+      }
       debugAudio("playVideoWithAudio", {
-        audioContextState: audioContextRef.current?.state,
-        currentTime: mediaRef.current.currentTime,
+        audioContextState,
+        currentTime: media.currentTime,
         isAudioFxEnabled,
         lofiAmount,
         bitCrushAmount,
@@ -599,6 +658,7 @@ export function useRetroPreviewMedia({
       scheduleRefreshLayout();
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
+      setEngineIsPlaying(false);
       finishLoading();
       if (isAutoplayBlockedError(error)) {
         setNeedsUserPlay(true);
@@ -746,6 +806,7 @@ export function useRetroPreviewMedia({
       }
 
       cleanupPreview();
+      await resetAudioGraphAfterPreviewFailure("previewFile:error", error);
       setPreviewError(
         error instanceof Error
           ? error.message
@@ -811,6 +872,7 @@ export function useRetroPreviewMedia({
       }
 
       cleanupPreview();
+      await resetAudioGraphAfterPreviewFailure("startDisplayCapture:error", error);
       setPreviewError(
         error instanceof Error
           ? error.message
@@ -900,6 +962,7 @@ export function useRetroPreviewMedia({
       }
 
       cleanupPreview();
+      await resetAudioGraphAfterPreviewFailure("previewStream:error", error);
       setPreviewError(error instanceof Error ? error.message : String(error));
     }
   };
@@ -1032,6 +1095,7 @@ export function useRetroPreviewMedia({
       }
 
       cleanupPreview();
+      await resetAudioGraphAfterPreviewFailure("previewUrl:error", error);
       setPreviewError(error instanceof Error ? error.message : String(error));
     }
   };
