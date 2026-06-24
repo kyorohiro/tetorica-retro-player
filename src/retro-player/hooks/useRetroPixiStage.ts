@@ -16,10 +16,6 @@ import {
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
 
-const isTauriRuntime = () =>
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
-
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 export type CanvasStageApp = {
@@ -149,15 +145,7 @@ export function useRetroPixiStage({
         return;
       }
 
-      // Tauri on macOS throttles rAF when the window is fully covered (document.hidden).
-      // Fall back to setTimeout so playback continues behind other windows.
-      // Use a slow interval when hidden — rendering is skipped anyway, and a fast
-      // loop only wastes main-thread budget that competes with the audio pipeline.
-      if (isTauriRuntime() && isHidden) {
-        animationFrameRef.current = window.setTimeout(tick, 500) as unknown as number;
-      } else {
-        animationFrameRef.current = window.requestAnimationFrame(tick);
-      }
+      animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
     animationFrameRef.current = window.requestAnimationFrame(tick);

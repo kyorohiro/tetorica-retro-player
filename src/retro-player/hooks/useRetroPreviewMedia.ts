@@ -350,13 +350,29 @@ export function useRetroPreviewMedia({
       image.addEventListener("error", handleError, { once: true });
     });
 
+  const isLikelyLoopTransition = (media: HTMLMediaElement | null) => {
+    if (!media || !media.loop || !media.paused) {
+      return false;
+    }
+
+    if (media.ended) {
+      return true;
+    }
+
+    const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+    const duration = Number.isFinite(media.duration) ? media.duration : 0;
+    const nearStart = currentTime <= 0.08;
+    const nearEnd = duration > 0 && duration - currentTime <= 0.12;
+    return nearStart || nearEnd;
+  };
+
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
     media.addEventListener("play", syncVideoState);
     media.addEventListener("pause", syncVideoState);
     media.addEventListener("pause", () => {
-      // Safari briefly fires "pause" at the end of a loop before restarting.
+      // Safari can briefly fire "pause" around a loop boundary before restarting.
       // Don't silence during that transition — audio is effectively uninterrupted.
-      if (media.ended && media.loop) return;
+      if (isLikelyLoopTransition(media)) return;
       quietAudioOutputImmediately();
     });
     media.addEventListener("abort", quietAudioOutputImmediately);
@@ -445,12 +461,8 @@ export function useRetroPreviewMedia({
     }
 
     // During a loop transition Safari may briefly fire "pause" even though the
-    // video is about to restart. Treat ended+loop as still-playing so that
-    // blur/visibilitychange captures the correct intended state.
-    const isLoopTransition =
-      mediaRef.current.paused &&
-      mediaRef.current.ended &&
-      mediaRef.current.loop;
+    // video is about to restart. Treat that window as still-playing.
+    const isLoopTransition = isLikelyLoopTransition(mediaRef.current);
     const effectivelyPlaying = !mediaRef.current.paused || isLoopTransition;
     isPlayingRef.current = effectivelyPlaying;
     setIsPlaying(effectivelyPlaying);

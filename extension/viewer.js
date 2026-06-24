@@ -216,22 +216,6 @@ async function init() {
   setupRenderer(gl);
   resizeCanvas();
   window.addEventListener("resize", handleWindowResize);
-  document.addEventListener("visibilitychange", () => {
-    logViewerAudioRecovery("visibility:change", { to: document.visibilityState });
-    if (document.visibilityState !== "visible" || !mediaStream || isAlarmArmed) {
-      return;
-    }
-
-    void recoverViewerAudioOutput("visibility:visible");
-  });
-  window.addEventListener("focus", () => {
-    logViewerAudioRecovery("window:focus");
-    if (!mediaStream || isAlarmArmed) {
-      return;
-    }
-
-    void recoverViewerAudioOutput("window:focus");
-  });
   fitButton?.addEventListener("click", toggleFitMode);
   recordButton?.addEventListener("click", handleRecordButtonClick);
   currentSettings = await loadSettings();
