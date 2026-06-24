@@ -311,6 +311,7 @@ export function RetroPreviewView({
 
   const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
   const [isCanvasVisible, setIsCanvasVisible] = React.useState(false);
+  const hasShownOnceRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!player.isLoading) {
@@ -329,21 +330,31 @@ export function RetroPreviewView({
     }
   }, [player.isRendererReady, player.isLoading]);
 
+  // 一度表示されたら次回以降は短いフェードにする
+  React.useEffect(() => {
+    if (!isCanvasVisible) return;
+    return () => { hasShownOnceRef.current = true; };
+  }, [isCanvasVisible]);
+
+  const stableDimensionsRef = React.useRef(player.sourceDimensions);
+  if (player.sourceDimensions) stableDimensionsRef.current = player.sourceDimensions;
+  const effectiveDimensions = stableDimensionsRef.current;
+
   const previewAspectRatio = React.useMemo(() => {
-    if (!player.sourceDimensions) return undefined;
-    return `${player.sourceDimensions.width} / ${player.sourceDimensions.height}`;
-  }, [player.sourceDimensions]);
+    if (!effectiveDimensions) return undefined;
+    return `${effectiveDimensions.width} / ${effectiveDimensions.height}`;
+  }, [effectiveDimensions]);
 
   // For pin mode: compute explicit pixel width from JS to avoid Safari
   // aspect-ratio + vh interaction issues.
   const pinnedContentWidth = React.useMemo(() => {
-    if (!player.sourceDimensions || !pinnedPreviewMetrics) return undefined;
-    const { width: srcW, height: srcH } = player.sourceDimensions;
+    if (!effectiveDimensions || !pinnedPreviewMetrics) return undefined;
+    const { width: srcW, height: srcH } = effectiveDimensions;
     const ar = srcW / Math.max(srcH, 1);
     const maxH = typeof window !== "undefined" ? window.innerHeight * 0.5 : 300;
     const idealW = maxH * ar;
     return `${Math.floor(Math.min(idealW, pinnedPreviewMetrics.width))}px`;
-  }, [player.sourceDimensions, pinnedPreviewMetrics]);
+  }, [effectiveDimensions, pinnedPreviewMetrics]);
 
   const isPinnedPreview =
     (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
@@ -521,7 +532,7 @@ export function RetroPreviewView({
             <div
               ref={player.canvasHostRef}
               className="pointer-events-none relative h-full w-full touch-manipulation"
-              style={{ opacity: isCanvasVisible ? 1 : 0, transition: "opacity 0.4s ease" }}
+              style={{ opacity: isCanvasVisible ? 1 : 0, transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease` }}
             />
             {!player.isPoweredOn && (
               <div className="absolute z-100 inset-0 flex items-center justify-center bg-black/72">
