@@ -3,6 +3,7 @@ import {
   Bell,
   Minimize2,
 } from "lucide-react";
+import type { RetroAudioSettings } from "../audio/preset";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import {
   loadPersistedRetroSettings,
@@ -24,6 +25,7 @@ export type RetroPreviewPlayerSlice = {
   isRendererReady: boolean;
   sourceDimensions: { width: number; height: number } | null;
   viewportRect: { width: number; height: number; x: number; y: number } | null;
+  audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
   hasPlayableMedia: boolean;
   hasAudibleMedia: boolean;
   canRecord: boolean;
@@ -32,6 +34,7 @@ export type RetroPreviewPlayerSlice = {
   isPlaying: boolean;
   togglePlayback: () => Promise<void>;
   setLoopingEnabled: (nextLooping: boolean) => void;
+  setAudioOptimizationMode: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
   powerOn: () => void;
   powerOff: () => void;
   playVideoWithAudio: () => Promise<void>;
@@ -627,6 +630,7 @@ export function RetroPreviewView({
                 onBrightnessChange={setBrightness}
                 onFlipHToggle={() => { setFlipH((v) => !v); }}
                 onFlipVToggle={() => { setFlipV((v) => !v); }}
+                onAudioOptimizationModeChange={player.setAudioOptimizationMode}
               />
             </div>
           )}
@@ -690,6 +694,7 @@ export function RetroPreviewView({
               onBrightnessChange={setBrightness}
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
+              onAudioOptimizationModeChange={player.setAudioOptimizationMode}
             />
           </div>
         )}
@@ -753,6 +758,7 @@ export function RetroPreviewView({
             onBrightnessChange={setBrightness}
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
+            onAudioOptimizationModeChange={player.setAudioOptimizationMode}
           />
         </div>
       )}

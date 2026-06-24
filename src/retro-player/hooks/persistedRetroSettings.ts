@@ -48,6 +48,7 @@ export type PersistedRetroFilterSettings = {
 };
 
 export type PersistedRetroAudioSettings = {
+  audioOptimizationMode: "auto" | "chrome" | "safari";
   isMuted: boolean;
   volume: number;
   playbackRate: number;
