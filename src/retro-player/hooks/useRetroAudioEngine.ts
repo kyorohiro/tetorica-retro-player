@@ -213,7 +213,7 @@ export function useRetroAudioEngine({
 
   const getOrCreateEngine = (): TetoricaRetroAudioNode => {
     if (!audioEngineRef.current) {
-      const context = new AudioContext();
+      const context = new AudioContext({ latencyHint: "interactive" });
       audioContextOwnedRef.current = context;
       audioEngineRef.current = createRetroAudioEngine({
         context,
@@ -374,7 +374,7 @@ export function useRetroAudioEngine({
     if (previousEngine) await previousEngine.dispose();
     if (previousContext) await closeOwnedAudioContext(previousContext);
 
-    const nextContext = new AudioContext();
+    const nextContext = new AudioContext({ latencyHint: "interactive" });
     const nextEngine = createRetroAudioEngine({
       context: nextContext,
       instanceLabel,

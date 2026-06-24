@@ -918,19 +918,29 @@ vec3 applyLumaToneCompression(vec3 color)
 
   float adjustedLuma = luma;
 
+  // Low side: lift darks toward low. Same (x*knee)/(x+knee) curve as high side —
+  // knee is the asymptotic floor below the threshold (consistent with audio gain).
   if (adjustedLuma < low) {
-    float lowSpan = max(low, 0.0001);
-    float lowAmount = smoothstep(0.0, knee, (low - adjustedLuma) / lowSpan);
-    adjustedLuma = mix(adjustedLuma, low, lowAmount);
+    float under = low - adjustedLuma;
+    float compressedUnder = (under * knee) / (under + knee);
+    adjustedLuma = low - compressedUnder;
   }
 
+  // High side: compress brights above high. Asymptote at high + knee.
   if (adjustedLuma > high) {
     float over = adjustedLuma - high;
     float compressedOver = (over * knee) / (over + knee);
     adjustedLuma = high + compressedOver;
   }
 
-  vec3 adjustedColor = clamp(color + vec3(adjustedLuma - luma), 0.0, 1.0);
+  // Multiplicative gain (like audio compressor) to preserve hue/saturation.
+  // Fallback to additive for near-black where multiplicative is undefined.
+  vec3 adjustedColor;
+  if (luma > 0.0001) {
+    adjustedColor = clamp(color * (adjustedLuma / luma), 0.0, 1.0);
+  } else {
+    adjustedColor = clamp(color + vec3(adjustedLuma), 0.0, 1.0);
+  }
   return clamp(mix(color, adjustedColor, amount), 0.0, 1.0);
 }
 
@@ -953,10 +963,11 @@ vec3 applySaturationToneCompression(vec3 color)
 
   float adjustedSat = sat;
 
+  // Same (x*knee)/(x+knee) curve on both sides for consistent knee semantics.
   if (adjustedSat < low) {
-    float lowSpan = max(low, 0.0001);
-    float lowAmount = smoothstep(0.0, knee, (low - adjustedSat) / lowSpan);
-    adjustedSat = mix(adjustedSat, low, lowAmount);
+    float under = low - adjustedSat;
+    float compressedUnder = (under * knee) / (under + knee);
+    adjustedSat = low - compressedUnder;
   }
 
   if (adjustedSat > high) {
@@ -1174,6 +1185,9 @@ void main(void)
     );
 
     color.rgb = clamp(phosphorColor, 0.0, 1.0);
+    color.rgb = applyLumaToneCompression(color.rgb);
+    color.rgb = applySaturationToneCompression(color.rgb);
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
     finalColor = color;
     return;
   }
