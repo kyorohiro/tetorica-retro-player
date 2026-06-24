@@ -1,4 +1,5 @@
 export type RetroAudioSettings = {
+  audioOptimizationMode: "auto" | "chrome" | "safari";
   isMuted: boolean;
   volume: number;
   playbackRate: number;
@@ -27,6 +28,7 @@ export type RetroAudioSettings = {
 };
 
 export const DEFAULT_AUDIO_SETTINGS = {
+  audioOptimizationMode: "auto",
   isMuted: false,
   volume: 0.72,
   playbackRate: 1,

@@ -32,7 +32,17 @@ type UseRetroAudioEngineParams = {
 // navigator.vendor is used as the primary discriminator because it is not affected by
 // Chrome DevTools' UA override (Chrome always reports "Google Inc." regardless of
 // the emulated UA, so spoofed iOS Safari UA strings don't trigger this path).
-function needsNativeAudioSuppression(): boolean {
+function resolveNativeAudioSuppression(
+  audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"],
+): boolean {
+  if (audioOptimizationMode === "chrome") {
+    return false;
+  }
+
+  if (audioOptimizationMode === "safari") {
+    return true;
+  }
+
   if (typeof navigator === "undefined") return false;
   if (
     typeof window !== "undefined" &&
@@ -69,6 +79,8 @@ export function useRetroAudioEngine({
     const persisted = loadPersistedRetroSettings()?.audio;
 
     return {
+      audioOptimizationMode:
+        persisted?.audioOptimizationMode ?? DEFAULT_AUDIO_SETTINGS.audioOptimizationMode,
       isMuted: persisted?.isMuted ?? DEFAULT_AUDIO_SETTINGS.isMuted,
       volume: persisted?.volume ?? DEFAULT_AUDIO_SETTINGS.volume,
       playbackRate: persisted?.playbackRate ?? DEFAULT_AUDIO_SETTINGS.playbackRate,
@@ -115,6 +127,9 @@ export function useRetroAudioEngine({
         persisted?.fxOutputTrimAmount ?? DEFAULT_AUDIO_SETTINGS.fxOutputTrimAmount,
     } satisfies RetroAudioSettings;
   });
+  const audioOptimizationModeRef = useRef<RetroAudioSettings["audioOptimizationMode"]>(
+    initialAudioSettings.audioOptimizationMode,
+  );
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
   const volumeRef = useRef<number>(initialAudioSettings.volume);
   const playbackRateRef = useRef<number>(initialAudioSettings.playbackRate);
@@ -145,6 +160,9 @@ export function useRetroAudioEngine({
   const compressorAmountRef = useRef<number>(initialAudioSettings.compressorAmount);
   const fxOutputTrimAmountRef = useRef<number>(initialAudioSettings.fxOutputTrimAmount);
 
+  const [audioOptimizationMode, setAudioOptimizationMode] = useState<
+    RetroAudioSettings["audioOptimizationMode"]
+  >(initialAudioSettings.audioOptimizationMode);
   const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRate] = useState<number>(
     initialAudioSettings.playbackRate,
@@ -306,6 +324,7 @@ export function useRetroAudioEngine({
   } = audioNodeRefs;
 
   const getCurrentAudioSettings = (): RetroAudioSettings => ({
+    audioOptimizationMode: audioOptimizationModeRef.current,
     isMuted: isMutedRef.current,
     volume: volumeRef.current,
     playbackRate: playbackRateRef.current,
@@ -435,7 +454,7 @@ export function useRetroAudioEngine({
       mediaSourceRef.current = mediaSource;
 
       // Apply initial state using best current knowledge (static fallback until probe runs)
-      if (needsNativeAudioSuppression()) {
+      if (resolveNativeAudioSuppression(audioOptimizationModeRef.current)) {
         media.muted = false;
         media.volume = 0;
       } else {
@@ -522,7 +541,7 @@ export function useRetroAudioEngine({
   };
 
   const applyAudioSettings = (nextSettings: RetroAudioSettings) => {
-
+    audioOptimizationModeRef.current = nextSettings.audioOptimizationMode;
     isMutedRef.current = nextSettings.isMuted;
     volumeRef.current = nextSettings.volume;
     playbackRateRef.current = nextSettings.playbackRate;
@@ -549,6 +568,7 @@ export function useRetroAudioEngine({
     compressorAmountRef.current = nextSettings.compressorAmount;
     fxOutputTrimAmountRef.current = nextSettings.fxOutputTrimAmount;
 
+    setAudioOptimizationMode(nextSettings.audioOptimizationMode);
     setIsMuted(nextSettings.isMuted);
     setVolume(nextSettings.volume);
     setPlaybackRate(nextSettings.playbackRate);
@@ -576,7 +596,7 @@ export function useRetroAudioEngine({
     setFxOutputTrimAmount(nextSettings.fxOutputTrimAmount);
 
     if (mediaRef.current) {
-      if (needsNativeAudioSuppression() && mediaSourceRef.current) {
+      if (resolveNativeAudioSuppression(nextSettings.audioOptimizationMode) && mediaSourceRef.current) {
         mediaRef.current.muted = false;
         mediaRef.current.volume = 0;
       } else {
@@ -594,6 +614,7 @@ export function useRetroAudioEngine({
   const resetAudioSettings = () => applyAudioSettings({ ...DEFAULT_AUDIO_SETTINGS });
 
   useEffect(() => {
+    audioOptimizationModeRef.current = audioOptimizationMode;
     isMutedRef.current = isMuted;
     volumeRef.current = volume;
     playbackRateRef.current = playbackRate;
@@ -623,6 +644,7 @@ export function useRetroAudioEngine({
     setParams(
       {
         isMuted,
+        audioOptimizationMode,
         volume,
         playbackRate,
         isLooping,
@@ -658,7 +680,7 @@ export function useRetroAudioEngine({
     );
 
     if (mediaRef.current) {
-      if (needsNativeAudioSuppression() && mediaSourceRef.current) {
+      if (resolveNativeAudioSuppression(audioOptimizationMode) && mediaSourceRef.current) {
         mediaRef.current.muted = false;
         mediaRef.current.volume = 0;
       } else {
@@ -669,6 +691,7 @@ export function useRetroAudioEngine({
       mediaRef.current.loop = isLooping;
     }
   }, [
+    audioOptimizationMode,
     isMuted,
     volume,
     isAudioFxEnabled,
@@ -701,6 +724,7 @@ export function useRetroAudioEngine({
   useEffect(() => {
     const id = setTimeout(() => {
       savePersistedRetroAudioSettings({
+        audioOptimizationMode,
         isMuted,
         volume,
         playbackRate,
@@ -730,6 +754,7 @@ export function useRetroAudioEngine({
     }, 300);
     return () => clearTimeout(id);
   }, [
+    audioOptimizationMode,
     isMuted,
     volume,
     playbackRate,
@@ -792,6 +817,9 @@ export function useRetroAudioEngine({
     vinylDustBedFilterRef,
     vinylDustBedGainRef,
     crackleGainRef,
+    audioOptimizationModeRef,
+    audioOptimizationMode,
+    setAudioOptimizationMode,
     isMutedRef,
     volumeRef,
     playbackRateRef,

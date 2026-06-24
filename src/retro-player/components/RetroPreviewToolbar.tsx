@@ -14,6 +14,7 @@ import {
   Square,
   Sun,
 } from "lucide-react";
+import type { RetroAudioSettings } from "../audio/preset";
 import type { RetroAlarmStatus } from "../hooks/useRetroAlarm";
 import type { RetroPlayerLocale } from "../types";
 
@@ -21,6 +22,7 @@ type RetroPreviewToolbarPlayerSlice = {
   canRecord: boolean;
   isRecording: boolean;
   isPoweredOn: boolean;
+  audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
 };
 
 type RetroPreviewToolbarProps = {
@@ -51,6 +53,9 @@ type RetroPreviewToolbarProps = {
   onBrightnessChange: (value: number) => void;
   onFlipHToggle: () => void;
   onFlipVToggle: () => void;
+  onAudioOptimizationModeChange: (
+    nextMode: RetroAudioSettings["audioOptimizationMode"],
+  ) => void;
 };
 
 export function RetroPreviewToolbar({
@@ -81,6 +86,7 @@ export function RetroPreviewToolbar({
   onBrightnessChange,
   onFlipHToggle,
   onFlipVToggle,
+  onAudioOptimizationModeChange,
 }: RetroPreviewToolbarProps) {
   const tooltipText =
     locale === "ja"
@@ -199,8 +205,38 @@ export function RetroPreviewToolbar({
         >
           <MoreHorizontal size={16} />
         </button>
-        {isMoreOpen && (
+            {isMoreOpen && (
           <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl border border-slate-600/80 bg-slate-950/96 p-3 shadow-xl backdrop-blur-sm">
+            <div className="mb-3 border-b border-slate-700 pb-3">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Audio Optimize</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  {player.audioOptimizationMode}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["auto", "chrome", "safari"] as const).map((mode) => {
+                  const isActive = player.audioOptimizationMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => {
+                        onAudioOptimizationModeChange(mode);
+                      }}
+                      className={[
+                        "inline-flex min-h-8 items-center justify-center rounded-md border px-1.5 py-1 text-[11px] font-medium capitalize transition",
+                        isActive
+                          ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                          : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                      ].join(" ")}
+                    >
+                      {mode}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
                 <span className="flex items-center gap-1.5">

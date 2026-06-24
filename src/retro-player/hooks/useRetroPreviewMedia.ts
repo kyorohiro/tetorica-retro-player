@@ -1,5 +1,6 @@
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
+import type { RetroAudioSettings } from "../audio/preset";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type CurrentRef<T> = { current: T };
@@ -22,6 +23,7 @@ type UseRetroPreviewMediaParams = {
   mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | null>;
   masterGainRef: CurrentRef<GainNode | null>;
   noiseGainRef: CurrentRef<GainNode | null>;
+  audioOptimizationModeRef: CurrentRef<RetroAudioSettings["audioOptimizationMode"]>;
   isMutedRef: CurrentRef<boolean>;
   volumeRef: CurrentRef<number>;
   playbackRateRef: CurrentRef<number>;
@@ -76,7 +78,17 @@ const isAndroidRuntime = () =>
 // navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
 // Chrome DevTools UA emulation does NOT change navigator.vendor, so this
 // correctly returns false even when the DevTools UA is set to iOS Safari.
-const staticNeedsNativeAudioSuppression = () => {
+const staticNeedsNativeAudioSuppression = (
+  audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"],
+) => {
+  if (audioOptimizationMode === "chrome") {
+    return false;
+  }
+
+  if (audioOptimizationMode === "safari") {
+    return true;
+  }
+
   if (typeof navigator === "undefined") return false;
   if (
     typeof window !== "undefined" &&
@@ -104,6 +116,7 @@ export function useRetroPreviewMedia({
   mediaSourceRef,
   masterGainRef,
   noiseGainRef,
+  audioOptimizationModeRef,
   isMutedRef,
   volumeRef,
   playbackRateRef,
@@ -600,7 +613,7 @@ export function useRetroPreviewMedia({
       const media = mediaRef.current;
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
       const context = await ensureAudioContext();
-      if (staticNeedsNativeAudioSuppression() && mediaSourceRef.current) {
+      if (staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) && mediaSourceRef.current) {
         media.muted = false;
         media.volume = 0;
       } else {
@@ -627,7 +640,7 @@ export function useRetroPreviewMedia({
       const audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
       if (
         audioContextState !== "running" &&
-        staticNeedsNativeAudioSuppression() &&
+        staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
         mediaSourceRef.current
       ) {
         media.muted = isMutedRef.current;
