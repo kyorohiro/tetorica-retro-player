@@ -128,7 +128,14 @@ export function useRetroPixiStage({
 
     const tick = () => {
       if (!isTickerRunningRef.current) return;
-      renderFrameRef.current();
+
+      // Skip WebGL rendering when hidden — no visual output needed, and the
+      // per-frame drawImage + texImage2D calls on the main thread add GC
+      // pressure that can cause AudioContext timing drift.
+      const isHidden = typeof document !== "undefined" && document.hidden;
+      if (!isHidden) {
+        renderFrameRef.current();
+      }
 
       const shouldAnimate =
         previewKindRef.current === "video" ||
@@ -144,8 +151,10 @@ export function useRetroPixiStage({
 
       // Tauri on macOS throttles rAF when the window is fully covered (document.hidden).
       // Fall back to setTimeout so playback continues behind other windows.
-      if (isTauriRuntime() && document.hidden) {
-        animationFrameRef.current = window.setTimeout(tick, 16) as unknown as number;
+      // Use a slow interval when hidden — rendering is skipped anyway, and a fast
+      // loop only wastes main-thread budget that competes with the audio pipeline.
+      if (isTauriRuntime() && isHidden) {
+        animationFrameRef.current = window.setTimeout(tick, 500) as unknown as number;
       } else {
         animationFrameRef.current = window.requestAnimationFrame(tick);
       }

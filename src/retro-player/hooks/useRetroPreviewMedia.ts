@@ -353,25 +353,43 @@ export function useRetroPreviewMedia({
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
     media.addEventListener("play", syncVideoState);
     media.addEventListener("pause", syncVideoState);
-    media.addEventListener("pause", quietAudioOutputImmediately);
+    media.addEventListener("pause", () => {
+      // Safari briefly fires "pause" at the end of a loop before restarting.
+      // Don't silence during that transition — audio is effectively uninterrupted.
+      if (media.ended && media.loop) return;
+      quietAudioOutputImmediately();
+    });
     media.addEventListener("abort", quietAudioOutputImmediately);
     media.addEventListener("emptied", quietAudioOutputImmediately);
     media.addEventListener("loadstart", quietAudioOutputImmediately);
     media.addEventListener("seeking", quietAudioOutputImmediately);
-    media.addEventListener("suspend", () => {
-      // Safari fires "suspend" when the browser stops buffering, which also
-      // happens when the window is covered or the tab is hidden. Silencing audio
-      // in that case breaks playback permanently until recovery. Only quiet on
-      // suspend when the document is still visible (network stall / buffer full).
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
-        quietAudioOutputImmediately();
-      }
-    });
+    // "suspend" intentionally NOT handled here.
+    // abort/emptied/loadstart/seeking/pause already cover every case where we
+    // need to silence. The "suspend" event fires when the browser buffer fills
+    // during ACTIVE playback, which must NOT silence audio. It can also fire
+    // after "play" (race with resume flow), and with the lightweight timeupdate
+    // handler no longer calling updateAudioNodes(), a quietAudioOutputImmediately()
+    // ramp from "suspend" would not be cancelled and would leave audio silent.
     // "stalled" and "waiting" are transient network/buffer states that resolve
     // on their own. Silencing on these and immediately restoring on "playing"
     // caused repeated click noise during media loading and file switching.
     media.addEventListener("volumechange", syncVideoState);
-    media.addEventListener("timeupdate", syncVideoState);
+
+    // Lightweight timeupdate handler: only update the scrubber position.
+    // syncVideoState (5x setState + updateAudioNodes) is too heavy to run at
+    // 15Hz — it generates significant GC pressure in JavaScriptCore and causes
+    // the periodic main-thread pauses that make A/V playback speed wobble.
+    // All other state (isPlaying, duration, playbackRate, isLooping) is kept
+    // correct by their dedicated events below.
+    let lastTimeupdateTime = -1;
+    const handleTimeUpdate = () => {
+      const t = mediaRef.current?.currentTime ?? 0;
+      if (Math.abs(t - lastTimeupdateTime) < 0.08) return;
+      lastTimeupdateTime = t;
+      setCurrentTime(t);
+    };
+    media.addEventListener("timeupdate", handleTimeUpdate);
+
     media.addEventListener("durationchange", syncVideoState);
     media.addEventListener("seeked", syncVideoState);
     media.addEventListener("ended", syncVideoState);
@@ -416,7 +434,12 @@ export function useRetroPreviewMedia({
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
-      updateAudioNodes();
+      // Use a fade rather than updateAudioNodes(): stale event listeners on
+      // the old media element (e.g. the "pause" fired by releaseDetachedMedia)
+      // reach here while engine.runtimeState.isPlaying is still true, so
+      // updateAudioNodes() would snap masterGain back to full and re-enable
+      // noiseGain, causing a brief noise burst.
+      quietAudioOutputImmediately();
       safeRender();
       return;
     }
@@ -518,24 +541,25 @@ export function useRetroPreviewMedia({
     if (!mediaRef.current) return;
 
     try {
-      // Skip audio context setup when the tab is hidden and AudioContext is already
-      // suspended. Calling resume() or createMediaElementSource() while hidden can
-      // corrupt the audio graph (MediaElementSourceNode is one-per-element and the
-      // old context still claims it). The visibilitychange:visible handler will
-      // call recoverAudioOutput when the tab returns.
-      const isHiddenWithSuspendedContext =
-        typeof document !== "undefined" &&
-        document.visibilityState === "hidden" &&
-        audioContextRef.current?.state === "suspended";
-      if (!isHiddenWithSuspendedContext) {
-        await ensureAudioContext();
-      }
+      const contextWasSuspended = audioContextRef.current?.state === "suspended";
+      await ensureAudioContext();
       if (staticNeedsNativeAudioSuppression() && mediaSourceRef.current) {
         mediaRef.current.muted = false;
         mediaRef.current.volume = 0;
       } else {
         mediaRef.current.muted = isMutedRef.current;
         mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
+      }
+      // Restore gain immediately before play in case a "suspend" event fired
+      // during ensureAudioContext() and scheduled a ramp-to-0.
+      updateAudioNodes();
+      // After a long pause Safari suspends the AudioContext. When resumed, the
+      // CoreAudio pipeline on macOS needs a moment to stabilize before audio
+      // and video can start in sync. Without this delay the video starts ahead
+      // of the audio output path, causing a stutter and permanent lip-sync offset.
+      const isHiddenDoc = typeof document !== "undefined" && document.visibilityState === "hidden";
+      if (contextWasSuspended && !isHiddenDoc) {
+        await new Promise<void>((resolve) => { setTimeout(resolve, 30); });
       }
       await mediaRef.current.play();
       isPlayingRef.current = true;
