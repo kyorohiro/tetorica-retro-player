@@ -351,7 +351,6 @@ function createOverlay(settings) {
   let pointerClientX = null;
   let pointerClientY = null;
   let detachPointerTracking = null;
-  let detachRecoveryListener = null;
   let lastHoveredElement = null;
   let lastHoveredDRMVideo = null;
 
@@ -633,7 +632,6 @@ function createOverlay(settings) {
     updateAudioFxButton();
     attachSettingsSync();
     attachPointerTracking();
-    attachRecoveryListeners();
     updateRecordButton();
     draw();
   }
@@ -652,11 +650,6 @@ function createOverlay(settings) {
     if (detachPointerTracking) {
       detachPointerTracking();
       detachPointerTracking = null;
-    }
-
-    if (detachRecoveryListener) {
-      detachRecoveryListener();
-      detachRecoveryListener = null;
     }
 
     stopRecording({ save: false });
@@ -791,33 +784,6 @@ function createOverlay(settings) {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("blur", clearPointerFocus);
       document.removeEventListener("pointerleave", clearPointerFocus);
-    };
-  }
-
-  function attachRecoveryListeners() {
-    const handleVisibilityChange = () => {
-      logOverlayAudioRecovery("visibility:change", { to: document.visibilityState });
-      if (document.visibilityState !== "visible" || !audioFxEnabled || !overlayAudioHookedEl) {
-        return;
-      }
-
-      void recoverOverlayAudioOutput(overlayAudioHookedEl, "visibility:visible");
-    };
-
-    const handleWindowFocus = () => {
-      logOverlayAudioRecovery("window:focus");
-      if (!audioFxEnabled || !overlayAudioHookedEl) {
-        return;
-      }
-
-      void recoverOverlayAudioOutput(overlayAudioHookedEl, "window:focus");
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleWindowFocus);
-    detachRecoveryListener = () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleWindowFocus);
     };
   }
 
