@@ -67,8 +67,8 @@ export type RetroPreviewViewProps = {
 
 export function RetroPreviewView({
   locale,
-  src,
-  kind,
+  src: _src,
+  kind: _kind,
   player,
   isHighResolution,
   isFitWidthEnabled,
@@ -309,11 +309,25 @@ export function RetroPreviewView({
 
   // --- Computed values ---
 
-  const showImagePlaceholder =
-    kind === "image" &&
-    Boolean(src) &&
-    !player.previewError &&
-    (!player.isRendererReady || player.isLoading);
+  const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
+  const [isCanvasVisible, setIsCanvasVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!player.isLoading) {
+      setShowLoadingOverlay(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowLoadingOverlay(true), 350);
+    return () => window.clearTimeout(timer);
+  }, [player.isLoading]);
+
+  React.useEffect(() => {
+    if (player.isRendererReady && !player.isLoading) {
+      setIsCanvasVisible(true);
+    } else {
+      setIsCanvasVisible(false);
+    }
+  }, [player.isRendererReady, player.isLoading]);
 
   const previewAspectRatio = React.useMemo(() => {
     if (!player.sourceDimensions) return undefined;
@@ -504,17 +518,10 @@ export function RetroPreviewView({
               transform: (flipH || flipV) ? `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` : undefined,
             }}
           >
-            {showImagePlaceholder && (
-              <img
-                src={src}
-                alt=""
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-95"
-              />
-            )}
             <div
               ref={player.canvasHostRef}
               className="pointer-events-none relative h-full w-full touch-manipulation"
+              style={{ opacity: isCanvasVisible ? 1 : 0, transition: "opacity 0.4s ease" }}
             />
             {!player.isPoweredOn && (
               <div className="absolute z-100 inset-0 flex items-center justify-center bg-black/72">
@@ -526,12 +533,9 @@ export function RetroPreviewView({
                 </div>
               </div>
             )}
-            {player.isLoading && !player.needsUserPlay && !player.previewError && (
+            {showLoadingOverlay && !player.needsUserPlay && !player.previewError && (
               <div
-                className={[
-                  "pointer-events-none absolute inset-0 flex items-center justify-center",
-                  showImagePlaceholder ? "bg-slate-950/26" : "bg-slate-950/72",
-                ].join(" ")}
+                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72"
               >
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
                   <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />

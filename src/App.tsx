@@ -4,9 +4,13 @@ import {
   FileUp,
   FolderOpen,
   Menu,
+  Mic2,
   MonitorUp,
   Pin,
   RefreshCw,
+  RotateCcw,
+  Save,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import "./App.css";
@@ -501,24 +505,46 @@ function App() {
         ) : (
           <React.Suspense
             fallback={
-              <section className="rounded-3xl border border-slate-300 bg-slate-100/80 p-3 shadow-sm">
-                <div className="overflow-hidden rounded-2xl bg-slate-950">
-                  <div className="relative aspect-[16/10] min-h-[220px] w-full">
-                    <img
-                      src={previewSource.previewSrc ?? defaultPreviewSrc}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full object-contain opacity-95"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/28">
-                      <div className="rounded-2xl border border-slate-700 bg-slate-900/88 px-5 py-4 text-center text-sm text-slate-100 shadow-lg">
-                        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
-                        <p className="font-medium">Preparing retro preview...</p>
+              <div
+                className="flex flex-col h-full rounded-2xl p-0.75 shadow-md"
+                style={{
+                  background: "linear-gradient(135deg, #555 0%, #111 30%, #333 65%, #111 100%)",
+                }}
+              >
+                <section className="relative flex flex-col flex-1 min-h-0 overflow-hidden rounded-[13px] bg-[rgba(245,241,234,0.78)] p-3">
+                  <div className="flex flex-col flex-1 min-h-0 gap-4">
+                    <div className="flex-1 min-h-0">
+                      <div className="rounded-2xl border border-slate-700 bg-slate-950 p-2 h-full">
+                        <div className="relative h-full min-h-45 rounded-xl bg-slate-950" />
+                      </div>
+                    </div>
+                    <div className="shrink-0 rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3">
+                      <div className="flex gap-2">
+                        <div className="grid flex-1 grid-cols-3 gap-2">
+                          <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white">
+                            <SlidersHorizontal size={16} />
+                            Video
+                          </div>
+                          <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white">
+                            <Mic2 size={16} />
+                            Audio
+                          </div>
+                          <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-[#12141c]">
+                            <RotateCcw size={15} />
+                            Reset
+                          </div>
+                        </div>
+                        <div className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268]">
+                          <Save size={13} />
+                        </div>
+                        <div className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268]">
+                          <FolderOpen size={13} />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              </div>
             }
           >
             <RetroPlayer
