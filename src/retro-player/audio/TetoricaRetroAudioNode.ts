@@ -449,7 +449,11 @@ export class TetoricaRetroAudioNode {
     const audibleMasterGain = settings.isMuted || !isOutputEnabled ? 0 : settings.volume;
 
     if (masterGain) {
-      masterGain.gain.value = audibleMasterGain;
+      // cancelScheduledValues prevents a pending quietAudioOutputImmediately ramp
+      // (triggered by the "seeking" event) from overriding the restored gain value
+      // when "seeked" fires before the 30ms ramp completes — a Chrome-specific race.
+      masterGain.gain.cancelScheduledValues(this.context.currentTime);
+      masterGain.gain.setValueAtTime(audibleMasterGain, this.context.currentTime);
     }
 
     if (radioToneHighpass && radioToneLowpass && radioTonePresence) {

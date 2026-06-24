@@ -15,6 +15,7 @@ const RetroFilterPanel = React.lazy(() =>
 // Subset of the player object that RetroControlPanel needs.
 // Add new player capabilities here, not in RetroPlayer.
 export type RetroControlPlayerSlice = {
+  isLoading: boolean;
   hasPlayableMedia: boolean;
   hasImage: boolean;
   hasVideo: boolean;
@@ -133,12 +134,15 @@ export function RetroControlPanel({
   onResetSettings,
   onImportSettings,
 }: RetroControlPanelProps) {
+  const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
+  if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
+
   return (
     <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
       {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
-              hasPlayback={player.hasPlayableMedia}
+              hasPlayback={stableHasPlayableRef.current}
               currentTime={player.currentTime}
               duration={player.duration}
               mode={
