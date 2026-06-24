@@ -34,6 +34,12 @@ type UseRetroAudioEngineParams = {
 // the emulated UA, so spoofed iOS Safari UA strings don't trigger this path).
 function needsNativeAudioSuppression(): boolean {
   if (typeof navigator === "undefined") return false;
+  if (
+    typeof window !== "undefined" &&
+    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
+  ) {
+    return false;
+  }
   // navigator.vendor === "Apple Computer, Inc." only in real Safari/WebKit.
   // Chrome DevTools UA emulation does NOT change navigator.vendor.
   if (navigator.vendor !== "Apple Computer, Inc.") return false;
@@ -865,6 +871,7 @@ export function useRetroAudioEngine({
     ensureAudioContextWithRecovery,
     ensureInitialized,
     updateAudioNodes,
+    setEngineIsPlaying,
     connectSourceNode,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
