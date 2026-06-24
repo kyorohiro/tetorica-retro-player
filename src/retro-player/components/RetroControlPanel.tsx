@@ -1,4 +1,5 @@
 import React from "react";
+import { FolderOpen, Mic2, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import type { RetroFilterState } from "../hooks/useRetroFilterState";
 import type { PresetFileData } from "../hooks/presetFile";
 import type { RetroPresetKey } from "../retro/config";
@@ -95,8 +96,27 @@ export type RetroControlPanelProps = {
 };
 
 const controlsFallback = (
-  <div className="flex min-h-24 items-center justify-center text-sm text-[#7a7268]">
-    Preparing controls...
+  <div className="flex gap-2">
+    <div className="grid flex-1 grid-cols-3 gap-2">
+      <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white">
+        <SlidersHorizontal size={16} />
+        Video
+      </div>
+      <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white">
+        <Mic2 size={16} />
+        Audio
+      </div>
+      <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-[#12141c]">
+        <RotateCcw size={15} />
+        Reset
+      </div>
+    </div>
+    <div className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268]">
+      <Save size={13} />
+    </div>
+    <div className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268]">
+      <FolderOpen size={13} />
+    </div>
   </div>
 );
 
@@ -115,8 +135,7 @@ export function RetroControlPanel({
 }: RetroControlPanelProps) {
   return (
     <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
-      {(player.hasPlayableMedia || player.hasImage) &&
-        controlPanelMode !== "video-settings" && (
+      {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
               hasPlayback={player.hasPlayableMedia}
