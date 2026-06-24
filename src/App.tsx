@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Menu,
   MonitorUp,
+  Pin,
   RefreshCw,
   X,
 } from "lucide-react";
@@ -43,6 +44,10 @@ const waitForExternalNavigationPause = async () => {
   });
 };
 
+const isTauriRuntime = () =>
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
 const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));
 
 function App() {
@@ -54,6 +59,7 @@ function App() {
   const previewSource = usePreviewSourceState();
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
   const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
@@ -291,43 +297,62 @@ function App() {
     }, 80);
   }, []);
 
+  const handleWindowPinToggle = useCallback(async () => {
+    const next = !isWindowAlwaysOnTop;
+    setIsWindowAlwaysOnTop(next);
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setAlwaysOnTop(next);
+  }, [isWindowAlwaysOnTop]);
+
   const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
     setLocalePreference(nextPreference);
   }, []);
 
   return (
-    <main
-      className="safe-top-pad h-dvh flex flex-col overflow-x-hidden bg-slate-700 text-slate-800"
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-    >
-      <div className="relative flex flex-col flex-1 min-h-0 w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
-        <header className="shrink-0 mb-3">
-          <div className="relative">
-            <div className="safe-top-offset fixed left-3 z-100 flex items-center gap-1">
-              <button
-                type="button"
-                aria-expanded={isMobileMenuOpen}
-                aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
-                onClick={() => {
-                  setIsMobileMenuOpen((current) => !current);
-                }}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-              >
-                {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-              <button
-                type="button"
-                aria-label={t(locale, "reloadApp")}
-                title={t(locale, "reloadApp")}
-                onClick={handleReloadApp}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-              >
-                <RefreshCw size={18} />
-              </button>
-            </div>
-            {isMobileMenuOpen && (
-              <div className="safe-top-menu fixed left-3 z-100 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+    <>
+      {/* Fixed nav buttons: kept outside <main> so overflow-x-hidden on <main> cannot clip them in WebKit */}
+      <div className="safe-top-offset fixed left-3 z-[9999] flex items-center gap-1">
+        <button
+          type="button"
+          aria-expanded={isMobileMenuOpen}
+          aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
+          onClick={() => {
+            setIsMobileMenuOpen((current) => !current);
+          }}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+        >
+          {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+        <button
+          type="button"
+          aria-label={t(locale, "reloadApp")}
+          title={t(locale, "reloadApp")}
+          onClick={handleReloadApp}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+        >
+          <RefreshCw size={18} />
+        </button>
+        {isTauriRuntime() && (
+          <button
+            type="button"
+            aria-label={isWindowAlwaysOnTop ? "Unpin window" : "Pin window on top"}
+            title={locale === "ja"
+              ? isWindowAlwaysOnTop ? "最前面固定: 解除" : "最前面固定"
+              : isWindowAlwaysOnTop ? "Always on top: off" : "Always on top"}
+            onClick={() => { void handleWindowPinToggle(); }}
+            className={[
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              isWindowAlwaysOnTop
+                ? "border-sky-400/80 bg-sky-500/20 text-sky-700 hover:bg-sky-500/30"
+                : "border-slate-300/80 bg-white/88 text-slate-700 hover:bg-white",
+            ].join(" ")}
+          >
+            <Pin size={18} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
+          </button>
+        )}
+      </div>
+      {isMobileMenuOpen && (
+        <div className="safe-top-menu fixed left-3 z-[9999] w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"
@@ -415,10 +440,15 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
-        </header>
+      <main
+        className="safe-top-pad h-dvh flex flex-col overflow-x-hidden bg-slate-700 text-slate-800"
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+      >
+        <div className="relative flex flex-col flex-1 min-h-0 w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
+          <header className="shrink-0 mb-3" />
 
-        {previewSource.previewStream && (
+          {previewSource.previewStream && (
           <div className="mb-4">
             <button
               type="button"
@@ -554,6 +584,7 @@ function App() {
         )}
       </div>
     </main>
+  </>
   );
 }
 
