@@ -9,6 +9,7 @@ import type { TargetFile } from "./api";
 type Options = {
   files: SharedFileInfo[];
   onPlay: (url: string, path: string) => void;
+  useHls?: boolean;
 };
 
 function sharedToTargetFile(f: SharedFileInfo): TargetFile {
@@ -27,7 +28,7 @@ export function useMDropSharedListDialog() {
   const showMDropSharedListDialog = React.useCallback(
     async (opts: Options) => {
       return await showDialog<void>(({ close }) => (
-        <MDropSharedListDialog files={opts.files} onClose={close} />
+        <MDropSharedListDialog files={opts.files} useHls={opts.useHls ?? false} onClose={close} />
       ));
     },
     [showDialog]
@@ -36,11 +37,17 @@ export function useMDropSharedListDialog() {
   return { showMDropSharedListDialog };
 }
 
+const cleanupHls = (apiServer: string) => {
+  fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
+};
+
 function MDropSharedListDialog({
   files,
+  useHls,
   onClose,
 }: {
   files: SharedFileInfo[];
+  useHls: boolean;
   onClose: () => void;
 }) {
   const { showPreviewDialog } = usePreviewDialog();
@@ -59,6 +66,7 @@ function MDropSharedListDialog({
         targetId: file.id,
         initialPath: "/",
         title: file.name,
+        useHls,
       });
       return;
     }
@@ -79,7 +87,7 @@ function MDropSharedListDialog({
         </h2>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => { if (useHls) cleanupHls(apiServer); onClose(); }}
           className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
         >
           Close

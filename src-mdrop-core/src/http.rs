@@ -163,6 +163,7 @@ pub struct HttpServerContext {
     pub local_only: bool,
     pub files: HashMap<String, PathBuf>,
     pub hls_sessions: HashMap<String, PathBuf>,
+    pub hls_children: HashMap<String, tokio::process::Child>,
     pub message_callback: Option<MessageCallback>,
     pub api_key: String,
 }
@@ -175,6 +176,7 @@ impl HttpServerContext {
             local_only: true,
             files: HashMap::new(),
             hls_sessions: HashMap::new(),
+            hls_children: HashMap::new(),
             message_callback: None,
             api_key: create_api_key(),
         }
@@ -362,6 +364,14 @@ impl SharedHttpServerContext {
             .route(
                 "/hls/{id}/{filename}",
                 get(http_stream::hls_segment),
+            )
+            .route(
+                "/hls-sub/{folder_id}/{*subpath}",
+                get(http_stream::hls_sub_playlist),
+            )
+            .route(
+                "/hls/cleanup",
+                axum::routing::post(http_stream::hls_cleanup_all),
             )
             //.route("/download/{id}", get(http_file::download_root_file))
             //.route("/download/{id}/{*sub_path}", get(http_file::download_file))

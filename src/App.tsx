@@ -165,6 +165,7 @@ function App() {
             } else {
               await showMDropSharedListDialogRef.current({
                 files: sharedFiles,
+                useHls: isFfmpegEnabledRef.current,
                 onPlay: (url, path) => { previewSourceRef.current.previewPath(url, path); },
               });
             }

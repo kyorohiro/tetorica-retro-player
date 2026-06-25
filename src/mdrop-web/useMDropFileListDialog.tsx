@@ -34,6 +34,7 @@ type FileListDialogOptions = {
     apiServer: string;
     targetId: string;
     initialPath?: string;
+    useHls?: boolean;
 };
 
 const parentPathOf = (path: string) => {
@@ -59,11 +60,18 @@ export function useMDropFileListDialog() {
     return { showMDropFileListDialog };
 }
 
+const hlsSubUrl = (apiServer: string, folderId: string, file: TargetFile): string => {
+    const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
+    const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
+    return `${apiServer}/hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
+};
+
 function FileListDialog({
     title,
     apiServer,
     targetId,
     initialPath = "/",
+    useHls = false,
     onClose,
 }: FileListDialogOptions & { onClose: () => void }) {
     const [path, setPath] = useState(initialPath);
@@ -178,7 +186,10 @@ function FileListDialog({
 
                 <button
                     type="button"
-                    onClick={onClose}
+                    onClick={() => {
+                        if (useHls) fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
+                        onClose();
+                    }}
                     className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
                 >
                     Close
@@ -223,12 +234,16 @@ function FileListDialog({
                                         onClick={async () => {
                                             if (isImage(file.path) || isVideo(file.path) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path)) {
                                                 const index = sortedFiles.findIndex((f) => f.path === file.path);
+                                                const getObjectUrl = (useHls && (isVideo(file.path) || isAudio(file.path)))
+                                                    ? async (f: TargetFile) => hlsSubUrl(apiServer, targetId, f)
+                                                    : undefined;
 
                                                 await showPreviewDialog({
                                                     files: sortedFiles,
                                                     initialIndex: index,
                                                     isRetro: true,
                                                     apiServer,
+                                                    ...(getObjectUrl ? { getObjectUrl } : {}),
                                                 });
                                             } else {
                                                 // showZipFileListDialog

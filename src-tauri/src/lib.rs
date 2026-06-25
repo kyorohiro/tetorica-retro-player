@@ -1,6 +1,9 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static SHARE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 use tauri::{Manager, State};
 
@@ -121,7 +124,9 @@ async fn mdrop_share_file(
         .to_string_lossy()
         .to_string();
 
-    let id = format!("{}", chrono::Utc::now().timestamp_millis());
+    let ts = chrono::Utc::now().timestamp_millis();
+    let seq = SHARE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let id = format!("{ts}{seq:04}");
     let is_dir = path.is_dir();
 
     let (hostname, port) = {
