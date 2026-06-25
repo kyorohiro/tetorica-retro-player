@@ -74,6 +74,7 @@ function MDropSharedListDialog({
       files: targetFiles,
       initialIndex: fileIndex,
       isRetro: true,
+      useHls,
       getObjectUrl,
     });
   };

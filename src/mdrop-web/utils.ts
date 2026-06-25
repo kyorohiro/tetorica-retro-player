@@ -82,6 +82,11 @@ export function isHeic(path: string, type?: string) {
 export const isVideo = (path: string) =>
     mimeFromPath(path).startsWith("video/");
 
+// Formats that ffmpeg can transcode to HLS but browsers can't play natively
+export const isVideoExtended = (path: string) =>
+    isVideo(path) ||
+    /\.(avi|flv|mkv|wmv|ts|m2ts|mts|divx|xvid|rm|rmvb|3gp|f4v|asf|vob|mpeg|mpg|m2v|mxf)$/i.test(path);
+
 export const isAudio = (path: string) =>
     mimeFromPath(path).startsWith("audio/");
 

@@ -3,7 +3,7 @@ import { File, Folder, Loader } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, getFiles } from "./api";
 import { downloadUrl, usePreviewDialog } from "./usePreviewDialog";
-import { isAudio, isEpub, isImage, isPdf, isText, isVideo } from "./utils";
+import { isAudio, isEpub, isImage, isPdf, isText, isVideo, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
 type SortMode = "name" | "modifiedAt" | "comic";
@@ -232,9 +232,10 @@ function FileListDialog({
                                         className="w-full text-left"
 
                                         onClick={async () => {
-                                            if (isImage(file.path) || isVideo(file.path) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path)) {
+                                            const isVideoHere = useHls ? isVideoExtended(file.path) : isVideo(file.path);
+                                            if (isImage(file.path) || isVideoHere || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path)) {
                                                 const index = sortedFiles.findIndex((f) => f.path === file.path);
-                                                const getObjectUrl = (useHls && (isVideo(file.path) || isAudio(file.path)))
+                                                const getObjectUrl = (useHls && (isVideoHere || isAudio(file.path)))
                                                     ? async (f: TargetFile) => hlsSubUrl(apiServer, targetId, f)
                                                     : undefined;
 
@@ -242,6 +243,7 @@ function FileListDialog({
                                                     files: sortedFiles,
                                                     initialIndex: index,
                                                     isRetro: true,
+                                                    useHls,
                                                     apiServer,
                                                     ...(getObjectUrl ? { getObjectUrl } : {}),
                                                 });
