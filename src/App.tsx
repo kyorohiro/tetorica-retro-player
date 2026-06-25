@@ -31,6 +31,7 @@ import {
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
 import { mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
+import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -78,6 +79,7 @@ function App() {
   const retroPlayerKey = "player:root";
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
+  const { showMDropSharedListDialog } = useMDropSharedListDialog();
 
   const finishPreparingSelection = useCallback(() => {
     pickerStateRef.current = "idle";
@@ -108,6 +110,11 @@ function App() {
     previewSourceRef.current = previewSource;
   }, [previewSource]);
 
+  const showMDropSharedListDialogRef = React.useRef(showMDropSharedListDialog);
+  React.useEffect(() => {
+    showMDropSharedListDialogRef.current = showMDropSharedListDialog;
+  }, [showMDropSharedListDialog]);
+
   // Tauri native OS drag-drop → mDrop HTTP URL
   React.useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -126,15 +133,16 @@ function App() {
 
         try {
           if (isMDropReadyRef.current) {
-            // mDrop ON: serve via local HTTP
-            const targets = paths.length === 1
-              ? [await mdropShareFile(paths[0])]
-              : await Promise.all(paths.map((p) => mdropShareFile(p)));
-            const firstMedia = targets.find(
-              (s) => isVideo(s.name) || isAudio(s.name) || isImage(s.name)
-            ) ?? targets[0];
-            if (firstMedia) {
-              previewSourceRef.current.previewPath(firstMedia.url, firstMedia.path);
+            // mDrop ON: share all files, play single or show list
+            const sharedFiles = await Promise.all(paths.map((p) => mdropShareFile(p)));
+            if (sharedFiles.length === 1) {
+              const f = sharedFiles[0];
+              previewSourceRef.current.previewPath(f.url, f.path);
+            } else {
+              await showMDropSharedListDialogRef.current({
+                files: sharedFiles,
+                onPlay: (url, path) => { previewSourceRef.current.previewPath(url, path); },
+              });
             }
           } else {
             // mDrop OFF: fallback to convertFileSrc (Tauri asset protocol)
