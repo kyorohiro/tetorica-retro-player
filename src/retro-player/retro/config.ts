@@ -66,6 +66,27 @@ export type RetroPresetDefinition = {
 };
 
 export const RETRO_PRESETS = {
+  none: {
+    label: "None",
+    width: 1920,
+    height: 1080,
+    colors: 256,
+    dither: 0,
+    palette: "free" as const,
+    curvature: 0,
+    scanline: 0,
+    scanline2: 0,
+    vignette: 0,
+    glow: 0,
+    phosphor: 0,
+    spotMask: 0,
+    bulbRadius: 0,
+    blackFloor: 0,
+    monoTint: "gray" as const,
+    neonBoost: 1,
+    neonSaturation: 1,
+    neonDetail: 1,
+  },
   chunky: {
     label: "Chunky",
     width: 256,

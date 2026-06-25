@@ -479,7 +479,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       neonBoost: presetSettings.neonBoost,
       neonSaturation: presetSettings.neonSaturation,
       neonDetail: presetSettings.neonDetail,
-      isFilterEnabled: true,
+      isFilterEnabled: preset !== "none",
     }));
   };
 

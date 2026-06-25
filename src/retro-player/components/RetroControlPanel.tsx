@@ -139,6 +139,9 @@ export function RetroControlPanel({
 
   return (
     <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
+      {player.previewError && (
+        <p className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-rose-600">{player.previewError}</p>
+      )}
       {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
@@ -222,10 +225,6 @@ export function RetroControlPanel({
             />
           </React.Suspense>
         )}
-
-      {player.previewError && (
-        <p className="mt-3 text-rose-400">{player.previewError}</p>
-      )}
 
       {controlPanelMode === "video-settings" && (
         <div className="mt-4 border-t border-[#cac0b2] pt-4">
