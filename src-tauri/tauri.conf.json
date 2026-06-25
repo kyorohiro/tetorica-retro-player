@@ -15,7 +15,7 @@
         "title": "tetorica-retro-player",
         "width": 800,
         "height": 600,
-        "dragDropEnabled": false,
+        "dragDropEnabled": true,
         "useHttpsScheme": true,
         "backgroundThrottling": "disabled"
       }

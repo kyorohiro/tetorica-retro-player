@@ -30,7 +30,7 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
-import { mdropGetServerStatus, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
+import { mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -96,6 +96,65 @@ function App() {
       .then((status) => { setIsMDropReady(status.running); })
       .catch(() => { setIsMDropReady(false); });
   }, []);
+
+  // Refs to avoid stale closures in async Tauri event callbacks
+  const isMDropReadyRef = React.useRef(isMDropReady);
+  React.useEffect(() => {
+    isMDropReadyRef.current = isMDropReady;
+  }, [isMDropReady]);
+
+  const previewSourceRef = React.useRef(previewSource);
+  React.useEffect(() => {
+    previewSourceRef.current = previewSource;
+  }, [previewSource]);
+
+  // Tauri native OS drag-drop → mDrop HTTP URL
+  React.useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      unlisten = await getCurrentWindow().onDragDropEvent(async (event) => {
+        console.log("[mDrop] onDragDropEvent", event.payload.type, event.payload);
+        if (event.payload.type !== "drop") return;
+
+        const paths = event.payload.paths;
+        console.log("[mDrop] paths:", paths, "isMDropReady:", isMDropReadyRef.current);
+        if (paths.length === 0) return;
+
+        try {
+          if (isMDropReadyRef.current) {
+            // mDrop ON: serve via local HTTP
+            const targets = paths.length === 1
+              ? [await mdropShareFile(paths[0])]
+              : await Promise.all(paths.map((p) => mdropShareFile(p)));
+            const firstMedia = targets.find(
+              (s) => isVideo(s.name) || isAudio(s.name) || isImage(s.name)
+            ) ?? targets[0];
+            if (firstMedia) {
+              previewSourceRef.current.previewPath(firstMedia.url, firstMedia.path);
+            }
+          } else {
+            // mDrop OFF: fallback to convertFileSrc (Tauri asset protocol)
+            const { convertFileSrc } = await import("@tauri-apps/api/core");
+            const firstMedia = paths.find(
+              (p) => isVideo(p) || isAudio(p) || isImage(p)
+            ) ?? paths[0];
+            if (firstMedia) {
+              previewSourceRef.current.previewPath(convertFileSrc(firstMedia), firstMedia);
+            }
+          }
+        } catch (e) {
+          console.error("[mDrop] drag-drop share failed:", e);
+        }
+      });
+    };
+
+    setup();
+    return () => { unlisten?.(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     const clearIfPickerWasCancelled = () => {
@@ -244,14 +303,13 @@ function App() {
 
   const onDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
+    console.log("[onDrop] React DragEvent fired (browser-context drop)");
     const droppedFiles = await getDroppedFiles(event);
     const uniqueMap = new Map<string, FileWithRelativePath>();
-
     for (const file of droppedFiles) {
       const key = file.webkitRelativePath || file.name;
       uniqueMap.set(key, file);
     }
-
     const targets = Array.from(uniqueMap.values());
     await openFiles(targets);
   };
