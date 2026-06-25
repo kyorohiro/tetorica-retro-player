@@ -84,6 +84,7 @@ export function usePixiVideoPlayer(
   const [isPoweredOn, setIsPoweredOn] = useState<boolean>(true);
   const [loadingLabel, setLoadingLabel] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isBuffering, setIsBuffering] = useState<boolean>(false);
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -462,6 +463,7 @@ export function usePixiVideoPlayer(
     ensureAudioContext,
     updateAudioNodes,
     setEngineIsPlaying,
+    setIsBuffering,
     connectMediaAudio,
     rebuildAudioGraphForCurrentMedia,
     fitSprite,
@@ -993,6 +995,7 @@ export function usePixiVideoPlayer(
     audioOptimizationMode,
     loadingLabel,
     isLoading,
+    isBuffering,
     needsUserPlay,
     isPlaying,
     isMuted,

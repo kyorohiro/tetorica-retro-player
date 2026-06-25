@@ -54,6 +54,7 @@ type UseRetroPreviewMediaParams = {
   setIsPoweredOn: (value: boolean) => void;
   beginLoading: (label: string) => void;
   finishLoading: () => void;
+  setIsBuffering: (v: boolean) => void;
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
   setEngineIsPlaying: (nextIsPlaying: boolean) => void;
@@ -147,6 +148,7 @@ export function useRetroPreviewMedia({
   setIsPoweredOn,
   beginLoading,
   finishLoading,
+  setIsBuffering,
   ensureAudioContext,
   updateAudioNodes,
   setEngineIsPlaying,
@@ -448,6 +450,9 @@ export function useRetroPreviewMedia({
     // "stalled" and "waiting" are transient network/buffer states that resolve
     // on their own. Silencing on these and immediately restoring on "playing"
     // caused repeated click noise during media loading and file switching.
+    // We DO track buffering state for the UI loading indicator (no audio impact).
+    media.addEventListener("waiting", () => { if (isCurrentMedia()) setIsBuffering(true); });
+    media.addEventListener("playing", () => { if (isCurrentMedia()) setIsBuffering(false); });
     media.addEventListener("volumechange", syncIfCurrentMedia);
 
     // Lightweight timeupdate handler: only update the scrubber position.
@@ -560,6 +565,7 @@ export function useRetroPreviewMedia({
     mediaSourceRef.current = null;
 
     setNeedsUserPlay(false);
+    setIsBuffering(false);
     isPlayingRef.current = false;
     setIsPlaying(false);
     setCurrentTime(0);
@@ -640,6 +646,18 @@ export function useRetroPreviewMedia({
       _setPreviewError("");
       setNeedsUserPlay(false);
       const audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
+      // play() succeeded but AudioContext is still suspended (e.g. Tauri WKWebView allows
+      // video autoplay but cannot resume AudioContext without a user gesture).
+      // Pause and require the user to click Play so the gesture unlocks the audio chain.
+      if (audioContextState === "suspended" && mediaSourceRef.current) {
+        media.pause();
+        isPlayingRef.current = false;
+        setEngineIsPlaying(false);
+        setIsPlaying(false);
+        finishLoading();
+        setNeedsUserPlay(true);
+        return;
+      }
       if (
         audioContextState !== "running" &&
         staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&

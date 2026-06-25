@@ -18,6 +18,7 @@ export type RetroPreviewPlayerSlice = {
   canvasHostRef: React.RefObject<HTMLDivElement | null>;
   isPoweredOn: boolean;
   isLoading: boolean;
+  isBuffering: boolean;
   loadingLabel: string;
   needsUserPlay: boolean;
   hasAudioOnly: boolean;
@@ -596,6 +597,14 @@ export function RetroPreviewView({
                       </button>
                     </>
                   )}
+                </div>
+              </div>
+            )}
+            {player.isBuffering && player.isPlaying && !player.isLoading && !player.needsUserPlay && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 px-4 py-3 text-center text-xs text-slate-300 backdrop-blur-sm">
+                  <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-slate-500 border-t-sky-400" />
+                  Buffering…
                 </div>
               </div>
             )}
