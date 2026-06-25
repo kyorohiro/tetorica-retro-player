@@ -2,6 +2,7 @@ import React, { useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import {
   FileUp,
+  Film,
   FolderOpen,
   Menu,
   MonitorUp,
@@ -60,6 +61,7 @@ function App() {
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
   const [isMDropReady, setIsMDropReady] = React.useState(false);
+  const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
@@ -116,6 +118,11 @@ function App() {
     isMDropReadyRef.current = isMDropReady;
   }, [isMDropReady]);
 
+  const isFfmpegEnabledRef = React.useRef(isFfmpegEnabled);
+  React.useEffect(() => {
+    isFfmpegEnabledRef.current = isFfmpegEnabled;
+  }, [isFfmpegEnabled]);
+
   const previewSourceRef = React.useRef(previewSource);
   React.useEffect(() => {
     previewSourceRef.current = previewSource;
@@ -145,7 +152,13 @@ function App() {
         try {
           if (isMDropReadyRef.current) {
             // mDrop ON: share all files, play single or show list
-            const sharedFiles = await Promise.all(paths.map((p) => mdropShareFile(p)));
+            const raw = await Promise.all(paths.map((p) => mdropShareFile(p)));
+            const sharedFiles = isFfmpegEnabledRef.current
+              ? raw.map((f) => ({
+                  ...f,
+                  url: f.isDir ? f.url : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
+                }))
+              : raw;
             if (sharedFiles.length === 1 && !sharedFiles[0].isDir) {
               const f = sharedFiles[0];
               previewSourceRef.current.previewPath(f.url, f.path);
@@ -357,13 +370,16 @@ function App() {
         "mdrop_share_file",
         { req: { path: selected } }
       );
-      previewSource.previewPath(shared.url, selected);
+      const playUrl = isFfmpegEnabled
+        ? `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`
+        : shared.url;
+      previewSource.previewPath(playUrl, selected);
       return;
     }
 
     beginPreparingSelection();
     fileInputRef.current?.click();
-  }, [beginPreparingSelection, isMDropReady, previewSource]);
+  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, previewSource]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -482,6 +498,24 @@ function App() {
             ].join(" ")}
           >
             <Server size={18} className={isMDropReady ? "text-emerald-600" : "text-slate-400"} />
+          </button>
+        )}
+        {isMDropReady && (
+          <button
+            type="button"
+            aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+            title={locale === "ja"
+              ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
+              : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
+            onClick={() => setIsFfmpegEnabled((v) => !v)}
+            className={[
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              isFfmpegEnabled
+                ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
+                : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+            ].join(" ")}
+          >
+            <Film size={18} className={isFfmpegEnabled ? "text-violet-600" : "text-slate-400"} />
           </button>
         )}
       </div>

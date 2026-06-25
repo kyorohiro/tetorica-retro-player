@@ -26,6 +26,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::http_api::{api_key_guard_middleware, create_api_key};
 use crate::http_file;
+use crate::http_stream;
 use crate::http_utils::{
     access_guard_middleware, apply_html_security_headers, apply_shared_security_headers,
     build_html_content_security_policy, list_ips,
@@ -161,6 +162,7 @@ pub struct HttpServerContext {
     pub shutdown_tx: Option<oneshot::Sender<()>>,
     pub local_only: bool,
     pub files: HashMap<String, PathBuf>,
+    pub hls_sessions: HashMap<String, PathBuf>,
     pub message_callback: Option<MessageCallback>,
     pub api_key: String,
 }
@@ -172,6 +174,7 @@ impl HttpServerContext {
             shutdown_tx: None,
             local_only: true,
             files: HashMap::new(),
+            hls_sessions: HashMap::new(),
             message_callback: None,
             api_key: create_api_key(),
         }
@@ -351,6 +354,14 @@ impl SharedHttpServerContext {
             .route(
                 "/download/{id}/{*sub_path}",
                 get(http_file::download_file).head(http_file::download_file),
+            )
+            .route(
+                "/hls/{id}/index.m3u8",
+                get(http_stream::hls_playlist),
+            )
+            .route(
+                "/hls/{id}/{filename}",
+                get(http_stream::hls_segment),
             )
             //.route("/download/{id}", get(http_file::download_root_file))
             //.route("/download/{id}/{*sub_path}", get(http_file::download_file))
