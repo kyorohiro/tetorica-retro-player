@@ -100,11 +100,13 @@ struct ShareFileRequest {
 }
 
 #[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SharedFileInfo {
     id: String,
     name: String,
     path: String,
     url: String,
+    is_dir: bool,
 }
 
 #[tauri::command]
@@ -120,6 +122,7 @@ async fn mdrop_share_file(
         .to_string();
 
     let id = format!("{}", chrono::Utc::now().timestamp_millis());
+    let is_dir = path.is_dir();
 
     let (hostname, port) = {
         let server = state.server.inner.lock().map_err(|e| e.to_string())?;
@@ -135,6 +138,7 @@ async fn mdrop_share_file(
     Ok(SharedFileInfo {
         id: id.clone(),
         name,
+        is_dir,
         path: req.path,
         url: format!("http://{hostname}:{port}/download/{id}"),
     })

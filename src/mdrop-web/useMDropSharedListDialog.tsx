@@ -1,8 +1,9 @@
 import React from "react";
-import { File } from "lucide-react";
+import { File, Folder } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
+import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
 
 type Options = {
@@ -14,8 +15,8 @@ function sharedToTargetFile(f: SharedFileInfo): TargetFile {
   return {
     id: f.id,
     path: f.name,
-    isFile: true,
-    isDir: false,
+    isFile: !f.isDir,
+    isDir: f.isDir,
     size: 0,
   };
 }
@@ -43,15 +44,27 @@ function MDropSharedListDialog({
   onClose: () => void;
 }) {
   const { showPreviewDialog } = usePreviewDialog();
+  const { showMDropFileListDialog } = useMDropFileListDialog();
 
-  const targetFiles: TargetFile[] = files.map(sharedToTargetFile);
+  const targetFiles: TargetFile[] = files.filter((f) => !f.isDir).map(sharedToTargetFile);
   const urlMap = Object.fromEntries(files.map((f) => [f.id, f.url]));
   const getObjectUrl = async (file: TargetFile) => urlMap[file.id] ?? "";
 
-  const handleClick = async (index: number) => {
+  const apiServer = files.length > 0 ? new URL(files[0].url).origin : "http://localhost:7878";
+
+  const handleClick = async (file: SharedFileInfo, fileIndex: number) => {
+    if (file.isDir) {
+      await showMDropFileListDialog({
+        apiServer,
+        targetId: file.id,
+        initialPath: "/",
+        title: file.name,
+      });
+      return;
+    }
     await showPreviewDialog({
       files: targetFiles,
-      initialIndex: index,
+      initialIndex: fileIndex,
       isRetro: true,
       getObjectUrl,
     });
@@ -75,23 +88,32 @@ function MDropSharedListDialog({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="space-y-2">
-          {files.map((file, index) => (
-            <div
-              key={file.id}
-              className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm"
-            >
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => handleClick(index)}
+          {files.map((file) => {
+            const fileIndex = targetFiles.findIndex((t) => t.id === file.id);
+            return (
+              <div
+                key={file.id}
+                className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm"
               >
-                <div className="flex items-center gap-2 font-medium text-slate-100">
-                  <File className="h-4 w-4 shrink-0 text-cyan-200" />
-                  <span className="min-w-0 flex-1 break-all text-cyan-50">{file.name}</span>
-                </div>
-              </button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => handleClick(file, fileIndex)}
+                >
+                  <div className="flex items-center gap-2 font-medium text-slate-100">
+                    {file.isDir ? (
+                      <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+                    ) : (
+                      <File className="h-4 w-4 shrink-0 text-cyan-200" />
+                    )}
+                    <span className={`min-w-0 flex-1 break-all ${file.isDir ? "text-amber-50" : "text-cyan-50"}`}>
+                      {file.name}{file.isDir ? "/" : ""}
+                    </span>
+                  </div>
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

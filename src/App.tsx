@@ -30,7 +30,7 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
-import { mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
+import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 
 const waitForNextPaint = async () => {
@@ -99,6 +99,17 @@ function App() {
       .catch(() => { setIsMDropReady(false); });
   }, []);
 
+  // Sync mDrop API key into window.__MDROP_CONFIG__ for /api/files access.
+  // apiServer is always http://localhost:7878 (server auto-starts on localhost).
+  React.useEffect(() => {
+    if (!isMDropReady) return;
+    mdropGetConfig().then((config) => {
+      if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
+      window.__MDROP_CONFIG__.apiKey = config.apiKey;
+      window.__MDROP_CONFIG__.apiServer = "http://localhost:7878";
+    }).catch(() => {});
+  }, [isMDropReady]);
+
   // Refs to avoid stale closures in async Tauri event callbacks
   const isMDropReadyRef = React.useRef(isMDropReady);
   React.useEffect(() => {
@@ -135,7 +146,7 @@ function App() {
           if (isMDropReadyRef.current) {
             // mDrop ON: share all files, play single or show list
             const sharedFiles = await Promise.all(paths.map((p) => mdropShareFile(p)));
-            if (sharedFiles.length === 1) {
+            if (sharedFiles.length === 1 && !sharedFiles[0].isDir) {
               const f = sharedFiles[0];
               previewSourceRef.current.previewPath(f.url, f.path);
             } else {

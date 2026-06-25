@@ -28,6 +28,7 @@ export interface SharedFileInfo {
   name: string;
   path: string;
   url: string;
+  isDir: boolean;
 }
 
 export interface MdropConfig {
