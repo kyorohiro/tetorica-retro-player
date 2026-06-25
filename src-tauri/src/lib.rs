@@ -3,6 +3,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::Manager;
 
+mod ffmpeg;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -36,10 +38,21 @@ fn persist_recording_for_share(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sharekit::init())
-        .invoke_handler(tauri::generate_handler![greet, persist_recording_for_share])
+        .plugin(tauri_plugin_sharekit::init());
+
+    // sidecar ビルド時のみ tauri-plugin-ffmpeg を有効化
+    #[cfg(feature = "ffmpeg-sidecar")]
+    let builder = builder.plugin(tauri_plugin_ffmpeg::init());
+
+    builder
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            persist_recording_for_share,
+            ffmpeg::ffmpeg_exec,
+            ffmpeg::get_ffmpeg_mode,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
