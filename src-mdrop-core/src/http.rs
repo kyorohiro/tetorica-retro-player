@@ -166,6 +166,17 @@ pub struct HttpServerContext {
     pub hls_children: HashMap<String, tokio::process::Child>,
     pub message_callback: Option<MessageCallback>,
     pub api_key: String,
+    pub has_ffmpeg: bool,
+}
+
+fn detect_ffmpeg() -> bool {
+    std::process::Command::new("ffmpeg")
+        .arg("-version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 impl HttpServerContext {
@@ -179,6 +190,7 @@ impl HttpServerContext {
             hls_children: HashMap::new(),
             message_callback: None,
             api_key: create_api_key(),
+            has_ffmpeg: detect_ffmpeg(),
         }
     }
 
@@ -233,15 +245,16 @@ pub struct SharedHttpServerContext {
 }
 
 async fn web_index(AxumState(state): AxumState<SharedHttpServerContext>) -> impl IntoResponse {
-    let (api_key, csp) = {
+    let (api_key, csp, has_ffmpeg) = {
         let ctx = state.inner.lock().unwrap();
         (
             ctx.api_key.clone(),
             build_html_content_security_policy(&ctx.status),
+            ctx.has_ffmpeg,
         )
     };
 
-    embedded_web_html_response("web.html", &api_key, &csp)
+    embedded_web_html_response("web.html", &api_key, &csp, has_ffmpeg)
 }
 
 async fn web_asset(Path(path): Path<String>) -> impl IntoResponse {
@@ -265,12 +278,16 @@ async fn web_asset_unrar_wasm() -> Response {
             .unwrap(),
     }
 }
-fn embedded_web_html_response(path: &str, api_key: &str, csp: &str) -> Response {
+fn embedded_web_html_response(path: &str, api_key: &str, csp: &str, has_ffmpeg: bool) -> Response {
     let Some(file) = WebAssets::get(path) else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let html = String::from_utf8_lossy(&file.data).replace("MDROP_DEV_ONLY_API_KEY", api_key);
     let html = html.replace("http://localhost:7878", "");
+    let html = html.replace(
+        "\"MDROP_HAS_FFMPEG_PLACEHOLDER\"",
+        if has_ffmpeg { "true" } else { "false" },
+    );
     let mut res = Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/html; charset=utf-8")

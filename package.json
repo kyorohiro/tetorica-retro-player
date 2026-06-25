@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && vite",
     "build": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && tsc && vite build",
+    "build:web": "tsc && vite build --config vite.web.config.ts",
     "build:extension": "node scripts/sync-extension-shader.mjs && node scripts/package-extension.mjs",
     "version:set": "node scripts/set-version.mjs",
     "preview": "vite preview",
