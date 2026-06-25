@@ -8,10 +8,20 @@
      <link rel="manifest" href="./manifest.webmanifest">
     <script>
       const isLoopbackHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-      //const isSecureRemoteHost = window.location.protocol === "https:" && !/\.local$/i.test(window.location.hostname);
+      const isTauriEnv = typeof window.__TAURI_INTERNALS__ !== "undefined" || typeof window.__TAURI__ !== "undefined";
 
-      if ("serviceWorker" in navigator && (!isLoopbackHost)){//} || isSecureRemoteHost)) {
-        navigator.serviceWorker.register("./sw.js");
+      if ("serviceWorker" in navigator) {
+        if (!isLoopbackHost && !isTauriEnv) {
+          navigator.serviceWorker.register("./sw.js");
+        } else {
+          // localhost / Tauri では SW を使わないので既存の SW と Cache Storage を削除
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var r of registrations) { r.unregister(); }
+          });
+          caches.keys().then(function(keys) {
+            for (var k of keys) { caches.delete(k); }
+          });
+        }
       }
     </script>
   </head>

@@ -99,7 +99,6 @@ export function RetroPreviewToolbar({
           fitWidthOn: "Fit width: 有効です。",
           fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
           pinUnavailable: "Pin: 最大化中は使えません。",
-          pinUnavailableFitWidth: "Pin: Fit Width 中は使えません。",
           pinOn: "Pin: プレビューを画面内に固定します。",
           pinOff: "Pin: スクロール中も見えるようにします。",
           maximizeOn: "Maximize: 通常表示に戻します。",
@@ -116,7 +115,6 @@ export function RetroPreviewToolbar({
           fitWidthOn: "Fit width: enabled.",
           fitWidthOff: "Fit width: stretch preview to the frame width.",
           pinUnavailable: "Pin: unavailable while maximize is active.",
-          pinUnavailableFitWidth: "Pin: unavailable in fit-width mode.",
           pinOn: "Pin: keep preview fixed on screen.",
           pinOff: "Pin: keep preview visible while you scroll.",
           maximizeOn: "Maximize: return to normal view.",
@@ -473,13 +471,13 @@ export function RetroPreviewToolbar({
             onBlur={hideTooltip}
             className={[
               "inline-flex h-9 w-9 items-center justify-center rounded-none border-t border-b border-l-0 border-r-0 text-sm transition backdrop-blur-sm",
-              isPreviewMaximized || isFitWidthEnabled
+              isPreviewMaximized
                 ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
                 : isPinnedPreview
                   ? glowingFloatingButtonClass
                   : idleFloatingButtonClass,
             ].join(" ")}
-            disabled={isPreviewMaximized || isFitWidthEnabled}
+            disabled={isPreviewMaximized}
           >
             <Pin size={16} />
           </button>
@@ -487,11 +485,9 @@ export function RetroPreviewToolbar({
             "pin",
             isPreviewMaximized
               ? tooltipText.pinUnavailable
-              : isFitWidthEnabled
-                ? tooltipText.pinUnavailableFitWidth
-                : isPinnedPreview
-                  ? tooltipText.pinOn
-                  : tooltipText.pinOff,
+              : isPinnedPreview
+                ? tooltipText.pinOn
+                : tooltipText.pinOff,
           )}
         </div>
         <div className="relative">

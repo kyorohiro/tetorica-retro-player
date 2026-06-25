@@ -198,8 +198,7 @@ export function RetroPreviewView({
     setPinnedPreviewMetrics(null);
   }, [isPreviewMaximized]);
 
-  // Fit Width: reset pin state (pin and fit-width conflict — fit-width expands
-  // the preview to natural content height, pinning would fight that).
+  // Fit Width ON: reset pin state (after render so layout has settled).
   React.useEffect(() => {
     if (!isFitWidthEnabled) return;
 
@@ -208,6 +207,7 @@ export function RetroPreviewView({
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetrics(null);
   }, [isFitWidthEnabled]);
+
 
   // Auto-pin when the settings panel is open and user scrolls up.
   React.useEffect(() => {
@@ -588,8 +588,8 @@ export function RetroPreviewView({
             )}
           </div>
 
-          {/* Floating buttons: overlaid below canvas in normal mode */}
-          {!isFitWidthEnabled && (
+          {/* Floating buttons: maximized mode — overlaid below canvas */}
+          {!isFitWidthEnabled && isPreviewMaximized && (
             <div className="absolute -bottom-8 -right-4 z-50 flex items-center gap-2">
               <RetroPreviewToolbar
                 locale={locale}
@@ -624,7 +624,7 @@ export function RetroPreviewView({
                   onFitWidthChange(!isFitWidthEnabled);
                 }}
                 onPinToggle={() => {
-                  if (isPreviewMaximized || isFitWidthEnabled) return;
+                  if (isPreviewMaximized) return;
                   setIsPreviewPinned((current) => {
                     const next = !current;
                     if (next) {
@@ -650,6 +650,70 @@ export function RetroPreviewView({
             </div>
           )}
         </div>
+
+        {/* Pinned mode toolbar — absolute relative to the fixed shell (not the canvas),
+            so horizontal position tracks the shell width and stays stable. */}
+        {!isFitWidthEnabled && isPinnedPreview && (
+          <div className="absolute -bottom-8 right-0 z-50 flex items-center gap-2">
+            <RetroPreviewToolbar
+              locale={locale}
+              player={player}
+              isHighResolution={isHighResolution}
+              isFitWidthEnabled={isFitWidthEnabled}
+              isPinnedPreview={isPinnedPreview}
+              isPreviewMaximized={isPreviewMaximized}
+              brightness={brightness}
+              flipH={flipH}
+              flipV={flipV}
+              alarmTime={alarmTime}
+              alarmTargetAt={alarmTargetAt}
+              alarmStatus={alarmStatus}
+              formatAlarmTarget={formatAlarmTarget}
+              onAlarmTimeChange={setAlarmTime}
+              onArmAlarm={handleArmAlarm}
+              onArmAlarmIn={handleArmAlarmIn}
+              onClearAlarm={handleClearAlarm}
+              onTestAlarm={handleTestAlarm}
+              onRecordClick={handleRecordClick}
+              onPowerToggle={() => {
+                if (player.isPoweredOn) {
+                  player.powerOff();
+                  return;
+                }
+                player.powerOn();
+              }}
+              onHighResolutionChange={onHighResolutionChange}
+              onFitWidthToggle={() => {
+                if (!isFitWidthEnabled) setIsPreviewMaximized(false);
+                onFitWidthChange(!isFitWidthEnabled);
+              }}
+              onPinToggle={() => {
+                if (isPreviewMaximized) return;
+                if (isFitWidthEnabled) onFitWidthChange(false);
+                setIsPreviewPinned((current) => {
+                  const next = !current;
+                  if (next) {
+                    const nextMetrics = measurePinnedPreviewMetrics();
+                    if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
+                    return true;
+                  }
+                  setIsAutoPreviewPinned(false);
+                  setAutoPinnedHiddenOffset(0);
+                  setPinnedPreviewMetrics(null);
+                  return false;
+                });
+              }}
+              onMaximizeToggle={() => {
+                if (!isPreviewMaximized) onFitWidthChange(false);
+                setIsPreviewMaximized((c) => !c);
+              }}
+              onBrightnessChange={setBrightness}
+              onFlipHToggle={() => { setFlipH((v) => !v); }}
+              onFlipVToggle={() => { setFlipV((v) => !v); }}
+              onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            />
+          </div>
+        )}
 
         {/* Fit-width maximize: buttons live inside the scrollable shell so
             they are reachable after scrolling through tall content. */}
@@ -688,7 +752,8 @@ export function RetroPreviewView({
                 onFitWidthChange(!isFitWidthEnabled);
               }}
               onPinToggle={() => {
-                if (isPreviewMaximized || isFitWidthEnabled) return;
+                if (isPreviewMaximized) return;
+                if (isFitWidthEnabled) onFitWidthChange(false);
                 setIsPreviewPinned((current) => {
                   const next = !current;
                   if (next) {
@@ -714,6 +779,68 @@ export function RetroPreviewView({
           </div>
         )}
       </div>
+
+      {/* Normal mode toolbar: document flow, right-aligned, overlapping shell bottom */}
+      {!isFitWidthEnabled && !isPreviewMaximized && !isPinnedPreview && (
+        <div className="flex items-center justify-end gap-2 -mt-3 pr-1">
+          <RetroPreviewToolbar
+            locale={locale}
+            player={player}
+            isHighResolution={isHighResolution}
+            isFitWidthEnabled={isFitWidthEnabled}
+            isPinnedPreview={isPinnedPreview}
+            isPreviewMaximized={isPreviewMaximized}
+            brightness={brightness}
+            flipH={flipH}
+            flipV={flipV}
+            alarmTime={alarmTime}
+            alarmTargetAt={alarmTargetAt}
+            alarmStatus={alarmStatus}
+            formatAlarmTarget={formatAlarmTarget}
+            onAlarmTimeChange={setAlarmTime}
+            onArmAlarm={handleArmAlarm}
+            onArmAlarmIn={handleArmAlarmIn}
+            onClearAlarm={handleClearAlarm}
+            onTestAlarm={handleTestAlarm}
+            onRecordClick={handleRecordClick}
+            onPowerToggle={() => {
+              if (player.isPoweredOn) {
+                player.powerOff();
+                return;
+              }
+              player.powerOn();
+            }}
+            onHighResolutionChange={onHighResolutionChange}
+            onFitWidthToggle={() => {
+              if (!isFitWidthEnabled) setIsPreviewMaximized(false);
+              onFitWidthChange(!isFitWidthEnabled);
+            }}
+            onPinToggle={() => {
+              if (isPreviewMaximized) return;
+              setIsPreviewPinned((current) => {
+                const next = !current;
+                if (next) {
+                  const nextMetrics = measurePinnedPreviewMetrics();
+                  if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
+                  return true;
+                }
+                setIsAutoPreviewPinned(false);
+                setAutoPinnedHiddenOffset(0);
+                setPinnedPreviewMetrics(null);
+                return false;
+              });
+            }}
+            onMaximizeToggle={() => {
+              if (!isPreviewMaximized) onFitWidthChange(false);
+              setIsPreviewMaximized((c) => !c);
+            }}
+            onBrightnessChange={setBrightness}
+            onFlipHToggle={() => { setFlipH((v) => !v); }}
+            onFlipVToggle={() => { setFlipV((v) => !v); }}
+            onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+          />
+        </div>
+      )}
 
       {/* Fit-width normal mode: buttons below the shell in document flow.
           Excluded when maximized — the shell's internal button bar handles it. */}
@@ -752,7 +879,8 @@ export function RetroPreviewView({
               onFitWidthChange(!isFitWidthEnabled);
             }}
             onPinToggle={() => {
-              if (isPreviewMaximized || isFitWidthEnabled) return;
+              if (isPreviewMaximized) return;
+              if (isFitWidthEnabled) onFitWidthChange(false);
               setIsPreviewPinned((current) => {
                 const next = !current;
                 if (next) {
