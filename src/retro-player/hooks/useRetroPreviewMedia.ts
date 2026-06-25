@@ -162,6 +162,8 @@ export function useRetroPreviewMedia({
   debugVideo,
   debugAudio,
 }: UseRetroPreviewMediaParams) {
+  const _setPreviewError = setPreviewError;
+
   const waitForMediaSwitchCooldown = async () => {
     if (!isAndroidRuntime()) {
       return;
@@ -226,7 +228,7 @@ export function useRetroPreviewMedia({
     }
 
     finishLoading();
-    setPreviewError("");
+    _setPreviewError("");
     setNeedsUserPlay(true);
     syncVideoState();
     safeRender();
@@ -635,7 +637,7 @@ export function useRetroPreviewMedia({
       isPlayingRef.current = true;
       setEngineIsPlaying(true);
       setIsPlaying(true);
-      setPreviewError("");
+      _setPreviewError("");
       setNeedsUserPlay(false);
       const audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
       if (
@@ -675,12 +677,12 @@ export function useRetroPreviewMedia({
       finishLoading();
       if (isAutoplayBlockedError(error)) {
         setNeedsUserPlay(true);
-        setPreviewError("");
+        _setPreviewError("");
         return;
       }
 
       setNeedsUserPlay(false);
-      setPreviewError(
+      _setPreviewError(
         error instanceof Error
           ? error.message
           : "音声付き再生を開始できませんでした。",
@@ -724,7 +726,7 @@ export function useRetroPreviewMedia({
     const isImage = file.type.startsWith("image/");
 
     if (!isVideo && !isAudio && !isImage) {
-      setPreviewError("動画、音声、または画像ファイルを選んでください。");
+      _setPreviewError("動画、音声、または画像ファイルを選んでください。");
       return;
     }
 
@@ -732,7 +734,7 @@ export function useRetroPreviewMedia({
     cleanupPreview();
     resetFilterInstance();
     const requestId = previewRequestIdRef.current;
-    setPreviewError("");
+    _setPreviewError("");
     setPreviewName(file.name);
     beginLoading(
       isVideo ? "Loading video preview..." : isAudio ? "Loading audio preview..." : "Loading image preview...",
@@ -820,7 +822,7 @@ export function useRetroPreviewMedia({
 
       cleanupPreview();
       await resetAudioGraphAfterPreviewFailure("previewFile:error", error);
-      setPreviewError(
+      _setPreviewError(
         error instanceof Error
           ? error.message
           : "動画プレビューに失敗しました。",
@@ -833,13 +835,13 @@ export function useRetroPreviewMedia({
     powerOn();
 
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      setPreviewError("このブラウザでは画面キャプチャーに対応していません。");
+      _setPreviewError("このブラウザでは画面キャプチャーに対応していません。");
       return;
     }
 
     cleanupPreview();
     const requestId = previewRequestIdRef.current;
-    setPreviewError("");
+    _setPreviewError("");
     setPreviewName("Display Capture");
     beginLoading("Preparing display capture...");
 
@@ -886,7 +888,7 @@ export function useRetroPreviewMedia({
 
       cleanupPreview();
       await resetAudioGraphAfterPreviewFailure("startDisplayCapture:error", error);
-      setPreviewError(
+      _setPreviewError(
         error instanceof Error
           ? error.message
           : "画面キャプチャーを開始できませんでした。",
@@ -898,7 +900,7 @@ export function useRetroPreviewMedia({
     if (previewKind !== "capture") return;
     cleanupPreview();
     setPreviewName("");
-    setPreviewError("");
+    _setPreviewError("");
   };
 
   const previewStream = async (
@@ -914,7 +916,7 @@ export function useRetroPreviewMedia({
       resetFilterInstance();
       requestId = previewRequestIdRef.current;
 
-      setPreviewError("");
+      _setPreviewError("");
       setPreviewName(name);
       beginLoading(kind === "video" ? "Loading stream preview..." : "Loading stream audio...");
       await ensureRendererReady();
@@ -976,7 +978,7 @@ export function useRetroPreviewMedia({
 
       cleanupPreview();
       await resetAudioGraphAfterPreviewFailure("previewStream:error", error);
-      setPreviewError(error instanceof Error ? error.message : String(error));
+      _setPreviewError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -998,7 +1000,7 @@ export function useRetroPreviewMedia({
       resetFilterInstance();
       requestId = previewRequestIdRef.current;
 
-      setPreviewError("");
+      _setPreviewError("");
       setPreviewName(url);
       beginLoading(
         kind === "video"
@@ -1108,8 +1110,8 @@ export function useRetroPreviewMedia({
       }
 
       cleanupPreview();
+      _setPreviewError(error instanceof Error ? error.message : String(error));
       await resetAudioGraphAfterPreviewFailure("previewUrl:error", error);
-      setPreviewError(error instanceof Error ? error.message : String(error));
     }
   };
 
