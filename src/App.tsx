@@ -4,13 +4,10 @@ import {
   FileUp,
   FolderOpen,
   Menu,
-  Mic2,
   MonitorUp,
   Pin,
   RefreshCw,
-  RotateCcw,
-  Save,
-  SlidersHorizontal,
+  Server,
   X,
 } from "lucide-react";
 import "./App.css";
@@ -25,7 +22,6 @@ import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceStat
 import { useDialog } from "./useDialog";
 import { FileTargetFile } from "./mdrop-web/api";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
-import { RETRO_PREVIEW_DIALOG_EVENT } from "./mdrop-web/usePreviewDialog";
 import {
   getDroppedFiles,
   isAudio,
@@ -34,7 +30,7 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
-import { mdropGetServerStatus } from "./mdrop-web/tauri";
+import { mdropGetServerStatus, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -62,7 +58,6 @@ function App() {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
-  const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
   const [isMDropReady, setIsMDropReady] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
@@ -264,25 +259,6 @@ function App() {
     event.preventDefault();
   };
 
-  React.useEffect(() => {
-    const handleRetroPreviewDialog = (event: Event) => {
-      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
-      const isActive = Boolean(detail?.active);
-      setIsRetroPreviewDialogActive(isActive);
-    };
-
-    window.addEventListener(
-      RETRO_PREVIEW_DIALOG_EVENT,
-      handleRetroPreviewDialog as EventListener,
-    );
-
-    return () => {
-      window.removeEventListener(
-        RETRO_PREVIEW_DIALOG_EVENT,
-        handleRetroPreviewDialog as EventListener,
-      );
-    };
-  }, []);
 
   const handleOpenFilePicker = useCallback(async () => {
     await waitForExternalNavigationPause();
@@ -351,6 +327,17 @@ function App() {
     await getCurrentWindow().setAlwaysOnTop(next);
   }, [isWindowAlwaysOnTop]);
 
+  const handleMDropToggle = useCallback(async () => {
+    if (isMDropReady) {
+      await mdropStopServer().catch(() => {});
+      setIsMDropReady(false);
+    } else {
+      await mdropStartServer({ hostname: "localhost", port: "7878", localOnly: true }).catch(() => {});
+      const status = await mdropGetServerStatus().catch(() => null);
+      setIsMDropReady(status?.running ?? false);
+    }
+  }, [isMDropReady]);
+
   const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
     setLocalePreference(nextPreference);
   }, []);
@@ -395,6 +382,25 @@ function App() {
             ].join(" ")}
           >
             <Pin size={18} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
+          </button>
+        )}
+        {//{isTauriRuntime() && }
+        (
+          <button
+            type="button"
+            aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
+            title={locale === "ja"
+              ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
+              : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
+            onClick={() => { void handleMDropToggle(); }}
+            className={[
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              isMDropReady
+                ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
+                : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+            ].join(" ")}
+          >
+            <Server size={18} className={isMDropReady ? "text-emerald-600" : "text-slate-400"} />
           </button>
         )}
       </div>
@@ -541,55 +547,7 @@ function App() {
         )}
 
         <div className="flex-1 min-h-0">
-        {isRetroPreviewDialogActive ? (
-          <section className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 text-center text-sm text-slate-500">
-            {t(locale, "retroPreviewActive")}
-          </section>
-        ) : (
-          <React.Suspense
-            fallback={
-              <div
-                className="flex flex-col h-full rounded-2xl p-0.75 shadow-md"
-                style={{
-                  background: "linear-gradient(135deg, #555 0%, #111 30%, #333 65%, #111 100%)",
-                }}
-              >
-                <section className="relative flex flex-col flex-1 min-h-0 overflow-hidden rounded-[13px] bg-[rgba(245,241,234,0.78)] p-3">
-                  <div className="flex flex-col flex-1 min-h-0 gap-4">
-                    <div className="flex-1 min-h-0">
-                      <div className="rounded-2xl border border-slate-700 bg-slate-950 p-2 h-full">
-                        <div className="relative h-full min-h-45 rounded-xl bg-slate-950" />
-                      </div>
-                    </div>
-                    <div className="shrink-0 rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3">
-                      <div className="flex gap-2">
-                        <div className="grid flex-1 grid-cols-3 gap-2">
-                          <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white">
-                            <SlidersHorizontal size={16} />
-                            Video
-                          </div>
-                          <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white">
-                            <Mic2 size={16} />
-                            Audio
-                          </div>
-                          <div className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-[#12141c]">
-                            <RotateCcw size={15} />
-                            Reset
-                          </div>
-                        </div>
-                        <div className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268]">
-                          <Save size={13} />
-                        </div>
-                        <div className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268]">
-                          <FolderOpen size={13} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            }
-          >
+          <React.Suspense fallback={null}>
             <RetroPlayer
               locale={locale}
               key={retroPlayerKey}
@@ -600,7 +558,6 @@ function App() {
               looping={!isUsingDefaultPreview}
             />
           </React.Suspense>
-        )}
         </div>
 
         <input
