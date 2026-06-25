@@ -156,10 +156,12 @@ function App() {
             const sharedFiles = isFfmpegEnabledRef.current
               ? raw.map((f) => ({
                   ...f,
-                  url: f.isDir ? f.url : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
+                  url: (f.isDir || (!isVideo(f.path) && !isAudio(f.path)))
+                    ? f.url
+                    : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
                 }))
               : raw;
-            if (sharedFiles.length === 1 && !sharedFiles[0].isDir) {
+            if (sharedFiles.length === 1 && !sharedFiles[0].isDir && (isVideo(sharedFiles[0].path) || isAudio(sharedFiles[0].path) || isImage(sharedFiles[0].path))) {
               const f = sharedFiles[0];
               previewSourceRef.current.previewPath(f.url, f.path);
             } else {
