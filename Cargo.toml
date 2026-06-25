@@ -1,0 +1,3 @@
+[workspace]
+members = ["src-tauri", "src-mdrop-core"]
+resolver = "2"

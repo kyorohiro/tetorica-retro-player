@@ -3,6 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 export type PreviewSourceKind = "video" | "image" | "audio";
 export type DisplayCaptureResult = string | null;
 
+function kindFromPath(path: string): PreviewSourceKind {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (/^(mp4|m4v|mov|mkv|avi|wmv|flv|webm|ts|m2ts|mts|ogv)$/.test(ext)) return "video";
+  if (/^(mp3|wav|ogg|oga|m4a|aac|flac|opus|wma)$/.test(ext)) return "audio";
+  return "image";
+}
+
 export function usePreviewSourceState() {
   const [previewSrc, setPreviewSrc] = useState<string>();
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
@@ -101,6 +108,19 @@ export function usePreviewSourceState() {
     }
   }, [clearPreviewSrc]);
 
+  // For Desktop: src is already a valid URL (convertFileSrc result or HTTP URL).
+  // Does NOT create a blob — revokePreviewSrc only revokes blob: URLs, so cleanup is safe.
+  const previewPath = useCallback((src: string, filePath: string) => {
+    stopPreviewStream();
+    setCaptureError("");
+    setPreviewLabel(filePath.replace(/.*[\\/]/, ""));
+    setPreviewSrc((current) => {
+      revokePreviewSrc(current);
+      return src;
+    });
+    setPreviewKind(kindFromPath(filePath));
+  }, [revokePreviewSrc, stopPreviewStream]);
+
   return {
     previewSrc,
     previewStream,
@@ -108,6 +128,7 @@ export function usePreviewSourceState() {
     captureError,
     previewKind,
     previewFile,
+    previewPath,
     startDisplayCapture,
     stopPreviewStream,
   };

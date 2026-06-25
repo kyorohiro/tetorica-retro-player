@@ -34,6 +34,7 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
+import { mdropGetServerStatus } from "./mdrop-web/tauri";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -62,6 +63,7 @@ function App() {
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
   const [isRetroPreviewDialogActive, setIsRetroPreviewDialogActive] = React.useState(false);
+  const [isMDropReady, setIsMDropReady] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
@@ -91,6 +93,14 @@ function App() {
   React.useEffect(() => {
     saveLocalePreference(localePreference);
   }, [localePreference]);
+
+  // Desktop: auto-start mDrop server on mount.
+  // isMDropReady drives the file picker choice (Tauri dialog vs <input>).
+  React.useEffect(() => {
+    mdropGetServerStatus()
+      .then((status) => { setIsMDropReady(status.running); })
+      .catch(() => { setIsMDropReady(false); });
+  }, []);
 
   React.useEffect(() => {
     const clearIfPickerWasCancelled = () => {
@@ -276,16 +286,49 @@ function App() {
 
   const handleOpenFilePicker = useCallback(async () => {
     await waitForExternalNavigationPause();
+
+    if (isMDropReady) {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { convertFileSrc } = await import("@tauri-apps/api/core");
+      setIsMobileMenuOpen(false);
+      const selected = await open({
+        multiple: false,
+        filters: [
+          { name: "Video", extensions: ["mp4", "m4v", "mov", "mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "mts", "ogv"] },
+          { name: "Audio", extensions: ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "wma"] },
+          { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif", "heic", "heif", "bmp"] },
+        ],
+      });
+      if (!selected || Array.isArray(selected)) return;
+      previewSource.previewPath(convertFileSrc(selected), selected);
+      return;
+    }
+
     beginPreparingSelection();
     fileInputRef.current?.click();
-  }, [beginPreparingSelection]);
+  }, [beginPreparingSelection, isMDropReady, previewSource]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
     await waitForExternalNavigationPause();
+
+    if (isMDropReady) {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      setIsMobileMenuOpen(false);
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected || Array.isArray(selected)) return;
+      // フォルダーは従来通り FileList ダイアログで展開
+      const { getFiles } = await import("./mdrop-web/api");
+      const files = await getFiles("", selected as string).catch(() => []);
+      if (files.length > 0) {
+        await showBrowserFileListDialog({ files, initialPath: "/", title: "" });
+      }
+      return;
+    }
+
     beginPreparingSelection();
     folderInputRef.current?.click();
-  }, [beginPreparingSelection, isIosOrAndroid]);
+  }, [beginPreparingSelection, isIosOrAndroid, isMDropReady, showBrowserFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
