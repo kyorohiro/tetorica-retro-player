@@ -3460,6 +3460,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-ffmpeg"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f777710cb560da98afb0b482c864c76dad184f4e58b74bbbbf8a0fe6e0b2f784"
+dependencies = [
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "tauri-plugin-opener"
 version = "2.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3648,6 +3664,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-plugin-ffmpeg",
  "tauri-plugin-opener",
  "tauri-plugin-sharekit",
  "tauri-plugin-sharesheet",
@@ -3759,6 +3776,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "windows-sys 0.61.2",
 ]

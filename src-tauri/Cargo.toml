@@ -14,6 +14,10 @@ edition = "2021"
 name = "tetorica_retro_player_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+ffmpeg-sidecar = ["dep:tauri-plugin-ffmpeg"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -24,4 +28,5 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-sharesheet = "0.0.1"
 tauri-plugin-sharekit = "0.3.1"
+tauri-plugin-ffmpeg = { version = "0.1", optional = true }
 
