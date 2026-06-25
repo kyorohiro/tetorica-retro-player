@@ -265,7 +265,7 @@ function App() {
 
     if (isMDropReady) {
       const { open } = await import("@tauri-apps/plugin-dialog");
-      const { convertFileSrc } = await import("@tauri-apps/api/core");
+      const { invoke } = await import("@tauri-apps/api/core");
       setIsMobileMenuOpen(false);
       const selected = await open({
         multiple: false,
@@ -276,7 +276,11 @@ function App() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
-      previewSource.previewPath(convertFileSrc(selected), selected);
+      const shared = await invoke<{ id: string; name: string; path: string; url: string }>(
+        "mdrop_share_file",
+        { req: { path: selected } }
+      );
+      previewSource.previewPath(shared.url, selected);
       return;
     }
 
