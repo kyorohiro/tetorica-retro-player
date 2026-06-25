@@ -28,6 +28,7 @@ import {
   isAudio,
   isImage,
   isVideo,
+  mimeFromPath,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
@@ -133,6 +134,11 @@ function App() {
     showMDropSharedListDialogRef.current = showMDropSharedListDialog;
   }, [showMDropSharedListDialog]);
 
+  const showBrowserFileListDialogRef = React.useRef(showBrowserFileListDialog);
+  React.useEffect(() => {
+    showBrowserFileListDialogRef.current = showBrowserFileListDialog;
+  }, [showBrowserFileListDialog]);
+
   // Tauri native OS drag-drop → mDrop HTTP URL
   React.useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -172,13 +178,34 @@ function App() {
               });
             }
           } else {
-            // mDrop OFF: fallback to convertFileSrc (Tauri asset protocol)
+            // mDrop OFF: Tauri intercepts OS drag-drop; DOM events do not fire.
+            // Use asset:// protocol (assetProtocol.enable: true in tauri.conf.json).
             const { convertFileSrc } = await import("@tauri-apps/api/core");
-            const firstMedia = paths.find(
-              (p) => isVideo(p) || isAudio(p) || isImage(p)
-            ) ?? paths[0];
-            if (firstMedia) {
-              previewSourceRef.current.previewPath(convertFileSrc(firstMedia), firstMedia);
+
+            if (paths.length === 1 && (isVideo(paths[0]) || isAudio(paths[0]) || isImage(paths[0]))) {
+              // Single media: use asset:// URL directly (Range request support, no memory pressure)
+              previewSourceRef.current.previewPath(convertFileSrc(paths[0]), paths[0]);
+            } else {
+              // Non-media or multiple files: fetch as blobs to get real File objects for the dialog
+              const fileEntries: FileTargetFile[] = [];
+              for (const p of paths) {
+                const name = p.split("/").pop() ?? p;
+                try {
+                  const res = await fetch(convertFileSrc(p));
+                  const blob = await res.blob();
+                  const mime = mimeFromPath(p) || blob.type;
+                  fileEntries.push({
+                    id: "", entry: new File([blob], name, { type: mime }),
+                    isDir: false, isFile: true, path: name,
+                    createdAt: 0, modifiedAt: 0, size: blob.size, isRoot: true,
+                  });
+                } catch (e) {
+                  console.error("[mDrop OFF] fetch failed:", p, e);
+                }
+              }
+              if (fileEntries.length > 0) {
+                await showBrowserFileListDialogRef.current({ files: fileEntries, initialPath: "/", title: "" });
+              }
             }
           }
         } catch (e) {
@@ -339,6 +366,8 @@ function App() {
   const onDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
     console.log("[onDrop] React DragEvent fired (browser-context drop)");
+    // mDrop ON in Tauri: onDragDropEvent handles it via HTTP; skip DOM path to avoid double handling
+    if (isTauriRuntime() && isMDropReadyRef.current) return;
     const droppedFiles = await getDroppedFiles(event);
     const uniqueMap = new Map<string, FileWithRelativePath>();
     for (const file of droppedFiles) {
