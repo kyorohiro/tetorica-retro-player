@@ -54,6 +54,9 @@ type VideoControlsProps = {
   wowFlutterAmount: number;
   noiseLevel: number;
   vinylDustAmount: number;
+  noiseWarmthAmount: number;
+  noiseAirAmount: number;
+  noisePresenceAmount: number;
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
@@ -75,6 +78,9 @@ type VideoControlsProps = {
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangeVinylDustAmount: (amount: number) => void;
+  onChangeNoiseWarmthAmount: (amount: number) => void;
+  onChangeNoiseAirAmount: (amount: number) => void;
+  onChangeNoisePresenceAmount: (amount: number) => void;
   onChangeDelayAmount: (amount: number) => void;
   onChangeReverbAmount: (amount: number) => void;
   onChangeChorusAmount: (amount: number) => void;
@@ -139,6 +145,9 @@ export const VideoControls = memo(function VideoControls({
   wowFlutterAmount,
   noiseLevel,
   vinylDustAmount,
+  noiseWarmthAmount,
+  noiseAirAmount,
+  noisePresenceAmount,
   delayAmount,
   reverbAmount,
   chorusAmount,
@@ -160,6 +169,9 @@ export const VideoControls = memo(function VideoControls({
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangeVinylDustAmount,
+  onChangeNoiseWarmthAmount,
+  onChangeNoiseAirAmount,
+  onChangeNoisePresenceAmount,
   onChangeDelayAmount,
   onChangeReverbAmount,
   onChangeChorusAmount,
@@ -244,6 +256,9 @@ export const VideoControls = memo(function VideoControls({
         isNearlyEqual(settings.wowFlutterAmount, wowFlutterAmount) &&
         isNearlyEqual(settings.noiseLevel, noiseLevel) &&
         isNearlyEqual(settings.vinylDustAmount, vinylDustAmount) &&
+        isNearlyEqual(settings.noiseWarmthAmount, noiseWarmthAmount) &&
+        isNearlyEqual(settings.noiseAirAmount, noiseAirAmount) &&
+        isNearlyEqual(settings.noisePresenceAmount, noisePresenceAmount) &&
         isNearlyEqual(settings.delayAmount, delayAmount) &&
         isNearlyEqual(settings.reverbAmount, reverbAmount) &&
         isNearlyEqual(settings.chorusAmount, chorusAmount) &&
@@ -279,6 +294,9 @@ export const VideoControls = memo(function VideoControls({
     onChangeWowFlutterAmount(presetSettings.wowFlutterAmount);
     onChangeNoiseLevel(presetSettings.noiseLevel);
     onChangeVinylDustAmount(presetSettings.vinylDustAmount);
+    onChangeNoiseWarmthAmount(presetSettings.noiseWarmthAmount);
+    onChangeNoiseAirAmount(presetSettings.noiseAirAmount);
+    onChangeNoisePresenceAmount(presetSettings.noisePresenceAmount);
     onChangeDelayAmount(presetSettings.delayAmount);
     onChangeReverbAmount(presetSettings.reverbAmount);
     onChangeChorusAmount(presetSettings.chorusAmount);
@@ -753,6 +771,57 @@ export const VideoControls = memo(function VideoControls({
               value={vinylDustAmount}
               onChange={(ev) => {
                 onChangeVinylDustAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+              <span>Warmth</span>
+              <span>{Math.round(noiseWarmthAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={noiseWarmthAmount}
+              onChange={(ev) => {
+                onChangeNoiseWarmthAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+              <span>Air</span>
+              <span>{Math.round(noiseAirAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={noiseAirAmount}
+              onChange={(ev) => {
+                onChangeNoiseAirAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+              <span>Presence</span>
+              <span>{Math.round(noisePresenceAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={noisePresenceAmount}
+              onChange={(ev) => {
+                onChangeNoisePresenceAmount(Number(ev.currentTarget.value));
               }}
               className="w-full"
             />

@@ -19,6 +19,9 @@ export type RetroAudioSettings = {
   isNoiseEnabled: boolean;
   noiseLevel: number;
   vinylDustAmount: number;
+  noiseWarmthAmount: number;
+  noiseAirAmount: number;
+  noisePresenceAmount: number;
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
@@ -46,8 +49,11 @@ export const DEFAULT_AUDIO_SETTINGS = {
   smallSpeakerRoomAmount: 0,
   wowFlutterAmount: 0,
   isNoiseEnabled: true,
-  noiseLevel: 0.0020,
+  noiseLevel: 0.0010,
   vinylDustAmount: 0,
+  noiseWarmthAmount: 0.33,
+  noiseAirAmount: 0.55,
+  noisePresenceAmount: 0.5,
   delayAmount: 0,
   reverbAmount: 0,
   chorusAmount: 0,
@@ -144,8 +150,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       stereoWidthAmount: -0.55,
       smallSpeakerRoomAmount: 0.12,
       wowFlutterAmount: 0,
-      noiseLevel: 0.007,
+      noiseLevel: 0.004,
       vinylDustAmount: 0,
+      noiseWarmthAmount: 0.67,
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
@@ -170,8 +177,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       stereoWidthAmount: 0.10,
       smallSpeakerRoomAmount: 0.18,
       wowFlutterAmount: 0.48,
-      noiseLevel: 0.0075,
+      noiseLevel: 0.0045,
       vinylDustAmount: 0,
+      noiseWarmthAmount: 0.5,
       reverbAmount: 0.05,
       chorusAmount: 0,
       tapeSaturationAmount: 0.18,
@@ -195,7 +203,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       stereoWidthAmount: -0.18,
       smallSpeakerRoomAmount: 0,
       wowFlutterAmount: 0.09,
-      noiseLevel: 0.0035,
+      noiseLevel: 0.0025,
       vinylDustAmount: 0.29,
       delayAmount: 0,
       reverbAmount: 0,
@@ -221,7 +229,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       stereoWidthAmount: -0.32,
       smallSpeakerRoomAmount: 0.12,
       wowFlutterAmount: 0,
-      noiseLevel: 0.0025,
+      noiseLevel: 0.0020,
       vinylDustAmount: 0.04,
       reverbAmount: 0.08,
       tapeSaturationAmount: 0.08,
@@ -296,8 +304,9 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       stereoWidthAmount: -0.10,
       smallSpeakerRoomAmount: 0.14,
       wowFlutterAmount: 0.04,
-      noiseLevel: 0.004,
+      noiseLevel: 0.003,
       vinylDustAmount: 0,
+      noiseWarmthAmount: 0.5,
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,

@@ -125,6 +125,7 @@ export class TetoricaRetroAudioNode {
     noiseSource: null as AudioBufferSourceNode | null,
     noiseHighpass: null as BiquadFilterNode | null,
     noiseLowpass: null as BiquadFilterNode | null,
+    noiseWarmth: null as BiquadFilterNode | null,
     noiseFilter: null as BiquadFilterNode | null,
     noisePanner: null as StereoPannerNode | null,
     noiseGain: null as GainNode | null,
@@ -382,6 +383,7 @@ export class TetoricaRetroAudioNode {
       noiseSource: null,
       noiseHighpass: null,
       noiseLowpass: null,
+      noiseWarmth: null,
       noiseFilter: null,
       noisePanner: null,
       noiseGain: null,
@@ -537,6 +539,24 @@ export class TetoricaRetroAudioNode {
       wowLfoGain.gain.value = amount * 0.0023;
       flutterLfo.frequency.value = 5.2 + amount * 6.5;
       flutterLfoGain.gain.value = amount * 0.0006;
+    }
+
+    const noiseHighpassNode = this.nodes.noiseHighpass;
+    const noiseLowpassNode = this.nodes.noiseLowpass;
+    const noiseWarmthNode = this.nodes.noiseWarmth;
+    if (noiseHighpassNode && noiseLowpassNode && noiseWarmthNode && noiseGainNode) {
+      const w = settings.noiseWarmthAmount;
+      const a = settings.noiseAirAmount;
+      const p = settings.noisePresenceAmount;
+      noiseHighpassNode.frequency.value = 1100 - w * 1040;
+      noiseHighpassNode.Q.value = 0.25 + w * 0.45;
+      noiseLowpassNode.frequency.value = 2000 + a * 4500;
+      noiseWarmthNode.gain.value = w * 2;
+      const noiseFilterNode = this.nodes.noiseFilter;
+      if (noiseFilterNode) {
+        noiseFilterNode.frequency.value = 3200;
+        noiseFilterNode.gain.value = (p - 1) * 4;
+      }
     }
 
     if (noiseGainNode) {
@@ -700,6 +720,7 @@ export class TetoricaRetroAudioNode {
     const noiseSource = context.createBufferSource();
     const noiseHighpass = context.createBiquadFilter();
     const noiseLowpass = context.createBiquadFilter();
+    const noiseWarmth = context.createBiquadFilter();
     const noisePresence = context.createBiquadFilter();
     const noisePanner = context.createStereoPanner();
     const noiseGain = context.createGain();
@@ -761,15 +782,19 @@ export class TetoricaRetroAudioNode {
     noiseSource.buffer = createTintedNoiseBuffer(context);
     noiseSource.loop = true;
     noiseHighpass.type = "highpass";
-    noiseHighpass.frequency.value = 1100;
-    noiseHighpass.Q.value = 0.25;
+    noiseHighpass.frequency.value = 220;
+    noiseHighpass.Q.value = 0.5;
     noiseLowpass.type = "lowpass";
-    noiseLowpass.frequency.value = 5600;
-    noiseLowpass.Q.value = 0.18;
+    noiseLowpass.frequency.value = 4500;
+    noiseLowpass.Q.value = 0.2;
+    noiseWarmth.type = "peaking";
+    noiseWarmth.frequency.value = 350;
+    noiseWarmth.Q.value = 0.9;
+    noiseWarmth.gain.value = 1.7;
     noisePresence.type = "peaking";
-    noisePresence.frequency.value = 2400;
-    noisePresence.Q.value = 0.7;
-    noisePresence.gain.value = -2.5;
+    noisePresence.frequency.value = 3200;
+    noisePresence.Q.value = 0.8;
+    noisePresence.gain.value = -2.0;
     noiseLfo.type = "sine";
     noiseLfo.frequency.value = 0.021;
     noiseLfoGain.gain.value = 0.08;
@@ -845,7 +870,8 @@ export class TetoricaRetroAudioNode {
     // --- Wire noise / crackle chain ---
     noiseSource.connect(noiseHighpass);
     noiseHighpass.connect(noiseLowpass);
-    noiseLowpass.connect(noisePresence);
+    noiseLowpass.connect(noiseWarmth);
+    noiseWarmth.connect(noisePresence);
     noisePresence.connect(noisePanner);
     noisePanner.connect(noiseGain);
     noiseGain.connect(masterGain);
@@ -884,6 +910,7 @@ export class TetoricaRetroAudioNode {
       noiseSource,
       noiseHighpass,
       noiseLowpass,
+      noiseWarmth,
       noiseFilter: noisePresence,
       noisePanner,
       noiseGain,

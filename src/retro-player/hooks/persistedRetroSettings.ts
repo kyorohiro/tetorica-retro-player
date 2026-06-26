@@ -68,6 +68,9 @@ export type PersistedRetroAudioSettings = {
   isNoiseEnabled: boolean;
   noiseLevel: number;
   vinylDustAmount: number;
+  noiseWarmthAmount: number;
+  noiseAirAmount: number;
+  noisePresenceAmount: number;
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
