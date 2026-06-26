@@ -97,6 +97,7 @@ export function usePixiVideoPlayer(
     height: number;
   } | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [pendingRecordingFilename, setPendingRecordingFilename] = useState<string | null>(null);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
@@ -148,6 +149,7 @@ export function usePixiVideoPlayer(
     renderResolutionScale,
     isPoweredOn,
     isPlayingRef,
+    isRecordingRef,
     previewKindRef,
     debugVideo,
   });
@@ -740,12 +742,14 @@ export function usePixiVideoPlayer(
       recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
+      isRecordingRef.current = false;
       setIsRecording(false);
       void ensureAudioContext();
       stopRecordingResolverRef.current?.(resolvedFilename);
       stopRecordingResolverRef.current = null;
     }, { once: true });
-    recorder.start();
+    recorder.start(100);
+    isRecordingRef.current = true;
     setIsRecording(true);
   };
 
@@ -771,6 +775,7 @@ export function usePixiVideoPlayer(
       recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
+      isRecordingRef.current = false;
       setIsRecording(false);
       stopRecordingResolverRef.current?.(pendingRecordingFilenameRef.current);
       stopRecordingResolverRef.current = null;
