@@ -44,6 +44,10 @@ input[type="range"] {
   top: max(0.0rem, env(safe-area-inset-top));
 }
 
+.safe-top-offset-right {
+  top: max(0.0rem, env(safe-area-inset-top));
+}
+
 .safe-top-menu {
   top: calc(max(0.0rem, env(safe-area-inset-top)) + 3.25rem);
 }
@@ -106,6 +110,10 @@ input[type="range"] {
   .safe-top-right-offset {
     top: 0.75rem;
     right: calc(env(safe-area-inset-right) + 0.75rem);
+  }
+
+  .safe-top-offset-right {
+    top: 0.75rem;
   }
 
   .safe-sticky-top {

@@ -2,13 +2,13 @@ import React, { useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import {
   FileUp,
-  Film,
   FolderOpen,
   Menu,
   MonitorUp,
   Pin,
   RefreshCw,
-  Server,
+  Waves,
+  Wifi,
   X,
 } from "lucide-react";
 import "./App.css";
@@ -475,7 +475,7 @@ function App() {
   return (
     <>
       {/* Fixed nav buttons: kept outside <main> so overflow-x-hidden on <main> cannot clip them in WebKit */}
-      <div className="safe-top-offset fixed left-3 z-[9999] flex items-center gap-1">
+      <div className="safe-top-offset fixed left-3 z-9999 flex items-center gap-1">
         <button
           type="button"
           aria-expanded={isMobileMenuOpen}
@@ -492,9 +492,9 @@ function App() {
           aria-label={t(locale, "reloadApp")}
           title={t(locale, "reloadApp")}
           onClick={handleReloadApp}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={16} />
         </button>
         {isTauriRuntime() && (
           <button
@@ -505,34 +505,35 @@ function App() {
               : isWindowAlwaysOnTop ? "Always on top: off" : "Always on top"}
             onClick={() => { void handleWindowPinToggle(); }}
             className={[
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              "inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
               isWindowAlwaysOnTop
                 ? "border-sky-400/80 bg-sky-500/20 text-sky-700 hover:bg-sky-500/30"
                 : "border-slate-300/80 bg-white/88 text-slate-700 hover:bg-white",
             ].join(" ")}
           >
-            <Pin size={18} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
+            <Pin size={16} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
           </button>
         )}
-        {//{isTauriRuntime() && }
-        (
-          <button
-            type="button"
-            aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
-            title={locale === "ja"
-              ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
-              : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
-            onClick={() => { void handleMDropToggle(); }}
-            className={[
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
-              isMDropReady
-                ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
-                : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
-            ].join(" ")}
-          >
-            <Server size={18} className={isMDropReady ? "text-emerald-600" : "text-slate-400"} />
-          </button>
-        )}
+      </div>
+      {/* mDrop / ffmpeg pills — top-right */}
+      <div className="safe-top-offset-right fixed right-10 z-9999 flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
+          title={locale === "ja"
+            ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
+            : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
+          onClick={() => { void handleMDropToggle(); }}
+          className={[
+            "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
+            isMDropReady
+              ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
+              : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+          ].join(" ")}
+        >
+          <Wifi size={13} />
+          <span>mDrop</span>
+        </button>
         {isMDropReady && (
           <button
             type="button"
@@ -542,18 +543,19 @@ function App() {
               : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
             onClick={() => setIsFfmpegEnabled((v) => !v)}
             className={[
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
               isFfmpegEnabled
                 ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
                 : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
             ].join(" ")}
           >
-            <Film size={18} className={isFfmpegEnabled ? "text-violet-600" : "text-slate-400"} />
+            <Waves size={13} />
+            <span>ffmpeg</span>
           </button>
         )}
       </div>
       {isMobileMenuOpen && (
-        <div className="safe-top-menu fixed left-3 z-[9999] w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+        <div className="safe-top-menu fixed left-3 z-9999 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"

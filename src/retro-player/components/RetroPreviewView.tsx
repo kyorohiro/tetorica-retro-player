@@ -476,9 +476,9 @@ export function RetroPreviewView({
               aria-label="Exit maximize"
               title="Exit maximize"
               onClick={() => { setIsPreviewMaximized(false); }}
-              className="safe-top-right-offset absolute z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
+              className="safe-top-right-offset absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
             >
-              <Minimize2 size={18} />
+              <Minimize2 size={16} />
             </button>
           )
         )}
