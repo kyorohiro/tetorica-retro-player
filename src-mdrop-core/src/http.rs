@@ -169,6 +169,18 @@ pub struct HttpServerContext {
     pub has_ffmpeg: bool,
 }
 
+fn bind_to_free_port(preferred: u16) -> Result<(std::net::TcpListener, u16), String> {
+    for port in preferred..=preferred.saturating_add(9) {
+        match std::net::TcpListener::bind(format!("0.0.0.0:{port}")) {
+            Ok(l) => return Ok((l, port)),
+            Err(_) => continue,
+        }
+    }
+    let l = std::net::TcpListener::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+    let port = l.local_addr().map_err(|e| e.to_string())?.port();
+    Ok((l, port))
+}
+
 fn detect_ffmpeg() -> bool {
     std::process::Command::new("ffmpeg")
         .arg("-version")
@@ -447,14 +459,14 @@ impl SharedHttpServerContext {
 
     async fn run_http_server(
         self,
-        port: u16,
+        std_listener: std::net::TcpListener,
         shutdown_rx: oneshot::Receiver<()>,
     ) -> Result<(), String> {
         let app = self.clone().build_router();
 
-        let listener = TcpListener::bind(format!("0.0.0.0:{port}"))
-            .await
-            .map_err(|e| e.to_string())?;
+        std_listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+        let listener = TcpListener::from_std(std_listener).map_err(|e| e.to_string())?;
+        let port = listener.local_addr().map(|a| a.port()).unwrap_or(0);
 
         println!("Server started on http://0.0.0.0:{port}/");
 
@@ -475,7 +487,7 @@ impl SharedHttpServerContext {
     pub fn start_server(
         &self,
         hostname: String,
-        port: u16,
+        preferred_port: Option<u16>,
         id: Option<String>,
         password: Option<String>,
         is_https: Option<bool>,
@@ -494,13 +506,16 @@ impl SharedHttpServerContext {
 
         ctx.local_only = local_only.unwrap_or(true);
 
+        let (std_listener, port) = bind_to_free_port(preferred_port.unwrap_or(7878))
+            .map_err(|e| format!("bind failed: {e}"))?;
+
         let (tx, rx) = oneshot::channel();
 
         let server = self.clone();
 
         if is_https.unwrap_or(false) == false {
             tokio::spawn(async move {
-                if let Err(e) = server.run_http_server(port, rx).await {
+                if let Err(e) = server.run_http_server(std_listener, rx).await {
                     eprintln!("server error: {e}");
                 }
             });

@@ -63,6 +63,8 @@ function App() {
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
   const [isMDropReady, setIsMDropReady] = React.useState(false);
+  const [mDropPort, setMDropPort] = React.useState<number | null>(null);
+  const [mDropIp, setMDropIp] = React.useState<string | null>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
@@ -103,14 +105,15 @@ function App() {
       .catch(() => { setIsMDropReady(false); });
   }, []);
 
-  // Sync mDrop API key into window.__MDROP_CONFIG__ for /api/files access.
-  // apiServer is always http://localhost:7878 (server auto-starts on localhost).
+  // Sync mDrop API key + actual port into window.__MDROP_CONFIG__.
   React.useEffect(() => {
     if (!isMDropReady) return;
-    mdropGetConfig().then((config) => {
+    Promise.all([mdropGetConfig(), mdropGetServerStatus()]).then(([config, status]) => {
       if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
       window.__MDROP_CONFIG__.apiKey = config.apiKey;
-      window.__MDROP_CONFIG__.apiServer = "http://localhost:7878";
+      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port ?? 7878}`;
+      setMDropPort(status.port);
+      setMDropIp(status.ips?.[0] ?? null);
     }).catch(() => {});
   }, [isMDropReady]);
 
@@ -462,9 +465,14 @@ function App() {
       await mdropStopServer().catch(() => {});
       setIsMDropReady(false);
     } else {
-      await mdropStartServer({ hostname: "localhost", port: "7878", localOnly: true }).catch(() => {});
-      const status = await mdropGetServerStatus().catch(() => null);
+      const status = await mdropStartServer({ hostname: "localhost", localOnly: true }).catch(() => null);
       setIsMDropReady(status?.running ?? false);
+      if (status?.running && status.port) {
+        if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
+        window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
+        setMDropPort(status.port);
+        setMDropIp(status.ips?.[0] ?? null);
+      }
     }
   }, [isMDropReady]);
 
@@ -516,42 +524,49 @@ function App() {
         )}
       </div>
       {/* mDrop / ffmpeg pills — top-right */}
-      <div className="safe-top-offset-right fixed right-10 z-9999 flex items-center gap-1">
-        <button
-          type="button"
-          aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
-          title={locale === "ja"
-            ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
-            : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
-          onClick={() => { void handleMDropToggle(); }}
-          className={[
-            "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
-            isMDropReady
-              ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
-              : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
-          ].join(" ")}
-        >
-          <Wifi size={13} />
-          <span>mDrop</span>
-        </button>
-        {isMDropReady && (
+      <div className="safe-top-offset-right fixed right-10 z-9999 flex flex-col items-end gap-0.5">
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+            aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
             title={locale === "ja"
-              ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
-              : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
-            onClick={() => setIsFfmpegEnabled((v) => !v)}
+              ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
+              : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
+            onClick={() => { void handleMDropToggle(); }}
             className={[
               "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
-              isFfmpegEnabled
-                ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
+              isMDropReady
+                ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
                 : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
             ].join(" ")}
           >
-            <Waves size={13} />
-            <span>ffmpeg</span>
+            <Wifi size={13} />
+            <span>mDrop</span>
           </button>
+          {isMDropReady && (
+            <button
+              type="button"
+              aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+              title={locale === "ja"
+                ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
+                : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
+              onClick={() => setIsFfmpegEnabled((v) => !v)}
+              className={[
+                "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
+                isFfmpegEnabled
+                  ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
+                  : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+              ].join(" ")}
+            >
+              <Waves size={13} />
+              <span>ffmpeg</span>
+            </button>
+          )}
+        </div>
+        {isMDropReady && mDropPort && (
+          <span className="-mt-1.5 px-1 font-mono text-[10px] text-slate-500">
+            {mDropIp ? `${mDropIp}:${mDropPort}` : `:${mDropPort}`}
+          </span>
         )}
       </div>
       {isMobileMenuOpen && (

@@ -63,7 +63,7 @@ struct MDropState {
 #[serde(rename_all = "camelCase")]
 struct StartServerRequest {
     hostname: String,
-    port: String,
+    port: Option<String>,
     id: Option<String>,
     password: Option<String>,
     is_https: Option<bool>,
@@ -75,11 +75,15 @@ async fn mdrop_start_server(
     state: State<'_, MDropState>,
     req: StartServerRequest,
 ) -> Result<ServerStatus, String> {
-    let port: u16 = req.port.parse().map_err(|_| "invalid port".to_string())?;
+    let preferred_port = req.port
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<u16>().map_err(|_| "invalid port".to_string()))
+        .transpose()?;
     let hostname = req.hostname.trim().trim_end_matches('/').to_string();
     state.server.start_server(
         hostname,
-        port,
+        preferred_port,
         req.id,
         req.password,
         req.is_https,
@@ -235,7 +239,7 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 match mdrop_server_for_start.start_server(
                     "localhost".to_string(),
-                    7878,
+                    Some(7878),
                     None,
                     None,
                     Some(false),

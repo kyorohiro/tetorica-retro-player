@@ -38,7 +38,7 @@ export interface MdropConfig {
 
 export interface StartServerRequest {
   hostname: string;
-  port: string;
+  port?: string;
   id?: string;
   password?: string;
   isHttps?: boolean;
