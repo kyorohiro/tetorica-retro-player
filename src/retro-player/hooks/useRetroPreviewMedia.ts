@@ -493,7 +493,12 @@ export function useRetroPreviewMedia({
         media.load();
         media.addEventListener("canplay", () => {
           if (!isCurrentMedia()) return;
-          media.play().catch(() => {});
+          media.play().then(() => {
+            if (!isCurrentMedia()) return;
+            isPlayingRef.current = true;
+            setEngineIsPlaying(true);
+            setIsPlaying(true);
+          }).catch(() => {});
         }, { once: true });
       }
     };

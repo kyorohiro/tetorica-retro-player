@@ -540,10 +540,12 @@ export class TetoricaRetroAudioNode {
     }
 
     if (noiseGainNode) {
-      noiseGainNode.gain.value =
+      const targetNoiseGain =
         settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying
           ? Math.min(0.24, settings.noiseLevel * 5.5)
           : 0;
+      noiseGainNode.gain.cancelScheduledValues(this.context.currentTime);
+      noiseGainNode.gain.setValueAtTime(targetNoiseGain, this.context.currentTime);
     }
 
     if (crackleGainNode) {
