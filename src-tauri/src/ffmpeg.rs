@@ -42,7 +42,7 @@ pub fn get_ffmpeg_mode() -> &'static str {
 /// Resolve the ffmpeg binary path.
 /// Sidecar builds: binary is placed next to the app executable by Tauri bundler.
 /// System builds:  just "ffmpeg" (resolved via PATH).
-fn ffmpeg_bin() -> PathBuf {
+pub fn ffmpeg_bin() -> PathBuf {
     #[cfg(feature = "ffmpeg-sidecar")]
     {
         if let Ok(exe) = std::env::current_exe() {

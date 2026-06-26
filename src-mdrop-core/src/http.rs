@@ -167,6 +167,7 @@ pub struct HttpServerContext {
     pub message_callback: Option<MessageCallback>,
     pub api_key: String,
     pub has_ffmpeg: bool,
+    pub ffmpeg_path: Option<PathBuf>,
 }
 
 fn bind_to_free_port(preferred: u16) -> Result<(std::net::TcpListener, u16), String> {
@@ -203,6 +204,7 @@ impl HttpServerContext {
             message_callback: None,
             api_key: create_api_key(),
             has_ffmpeg: detect_ffmpeg(),
+            ffmpeg_path: None,
         }
     }
 
@@ -340,6 +342,15 @@ impl SharedHttpServerContext {
     {
         if let Ok(mut ctx) = self.inner.lock() {
             ctx.message_callback = Some(Arc::new(callback));
+        }
+    }
+
+    pub fn set_ffmpeg_path(&self, path: PathBuf) {
+        if let Ok(mut ctx) = self.inner.lock() {
+            if path.exists() {
+                ctx.has_ffmpeg = true;
+                ctx.ffmpeg_path = Some(path);
+            }
         }
     }
 

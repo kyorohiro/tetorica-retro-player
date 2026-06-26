@@ -250,6 +250,9 @@ pub fn run() {
                 }
             });
 
+            #[cfg(feature = "ffmpeg-sidecar")]
+            mdrop_server.set_ffmpeg_path(crate::ffmpeg::ffmpeg_bin());
+
             let handle = app.handle().clone();
             mdrop_server.set_message_callback(move |msg| {
                 use tauri::Emitter;

@@ -10,7 +10,9 @@
     "build:extension": "node scripts/sync-extension-shader.mjs && node scripts/package-extension.mjs",
     "version:set": "node scripts/set-version.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:tauri": "npx tauri build",
+    "build:tauri-sidecar": "npx tauri build --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-sidecar"
   },
   "dependencies": {
     "@buildyourwebapp/tauri-plugin-sharesheet": "^0.0.1",

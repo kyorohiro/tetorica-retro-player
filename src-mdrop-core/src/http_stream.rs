@@ -187,7 +187,12 @@ async fn start_hls_for_path(
     // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
     let base_url = format!("http://localhost:{}/hls/{}/", port, session_id);
 
-    let mut child = Command::new("ffmpeg")
+    let ffmpeg_cmd = {
+        let ctx = state.inner.lock().unwrap();
+        ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg"))
+    };
+
+    let mut child = Command::new(&ffmpeg_cmd)
         .args([
             "-y",
             "-i",
