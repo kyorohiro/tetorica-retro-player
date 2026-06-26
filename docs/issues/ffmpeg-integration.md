@@ -127,7 +127,34 @@ npm run build:tauri
 # 内部: npx tauri build
 ```
 
-### サイドカービルド（macOS arm64 の例）
+### サイドカービルド（macOS）
+
+#### ffmpeg バイナリの準備
+
+evermeet.cx は **x86_64（Intel）の静的ビルド**のみ提供している。
+Homebrew の ffmpeg は `/opt/homebrew/` への動的リンクが多く、配布アプリには使用不可。
+
+**v1.0.x 方針**: x86_64 静的バイナリを両アーキテクチャに配置する。
+- Intel Mac → ネイティブ実行
+- Apple Silicon Mac → Rosetta 2 で実行（動作確認済み）
+
+```bash
+# evermeet.cx から x86_64 静的ビルドをダウンロード
+curl -L "https://evermeet.cx/ffmpeg/ffmpeg-7.1.zip" -o /tmp/ffmpeg.zip
+unzip /tmp/ffmpeg.zip -d /tmp/
+
+# アーキテクチャを確認（x86_64 であることを確認）
+file /tmp/ffmpeg
+
+# 両アーキテクチャ向けに配置（同じバイナリを使用）
+cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+```
+
+> **TODO（将来）**: Apple Silicon ネイティブ実行のためには ARM64 静的ビルドが必要。
+> evermeet.cx は ARM64 未提供のため、ソースからのスタティックビルドが必要。
 
 1. 現在のターゲットトリプルを確認:
 
@@ -136,15 +163,7 @@ rustc -Vv | grep host | awk '{print $2}'
 # 例: aarch64-apple-darwin
 ```
 
-2. 静的 ffmpeg バイナリを配置:
-
-```bash
-# evermeet.cx から静的ビルドをダウンロード
-curl -L "https://evermeet.cx/ffmpeg/ffmpeg-7.1.zip" -o /tmp/ffmpeg.zip
-unzip /tmp/ffmpeg.zip -d /tmp/
-cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-```
+2. ビルド実行:
 
 3. ビルド実行:
 
