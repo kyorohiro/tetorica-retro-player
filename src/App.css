@@ -90,6 +90,11 @@ input[type="range"] {
   );
 }
 
+@keyframes long-press-charge {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 @media (orientation: landscape) {
   .safe-top-pad {
     padding-top: 0;

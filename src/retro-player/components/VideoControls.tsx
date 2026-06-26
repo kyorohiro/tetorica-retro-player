@@ -1,4 +1,5 @@
 import { memo, useRef, useState } from "react";
+import { useLongPress } from "../hooks/useLongPress";
 import {
   FolderOpen,
   Gauge,
@@ -36,6 +37,7 @@ type VideoControlsProps = {
   isMuted: boolean;
   isPlaying: boolean;
   isAudioFxEnabled: boolean;
+  isVideoFxEnabled: boolean;
   isNoiseEnabled: boolean;
   hasVideo: boolean;
   isVideoSettingsOpen: boolean;
@@ -86,6 +88,7 @@ type VideoControlsProps = {
   onStepFrame: (direction: -1 | 1) => void;
   onToggleLoop: () => void;
   onToggleAudioFx: () => void;
+  onToggleVideoFx: () => void;
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
@@ -119,6 +122,7 @@ export const VideoControls = memo(function VideoControls({
   isMuted,
   isPlaying,
   isAudioFxEnabled,
+  isVideoFxEnabled,
   isNoiseEnabled,
   hasVideo,
   isVideoSettingsOpen,
@@ -169,6 +173,7 @@ export const VideoControls = memo(function VideoControls({
   onStepFrame,
   onToggleLoop,
   onToggleAudioFx,
+  onToggleVideoFx,
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
@@ -182,6 +187,20 @@ export const VideoControls = memo(function VideoControls({
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevNoiseEnabledRef = useRef(false);
+
+  const { isHolding: isVideoHolding, ...videoButtonHandlers } = useLongPress(onToggleVideoFx, onToggleVideoSettings);
+  const handleAudioFxLongPress = () => {
+    if (isAudioFxEnabled) {
+      prevNoiseEnabledRef.current = isNoiseEnabled;
+      onToggleAudioFx();
+      if (isNoiseEnabled) onToggleNoise();
+    } else {
+      onToggleAudioFx();
+      if (prevNoiseEnabledRef.current && !isNoiseEnabled) onToggleNoise();
+    }
+  };
+  const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
 
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
@@ -957,19 +976,43 @@ export const VideoControls = memo(function VideoControls({
         <div className="grid flex-1 grid-cols-3 gap-2">
           <button
             type="button"
-            onClick={onToggleVideoSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white hover:bg-[#2a2a32]"
+            {...videoButtonHandlers}
+            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+              isVideoHolding
+                ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
+                : isVideoFxEnabled
+                  ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
+            }`}
           >
-            <SlidersHorizontal size={16} />
-            {isVideoSettingsOpen ? "Close Video" : "Video"}
+            {isVideoHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <SlidersHorizontal size={16} className="relative z-10" />
+            <span className="relative z-10">{isVideoSettingsOpen ? "Close Video" : "Video"}</span>
           </button>
           <button
             type="button"
-            onClick={onToggleAudioSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white hover:bg-[#2a2a32]"
+            {...audioButtonHandlers}
+            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+              isAudioHolding
+                ? "border-sky-400/70 bg-[#111a24] text-sky-200"
+                : isAudioFxEnabled
+                  ? "border-sky-500/60 bg-sky-500/15 text-black shadow-[0_0_8px_rgba(14,165,233,0.5)]"
+                  : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
+            }`}
           >
-            <Mic2 size={16} />
-            Audio
+            {isAudioHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-sky-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <Mic2 size={16} className="relative z-10" />
+            <span className="relative z-10">Audio</span>
           </button>
           {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
           <button

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -99,6 +99,7 @@ export function usePixiVideoPlayer(
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
   const [pendingRecordingFilename, setPendingRecordingFilename] = useState<string | null>(null);
+  const [isVideoFxEnabled, setIsVideoFxEnabled] = useState(true);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -143,8 +144,16 @@ export function usePixiVideoPlayer(
     console.info(`[retro-player audio recovery][${instanceLabelRef.current}] ${label}`, details);
   };
 
+  const effectiveFilterState = useMemo(
+    () => ({
+      ...filterState,
+      isFilterEnabled: filterState.isFilterEnabled && isVideoFxEnabled,
+    }),
+    [filterState, isVideoFxEnabled],
+  );
+
   const stage = useRetroPixiStage({
-    filterState,
+    filterState: effectiveFilterState,
     fitMode,
     renderResolutionScale,
     isPoweredOn,
@@ -1080,6 +1089,10 @@ export function usePixiVideoPlayer(
     refreshLayout,
     toggleAudioFx: () => {
       setIsAudioFxEnabled((current) => !current);
+    },
+    isVideoFxEnabled,
+    toggleVideoFx: () => {
+      setIsVideoFxEnabled((current) => !current);
     },
     setLofiAmount,
     setRadioToneAmount,

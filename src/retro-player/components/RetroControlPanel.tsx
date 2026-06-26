@@ -72,7 +72,9 @@ export type RetroControlPlayerSlice = {
   changeVolume: (v: number) => void;
   seekTo: (time: number) => void;
   stepFrame: (dir: -1 | 1) => void;
+  isVideoFxEnabled: boolean;
   toggleAudioFx: () => void;
+  toggleVideoFx: () => void;
   toggleLoop: () => void;
   toggleMute: () => void;
   toggleNoise: () => void;
@@ -152,6 +154,7 @@ export function RetroControlPanel({
                 controlPanelMode === "audio-settings" ? "audio-settings" : "playback"
               }
               isAudioFxEnabled={player.isAudioFxEnabled}
+              isVideoFxEnabled={player.isVideoFxEnabled}
               isLooping={player.isLooping}
               isMuted={player.isMuted}
               isNoiseEnabled={player.isNoiseEnabled}
@@ -207,6 +210,7 @@ export function RetroControlPanel({
               onSeek={player.seekTo}
               onStepFrame={player.stepFrame}
               onToggleAudioFx={player.toggleAudioFx}
+              onToggleVideoFx={player.toggleVideoFx}
               onToggleLoop={player.toggleLoop}
               onToggleMute={player.toggleMute}
               onToggleNoise={player.toggleNoise}
