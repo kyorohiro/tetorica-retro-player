@@ -472,24 +472,77 @@ export function useRetroPreviewMedia({
 
     media.addEventListener("durationchange", syncIfCurrentMedia);
     media.addEventListener("seeked", syncIfCurrentMedia);
+    // WKWebView HLS VOD: 'ended' never fires; seeking/play silently fail after
+    // the stream stops. Use an interval to detect when currentTime stops
+    // advancing near the end of the stream (works even after timeupdate stops).
+    const isHlsStream = media.src.includes(".m3u8");
+    let hlsEndedFlag = false;
+    let hlsWatchInterval: ReturnType<typeof setInterval> | null = null;
+
+    const stopHlsWatch = () => {
+      if (hlsWatchInterval) { clearInterval(hlsWatchInterval); hlsWatchInterval = null; }
+    };
+
+    const handleHlsEnded = () => {
+      stopHlsWatch();
+      if (!isCurrentMedia()) return;
+      hlsEndedFlag = true;
+      syncVideoState();
+      if (media.loop) {
+        hlsEndedFlag = false;
+        media.load();
+        media.addEventListener("canplay", () => {
+          if (!isCurrentMedia()) return;
+          media.play().catch(() => {});
+        }, { once: true });
+      }
+    };
+
     media.addEventListener("ended", () => {
       if (!isCurrentMedia()) return;
-      console.log("[HLS-loop] ended fired", {
-        loop: media.loop,
-        src: media.currentSrc || media.src,
-        currentTime: media.currentTime,
-        duration: media.duration,
-        ended: media.ended,
-        paused: media.paused,
-      });
-      syncVideoState();
-      // WKWebView does not natively loop HLS VOD streams (ENDLIST). Manually
-      // restart when loop is on and the src is an HLS playlist.
-      if (media.loop && (media.currentSrc || media.src).includes(".m3u8")) {
-        console.log("[HLS-loop] restarting HLS loop");
-        media.currentTime = 0;
-        media.play().catch((e) => console.warn("[HLS-loop] play() rejected:", e));
+      if (isHlsStream) {
+        handleHlsEnded();
+      } else {
+        syncVideoState();
       }
+    });
+
+    if (isHlsStream) {
+      // Start an interval once playback begins to watch for the stream stopping.
+      // Every 500ms, check if currentTime has advanced. If it hasn't moved for
+      // 2 seconds (4 ticks) while near the end of duration, treat as ended.
+      media.addEventListener("playing", () => {
+        if (!isCurrentMedia() || hlsWatchInterval) return;
+        let lastCt = media.currentTime;
+        let stuckTicks = 0;
+        hlsWatchInterval = setInterval(() => {
+          if (!isCurrentMedia()) { stopHlsWatch(); return; }
+          const ct = media.currentTime;
+          const dur = media.duration;
+          const remaining = Number.isFinite(dur) ? dur - ct : Infinity;
+          if (ct === lastCt && remaining < 10.0) {
+            stuckTicks++;
+            if (stuckTicks >= 4) handleHlsEnded();
+          } else {
+            stuckTicks = 0;
+            lastCt = ct;
+          }
+        }, 500);
+      });
+    }
+
+    // After HLS VOD ends, seeking via scrubbar silently fails in WKWebView.
+    // Detect via hlsEndedFlag and reload to the target position.
+    media.addEventListener("seeking", () => {
+      if (!isCurrentMedia() || !isHlsStream || !hlsEndedFlag) return;
+      hlsEndedFlag = false;
+      const targetTime = media.currentTime;
+      media.load();
+      media.addEventListener("canplay", () => {
+        if (!isCurrentMedia()) return;
+        media.currentTime = targetTime;
+        media.play().catch(() => {});
+      }, { once: true });
     });
     media.addEventListener("ratechange", syncIfCurrentMedia);
 

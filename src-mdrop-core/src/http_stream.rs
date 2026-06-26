@@ -241,15 +241,15 @@ async fn start_hls_for_path(
             )
         })?;
 
-    // Poll until ffmpeg finishes transcoding (EXT-X-ENDLIST present, up to 90 s).
-    // WKWebView does not re-fetch a growing live playlist — it uses whatever
-    // segments are listed on the first request. Waiting for the complete VOD
-    // playlist ensures all segments are available before the client starts.
+    // Poll until the playlist references at least one segment (up to 30 s).
+    // Pre-warm ensures ffmpeg starts immediately (no GateKeeper delay), so the
+    // first segment typically appears within 1-2 s. WKWebView re-fetches the
+    // playlist periodically and discovers remaining segments as ffmpeg encodes.
     let mut ready = false;
-    for _ in 0..450 {
+    for _ in 0..150 {
         if playlist.exists() {
             if let Ok(text) = std::fs::read_to_string(&playlist) {
-                if text.contains("#EXT-X-ENDLIST") {
+                if text.contains(".ts") {
                     ready = true;
                     break;
                 }
@@ -261,7 +261,7 @@ async fn start_hls_for_path(
     if !ready {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            "ffmpeg did not finish transcoding in time".to_string(),
+            "ffmpeg did not produce HLS output in time".to_string(),
         ));
     }
 
