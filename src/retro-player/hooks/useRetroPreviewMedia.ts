@@ -472,7 +472,25 @@ export function useRetroPreviewMedia({
 
     media.addEventListener("durationchange", syncIfCurrentMedia);
     media.addEventListener("seeked", syncIfCurrentMedia);
-    media.addEventListener("ended", syncIfCurrentMedia);
+    media.addEventListener("ended", () => {
+      if (!isCurrentMedia()) return;
+      console.log("[HLS-loop] ended fired", {
+        loop: media.loop,
+        src: media.currentSrc || media.src,
+        currentTime: media.currentTime,
+        duration: media.duration,
+        ended: media.ended,
+        paused: media.paused,
+      });
+      syncVideoState();
+      // WKWebView does not natively loop HLS VOD streams (ENDLIST). Manually
+      // restart when loop is on and the src is an HLS playlist.
+      if (media.loop && (media.currentSrc || media.src).includes(".m3u8")) {
+        console.log("[HLS-loop] restarting HLS loop");
+        media.currentTime = 0;
+        media.play().catch((e) => console.warn("[HLS-loop] play() rejected:", e));
+      }
+    });
     media.addEventListener("ratechange", syncIfCurrentMedia);
 
     // The "resize" event fires on <video> when the video's intrinsic size

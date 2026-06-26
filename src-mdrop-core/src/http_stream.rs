@@ -187,10 +187,22 @@ async fn start_hls_for_path(
     // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
     let base_url = format!("http://localhost:{}/hls/{}/", port, session_id);
 
-    let ffmpeg_cmd = {
+    let (ffmpeg_cmd, prewarm_rx) = {
         let ctx = state.inner.lock().unwrap();
-        ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg"))
+        (
+            ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
+            ctx.ffmpeg_prewarm_rx.clone(),
+        )
     };
+
+    // Wait for the pre-warm (macOS GateKeeper check) to complete before
+    // spawning ffmpeg. Without this, the first HLS request races against the
+    // GateKeeper check and the 30-second poll timeout is exceeded.
+    if let Some(mut rx) = prewarm_rx {
+        if !*rx.borrow() {
+            let _ = tokio::time::timeout(Duration::from_secs(90), rx.changed()).await;
+        }
+    }
 
     let mut child = Command::new(&ffmpeg_cmd)
         .args([
@@ -229,12 +241,15 @@ async fn start_hls_for_path(
             )
         })?;
 
-    // Poll until the playlist references at least one segment (up to 30 s)
+    // Poll until ffmpeg finishes transcoding (EXT-X-ENDLIST present, up to 90 s).
+    // WKWebView does not re-fetch a growing live playlist — it uses whatever
+    // segments are listed on the first request. Waiting for the complete VOD
+    // playlist ensures all segments are available before the client starts.
     let mut ready = false;
-    for _ in 0..150 {
+    for _ in 0..450 {
         if playlist.exists() {
             if let Ok(text) = std::fs::read_to_string(&playlist) {
-                if text.contains(".ts") {
+                if text.contains("#EXT-X-ENDLIST") {
                     ready = true;
                     break;
                 }
@@ -246,7 +261,7 @@ async fn start_hls_for_path(
     if !ready {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            "ffmpeg did not produce HLS output in time".to_string(),
+            "ffmpeg did not finish transcoding in time".to_string(),
         ));
     }
 

@@ -21,7 +21,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::{net::TcpListener, sync::{oneshot, watch}};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::http_api::{api_key_guard_middleware, create_api_key};
@@ -168,6 +168,9 @@ pub struct HttpServerContext {
     pub api_key: String,
     pub has_ffmpeg: bool,
     pub ffmpeg_path: Option<PathBuf>,
+    /// Receives `true` once the ffmpeg pre-warm finishes so HLS requests can
+    /// wait for GateKeeper to clear before spawning a new ffmpeg process.
+    pub ffmpeg_prewarm_rx: Option<watch::Receiver<bool>>,
 }
 
 fn bind_to_free_port(preferred: u16) -> Result<(std::net::TcpListener, u16), String> {
@@ -205,6 +208,7 @@ impl HttpServerContext {
             api_key: create_api_key(),
             has_ffmpeg: detect_ffmpeg(),
             ffmpeg_path: None,
+            ffmpeg_prewarm_rx: None,
         }
     }
 
@@ -253,6 +257,17 @@ impl HttpServerContext {
 
   }
  */
+/// Returned by `SharedHttpServerContext::setup_ffmpeg_prewarm`.
+/// Call `.complete()` once the pre-warm process finishes so HLS requests
+/// that are waiting for GateKeeper to clear can proceed.
+pub struct FfmpegPrewarmHandle(watch::Sender<bool>);
+
+impl FfmpegPrewarmHandle {
+    pub fn complete(self) {
+        let _ = self.0.send(true);
+    }
+}
+
 #[derive(Clone)]
 pub struct SharedHttpServerContext {
     pub inner: Arc<Mutex<HttpServerContext>>,
@@ -352,6 +367,17 @@ impl SharedHttpServerContext {
                 ctx.ffmpeg_path = Some(path);
             }
         }
+    }
+
+    /// Create a pre-warm channel: stores the receiver internally and returns
+    /// an opaque handle. Call `FfmpegPrewarmHandle::complete()` once the
+    /// macOS GateKeeper check finishes so HLS requests can proceed.
+    pub fn setup_ffmpeg_prewarm(&self) -> FfmpegPrewarmHandle {
+        let (tx, rx) = watch::channel(false);
+        if let Ok(mut ctx) = self.inner.lock() {
+            ctx.ffmpeg_prewarm_rx = Some(rx);
+        }
+        FfmpegPrewarmHandle(tx)
     }
 
     pub fn clear_message_callback(&self) {

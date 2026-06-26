@@ -246,7 +246,23 @@ pub fn run() {
             });
 
             #[cfg(feature = "ffmpeg-sidecar")]
-            mdrop_server.set_ffmpeg_path(crate::ffmpeg::ffmpeg_bin());
+            {
+                let ffmpeg_path = crate::ffmpeg::ffmpeg_bin();
+                mdrop_server.set_ffmpeg_path(ffmpeg_path.clone());
+
+                // Pre-warm: run `ffmpeg -version` silently so macOS completes its
+                // first-run GateKeeper check before the user plays a file.
+                // FfmpegPrewarmHandle::complete() signals HLS requests to proceed.
+                let prewarm = mdrop_server.setup_ffmpeg_prewarm();
+                tauri::async_runtime::spawn_blocking(move || {
+                    let _ = std::process::Command::new(ffmpeg_path)
+                        .arg("-version")
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .output();
+                    prewarm.complete();
+                });
+            }
 
             let handle = app.handle().clone();
             mdrop_server.set_message_callback(move |msg| {
