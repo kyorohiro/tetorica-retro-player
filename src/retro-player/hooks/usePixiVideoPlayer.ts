@@ -614,6 +614,8 @@ export function usePixiVideoPlayer(
     }, 0);
   };
 
+  // Output format: webm (vp9+opus). VLC may play it at wrong speed due to timestamp
+  // interpretation bugs — use QuickTime, browser, or mpv for correct playback.
   const saveRecording = (chunks: Blob[], mimeType: string) => {
     if (typeof window === "undefined" || chunks.length === 0) {
       return null;
