@@ -1,4 +1,5 @@
 import { memo, useRef, useState } from "react";
+import { useLongPress } from "../hooks/useLongPress";
 import {
   FolderOpen,
   Gauge,
@@ -36,6 +37,7 @@ type VideoControlsProps = {
   isMuted: boolean;
   isPlaying: boolean;
   isAudioFxEnabled: boolean;
+  isVideoFxEnabled: boolean;
   isNoiseEnabled: boolean;
   hasVideo: boolean;
   isVideoSettingsOpen: boolean;
@@ -52,6 +54,9 @@ type VideoControlsProps = {
   wowFlutterAmount: number;
   noiseLevel: number;
   vinylDustAmount: number;
+  noiseWarmthAmount: number;
+  noiseAirAmount: number;
+  noisePresenceAmount: number;
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
@@ -73,6 +78,9 @@ type VideoControlsProps = {
   onChangeWowFlutterAmount: (amount: number) => void;
   onChangeNoiseLevel: (amount: number) => void;
   onChangeVinylDustAmount: (amount: number) => void;
+  onChangeNoiseWarmthAmount: (amount: number) => void;
+  onChangeNoiseAirAmount: (amount: number) => void;
+  onChangeNoisePresenceAmount: (amount: number) => void;
   onChangeDelayAmount: (amount: number) => void;
   onChangeReverbAmount: (amount: number) => void;
   onChangeChorusAmount: (amount: number) => void;
@@ -86,6 +94,7 @@ type VideoControlsProps = {
   onStepFrame: (direction: -1 | 1) => void;
   onToggleLoop: () => void;
   onToggleAudioFx: () => void;
+  onToggleVideoFx: () => void;
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
@@ -119,6 +128,7 @@ export const VideoControls = memo(function VideoControls({
   isMuted,
   isPlaying,
   isAudioFxEnabled,
+  isVideoFxEnabled,
   isNoiseEnabled,
   hasVideo,
   isVideoSettingsOpen,
@@ -135,6 +145,9 @@ export const VideoControls = memo(function VideoControls({
   wowFlutterAmount,
   noiseLevel,
   vinylDustAmount,
+  noiseWarmthAmount,
+  noiseAirAmount,
+  noisePresenceAmount,
   delayAmount,
   reverbAmount,
   chorusAmount,
@@ -156,6 +169,9 @@ export const VideoControls = memo(function VideoControls({
   onChangeWowFlutterAmount,
   onChangeNoiseLevel,
   onChangeVinylDustAmount,
+  onChangeNoiseWarmthAmount,
+  onChangeNoiseAirAmount,
+  onChangeNoisePresenceAmount,
   onChangeDelayAmount,
   onChangeReverbAmount,
   onChangeChorusAmount,
@@ -169,6 +185,7 @@ export const VideoControls = memo(function VideoControls({
   onStepFrame,
   onToggleLoop,
   onToggleAudioFx,
+  onToggleVideoFx,
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
@@ -182,6 +199,20 @@ export const VideoControls = memo(function VideoControls({
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevNoiseEnabledRef = useRef(false);
+
+  const { isHolding: isVideoHolding, ...videoButtonHandlers } = useLongPress(onToggleVideoFx, onToggleVideoSettings);
+  const handleAudioFxLongPress = () => {
+    if (isAudioFxEnabled) {
+      prevNoiseEnabledRef.current = isNoiseEnabled;
+      onToggleAudioFx();
+      if (isNoiseEnabled) onToggleNoise();
+    } else {
+      onToggleAudioFx();
+      if (prevNoiseEnabledRef.current && !isNoiseEnabled) onToggleNoise();
+    }
+  };
+  const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
 
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
@@ -225,6 +256,9 @@ export const VideoControls = memo(function VideoControls({
         isNearlyEqual(settings.wowFlutterAmount, wowFlutterAmount) &&
         isNearlyEqual(settings.noiseLevel, noiseLevel) &&
         isNearlyEqual(settings.vinylDustAmount, vinylDustAmount) &&
+        isNearlyEqual(settings.noiseWarmthAmount, noiseWarmthAmount) &&
+        isNearlyEqual(settings.noiseAirAmount, noiseAirAmount) &&
+        isNearlyEqual(settings.noisePresenceAmount, noisePresenceAmount) &&
         isNearlyEqual(settings.delayAmount, delayAmount) &&
         isNearlyEqual(settings.reverbAmount, reverbAmount) &&
         isNearlyEqual(settings.chorusAmount, chorusAmount) &&
@@ -260,6 +294,9 @@ export const VideoControls = memo(function VideoControls({
     onChangeWowFlutterAmount(presetSettings.wowFlutterAmount);
     onChangeNoiseLevel(presetSettings.noiseLevel);
     onChangeVinylDustAmount(presetSettings.vinylDustAmount);
+    onChangeNoiseWarmthAmount(presetSettings.noiseWarmthAmount);
+    onChangeNoiseAirAmount(presetSettings.noiseAirAmount);
+    onChangeNoisePresenceAmount(presetSettings.noisePresenceAmount);
     onChangeDelayAmount(presetSettings.delayAmount);
     onChangeReverbAmount(presetSettings.reverbAmount);
     onChangeChorusAmount(presetSettings.chorusAmount);
@@ -738,6 +775,57 @@ export const VideoControls = memo(function VideoControls({
               className="w-full"
             />
           </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+              <span>Warmth</span>
+              <span>{Math.round(noiseWarmthAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={noiseWarmthAmount}
+              onChange={(ev) => {
+                onChangeNoiseWarmthAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+              <span>Air</span>
+              <span>{Math.round(noiseAirAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={noiseAirAmount}
+              onChange={(ev) => {
+                onChangeNoiseAirAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+              <span>Presence</span>
+              <span>{Math.round(noisePresenceAmount * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={noisePresenceAmount}
+              onChange={(ev) => {
+                onChangeNoisePresenceAmount(Number(ev.currentTarget.value));
+              }}
+              className="w-full"
+            />
+          </div>
         </div>
       </div>
     );
@@ -957,19 +1045,43 @@ export const VideoControls = memo(function VideoControls({
         <div className="grid flex-1 grid-cols-3 gap-2">
           <button
             type="button"
-            onClick={onToggleVideoSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white hover:bg-[#2a2a32]"
+            {...videoButtonHandlers}
+            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+              isVideoHolding
+                ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
+                : isVideoFxEnabled
+                  ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
+            }`}
           >
-            <SlidersHorizontal size={16} />
-            {isVideoSettingsOpen ? "Close Video" : "Video"}
+            {isVideoHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <SlidersHorizontal size={16} className="relative z-10" />
+            <span className="relative z-10">{isVideoSettingsOpen ? "Close Video" : "Video"}</span>
           </button>
           <button
             type="button"
-            onClick={onToggleAudioSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#111014]/30 bg-[#111014] px-2 py-2 text-xs text-white hover:bg-[#2a2a32]"
+            {...audioButtonHandlers}
+            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+              isAudioHolding
+                ? "border-sky-400/70 bg-[#111a24] text-sky-200"
+                : isAudioFxEnabled
+                  ? "border-sky-500/60 bg-sky-500/15 text-black shadow-[0_0_8px_rgba(14,165,233,0.5)]"
+                  : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
+            }`}
           >
-            <Mic2 size={16} />
-            Audio
+            {isAudioHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-sky-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <Mic2 size={16} className="relative z-10" />
+            <span className="relative z-10">Audio</span>
           </button>
           {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
           <button

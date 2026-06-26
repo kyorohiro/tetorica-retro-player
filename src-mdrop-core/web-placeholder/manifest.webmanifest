@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "name": "Tetorica Retro Player",
+  "short_name": "RetroPlayer",
+  "description": "Retro Player",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./Square142x142Logo.png",
+      "sizes": "142x142",
+      "type": "image/png"
+    },
+    {
+      "src": "./Square310x310Logo.png",
+      "sizes": "310x310",
+      "type": "image/png"
+    }
+  ]
+}

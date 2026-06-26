@@ -113,6 +113,12 @@ export function useRetroAudioEngine({
       noiseLevel: persisted?.noiseLevel ?? DEFAULT_AUDIO_SETTINGS.noiseLevel,
       vinylDustAmount:
         persisted?.vinylDustAmount ?? DEFAULT_AUDIO_SETTINGS.vinylDustAmount,
+      noiseWarmthAmount:
+        persisted?.noiseWarmthAmount ?? DEFAULT_AUDIO_SETTINGS.noiseWarmthAmount,
+      noiseAirAmount:
+        persisted?.noiseAirAmount ?? DEFAULT_AUDIO_SETTINGS.noiseAirAmount,
+      noisePresenceAmount:
+        persisted?.noisePresenceAmount ?? DEFAULT_AUDIO_SETTINGS.noisePresenceAmount,
       delayAmount:
         persisted?.delayAmount ?? DEFAULT_AUDIO_SETTINGS.delayAmount,
       reverbAmount:
@@ -153,6 +159,9 @@ export function useRetroAudioEngine({
   const isNoiseEnabledRef = useRef<boolean>(initialAudioSettings.isNoiseEnabled);
   const noiseLevelRef = useRef<number>(initialAudioSettings.noiseLevel);
   const vinylDustAmountRef = useRef<number>(initialAudioSettings.vinylDustAmount);
+  const noiseWarmthAmountRef = useRef<number>(initialAudioSettings.noiseWarmthAmount);
+  const noiseAirAmountRef = useRef<number>(initialAudioSettings.noiseAirAmount);
+  const noisePresenceAmountRef = useRef<number>(initialAudioSettings.noisePresenceAmount);
   const delayAmountRef = useRef<number>(initialAudioSettings.delayAmount);
   const reverbAmountRef = useRef<number>(initialAudioSettings.reverbAmount);
   const chorusAmountRef = useRef<number>(initialAudioSettings.chorusAmount);
@@ -209,6 +218,15 @@ export function useRetroAudioEngine({
   const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
   const [vinylDustAmount, setVinylDustAmount] = useState<number>(
     initialAudioSettings.vinylDustAmount,
+  );
+  const [noiseWarmthAmount, setNoiseWarmthAmount] = useState<number>(
+    initialAudioSettings.noiseWarmthAmount,
+  );
+  const [noiseAirAmount, setNoiseAirAmount] = useState<number>(
+    initialAudioSettings.noiseAirAmount,
+  );
+  const [noisePresenceAmount, setNoisePresenceAmount] = useState<number>(
+    initialAudioSettings.noisePresenceAmount,
   );
   const [delayAmount, setDelayAmount] = useState<number>(
     initialAudioSettings.delayAmount,
@@ -344,6 +362,9 @@ export function useRetroAudioEngine({
     isNoiseEnabled: isNoiseEnabledRef.current,
     noiseLevel: noiseLevelRef.current,
     vinylDustAmount: vinylDustAmountRef.current,
+    noiseWarmthAmount: noiseWarmthAmountRef.current,
+    noiseAirAmount: noiseAirAmountRef.current,
+    noisePresenceAmount: noisePresenceAmountRef.current,
     delayAmount: delayAmountRef.current,
     reverbAmount: reverbAmountRef.current,
     chorusAmount: chorusAmountRef.current,
@@ -561,6 +582,9 @@ export function useRetroAudioEngine({
     isNoiseEnabledRef.current = nextSettings.isNoiseEnabled;
     noiseLevelRef.current = nextSettings.noiseLevel;
     vinylDustAmountRef.current = nextSettings.vinylDustAmount;
+    noiseWarmthAmountRef.current = nextSettings.noiseWarmthAmount;
+    noiseAirAmountRef.current = nextSettings.noiseAirAmount;
+    noisePresenceAmountRef.current = nextSettings.noisePresenceAmount;
     delayAmountRef.current = nextSettings.delayAmount;
     reverbAmountRef.current = nextSettings.reverbAmount;
     chorusAmountRef.current = nextSettings.chorusAmount;
@@ -588,6 +612,9 @@ export function useRetroAudioEngine({
     setIsNoiseEnabled(nextSettings.isNoiseEnabled);
     setNoiseLevel(nextSettings.noiseLevel);
     setVinylDustAmount(nextSettings.vinylDustAmount);
+    setNoiseWarmthAmount(nextSettings.noiseWarmthAmount);
+    setNoiseAirAmount(nextSettings.noiseAirAmount);
+    setNoisePresenceAmount(nextSettings.noisePresenceAmount);
     setDelayAmount(nextSettings.delayAmount);
     setReverbAmount(nextSettings.reverbAmount);
     setChorusAmount(nextSettings.chorusAmount);
@@ -634,6 +661,9 @@ export function useRetroAudioEngine({
     isNoiseEnabledRef.current = isNoiseEnabled;
     noiseLevelRef.current = noiseLevel;
     vinylDustAmountRef.current = vinylDustAmount;
+    noiseWarmthAmountRef.current = noiseWarmthAmount;
+    noiseAirAmountRef.current = noiseAirAmount;
+    noisePresenceAmountRef.current = noisePresenceAmount;
     delayAmountRef.current = delayAmount;
     reverbAmountRef.current = reverbAmount;
     chorusAmountRef.current = chorusAmount;
@@ -663,6 +693,9 @@ export function useRetroAudioEngine({
         isNoiseEnabled,
         noiseLevel,
         vinylDustAmount,
+        noiseWarmthAmount,
+        noiseAirAmount,
+        noisePresenceAmount,
         delayAmount,
         reverbAmount,
         chorusAmount,
@@ -709,6 +742,9 @@ export function useRetroAudioEngine({
     isNoiseEnabled,
     noiseLevel,
     vinylDustAmount,
+    noiseWarmthAmount,
+    noiseAirAmount,
+    noisePresenceAmount,
     delayAmount,
     reverbAmount,
     chorusAmount,
@@ -744,6 +780,9 @@ export function useRetroAudioEngine({
         isNoiseEnabled,
         noiseLevel,
         vinylDustAmount,
+        noiseWarmthAmount,
+        noiseAirAmount,
+        noisePresenceAmount,
         delayAmount,
         reverbAmount,
         chorusAmount,
@@ -774,6 +813,9 @@ export function useRetroAudioEngine({
     isNoiseEnabled,
     noiseLevel,
     vinylDustAmount,
+    noiseWarmthAmount,
+    noiseAirAmount,
+    noisePresenceAmount,
     delayAmount,
     reverbAmount,
     chorusAmount,
@@ -882,6 +924,12 @@ export function useRetroAudioEngine({
     setNoiseLevel,
     vinylDustAmount,
     setVinylDustAmount,
+    noiseWarmthAmount,
+    setNoiseWarmthAmount,
+    noiseAirAmount,
+    setNoiseAirAmount,
+    noisePresenceAmount,
+    setNoisePresenceAmount,
     delayAmount,
     setDelayAmount,
     reverbAmount,

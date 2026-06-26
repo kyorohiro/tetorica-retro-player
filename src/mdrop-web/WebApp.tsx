@@ -11,6 +11,7 @@ function WebApp({ active }: { active?: boolean }) {
     const [errorMsg,] = useState<string>("");
     const [sharedTargets, setSharedTargets] = useState<Target[]>([]);
     const [apiServer, setApiServer] = useState("");
+    const [useHls, setUseHls] = useState(false);
     const [loading, setLoading] = useState(false);
     const mainRef = useRef<HTMLElement>(null);
     const { showMDropFileListDialog: showFileListDialog } = useMDropFileListDialog();
@@ -21,6 +22,7 @@ function WebApp({ active }: { active?: boolean }) {
         try {
             const metaResp = await getMeta();
             setApiServer(metaResp.apiServer);
+            setUseHls(metaResp.hasFfmpeg);
             const resp = await getDownloadList();
             setSharedTargets(resp);
             await sleep(300);
@@ -38,6 +40,7 @@ function WebApp({ active }: { active?: boolean }) {
             apiServer,
             targetId: target.id,
             initialPath: "/",
+            useHls,
         });
     }
 

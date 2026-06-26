@@ -1,20 +1,26 @@
 {
   "name": "tetorica-retro-player",
   "private": true,
-  "version": "0.26.6",
+  "version": "0.30.3",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && vite",
     "build": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && tsc && vite build",
+    "build:web": "tsc && vite build --config vite.web.config.ts",
     "build:extension": "node scripts/sync-extension-shader.mjs && node scripts/package-extension.mjs",
     "version:set": "node scripts/set-version.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "dev:tauri": "npx tauri dev",
+    "dev:tauri-sidecar": "npx tauri dev --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-sidecar",
+    "build:tauri": "npx tauri build",
+    "build:tauri-sidecar": "npx tauri build --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-sidecar"
   },
   "dependencies": {
     "@buildyourwebapp/tauri-plugin-sharesheet": "^0.0.1",
     "@choochmeque/tauri-plugin-sharekit-api": "^0.3.1",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
     "@zip.js/zip.js": "^2.8.26",
     "heic2any": "^0.0.4",

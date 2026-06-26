@@ -41,6 +41,9 @@ export type RetroControlPlayerSlice = {
   wowFlutterAmount: number;
   noiseLevel: number;
   vinylDustAmount: number;
+  noiseWarmthAmount: number;
+  noiseAirAmount: number;
+  noisePresenceAmount: number;
   delayAmount: number;
   reverbAmount: number;
   chorusAmount: number;
@@ -62,6 +65,9 @@ export type RetroControlPlayerSlice = {
   setWowFlutterAmount: (v: number) => void;
   setNoiseLevel: (v: number) => void;
   setVinylDustAmount: (v: number) => void;
+  setNoiseWarmthAmount: (v: number) => void;
+  setNoiseAirAmount: (v: number) => void;
+  setNoisePresenceAmount: (v: number) => void;
   setDelayAmount: (v: number) => void;
   setReverbAmount: (v: number) => void;
   setChorusAmount: (v: number) => void;
@@ -72,7 +78,9 @@ export type RetroControlPlayerSlice = {
   changeVolume: (v: number) => void;
   seekTo: (time: number) => void;
   stepFrame: (dir: -1 | 1) => void;
+  isVideoFxEnabled: boolean;
   toggleAudioFx: () => void;
+  toggleVideoFx: () => void;
   toggleLoop: () => void;
   toggleMute: () => void;
   toggleNoise: () => void;
@@ -152,6 +160,7 @@ export function RetroControlPanel({
                 controlPanelMode === "audio-settings" ? "audio-settings" : "playback"
               }
               isAudioFxEnabled={player.isAudioFxEnabled}
+              isVideoFxEnabled={filterState.isFilterEnabled}
               isLooping={player.isLooping}
               isMuted={player.isMuted}
               isNoiseEnabled={player.isNoiseEnabled}
@@ -171,6 +180,9 @@ export function RetroControlPanel({
               wowFlutterAmount={player.wowFlutterAmount}
               noiseLevel={player.noiseLevel}
               vinylDustAmount={player.vinylDustAmount}
+              noiseWarmthAmount={player.noiseWarmthAmount}
+              noiseAirAmount={player.noiseAirAmount}
+              noisePresenceAmount={player.noisePresenceAmount}
               delayAmount={player.delayAmount}
               reverbAmount={player.reverbAmount}
               chorusAmount={player.chorusAmount}
@@ -192,6 +204,9 @@ export function RetroControlPanel({
               onChangeWowFlutterAmount={player.setWowFlutterAmount}
               onChangeNoiseLevel={player.setNoiseLevel}
               onChangeVinylDustAmount={player.setVinylDustAmount}
+              onChangeNoiseWarmthAmount={player.setNoiseWarmthAmount}
+              onChangeNoiseAirAmount={player.setNoiseAirAmount}
+              onChangeNoisePresenceAmount={player.setNoisePresenceAmount}
               onChangeDelayAmount={player.setDelayAmount}
               onChangeReverbAmount={player.setReverbAmount}
               onChangeChorusAmount={player.setChorusAmount}
@@ -207,6 +222,7 @@ export function RetroControlPanel({
               onSeek={player.seekTo}
               onStepFrame={player.stepFrame}
               onToggleAudioFx={player.toggleAudioFx}
+              onToggleVideoFx={() => filterState.setIsFilterEnabled(!filterState.isFilterEnabled)}
               onToggleLoop={player.toggleLoop}
               onToggleMute={player.toggleMute}
               onToggleNoise={player.toggleNoise}

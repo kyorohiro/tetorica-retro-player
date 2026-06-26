@@ -54,6 +54,7 @@ type UseRetroPreviewMediaParams = {
   setIsPoweredOn: (value: boolean) => void;
   beginLoading: (label: string) => void;
   finishLoading: () => void;
+  setIsBuffering: (v: boolean) => void;
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
   setEngineIsPlaying: (nextIsPlaying: boolean) => void;
@@ -147,6 +148,7 @@ export function useRetroPreviewMedia({
   setIsPoweredOn,
   beginLoading,
   finishLoading,
+  setIsBuffering,
   ensureAudioContext,
   updateAudioNodes,
   setEngineIsPlaying,
@@ -448,6 +450,9 @@ export function useRetroPreviewMedia({
     // "stalled" and "waiting" are transient network/buffer states that resolve
     // on their own. Silencing on these and immediately restoring on "playing"
     // caused repeated click noise during media loading and file switching.
+    // We DO track buffering state for the UI loading indicator (no audio impact).
+    media.addEventListener("waiting", () => { if (isCurrentMedia()) setIsBuffering(true); });
+    media.addEventListener("playing", () => { if (isCurrentMedia()) setIsBuffering(false); });
     media.addEventListener("volumechange", syncIfCurrentMedia);
 
     // Lightweight timeupdate handler: only update the scrubber position.
@@ -467,7 +472,83 @@ export function useRetroPreviewMedia({
 
     media.addEventListener("durationchange", syncIfCurrentMedia);
     media.addEventListener("seeked", syncIfCurrentMedia);
-    media.addEventListener("ended", syncIfCurrentMedia);
+    // WKWebView HLS VOD: 'ended' never fires; seeking/play silently fail after
+    // the stream stops. Use an interval to detect when currentTime stops
+    // advancing near the end of the stream (works even after timeupdate stops).
+    const isHlsStream = media.src.includes(".m3u8");
+    let hlsEndedFlag = false;
+    let hlsWatchInterval: ReturnType<typeof setInterval> | null = null;
+
+    const stopHlsWatch = () => {
+      if (hlsWatchInterval) { clearInterval(hlsWatchInterval); hlsWatchInterval = null; }
+    };
+
+    const handleHlsEnded = () => {
+      stopHlsWatch();
+      if (!isCurrentMedia()) return;
+      hlsEndedFlag = true;
+      syncVideoState();
+      if (media.loop) {
+        hlsEndedFlag = false;
+        media.load();
+        media.addEventListener("canplay", () => {
+          if (!isCurrentMedia()) return;
+          media.play().then(() => {
+            if (!isCurrentMedia()) return;
+            isPlayingRef.current = true;
+            setEngineIsPlaying(true);
+            setIsPlaying(true);
+          }).catch(() => {});
+        }, { once: true });
+      }
+    };
+
+    media.addEventListener("ended", () => {
+      if (!isCurrentMedia()) return;
+      if (isHlsStream) {
+        handleHlsEnded();
+      } else {
+        syncVideoState();
+      }
+    });
+
+    if (isHlsStream) {
+      // Start an interval once playback begins to watch for the stream stopping.
+      // Every 500ms, check if currentTime has advanced. If it hasn't moved for
+      // 2 seconds (4 ticks) while near the end of duration, treat as ended.
+      media.addEventListener("playing", () => {
+        if (!isCurrentMedia() || hlsWatchInterval) return;
+        let lastCt = media.currentTime;
+        let stuckTicks = 0;
+        hlsWatchInterval = setInterval(() => {
+          if (!isCurrentMedia()) { stopHlsWatch(); return; }
+          const ct = media.currentTime;
+          const dur = media.duration;
+          const remaining = Number.isFinite(dur) ? dur - ct : Infinity;
+          if (ct === lastCt && remaining < 10.0) {
+            stuckTicks++;
+            if (stuckTicks >= 4) handleHlsEnded();
+          } else {
+            stuckTicks = 0;
+            lastCt = ct;
+          }
+        }, 500);
+      });
+    }
+
+    // After HLS VOD ends, seeking via scrubbar silently fails in WKWebView.
+    // Detect via hlsEndedFlag and reload to the target position.
+    media.addEventListener("seeking", () => {
+      if (!isCurrentMedia() || !isHlsStream || !hlsEndedFlag) return;
+      hlsEndedFlag = false;
+      const targetTime = media.currentTime;
+      media.load();
+      media.addEventListener("canplay", () => {
+        if (!isCurrentMedia()) return;
+        media.currentTime = targetTime;
+        media.play().catch(() => {});
+      }, { once: true });
+    });
     media.addEventListener("ratechange", syncIfCurrentMedia);
 
     // The "resize" event fires on <video> when the video's intrinsic size
@@ -560,6 +641,7 @@ export function useRetroPreviewMedia({
     mediaSourceRef.current = null;
 
     setNeedsUserPlay(false);
+    setIsBuffering(false);
     isPlayingRef.current = false;
     setIsPlaying(false);
     setCurrentTime(0);
@@ -640,6 +722,18 @@ export function useRetroPreviewMedia({
       _setPreviewError("");
       setNeedsUserPlay(false);
       const audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
+      // play() succeeded but AudioContext is still suspended (e.g. Tauri WKWebView allows
+      // video autoplay but cannot resume AudioContext without a user gesture).
+      // Pause and require the user to click Play so the gesture unlocks the audio chain.
+      if (audioContextState === "suspended" && mediaSourceRef.current) {
+        media.pause();
+        isPlayingRef.current = false;
+        setEngineIsPlaying(false);
+        setIsPlaying(false);
+        finishLoading();
+        setNeedsUserPlay(true);
+        return;
+      }
       if (
         audioContextState !== "running" &&
         staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&

@@ -16,6 +16,10 @@ import {
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
 
+const isTauriRuntime = () =>
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 export type CanvasStageApp = {
@@ -34,6 +38,7 @@ type UseRetroPixiStageParams = {
   isPoweredOn: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   previewKindRef: MutableRefObject<PreviewKind>;
+  isRecordingRef: MutableRefObject<boolean>;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
 
@@ -42,6 +47,7 @@ export function useRetroPixiStage({
   fitMode,
   renderResolutionScale,
   isPoweredOn,
+  isRecordingRef,
   isPlayingRef,
   previewKindRef,
   debugVideo,
@@ -145,11 +151,19 @@ export function useRetroPixiStage({
         return;
       }
 
-      animationFrameRef.current = window.requestAnimationFrame(tick);
+      // During recording, cap at 30 fps via setTimeout so captureStream(30)
+      // gets exactly 30 frames/s regardless of display refresh rate.
+      if (isRecordingRef.current) {
+        animationFrameRef.current = window.setTimeout(tick, 1000 / 30) as unknown as number;
+      } else if (isTauriRuntime() && document.hidden) {
+        animationFrameRef.current = window.setTimeout(tick, 16) as unknown as number;
+      } else {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      }
     };
 
     animationFrameRef.current = window.requestAnimationFrame(tick);
-  }, [isPlayingRef, previewKindRef]);
+  }, [isPlayingRef, isRecordingRef, previewKindRef]);
 
   const applyFilterState = useCallback(() => {
     renderFrame();

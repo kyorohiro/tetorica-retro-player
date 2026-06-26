@@ -10,6 +10,7 @@ import {
     isPdf,
     isText,
     isVideo,
+    isVideoExtended,
     makeBlobFromUrl,
 } from "../utils";
 import { useZipFileListDialog } from "../useZipFileListDialog";
@@ -29,6 +30,7 @@ type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
 export type PreviewPageProps = {
     file: TargetFile;
     isRetro?: boolean;
+    useHls?: boolean;
     apiServer?: string;
     coverSrc?: string;
     getObjectUrl?: (
@@ -41,11 +43,13 @@ export type PreviewPageProps = {
 export function PreviewPage({
     file,
     isRetro = false,
+    useHls = false,
     apiServer = "",
     getObjectUrl,
     onLoadingMessage,
     coverSrc,
 }: PreviewPageProps) {
+    const isVideoHere = useHls ? isVideoExtended(file.path) : isVideo(file.path);
     const [status, setStatus] = React.useState<PreviewPageStatus>("none");
     const [src, setSrc] = React.useState("");
     const [text, setText] = React.useState("");
@@ -91,7 +95,7 @@ export function PreviewPage({
                 void loadReactReader();
             }
 
-            if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+            if (isRetro && (isVideoHere || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
                 void loadRetroPlayer();
             }
 
@@ -170,7 +174,7 @@ export function PreviewPage({
         );
     }
 
-    if (isRetro && (isVideo(file.path) || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+    if (isRetro && (isVideoHere || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
         return (
             <div className="mx-auto w-full max-w-6xl touch-manipulation">
                 <React.Suspense
@@ -186,7 +190,7 @@ export function PreviewPage({
                     <RetroPlayer
                         src={src}
                         kind={
-                            isVideo(file.path)
+                            isVideoHere
                                 ? "video"
                                 : isAudio(file.path)
                                     ? "audio"
@@ -199,7 +203,7 @@ export function PreviewPage({
         );
     }
 
-    if (isVideo(file.path)) {
+    if (isVideoHere) {
         return (
             <video
                 src={src}
