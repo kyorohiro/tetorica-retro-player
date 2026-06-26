@@ -37,10 +37,9 @@ export default function PdfPreview({ filePath, src }: PdfPreviewProps) {
       cMapUrl: `${pdfAssetBase}cmaps/`,
       cMapPacked: true,
       standardFontDataUrl: `${pdfAssetBase}standard_fonts/`,
-      // Android WebView seems more prone to font/canvas issues with some PDFs.
+      wasmUrl: `${pdfAssetBase}`,
       disableFontFace: androidRuntime,
       isOffscreenCanvasSupported: !androidRuntime,
-      useWasm: !androidRuntime,
     });
 
     const render = async () => {

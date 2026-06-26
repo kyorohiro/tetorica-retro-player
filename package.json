@@ -11,6 +11,8 @@
     "version:set": "node scripts/set-version.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
+    "dev:tauri": "npx tauri dev",
+    "dev:tauri-sidecar": "npx tauri dev --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-sidecar",
     "build:tauri": "npx tauri build",
     "build:tauri-sidecar": "npx tauri build --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-sidecar"
   },
