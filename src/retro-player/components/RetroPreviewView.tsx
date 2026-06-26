@@ -18,6 +18,7 @@ export type RetroPreviewPlayerSlice = {
   canvasHostRef: React.RefObject<HTMLDivElement | null>;
   isPoweredOn: boolean;
   isLoading: boolean;
+  isBuffering: boolean;
   loadingLabel: string;
   needsUserPlay: boolean;
   hasAudioOnly: boolean;
@@ -106,6 +107,7 @@ export function RetroPreviewView({
     width: number;
     height: number;
   } | null>(null);
+  const [isStartingPlay, setIsStartingPlay] = React.useState(false);
 
   const previewFrameRef = React.useRef<HTMLDivElement | null>(null);
   const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
@@ -207,6 +209,11 @@ export function RetroPreviewView({
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetrics(null);
   }, [isFitWidthEnabled]);
+
+  // Reset isStartingPlay once the video begins playing (needsUserPlay clears).
+  React.useEffect(() => {
+    if (!player.needsUserPlay) setIsStartingPlay(false);
+  }, [player.needsUserPlay]);
 
 
   // Auto-pin when the settings panel is open and user scrolls up.
@@ -469,9 +476,9 @@ export function RetroPreviewView({
               aria-label="Exit maximize"
               title="Exit maximize"
               onClick={() => { setIsPreviewMaximized(false); }}
-              className="safe-top-right-offset absolute z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
+              className="safe-top-right-offset absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
             >
-              <Minimize2 size={18} />
+              <Minimize2 size={16} />
             </button>
           )
         )}
@@ -562,22 +569,42 @@ export function RetroPreviewView({
             {player.needsUserPlay && !player.isLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950/46">
                 <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
-                  <p className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/80">
-                    Preview Ready
-                  </p>
-                  <p className="mt-3 text-lg font-semibold text-slate-100">
-                    Press Play to start
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Safari may require a direct user action before video and audio can begin.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => { void player.playVideoWithAudio(); }}
-                    className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
-                  >
-                    Play
-                  </button>
+                  {isStartingPlay ? (
+                    <>
+                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                      <p className="text-sm text-slate-400">Starting playback…</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/80">
+                        Preview Ready
+                      </p>
+                      <p className="mt-3 text-lg font-semibold text-slate-100">
+                        Press Play to start
+                      </p>
+                      <p className="mt-2 text-sm text-slate-400">
+                        Safari may require a direct user action before video and audio can begin.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsStartingPlay(true);
+                          void player.playVideoWithAudio();
+                        }}
+                        className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
+                      >
+                        Play
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+            {player.isBuffering && player.isPlaying && !player.isLoading && !player.needsUserPlay && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 px-4 py-3 text-center text-xs text-slate-300 backdrop-blur-sm">
+                  <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-slate-500 border-t-sky-400" />
+                  Buffering…
                 </div>
               </div>
             )}

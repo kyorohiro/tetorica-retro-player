@@ -4,6 +4,6 @@ export APPLE_ID="kyorohiro@gmail.com"
 export APPLE_PASSWORD="<password>"
 export APPLE_TEAM_ID="5H7KW7PC7C"
 
-npm run tauri build -- --target x86_64-apple-darwin
-npm run tauri build -- --target aarch64-apple-darwin
+npx tauri build --config src-tauri/tauri.ffmpeg.conf.json --target x86_64-apple-darwin -- --features ffmpeg-sidecar
+npx tauri build --config src-tauri/tauri.ffmpeg.conf.json --target aarch64-apple-darwin -- --features ffmpeg-sidecar
 

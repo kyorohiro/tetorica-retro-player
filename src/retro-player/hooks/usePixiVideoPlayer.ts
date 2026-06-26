@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -84,6 +84,7 @@ export function usePixiVideoPlayer(
   const [isPoweredOn, setIsPoweredOn] = useState<boolean>(true);
   const [loadingLabel, setLoadingLabel] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isBuffering, setIsBuffering] = useState<boolean>(false);
   const [needsUserPlay, setNeedsUserPlay] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -96,7 +97,9 @@ export function usePixiVideoPlayer(
     height: number;
   } | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [pendingRecordingFilename, setPendingRecordingFilename] = useState<string | null>(null);
+  const [isVideoFxEnabled, setIsVideoFxEnabled] = useState(true);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -141,12 +144,21 @@ export function usePixiVideoPlayer(
     console.info(`[retro-player audio recovery][${instanceLabelRef.current}] ${label}`, details);
   };
 
+  const effectiveFilterState = useMemo(
+    () => ({
+      ...filterState,
+      isFilterEnabled: filterState.isFilterEnabled && isVideoFxEnabled,
+    }),
+    [filterState, isVideoFxEnabled],
+  );
+
   const stage = useRetroPixiStage({
-    filterState,
+    filterState: effectiveFilterState,
     fitMode,
     renderResolutionScale,
     isPoweredOn,
     isPlayingRef,
+    isRecordingRef,
     previewKindRef,
     debugVideo,
   });
@@ -237,6 +249,12 @@ export function usePixiVideoPlayer(
     setNoiseLevel,
     vinylDustAmount,
     setVinylDustAmount,
+    noiseWarmthAmount,
+    setNoiseWarmthAmount,
+    noiseAirAmount,
+    setNoiseAirAmount,
+    noisePresenceAmount,
+    setNoisePresenceAmount,
     delayAmount,
     setDelayAmount,
     reverbAmount,
@@ -462,6 +480,7 @@ export function usePixiVideoPlayer(
     ensureAudioContext,
     updateAudioNodes,
     setEngineIsPlaying,
+    setIsBuffering,
     connectMediaAudio,
     rebuildAudioGraphForCurrentMedia,
     fitSprite,
@@ -610,6 +629,8 @@ export function usePixiVideoPlayer(
     }, 0);
   };
 
+  // Output format: webm (vp9+opus). VLC may play it at wrong speed due to timestamp
+  // interpretation bugs — use QuickTime, browser, or mpv for correct playback.
   const saveRecording = (chunks: Blob[], mimeType: string) => {
     if (typeof window === "undefined" || chunks.length === 0) {
       return null;
@@ -738,12 +759,14 @@ export function usePixiVideoPlayer(
       recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
+      isRecordingRef.current = false;
       setIsRecording(false);
       void ensureAudioContext();
       stopRecordingResolverRef.current?.(resolvedFilename);
       stopRecordingResolverRef.current = null;
     }, { once: true });
-    recorder.start();
+    recorder.start(100);
+    isRecordingRef.current = true;
     setIsRecording(true);
   };
 
@@ -769,6 +792,7 @@ export function usePixiVideoPlayer(
       recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
+      isRecordingRef.current = false;
       setIsRecording(false);
       stopRecordingResolverRef.current?.(pendingRecordingFilenameRef.current);
       stopRecordingResolverRef.current = null;
@@ -993,6 +1017,7 @@ export function usePixiVideoPlayer(
     audioOptimizationMode,
     loadingLabel,
     isLoading,
+    isBuffering,
     needsUserPlay,
     isPlaying,
     isMuted,
@@ -1018,6 +1043,9 @@ export function usePixiVideoPlayer(
     isNoiseEnabled,
     noiseLevel,
     vinylDustAmount,
+    noiseWarmthAmount,
+    noiseAirAmount,
+    noisePresenceAmount,
     delayAmount,
     reverbAmount,
     chorusAmount,
@@ -1071,6 +1099,10 @@ export function usePixiVideoPlayer(
     toggleAudioFx: () => {
       setIsAudioFxEnabled((current) => !current);
     },
+    isVideoFxEnabled,
+    toggleVideoFx: () => {
+      setIsVideoFxEnabled((current) => !current);
+    },
     setLofiAmount,
     setRadioToneAmount,
     setBitCrushAmount,
@@ -1087,6 +1119,9 @@ export function usePixiVideoPlayer(
     },
     setNoiseLevel,
     setVinylDustAmount,
+    setNoiseWarmthAmount,
+    setNoiseAirAmount,
+    setNoisePresenceAmount,
     setDelayAmount,
     setReverbAmount,
     setChorusAmount,

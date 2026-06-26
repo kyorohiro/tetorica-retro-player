@@ -7,6 +7,8 @@ import {
   MonitorUp,
   Pin,
   RefreshCw,
+  Waves,
+  Wifi,
   X,
 } from "lucide-react";
 import "./App.css";
@@ -26,9 +28,13 @@ import {
   isAudio,
   isImage,
   isVideo,
+  isVideoExtended,
+  mimeFromPath,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
+import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
+import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -56,6 +62,10 @@ function App() {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
   const previewSource = usePreviewSourceState();
+  const [isMDropReady, setIsMDropReady] = React.useState(false);
+  const [mDropPort, setMDropPort] = React.useState<number | null>(null);
+  const [mDropIp, setMDropIp] = React.useState<string | null>(null);
+  const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
@@ -75,6 +85,7 @@ function App() {
   const retroPlayerKey = "player:root";
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
+  const { showMDropSharedListDialog } = useMDropSharedListDialog();
 
   const finishPreparingSelection = useCallback(() => {
     pickerStateRef.current = "idle";
@@ -85,6 +96,131 @@ function App() {
   React.useEffect(() => {
     saveLocalePreference(localePreference);
   }, [localePreference]);
+
+  // Desktop: auto-start mDrop server on mount.
+  // isMDropReady drives the file picker choice (Tauri dialog vs <input>).
+  React.useEffect(() => {
+    mdropGetServerStatus()
+      .then((status) => { setIsMDropReady(status.running); })
+      .catch(() => { setIsMDropReady(false); });
+  }, []);
+
+  // Sync mDrop API key + actual port into window.__MDROP_CONFIG__.
+  React.useEffect(() => {
+    if (!isMDropReady) return;
+    Promise.all([mdropGetConfig(), mdropGetServerStatus()]).then(([config, status]) => {
+      if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
+      window.__MDROP_CONFIG__.apiKey = config.apiKey;
+      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port ?? 7878}`;
+      setMDropPort(status.port);
+      setMDropIp(status.ips?.[0] ?? null);
+    }).catch(() => {});
+  }, [isMDropReady]);
+
+  // Refs to avoid stale closures in async Tauri event callbacks
+  const isMDropReadyRef = React.useRef(isMDropReady);
+  React.useEffect(() => {
+    isMDropReadyRef.current = isMDropReady;
+  }, [isMDropReady]);
+
+  const isFfmpegEnabledRef = React.useRef(isFfmpegEnabled);
+  React.useEffect(() => {
+    isFfmpegEnabledRef.current = isFfmpegEnabled;
+  }, [isFfmpegEnabled]);
+
+  const previewSourceRef = React.useRef(previewSource);
+  React.useEffect(() => {
+    previewSourceRef.current = previewSource;
+  }, [previewSource]);
+
+  const showMDropSharedListDialogRef = React.useRef(showMDropSharedListDialog);
+  React.useEffect(() => {
+    showMDropSharedListDialogRef.current = showMDropSharedListDialog;
+  }, [showMDropSharedListDialog]);
+
+  const showBrowserFileListDialogRef = React.useRef(showBrowserFileListDialog);
+  React.useEffect(() => {
+    showBrowserFileListDialogRef.current = showBrowserFileListDialog;
+  }, [showBrowserFileListDialog]);
+
+  // Tauri native OS drag-drop → mDrop HTTP URL
+  React.useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      unlisten = await getCurrentWindow().onDragDropEvent(async (event) => {
+        console.log("[mDrop] onDragDropEvent", event.payload.type, event.payload);
+        if (event.payload.type !== "drop") return;
+
+        const paths = event.payload.paths;
+        console.log("[mDrop] paths:", paths, "isMDropReady:", isMDropReadyRef.current);
+        if (paths.length === 0) return;
+
+        try {
+          if (isMDropReadyRef.current) {
+            // mDrop ON: share all files, play single or show list
+            const raw = await Promise.all(paths.map((p) => mdropShareFile(p)));
+            const sharedFiles = isFfmpegEnabledRef.current
+              ? raw.map((f) => ({
+                  ...f,
+                  url: (f.isDir || (!isVideoExtended(f.path) && !isAudio(f.path)))
+                    ? f.url
+                    : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
+                }))
+              : raw;
+            if (sharedFiles.length === 1 && !sharedFiles[0].isDir && (isVideoExtended(sharedFiles[0].path) || isAudio(sharedFiles[0].path) || isImage(sharedFiles[0].path))) {
+              const f = sharedFiles[0];
+              previewSourceRef.current.previewPath(f.url, f.path);
+            } else {
+              await showMDropSharedListDialogRef.current({
+                files: sharedFiles,
+                useHls: isFfmpegEnabledRef.current,
+                onPlay: (url, path) => { previewSourceRef.current.previewPath(url, path); },
+              });
+            }
+          } else {
+            // mDrop OFF: Tauri intercepts OS drag-drop; DOM events do not fire.
+            // Use asset:// protocol (assetProtocol.enable: true in tauri.conf.json).
+            const { convertFileSrc } = await import("@tauri-apps/api/core");
+
+            if (paths.length === 1 && (isVideo(paths[0]) || isAudio(paths[0]) || isImage(paths[0]))) {
+              // Single media: use asset:// URL directly (Range request support, no memory pressure)
+              previewSourceRef.current.previewPath(convertFileSrc(paths[0]), paths[0]);
+            } else {
+              // Non-media or multiple files: fetch as blobs to get real File objects for the dialog
+              const fileEntries: FileTargetFile[] = [];
+              for (const p of paths) {
+                const name = p.split("/").pop() ?? p;
+                try {
+                  const res = await fetch(convertFileSrc(p));
+                  const blob = await res.blob();
+                  const mime = mimeFromPath(p) || blob.type;
+                  fileEntries.push({
+                    id: "", entry: new File([blob], name, { type: mime }),
+                    isDir: false, isFile: true, path: name,
+                    createdAt: 0, modifiedAt: 0, size: blob.size, isRoot: true,
+                  });
+                } catch (e) {
+                  console.error("[mDrop OFF] fetch failed:", p, e);
+                }
+              }
+              if (fileEntries.length > 0) {
+                await showBrowserFileListDialogRef.current({ files: fileEntries, initialPath: "/", title: "" });
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[mDrop] drag-drop share failed:", e);
+        }
+      });
+    };
+
+    setup();
+    return () => { unlisten?.(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     const clearIfPickerWasCancelled = () => {
@@ -233,14 +369,15 @@ function App() {
 
   const onDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
+    console.log("[onDrop] React DragEvent fired (browser-context drop)");
+    // mDrop ON in Tauri: onDragDropEvent handles it via HTTP; skip DOM path to avoid double handling
+    if (isTauriRuntime() && isMDropReadyRef.current) return;
     const droppedFiles = await getDroppedFiles(event);
     const uniqueMap = new Map<string, FileWithRelativePath>();
-
     for (const file of droppedFiles) {
       const key = file.webkitRelativePath || file.name;
       uniqueMap.set(key, file);
     }
-
     const targets = Array.from(uniqueMap.values());
     await openFiles(targets);
   };
@@ -251,16 +388,56 @@ function App() {
 
   const handleOpenFilePicker = useCallback(async () => {
     await waitForExternalNavigationPause();
+
+    if (isMDropReady) {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { invoke } = await import("@tauri-apps/api/core");
+      setIsMobileMenuOpen(false);
+      const selected = await open({
+        multiple: false,
+        filters: [
+          { name: "Video", extensions: ["mp4", "m4v", "mov", "mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "mts", "ogv"] },
+          { name: "Audio", extensions: ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "wma"] },
+          { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif", "heic", "heif", "bmp"] },
+        ],
+      });
+      if (!selected || Array.isArray(selected)) return;
+      const shared = await invoke<{ id: string; name: string; path: string; url: string }>(
+        "mdrop_share_file",
+        { req: { path: selected } }
+      );
+      const playUrl = isFfmpegEnabled
+        ? `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`
+        : shared.url;
+      previewSource.previewPath(playUrl, selected);
+      return;
+    }
+
     beginPreparingSelection();
     fileInputRef.current?.click();
-  }, [beginPreparingSelection]);
+  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, previewSource]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
     await waitForExternalNavigationPause();
+
+    if (isMDropReady) {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      setIsMobileMenuOpen(false);
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected || Array.isArray(selected)) return;
+      // フォルダーは従来通り FileList ダイアログで展開
+      const { getFiles } = await import("./mdrop-web/api");
+      const files = await getFiles("", selected as string).catch(() => []);
+      if (files.length > 0) {
+        await showBrowserFileListDialog({ files, initialPath: "/", title: "" });
+      }
+      return;
+    }
+
     beginPreparingSelection();
     folderInputRef.current?.click();
-  }, [beginPreparingSelection, isIosOrAndroid]);
+  }, [beginPreparingSelection, isIosOrAndroid, isMDropReady, showBrowserFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -283,6 +460,22 @@ function App() {
     await getCurrentWindow().setAlwaysOnTop(next);
   }, [isWindowAlwaysOnTop]);
 
+  const handleMDropToggle = useCallback(async () => {
+    if (isMDropReady) {
+      await mdropStopServer().catch(() => {});
+      setIsMDropReady(false);
+    } else {
+      const status = await mdropStartServer({ hostname: "localhost", localOnly: true }).catch(() => null);
+      setIsMDropReady(status?.running ?? false);
+      if (status?.running && status.port) {
+        if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
+        window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
+        setMDropPort(status.port);
+        setMDropIp(status.ips?.[0] ?? null);
+      }
+    }
+  }, [isMDropReady]);
+
   const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
     setLocalePreference(nextPreference);
   }, []);
@@ -290,7 +483,7 @@ function App() {
   return (
     <>
       {/* Fixed nav buttons: kept outside <main> so overflow-x-hidden on <main> cannot clip them in WebKit */}
-      <div className="safe-top-offset fixed left-3 z-[9999] flex items-center gap-1">
+      <div className="safe-top-offset fixed left-3 z-9999 flex items-center gap-1">
         <button
           type="button"
           aria-expanded={isMobileMenuOpen}
@@ -307,9 +500,9 @@ function App() {
           aria-label={t(locale, "reloadApp")}
           title={t(locale, "reloadApp")}
           onClick={handleReloadApp}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={16} />
         </button>
         {isTauriRuntime() && (
           <button
@@ -320,18 +513,64 @@ function App() {
               : isWindowAlwaysOnTop ? "Always on top: off" : "Always on top"}
             onClick={() => { void handleWindowPinToggle(); }}
             className={[
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              "inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
               isWindowAlwaysOnTop
                 ? "border-sky-400/80 bg-sky-500/20 text-sky-700 hover:bg-sky-500/30"
                 : "border-slate-300/80 bg-white/88 text-slate-700 hover:bg-white",
             ].join(" ")}
           >
-            <Pin size={18} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
+            <Pin size={16} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
           </button>
         )}
       </div>
+      {/* mDrop / ffmpeg pills — top-right */}
+      <div className="safe-top-offset-right fixed right-10 z-9999 flex flex-col items-end gap-0.5">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
+            title={locale === "ja"
+              ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
+              : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
+            onClick={() => { void handleMDropToggle(); }}
+            className={[
+              "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
+              isMDropReady
+                ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
+                : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+            ].join(" ")}
+          >
+            <Wifi size={13} />
+            <span>mDrop</span>
+          </button>
+          {isMDropReady && (
+            <button
+              type="button"
+              aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+              title={locale === "ja"
+                ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
+                : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
+              onClick={() => setIsFfmpegEnabled((v) => !v)}
+              className={[
+                "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
+                isFfmpegEnabled
+                  ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
+                  : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+              ].join(" ")}
+            >
+              <Waves size={13} />
+              <span>ffmpeg</span>
+            </button>
+          )}
+        </div>
+        {isMDropReady && mDropPort && (
+          <span className="-mt-1.5 px-1 font-mono text-[10px] text-slate-500">
+            {mDropIp ? `${mDropIp}:${mDropPort}` : `:${mDropPort}`}
+          </span>
+        )}
+      </div>
       {isMobileMenuOpen && (
-        <div className="safe-top-menu fixed left-3 z-[9999] w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+        <div className="safe-top-menu fixed left-3 z-9999 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"

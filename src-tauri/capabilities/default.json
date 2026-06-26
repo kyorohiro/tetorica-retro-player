@@ -7,6 +7,8 @@
     "core:default",
     "core:window:allow-set-always-on-top",
     "opener:default",
-    "sharekit:default"
+    "sharekit:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

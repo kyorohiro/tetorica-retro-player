@@ -21,15 +21,15 @@ type FileTargetFile = TargetFile & {
     entry?: File;
 };
 
-const getMeta = async (): Promise<{ apiServer: string }> => {
-    const apiServer = window.__MDROP_CONFIG__?.apiServer;
+const getMeta = async (): Promise<{ apiServer: string; hasFfmpeg: boolean }> => {
+    const cfg = window.__MDROP_CONFIG__;
+    const apiServer = cfg?.apiServer;
+    const hasFfmpeg = (cfg as { hasFfmpeg?: boolean } | undefined)?.hasFfmpeg === true;
     if (!apiServer || apiServer == "") {
         const url = new URL(window.location.href);
-        return {
-            apiServer: url.origin,
-        }
+        return { apiServer: url.origin, hasFfmpeg };
     }
-    return {apiServer:apiServer} as { apiServer: string };
+    return { apiServer, hasFfmpeg };
 };
 
 const getDownloadList = async (): Promise<Target[]> => {

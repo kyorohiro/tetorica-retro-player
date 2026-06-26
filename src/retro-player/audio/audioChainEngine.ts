@@ -141,14 +141,18 @@ export function createTintedNoiseBuffer(context: BaseAudioContext): AudioBuffer 
   let airState = 0;
   for (let i = 0; i < length; i++) {
     const white = Math.random() * 2 - 1;
-    brownState = (brownState + white * 0.045) / 1.045;
+    // Heavier brownian accumulation → more low-end warmth
+    brownState = (brownState + white * 0.06) / 1.06;
     airState = airState * 0.82 + white * 0.18;
-    const body = brownState * 1.35;
-    const air = (white - airState) * 0.55;
-    const sample = Math.max(-1, Math.min(1, body + air));
+    const body = brownState * 2.2;
+    // Reduced air component → less harsh high-frequency hiss
+    const air = (white - airState) * 0.15;
+    const preSat = body + air;
+    // Soft even-harmonic saturation (x - α·x|x|) adds tube-like glow
+    const sample = Math.max(-1, Math.min(1, preSat - preSat * Math.abs(preSat) * 0.12));
     for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
       const channelData = buffer.getChannelData(channel);
-      const channelJitter = (Math.random() * 2 - 1) * 0.012;
+      const channelJitter = (Math.random() * 2 - 1) * 0.008;
       channelData[i] = Math.max(-1, Math.min(1, sample + channelJitter));
     }
   }
@@ -381,19 +385,27 @@ export async function buildAudioChain(
   const noiseSourceNode = audioCtx.createBufferSource();
   noiseSourceNode.buffer = createTintedNoiseBuffer(audioCtx);
   noiseSourceNode.loop = true;
+  // Tube noise filter chain:
+  // highpass @ 220Hz (pass warmth) → lowpass @ 4500Hz (soft highs)
+  // → warmth boost @ 350Hz → harshness cut @ 3200Hz
   const noiseHighpassNode = audioCtx.createBiquadFilter();
   noiseHighpassNode.type = "highpass";
-  noiseHighpassNode.frequency.value = 1100;
-  noiseHighpassNode.Q.value = 0.25;
+  noiseHighpassNode.frequency.value = 220;
+  noiseHighpassNode.Q.value = 0.5;
   const noiseLowpassNode = audioCtx.createBiquadFilter();
   noiseLowpassNode.type = "lowpass";
-  noiseLowpassNode.frequency.value = 5600;
-  noiseLowpassNode.Q.value = 0.18;
+  noiseLowpassNode.frequency.value = 4500;
+  noiseLowpassNode.Q.value = 0.2;
+  const noiseWarmthNode = audioCtx.createBiquadFilter();
+  noiseWarmthNode.type = "peaking";
+  noiseWarmthNode.frequency.value = 350;
+  noiseWarmthNode.Q.value = 0.9;
+  noiseWarmthNode.gain.value = 1.5;
   const noiseFilterNode = audioCtx.createBiquadFilter();
   noiseFilterNode.type = "peaking";
-  noiseFilterNode.frequency.value = 2400;
-  noiseFilterNode.Q.value = 0.7;
-  noiseFilterNode.gain.value = -2.5;
+  noiseFilterNode.frequency.value = 3200;
+  noiseFilterNode.Q.value = 0.8;
+  noiseFilterNode.gain.value = -2.0;
   const noisePannerNode = audioCtx.createStereoPanner();
   const noiseGainNode = audioCtx.createGain();
   noiseGainNode.gain.value = 0;
@@ -405,7 +417,8 @@ export async function buildAudioChain(
 
   noiseSourceNode.connect(noiseHighpassNode);
   noiseHighpassNode.connect(noiseLowpassNode);
-  noiseLowpassNode.connect(noiseFilterNode);
+  noiseLowpassNode.connect(noiseWarmthNode);
+  noiseWarmthNode.connect(noiseFilterNode);
   noiseFilterNode.connect(noisePannerNode);
   noisePannerNode.connect(noiseGainNode);
   noiseGainNode.connect(masterGainNode);

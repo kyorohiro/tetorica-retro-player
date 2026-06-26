@@ -10,6 +10,7 @@ type PreviewDialogOptions = {
     files: TargetFile[];
     initialIndex: number;
     isRetro?: boolean;
+    useHls?: boolean;
     apiServer?: string;
     coverSrc?: string;
     getObjectUrl?: (
@@ -61,6 +62,7 @@ function PreviewDialog({
     files,
     initialIndex,
     isRetro = false,
+    useHls = false,
     apiServer = "",
     coverSrc,
     getObjectUrl,
@@ -247,6 +249,7 @@ function PreviewDialog({
                     key={`${file.id}:${file.path}`}
                     file={file}
                     isRetro={isRetro}
+                    useHls={useHls}
                     apiServer={apiServer}
                     getObjectUrl={getObjectUrl}
                     onLoadingMessage={setLoadingMessage}
