@@ -44,6 +44,10 @@ export function useLongPress(
     [onShortPress],
   );
 
+  const onContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+  }, []);
+
   return {
     isHolding,
     onPointerDown,
@@ -51,5 +55,6 @@ export function useLongPress(
     onPointerLeave: cancel,
     onPointerCancel: cancel,
     onClick,
+    onContextMenu,
   };
 }
