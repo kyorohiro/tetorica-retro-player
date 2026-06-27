@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -61,7 +61,7 @@ export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
   renderResolutionScale = 1,
-  options?: { onEnded?: () => void },
+  options?: { onEnded?: () => void; onError?: (error: Error) => void },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const objectUrlRef = useRef<string | null>(null);
@@ -80,9 +80,14 @@ export function usePixiVideoPlayer(
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
   const wasPlayingBeforePowerOffRef = useRef(false);
   const onEndedRef = useRef<(() => void) | undefined>(options?.onEnded);
+  const onErrorRef = useRef<((error: Error) => void) | undefined>(options?.onError);
 
   const [previewName, setPreviewName] = useState<string>("");
-  const [previewError, setPreviewError] = useState<string>("");
+  const [previewError, _setPreviewErrorState] = useState<string>("");
+  const setPreviewError = useCallback((msg: string) => {
+    _setPreviewErrorState(msg);
+    if (msg) onErrorRef.current?.(new Error(msg));
+  }, []);
   const [isPoweredOn, setIsPoweredOn] = useState<boolean>(true);
   const [loadingLabel, setLoadingLabel] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -511,6 +516,10 @@ export function usePixiVideoPlayer(
   useEffect(() => {
     onEndedRef.current = options?.onEnded;
   }, [options?.onEnded]);
+
+  useEffect(() => {
+    onErrorRef.current = options?.onError;
+  }, [options?.onError]);
 
   useEffect(() => {
     cleanupPreviewRef.current = cleanupPreview;
