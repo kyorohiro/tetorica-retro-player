@@ -6,6 +6,8 @@ import {
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1 } from "../retro/filterPass1Shader.ts";
 import { FILTER_FRAGMENT_PASS2 } from "../retro/filterPass2Shader.ts";
+import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
+import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 
 export type RetroVideoFilterState = {
   targetWidth: number;
@@ -420,55 +422,6 @@ async function waitAndVerifyPrograms(
   }
 }
 
-async function waitForProgramCompletion(
-  gl: WebGL2RenderingContext,
-  program: WebGLProgram,
-  label: string,
-): Promise<boolean> {
-  const ext = getParallelShaderCompileExtension(gl);
-  if (!ext) {
-    TetoricaRetroVideoPipeline.showDebug(`${label}: no parallel-compile ext, using program as-is`);
-    return !gl.isContextLost();
-  }
-
-  let frames = 0;
-  await new Promise<void>((resolve) => {
-    const poll = () => {
-      if (gl.isContextLost()) {
-        resolve();
-        return;
-      }
-
-      const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR) as boolean;
-      TetoricaRetroVideoPipeline.showDebug(`${label}: poll#${++frames} done=${done ? 1 : 0}`);
-      if (done) resolve();
-      else requestAnimationFrame(poll);
-    };
-
-    requestAnimationFrame(poll);
-  });
-
-  return !gl.isContextLost();
-}
-
-function verifyProgramLinkStatus(
-  gl: WebGL2RenderingContext,
-  program: WebGLProgram,
-  label: string,
-): boolean {
-  if (gl.isContextLost()) {
-    return false;
-  }
-
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const msg = gl.getProgramInfoLog(program) ?? "unknown";
-    TetoricaRetroVideoPipeline.showDebug(`${label}: LINK FAILED: ${msg}`);
-    return false;
-  }
-
-  return true;
-}
-
 export class TetoricaRetroVideoPipeline {
   private static debugEl: HTMLElement | null = null;
 
@@ -576,39 +529,23 @@ export class TetoricaRetroVideoPipeline {
 
     if (isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile()) {
       requestAnimationFrame(async () => {
-        TetoricaRetroVideoPipeline.showDebug(
-          "filter: Windows sequential compile start (pass1 -> pass2)",
-        );
+        try {
+          TetoricaRetroVideoPipeline.showDebug("filter: loading Windows lite fallback...");
 
-        const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1);
-        TetoricaRetroVideoPipeline.showDebug("filter: Windows pass1 compile submitted (wait 3s)...");
-        await new Promise<void>(resolve => setTimeout(resolve, 3000));
-        if (!await waitForProgramCompletion(gl, pass1Program, "filter: Windows pass1")) {
-          gl.deleteProgram(pass1Program);
-          return;
-        }
-        if (!verifyProgramLinkStatus(gl, pass1Program, "filter: Windows pass1")) {
-          gl.deleteProgram(pass1Program);
-          return;
-        }
+          const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1_LITE);
+          const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2_LITE);
+          await waitAndVerifyPrograms(gl, [pass1Program, pass2Program]);
+          if (gl.isContextLost()) return;
 
-        const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
-        TetoricaRetroVideoPipeline.showDebug("filter: Windows pass2 compile submitted (wait 1.5s)...");
-        await new Promise<void>(resolve => setTimeout(resolve, 1500));
-        if (!await waitForProgramCompletion(gl, pass2Program, "filter: Windows pass2")) {
-          gl.deleteProgram(pass1Program);
-          gl.deleteProgram(pass2Program);
-          return;
+          pipeline.setFilterPrograms(pass1Program, pass2Program);
+          onFilterReady?.();
+          TetoricaRetroVideoPipeline.showDebug("filter: Windows lite fallback LOADED");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          TetoricaRetroVideoPipeline.showDebug(
+            `filter: Windows lite fallback failed, using passthrough (${message})`,
+          );
         }
-        if (!verifyProgramLinkStatus(gl, pass2Program, "filter: Windows pass2")) {
-          gl.deleteProgram(pass1Program);
-          gl.deleteProgram(pass2Program);
-          return;
-        }
-
-        pipeline.setFilterPrograms(pass1Program, pass2Program);
-        onFilterReady?.();
-        TetoricaRetroVideoPipeline.showDebug("filter: Windows sequential LOADED (2-pass)");
       });
 
       return pipeline;

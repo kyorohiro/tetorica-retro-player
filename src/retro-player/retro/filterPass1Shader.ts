@@ -16,6 +16,9 @@ uniform float uPaletteMode;
 uniform float uGlowStrength;
 uniform float uSmoothStrength;
 uniform float uToonSteps;
+uniform float uEdgeBoost;
+uniform float uAnimeEdgeLow;
+uniform float uAnimeEdgeHigh;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
 uniform float uNeonSaturation;
@@ -533,6 +536,65 @@ vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint, ve
   return monochromePalette(color, max(levels, 2.0), monoTint);
 }
 
+vec3 sampleProcessedSourceColor(vec2 sampleUv, vec2 sampleCell, vec2 texel)
+{
+  float smoothStrength = clamp(uSmoothStrength, 0.0, 1.0);
+  vec3 sampleColor = smoothSourceColor(uTexture, sampleUv, texel, smoothStrength);
+  bool isPc98Tile = uPaletteMode > 1.5 && uPaletteMode < 2.5;
+  if (isPc98Tile) {
+    sampleColor = samplePc98TileSource(uTexture, sampleCell, uTargetSize);
+  }
+
+  float sampleDither = (bayer4x4(sampleCell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
+  sampleColor = clamp(sampleColor + sampleDither, 0.0, 1.0);
+  sampleColor = applyToonShading(sampleColor, uToonSteps);
+
+  bool isNeon = uPaletteMode > 8.5 && uPaletteMode < 9.5;
+  if (isNeon) {
+    return applyNeonLinePalette(uTexture, sampleUv, texel, max(uColorLevels, 2.0), uMonoTint);
+  }
+
+  return applyPalette(sampleColor, uColorLevels, uPaletteMode, uMonoTint, sampleCell);
+}
+
+float sampleProcessedLuminance(vec2 sampleUv, vec2 sampleCell, vec2 texel)
+{
+  return dot(sampleProcessedSourceColor(sampleUv, sampleCell, texel), vec3(0.299, 0.587, 0.114));
+}
+
+float computeAnimeEdge(vec2 uv, vec2 texel)
+{
+  vec3 tl = texture(uTexture, clamp(uv + vec2(-texel.x, -texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 tc = texture(uTexture, clamp(uv + vec2( 0.0,     -texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 tr = texture(uTexture, clamp(uv + vec2( texel.x, -texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 ml = texture(uTexture, clamp(uv + vec2(-texel.x,  0.0    ), vec2(0.0), vec2(1.0))).rgb;
+  vec3 mr = texture(uTexture, clamp(uv + vec2( texel.x,  0.0    ), vec2(0.0), vec2(1.0))).rgb;
+  vec3 bl = texture(uTexture, clamp(uv + vec2(-texel.x,  texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 bc = texture(uTexture, clamp(uv + vec2( 0.0,      texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 br = texture(uTexture, clamp(uv + vec2( texel.x,  texel.y), vec2(0.0), vec2(1.0))).rgb;
+
+  vec3 gx = -tl + tr - 2.0*ml + 2.0*mr - bl + br;
+  vec3 gy = -tl - 2.0*tc - tr + bl + 2.0*bc + br;
+  return clamp(length(vec2(length(gx), length(gy))) * 0.4, 0.0, 1.0);
+}
+
+float computeEdgeBoost(vec2 uv, vec2 texel, vec2 cell)
+{
+  float tl = sampleProcessedLuminance(clamp(uv + vec2(-texel.x, -texel.y), vec2(0.0), vec2(1.0)), cell + vec2(-1.0, -1.0), texel);
+  float tc = sampleProcessedLuminance(clamp(uv + vec2(0.0, -texel.y), vec2(0.0), vec2(1.0)), cell + vec2(0.0, -1.0), texel);
+  float tr = sampleProcessedLuminance(clamp(uv + vec2(texel.x, -texel.y), vec2(0.0), vec2(1.0)), cell + vec2(1.0, -1.0), texel);
+  float ml = sampleProcessedLuminance(clamp(uv + vec2(-texel.x, 0.0), vec2(0.0), vec2(1.0)), cell + vec2(-1.0, 0.0), texel);
+  float mr = sampleProcessedLuminance(clamp(uv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0)), cell + vec2(1.0, 0.0), texel);
+  float bl = sampleProcessedLuminance(clamp(uv + vec2(-texel.x, texel.y), vec2(0.0), vec2(1.0)), cell + vec2(-1.0, 1.0), texel);
+  float bc = sampleProcessedLuminance(clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0)), cell + vec2(0.0, 1.0), texel);
+  float br = sampleProcessedLuminance(clamp(uv + vec2(texel.x, texel.y), vec2(0.0), vec2(1.0)), cell + vec2(1.0, 1.0), texel);
+
+  float gx = -tl + tr - 2.0 * ml + 2.0 * mr - bl + br;
+  float gy = -tl - 2.0 * tc - tr + bl + 2.0 * bc + br;
+  float gradient = length(vec2(gx, gy));
+  return clamp(pow(clamp(gradient * 0.85, 0.0, 1.0), 0.9), 0.0, 1.0);
+}
+
 
 void main(void)
 {
@@ -581,7 +643,27 @@ void main(void)
       color.rgb += glow * glowMask * uGlowStrength;
     }
   }
-  // Edge boost is applied in Pass 2 on the FBO output (much cheaper: no palette re-evaluation)
+  color.rgb = clamp(color.rgb, 0.0, 1.0);
+
+  float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
+  if (edgeBoost > 0.001) {
+    if (uToonSteps >= 1.0) {
+      float edge = computeAnimeEdge(pixelatedUv, texel);
+      float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float adaptedLow = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, lum));
+      float edgeMix = smoothstep(adaptedLow, uAnimeEdgeHigh, edge) * edgeBoost;
+      color.rgb = mix(color.rgb, vec3(0.0), clamp(edgeMix, 0.0, 1.0));
+    } else {
+      float edge = computeEdgeBoost(pixelatedUv, texel, cell);
+      float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float darkPreference = 1.0 - smoothstep(0.45, 0.92, luminance);
+      float edgeMix = smoothstep(0.04, 0.75, edge) * min(edgeBoost, 1.0) * (0.55 + darkPreference * 0.45);
+      float edgeShade = edge * (0.12 + edgeBoost * 0.34) * (0.65 + darkPreference * 0.55);
+      vec3 edgeColor = color.rgb * (1.0 - edgeShade);
+      color.rgb = clamp(mix(color.rgb, edgeColor, edgeMix), 0.0, 1.0);
+    }
+  }
+
   finalColor = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
 }
 `;
