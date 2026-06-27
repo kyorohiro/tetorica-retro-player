@@ -919,6 +919,7 @@ function App() {
 
         <div className="relative flex-1 min-h-0">
           <React.Suspense fallback={null}>
+            {
             <RetroPlayer
               locale={locale}
               key={retroPlayerKey}
@@ -934,6 +935,7 @@ function App() {
               loopMode={loopMode}
               onCycleLoopMode={cycleLoopMode}
             />
+            }
           </React.Suspense>
           {showFfmpegRetry && (
             <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">

@@ -377,9 +377,10 @@ export function useRetroPixiStage({
           ) / 10,
       });
 
+      const pipeline = await TetoricaRetroVideoPipeline.create(gl);
       const app: CanvasStageApp = {
         canvas,
-        pipeline: new TetoricaRetroVideoPipeline(gl),
+        pipeline,
         ticker: {
           start: startTicker,
           stop: stopTicker,
