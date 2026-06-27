@@ -71,7 +71,13 @@ function App() {
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   const [playlistFiles, setPlaylistFiles] = React.useState<File[]>([]);
   const [_playlistIndex, setPlaylistIndex] = React.useState(0);
-  const [isAutoPlay, setIsAutoPlay] = React.useState(false);
+  type LoopMode = "loop" | "autoplay" | "off";
+  const [loopMode, setLoopMode] = React.useState<LoopMode>("loop");
+  const loopModeRef = React.useRef<LoopMode>(loopMode);
+  React.useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
+  const cycleLoopMode = React.useCallback(() => {
+    setLoopMode((m) => m === "loop" ? "autoplay" : m === "autoplay" ? "off" : "loop");
+  }, []);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -334,7 +340,7 @@ function App() {
       }
 
       const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
-      if (mediaFiles.length > 1 && mediaFiles.length === files.length) {
+      if (loopModeRef.current === "autoplay" && mediaFiles.length > 1 && mediaFiles.length === files.length) {
         setPlaylistFiles(mediaFiles);
         setPlaylistIndex(0);
         previewSource.previewFile(mediaFiles[0]);
@@ -373,10 +379,10 @@ function App() {
   }, [previewSource]);
 
   const handleEnded = useCallback(() => {
-    if (isAutoPlay) {
+    if (loopMode === "autoplay") {
       nextTrack();
     }
-  }, [isAutoPlay, nextTrack]);
+  }, [loopMode, nextTrack]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -798,12 +804,12 @@ function App() {
               stream={previewSource.previewStream}
               streamName={previewSource.previewLabel}
               kind={previewSource.previewKind ?? defaultPreviewKind}
-              looping={!isUsingDefaultPreview && !isAutoPlay}
+              looping={!isUsingDefaultPreview && loopMode === "loop"}
               onEnded={handleEnded}
               onPrevTrack={playlistFiles.length > 1 ? prevTrack : undefined}
               onNextTrack={playlistFiles.length > 1 ? nextTrack : undefined}
-              isAutoPlay={isAutoPlay}
-              onToggleAutoPlay={() => setIsAutoPlay((v) => !v)}
+              isAutoPlay={loopMode === "autoplay"}
+              onCycleLoopMode={cycleLoopMode}
             />
           </React.Suspense>
         </div>

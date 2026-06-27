@@ -105,7 +105,7 @@ export type RetroControlPanelProps = {
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
   isAutoPlay?: boolean;
-  onToggleAutoPlay?: () => void;
+  onCycleLoopMode?: () => void;
 };
 
 const controlsFallback = (
@@ -148,7 +148,7 @@ export function RetroControlPanel({
   onPrevTrack,
   onNextTrack,
   isAutoPlay,
-  onToggleAutoPlay,
+  onCycleLoopMode,
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
   if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
@@ -161,7 +161,7 @@ export function RetroControlPanel({
       {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
-              hasPlayback={stableHasPlayableRef.current}
+              hasPlayback={stableHasPlayableRef.current || !!onNextTrack}
               currentTime={player.currentTime}
               duration={player.duration}
               mode={
@@ -231,7 +231,7 @@ export function RetroControlPanel({
               onStepFrame={player.stepFrame}
               onToggleAudioFx={player.toggleAudioFx}
               onToggleVideoFx={() => filterState.setIsFilterEnabled(!filterState.isFilterEnabled)}
-              onToggleLoop={player.toggleLoop}
+              onToggleLoop={onCycleLoopMode ?? player.toggleLoop}
               onToggleMute={player.toggleMute}
               onToggleNoise={player.toggleNoise}
               onTogglePlayback={() => { void player.togglePlayback(); }}
@@ -249,7 +249,7 @@ export function RetroControlPanel({
               onPrevTrack={onPrevTrack}
               onNextTrack={onNextTrack}
               isAutoPlay={isAutoPlay}
-              onToggleAutoPlay={onToggleAutoPlay}
+              onCycleLoopMode={onCycleLoopMode}
             />
           </React.Suspense>
         )}

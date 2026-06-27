@@ -107,7 +107,7 @@ type VideoControlsProps = {
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
   isAutoPlay?: boolean;
-  onToggleAutoPlay?: () => void;
+  onCycleLoopMode?: () => void;
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -202,7 +202,7 @@ export const VideoControls = memo(function VideoControls({
   onPrevTrack,
   onNextTrack,
   isAutoPlay,
-  onToggleAutoPlay,
+  onCycleLoopMode,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
@@ -894,7 +894,7 @@ export const VideoControls = memo(function VideoControls({
             />
           </div>
 
-          <div className={onNextTrack ? "grid grid-cols-5 gap-2" : "grid grid-cols-4 gap-2"}>
+          <div className="grid grid-cols-4 gap-2">
             <button
               type="button"
               onClick={onTogglePlayback}
@@ -927,33 +927,17 @@ export const VideoControls = memo(function VideoControls({
             <button
               type="button"
               onClick={onToggleLoop}
-              aria-label={isLooping ? "Loop on" : "Loop off"}
-              title={isLooping ? "Loop on" : "Loop off"}
+              aria-label={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
+              title={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
               className={[
-                  "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                  isLooping
-                    ? "border-[#000000] bg-[#111014]/20"
-                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                isLooping || isAutoPlay
+                  ? "border-[#000000] bg-[#111014]/20"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
-              <RotateCcw size={16} />
+              {isAutoPlay ? <ChevronsRight size={16} /> : <RotateCcw size={16} />}
             </button>
-            {onNextTrack && (
-              <button
-                type="button"
-                onClick={onToggleAutoPlay}
-                aria-label={isAutoPlay ? "Auto play on" : "Auto play off"}
-                title={isAutoPlay ? "Auto play on" : "Auto play off"}
-                className={[
-                  "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                  isAutoPlay
-                    ? "border-[#000000] bg-[#111014]/20"
-                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-                ].join(" ")}
-              >
-                <ChevronsRight size={16} />
-              </button>
-            )}
             <div className="relative">
               <button
                 type="button"
@@ -1154,6 +1138,22 @@ export const VideoControls = memo(function VideoControls({
             Reset
           </button>
         </div>
+        {!hasPlayback && (
+          <button
+            type="button"
+            onClick={onCycleLoopMode ?? onToggleLoop}
+            aria-label={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
+            title={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
+            className={[
+              "inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#12141c]",
+              isLooping || isAutoPlay
+                ? "border-[#000000] bg-[#111014]/20"
+                : "border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
+            ].join(" ")}
+          >
+            {isAutoPlay ? <ChevronsRight size={13} /> : <RotateCcw size={13} />}
+          </button>
+        )}
         <button
           type="button"
           onClick={exportPresetFile}
