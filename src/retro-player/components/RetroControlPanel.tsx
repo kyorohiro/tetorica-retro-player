@@ -102,6 +102,10 @@ export type RetroControlPanelProps = {
   onSetMatchTargetAspect: (v: boolean) => void;
   onResetSettings: () => void;
   onImportSettings: (data: PresetFileData) => void;
+  onPrevTrack?: () => void;
+  onNextTrack?: () => void;
+  loopMode?: "one" | "autoplay" | "all" | "off";
+  onCycleLoopMode?: () => void;
 };
 
 const controlsFallback = (
@@ -141,6 +145,10 @@ export function RetroControlPanel({
   onSetMatchTargetAspect,
   onResetSettings,
   onImportSettings,
+  onPrevTrack,
+  onNextTrack,
+  loopMode,
+  onCycleLoopMode,
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
   if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
@@ -153,7 +161,7 @@ export function RetroControlPanel({
       {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
-              hasPlayback={stableHasPlayableRef.current}
+              hasPlayback={stableHasPlayableRef.current || !!onNextTrack}
               currentTime={player.currentTime}
               duration={player.duration}
               mode={
@@ -223,7 +231,7 @@ export function RetroControlPanel({
               onStepFrame={player.stepFrame}
               onToggleAudioFx={player.toggleAudioFx}
               onToggleVideoFx={() => filterState.setIsFilterEnabled(!filterState.isFilterEnabled)}
-              onToggleLoop={player.toggleLoop}
+              onToggleLoop={onCycleLoopMode ?? player.toggleLoop}
               onToggleMute={player.toggleMute}
               onToggleNoise={player.toggleNoise}
               onTogglePlayback={() => { void player.togglePlayback(); }}
@@ -238,6 +246,10 @@ export function RetroControlPanel({
                   controlPanelMode === "audio-settings" ? "playback" : "audio-settings",
                 );
               }}
+              onPrevTrack={onPrevTrack}
+              onNextTrack={onNextTrack}
+              loopMode={loopMode}
+              onCycleLoopMode={onCycleLoopMode}
             />
           </React.Suspense>
         )}
