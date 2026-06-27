@@ -456,18 +456,9 @@ export class TetoricaRetroVideoPipeline {
 
   private static showDebug(msg: string) {
     void msg;
-    // Keep the call sites for temporary investigation, but hide the on-screen
-    // debug overlay until we need it again.
-    return;
-
-    if (typeof document === "undefined") return;
-    if (!TetoricaRetroVideoPipeline.debugEl) {
-      const el = document.createElement("div");
-      el.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:13px;padding:6px 8px;white-space:pre-wrap;word-break:break-all;pointer-events:none;";
-      document.body.appendChild(el);
-      TetoricaRetroVideoPipeline.debugEl = el;
-    }
-    TetoricaRetroVideoPipeline.debugEl.textContent = msg;
+    void TetoricaRetroVideoPipeline.debugEl;
+    // Keep call sites available for later investigation, but do not render the
+    // on-screen debug overlay in normal builds.
   }
 
   private readonly gl: WebGL2RenderingContext;
