@@ -346,6 +346,12 @@ type KHRParallelShaderCompile = {
   COMPLETION_STATUS_KHR: number;
 };
 
+const getParallelShaderCompileExtension = (gl: WebGL2RenderingContext) =>
+  (
+    gl.getExtension("WEBGL_parallel_shader_compile") ??
+    gl.getExtension("KHR_parallel_shader_compile")
+  ) as KHRParallelShaderCompile | null;
+
 // Submit shader compilation and linking without blocking on status checks.
 // Caller must await completion before calling gl.getProgramParameter(LINK_STATUS).
 function submitProgram(
@@ -387,10 +393,7 @@ async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
   programs: WebGLProgram[],
 ): Promise<void> {
-  const ext = (
-    gl.getExtension("WEBGL_parallel_shader_compile") ??
-    gl.getExtension("KHR_parallel_shader_compile")
-  ) as KHRParallelShaderCompile | null;
+  const ext = getParallelShaderCompileExtension(gl);
 
   if (ext) {
     await new Promise<void>((resolve) => {
@@ -415,6 +418,55 @@ async function waitAndVerifyPrograms(
       throw new Error(message);
     }
   }
+}
+
+async function waitForProgramCompletion(
+  gl: WebGL2RenderingContext,
+  program: WebGLProgram,
+  label: string,
+): Promise<boolean> {
+  const ext = getParallelShaderCompileExtension(gl);
+  if (!ext) {
+    TetoricaRetroVideoPipeline.showDebug(`${label}: no parallel-compile ext, using program as-is`);
+    return !gl.isContextLost();
+  }
+
+  let frames = 0;
+  await new Promise<void>((resolve) => {
+    const poll = () => {
+      if (gl.isContextLost()) {
+        resolve();
+        return;
+      }
+
+      const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR) as boolean;
+      TetoricaRetroVideoPipeline.showDebug(`${label}: poll#${++frames} done=${done ? 1 : 0}`);
+      if (done) resolve();
+      else requestAnimationFrame(poll);
+    };
+
+    requestAnimationFrame(poll);
+  });
+
+  return !gl.isContextLost();
+}
+
+function verifyProgramLinkStatus(
+  gl: WebGL2RenderingContext,
+  program: WebGLProgram,
+  label: string,
+): boolean {
+  if (gl.isContextLost()) {
+    return false;
+  }
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const msg = gl.getProgramInfoLog(program) ?? "unknown";
+    TetoricaRetroVideoPipeline.showDebug(`${label}: LINK FAILED: ${msg}`);
+    return false;
+  }
+
+  return true;
 }
 
 export class TetoricaRetroVideoPipeline {
@@ -524,47 +576,39 @@ export class TetoricaRetroVideoPipeline {
 
     if (isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile()) {
       requestAnimationFrame(async () => {
-        const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
-
         TetoricaRetroVideoPipeline.showDebug(
-          "filter: Windows fallback compile (pass2 only, wait 1.5s)...",
+          "filter: Windows sequential compile start (pass1 -> pass2)",
         );
-        await new Promise<void>(resolve => setTimeout(resolve, 1500));
 
-        const ext = (
-          gl.getExtension("WEBGL_parallel_shader_compile") ??
-          gl.getExtension("KHR_parallel_shader_compile")
-        ) as KHRParallelShaderCompile | null;
-
-        if (ext) {
-          let frames = 0;
-          await new Promise<void>((resolve) => {
-            const poll = () => {
-              if (gl.isContextLost()) { resolve(); return; }
-              const p2done = gl.getProgramParameter(pass2Program, ext.COMPLETION_STATUS_KHR) as boolean;
-              TetoricaRetroVideoPipeline.showDebug(`filter: fallback poll#${++frames} p2=${p2done ? 1 : 0}`);
-              if (p2done) resolve();
-              else requestAnimationFrame(poll);
-            };
-            requestAnimationFrame(poll);
-          });
-          if (gl.isContextLost()) return;
-
-          if (!gl.getProgramParameter(pass2Program, gl.LINK_STATUS)) {
-            const msg = gl.getProgramInfoLog(pass2Program) ?? "unknown";
-            TetoricaRetroVideoPipeline.showDebug(`filter: fallback pass2 LINK FAILED: ${msg}`);
-            gl.deleteProgram(pass2Program);
-            return;
-          }
-        } else {
-          TetoricaRetroVideoPipeline.showDebug(
-            "filter: Windows fallback without parallel-compile ext, using pass2 as-is",
-          );
+        const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1);
+        TetoricaRetroVideoPipeline.showDebug("filter: Windows pass1 compile submitted (wait 3s)...");
+        await new Promise<void>(resolve => setTimeout(resolve, 3000));
+        if (!await waitForProgramCompletion(gl, pass1Program, "filter: Windows pass1")) {
+          gl.deleteProgram(pass1Program);
+          return;
+        }
+        if (!verifyProgramLinkStatus(gl, pass1Program, "filter: Windows pass1")) {
+          gl.deleteProgram(pass1Program);
+          return;
         }
 
-        pipeline.setFilterPrograms(pipeline.passthroughProgram, pass2Program);
+        const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
+        TetoricaRetroVideoPipeline.showDebug("filter: Windows pass2 compile submitted (wait 1.5s)...");
+        await new Promise<void>(resolve => setTimeout(resolve, 1500));
+        if (!await waitForProgramCompletion(gl, pass2Program, "filter: Windows pass2")) {
+          gl.deleteProgram(pass1Program);
+          gl.deleteProgram(pass2Program);
+          return;
+        }
+        if (!verifyProgramLinkStatus(gl, pass2Program, "filter: Windows pass2")) {
+          gl.deleteProgram(pass1Program);
+          gl.deleteProgram(pass2Program);
+          return;
+        }
+
+        pipeline.setFilterPrograms(pass1Program, pass2Program);
         onFilterReady?.();
-        TetoricaRetroVideoPipeline.showDebug("filter: Windows fallback LOADED (pass2 only)");
+        TetoricaRetroVideoPipeline.showDebug("filter: Windows sequential LOADED (2-pass)");
       });
 
       return pipeline;
