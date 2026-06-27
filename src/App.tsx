@@ -54,6 +54,11 @@ const isTauriRuntime = () =>
   typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
+const isAndroidRuntime = () => {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent || "");
+};
+
 const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));
 
 function App() {
@@ -93,6 +98,14 @@ function App() {
     return /Android|iPhone|iPad|iPod/i.test(userAgent);
   }, []);
   const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
+  const isAndroidTauri = React.useMemo(
+    () => isTauriRuntime() && isAndroidRuntime(),
+    [],
+  );
+  const isNativeMdropAvailable = React.useMemo(
+    () => isTauriRuntime() && !isAndroidTauri,
+    [isAndroidTauri],
+  );
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = "player:root";
@@ -113,14 +126,18 @@ function App() {
   // Desktop: auto-start mDrop server on mount.
   // isMDropReady drives the file picker choice (Tauri dialog vs <input>).
   React.useEffect(() => {
+    if (!isNativeMdropAvailable) {
+      setIsMDropReady(false);
+      return;
+    }
     mdropGetServerStatus()
       .then((status) => { setIsMDropReady(status.running); })
       .catch(() => { setIsMDropReady(false); });
-  }, []);
+  }, [isNativeMdropAvailable]);
 
   // Sync mDrop API key + actual port into window.__MDROP_CONFIG__.
   React.useEffect(() => {
-    if (!isMDropReady) return;
+    if (!isNativeMdropAvailable || !isMDropReady) return;
     Promise.all([mdropGetConfig(), mdropGetServerStatus()]).then(([config, status]) => {
       if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
       window.__MDROP_CONFIG__.apiKey = config.apiKey;
@@ -128,7 +145,7 @@ function App() {
       setMDropPort(status.port);
       setMDropIp(status.ips?.[0] ?? null);
     }).catch(() => {});
-  }, [isMDropReady]);
+  }, [isMDropReady, isNativeMdropAvailable]);
 
   // Refs to avoid stale closures in async Tauri event callbacks
   const isMDropReadyRef = React.useRef(isMDropReady);
@@ -561,7 +578,7 @@ function App() {
   const handleOpenFilePicker = useCallback(async () => {
     await waitForExternalNavigationPause();
 
-    if (isMDropReady) {
+    if (isNativeMdropAvailable && isMDropReady) {
       const { open } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       setIsMobileMenuOpen(false);
@@ -589,13 +606,13 @@ function App() {
 
     beginPreparingSelection();
     fileInputRef.current?.click();
-  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, previewSource]);
+  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, isNativeMdropAvailable, previewSource]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
     await waitForExternalNavigationPause();
 
-    if (isMDropReady) {
+    if (isNativeMdropAvailable && isMDropReady) {
       const { open } = await import("@tauri-apps/plugin-dialog");
       setIsMobileMenuOpen(false);
       const selected = await open({ directory: true, multiple: false });
@@ -611,7 +628,7 @@ function App() {
 
     beginPreparingSelection();
     folderInputRef.current?.click();
-  }, [beginPreparingSelection, isIosOrAndroid, isMDropReady, showBrowserFileListDialog]);
+  }, [beginPreparingSelection, isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showBrowserFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -645,6 +662,7 @@ function App() {
   }, [isWindowAlwaysOnTop]);
 
   const handleMDropToggle = useCallback(async () => {
+    if (!isNativeMdropAvailable) return;
     if (isMDropReady) {
       await mdropStopServer().catch(() => {});
       setIsMDropReady(false);
@@ -658,7 +676,7 @@ function App() {
         setMDropIp(status.ips?.[0] ?? null);
       }
     }
-  }, [isMDropReady]);
+  }, [isMDropReady, isNativeMdropAvailable]);
 
   const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
     setLocalePreference(nextPreference);
@@ -730,51 +748,53 @@ function App() {
         </div>
       )}
       {/* mDrop / ffmpeg pills — top-right */}
-      <div className={["safe-top-offset-right fixed right-10 z-9999 flex flex-col items-end gap-0.5", isToolbarHidden ? "hidden" : ""].join(" ")}>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
-            title={locale === "ja"
-              ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
-              : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
-            onClick={() => { void handleMDropToggle(); }}
-            className={[
-              "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
-              isMDropReady
-                ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
-                : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
-            ].join(" ")}
-          >
-            <Wifi size={13} />
-            <span>mDrop</span>
-          </button>
-          {isMDropReady && (
+      {isNativeMdropAvailable && (
+        <div className={["safe-top-offset-right fixed right-10 z-9999 flex flex-col items-end gap-0.5", isToolbarHidden ? "hidden" : ""].join(" ")}>
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+              aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
               title={locale === "ja"
-                ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
-                : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
-              onClick={() => setIsFfmpegEnabled((v) => !v)}
+                ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
+                : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
+              onClick={() => { void handleMDropToggle(); }}
               className={[
                 "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
-                isFfmpegEnabled
-                  ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
+                isMDropReady
+                  ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
                   : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
               ].join(" ")}
             >
-              <Waves size={13} />
-              <span>ffmpeg</span>
+              <Wifi size={13} />
+              <span>mDrop</span>
             </button>
+            {isMDropReady && (
+              <button
+                type="button"
+                aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+                title={locale === "ja"
+                  ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
+                  : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
+                onClick={() => setIsFfmpegEnabled((v) => !v)}
+                className={[
+                  "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
+                  isFfmpegEnabled
+                    ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
+                    : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
+                ].join(" ")}
+              >
+                <Waves size={13} />
+                <span>ffmpeg</span>
+              </button>
+            )}
+          </div>
+          {isMDropReady && mDropPort && (
+            <span className="-mt-1.5 px-1 font-mono text-[10px] text-slate-500">
+              {mDropIp ? `${mDropIp}:${mDropPort}` : `:${mDropPort}`}
+            </span>
           )}
         </div>
-        {isMDropReady && mDropPort && (
-          <span className="-mt-1.5 px-1 font-mono text-[10px] text-slate-500">
-            {mDropIp ? `${mDropIp}:${mDropPort}` : `:${mDropPort}`}
-          </span>
-        )}
-      </div>
+      )}
       {isMobileMenuOpen && (
         <div className="safe-top-menu fixed left-3 z-9999 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
                 <div className="grid grid-cols-1 gap-2">

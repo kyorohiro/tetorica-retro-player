@@ -11,7 +11,7 @@ export interface FfmpegOutput {
   exitCode: number;
 }
 
-export type FfmpegMode = "system" | "sidecar";
+export type FfmpegMode = "system" | "sidecar" | "disabled";
 
 /** Progress event emitted by tauri-plugin-ffmpeg during transcode (sidecar mode only). */
 export interface FfmpegProgressPayload {
@@ -51,7 +51,7 @@ export async function ffmpegExec(args: string[]): Promise<FfmpegOutput> {
 
 let _mode: FfmpegMode | null = null;
 
-/** Returns "system" or "sidecar" depending on how the app was built. */
+/** Returns "system", "sidecar", or "disabled" depending on the current platform/build. */
 export async function getFfmpegMode(): Promise<FfmpegMode> {
   if (_mode !== null) return _mode;
   _mode = await invoke<FfmpegMode>("get_ffmpeg_mode");
@@ -65,7 +65,8 @@ export async function getFfmpegMode(): Promise<FfmpegMode> {
 /**
  * Transcode a media file.
  * - Sidecar mode: delegates to tauri-plugin-ffmpeg (supports progress events via onFfmpegProgress).
- * - System mode:  builds ffmpeg args and calls ffmpegExec.
+ * - System mode: builds ffmpeg args and calls ffmpegExec.
+ * - Disabled mode: rejects on unsupported platforms such as Android builds.
  */
 export async function ffmpegTranscode(
   options: FfmpegTranscodeOptions,
@@ -80,6 +81,14 @@ export async function ffmpegTranscode(
         mediaType: options.mediaType,
       },
     });
+  }
+
+  if (mode === "disabled") {
+    return {
+      success: false,
+      outputPath: options.outputPath,
+      error: "ffmpeg is disabled on this platform",
+    };
   }
 
   // System mode: build args manually

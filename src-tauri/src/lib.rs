@@ -72,30 +72,69 @@ async fn mdrop_start_server(
     state: State<'_, MDropState>,
     req: StartServerRequest,
 ) -> Result<ServerStatus, String> {
-    let preferred_port = req.port
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .map(|s| s.parse::<u16>().map_err(|_| "invalid port".to_string()))
-        .transpose()?;
-    let hostname = req.hostname.trim().trim_end_matches('/').to_string();
-    state.server.start_server(
-        hostname,
-        preferred_port,
-        req.id,
-        req.password,
-        req.is_https,
-        req.local_only,
-    )
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        let _ = req;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let preferred_port = req
+            .port
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse::<u16>().map_err(|_| "invalid port".to_string()))
+            .transpose()?;
+        let hostname = req.hostname.trim().trim_end_matches('/').to_string();
+        state.server.start_server(
+            hostname,
+            preferred_port,
+            req.id,
+            req.password,
+            req.is_https,
+            req.local_only,
+        )
+    }
 }
 
 #[tauri::command]
 async fn mdrop_stop_server(state: State<'_, MDropState>) -> Result<ServerStatus, String> {
-    state.server.stop_server()
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        state.server.stop_server()
+    }
 }
 
 #[tauri::command]
 async fn mdrop_get_server_status(state: State<'_, MDropState>) -> Result<ServerStatus, String> {
-    state.server.status()
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Ok(ServerStatus {
+            running: false,
+            port: None,
+            url: None,
+            hostname: None,
+            ips: None,
+            id: None,
+            password: None,
+            local_only: None,
+            is_https: None,
+        })
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        state.server.status()
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -118,34 +157,49 @@ async fn mdrop_share_file(
     state: State<'_, MDropState>,
     req: ShareFileRequest,
 ) -> Result<SharedFileInfo, String> {
-    let path = PathBuf::from(&req.path);
-    let name = path
-        .file_name()
-        .ok_or("invalid file name")?
-        .to_string_lossy()
-        .to_string();
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        let _ = req;
+        Err("mDrop is disabled on android".to_string())
+    }
 
-    let id = uuid::Uuid::new_v4().simple().to_string();
-    let is_dir = path.is_dir();
+    #[cfg(not(target_os = "android"))]
+    {
+        let path = PathBuf::from(&req.path);
+        let name = path
+            .file_name()
+            .ok_or("invalid file name")?
+            .to_string_lossy()
+            .to_string();
 
-    let (hostname, port) = {
-        let server = state.server.inner.lock().map_err(|e| e.to_string())?;
-        (
-            server.status.hostname.clone().ok_or("server not started")?,
-            server.status.port.ok_or("server not started")?,
-        )
-    };
+        let id = uuid::Uuid::new_v4().simple().to_string();
+        let is_dir = path.is_dir();
 
-    state.server.inner.lock().map_err(|e| e.to_string())?
-        .files.insert(id.clone(), path);
+        let (hostname, port) = {
+            let server = state.server.inner.lock().map_err(|e| e.to_string())?;
+            (
+                server.status.hostname.clone().ok_or("server not started")?,
+                server.status.port.ok_or("server not started")?,
+            )
+        };
 
-    Ok(SharedFileInfo {
-        id: id.clone(),
-        name,
-        is_dir,
-        path: req.path,
-        url: format!("http://{hostname}:{port}/download/{id}"),
-    })
+        state
+            .server
+            .inner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .files
+            .insert(id.clone(), path);
+
+        Ok(SharedFileInfo {
+            id: id.clone(),
+            name,
+            is_dir,
+            path: req.path,
+            url: format!("http://{hostname}:{port}/download/{id}"),
+        })
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -158,38 +212,89 @@ async fn mdrop_unshare_file(
     state: State<'_, MDropState>,
     req: UnshareFileRequest,
 ) -> Result<(), String> {
-    let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
-    server.files.remove(&req.id).ok_or("not found")?;
-    Ok(())
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        let _ = req;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
+        server.files.remove(&req.id).ok_or("not found")?;
+        Ok(())
+    }
 }
 
 #[tauri::command]
 async fn mdrop_unshare_all(state: State<'_, MDropState>) -> Result<(), String> {
-    let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
-    server.files.clear();
-    Ok(())
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
+        server.files.clear();
+        Ok(())
+    }
 }
 
 #[tauri::command]
 async fn mdrop_start_bonjour(state: State<'_, MDropState>) -> Result<BonjourStatus, String> {
-    let (hostname, port) = {
-        let server = state.server.inner.lock().map_err(|e| e.to_string())?;
-        (
-            server.status.hostname.clone().ok_or("server not started")?,
-            server.status.port.ok_or("server not started")?,
-        )
-    };
-    state.bonjour.start(hostname, port)
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let (hostname, port) = {
+            let server = state.server.inner.lock().map_err(|e| e.to_string())?;
+            (
+                server.status.hostname.clone().ok_or("server not started")?,
+                server.status.port.ok_or("server not started")?,
+            )
+        };
+        state.bonjour.start(hostname, port)
+    }
 }
 
 #[tauri::command]
 async fn mdrop_stop_bonjour(state: State<'_, MDropState>) -> Result<BonjourStatus, String> {
-    state.bonjour.stop()
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        state.bonjour.stop()
+    }
 }
 
 #[tauri::command]
 async fn mdrop_get_bonjour_status(state: State<'_, MDropState>) -> Result<BonjourStatus, String> {
-    state.bonjour.status()
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Ok(BonjourStatus {
+            running: false,
+            service_name: None,
+            service_type: None,
+            port: None,
+        })
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        state.bonjour.status()
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -201,11 +306,20 @@ struct MdropConfig {
 
 #[tauri::command]
 async fn mdrop_get_config(state: State<'_, MDropState>) -> Result<MdropConfig, String> {
-    let mut ctx = state.server.inner.lock().map_err(|e| e.to_string())?;
-    Ok(MdropConfig {
-        api_key: ctx.get_apikey(),
-        server_url: ctx.status.url.clone(),
-    })
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let mut ctx = state.server.inner.lock().map_err(|e| e.to_string())?;
+        Ok(MdropConfig {
+            api_key: ctx.get_apikey(),
+            server_url: ctx.status.url.clone(),
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
