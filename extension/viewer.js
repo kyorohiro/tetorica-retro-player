@@ -802,27 +802,28 @@ function setupRenderer(webgl) {
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
   const fragmentShader = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT);
 
-  program = webgl.createProgram();
-  if (!program) {
+  const prog = webgl.createProgram();
+  if (!prog) {
     throw new Error("Failed to create WebGL program.");
   }
 
-  webgl.attachShader(program, vertexShader);
-  webgl.attachShader(program, fragmentShader);
-  webgl.linkProgram(program);
+  webgl.attachShader(prog, vertexShader);
+  webgl.attachShader(prog, fragmentShader);
+  webgl.linkProgram(prog);
 
-  if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
-    const message = webgl.getProgramInfoLog(program) || "Unknown program link error.";
-    throw new Error(message);
-  }
+  // CRITICAL: Do NOT call getProgramParameter (or any program readback) here.
+  // On Windows/ANGLE, Chrome's D3D GPU shader cache causes any readback during
+  // cache loading to freeze the main thread. program and uniformLocations are
+  // set asynchronously in finalizeFilterProgram() below.
+  // drawFrame() already handles program === null by returning early each frame.
 
   const vertices = new Float32Array([
     -1, -1,
-    1, -1,
-    -1, 1,
-    -1, 1,
-    1, -1,
-    1, 1,
+     1, -1,
+    -1,  1,
+    -1,  1,
+     1, -1,
+     1,  1,
   ]);
 
   const vertexBuffer = webgl.createBuffer();
@@ -831,9 +832,9 @@ function setupRenderer(webgl) {
 
   const vao = webgl.createVertexArray();
   webgl.bindVertexArray(vao);
-  const positionLocation = webgl.getAttribLocation(program, "aPosition");
-  webgl.enableVertexAttribArray(positionLocation);
-  webgl.vertexAttribPointer(positionLocation, 2, webgl.FLOAT, false, 0, 0);
+  // aPosition is the only attribute so it is always assigned location 0.
+  webgl.enableVertexAttribArray(0);
+  webgl.vertexAttribPointer(0, 2, webgl.FLOAT, false, 0, 0);
 
   texture = webgl.createTexture();
   webgl.bindTexture(webgl.TEXTURE_2D, texture);
@@ -844,53 +845,91 @@ function setupRenderer(webgl) {
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.CLAMP_TO_EDGE);
 
-  webgl.useProgram(program);
-  webgl.uniform1i(webgl.getUniformLocation(program, "uTexture"), 0);
+  // useProgram, getUniformLocation, and uniformLocations assignment are deferred
+  // to finalizeFilterProgram() to avoid the Windows D3D cache freeze.
+  finalizeFilterProgram(webgl, prog);
+}
+
+async function finalizeFilterProgram(webgl, prog) {
+  // On Windows/Chrome (the only environment this extension runs in), the D3D
+  // shader cache causes linkProgram to load pre-compiled DXBC bytecode in the
+  // GPU process. Any getProgramParameter call during this window blocks the JS
+  // main thread — causing a visible freeze. Wait 3 s via setTimeout (not RAF)
+  // so the GPU process finishes loading before we issue any read-back command.
+  const ext =
+    webgl.getExtension("WEBGL_parallel_shader_compile") ??
+    webgl.getExtension("KHR_parallel_shader_compile");
+
+  if (ext) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise((resolve) => {
+      const poll = () => {
+        if (webgl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR)) resolve();
+        else requestAnimationFrame(poll);
+      };
+      requestAnimationFrame(poll);
+    });
+  } else {
+    // Non-Chromium fallback: yield one frame then block briefly on LINK_STATUS.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+
+  if (!webgl.getProgramParameter(prog, webgl.LINK_STATUS)) {
+    const message = webgl.getProgramInfoLog(prog) || "Unknown program link error.";
+    console.error("[viewer] Filter shader link failed:", message);
+    return;
+  }
+
+  webgl.useProgram(prog);
+  webgl.uniform1i(webgl.getUniformLocation(prog, "uTexture"), 0);
 
   uniformLocations = {
-    uTargetSize: webgl.getUniformLocation(program, "uTargetSize"),
-    uSampleTargetSize: webgl.getUniformLocation(program, "uSampleTargetSize"),
-    uColorLevels: webgl.getUniformLocation(program, "uColorLevels"),
-    uDitherStrength: webgl.getUniformLocation(program, "uDitherStrength"),
-    uPaletteMode: webgl.getUniformLocation(program, "uPaletteMode"),
-    uCurvature: webgl.getUniformLocation(program, "uCurvature"),
-    uScanlineStrength: webgl.getUniformLocation(program, "uScanlineStrength"),
-    uScanline2Strength: webgl.getUniformLocation(program, "uScanline2Strength"),
-    uScanlineBrightnessFade: webgl.getUniformLocation(program, "uScanlineBrightnessFade"),
-    uVignetteStrength: webgl.getUniformLocation(program, "uVignetteStrength"),
-    uGlowStrength: webgl.getUniformLocation(program, "uGlowStrength"),
-    uPhosphorStrength: webgl.getUniformLocation(program, "uPhosphorStrength"),
-    uSpotMaskStrength: webgl.getUniformLocation(program, "uSpotMaskStrength"),
-    uBulbRadius: webgl.getUniformLocation(program, "uBulbRadius"),
-    uBlackFloor: webgl.getUniformLocation(program, "uBlackFloor"),
-    uLumaAmount: webgl.getUniformLocation(program, "uLumaAmount"),
-    uLumaLow: webgl.getUniformLocation(program, "uLumaLow"),
-    uLumaHigh: webgl.getUniformLocation(program, "uLumaHigh"),
-    uLumaKnee: webgl.getUniformLocation(program, "uLumaKnee"),
-    uSaturationAmount: webgl.getUniformLocation(program, "uSaturationAmount"),
-    uSaturationLow: webgl.getUniformLocation(program, "uSaturationLow"),
-    uSaturationHigh: webgl.getUniformLocation(program, "uSaturationHigh"),
-    uSaturationKnee: webgl.getUniformLocation(program, "uSaturationKnee"),
-    uPhosphorDotLightBalance: webgl.getUniformLocation(program, "uPhosphorDotLightBalance"),
-    uPixelAspect: webgl.getUniformLocation(program, "uPixelAspect"),
-    uPhosphorDotMode: webgl.getUniformLocation(program, "uPhosphorDotMode"),
-    uPhosphorDotInternalScale: webgl.getUniformLocation(program, "uPhosphorDotInternalScale"),
-    uPhosphorDotBrightCore: webgl.getUniformLocation(program, "uPhosphorDotBrightCore"),
-    uPhosphorDotCellFill: webgl.getUniformLocation(program, "uPhosphorDotCellFill"),
-    uPhosphorDotFlatDisc: webgl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
-    uPhosphorDotNeighborBlend: webgl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
-    uCloseUpNoiseStrength: webgl.getUniformLocation(program, "uCloseUpNoiseStrength"),
-    uMonoTint: webgl.getUniformLocation(program, "uMonoTint"),
-    uNeonBoost: webgl.getUniformLocation(program, "uNeonBoost"),
-    uNeonSaturation: webgl.getUniformLocation(program, "uNeonSaturation"),
-    uNeonDetail: webgl.getUniformLocation(program, "uNeonDetail"),
-    uSmoothStrength: webgl.getUniformLocation(program, "uSmoothStrength"),
-    uToonSteps: webgl.getUniformLocation(program, "uToonSteps"),
-    uEdgeBoost: webgl.getUniformLocation(program, "uEdgeBoost"),
-    uAnimeEdgeLow: webgl.getUniformLocation(program, "uAnimeEdgeLow"),
-    uAnimeEdgeHigh: webgl.getUniformLocation(program, "uAnimeEdgeHigh"),
-    uTime: webgl.getUniformLocation(program, "uTime"),
+    uTargetSize: webgl.getUniformLocation(prog, "uTargetSize"),
+    uSampleTargetSize: webgl.getUniformLocation(prog, "uSampleTargetSize"),
+    uColorLevels: webgl.getUniformLocation(prog, "uColorLevels"),
+    uDitherStrength: webgl.getUniformLocation(prog, "uDitherStrength"),
+    uPaletteMode: webgl.getUniformLocation(prog, "uPaletteMode"),
+    uCurvature: webgl.getUniformLocation(prog, "uCurvature"),
+    uScanlineStrength: webgl.getUniformLocation(prog, "uScanlineStrength"),
+    uScanline2Strength: webgl.getUniformLocation(prog, "uScanline2Strength"),
+    uScanlineBrightnessFade: webgl.getUniformLocation(prog, "uScanlineBrightnessFade"),
+    uVignetteStrength: webgl.getUniformLocation(prog, "uVignetteStrength"),
+    uGlowStrength: webgl.getUniformLocation(prog, "uGlowStrength"),
+    uPhosphorStrength: webgl.getUniformLocation(prog, "uPhosphorStrength"),
+    uSpotMaskStrength: webgl.getUniformLocation(prog, "uSpotMaskStrength"),
+    uBulbRadius: webgl.getUniformLocation(prog, "uBulbRadius"),
+    uBlackFloor: webgl.getUniformLocation(prog, "uBlackFloor"),
+    uLumaAmount: webgl.getUniformLocation(prog, "uLumaAmount"),
+    uLumaLow: webgl.getUniformLocation(prog, "uLumaLow"),
+    uLumaHigh: webgl.getUniformLocation(prog, "uLumaHigh"),
+    uLumaKnee: webgl.getUniformLocation(prog, "uLumaKnee"),
+    uSaturationAmount: webgl.getUniformLocation(prog, "uSaturationAmount"),
+    uSaturationLow: webgl.getUniformLocation(prog, "uSaturationLow"),
+    uSaturationHigh: webgl.getUniformLocation(prog, "uSaturationHigh"),
+    uSaturationKnee: webgl.getUniformLocation(prog, "uSaturationKnee"),
+    uPhosphorDotLightBalance: webgl.getUniformLocation(prog, "uPhosphorDotLightBalance"),
+    uPixelAspect: webgl.getUniformLocation(prog, "uPixelAspect"),
+    uPhosphorDotMode: webgl.getUniformLocation(prog, "uPhosphorDotMode"),
+    uPhosphorDotInternalScale: webgl.getUniformLocation(prog, "uPhosphorDotInternalScale"),
+    uPhosphorDotBrightCore: webgl.getUniformLocation(prog, "uPhosphorDotBrightCore"),
+    uPhosphorDotCellFill: webgl.getUniformLocation(prog, "uPhosphorDotCellFill"),
+    uPhosphorDotFlatDisc: webgl.getUniformLocation(prog, "uPhosphorDotFlatDisc"),
+    uPhosphorDotNeighborBlend: webgl.getUniformLocation(prog, "uPhosphorDotNeighborBlend"),
+    uCloseUpNoiseStrength: webgl.getUniformLocation(prog, "uCloseUpNoiseStrength"),
+    uMonoTint: webgl.getUniformLocation(prog, "uMonoTint"),
+    uNeonBoost: webgl.getUniformLocation(prog, "uNeonBoost"),
+    uNeonSaturation: webgl.getUniformLocation(prog, "uNeonSaturation"),
+    uNeonDetail: webgl.getUniformLocation(prog, "uNeonDetail"),
+    uSmoothStrength: webgl.getUniformLocation(prog, "uSmoothStrength"),
+    uToonSteps: webgl.getUniformLocation(prog, "uToonSteps"),
+    uEdgeBoost: webgl.getUniformLocation(prog, "uEdgeBoost"),
+    uAnimeEdgeLow: webgl.getUniformLocation(prog, "uAnimeEdgeLow"),
+    uAnimeEdgeHigh: webgl.getUniformLocation(prog, "uAnimeEdgeHigh"),
+    uTime: webgl.getUniformLocation(prog, "uTime"),
   };
+
+  program = prog;
+  applyCurrentSettings();
 }
 
 function compileShader(webgl, type, source) {
