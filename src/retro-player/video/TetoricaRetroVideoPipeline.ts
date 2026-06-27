@@ -8,6 +8,8 @@ import { FILTER_FRAGMENT_PASS1 } from "../retro/filterPass1Shader.ts";
 import { FILTER_FRAGMENT_PASS2 } from "../retro/filterPass2Shader.ts";
 import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
+import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
+import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
 
 export type RetroVideoFilterState = {
   targetWidth: number;
@@ -186,6 +188,35 @@ const isWindowsChromiumAngleRisk = () => {
     );
 
   return isWindows && isChromium;
+};
+
+type WindowsLitePass1Variant = "basic" | "pc98";
+type WindowsLitePass2Variant = "basic" | "phosphor";
+type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
+
+const isPc98PaletteMode = (mode: PaletteMode) =>
+  mode === "pc98" ||
+  mode === "pc98_tile" ||
+  mode === "pc98_512" ||
+  mode === "pc98_512_sat" ||
+  mode === "pc98_4096";
+
+const getWindowsLiteVariantKey = (
+  filterState: RetroVideoFilterState | null,
+): WindowsLiteVariantKey => {
+  const pass1: WindowsLitePass1Variant =
+    filterState && isPc98PaletteMode(filterState.paletteMode) ? "pc98" : "basic";
+  const pass2: WindowsLitePass2Variant =
+    filterState &&
+    (
+      filterState.phosphorStrength > 0.001 ||
+      filterState.spotMaskStrength > 0.001 ||
+      isPhosphorDotModeEnabled(filterState)
+    )
+      ? "phosphor"
+      : "basic";
+
+  return `${pass1}:${pass2}`;
 };
 
 const isHtmlVideoElement = (value: unknown): value is HTMLVideoElement =>
@@ -437,6 +468,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private readonly gl: WebGL2RenderingContext;
+  private readonly windowsLiteMode: boolean;
 
   // null until the background filter compilation finishes
   private filterPass1Program: WebGLProgram | null = null;
@@ -464,6 +496,9 @@ export class TetoricaRetroVideoPipeline {
   private outputEnabled = true;
 
   private startedAt = nowMs();
+  private windowsLiteVariantKey: WindowsLiteVariantKey | null = null;
+  private windowsLitePendingVariantKey: WindowsLiteVariantKey | null = null;
+  private windowsLiteCompilePromise: Promise<void> | null = null;
 
   // Ensure the FBO matches the current drawing buffer size.
   private ensureFbo(width: number, height: number) {
@@ -517,35 +552,109 @@ export class TetoricaRetroVideoPipeline {
     this.resetAnimationClock();
   }
 
+  private getWindowsLiteShaderSources(variantKey: WindowsLiteVariantKey) {
+    const [pass1Variant, pass2Variant] = variantKey.split(":") as [
+      WindowsLitePass1Variant,
+      WindowsLitePass2Variant,
+    ];
+
+    return {
+      pass1:
+        pass1Variant === "pc98"
+          ? FILTER_FRAGMENT_PASS1_PC98_LITE
+          : FILTER_FRAGMENT_PASS1_LITE,
+      pass2:
+        pass2Variant === "phosphor"
+          ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
+          : FILTER_FRAGMENT_PASS2_LITE,
+    };
+  }
+
+  private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
+    if (!this.windowsLiteMode) {
+      return;
+    }
+
+    const nextVariantKey = getWindowsLiteVariantKey(filterState);
+    if (
+      nextVariantKey === this.windowsLiteVariantKey ||
+      nextVariantKey === this.windowsLitePendingVariantKey
+    ) {
+      return;
+    }
+
+    this.windowsLitePendingVariantKey = nextVariantKey;
+    if (this.windowsLiteCompilePromise) {
+      return;
+    }
+
+    this.windowsLiteCompilePromise = this.compilePendingWindowsLiteVariant().finally(() => {
+      this.windowsLiteCompilePromise = null;
+      if (
+        this.windowsLitePendingVariantKey &&
+        this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
+      ) {
+        this.queueWindowsLiteVariant(this.currentFilterState);
+      }
+    });
+  }
+
+  private async compilePendingWindowsLiteVariant() {
+    while (
+      this.windowsLitePendingVariantKey &&
+      this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
+    ) {
+      const variantKey = this.windowsLitePendingVariantKey;
+      const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
+      TetoricaRetroVideoPipeline.showDebug(`filter: loading Windows lite variant ${variantKey}...`);
+
+      try {
+        const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
+        const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
+        await waitAndVerifyPrograms(this.gl, [pass1Program, pass2Program]);
+        if (this.gl.isContextLost()) return;
+
+        if (this.windowsLitePendingVariantKey !== variantKey) {
+          this.gl.deleteProgram(pass1Program);
+          this.gl.deleteProgram(pass2Program);
+          continue;
+        }
+
+        this.setFilterPrograms(pass1Program, pass2Program);
+        this.windowsLiteVariantKey = variantKey;
+        this.windowsLitePendingVariantKey = null;
+        TetoricaRetroVideoPipeline.showDebug(`filter: Windows lite variant ${variantKey} LOADED`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        TetoricaRetroVideoPipeline.showDebug(
+          `filter: Windows lite variant ${variantKey} failed, keeping previous programs (${message})`,
+        );
+        this.windowsLitePendingVariantKey = null;
+        return;
+      }
+    }
+  }
+
   // onFilterReady is called after the background filter compilation finishes.
   static async create(
     gl: WebGL2RenderingContext,
     onFilterReady?: () => void,
   ): Promise<TetoricaRetroVideoPipeline> {
+    const shouldUseWindowsLiteMode =
+      isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile();
+
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
     await waitAndVerifyPrograms(gl, [passthroughProgram]);
-    const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram);
+    const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, shouldUseWindowsLiteMode);
 
-    if (isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile()) {
+    if (shouldUseWindowsLiteMode) {
       requestAnimationFrame(async () => {
-        try {
-          TetoricaRetroVideoPipeline.showDebug("filter: loading Windows lite fallback...");
-
-          const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1_LITE);
-          const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2_LITE);
-          await waitAndVerifyPrograms(gl, [pass1Program, pass2Program]);
-          if (gl.isContextLost()) return;
-
-          pipeline.setFilterPrograms(pass1Program, pass2Program);
-          onFilterReady?.();
-          TetoricaRetroVideoPipeline.showDebug("filter: Windows lite fallback LOADED");
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          TetoricaRetroVideoPipeline.showDebug(
-            `filter: Windows lite fallback failed, using passthrough (${message})`,
-          );
+        pipeline.queueWindowsLiteVariant(null);
+        if (pipeline.windowsLiteCompilePromise) {
+          await pipeline.windowsLiteCompilePromise;
         }
+        onFilterReady?.();
       });
 
       return pipeline;
@@ -626,9 +735,14 @@ export class TetoricaRetroVideoPipeline {
     return pipeline;
   }
 
-  constructor(gl: WebGL2RenderingContext, passthroughProgram: WebGLProgram) {
+  constructor(
+    gl: WebGL2RenderingContext,
+    passthroughProgram: WebGLProgram,
+    windowsLiteMode = false,
+  ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
+    this.windowsLiteMode = windowsLiteMode;
 
     const vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -719,6 +833,7 @@ export class TetoricaRetroVideoPipeline {
 
   setFilterState(filterState: RetroVideoFilterState) {
     this.currentFilterState = filterState;
+    this.queueWindowsLiteVariant(filterState);
   }
 
   setOutputEnabled(enabled: boolean) {
