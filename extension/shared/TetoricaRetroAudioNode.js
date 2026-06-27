@@ -1,5 +1,6 @@
 // src/retro-player/audio/preset.ts
 var DEFAULT_AUDIO_SETTINGS = {
+  audioOptimizationMode: "auto",
   isMuted: false,
   volume: 0.72,
   playbackRate: 1,
@@ -17,8 +18,11 @@ var DEFAULT_AUDIO_SETTINGS = {
   smallSpeakerRoomAmount: 0,
   wowFlutterAmount: 0,
   isNoiseEnabled: true,
-  noiseLevel: 2e-3,
+  noiseLevel: 1e-3,
   vinylDustAmount: 0,
+  noiseWarmthAmount: 0.33,
+  noiseAirAmount: 0.55,
+  noisePresenceAmount: 0.5,
   delayAmount: 0,
   reverbAmount: 0,
   chorusAmount: 0,
@@ -94,8 +98,9 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
       stereoWidthAmount: -0.55,
       smallSpeakerRoomAmount: 0.12,
       wowFlutterAmount: 0,
-      noiseLevel: 7e-3,
+      noiseLevel: 4e-3,
       vinylDustAmount: 0,
+      noiseWarmthAmount: 0.67,
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
@@ -120,8 +125,9 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
       stereoWidthAmount: 0.1,
       smallSpeakerRoomAmount: 0.18,
       wowFlutterAmount: 0.48,
-      noiseLevel: 75e-4,
+      noiseLevel: 45e-4,
       vinylDustAmount: 0,
+      noiseWarmthAmount: 0.5,
       reverbAmount: 0.05,
       chorusAmount: 0,
       tapeSaturationAmount: 0.18,
@@ -145,7 +151,7 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
       stereoWidthAmount: -0.18,
       smallSpeakerRoomAmount: 0,
       wowFlutterAmount: 0.09,
-      noiseLevel: 35e-4,
+      noiseLevel: 25e-4,
       vinylDustAmount: 0.29,
       delayAmount: 0,
       reverbAmount: 0,
@@ -171,7 +177,7 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
       stereoWidthAmount: -0.32,
       smallSpeakerRoomAmount: 0.12,
       wowFlutterAmount: 0,
-      noiseLevel: 25e-4,
+      noiseLevel: 2e-3,
       vinylDustAmount: 0.04,
       reverbAmount: 0.08,
       tapeSaturationAmount: 0.08,
@@ -246,8 +252,9 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
       stereoWidthAmount: -0.1,
       smallSpeakerRoomAmount: 0.14,
       wowFlutterAmount: 0.04,
-      noiseLevel: 4e-3,
+      noiseLevel: 3e-3,
       vinylDustAmount: 0,
+      noiseWarmthAmount: 0.5,
       delayAmount: 0,
       reverbAmount: 0,
       chorusAmount: 0,
@@ -364,14 +371,15 @@ function createTintedNoiseBuffer(context) {
   let airState = 0;
   for (let i = 0; i < length; i++) {
     const white = Math.random() * 2 - 1;
-    brownState = (brownState + white * 0.045) / 1.045;
+    brownState = (brownState + white * 0.06) / 1.06;
     airState = airState * 0.82 + white * 0.18;
-    const body = brownState * 1.35;
-    const air = (white - airState) * 0.55;
-    const sample = Math.max(-1, Math.min(1, body + air));
+    const body = brownState * 2.2;
+    const air = (white - airState) * 0.15;
+    const preSat = body + air;
+    const sample = Math.max(-1, Math.min(1, preSat - preSat * Math.abs(preSat) * 0.12));
     for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
       const channelData = buffer.getChannelData(channel);
-      const channelJitter = (Math.random() * 2 - 1) * 0.012;
+      const channelJitter = (Math.random() * 2 - 1) * 8e-3;
       channelData[i] = Math.max(-1, Math.min(1, sample + channelJitter));
     }
   }
@@ -484,6 +492,7 @@ var TetoricaRetroAudioNode = class {
     noiseSource: null,
     noiseHighpass: null,
     noiseLowpass: null,
+    noiseWarmth: null,
     noiseFilter: null,
     noisePanner: null,
     noiseGain: null,
@@ -691,6 +700,7 @@ var TetoricaRetroAudioNode = class {
       noiseSource: null,
       noiseHighpass: null,
       noiseLowpass: null,
+      noiseWarmth: null,
       noiseFilter: null,
       noisePanner: null,
       noiseGain: null,
@@ -751,7 +761,8 @@ var TetoricaRetroAudioNode = class {
     const { settings, isPlaying, isOutputEnabled } = this.runtimeState;
     const audibleMasterGain = settings.isMuted || !isOutputEnabled ? 0 : settings.volume;
     if (masterGain) {
-      masterGain.gain.value = audibleMasterGain;
+      masterGain.gain.cancelScheduledValues(this.context.currentTime);
+      masterGain.gain.setValueAtTime(audibleMasterGain, this.context.currentTime);
     }
     if (radioToneHighpass && radioToneLowpass && radioTonePresence) {
       const amount = settings.isAudioFxEnabled ? settings.radioToneAmount : 0;
@@ -822,8 +833,27 @@ var TetoricaRetroAudioNode = class {
       flutterLfo.frequency.value = 5.2 + amount * 6.5;
       flutterLfoGain.gain.value = amount * 6e-4;
     }
+    const noiseHighpassNode = this.nodes.noiseHighpass;
+    const noiseLowpassNode = this.nodes.noiseLowpass;
+    const noiseWarmthNode = this.nodes.noiseWarmth;
+    if (noiseHighpassNode && noiseLowpassNode && noiseWarmthNode && noiseGainNode) {
+      const w = settings.noiseWarmthAmount;
+      const a = settings.noiseAirAmount;
+      const p = settings.noisePresenceAmount;
+      noiseHighpassNode.frequency.value = 1100 - w * 1040;
+      noiseHighpassNode.Q.value = 0.25 + w * 0.45;
+      noiseLowpassNode.frequency.value = 2e3 + a * 4500;
+      noiseWarmthNode.gain.value = w * 2;
+      const noiseFilterNode = this.nodes.noiseFilter;
+      if (noiseFilterNode) {
+        noiseFilterNode.frequency.value = 3200;
+        noiseFilterNode.gain.value = (p - 1) * 4;
+      }
+    }
     if (noiseGainNode) {
-      noiseGainNode.gain.value = settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying ? Math.min(0.24, settings.noiseLevel * 5.5) : 0;
+      const targetNoiseGain = settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying ? Math.min(0.24, settings.noiseLevel * 5.5) : 0;
+      noiseGainNode.gain.cancelScheduledValues(this.context.currentTime);
+      noiseGainNode.gain.setValueAtTime(targetNoiseGain, this.context.currentTime);
     }
     if (crackleGainNode) {
       const isCrackleActive = settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
@@ -950,6 +980,7 @@ var TetoricaRetroAudioNode = class {
     const noiseSource = context.createBufferSource();
     const noiseHighpass = context.createBiquadFilter();
     const noiseLowpass = context.createBiquadFilter();
+    const noiseWarmth = context.createBiquadFilter();
     const noisePresence = context.createBiquadFilter();
     const noisePanner = context.createStereoPanner();
     const noiseGain = context.createGain();
@@ -1009,15 +1040,19 @@ var TetoricaRetroAudioNode = class {
     noiseSource.buffer = createTintedNoiseBuffer(context);
     noiseSource.loop = true;
     noiseHighpass.type = "highpass";
-    noiseHighpass.frequency.value = 1100;
-    noiseHighpass.Q.value = 0.25;
+    noiseHighpass.frequency.value = 220;
+    noiseHighpass.Q.value = 0.5;
     noiseLowpass.type = "lowpass";
-    noiseLowpass.frequency.value = 5600;
-    noiseLowpass.Q.value = 0.18;
+    noiseLowpass.frequency.value = 4500;
+    noiseLowpass.Q.value = 0.2;
+    noiseWarmth.type = "peaking";
+    noiseWarmth.frequency.value = 350;
+    noiseWarmth.Q.value = 0.9;
+    noiseWarmth.gain.value = 1.7;
     noisePresence.type = "peaking";
-    noisePresence.frequency.value = 2400;
-    noisePresence.Q.value = 0.7;
-    noisePresence.gain.value = -2.5;
+    noisePresence.frequency.value = 3200;
+    noisePresence.Q.value = 0.8;
+    noisePresence.gain.value = -2;
     noiseLfo.type = "sine";
     noiseLfo.frequency.value = 0.021;
     noiseLfoGain.gain.value = 0.08;
@@ -1085,7 +1120,8 @@ var TetoricaRetroAudioNode = class {
     busCompressor.connect(fxOutputGain);
     noiseSource.connect(noiseHighpass);
     noiseHighpass.connect(noiseLowpass);
-    noiseLowpass.connect(noisePresence);
+    noiseLowpass.connect(noiseWarmth);
+    noiseWarmth.connect(noisePresence);
     noisePresence.connect(noisePanner);
     noisePanner.connect(noiseGain);
     noiseGain.connect(masterGain);
@@ -1123,6 +1159,7 @@ var TetoricaRetroAudioNode = class {
       noiseSource,
       noiseHighpass,
       noiseLowpass,
+      noiseWarmth,
       noiseFilter: noisePresence,
       noisePanner,
       noiseGain,

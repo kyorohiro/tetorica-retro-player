@@ -213,6 +213,10 @@ export const VideoControls = memo(function VideoControls({
     }
   };
   const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
+  const { isHolding: isVolumeHolding, ...volumeLongPressHandlers } = useLongPress(
+    onToggleMute,
+    () => setIsVolumeOpen((v) => !v),
+  );
 
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
@@ -884,12 +888,23 @@ export const VideoControls = memo(function VideoControls({
             </button>
             <button
               type="button"
-              onClick={() => setIsVolumeOpen((v) => !v)}
+              {...volumeLongPressHandlers}
               aria-label="Volume"
               title="Volume"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+              className={[
+                "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                isVolumeHolding
+                  ? "border-[#bcb4a6] bg-[#e2ddd5]"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
             >
-              {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              {isVolumeHolding && (
+                <span
+                  className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+              )}
+              {isMuted || volume === 0 ? <VolumeX size={16} className="relative z-10" /> : <Volume2 size={16} className="relative z-10" />}
             </button>
             <button
               type="button"
