@@ -656,71 +656,22 @@ export class TetoricaRetroVideoPipeline {
     }
 
     requestAnimationFrame(async () => {
-      // Submit both filter passes simultaneously so WEBGL_parallel_shader_compile
-      // can compile them in parallel. Splitting from one ~1277-line shader into
-      // two smaller shaders (~730 + ~470 lines) significantly reduces ANGLE's
-      // GLSL→HLSL compilation time on Windows/Chrome.
+      // Submit both filter passes simultaneously so the parallel-shader-compile
+      // extension can overlap their compilation.
+      // NOTE: Windows/ANGLE (D3D cache freeze) is already handled above by the
+      // shouldUseWindowsLiteMode branch, so no 3-second delay is needed here.
       const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1);
       const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
 
-      // CRITICAL: Do NOT call getProgramParameter immediately after linkProgram.
-      //
-      // On Windows/ANGLE, Chrome's D3D GPU shader cache stores pre-compiled DXBC
-      // bytecode. On the 2nd+ page load (cache warm), linkProgram triggers a
-      // synchronous D3D shader load in the GPU process command thread. Any
-      // getProgramParameter call (including COMPLETION_STATUS_KHR) during this
-      // window blocks the JS main thread until the GPU process responds — causing
-      // a full browser freeze that requires Task Manager to clear.
-      //
-      // Fix: wait 3 s via setTimeout (not RAF) so the GPU process finishes
-      // cache loading before we issue any read-back commands.
-      TetoricaRetroVideoPipeline.showDebug("filter: compiling pass1+pass2 (wait 3s)...");
-      await new Promise<void>(resolve => setTimeout(resolve, 3000));
-
-      // GPU process should now be idle. Safe to poll COMPLETION_STATUS_KHR.
-      const ext = (
-        gl.getExtension("WEBGL_parallel_shader_compile") ??
-        gl.getExtension("KHR_parallel_shader_compile")
-      ) as KHRParallelShaderCompile | null;
-
-      if (ext) {
-        // Poll until both programs are done (or context lost).
-        // No frame-count timeout: calling LINK_STATUS while compilation is still
-        // running blocks the main thread and freezes the browser.
-        let frames = 0;
-        await new Promise<void>((resolve) => {
-          const poll = () => {
-            if (gl.isContextLost()) { resolve(); return; }
-            const p1done = gl.getProgramParameter(pass1Program, ext.COMPLETION_STATUS_KHR) as boolean;
-            const p2done = gl.getProgramParameter(pass2Program, ext.COMPLETION_STATUS_KHR) as boolean;
-            TetoricaRetroVideoPipeline.showDebug(`filter: poll#${++frames} p1=${p1done ? 1 : 0} p2=${p2done ? 1 : 0}`);
-            if (p1done && p2done) resolve();
-            else requestAnimationFrame(poll);
-          };
-          requestAnimationFrame(poll);
-        });
-        if (gl.isContextLost()) return;
-
-        if (!gl.getProgramParameter(pass1Program, gl.LINK_STATUS)) {
-          const msg = gl.getProgramInfoLog(pass1Program) ?? "unknown";
-          TetoricaRetroVideoPipeline.showDebug(`filter: pass1 LINK FAILED: ${msg}`);
-          gl.deleteProgram(pass1Program);
-          gl.deleteProgram(pass2Program);
-          return;
-        }
-        if (!gl.getProgramParameter(pass2Program, gl.LINK_STATUS)) {
-          const msg = gl.getProgramInfoLog(pass2Program) ?? "unknown";
-          TetoricaRetroVideoPipeline.showDebug(`filter: pass2 LINK FAILED: ${msg}`);
-          gl.deleteProgram(pass1Program);
-          gl.deleteProgram(pass2Program);
-          return;
-        }
-      } else {
-        // WEBGL_parallel_shader_compile not available (non-Chromium browser).
-        // Cannot safely poll without potentially blocking. Best effort: use programs
-        // as-is and let GL errors in render() fall through silently to passthrough.
-        TetoricaRetroVideoPipeline.showDebug("filter: no parallel-compile ext, using programs as-is");
+      try {
+        await waitAndVerifyPrograms(gl, [pass1Program, pass2Program]);
+      } catch (err) {
+        TetoricaRetroVideoPipeline.showDebug(`filter: link failed: ${err}`);
+        gl.deleteProgram(pass1Program);
+        gl.deleteProgram(pass2Program);
+        return;
       }
+      if (gl.isContextLost()) return;
 
       pipeline.setFilterPrograms(pass1Program, pass2Program);
       onFilterReady?.();
