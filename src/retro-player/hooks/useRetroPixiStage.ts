@@ -377,7 +377,13 @@ export function useRetroPixiStage({
           ) / 10,
       });
 
-      const pipeline = await TetoricaRetroVideoPipeline.create(gl);
+      // onFilterReady fires after background filter compilation.
+      // appRef.current is set below, so by the time the callback fires it's available.
+      const onFilterReady = () => {
+        renderFrameRef.current();
+        startTicker();
+      };
+      const pipeline = await TetoricaRetroVideoPipeline.create(gl, onFilterReady);
       const app: CanvasStageApp = {
         canvas,
         pipeline,

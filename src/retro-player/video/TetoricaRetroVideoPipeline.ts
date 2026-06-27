@@ -143,7 +143,6 @@ const QUAD_VERTICES = new Float32Array([
   1, 1,
 ]);
 
-const LARGE_VIDEO_SOURCE_THRESHOLD = 640;
 
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -180,17 +179,6 @@ export const getRetroVideoSourceSize = (source: RetroVideoSource) => ({
         ? source.naturalHeight
         : source.height,
 });
-
-const shouldUseDirectVideoUpload = (
-  source: RetroVideoSource,
-  sourceWidth: number,
-  sourceHeight: number,
-) =>
-  isHtmlVideoElement(source) &&
-  (
-    sourceWidth > LARGE_VIDEO_SOURCE_THRESHOLD ||
-    sourceHeight > LARGE_VIDEO_SOURCE_THRESHOLD
-  );
 
 export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
   filterState.spotMaskStrength > 0.001 &&
@@ -498,6 +486,19 @@ async function waitAndVerifyPrograms(
 }
 
 export class TetoricaRetroVideoPipeline {
+  private static debugEl: HTMLElement | null = null;
+
+  private static showDebug(msg: string) {
+    if (typeof document === "undefined") return;
+    if (!TetoricaRetroVideoPipeline.debugEl) {
+      const el = document.createElement("div");
+      el.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:13px;padding:6px 8px;white-space:pre-wrap;word-break:break-all;pointer-events:none;";
+      document.body.appendChild(el);
+      TetoricaRetroVideoPipeline.debugEl = el;
+    }
+    TetoricaRetroVideoPipeline.debugEl.textContent = msg;
+  }
+
   private readonly gl: WebGL2RenderingContext;
 
   // null until the background filter compilation finishes
@@ -507,11 +508,9 @@ export class TetoricaRetroVideoPipeline {
 
   private readonly texture: WebGLTexture;
 
+  private readonly vao: WebGLVertexArrayObject;
+
   private uniformLocations: RendererUniformLocations | null;
-
-  private uploadCanvas: HTMLCanvasElement | null = null;
-
-  private uploadContext: CanvasRenderingContext2D | null = null;
 
   private currentSource: RetroVideoSource | null = null;
 
@@ -529,9 +528,17 @@ export class TetoricaRetroVideoPipeline {
     gl.useProgram(program);
     gl.uniform1i(gl.getUniformLocation(program, "uTexture"), 0);
     this.uniformLocations = this.buildUniformLocations(program);
+    // Reset time so CRT/glow animations start from t=0 (avoids large initial uTime jump).
+    this.resetAnimationClock();
   }
 
-  static async create(gl: WebGL2RenderingContext): Promise<TetoricaRetroVideoPipeline> {
+  // onFilterReady is called after the background filter compilation finishes.
+  // The caller (useRetroPixiStage) uses it to trigger safeRender() + startTicker()
+  // so the render loop picks up the filter with a valid currentSource/currentFilterState.
+  static async create(
+    gl: WebGL2RenderingContext,
+    onFilterReady?: () => void,
+  ): Promise<TetoricaRetroVideoPipeline> {
     const cacheKey = getBinaryCacheKey(gl);
 
     // Try restoring from binary cache (skips GLSL→HLSL translation on Windows)
@@ -557,6 +564,7 @@ export class TetoricaRetroVideoPipeline {
       const filterJob = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT);
       waitAndVerifyPrograms(gl, [filterJob]).then(() => {
         pipeline.setFilterProgram(filterJob);
+        onFilterReady?.();
         const filterBin = getProgramBinaryEntry(gl, filterJob);
         const passthroughBin = getProgramBinaryEntry(gl, passthroughProgram);
         if (filterBin && passthroughBin) {
@@ -581,6 +589,8 @@ export class TetoricaRetroVideoPipeline {
     gl.bufferData(gl.ARRAY_BUFFER, QUAD_VERTICES, gl.STATIC_DRAW);
 
     const vao = gl.createVertexArray();
+    if (!vao) throw new Error("Failed to create VAO.");
+    this.vao = vao;
     gl.bindVertexArray(vao);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -683,8 +693,17 @@ export class TetoricaRetroVideoPipeline {
     return buffer;
   }
 
+  private renderCount = 0;
+
   render() {
     const { gl } = this;
+    if (gl.isContextLost()) {
+      console.warn("[retro-player] render() skipped: WebGL context is lost");
+      return;
+    }
+
+    gl.bindVertexArray(this.vao);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.clearColor(0.01, 0.02, 0.01, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -692,6 +711,8 @@ export class TetoricaRetroVideoPipeline {
     const source = this.currentSource;
     const filterState = this.currentFilterState;
     if (!this.outputEnabled || !source || !filterState) {
+      TetoricaRetroVideoPipeline.showDebug(`EXIT out=${this.outputEnabled ? 1 : 0} src=${!!source ? 1 : 0} fs=${!!filterState ? 1 : 0}`);
+      this.renderCount++;
       return;
     }
 
@@ -717,25 +738,34 @@ export class TetoricaRetroVideoPipeline {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
     }
 
-    if (filterState.isFilterEnabled && this.filterProgram) {
+    const usingFilter = filterState.isFilterEnabled && this.filterProgram;
+    if (usingFilter) {
+      gl.useProgram(this.filterProgram);
       const sourceSize = getRetroVideoSourceSize(source);
       this.applyFilterUniforms(filterState, sourceSize.width, sourceSize.height);
-      gl.useProgram(this.filterProgram);
     } else {
       gl.useProgram(this.passthroughProgram);
     }
+
+    if (this.renderCount < 200) {
+      const sourceSize = getRetroVideoSourceSize(source);
+      const srcType = source instanceof HTMLVideoElement ? "vid" : source instanceof HTMLImageElement ? "img" : "cvs";
+      const glErr = gl.getError();
+      const info = `f=${!!usingFilter ? 1 : 0} fp=${!!this.filterProgram ? 1 : 0} src=${srcType} ${sourceSize.width}x${sourceSize.height} up=${uploadSource === source ? "d" : "c"} err=${glErr} buf=${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`;
+      TetoricaRetroVideoPipeline.showDebug(info);
+    }
+    this.renderCount++;
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
   dispose() {
     this.gl.deleteTexture(this.texture);
+    this.gl.deleteVertexArray(this.vao);
     if (this.filterProgram) this.gl.deleteProgram(this.filterProgram);
     this.gl.deleteProgram(this.passthroughProgram);
     this.currentSource = null;
     this.currentFilterState = null;
-    this.uploadCanvas = null;
-    this.uploadContext = null;
   }
 
   private getUploadSource(
@@ -750,73 +780,9 @@ export class TetoricaRetroVideoPipeline {
       return source;
     }
 
-    const sourceSize = getRetroVideoSourceSize(source);
-    if (sourceSize.width <= 0 || sourceSize.height <= 0) {
-      return source;
-    }
-
-    if (shouldUseDirectVideoUpload(source, sourceSize.width, sourceSize.height)) {
-      return source;
-    }
-
-    const {
-      width: effectiveTargetWidth,
-      height: effectiveTargetHeight,
-      sampleWidth,
-      sampleHeight,
-      isPhosphorDotMode,
-    } = getEffectiveRetroTargetSize(
-      filterState,
-      sourceSize.width,
-      sourceSize.height,
-    );
-    const targetWidth = Math.max(
-      1,
-      Math.round(isPhosphorDotMode ? sampleWidth : effectiveTargetWidth),
-    );
-    const targetHeight = Math.max(
-      1,
-      Math.round(isPhosphorDotMode ? sampleHeight : effectiveTargetHeight),
-    );
-
-    const uploadContext = this.ensureUploadContext();
-    if (!uploadContext || !this.uploadCanvas) {
-      return source;
-    }
-
-    if (this.uploadCanvas.width !== targetWidth) this.uploadCanvas.width = targetWidth;
-    if (this.uploadCanvas.height !== targetHeight) this.uploadCanvas.height = targetHeight;
-
-    uploadContext.imageSmoothingEnabled = true;
-    uploadContext.imageSmoothingQuality = "high";
-    uploadContext.fillStyle = "#000";
-    uploadContext.fillRect(0, 0, targetWidth, targetHeight);
-    uploadContext.drawImage(source, 0, 0, targetWidth, targetHeight);
-    return this.uploadCanvas;
-  }
-
-  private ensureUploadContext() {
-    if (this.uploadCanvas && this.uploadContext) {
-      return this.uploadContext;
-    }
-
-    if (typeof document === "undefined") {
-      return null;
-    }
-
-    const uploadCanvas = document.createElement("canvas");
-    const uploadContext = uploadCanvas.getContext("2d", {
-      alpha: false,
-      desynchronized: true,
-    });
-
-    if (!uploadContext) {
-      return null;
-    }
-
-    this.uploadCanvas = uploadCanvas;
-    this.uploadContext = uploadContext;
-    return uploadContext;
+    // The WebGL shader quantizes pixels via uTargetSize uniforms, so direct
+    // upload always works. Avoids drawImage() failures on older Android.
+    return source;
   }
 
   private applyFilterUniforms(

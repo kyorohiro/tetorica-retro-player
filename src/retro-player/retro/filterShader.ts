@@ -31,7 +31,7 @@ void main(void)
 `;
 
 export const FILTER_FRAGMENT = `#version 300 es
-precision mediump float;
+precision highp float;
 
 in vec2 vTextureCoord;
 in vec2 vMaskCoord;
