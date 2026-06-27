@@ -69,6 +69,17 @@ function App() {
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
+  type PlaylistItem = { kind: "file"; file: File } | { kind: "path"; url: string; path: string };
+  const playlistRef = React.useRef<PlaylistItem[]>([]);
+  const [playlistLength, setPlaylistLength] = React.useState(0);
+  const [_playlistIndex, setPlaylistIndex] = React.useState(0);
+  type LoopMode = "one" | "autoplay" | "all" | "off";
+  const [loopMode, setLoopMode] = React.useState<LoopMode>("one");
+  const loopModeRef = React.useRef<LoopMode>(loopMode);
+  React.useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
+  const cycleLoopMode = React.useCallback(() => {
+    setLoopMode((m) => m === "one" ? "autoplay" : m === "autoplay" ? "all" : m === "all" ? "off" : "one");
+  }, []);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -173,9 +184,19 @@ function App() {
                     : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
                 }))
               : raw;
-            if (sharedFiles.length === 1 && !sharedFiles[0].isDir && (isVideoExtended(sharedFiles[0].path) || isAudio(sharedFiles[0].path) || isImage(sharedFiles[0].path))) {
+            const mediaShared = sharedFiles.filter((f) => !f.isDir && (isVideoExtended(f.path) || isAudio(f.path) || isImage(f.path)));
+            const isPlaylistMode = (loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaShared.length > 1 && mediaShared.length === sharedFiles.length;
+            if (sharedFiles.length === 1 && mediaShared.length === 1) {
               const f = sharedFiles[0];
+              playlistRef.current = [{ kind: "path", url: f.url, path: f.path }];
+              setPlaylistLength(1);
+              setPlaylistIndex(0);
               previewSourceRef.current.previewPath(f.url, f.path);
+            } else if (isPlaylistMode) {
+              playlistRef.current = mediaShared.map((f) => ({ kind: "path" as const, url: f.url, path: f.path }));
+              setPlaylistLength(mediaShared.length);
+              setPlaylistIndex(0);
+              previewSourceRef.current.previewPath(mediaShared[0].url, mediaShared[0].path);
             } else {
               await showMDropSharedListDialogRef.current({
                 files: sharedFiles,
@@ -188,9 +209,19 @@ function App() {
             // Use asset:// protocol (assetProtocol.enable: true in tauri.conf.json).
             const { convertFileSrc } = await import("@tauri-apps/api/core");
 
-            if (paths.length === 1 && (isVideo(paths[0]) || isAudio(paths[0]) || isImage(paths[0]))) {
-              // Single media: use asset:// URL directly (Range request support, no memory pressure)
+            const isAllMedia = paths.every((p) => isVideo(p) || isAudio(p) || isImage(p));
+            const isPlaylistMode = (loopModeRef.current === "autoplay" || loopModeRef.current === "all") && paths.length > 1 && isAllMedia;
+            if (paths.length === 1 && isAllMedia) {
+              playlistRef.current = [{ kind: "path", url: convertFileSrc(paths[0]), path: paths[0] }];
+              setPlaylistLength(1);
+              setPlaylistIndex(0);
               previewSourceRef.current.previewPath(convertFileSrc(paths[0]), paths[0]);
+            } else if (isPlaylistMode) {
+              const items = paths.map((p) => ({ kind: "path" as const, url: convertFileSrc(p), path: p }));
+              playlistRef.current = items;
+              setPlaylistLength(items.length);
+              setPlaylistIndex(0);
+              previewSourceRef.current.previewPath(items[0].url, items[0].path);
             } else {
               // Non-media or multiple files: fetch as blobs to get real File objects for the dialog
               const fileEntries: FileTargetFile[] = [];
@@ -325,6 +356,19 @@ function App() {
 
       if (files.length === 1 && isDirectRetroFile(files[0])) {
         previewSource.previewFile(files[0]);
+        playlistRef.current = [{ kind: "file", file: files[0] }];
+        setPlaylistLength(1);
+        setPlaylistIndex(0);
+        return;
+      }
+
+      const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
+      if ((loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaFiles.length > 1 && mediaFiles.length === files.length) {
+        playlistRef.current = mediaFiles.map((f) => ({ kind: "file" as const, file: f }));
+        setPlaylistLength(mediaFiles.length);
+        setPlaylistIndex(0);
+        previewSource.previewFile(mediaFiles[0]);
+        finishPreparingSelection();
         return;
       }
 
@@ -333,6 +377,46 @@ function App() {
       finishPreparingSelection();
     }
   }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets, previewSource]);
+
+  const previewItem = useCallback((item: PlaylistItem) => {
+    if (item.kind === "file") previewSource.previewFile(item.file);
+    else previewSource.previewPath(item.url, item.path);
+  }, [previewSource]);
+
+  const nextTrack = useCallback(() => {
+    const list = playlistRef.current;
+    setPlaylistIndex((idx) => {
+      const next = idx + 1;
+      if (next >= list.length) return idx;
+      previewItem(list[next]);
+      return next;
+    });
+  }, [previewItem]);
+
+  const nextTrackAll = useCallback(() => {
+    const list = playlistRef.current;
+    if (list.length === 0) return;
+    setPlaylistIndex((idx) => {
+      const next = (idx + 1) % list.length;
+      previewItem(list[next]);
+      return next;
+    });
+  }, [previewItem]);
+
+  const prevTrack = useCallback(() => {
+    const list = playlistRef.current;
+    setPlaylistIndex((idx) => {
+      const prev = idx - 1;
+      if (prev < 0) return idx;
+      previewItem(list[prev]);
+      return prev;
+    });
+  }, [previewItem]);
+
+  const handleEnded = useCallback(() => {
+    if (loopMode === "autoplay") nextTrack();
+    else if (loopMode === "all") nextTrackAll();
+  }, [loopMode, nextTrack, nextTrackAll]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -754,7 +838,12 @@ function App() {
               stream={previewSource.previewStream}
               streamName={previewSource.previewLabel}
               kind={previewSource.previewKind ?? defaultPreviewKind}
-              looping={!isUsingDefaultPreview}
+              looping={!isUsingDefaultPreview && loopMode === "one"}
+              onEnded={handleEnded}
+              onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
+              onNextTrack={playlistLength > 1 ? nextTrack : undefined}
+              loopMode={loopMode}
+              onCycleLoopMode={cycleLoopMode}
             />
           </React.Suspense>
         </div>

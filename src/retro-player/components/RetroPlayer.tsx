@@ -32,6 +32,11 @@ type RetroPlayerProps = {
   onError?: (error: Error) => void;
   initialFilterState?: RetroFilterInitialState;
   confirmDialog?: ConfirmDialogFn;
+  onEnded?: () => void;
+  onPrevTrack?: () => void;
+  onNextTrack?: () => void;
+  loopMode?: "one" | "autoplay" | "all" | "off";
+  onCycleLoopMode?: () => void;
 };
 
 export function RetroPlayer({
@@ -45,6 +50,11 @@ export function RetroPlayer({
   onError,
   initialFilterState,
   confirmDialog: confirmDialogProp,
+  onEnded,
+  onPrevTrack,
+  onNextTrack,
+  loopMode,
+  onCycleLoopMode,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
@@ -78,6 +88,7 @@ export function RetroPlayer({
     filterState,
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
+    { onEnded },
   );
 
   // --- Callbacks ---
@@ -338,6 +349,10 @@ export function RetroPlayer({
     onSetMatchTargetAspect: handleSetMatchTargetAspect,
     onResetSettings: resetAllSettings,
     onImportSettings: handleImportSettings,
+    onPrevTrack,
+    onNextTrack,
+    loopMode,
+    onCycleLoopMode,
   } as const;
 
   return (

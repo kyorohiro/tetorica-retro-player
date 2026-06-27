@@ -1,11 +1,14 @@
-import { memo, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { useLongPress } from "../hooks/useLongPress";
 import {
+  ChevronsRight,
   FolderOpen,
   Gauge,
   Mic2,
   Pause,
   Play,
+  Repeat,
+  Repeat1,
   RotateCcw,
   Save,
   SkipBack,
@@ -103,6 +106,10 @@ type VideoControlsProps = {
   onToggleVideoSettings: () => void;
   onToggleAudioSettings: () => void;
   onImportSettings: (data: PresetFileData) => void;
+  onPrevTrack?: () => void;
+  onNextTrack?: () => void;
+  loopMode?: "one" | "autoplay" | "all" | "off";
+  onCycleLoopMode?: () => void;
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -124,7 +131,7 @@ export const VideoControls = memo(function VideoControls({
   hasPlayback,
   currentTime,
   duration,
-  isLooping,
+  isLooping: _isLooping,
   isMuted,
   isPlaying,
   isAudioFxEnabled,
@@ -194,6 +201,10 @@ export const VideoControls = memo(function VideoControls({
   onToggleVideoSettings,
   onToggleAudioSettings,
   onImportSettings,
+  onPrevTrack,
+  onNextTrack,
+  loopMode,
+  onCycleLoopMode,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
@@ -213,6 +224,15 @@ export const VideoControls = memo(function VideoControls({
     }
   };
   const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
+  const noop = useCallback(() => {}, []);
+  const { isHolding: isPrevHolding, ...prevTrackHandlers } = useLongPress(
+    onPrevTrack ?? noop,
+    useCallback(() => { onSeek(Math.max(currentTime - 5, 0)); }, [onSeek, currentTime]),
+  );
+  const { isHolding: isNextHolding, ...nextTrackHandlers } = useLongPress(
+    onNextTrack ?? noop,
+    useCallback(() => { onSeek(Math.min(currentTime + 5, duration || currentTime + 5)); }, [onSeek, currentTime, duration]),
+  );
   const { isHolding: isVolumeHolding, ...volumeLongPressHandlers } = useLongPress(
     onToggleMute,
     () => setIsVolumeOpen((v) => !v),
@@ -220,6 +240,20 @@ export const VideoControls = memo(function VideoControls({
 
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
+
+  const loopIcon = loopMode === "one" ? <Repeat1 size={16} />
+    : loopMode === "autoplay" ? <ChevronsRight size={16} />
+    : loopMode === "all" ? <Repeat size={16} />
+    : <Repeat size={16} />;
+  const loopIconSm = loopMode === "one" ? <Repeat1 size={13} />
+    : loopMode === "autoplay" ? <ChevronsRight size={13} />
+    : loopMode === "all" ? <Repeat size={13} />
+    : <Repeat size={13} />;
+  const loopLabel = loopMode === "one" ? "Loop 1"
+    : loopMode === "autoplay" ? "Auto Next"
+    : loopMode === "all" ? "Loop All"
+    : "No loop";
+  const loopActive = loopMode === "one" || loopMode === "autoplay" || loopMode === "all";
 
   const handleSettingsFile = async (file: File) => {
     if (!file.name.endsWith(".retro.json")) return;
@@ -908,17 +942,17 @@ export const VideoControls = memo(function VideoControls({
             </button>
             <button
               type="button"
-              onClick={onToggleLoop}
-              aria-label={isLooping ? "Loop on" : "Loop off"}
-              title={isLooping ? "Loop on" : "Loop off"}
+              onClick={onCycleLoopMode ?? onToggleLoop}
+              aria-label={loopLabel}
+              title={loopLabel}
               className={[
-                  "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                  isLooping
-                    ? "border-[#000000] bg-[#111014]/20"
-                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                loopActive
+                  ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
-              <RotateCcw size={16} />
+              {loopIcon}
             </button>
             <div className="relative">
               <button
@@ -969,23 +1003,29 @@ export const VideoControls = memo(function VideoControls({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSeek(Math.max(currentTime - 5, 0));
-                  }}
-                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                  {...prevTrackHandlers}
+                  className={["col-span-2 relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+                    isPrevHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
                 >
-                  <SkipBack size={16} />
-                  -5s
+                  {isPrevHolding && onPrevTrack && (
+                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                  )}
+                  <SkipBack size={16} className="relative z-10" />
+                  <span className="relative z-10">-5s</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
-                  }}
-                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                  {...nextTrackHandlers}
+                  className={["col-span-2 relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+                    isNextHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
                 >
-                  <SkipForward size={16} />
-                  +5s
+                  {isNextHolding && onNextTrack && (
+                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                  )}
+                  <SkipForward size={16} className="relative z-10" />
+                  <span className="relative z-10">+5s</span>
                 </button>
                 <button
                   type="button"
@@ -1003,23 +1043,29 @@ export const VideoControls = memo(function VideoControls({
               <>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSeek(Math.max(currentTime - 5, 0));
-                  }}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                  {...prevTrackHandlers}
+                  className={["relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+                    isPrevHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
                 >
-                  <SkipBack size={16} />
-                  -5s
+                  {isPrevHolding && onPrevTrack && (
+                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                  )}
+                  <SkipBack size={16} className="relative z-10" />
+                  <span className="relative z-10">-5s</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
-                  }}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                  {...nextTrackHandlers}
+                  className={["relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+                    isNextHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
                 >
-                  <SkipForward size={16} />
-                  +5s
+                  {isNextHolding && onNextTrack && (
+                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                  )}
+                  <SkipForward size={16} className="relative z-10" />
+                  <span className="relative z-10">+5s</span>
                 </button>
               </>
             )}
@@ -1108,6 +1154,22 @@ export const VideoControls = memo(function VideoControls({
             Reset
           </button>
         </div>
+        {!hasPlayback && (
+          <button
+            type="button"
+            onClick={onCycleLoopMode ?? onToggleLoop}
+            aria-label={loopLabel}
+            title={loopLabel}
+            className={[
+              "inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#12141c]",
+              loopActive
+                ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
+                : "border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
+            ].join(" ")}
+          >
+            {loopIconSm}
+          </button>
+        )}
         <button
           type="button"
           onClick={exportPresetFile}
