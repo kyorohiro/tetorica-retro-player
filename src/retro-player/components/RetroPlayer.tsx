@@ -267,6 +267,12 @@ export function RetroPlayer({
     player.refreshLayout,
   ]);
 
+  // Forward previewError to onError callback.
+  React.useEffect(() => {
+    if (!player.previewError || !onError) return;
+    onError(new Error(player.previewError));
+  }, [player.previewError, onError]);
+
   // Propagate looping prop to the player.
   React.useEffect(() => {
     if (typeof looping !== "boolean") return;

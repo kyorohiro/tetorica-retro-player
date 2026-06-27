@@ -37,6 +37,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      { "ext": ["mp4", "m4v", "mov", "mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "ogv"], "name": "Video" },
+      { "ext": ["mp3", "wav", "ogg", "m4a", "aac", "flac", "opus"], "name": "Audio" },
+      { "ext": ["png", "jpg", "jpeg", "webp", "gif", "avif"], "name": "Image" }
     ]
   }
 }

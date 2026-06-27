@@ -191,17 +191,25 @@ function App() {
               playlistRef.current = [{ kind: "path", url: f.url, path: f.path }];
               setPlaylistLength(1);
               setPlaylistIndex(0);
+              currentPlayingPathRef.current = f.path;
+              setShowFfmpegRetry(false);
               previewSourceRef.current.previewPath(f.url, f.path);
             } else if (isPlaylistMode) {
               playlistRef.current = mediaShared.map((f) => ({ kind: "path" as const, url: f.url, path: f.path }));
               setPlaylistLength(mediaShared.length);
               setPlaylistIndex(0);
+              currentPlayingPathRef.current = mediaShared[0].path;
+              setShowFfmpegRetry(false);
               previewSourceRef.current.previewPath(mediaShared[0].url, mediaShared[0].path);
             } else {
               await showMDropSharedListDialogRef.current({
                 files: sharedFiles,
                 useHls: isFfmpegEnabledRef.current,
-                onPlay: (url, path) => { previewSourceRef.current.previewPath(url, path); },
+                onPlay: (url, path) => {
+                  currentPlayingPathRef.current = path;
+                  setShowFfmpegRetry(false);
+                  previewSourceRef.current.previewPath(url, path);
+                },
               });
             }
           } else {
@@ -215,12 +223,16 @@ function App() {
               playlistRef.current = [{ kind: "path", url: convertFileSrc(paths[0]), path: paths[0] }];
               setPlaylistLength(1);
               setPlaylistIndex(0);
+              currentPlayingPathRef.current = paths[0];
+              setShowFfmpegRetry(false);
               previewSourceRef.current.previewPath(convertFileSrc(paths[0]), paths[0]);
             } else if (isPlaylistMode) {
               const items = paths.map((p) => ({ kind: "path" as const, url: convertFileSrc(p), path: p }));
               playlistRef.current = items;
               setPlaylistLength(items.length);
               setPlaylistIndex(0);
+              currentPlayingPathRef.current = items[0].path;
+              setShowFfmpegRetry(false);
               previewSourceRef.current.previewPath(items[0].url, items[0].path);
             } else {
               // Non-media or multiple files: fetch as blobs to get real File objects for the dialog
@@ -248,6 +260,51 @@ function App() {
         } catch (e) {
           console.error("[mDrop] drag-drop share failed:", e);
         }
+      });
+    };
+
+    setup();
+    return () => { unlisten?.(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tauri "Open With" / file association handler (tauri-plugin-deep-link)
+  React.useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      unlisten = await listen<string[]>("retro://open-files", async (event) => {
+        const fileUrls = event.payload;
+        if (!fileUrls || fileUrls.length === 0) return;
+
+        // file:///path/to/file → /path/to/file
+        const paths = fileUrls.map((u) => {
+          try { return decodeURIComponent(new URL(u).pathname); } catch { return u; }
+        });
+
+        const isAllMedia = paths.every((p) => isVideoExtended(p) || isAudio(p) || isImage(p));
+        if (!isAllMedia || paths.length === 0) return;
+
+        const isPlaylistMode =
+          (loopModeRef.current === "autoplay" || loopModeRef.current === "all") &&
+          paths.length > 1;
+
+        const { convertFileSrc } = await import("@tauri-apps/api/core");
+        const items = paths.map((p) => ({ kind: "path" as const, url: convertFileSrc(p), path: p }));
+        if (isPlaylistMode) {
+          playlistRef.current = items;
+          setPlaylistLength(items.length);
+          setPlaylistIndex(0);
+        } else {
+          playlistRef.current = [items[0]];
+          setPlaylistLength(1);
+          setPlaylistIndex(0);
+        }
+        currentPlayingPathRef.current = items[0].path;
+        setShowFfmpegRetry(false);
+        previewSourceRef.current.previewPath(items[0].url, items[0].path);
       });
     };
 
@@ -378,9 +435,38 @@ function App() {
     }
   }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets, previewSource]);
 
+  const currentPlayingPathRef = React.useRef<string | null>(null);
+  const [showFfmpegRetry, setShowFfmpegRetry] = React.useState(false);
+
+  const handleFfmpegRetry = useCallback(async () => {
+    const path = currentPlayingPathRef.current;
+    if (!path || !isMDropReadyRef.current) return;
+    setShowFfmpegRetry(false);
+    try {
+      const shared = await mdropShareFile(path);
+      const hlsUrl = `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`;
+      setIsFfmpegEnabled(true);
+      previewSourceRef.current.previewPath(hlsUrl, path);
+    } catch (e) {
+      console.error("[ffmpeg retry] failed:", e);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePlayerError = useCallback((_error: Error) => {
+    if (isMDropReadyRef.current && currentPlayingPathRef.current) {
+      setShowFfmpegRetry(true);
+    }
+  }, []);
+
   const previewItem = useCallback((item: PlaylistItem) => {
-    if (item.kind === "file") previewSource.previewFile(item.file);
-    else previewSource.previewPath(item.url, item.path);
+    setShowFfmpegRetry(false);
+    if (item.kind === "file") {
+      currentPlayingPathRef.current = null;
+      previewSource.previewFile(item.file);
+    } else {
+      currentPlayingPathRef.current = item.path;
+      previewSource.previewPath(item.url, item.path);
+    }
   }, [previewSource]);
 
   const nextTrack = useCallback(() => {
@@ -495,6 +581,8 @@ function App() {
       const playUrl = isFfmpegEnabled
         ? `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`
         : shared.url;
+      currentPlayingPathRef.current = selected;
+      setShowFfmpegRetry(false);
       previewSource.previewPath(playUrl, selected);
       return;
     }
@@ -829,7 +917,7 @@ function App() {
           </div>
         )}
 
-        <div className="flex-1 min-h-0">
+        <div className="relative flex-1 min-h-0">
           <React.Suspense fallback={null}>
             <RetroPlayer
               locale={locale}
@@ -840,12 +928,34 @@ function App() {
               kind={previewSource.previewKind ?? defaultPreviewKind}
               looping={!isUsingDefaultPreview && loopMode === "one"}
               onEnded={handleEnded}
+              onError={handlePlayerError}
               onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
               onNextTrack={playlistLength > 1 ? nextTrack : undefined}
               loopMode={loopMode}
               onCycleLoopMode={cycleLoopMode}
             />
           </React.Suspense>
+          {showFfmpegRetry && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">
+              <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-400/60 bg-slate-900/80 px-4 py-2 text-sm shadow-lg backdrop-blur-sm">
+                <span className="text-amber-300">{locale === "ja" ? "再生できません" : "Playback failed"}</span>
+                <button
+                  type="button"
+                  onClick={() => { void handleFfmpegRetry(); }}
+                  className="rounded-full bg-amber-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-amber-400"
+                >
+                  ffmpeg で再生
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFfmpegRetry(false)}
+                  className="text-slate-400 hover:text-slate-200"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <input
