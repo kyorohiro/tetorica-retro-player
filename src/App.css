@@ -38,6 +38,7 @@ input[type="range"] {
 
 .safe-top-pad {
   padding-top: max(0.0rem, env(safe-area-inset-top));
+  padding-bottom: max(0.0rem, env(safe-area-inset-bottom));
 }
 
 .safe-top-offset {
