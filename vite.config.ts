@@ -9,7 +9,8 @@ function swBuildPlugin(): Plugin {
     name: "sw-build",
     closeBundle() {
       const template = fs.readFileSync(path.resolve(__dirname, "public/sw-template.js"), "utf-8");
-      const buildHash = Date.now().toString(36);
+      const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8"));
+      const buildHash = `${pkg.version}-${Date.now().toString(36)}`;
       const out = template.replace("__APP_VERSION__", buildHash);
       fs.writeFileSync(path.resolve(__dirname, "dist/sw.js"), out);
     },
