@@ -102,6 +102,10 @@ export type RetroControlPanelProps = {
   onSetMatchTargetAspect: (v: boolean) => void;
   onResetSettings: () => void;
   onImportSettings: (data: PresetFileData) => void;
+  onPrevTrack?: () => void;
+  onNextTrack?: () => void;
+  isAutoPlay?: boolean;
+  onToggleAutoPlay?: () => void;
 };
 
 const controlsFallback = (
@@ -141,6 +145,10 @@ export function RetroControlPanel({
   onSetMatchTargetAspect,
   onResetSettings,
   onImportSettings,
+  onPrevTrack,
+  onNextTrack,
+  isAutoPlay,
+  onToggleAutoPlay,
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
   if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
@@ -238,6 +246,10 @@ export function RetroControlPanel({
                   controlPanelMode === "audio-settings" ? "playback" : "audio-settings",
                 );
               }}
+              onPrevTrack={onPrevTrack}
+              onNextTrack={onNextTrack}
+              isAutoPlay={isAutoPlay}
+              onToggleAutoPlay={onToggleAutoPlay}
             />
           </React.Suspense>
         )}

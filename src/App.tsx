@@ -69,6 +69,9 @@ function App() {
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
+  const [playlistFiles, setPlaylistFiles] = React.useState<File[]>([]);
+  const [_playlistIndex, setPlaylistIndex] = React.useState(0);
+  const [isAutoPlay, setIsAutoPlay] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -325,6 +328,17 @@ function App() {
 
       if (files.length === 1 && isDirectRetroFile(files[0])) {
         previewSource.previewFile(files[0]);
+        setPlaylistFiles([files[0]]);
+        setPlaylistIndex(0);
+        return;
+      }
+
+      const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
+      if (mediaFiles.length > 1 && mediaFiles.length === files.length) {
+        setPlaylistFiles(mediaFiles);
+        setPlaylistIndex(0);
+        previewSource.previewFile(mediaFiles[0]);
+        finishPreparingSelection();
         return;
       }
 
@@ -333,6 +347,36 @@ function App() {
       finishPreparingSelection();
     }
   }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets, previewSource]);
+
+  const nextTrack = useCallback(() => {
+    setPlaylistFiles((current) => {
+      setPlaylistIndex((idx) => {
+        const next = idx + 1;
+        if (next >= current.length) return idx;
+        previewSource.previewFile(current[next]);
+        return next;
+      });
+      return current;
+    });
+  }, [previewSource]);
+
+  const prevTrack = useCallback(() => {
+    setPlaylistFiles((current) => {
+      setPlaylistIndex((idx) => {
+        const prev = idx - 1;
+        if (prev < 0) return idx;
+        previewSource.previewFile(current[prev]);
+        return prev;
+      });
+      return current;
+    });
+  }, [previewSource]);
+
+  const handleEnded = useCallback(() => {
+    if (isAutoPlay) {
+      nextTrack();
+    }
+  }, [isAutoPlay, nextTrack]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -754,7 +798,12 @@ function App() {
               stream={previewSource.previewStream}
               streamName={previewSource.previewLabel}
               kind={previewSource.previewKind ?? defaultPreviewKind}
-              looping={!isUsingDefaultPreview}
+              looping={!isUsingDefaultPreview && !isAutoPlay}
+              onEnded={handleEnded}
+              onPrevTrack={playlistFiles.length > 1 ? prevTrack : undefined}
+              onNextTrack={playlistFiles.length > 1 ? nextTrack : undefined}
+              isAutoPlay={isAutoPlay}
+              onToggleAutoPlay={() => setIsAutoPlay((v) => !v)}
             />
           </React.Suspense>
         </div>

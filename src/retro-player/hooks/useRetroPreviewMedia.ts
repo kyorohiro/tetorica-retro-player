@@ -71,6 +71,7 @@ type UseRetroPreviewMediaParams = {
   resetPerfAccumulators?: () => void;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
+  onEndedRef?: CurrentRef<(() => void) | undefined>;
 };
 
 const isAndroidRuntime = () =>
@@ -163,6 +164,7 @@ export function useRetroPreviewMedia({
   resetPerfAccumulators,
   debugVideo,
   debugAudio,
+  onEndedRef,
 }: UseRetroPreviewMediaParams) {
   const _setPreviewError = setPreviewError;
 
@@ -509,6 +511,9 @@ export function useRetroPreviewMedia({
         handleHlsEnded();
       } else {
         syncVideoState();
+      }
+      if (!media.loop) {
+        onEndedRef?.current?.();
       }
     });
 

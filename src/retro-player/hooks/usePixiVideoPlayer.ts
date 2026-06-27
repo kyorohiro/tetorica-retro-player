@@ -61,6 +61,7 @@ export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
   renderResolutionScale = 1,
+  options?: { onEnded?: () => void },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const objectUrlRef = useRef<string | null>(null);
@@ -78,6 +79,7 @@ export function usePixiVideoPlayer(
   const isPlayingRef = useRef<boolean>(false);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
   const wasPlayingBeforePowerOffRef = useRef(false);
+  const onEndedRef = useRef<(() => void) | undefined>(options?.onEnded);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, setPreviewError] = useState<string>("");
@@ -491,6 +493,7 @@ export function usePixiVideoPlayer(
     initPixi,
     debugVideo,
     debugAudio,
+    onEndedRef,
   });
 
   const {
@@ -504,6 +507,10 @@ export function usePixiVideoPlayer(
     stopDisplayCapture,
     syncVideoState,
   } = media;
+
+  useEffect(() => {
+    onEndedRef.current = options?.onEnded;
+  }, [options?.onEnded]);
 
   useEffect(() => {
     cleanupPreviewRef.current = cleanupPreview;
