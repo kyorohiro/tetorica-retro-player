@@ -195,6 +195,8 @@ export function usePixiVideoPlayer(
   } = stage;
   const initPixiRef = useRef(initPixi);
   const destroyPixiRef = useRef(destroyPixi);
+  const debugVideoRef = useRef(debugVideo);
+  const initialRenderResolutionScaleRef = useRef(renderResolutionScale);
   const cleanupPreviewRef = useRef<() => void>(() => {});
   const disposeAudioEngineRef = useRef<() => Promise<void> | void>(() => {});
 
@@ -292,7 +294,8 @@ export function usePixiVideoPlayer(
   useEffect(() => {
     initPixiRef.current = initPixi;
     destroyPixiRef.current = destroyPixi;
-  }, [initPixi, destroyPixi]);
+    debugVideoRef.current = debugVideo;
+  }, [debugVideo, initPixi, destroyPixi]);
 
   const setPreviewKindState = (
     nextKind: "video" | "audio" | "image" | "capture" | null,
@@ -823,8 +826,8 @@ export function usePixiVideoPlayer(
     let cancelled = false;
 
     const setupPixi = async () => {
-      debugVideo("startup:setupPixi-effect:start", {
-        renderResolutionScale,
+      debugVideoRef.current("startup:setupPixi-effect:start", {
+        renderResolutionScale: initialRenderResolutionScaleRef.current,
       });
       await initPixiRef.current();
 
@@ -841,7 +844,7 @@ export function usePixiVideoPlayer(
       cancelled = true;
       destroyPixiRef.current();
     };
-  }, [renderResolutionScale]);
+  }, []);
 
   useEffect(() => {
     return () => {
