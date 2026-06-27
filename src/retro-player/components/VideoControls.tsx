@@ -948,7 +948,7 @@ export const VideoControls = memo(function VideoControls({
               className={[
                 "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
                 loopActive
-                  ? "border-[#000000] bg-[#111014]/20"
+                  ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
@@ -1163,7 +1163,7 @@ export const VideoControls = memo(function VideoControls({
             className={[
               "inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#12141c]",
               loopActive
-                ? "border-[#000000] bg-[#111014]/20"
+                ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                 : "border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
             ].join(" ")}
           >

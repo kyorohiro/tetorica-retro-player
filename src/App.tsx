@@ -340,7 +340,7 @@ function App() {
       }
 
       const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
-      if (loopModeRef.current === "autoplay" && mediaFiles.length > 1 && mediaFiles.length === files.length) {
+      if ((loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaFiles.length > 1 && mediaFiles.length === files.length) {
         setPlaylistFiles(mediaFiles);
         setPlaylistIndex(0);
         previewSource.previewFile(mediaFiles[0]);
