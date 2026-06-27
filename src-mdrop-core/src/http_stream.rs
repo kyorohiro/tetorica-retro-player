@@ -211,6 +211,8 @@ async fn start_hls_for_path(
             &input,
             "-c:v",
             "libx264",
+            "-vf",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
             "-preset",
             "ultrafast",
             "-tune",
