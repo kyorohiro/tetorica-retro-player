@@ -20,6 +20,7 @@ import {
   type LocalePreference,
 } from "./i18n";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
+import { useLongPress } from "./retro-player/hooks/useLongPress";
 import { useDialog } from "./useDialog";
 import { FileTargetFile } from "./mdrop-web/api";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
@@ -67,6 +68,7 @@ function App() {
   const [mDropIp, setMDropIp] = React.useState<string | null>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -453,6 +455,16 @@ function App() {
     }, 80);
   }, []);
 
+  const { isHolding: isMenuHolding, ...menuLongPressHandlers } = useLongPress(
+    useCallback(() => {
+      setIsMobileMenuOpen(false);
+      setIsToolbarHidden(true);
+    }, []),
+    useCallback(() => {
+      setIsMobileMenuOpen((current) => !current);
+    }, []),
+  );
+
   const handleWindowPinToggle = useCallback(async () => {
     const next = !isWindowAlwaysOnTop;
     setIsWindowAlwaysOnTop(next);
@@ -483,48 +495,70 @@ function App() {
   return (
     <>
       {/* Fixed nav buttons: kept outside <main> so overflow-x-hidden on <main> cannot clip them in WebKit */}
-      <div className="safe-top-offset fixed left-3 z-9999 flex items-center gap-1">
-        <button
-          type="button"
-          aria-expanded={isMobileMenuOpen}
-          aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
-          onClick={() => {
-            setIsMobileMenuOpen((current) => !current);
-          }}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-        >
-          {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-        </button>
-        <button
-          type="button"
-          aria-label={t(locale, "reloadApp")}
-          title={t(locale, "reloadApp")}
-          onClick={handleReloadApp}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
-        >
-          <RefreshCw size={16} />
-        </button>
-        {isTauriRuntime() && (
+      {isToolbarHidden ? (
+        <div className="safe-top-offset fixed left-3 z-9999">
           <button
             type="button"
-            aria-label={isWindowAlwaysOnTop ? "Unpin window" : "Pin window on top"}
-            title={locale === "ja"
-              ? isWindowAlwaysOnTop ? "最前面固定: 解除" : "最前面固定"
-              : isWindowAlwaysOnTop ? "Always on top: off" : "Always on top"}
-            onClick={() => { void handleWindowPinToggle(); }}
+            aria-label="Show toolbar"
+            onClick={() => setIsToolbarHidden(false)}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300/50 bg-white/40 text-slate-500 shadow-sm backdrop-blur-sm transition hover:bg-white/80 hover:text-slate-700"
+          >
+            <Menu size={13} />
+          </button>
+        </div>
+      ) : (
+        <div className="safe-top-offset fixed left-3 z-9999 flex items-center gap-1">
+          <button
+            type="button"
+            aria-expanded={isMobileMenuOpen}
+            aria-label={isMobileMenuOpen ? t(locale, "closeMenu") : t(locale, "openMenu")}
+            {...menuLongPressHandlers}
             className={[
-              "inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
-              isWindowAlwaysOnTop
-                ? "border-sky-400/80 bg-sky-500/20 text-sky-700 hover:bg-sky-500/30"
+              "relative select-none overflow-hidden inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+              isMenuHolding
+                ? "border-slate-400/80 bg-slate-200/80 text-slate-700"
                 : "border-slate-300/80 bg-white/88 text-slate-700 hover:bg-white",
             ].join(" ")}
           >
-            <Pin size={16} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
+            {isMenuHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            {isMobileMenuOpen ? <X size={18} className="relative z-10" /> : <Menu size={18} className="relative z-10" />}
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            aria-label={t(locale, "reloadApp")}
+            title={t(locale, "reloadApp")}
+            onClick={handleReloadApp}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300/80 bg-white/88 text-slate-700 shadow-md backdrop-blur-sm transition hover:bg-white"
+          >
+            <RefreshCw size={16} />
+          </button>
+          {isTauriRuntime() && (
+            <button
+              type="button"
+              aria-label={isWindowAlwaysOnTop ? "Unpin window" : "Pin window on top"}
+              title={locale === "ja"
+                ? isWindowAlwaysOnTop ? "最前面固定: 解除" : "最前面固定"
+                : isWindowAlwaysOnTop ? "Always on top: off" : "Always on top"}
+              onClick={() => { void handleWindowPinToggle(); }}
+              className={[
+                "inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition",
+                isWindowAlwaysOnTop
+                  ? "border-sky-400/80 bg-sky-500/20 text-sky-700 hover:bg-sky-500/30"
+                  : "border-slate-300/80 bg-white/88 text-slate-700 hover:bg-white",
+              ].join(" ")}
+            >
+              <Pin size={16} className={isWindowAlwaysOnTop ? "fill-sky-500" : ""} />
+            </button>
+          )}
+        </div>
+      )}
       {/* mDrop / ffmpeg pills — top-right */}
-      <div className="safe-top-offset-right fixed right-10 z-9999 flex flex-col items-end gap-0.5">
+      <div className={["safe-top-offset-right fixed right-10 z-9999 flex flex-col items-end gap-0.5", isToolbarHidden ? "hidden" : ""].join(" ")}>
         <div className="flex items-center gap-1">
           <button
             type="button"
