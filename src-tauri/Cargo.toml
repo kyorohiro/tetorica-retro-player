@@ -1,6 +1,6 @@
 [package]
 name = "tetorica-retro-player"
-version = "0.32.1"
+version = "0.32.2"
 description = "retro player"
 authors = ["you"]
 edition = "2021"
