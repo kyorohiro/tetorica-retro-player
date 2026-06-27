@@ -178,12 +178,14 @@ export function usePixiVideoPlayer(
     previewElementRef,
     filterRef,
     isRendererReady,
+    isFilterReady,
     viewportRect,
     setViewportRect,
     applyFilterState,
     destroyPixi,
     fitSprite,
     initPixi,
+    ensureFilterReady,
     refreshLayout,
     resetFilterInstance,
     safeRender,
@@ -496,6 +498,7 @@ export function usePixiVideoPlayer(
     safeRender,
     resetFilterInstance,
     initPixi,
+    ensureFilterReady,
     debugVideo,
     debugAudio,
     onEndedRef,
@@ -926,6 +929,14 @@ export function usePixiVideoPlayer(
   ]);
 
   useEffect(() => {
+    const visualShaderPending =
+      (previewKind === "video" || previewKind === "capture" || previewKind === "image") &&
+      !isFilterReady;
+
+    if (visualShaderPending) {
+      return;
+    }
+
     if (previewError || needsUserPlay) {
       finishLoading();
       return;
@@ -939,7 +950,7 @@ export function usePixiVideoPlayer(
     if (isPlaying) {
       finishLoading();
     }
-  }, [previewError, needsUserPlay, previewKind, isPlaying]);
+  }, [previewError, needsUserPlay, previewKind, isPlaying, isFilterReady]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -951,12 +962,13 @@ export function usePixiVideoPlayer(
       !mediaRef.current || Math.abs(mediaRef.current.currentTime) < 0.05;
     const isEnded = mediaRef.current?.ended ?? false;
 
-    if (isVideoReady) {
+    if (isVideoReady && isFilterReady) {
       finishLoading();
     }
 
     if (
       isVideoReady &&
+      isFilterReady &&
       !isPlaying &&
       !previewError &&
       !isEnded &&
@@ -964,7 +976,7 @@ export function usePixiVideoPlayer(
     ) {
       setNeedsUserPlay(true);
     }
-  }, [audioContextRef, isPlaying, previewError, previewKind]);
+  }, [audioContextRef, isPlaying, previewError, previewKind, isFilterReady]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1030,6 +1042,7 @@ export function usePixiVideoPlayer(
     previewName,
     previewError,
     isRendererReady,
+    isFilterReady,
     audioOptimizationMode,
     loadingLabel,
     isLoading,

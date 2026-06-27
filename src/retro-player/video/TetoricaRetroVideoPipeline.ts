@@ -455,6 +455,11 @@ export class TetoricaRetroVideoPipeline {
   private static debugEl: HTMLElement | null = null;
 
   private static showDebug(msg: string) {
+    void msg;
+    // Keep the call sites for temporary investigation, but hide the on-screen
+    // debug overlay until we need it again.
+    return;
+
     if (typeof document === "undefined") return;
     if (!TetoricaRetroVideoPipeline.debugEl) {
       const el = document.createElement("div");
@@ -475,6 +480,7 @@ export class TetoricaRetroVideoPipeline {
   private readonly passthroughProgram: WebGLProgram;
 
   private readonly texture: WebGLTexture;
+  private textureSamplingFilter: number | null = null;
 
   private readonly vao: WebGLVertexArrayObject;
 
@@ -761,8 +767,9 @@ export class TetoricaRetroVideoPipeline {
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    this.textureSamplingFilter = gl.NEAREST;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, this.textureSamplingFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, this.textureSamplingFilter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -838,6 +845,17 @@ export class TetoricaRetroVideoPipeline {
     this.outputEnabled = enabled;
   }
 
+  private syncTextureSamplingFilter(nextFilter: number) {
+    if (this.textureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.textureSamplingFilter = nextFilter;
+  }
+
   resetAnimationClock(startedAt = nowMs()) {
     this.startedAt = startedAt;
   }
@@ -888,8 +906,7 @@ export class TetoricaRetroVideoPipeline {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     const textureFilter = filterState.isFilterEnabled ? gl.LINEAR : gl.NEAREST;
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, textureFilter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, textureFilter);
+    this.syncTextureSamplingFilter(textureFilter);
     if (isRawRetroVideoFrame(uploadSource)) {
       gl.texImage2D(
         gl.TEXTURE_2D,

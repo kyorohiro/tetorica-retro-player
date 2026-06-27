@@ -22,7 +22,7 @@ import {
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useLongPress } from "./retro-player/hooks/useLongPress";
 import { useDialog } from "./useDialog";
-import { FileTargetFile } from "./mdrop-web/api";
+import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
   getDroppedFiles,
@@ -36,6 +36,7 @@ import {
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
+import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -53,6 +54,11 @@ const waitForExternalNavigationPause = async () => {
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
+const isWindowsRuntime = () => {
+  if (typeof navigator === "undefined") return false;
+  return /Windows/i.test(navigator.userAgent || "");
+};
 
 const isAndroidRuntime = () => {
   if (typeof navigator === "undefined") return false;
@@ -106,12 +112,17 @@ function App() {
     () => isTauriRuntime() && !isAndroidTauri,
     [isAndroidTauri],
   );
+  const shouldPreferDialogRetroPreview = React.useMemo(
+    () => isTauriRuntime() && isWindowsRuntime(),
+    [],
+  );
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = "player:root";
   const { showConfirmDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
+  const { showPreviewDialog } = usePreviewDialog();
 
   const finishPreparingSelection = useCallback(() => {
     pickerStateRef.current = "idle";
@@ -210,6 +221,10 @@ function App() {
               setPlaylistIndex(0);
               currentPlayingPathRef.current = f.path;
               setShowFfmpegRetry(false);
+              if (shouldPreferDialogRetroPreview) {
+                await showDialogPreviewForPath(f.url, f.path);
+                return;
+              }
               previewSourceRef.current.previewPath(f.url, f.path);
             } else if (isPlaylistMode) {
               playlistRef.current = mediaShared.map((f) => ({ kind: "path" as const, url: f.url, path: f.path }));
@@ -242,6 +257,10 @@ function App() {
               setPlaylistIndex(0);
               currentPlayingPathRef.current = paths[0];
               setShowFfmpegRetry(false);
+              if (shouldPreferDialogRetroPreview) {
+                await showDialogPreviewForPath(convertFileSrc(paths[0]), paths[0]);
+                return;
+              }
               previewSourceRef.current.previewPath(convertFileSrc(paths[0]), paths[0]);
             } else if (isPlaylistMode) {
               const items = paths.map((p) => ({ kind: "path" as const, url: convertFileSrc(p), path: p }));
@@ -321,6 +340,10 @@ function App() {
         }
         currentPlayingPathRef.current = items[0].path;
         setShowFfmpegRetry(false);
+        if (shouldPreferDialogRetroPreview && !isPlaylistMode) {
+          await showDialogPreviewForPath(items[0].url, items[0].path);
+          return;
+        }
         previewSourceRef.current.previewPath(items[0].url, items[0].path);
       });
     };
@@ -420,6 +443,72 @@ function App() {
     });
   }, [filesToTargets, showBrowserFileListDialog]);
 
+  const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
+    const previewFiles = Array.from(files).map((file) => ({
+      id: "",
+      entry: file,
+      isDir: false,
+      isFile: true,
+      path: file.name,
+      createdAt: 0,
+      modifiedAt: file.lastModified ?? 0,
+      size: file.size ?? 0,
+      isRoot: true,
+    } satisfies FileTargetFile));
+
+    await showPreviewDialog({
+      files: previewFiles,
+      initialIndex: 0,
+      isRetro: true,
+      apiServer: ".",
+      getObjectUrl: async (file: TargetFile) =>
+        URL.createObjectURL((file as FileTargetFile).entry!),
+      download: async (file: TargetFile) => {
+        const entry = (file as FileTargetFile).entry!;
+        const url = URL.createObjectURL(entry);
+        try {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = file.path.replace(/.*\//, "");
+          a.target = "_blank";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      },
+    });
+  }, [showPreviewDialog]);
+
+  const showDialogPreviewForPath = useCallback(async (url: string, path: string) => {
+    const previewFile: TargetFile = {
+      id: path || url,
+      path,
+      isFile: true,
+      isDir: false,
+      size: 0,
+      createdAt: undefined,
+      modifiedAt: undefined,
+    };
+
+    await showPreviewDialog({
+      files: [previewFile],
+      initialIndex: 0,
+      isRetro: true,
+      getObjectUrl: async () => url,
+      download: async () => {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = path.replace(/.*\//, "") || "download";
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      },
+    });
+  }, [showPreviewDialog]);
+
   const openFiles = useCallback(async (files: FileList | File[]) => {
     if (files.length === 0) return;
 
@@ -429,6 +518,10 @@ function App() {
       await waitForNextPaint();
 
       if (files.length === 1 && isDirectRetroFile(files[0])) {
+        if (shouldPreferDialogRetroPreview) {
+          await showDialogPreviewForBrowserFiles(files);
+          return;
+        }
         previewSource.previewFile(files[0]);
         playlistRef.current = [{ kind: "file", file: files[0] }];
         setPlaylistLength(1);
@@ -450,7 +543,7 @@ function App() {
     } finally {
       finishPreparingSelection();
     }
-  }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets, previewSource]);
+  }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
 
   const currentPlayingPathRef = React.useRef<string | null>(null);
   const [showFfmpegRetry, setShowFfmpegRetry] = React.useState(false);
@@ -463,11 +556,15 @@ function App() {
       const shared = await mdropShareFile(path);
       const hlsUrl = `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`;
       setIsFfmpegEnabled(true);
+      if (shouldPreferDialogRetroPreview) {
+        await showDialogPreviewForPath(hlsUrl, path);
+        return;
+      }
       previewSourceRef.current.previewPath(hlsUrl, path);
     } catch (e) {
       console.error("[ffmpeg retry] failed:", e);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
   const handlePlayerError = useCallback((_error: Error) => {
     if (isMDropReadyRef.current && currentPlayingPathRef.current) {
@@ -479,12 +576,20 @@ function App() {
     setShowFfmpegRetry(false);
     if (item.kind === "file") {
       currentPlayingPathRef.current = null;
+      if (shouldPreferDialogRetroPreview) {
+        void showDialogPreviewForBrowserFiles([item.file]);
+        return;
+      }
       previewSource.previewFile(item.file);
     } else {
       currentPlayingPathRef.current = item.path;
+      if (shouldPreferDialogRetroPreview) {
+        void showDialogPreviewForPath(item.url, item.path);
+        return;
+      }
       previewSource.previewPath(item.url, item.path);
     }
-  }, [previewSource]);
+  }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath]);
 
   const nextTrack = useCallback(() => {
     const list = playlistRef.current;
@@ -600,13 +705,17 @@ function App() {
         : shared.url;
       currentPlayingPathRef.current = selected;
       setShowFfmpegRetry(false);
+      if (shouldPreferDialogRetroPreview) {
+        await showDialogPreviewForPath(playUrl, selected);
+        return;
+      }
       previewSource.previewPath(playUrl, selected);
       return;
     }
 
     beginPreparingSelection();
     fileInputRef.current?.click();
-  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, isNativeMdropAvailable, previewSource]);
+  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, isNativeMdropAvailable, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
