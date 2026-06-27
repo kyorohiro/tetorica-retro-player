@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { File, Folder, Loader } from "lucide-react";
+import { File, Folder, Loader, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, getFiles } from "./api";
 import { downloadUrl, usePreviewDialog } from "./usePreviewDialog";
@@ -190,9 +190,10 @@ function FileListDialog({
                         if (useHls) fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
                         onClose();
                     }}
-                    className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
+                    aria-label="Close"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                 >
-                    Close
+                    <X size={16} />
                 </button>
             </div>
 

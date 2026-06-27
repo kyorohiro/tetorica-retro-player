@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import type { TargetFile } from "./api";
 import { PreviewPage } from "./preview/PreviewPage";
@@ -177,63 +178,22 @@ function PreviewDialog({
 
     return (
         <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-2 text-slate-100">
+            <div className="border-b border-slate-800 px-4 py-2 text-slate-100">
                 <div className="min-w-0 truncate text-sm">
                     {index + 1} / {files.length} {file.path}
                     {loadingMessage ? ` : ${loadingMessage}` : ""}
                 </div>
-
-                <div className="flex shrink-0 gap-2">
-                    {
-                    (!!preivewGlobalSetting.isOpen) &&
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const link = document.createElement("a");
-                                link.href = downloadUrl(apiServer, file);
-                                link.target = "_blank";
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                            }}
-                            className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-                        >
-                            Open
-                        </button>
-                    }
-                    <button
-                        type="button"
-                        onClick={async () => {
-                            if (download) {
-                                await download(file, (loaded, total) => {
-                                    setLoadingMessage(`${loaded}/${total}`);
-                                });
-                                return;
-                            }
-
-                            const link = document.createElement("a");
-                            link.href = downloadUrl(apiServer, file);
-                            link.download = "";
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        }}
-                        className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-                    >
-                        Download
-                    </button>
-
-                    {onClose && (
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-                        >
-                            Close
-                        </button>
-                    )}
-                </div>
             </div>
+            {onClose && (
+                <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Close"
+                    className="safe-top-offset-right fixed right-2 z-9998 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                >
+                    <X size={16} />
+                </button>
+            )}
 
             <div
                 className={[
@@ -257,7 +217,7 @@ function PreviewDialog({
                 />
             </div>
 
-            <div className="flex justify-center gap-3 border-t border-slate-800 px-4 py-3">
+            <div className="flex flex-wrap justify-center gap-2 border-t border-slate-800 px-4 py-3">
                 <button
                     type="button"
                     onClick={() => move(-1)}
@@ -275,6 +235,45 @@ function PreviewDialog({
                 >
                     Next
                 </button>
+
+                {(!!preivewGlobalSetting.isOpen) && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const link = document.createElement("a");
+                            link.href = downloadUrl(apiServer, file);
+                            link.target = "_blank";
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }}
+                        className="rounded-lg border border-slate-700 px-3 py-1 text-sm text-slate-300 hover:bg-slate-800"
+                    >
+                        Open
+                    </button>
+                )}
+
+                <button
+                    type="button"
+                    onClick={async () => {
+                        if (download) {
+                            await download(file, (loaded, total) => {
+                                setLoadingMessage(`${loaded}/${total}`);
+                            });
+                            return;
+                        }
+                        const link = document.createElement("a");
+                        link.href = downloadUrl(apiServer, file);
+                        link.download = "";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }}
+                    className="rounded-lg border border-slate-700 px-3 py-1 text-sm text-slate-300 hover:bg-slate-800"
+                >
+                    Download
+                </button>
+
             </div>
         </div>
     );
