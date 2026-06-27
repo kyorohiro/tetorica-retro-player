@@ -178,14 +178,12 @@ const isWindowsChromiumAngleRisk = () => {
 
   const userAgent = navigator.userAgent ?? "";
   const isWindows = /Windows/i.test(userAgent);
+  const userAgentDataBrands = (
+    navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }
+  ).userAgentData?.brands;
   const isChromium =
     /\b(?:Chrome|Chromium|Edg|OPR|Brave)\//i.test(userAgent) ||
-    (
-      Array.isArray((navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }).userAgentData?.brands) &&
-      (navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }).userAgentData!.brands.some(
-        ({ brand }) => /Chrom/i.test(brand),
-      )
-    );
+    (Array.isArray(userAgentDataBrands) && userAgentDataBrands.some(({ brand }) => /Chrom/i.test(brand)));
 
   return isWindows && isChromium;
 };
