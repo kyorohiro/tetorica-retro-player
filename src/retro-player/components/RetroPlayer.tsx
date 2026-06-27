@@ -88,7 +88,7 @@ export function RetroPlayer({
     filterState,
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
-    { onEnded },
+    { onEnded, onError },
   );
 
   // --- Callbacks ---
@@ -266,12 +266,6 @@ export function RetroPlayer({
     renderResolutionScale,
     player.refreshLayout,
   ]);
-
-  // Forward previewError to onError callback.
-  React.useEffect(() => {
-    if (!player.previewError || !onError) return;
-    onError(new Error(player.previewError));
-  }, [player.previewError, onError]);
 
   // Propagate looping prop to the player.
   React.useEffect(() => {

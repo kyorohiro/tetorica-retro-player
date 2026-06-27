@@ -222,14 +222,14 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sharekit::init())
-        .plugin(tauri_plugin_deep_link::init())
         .manage(MDropState {
             server: mdrop_server.clone(),
             bonjour: SharedBonjourContext::new(),
         })
         .setup(move |app| {
-            // Forward "Open With" file paths to the frontend.
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            // Forward "Open With" file paths to the frontend (macOS/Linux only).
+            // Windows: tauri-plugin-deep-link causes a freeze on startup; skip for now.
+            #[cfg(target_os = "macos")]
             {
                 use tauri::Emitter;
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -297,6 +297,10 @@ pub fn run() {
             });
             Ok(())
         });
+
+    // deep-link: macOS only (Windows freezes on init; Linux untested)
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_deep_link::init());
 
     #[cfg(feature = "ffmpeg-sidecar")]
     let builder = builder.plugin(tauri_plugin_ffmpeg::init());

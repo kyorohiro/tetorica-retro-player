@@ -9,6 +9,7 @@
     "opener:default",
     "sharekit:default",
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "deep-link:default"
   ]
 }
