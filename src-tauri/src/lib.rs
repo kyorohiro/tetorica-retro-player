@@ -222,11 +222,37 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sharekit::init())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(MDropState {
             server: mdrop_server.clone(),
             bonjour: SharedBonjourContext::new(),
         })
         .setup(move |app| {
+            // Forward "Open With" file paths to the frontend.
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                use tauri::Emitter;
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    let urls: Vec<String> = event.urls().iter().map(|u| u.to_string()).collect();
+                    let _ = handle.emit("retro://open-files", urls);
+                });
+                // Files passed on cold launch (app not yet running)
+                if let Ok(urls) = app.deep_link().get_current() {
+                    if let Some(urls) = urls {
+                        let paths: Vec<String> = urls.iter().map(|u| u.to_string()).collect();
+                        if !paths.is_empty() {
+                            let handle2 = app.handle().clone();
+                            tauri::async_runtime::spawn_blocking(move || {
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                let _ = handle2.emit("retro://open-files", paths);
+                            });
+                        }
+                    }
+                }
+            }
+
             // Auto-start mDrop server on desktop platforms.
             // Wrapped in tauri::async_runtime::spawn so tokio::spawn inside
             // start_server runs within the Tauri-managed tokio runtime.
