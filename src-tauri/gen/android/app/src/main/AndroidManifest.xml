@@ -48,7 +48,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/x-matroska" />
+                <data android:mimeType="video/mp4" />
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.m4v" />
                 <data android:pathPattern=".*\\.mov" />
@@ -86,7 +86,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/mp4" />
+                <data android:mimeType="video/x-matroska" />
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.m4v" />
                 <data android:pathPattern=".*\\.mov" />
@@ -105,22 +105,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="audio/wav" />
-                <data android:pathPattern=".*\\.mp3" />
-                <data android:pathPattern=".*\\.wav" />
-                <data android:pathPattern=".*\\.ogg" />
-                <data android:pathPattern=".*\\.m4a" />
-                <data android:pathPattern=".*\\.aac" />
-                <data android:pathPattern=".*\\.flac" />
-                <data android:pathPattern=".*\\.opus" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="audio/mpeg" />
+                <data android:mimeType="audio/mp4" />
                 <data android:pathPattern=".*\\.mp3" />
                 <data android:pathPattern=".*\\.wav" />
                 <data android:pathPattern=".*\\.ogg" />
@@ -150,7 +135,22 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="audio/mp4" />
+                <data android:mimeType="audio/mpeg" />
+                <data android:pathPattern=".*\\.mp3" />
+                <data android:pathPattern=".*\\.wav" />
+                <data android:pathPattern=".*\\.ogg" />
+                <data android:pathPattern=".*\\.m4a" />
+                <data android:pathPattern=".*\\.aac" />
+                <data android:pathPattern=".*\\.flac" />
+                <data android:pathPattern=".*\\.opus" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="audio/wav" />
                 <data android:pathPattern=".*\\.mp3" />
                 <data android:pathPattern=".*\\.wav" />
                 <data android:pathPattern=".*\\.ogg" />

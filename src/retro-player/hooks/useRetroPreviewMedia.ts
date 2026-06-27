@@ -68,6 +68,7 @@ type UseRetroPreviewMediaParams = {
   safeRender: () => void;
   resetFilterInstance: () => void;
   initPixi: () => Promise<void>;
+  ensureFilterReady: () => Promise<void>;
   resetPerfAccumulators?: () => void;
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
@@ -103,6 +104,7 @@ const staticNeedsNativeAudioSuppression = (
 };
 
 export function useRetroPreviewMedia({
+  filterState,
   appRef,
   spriteRef,
   textureRef,
@@ -161,6 +163,7 @@ export function useRetroPreviewMedia({
   safeRender,
   resetFilterInstance,
   initPixi,
+  ensureFilterReady,
   resetPerfAccumulators,
   debugVideo,
   debugAudio,
@@ -799,6 +802,19 @@ export function useRetroPreviewMedia({
     return appRef.current;
   };
 
+  const ensureVisualStartupReady = async (
+    kind: "video" | "image" | "capture",
+  ) => {
+    if (!filterState.isFilterEnabled) {
+      return;
+    }
+
+    beginLoading(
+      kind === "image" ? "Preparing shader preview..." : "Preparing video shader...",
+    );
+    await ensureFilterReady();
+  };
+
   const attachVisualPreview = async (
     source: HTMLVideoElement | HTMLImageElement,
     kind: "video" | "image" | "capture",
@@ -867,6 +883,7 @@ export function useRetroPreviewMedia({
 
         if (media instanceof HTMLVideoElement) {
           await attachVisualPreview(media, "video");
+          await ensureVisualStartupReady("video");
         } else {
           previewElementRef.current = null;
           setPreviewKindState("audio");
@@ -901,6 +918,7 @@ export function useRetroPreviewMedia({
       muteNoiseImmediately();
       updateAudioNodes();
       await attachVisualPreview(image, "image");
+      await ensureVisualStartupReady("image");
       syncVideoState();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -971,6 +989,7 @@ export function useRetroPreviewMedia({
       streamOwnedRef.current = true;
       mediaRef.current = video;
       await attachVisualPreview(video, "capture");
+      await ensureVisualStartupReady("capture");
       await connectMediaAudio(video);
       setNeedsUserPlay(false);
       await waitForMediaSwitchCooldown();
@@ -1036,6 +1055,7 @@ export function useRetroPreviewMedia({
         streamOwnedRef.current = false;
         mediaRef.current = media;
         await attachVisualPreview(media, "capture");
+        await ensureVisualStartupReady("capture");
         await connectMediaAudio(media);
       } else {
         const media = document.createElement("audio");
@@ -1134,6 +1154,7 @@ export function useRetroPreviewMedia({
 
         mediaRef.current = media;
         await attachVisualPreview(media, "video");
+        await ensureVisualStartupReady("video");
         await connectMediaAudio(media);
         syncVideoState();
       } else if (kind === "image") {
@@ -1155,6 +1176,7 @@ export function useRetroPreviewMedia({
         muteNoiseImmediately();
         updateAudioNodes();
         await attachVisualPreview(image, "image");
+        await ensureVisualStartupReady("image");
         syncVideoState();
       } else {
         const audio = document.createElement("audio");

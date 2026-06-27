@@ -20,6 +20,8 @@ const isTauriRuntime = () =>
   typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
+const TAURI_HIDDEN_TICK_MS = 250;
+
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
 export type CanvasStageApp = {
@@ -66,6 +68,8 @@ export function useRetroPixiStage({
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutTimeoutRef = useRef<number | null>(null);
+  const filterReadyPromiseRef = useRef<Promise<void> | null>(null);
+  const resolveFilterReadyRef = useRef<(() => void) | null>(null);
   const viewportRectRef = useRef<{
     width: number;
     height: number;
@@ -73,6 +77,7 @@ export function useRetroPixiStage({
     y: number;
   } | null>(null);
   const [isRendererReady, setIsRendererReady] = useState(false);
+  const [isFilterReady, setIsFilterReady] = useState(false);
   const [viewportRect, setViewportRect] = useState<{
     width: number;
     height: number;
@@ -156,7 +161,11 @@ export function useRetroPixiStage({
       if (isRecordingRef.current) {
         animationFrameRef.current = window.setTimeout(tick, 1000 / 30) as unknown as number;
       } else if (isTauriRuntime() && document.hidden) {
-        animationFrameRef.current = window.setTimeout(tick, 16) as unknown as number;
+        // A hidden Tauri WebView does not need a near-60fps heartbeat.
+        // Keep the loop alive at a low rate so playback state can resume
+        // cleanly, but avoid burning CPU while the window is minimized.
+        animationFrameRef.current =
+          window.setTimeout(tick, TAURI_HIDDEN_TICK_MS) as unknown as number;
       } else {
         animationFrameRef.current = window.requestAnimationFrame(tick);
       }
@@ -164,6 +173,38 @@ export function useRetroPixiStage({
 
     animationFrameRef.current = window.requestAnimationFrame(tick);
   }, [isPlayingRef, isRecordingRef, previewKindRef]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !isTauriRuntime()) {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        return;
+      }
+
+      const shouldAnimate =
+        previewKindRef.current === "video" ||
+        previewKindRef.current === "capture" ||
+        previewKindRef.current === "image" ||
+        isPlayingRef.current;
+
+      renderFrameRef.current();
+
+      if (!shouldAnimate) {
+        return;
+      }
+
+      stopTicker();
+      startTicker();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isPlayingRef, previewKindRef, startTicker, stopTicker]);
 
   const applyFilterState = useCallback(() => {
     renderFrame();
@@ -379,7 +420,14 @@ export function useRetroPixiStage({
 
       // onFilterReady fires after background filter compilation.
       // appRef.current is set below, so by the time the callback fires it's available.
+      setIsFilterReady(false);
+      filterReadyPromiseRef.current = new Promise<void>((resolve) => {
+        resolveFilterReadyRef.current = resolve;
+      });
       const onFilterReady = () => {
+        setIsFilterReady(true);
+        resolveFilterReadyRef.current?.();
+        resolveFilterReadyRef.current = null;
         renderFrameRef.current();
         startTicker();
       };
@@ -419,23 +467,17 @@ export function useRetroPixiStage({
 
       refreshLayout();
 
-      const shouldAnimateOnInit =
-        previewKindRef.current === "video" ||
-        previewKindRef.current === "capture" ||
-        previewKindRef.current === "image" ||
-        isPlayingRef.current;
-
-      if (isPoweredOn && shouldAnimateOnInit) {
-        startTicker();
-      }
-
       debugVideo("startup:initPixi:done", {
         elapsedMs:
           Math.round(
             ((typeof performance !== "undefined" ? performance.now() : Date.now()) - initStartedAt) *
               10,
           ) / 10,
-        shouldAnimateOnInit,
+        shouldAnimateOnInit:
+          previewKindRef.current === "video" ||
+          previewKindRef.current === "capture" ||
+          previewKindRef.current === "image" ||
+          isPlayingRef.current,
       });
     })();
 
@@ -455,6 +497,9 @@ export function useRetroPixiStage({
 
   const destroyPixi = useCallback(() => {
     initPromiseRef.current = null;
+    resolveFilterReadyRef.current?.();
+    resolveFilterReadyRef.current = null;
+    filterReadyPromiseRef.current = null;
     stopTicker();
 
     if (layoutFrameRef.current !== null) {
@@ -476,7 +521,30 @@ export function useRetroPixiStage({
     filterRef.current = null;
     updateViewportRect(null);
     setIsRendererReady(false);
+    setIsFilterReady(false);
   }, [stopTicker, updateViewportRect]);
+
+  const waitForCanvasPresentation = useCallback(async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  }, []);
+
+  const ensureFilterReady = useCallback(async () => {
+    await initPixi();
+    if (filterReadyPromiseRef.current) {
+      await filterReadyPromiseRef.current;
+    }
+    renderFrameRef.current();
+    await waitForCanvasPresentation();
+  }, [initPixi, waitForCanvasPresentation]);
 
   useEffect(() => {
     const host = canvasHostRef.current;
@@ -510,6 +578,7 @@ export function useRetroPixiStage({
     previewElementRef,
     filterRef,
     isRendererReady,
+    isFilterReady,
     viewportRect,
     setViewportRect: updateViewportRect,
     applyFilterState,
@@ -518,6 +587,7 @@ export function useRetroPixiStage({
     fitCurrentSprite,
     fitSprite,
     initPixi,
+    ensureFilterReady,
     refreshLayout,
     resetFilterInstance,
     safeRender,
