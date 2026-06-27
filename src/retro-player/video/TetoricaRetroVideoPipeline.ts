@@ -152,6 +152,40 @@ const QUAD_VERTICES = new Float32Array([
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
+const readSearchParams = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return new URLSearchParams(window.location.search);
+  } catch {
+    return null;
+  }
+};
+
+const shouldForceRetroFilterCompile = () =>
+  readSearchParams()?.get("forceRetroFilterCompile") === "1";
+
+const isWindowsChromiumAngleRisk = () => {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent ?? "";
+  const isWindows = /Windows/i.test(userAgent);
+  const isChromium =
+    /\b(?:Chrome|Chromium|Edg|OPR|Brave)\//i.test(userAgent) ||
+    (
+      Array.isArray((navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }).userAgentData?.brands) &&
+      (navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }).userAgentData!.brands.some(
+        ({ brand }) => /Chrom/i.test(brand),
+      )
+    );
+
+  return isWindows && isChromium;
+};
+
 const isHtmlVideoElement = (value: unknown): value is HTMLVideoElement =>
   typeof HTMLVideoElement !== "undefined" && value instanceof HTMLVideoElement;
 
@@ -458,7 +492,9 @@ export class TetoricaRetroVideoPipeline {
   // Called once the background filter compilation succeeds.
   setFilterPrograms(pass1: WebGLProgram, pass2: WebGLProgram): void {
     const { gl } = this;
-    if (this.filterPass1Program) gl.deleteProgram(this.filterPass1Program);
+    if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
+      gl.deleteProgram(this.filterPass1Program);
+    }
     if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
 
     this.filterPass1Program = pass1;
@@ -485,6 +521,54 @@ export class TetoricaRetroVideoPipeline {
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
     await waitAndVerifyPrograms(gl, [passthroughProgram]);
     const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram);
+
+    if (isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile()) {
+      requestAnimationFrame(async () => {
+        const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
+
+        TetoricaRetroVideoPipeline.showDebug(
+          "filter: Windows fallback compile (pass2 only, wait 1.5s)...",
+        );
+        await new Promise<void>(resolve => setTimeout(resolve, 1500));
+
+        const ext = (
+          gl.getExtension("WEBGL_parallel_shader_compile") ??
+          gl.getExtension("KHR_parallel_shader_compile")
+        ) as KHRParallelShaderCompile | null;
+
+        if (ext) {
+          let frames = 0;
+          await new Promise<void>((resolve) => {
+            const poll = () => {
+              if (gl.isContextLost()) { resolve(); return; }
+              const p2done = gl.getProgramParameter(pass2Program, ext.COMPLETION_STATUS_KHR) as boolean;
+              TetoricaRetroVideoPipeline.showDebug(`filter: fallback poll#${++frames} p2=${p2done ? 1 : 0}`);
+              if (p2done) resolve();
+              else requestAnimationFrame(poll);
+            };
+            requestAnimationFrame(poll);
+          });
+          if (gl.isContextLost()) return;
+
+          if (!gl.getProgramParameter(pass2Program, gl.LINK_STATUS)) {
+            const msg = gl.getProgramInfoLog(pass2Program) ?? "unknown";
+            TetoricaRetroVideoPipeline.showDebug(`filter: fallback pass2 LINK FAILED: ${msg}`);
+            gl.deleteProgram(pass2Program);
+            return;
+          }
+        } else {
+          TetoricaRetroVideoPipeline.showDebug(
+            "filter: Windows fallback without parallel-compile ext, using pass2 as-is",
+          );
+        }
+
+        pipeline.setFilterPrograms(pipeline.passthroughProgram, pass2Program);
+        onFilterReady?.();
+        TetoricaRetroVideoPipeline.showDebug("filter: Windows fallback LOADED (pass2 only)");
+      });
+
+      return pipeline;
+    }
 
     requestAnimationFrame(async () => {
       // Submit both filter passes simultaneously so WEBGL_parallel_shader_compile
@@ -784,7 +868,9 @@ export class TetoricaRetroVideoPipeline {
     const { gl } = this;
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);
-    if (this.filterPass1Program) gl.deleteProgram(this.filterPass1Program);
+    if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
+      gl.deleteProgram(this.filterPass1Program);
+    }
     if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     gl.deleteProgram(this.passthroughProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
