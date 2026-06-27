@@ -1,5 +1,5 @@
 import React from "react";
-import { File, Folder } from "lucide-react";
+import { File, Folder, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
@@ -81,18 +81,19 @@ function MDropSharedListDialog({
 
   return (
     <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+      <button
+        type="button"
+        onClick={() => { if (useHls) cleanupHls(apiServer); onClose(); }}
+        aria-label="Close"
+        className="safe-top-offset-right fixed right-2 z-9998 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+      >
+        <X size={16} />
+      </button>
+      <div className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 py-3">
         <h2 className="text-lg font-semibold">
           Files
           <span className="ml-2 text-sm font-normal text-slate-400">{files.length}</span>
         </h2>
-        <button
-          type="button"
-          onClick={() => { if (useHls) cleanupHls(apiServer); onClose(); }}
-          className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-        >
-          Close
-        </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
