@@ -35,7 +35,7 @@ type RetroPlayerProps = {
   onEnded?: () => void;
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
-  isAutoPlay?: boolean;
+  loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
 };
 
@@ -53,7 +53,7 @@ export function RetroPlayer({
   onEnded,
   onPrevTrack,
   onNextTrack,
-  isAutoPlay,
+  loopMode,
   onCycleLoopMode,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
@@ -351,7 +351,7 @@ export function RetroPlayer({
     onImportSettings: handleImportSettings,
     onPrevTrack,
     onNextTrack,
-    isAutoPlay,
+    loopMode,
     onCycleLoopMode,
   } as const;
 

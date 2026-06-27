@@ -104,7 +104,7 @@ export type RetroControlPanelProps = {
   onImportSettings: (data: PresetFileData) => void;
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
-  isAutoPlay?: boolean;
+  loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
 };
 
@@ -147,7 +147,7 @@ export function RetroControlPanel({
   onImportSettings,
   onPrevTrack,
   onNextTrack,
-  isAutoPlay,
+  loopMode,
   onCycleLoopMode,
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
@@ -248,7 +248,7 @@ export function RetroControlPanel({
               }}
               onPrevTrack={onPrevTrack}
               onNextTrack={onNextTrack}
-              isAutoPlay={isAutoPlay}
+              loopMode={loopMode}
               onCycleLoopMode={onCycleLoopMode}
             />
           </React.Suspense>

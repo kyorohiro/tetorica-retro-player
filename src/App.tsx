@@ -71,12 +71,12 @@ function App() {
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   const [playlistFiles, setPlaylistFiles] = React.useState<File[]>([]);
   const [_playlistIndex, setPlaylistIndex] = React.useState(0);
-  type LoopMode = "loop" | "autoplay" | "off";
-  const [loopMode, setLoopMode] = React.useState<LoopMode>("loop");
+  type LoopMode = "one" | "autoplay" | "all" | "off";
+  const [loopMode, setLoopMode] = React.useState<LoopMode>("one");
   const loopModeRef = React.useRef<LoopMode>(loopMode);
   React.useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
   const cycleLoopMode = React.useCallback(() => {
-    setLoopMode((m) => m === "loop" ? "autoplay" : m === "autoplay" ? "off" : "loop");
+    setLoopMode((m) => m === "one" ? "autoplay" : m === "autoplay" ? "all" : m === "all" ? "off" : "one");
   }, []);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
@@ -366,6 +366,18 @@ function App() {
     });
   }, [previewSource]);
 
+  const nextTrackAll = useCallback(() => {
+    setPlaylistFiles((current) => {
+      if (current.length === 0) return current;
+      setPlaylistIndex((idx) => {
+        const next = (idx + 1) % current.length;
+        previewSource.previewFile(current[next]);
+        return next;
+      });
+      return current;
+    });
+  }, [previewSource]);
+
   const prevTrack = useCallback(() => {
     setPlaylistFiles((current) => {
       setPlaylistIndex((idx) => {
@@ -379,10 +391,9 @@ function App() {
   }, [previewSource]);
 
   const handleEnded = useCallback(() => {
-    if (loopMode === "autoplay") {
-      nextTrack();
-    }
-  }, [loopMode, nextTrack]);
+    if (loopMode === "autoplay") nextTrack();
+    else if (loopMode === "all") nextTrackAll();
+  }, [loopMode, nextTrack, nextTrackAll]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -804,11 +815,11 @@ function App() {
               stream={previewSource.previewStream}
               streamName={previewSource.previewLabel}
               kind={previewSource.previewKind ?? defaultPreviewKind}
-              looping={!isUsingDefaultPreview && loopMode === "loop"}
+              looping={!isUsingDefaultPreview && loopMode === "one"}
               onEnded={handleEnded}
               onPrevTrack={playlistFiles.length > 1 ? prevTrack : undefined}
               onNextTrack={playlistFiles.length > 1 ? nextTrack : undefined}
-              isAutoPlay={loopMode === "autoplay"}
+              loopMode={loopMode}
               onCycleLoopMode={cycleLoopMode}
             />
           </React.Suspense>

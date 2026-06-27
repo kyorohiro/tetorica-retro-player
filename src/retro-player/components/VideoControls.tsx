@@ -7,6 +7,8 @@ import {
   Mic2,
   Pause,
   Play,
+  Repeat,
+  Repeat1,
   RotateCcw,
   Save,
   SkipBack,
@@ -106,7 +108,7 @@ type VideoControlsProps = {
   onImportSettings: (data: PresetFileData) => void;
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
-  isAutoPlay?: boolean;
+  loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
 };
 
@@ -129,7 +131,7 @@ export const VideoControls = memo(function VideoControls({
   hasPlayback,
   currentTime,
   duration,
-  isLooping,
+  isLooping: _isLooping,
   isMuted,
   isPlaying,
   isAudioFxEnabled,
@@ -201,7 +203,7 @@ export const VideoControls = memo(function VideoControls({
   onImportSettings,
   onPrevTrack,
   onNextTrack,
-  isAutoPlay,
+  loopMode,
   onCycleLoopMode,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
@@ -238,6 +240,20 @@ export const VideoControls = memo(function VideoControls({
 
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
+
+  const loopIcon = loopMode === "one" ? <Repeat1 size={16} />
+    : loopMode === "autoplay" ? <ChevronsRight size={16} />
+    : loopMode === "all" ? <Repeat size={16} />
+    : <Repeat size={16} />;
+  const loopIconSm = loopMode === "one" ? <Repeat1 size={13} />
+    : loopMode === "autoplay" ? <ChevronsRight size={13} />
+    : loopMode === "all" ? <Repeat size={13} />
+    : <Repeat size={13} />;
+  const loopLabel = loopMode === "one" ? "Loop 1"
+    : loopMode === "autoplay" ? "Auto Next"
+    : loopMode === "all" ? "Loop All"
+    : "No loop";
+  const loopActive = loopMode === "one" || loopMode === "autoplay" || loopMode === "all";
 
   const handleSettingsFile = async (file: File) => {
     if (!file.name.endsWith(".retro.json")) return;
@@ -926,17 +942,17 @@ export const VideoControls = memo(function VideoControls({
             </button>
             <button
               type="button"
-              onClick={onToggleLoop}
-              aria-label={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
-              title={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
+              onClick={onCycleLoopMode ?? onToggleLoop}
+              aria-label={loopLabel}
+              title={loopLabel}
               className={[
                 "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                isLooping || isAutoPlay
+                loopActive
                   ? "border-[#000000] bg-[#111014]/20"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
-              {isAutoPlay ? <ChevronsRight size={16} /> : <RotateCcw size={16} />}
+              {loopIcon}
             </button>
             <div className="relative">
               <button
@@ -1142,16 +1158,16 @@ export const VideoControls = memo(function VideoControls({
           <button
             type="button"
             onClick={onCycleLoopMode ?? onToggleLoop}
-            aria-label={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
-            title={isLooping ? "Loop" : isAutoPlay ? "Auto play" : "Loop off"}
+            aria-label={loopLabel}
+            title={loopLabel}
             className={[
               "inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#12141c]",
-              isLooping || isAutoPlay
+              loopActive
                 ? "border-[#000000] bg-[#111014]/20"
                 : "border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
             ].join(" ")}
           >
-            {isAutoPlay ? <ChevronsRight size={13} /> : <RotateCcw size={13} />}
+            {loopIconSm}
           </button>
         )}
         <button
