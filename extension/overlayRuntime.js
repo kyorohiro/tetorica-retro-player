@@ -820,7 +820,7 @@ function createOverlay(settings) {
   function syncSurfaceCount(count) {
     while (surfaces.length < count) {
       const surface = createOverlaySurface(surfaces.length, (renderer) => {
-        if (!renderer.program) return;
+        if (!renderer.uniformLocations) return;
         applySettings(surface.gl, renderer.program, renderer.uniformLocations, currentSettings);
         surface.gl.useProgram(renderer.program);
         surface.gl.uniform1f(renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
@@ -884,18 +884,18 @@ function createOverlay(settings) {
       return;
     }
 
-    if (!surface.renderer.program) return;
-
     surface.canvas.style.display = "block";
     surface.hideFailureOverlay();
     surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
     surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
     surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
     surface.gl.useProgram(surface.renderer.program);
-    surface.gl.uniform1f(
-      surface.renderer.uniformLocations.uTime,
-      (performance.now() - surface.startedAt) / 1000,
-    );
+    if (surface.renderer.uniformLocations) {
+      surface.gl.uniform1f(
+        surface.renderer.uniformLocations.uTime,
+        (performance.now() - surface.startedAt) / 1000,
+      );
+    }
     surface.gl.activeTexture(surface.gl.TEXTURE0);
     surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
 
@@ -1100,7 +1100,7 @@ function createOverlay(settings) {
     const sy = flipV ? -1 : 1;
     const t = sx === 1 && sy === 1 ? "" : `scale(${sx},${sy})`;
     for (const surface of surfaces) {
-      if (!surface.renderer.program) continue;
+      if (!surface.renderer.uniformLocations) continue;
       surface.gl.useProgram(surface.renderer.program);
       surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
       surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
@@ -1881,7 +1881,34 @@ function paletteModeToUniform(mode) {
   return 0;
 }
 
+const PASSTHROUGH_FRAGMENT_OVERLAY = `#version 300 es
+precision mediump float;
+in vec2 vTextureCoord;
+uniform sampler2D uTexture;
+out vec4 fragColor;
+void main() { fragColor = texture(uTexture, vTextureCoord); }
+`;
+
 function setupRenderer(webgl, onReady) {
+  // --- Passthrough program (tiny; compiles instantly) ---
+  // Returned immediately so the overlay shows raw video while the full filter
+  // compiles in the background. After compilation, renderer.program is swapped.
+  let passthruProg = null;
+  const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
+  const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT_OVERLAY);
+  const passthru = webgl.createProgram();
+  if (passthru) {
+    webgl.attachShader(passthru, passVert);
+    webgl.attachShader(passthru, passFrag);
+    webgl.linkProgram(passthru);
+    if (webgl.getProgramParameter(passthru, webgl.LINK_STATUS)) {
+      passthruProg = passthru;
+      webgl.useProgram(passthru);
+      webgl.uniform1i(webgl.getUniformLocation(passthru, "uTexture"), 0);
+    }
+  }
+
+  // --- Full filter program (async; D3D cache can block if checked immediately) ---
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
   const fragmentShader = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT);
   const prog = webgl.createProgram();
@@ -1894,10 +1921,10 @@ function setupRenderer(webgl, onReady) {
   webgl.attachShader(prog, fragmentShader);
   webgl.linkProgram(prog);
 
-  // CRITICAL: Do NOT call getProgramParameter (or any program readback) here.
-  // On Windows/ANGLE, Chrome's D3D GPU shader cache causes any readback during
-  // cache loading to freeze the main thread. renderer.program and uniformLocations
-  // are set asynchronously below. All call sites guard on !renderer.program.
+  // CRITICAL: Do NOT call getProgramParameter here. On Windows/ANGLE, Chrome's
+  // D3D GPU shader cache causes any readback during cache loading to freeze the
+  // main thread. renderer.program starts as passthruProg and is replaced
+  // asynchronously with the full filter when compilation finishes.
 
   const vertices = new Float32Array([
     -1, -1,
@@ -1926,7 +1953,7 @@ function setupRenderer(webgl, onReady) {
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.CLAMP_TO_EDGE);
 
-  const renderer = { program: null, texture, uniformLocations: null };
+  const renderer = { program: passthruProg, texture, uniformLocations: null };
 
   (async () => {
     const ext =

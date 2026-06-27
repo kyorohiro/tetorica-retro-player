@@ -28,8 +28,17 @@ void main() {
 }
 `;
 
+const PASSTHROUGH_FRAGMENT = `#version 300 es
+precision mediump float;
+in vec2 vTextureCoord;
+uniform sampler2D uTexture;
+out vec4 fragColor;
+void main() { fragColor = texture(uTexture, vTextureCoord); }
+`;
+
 let gl = null;
 let program = null;
+let passthroughProgram = null;
 let texture = null;
 let animationFrameId = 0;
 let mediaStream = null;
@@ -298,7 +307,8 @@ function detachCaptureSizeListeners() {
 }
 
 function drawFrame() {
-  if (!gl || !program || !texture || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+  const activeProgram = program ?? passthroughProgram;
+  if (!gl || !activeProgram || !texture || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
     animationFrameId = requestAnimationFrame(drawFrame);
     return;
   }
@@ -307,8 +317,10 @@ function drawFrame() {
   gl.clearColor(0.01, 0.02, 0.01, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  gl.useProgram(program);
-  gl.uniform1f(uniformLocations.uTime, (performance.now() - startedAt) / 1000);
+  gl.useProgram(activeProgram);
+  if (program && uniformLocations) {
+    gl.uniform1f(uniformLocations.uTime, (performance.now() - startedAt) / 1000);
+  }
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
@@ -799,6 +811,24 @@ async function disposeAudioEngine() {
 }
 
 function setupRenderer(webgl) {
+  // --- Passthrough program (tiny; compiles instantly, safe to link-check now) ---
+  // Used while the full filter shader compiles in the background so the canvas
+  // shows raw video immediately instead of staying black.
+  const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
+  const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT);
+  const passthru = webgl.createProgram();
+  if (passthru) {
+    webgl.attachShader(passthru, passVert);
+    webgl.attachShader(passthru, passFrag);
+    webgl.linkProgram(passthru);
+    if (webgl.getProgramParameter(passthru, webgl.LINK_STATUS)) {
+      passthroughProgram = passthru;
+      webgl.useProgram(passthru);
+      webgl.uniform1i(webgl.getUniformLocation(passthru, "uTexture"), 0);
+    }
+  }
+
+  // --- Full filter program (async; D3D cache can block if checked immediately) ---
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
   const fragmentShader = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT);
 
@@ -811,11 +841,10 @@ function setupRenderer(webgl) {
   webgl.attachShader(prog, fragmentShader);
   webgl.linkProgram(prog);
 
-  // CRITICAL: Do NOT call getProgramParameter (or any program readback) here.
-  // On Windows/ANGLE, Chrome's D3D GPU shader cache causes any readback during
-  // cache loading to freeze the main thread. program and uniformLocations are
-  // set asynchronously in finalizeFilterProgram() below.
-  // drawFrame() already handles program === null by returning early each frame.
+  // CRITICAL: Do NOT call getProgramParameter here. On Windows/ANGLE, Chrome's
+  // D3D GPU shader cache causes any readback during cache loading to freeze the
+  // main thread. program and uniformLocations are set asynchronously below.
+  // drawFrame() uses passthroughProgram until program is ready.
 
   const vertices = new Float32Array([
     -1, -1,
