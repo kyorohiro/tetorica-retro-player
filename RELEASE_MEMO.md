@@ -50,3 +50,8 @@ npm run tauri android build -- --apk
   --out app-release-signed_0.32.1.apk \
   src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
 ```
+
+Android notes:
+
+- Android では `mdrop` を無効化
+- Android では `ffmpeg` を無効化

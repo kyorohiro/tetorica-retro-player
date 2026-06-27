@@ -14,28 +14,45 @@ pub struct FfmpegOutput {
 /// Sidecar mode: calls the bundled ffmpeg binary (placed next to the app executable).
 #[tauri::command]
 pub async fn ffmpeg_exec(args: Vec<String>) -> Result<FfmpegOutput, String> {
-    let bin = ffmpeg_bin();
-    let output = tauri::async_runtime::spawn_blocking(move || {
-        std::process::Command::new(&bin).args(&args).output()
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| format!("ffmpeg launch failed: {e}"))?;
+    #[cfg(target_os = "android")]
+    {
+        let _ = args;
+        Err("ffmpeg is disabled on android".to_string())
+    }
 
-    Ok(FfmpegOutput {
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        exit_code: output.status.code().unwrap_or(-1),
-    })
+    #[cfg(not(target_os = "android"))]
+    {
+        let bin = ffmpeg_bin();
+        let output = tauri::async_runtime::spawn_blocking(move || {
+            std::process::Command::new(&bin).args(&args).output()
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("ffmpeg launch failed: {e}"))?;
+
+        Ok(FfmpegOutput {
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            exit_code: output.status.code().unwrap_or(-1),
+        })
+    }
 }
 
-/// Returns "sidecar" or "system" so the frontend can adapt its behaviour.
+/// Returns "sidecar", "system", or "disabled" so the frontend can adapt its behaviour.
 #[tauri::command]
 pub fn get_ffmpeg_mode() -> &'static str {
-    if cfg!(feature = "ffmpeg-sidecar") {
-        "sidecar"
-    } else {
-        "system"
+    #[cfg(target_os = "android")]
+    {
+        "disabled"
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        if cfg!(feature = "ffmpeg-sidecar") {
+            "sidecar"
+        } else {
+            "system"
+        }
     }
 }
 
