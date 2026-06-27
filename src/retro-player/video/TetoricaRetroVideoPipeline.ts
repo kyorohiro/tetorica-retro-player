@@ -4,7 +4,8 @@ import {
   type MonoTintMode,
   type PaletteMode,
 } from "../retro/config.ts";
-import { FILTER_FRAGMENT } from "../retro/filterShader.ts";
+import { FILTER_FRAGMENT_PASS1 } from "../retro/filterPass1Shader.ts";
+import { FILTER_FRAGMENT_PASS2 } from "../retro/filterPass2Shader.ts";
 
 export type RetroVideoFilterState = {
   targetWidth: number;
@@ -62,23 +63,31 @@ export type RawRetroVideoFrame = {
   data: Uint8Array | Uint8ClampedArray;
 };
 
-type RendererUniformLocations = {
+type Pass1UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
-  uSampleTargetSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
   uPaletteMode: WebGLUniformLocation | null;
-  uCurvature: WebGLUniformLocation | null;
-  uScanlineStrength: WebGLUniformLocation | null;
-  uScanline2Strength: WebGLUniformLocation | null;
-  uScanlineBrightnessFade: WebGLUniformLocation | null;
-  uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
   uSmoothStrength: WebGLUniformLocation | null;
   uToonSteps: WebGLUniformLocation | null;
   uEdgeBoost: WebGLUniformLocation | null;
   uAnimeEdgeLow: WebGLUniformLocation | null;
   uAnimeEdgeHigh: WebGLUniformLocation | null;
+  uMonoTint: WebGLUniformLocation | null;
+  uNeonBoost: WebGLUniformLocation | null;
+  uNeonSaturation: WebGLUniformLocation | null;
+  uNeonDetail: WebGLUniformLocation | null;
+};
+
+type Pass2UniformLocations = {
+  uTargetSize: WebGLUniformLocation | null;
+  uCurvature: WebGLUniformLocation | null;
+  uScanlineStrength: WebGLUniformLocation | null;
+  uScanline2Strength: WebGLUniformLocation | null;
+  uScanlineBrightnessFade: WebGLUniformLocation | null;
+  uVignetteStrength: WebGLUniformLocation | null;
+  uGlowStrength: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
@@ -100,10 +109,6 @@ type RendererUniformLocations = {
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
-  uMonoTint: WebGLUniformLocation | null;
-  uNeonBoost: WebGLUniformLocation | null;
-  uNeonSaturation: WebGLUniformLocation | null;
-  uNeonDetail: WebGLUniformLocation | null;
   uTime: WebGLUniformLocation | null;
 };
 
@@ -307,113 +312,6 @@ type KHRParallelShaderCompile = {
   COMPLETION_STATUS_KHR: number;
 };
 
-// --- Program binary cache (IndexedDB) ---
-// Windows ANGLE translates GLSL→HLSL which can take minutes for large shaders.
-// Caching the compiled binary skips that on subsequent loads.
-
-const SHADER_CACHE_DB = "retro-player-shader-cache";
-const SHADER_CACHE_STORE = "programs";
-
-type CachedBinaries = {
-  filter: { format: number; data: ArrayBuffer };
-  passthrough: { format: number; data: ArrayBuffer };
-};
-
-function fnv1a(str: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16);
-}
-
-function getBinaryCacheKey(gl: WebGL2RenderingContext): string {
-  const renderer = (gl.getParameter(gl.RENDERER) as string | null) ?? "unknown";
-  const hash = fnv1a(VERTEX_SHADER_SOURCE + FILTER_FRAGMENT + PASS_THROUGH_FRAGMENT);
-  return `${renderer}::${hash}`;
-}
-
-async function openCacheDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(SHADER_CACHE_DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(SHADER_CACHE_STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function readCachedBinaries(key: string): Promise<CachedBinaries | null> {
-  try {
-    const db = await openCacheDB();
-    return await new Promise<CachedBinaries | null>((resolve, reject) => {
-      const req = db.transaction(SHADER_CACHE_STORE, "readonly")
-        .objectStore(SHADER_CACHE_STORE).get(key);
-      req.onsuccess = () => resolve((req.result as CachedBinaries) ?? null);
-      req.onerror = () => reject(req.error);
-    });
-  } catch {
-    return null;
-  }
-}
-
-async function writeCachedBinaries(key: string, value: CachedBinaries): Promise<void> {
-  try {
-    const db = await openCacheDB();
-    await new Promise<void>((resolve, reject) => {
-      const req = db.transaction(SHADER_CACHE_STORE, "readwrite")
-        .objectStore(SHADER_CACHE_STORE).put(value, key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-  } catch {
-    // Cache write failure is non-fatal
-  }
-}
-
-// PROGRAM_BINARY_LENGTH (0x8741) and programBinary/getProgramBinary are part of
-// WebGL2 core but absent from TypeScript's lib.dom.d.ts. Cast via this interface.
-type GL2WithBinary = WebGL2RenderingContext & {
-  readonly PROGRAM_BINARY_LENGTH: 0x8741;
-  getProgramBinary(program: WebGLProgram): { binary: ArrayBuffer; format: number } | null;
-  programBinary(program: WebGLProgram, binaryFormat: number, binary: ArrayBuffer | ArrayBufferView): void;
-};
-
-function getProgramBinaryEntry(
-  gl: WebGL2RenderingContext,
-  program: WebGLProgram,
-): { format: number; data: ArrayBuffer } | null {
-  try {
-    const gl2 = gl as GL2WithBinary;
-    const len = gl.getProgramParameter(program, gl2.PROGRAM_BINARY_LENGTH) as number;
-    if (!len) return null;
-    const result = gl2.getProgramBinary(program);
-    if (!result?.binary) return null;
-    return { format: result.format, data: result.binary };
-  } catch {
-    return null;
-  }
-}
-
-function restoreProgramFromBinary(
-  gl: WebGL2RenderingContext,
-  entry: { format: number; data: ArrayBuffer },
-): WebGLProgram | null {
-  try {
-    const gl2 = gl as GL2WithBinary;
-    const program = gl.createProgram();
-    if (!program) return null;
-    gl2.programBinary(program, entry.format, entry.data);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      gl.deleteProgram(program);
-      return null;
-    }
-    return program;
-  } catch {
-    return null;
-  }
-}
-
 // Submit shader compilation and linking without blocking on status checks.
 // Caller must await completion before calling gl.getProgramParameter(LINK_STATUS).
 function submitProgram(
@@ -502,7 +400,8 @@ export class TetoricaRetroVideoPipeline {
   private readonly gl: WebGL2RenderingContext;
 
   // null until the background filter compilation finishes
-  private filterProgram: WebGLProgram | null;
+  private filterPass1Program: WebGLProgram | null = null;
+  private filterPass2Program: WebGLProgram | null = null;
 
   private readonly passthroughProgram: WebGLProgram;
 
@@ -510,7 +409,14 @@ export class TetoricaRetroVideoPipeline {
 
   private readonly vao: WebGLVertexArrayObject;
 
-  private uniformLocations: RendererUniformLocations | null;
+  private pass1Locs: Pass1UniformLocations | null = null;
+  private pass2Locs: Pass2UniformLocations | null = null;
+
+  // Framebuffer for Pass 1 output (palette-quantized frame)
+  private fbo: WebGLFramebuffer | null = null;
+  private fboTexture: WebGLTexture | null = null;
+  private fboWidth = 0;
+  private fboHeight = 0;
 
   private currentSource: RetroVideoSource | null = null;
 
@@ -520,59 +426,136 @@ export class TetoricaRetroVideoPipeline {
 
   private startedAt = nowMs();
 
-  // Called once the background filter compilation succeeds.
-  setFilterProgram(program: WebGLProgram): void {
+  // Ensure the FBO matches the current drawing buffer size.
+  private ensureFbo(width: number, height: number) {
+    if (this.fboWidth === width && this.fboHeight === height && this.fbo) return;
+
     const { gl } = this;
-    if (this.filterProgram) gl.deleteProgram(this.filterProgram);
-    this.filterProgram = program;
-    gl.useProgram(program);
-    gl.uniform1i(gl.getUniformLocation(program, "uTexture"), 0);
-    this.uniformLocations = this.buildUniformLocations(program);
-    // Reset time so CRT/glow animations start from t=0 (avoids large initial uTime jump).
+    if (this.fbo) gl.deleteFramebuffer(this.fbo);
+    if (this.fboTexture) gl.deleteTexture(this.fboTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    this.fbo = fbo;
+    this.fboTexture = tex;
+    this.fboWidth = width;
+    this.fboHeight = height;
+  }
+
+  // Called once the background filter compilation succeeds.
+  setFilterPrograms(pass1: WebGLProgram, pass2: WebGLProgram): void {
+    const { gl } = this;
+    if (this.filterPass1Program) gl.deleteProgram(this.filterPass1Program);
+    if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
+
+    this.filterPass1Program = pass1;
+    this.filterPass2Program = pass2;
+
+    gl.useProgram(pass1);
+    gl.uniform1i(gl.getUniformLocation(pass1, "uTexture"), 0);
+    this.pass1Locs = this.buildPass1UniformLocations(pass1);
+
+    gl.useProgram(pass2);
+    gl.uniform1i(gl.getUniformLocation(pass2, "uPass1Texture"), 0);
+    this.pass2Locs = this.buildPass2UniformLocations(pass2);
+
+    // Reset time so CRT/glow animations start from t=0.
     this.resetAnimationClock();
   }
 
   // onFilterReady is called after the background filter compilation finishes.
-  // The caller (useRetroPixiStage) uses it to trigger safeRender() + startTicker()
-  // so the render loop picks up the filter with a valid currentSource/currentFilterState.
   static async create(
     gl: WebGL2RenderingContext,
     onFilterReady?: () => void,
   ): Promise<TetoricaRetroVideoPipeline> {
-    const cacheKey = getBinaryCacheKey(gl);
-
-    // Try restoring from binary cache (skips GLSL→HLSL translation on Windows)
-    const cached = await readCachedBinaries(cacheKey);
-    if (cached) {
-      const filterProgram = restoreProgramFromBinary(gl, cached.filter);
-      const passthroughProgram = restoreProgramFromBinary(gl, cached.passthrough);
-      if (filterProgram && passthroughProgram) {
-        const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram);
-        pipeline.setFilterProgram(filterProgram);
-        return pipeline;
-      }
-    }
-
-    // Fast path: compile passthrough only → return and render immediately
+    // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
     await waitAndVerifyPrograms(gl, [passthroughProgram]);
     const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram);
 
-    // Background: compile filter shader after yielding so the browser can paint first.
-    // On Windows/ANGLE this can take minutes; passthrough renders in the meantime.
-    requestAnimationFrame(() => {
-      const filterJob = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT);
-      waitAndVerifyPrograms(gl, [filterJob]).then(() => {
-        pipeline.setFilterProgram(filterJob);
-        onFilterReady?.();
-        const filterBin = getProgramBinaryEntry(gl, filterJob);
-        const passthroughBin = getProgramBinaryEntry(gl, passthroughProgram);
-        if (filterBin && passthroughBin) {
-          void writeCachedBinaries(cacheKey, { filter: filterBin, passthrough: passthroughBin });
+    requestAnimationFrame(async () => {
+      // Submit both filter passes simultaneously so WEBGL_parallel_shader_compile
+      // can compile them in parallel. Splitting from one ~1277-line shader into
+      // two smaller shaders (~730 + ~470 lines) significantly reduces ANGLE's
+      // GLSL→HLSL compilation time on Windows/Chrome.
+      const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1);
+      const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
+
+      // CRITICAL: Do NOT call getProgramParameter immediately after linkProgram.
+      //
+      // On Windows/ANGLE, Chrome's D3D GPU shader cache stores pre-compiled DXBC
+      // bytecode. On the 2nd+ page load (cache warm), linkProgram triggers a
+      // synchronous D3D shader load in the GPU process command thread. Any
+      // getProgramParameter call (including COMPLETION_STATUS_KHR) during this
+      // window blocks the JS main thread until the GPU process responds — causing
+      // a full browser freeze that requires Task Manager to clear.
+      //
+      // Fix: wait 3 s via setTimeout (not RAF) so the GPU process finishes
+      // cache loading before we issue any read-back commands.
+      TetoricaRetroVideoPipeline.showDebug("filter: compiling pass1+pass2 (wait 3s)...");
+      await new Promise<void>(resolve => setTimeout(resolve, 3000));
+
+      // GPU process should now be idle. Safe to poll COMPLETION_STATUS_KHR.
+      const ext = (
+        gl.getExtension("WEBGL_parallel_shader_compile") ??
+        gl.getExtension("KHR_parallel_shader_compile")
+      ) as KHRParallelShaderCompile | null;
+
+      if (ext) {
+        // Poll until both programs are done (or context lost).
+        // No frame-count timeout: calling LINK_STATUS while compilation is still
+        // running blocks the main thread and freezes the browser.
+        let frames = 0;
+        await new Promise<void>((resolve) => {
+          const poll = () => {
+            if (gl.isContextLost()) { resolve(); return; }
+            const p1done = gl.getProgramParameter(pass1Program, ext.COMPLETION_STATUS_KHR) as boolean;
+            const p2done = gl.getProgramParameter(pass2Program, ext.COMPLETION_STATUS_KHR) as boolean;
+            TetoricaRetroVideoPipeline.showDebug(`filter: poll#${++frames} p1=${p1done ? 1 : 0} p2=${p2done ? 1 : 0}`);
+            if (p1done && p2done) resolve();
+            else requestAnimationFrame(poll);
+          };
+          requestAnimationFrame(poll);
+        });
+        if (gl.isContextLost()) return;
+
+        if (!gl.getProgramParameter(pass1Program, gl.LINK_STATUS)) {
+          const msg = gl.getProgramInfoLog(pass1Program) ?? "unknown";
+          TetoricaRetroVideoPipeline.showDebug(`filter: pass1 LINK FAILED: ${msg}`);
+          gl.deleteProgram(pass1Program);
+          gl.deleteProgram(pass2Program);
+          return;
         }
-      }).catch((err: unknown) => {
-        console.warn("[retro-player] filter shader compile failed:", err);
-      });
+        if (!gl.getProgramParameter(pass2Program, gl.LINK_STATUS)) {
+          const msg = gl.getProgramInfoLog(pass2Program) ?? "unknown";
+          TetoricaRetroVideoPipeline.showDebug(`filter: pass2 LINK FAILED: ${msg}`);
+          gl.deleteProgram(pass1Program);
+          gl.deleteProgram(pass2Program);
+          return;
+        }
+      } else {
+        // WEBGL_parallel_shader_compile not available (non-Chromium browser).
+        // Cannot safely poll without potentially blocking. Best effort: use programs
+        // as-is and let GL errors in render() fall through silently to passthrough.
+        TetoricaRetroVideoPipeline.showDebug("filter: no parallel-compile ext, using programs as-is");
+      }
+
+      pipeline.setFilterPrograms(pass1Program, pass2Program);
+      onFilterReady?.();
+      TetoricaRetroVideoPipeline.showDebug("filter: LOADED (2-pass)");
     });
 
     return pipeline;
@@ -580,9 +563,7 @@ export class TetoricaRetroVideoPipeline {
 
   constructor(gl: WebGL2RenderingContext, passthroughProgram: WebGLProgram) {
     this.gl = gl;
-    this.filterProgram = null;
     this.passthroughProgram = passthroughProgram;
-    this.uniformLocations = null;
 
     const vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -612,51 +593,58 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1i(gl.getUniformLocation(this.passthroughProgram, "uTexture"), 0);
   }
 
-  private buildUniformLocations(filterProgram: WebGLProgram): RendererUniformLocations {
+  private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
     const { gl } = this;
     return {
-      uTargetSize: gl.getUniformLocation(filterProgram, "uTargetSize"),
-      uSampleTargetSize: gl.getUniformLocation(filterProgram, "uSampleTargetSize"),
-      uColorLevels: gl.getUniformLocation(filterProgram, "uColorLevels"),
-      uDitherStrength: gl.getUniformLocation(filterProgram, "uDitherStrength"),
-      uPaletteMode: gl.getUniformLocation(filterProgram, "uPaletteMode"),
-      uCurvature: gl.getUniformLocation(filterProgram, "uCurvature"),
-      uScanlineStrength: gl.getUniformLocation(filterProgram, "uScanlineStrength"),
-      uScanline2Strength: gl.getUniformLocation(filterProgram, "uScanline2Strength"),
-      uScanlineBrightnessFade: gl.getUniformLocation(filterProgram, "uScanlineBrightnessFade"),
-      uVignetteStrength: gl.getUniformLocation(filterProgram, "uVignetteStrength"),
-      uGlowStrength: gl.getUniformLocation(filterProgram, "uGlowStrength"),
-      uSmoothStrength: gl.getUniformLocation(filterProgram, "uSmoothStrength"),
-      uToonSteps: gl.getUniformLocation(filterProgram, "uToonSteps"),
-      uEdgeBoost: gl.getUniformLocation(filterProgram, "uEdgeBoost"),
-      uAnimeEdgeLow: gl.getUniformLocation(filterProgram, "uAnimeEdgeLow"),
-      uAnimeEdgeHigh: gl.getUniformLocation(filterProgram, "uAnimeEdgeHigh"),
-      uPhosphorStrength: gl.getUniformLocation(filterProgram, "uPhosphorStrength"),
-      uSpotMaskStrength: gl.getUniformLocation(filterProgram, "uSpotMaskStrength"),
-      uBulbRadius: gl.getUniformLocation(filterProgram, "uBulbRadius"),
-      uBlackFloor: gl.getUniformLocation(filterProgram, "uBlackFloor"),
-      uLumaAmount: gl.getUniformLocation(filterProgram, "uLumaAmount"),
-      uLumaLow: gl.getUniformLocation(filterProgram, "uLumaLow"),
-      uLumaHigh: gl.getUniformLocation(filterProgram, "uLumaHigh"),
-      uLumaKnee: gl.getUniformLocation(filterProgram, "uLumaKnee"),
-      uSaturationAmount: gl.getUniformLocation(filterProgram, "uSaturationAmount"),
-      uSaturationLow: gl.getUniformLocation(filterProgram, "uSaturationLow"),
-      uSaturationHigh: gl.getUniformLocation(filterProgram, "uSaturationHigh"),
-      uSaturationKnee: gl.getUniformLocation(filterProgram, "uSaturationKnee"),
-      uPhosphorDotLightBalance: gl.getUniformLocation(filterProgram, "uPhosphorDotLightBalance"),
-      uPixelAspect: gl.getUniformLocation(filterProgram, "uPixelAspect"),
-      uPhosphorDotMode: gl.getUniformLocation(filterProgram, "uPhosphorDotMode"),
-      uPhosphorDotInternalScale: gl.getUniformLocation(filterProgram, "uPhosphorDotInternalScale"),
-      uPhosphorDotBrightCore: gl.getUniformLocation(filterProgram, "uPhosphorDotBrightCore"),
-      uPhosphorDotCellFill: gl.getUniformLocation(filterProgram, "uPhosphorDotCellFill"),
-      uPhosphorDotFlatDisc: gl.getUniformLocation(filterProgram, "uPhosphorDotFlatDisc"),
-      uPhosphorDotNeighborBlend: gl.getUniformLocation(filterProgram, "uPhosphorDotNeighborBlend"),
-      uCloseUpNoiseStrength: gl.getUniformLocation(filterProgram, "uCloseUpNoiseStrength"),
-      uMonoTint: gl.getUniformLocation(filterProgram, "uMonoTint"),
-      uNeonBoost: gl.getUniformLocation(filterProgram, "uNeonBoost"),
-      uNeonSaturation: gl.getUniformLocation(filterProgram, "uNeonSaturation"),
-      uNeonDetail: gl.getUniformLocation(filterProgram, "uNeonDetail"),
-      uTime: gl.getUniformLocation(filterProgram, "uTime"),
+      uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
+      uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
+      uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
+      uPaletteMode: gl.getUniformLocation(program, "uPaletteMode"),
+      uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
+      uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
+      uToonSteps: gl.getUniformLocation(program, "uToonSteps"),
+      uEdgeBoost: gl.getUniformLocation(program, "uEdgeBoost"),
+      uAnimeEdgeLow: gl.getUniformLocation(program, "uAnimeEdgeLow"),
+      uAnimeEdgeHigh: gl.getUniformLocation(program, "uAnimeEdgeHigh"),
+      uMonoTint: gl.getUniformLocation(program, "uMonoTint"),
+      uNeonBoost: gl.getUniformLocation(program, "uNeonBoost"),
+      uNeonSaturation: gl.getUniformLocation(program, "uNeonSaturation"),
+      uNeonDetail: gl.getUniformLocation(program, "uNeonDetail"),
+    };
+  }
+
+  private buildPass2UniformLocations(program: WebGLProgram): Pass2UniformLocations {
+    const { gl } = this;
+    return {
+      uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
+      uCurvature: gl.getUniformLocation(program, "uCurvature"),
+      uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
+      uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
+      uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
+      uVignetteStrength: gl.getUniformLocation(program, "uVignetteStrength"),
+      uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
+      uPhosphorStrength: gl.getUniformLocation(program, "uPhosphorStrength"),
+      uSpotMaskStrength: gl.getUniformLocation(program, "uSpotMaskStrength"),
+      uBulbRadius: gl.getUniformLocation(program, "uBulbRadius"),
+      uBlackFloor: gl.getUniformLocation(program, "uBlackFloor"),
+      uLumaAmount: gl.getUniformLocation(program, "uLumaAmount"),
+      uLumaLow: gl.getUniformLocation(program, "uLumaLow"),
+      uLumaHigh: gl.getUniformLocation(program, "uLumaHigh"),
+      uLumaKnee: gl.getUniformLocation(program, "uLumaKnee"),
+      uSaturationAmount: gl.getUniformLocation(program, "uSaturationAmount"),
+      uSaturationLow: gl.getUniformLocation(program, "uSaturationLow"),
+      uSaturationHigh: gl.getUniformLocation(program, "uSaturationHigh"),
+      uSaturationKnee: gl.getUniformLocation(program, "uSaturationKnee"),
+      uPhosphorDotLightBalance: gl.getUniformLocation(program, "uPhosphorDotLightBalance"),
+      uPixelAspect: gl.getUniformLocation(program, "uPixelAspect"),
+      uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
+      uPhosphorDotInternalScale: gl.getUniformLocation(program, "uPhosphorDotInternalScale"),
+      uPhosphorDotBrightCore: gl.getUniformLocation(program, "uPhosphorDotBrightCore"),
+      uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
+      uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
+      uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
+      uCloseUpNoiseStrength: gl.getUniformLocation(program, "uCloseUpNoiseStrength"),
+      uTime: gl.getUniformLocation(program, "uTime"),
     };
   }
 
@@ -704,18 +692,20 @@ export class TetoricaRetroVideoPipeline {
 
     gl.bindVertexArray(this.vao);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(0.01, 0.02, 0.01, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
 
     const source = this.currentSource;
     const filterState = this.currentFilterState;
     if (!this.outputEnabled || !source || !filterState) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0.01, 0.02, 0.01, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
       TetoricaRetroVideoPipeline.showDebug(`EXIT out=${this.outputEnabled ? 1 : 0} src=${!!source ? 1 : 0} fs=${!!filterState ? 1 : 0}`);
       this.renderCount++;
       return;
     }
 
+    // Upload source texture (unit 0)
     const uploadSource = this.getUploadSource(source, filterState);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -738,12 +728,41 @@ export class TetoricaRetroVideoPipeline {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
     }
 
-    const usingFilter = filterState.isFilterEnabled && this.filterProgram;
+    const usingFilter = filterState.isFilterEnabled && this.filterPass1Program && this.filterPass2Program;
+
     if (usingFilter) {
-      gl.useProgram(this.filterProgram);
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
       const sourceSize = getRetroVideoSourceSize(source);
-      this.applyFilterUniforms(filterState, sourceSize.width, sourceSize.height);
+
+      // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
+      this.ensureFbo(w, h);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+      gl.viewport(0, 0, w, h);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(this.filterPass1Program);
+      this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      // Pass 2: FBO → screen (CRT effects: curvature, scanlines, phosphor dots, vignette)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, w, h);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+      gl.useProgram(this.filterPass2Program);
+      this.applyPass2Uniforms(filterState, sourceSize.width, sourceSize.height);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      // Restore source texture binding for next frame's upload
+      gl.bindTexture(gl.TEXTURE_2D, this.texture);
     } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0.01, 0.02, 0.01, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(this.passthroughProgram);
     }
 
@@ -751,46 +770,44 @@ export class TetoricaRetroVideoPipeline {
       const sourceSize = getRetroVideoSourceSize(source);
       const srcType = source instanceof HTMLVideoElement ? "vid" : source instanceof HTMLImageElement ? "img" : "cvs";
       const glErr = gl.getError();
-      const info = `f=${!!usingFilter ? 1 : 0} fp=${!!this.filterProgram ? 1 : 0} src=${srcType} ${sourceSize.width}x${sourceSize.height} up=${uploadSource === source ? "d" : "c"} err=${glErr} buf=${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`;
+      const info = `f=${!!usingFilter ? 1 : 0} fp1=${!!this.filterPass1Program ? 1 : 0} src=${srcType} ${sourceSize.width}x${sourceSize.height} up=${uploadSource === source ? "d" : "c"} err=${glErr} buf=${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`;
       TetoricaRetroVideoPipeline.showDebug(info);
     }
     this.renderCount++;
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (!usingFilter) {
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
   }
 
   dispose() {
-    this.gl.deleteTexture(this.texture);
-    this.gl.deleteVertexArray(this.vao);
-    if (this.filterProgram) this.gl.deleteProgram(this.filterProgram);
-    this.gl.deleteProgram(this.passthroughProgram);
+    const { gl } = this;
+    gl.deleteTexture(this.texture);
+    gl.deleteVertexArray(this.vao);
+    if (this.filterPass1Program) gl.deleteProgram(this.filterPass1Program);
+    if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
+    gl.deleteProgram(this.passthroughProgram);
+    if (this.fbo) gl.deleteFramebuffer(this.fbo);
+    if (this.fboTexture) gl.deleteTexture(this.fboTexture);
     this.currentSource = null;
     this.currentFilterState = null;
   }
 
   private getUploadSource(
     source: RetroVideoSource,
-    filterState: RetroVideoFilterState,
+    _filterState: RetroVideoFilterState,
   ): RetroVideoSource {
-    if (isRawRetroVideoFrame(source)) {
-      return source;
-    }
-
-    if (!filterState.isFilterEnabled) {
-      return source;
-    }
-
     // The WebGL shader quantizes pixels via uTargetSize uniforms, so direct
     // upload always works. Avoids drawImage() failures on older Android.
     return source;
   }
 
-  private applyFilterUniforms(
+  private applyPass1Uniforms(
     filterState: RetroVideoFilterState,
     sourceWidth: number | undefined,
     sourceHeight: number | undefined,
   ) {
-    if (!this.uniformLocations || !this.filterProgram) return;
+    if (!this.pass1Locs || !this.filterPass1Program) return;
     const { gl } = this;
     const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
     const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
@@ -798,8 +815,44 @@ export class TetoricaRetroVideoPipeline {
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
-      sampleWidth,
-      sampleHeight,
+    } = getEffectiveRetroTargetSize(
+      filterState,
+      sourceWidth,
+      sourceHeight,
+      visibleWidth,
+      visibleHeight,
+    );
+
+    gl.useProgram(this.filterPass1Program);
+    gl.uniform2f(this.pass1Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
+    gl.uniform1f(this.pass1Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
+    gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
+    gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
+    gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.pass1Locs.uSmoothStrength, filterState.smoothStrength);
+    gl.uniform1f(this.pass1Locs.uToonSteps, filterState.toonSteps);
+    gl.uniform1f(this.pass1Locs.uEdgeBoost, filterState.edgeBoost);
+    gl.uniform1f(this.pass1Locs.uAnimeEdgeLow, filterState.animeEdgeLow);
+    gl.uniform1f(this.pass1Locs.uAnimeEdgeHigh, filterState.animeEdgeHigh);
+    gl.uniform3f(this.pass1Locs.uMonoTint, ...MONO_TINTS[filterState.monoTint].rgb);
+    gl.uniform1f(this.pass1Locs.uNeonBoost, filterState.neonBoost);
+    gl.uniform1f(this.pass1Locs.uNeonSaturation, filterState.neonSaturation);
+    gl.uniform1f(this.pass1Locs.uNeonDetail, filterState.neonDetail);
+  }
+
+  private applyPass2Uniforms(
+    filterState: RetroVideoFilterState,
+    sourceWidth: number | undefined,
+    sourceHeight: number | undefined,
+  ) {
+    if (!this.pass2Locs || !this.filterPass2Program) return;
+    const { gl } = this;
+    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
+    const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
+    const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+    const {
+      width: effectiveTargetWidth,
+      height: effectiveTargetHeight,
       isPhosphorDotMode,
     } = getEffectiveRetroTargetSize(
       filterState,
@@ -809,96 +862,39 @@ export class TetoricaRetroVideoPipeline {
       visibleHeight,
     );
 
-    gl.useProgram(this.filterProgram);
-    gl.uniform2f(
-      this.uniformLocations.uTargetSize,
-      effectiveTargetWidth,
-      effectiveTargetHeight,
-    );
-    gl.uniform2f(
-      this.uniformLocations.uSampleTargetSize,
-      sampleWidth,
-      sampleHeight,
-    );
-    gl.uniform1f(this.uniformLocations.uColorLevels, Math.max(filterState.colorLevels, 2));
-    gl.uniform1f(this.uniformLocations.uDitherStrength, filterState.ditherStrength);
+    gl.useProgram(this.filterPass2Program);
+    gl.uniform2f(this.pass2Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
+    gl.uniform1f(this.pass2Locs.uCurvature, filterState.curvature);
+    gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
+    gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
+    gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);
+    gl.uniform1f(this.pass2Locs.uVignetteStrength, filterState.vignetteStrength);
+    gl.uniform1f(this.pass2Locs.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.pass2Locs.uPhosphorStrength, filterState.phosphorStrength);
+    gl.uniform1f(this.pass2Locs.uSpotMaskStrength, filterState.spotMaskStrength);
+    gl.uniform1f(this.pass2Locs.uBulbRadius, filterState.bulbRadius);
+    gl.uniform1f(this.pass2Locs.uBlackFloor, filterState.blackFloor);
+    gl.uniform1f(this.pass2Locs.uLumaAmount, filterState.lumaAmount);
+    gl.uniform1f(this.pass2Locs.uLumaLow, filterState.lumaLow);
+    gl.uniform1f(this.pass2Locs.uLumaHigh, filterState.lumaHigh);
+    gl.uniform1f(this.pass2Locs.uLumaKnee, filterState.lumaKnee);
+    gl.uniform1f(this.pass2Locs.uSaturationAmount, filterState.saturationAmount);
+    gl.uniform1f(this.pass2Locs.uSaturationLow, filterState.saturationLow);
+    gl.uniform1f(this.pass2Locs.uSaturationHigh, filterState.saturationHigh);
+    gl.uniform1f(this.pass2Locs.uSaturationKnee, filterState.saturationKnee);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotLightBalance, filterState.phosphorDotLightBalance);
     gl.uniform1f(
-      this.uniformLocations.uPaletteMode,
-      paletteModeToUniform(filterState.paletteMode),
-    );
-    gl.uniform1f(this.uniformLocations.uCurvature, filterState.curvature);
-    gl.uniform1f(this.uniformLocations.uScanlineStrength, filterState.scanlineStrength);
-    gl.uniform1f(this.uniformLocations.uScanline2Strength, filterState.scanline2Strength);
-    gl.uniform1f(
-      this.uniformLocations.uScanlineBrightnessFade,
-      filterState.scanlineBrightnessFade,
-    );
-    gl.uniform1f(this.uniformLocations.uVignetteStrength, filterState.vignetteStrength);
-    gl.uniform1f(this.uniformLocations.uGlowStrength, filterState.glowStrength);
-    gl.uniform1f(this.uniformLocations.uSmoothStrength, filterState.smoothStrength);
-    gl.uniform1f(this.uniformLocations.uToonSteps, filterState.toonSteps);
-    gl.uniform1f(this.uniformLocations.uEdgeBoost, filterState.edgeBoost);
-    gl.uniform1f(this.uniformLocations.uAnimeEdgeLow, filterState.animeEdgeLow);
-    gl.uniform1f(this.uniformLocations.uAnimeEdgeHigh, filterState.animeEdgeHigh);
-    gl.uniform1f(this.uniformLocations.uPhosphorStrength, filterState.phosphorStrength);
-    gl.uniform1f(this.uniformLocations.uSpotMaskStrength, filterState.spotMaskStrength);
-    gl.uniform1f(this.uniformLocations.uBulbRadius, filterState.bulbRadius);
-    gl.uniform1f(this.uniformLocations.uBlackFloor, filterState.blackFloor);
-    gl.uniform1f(this.uniformLocations.uLumaAmount, filterState.lumaAmount);
-    gl.uniform1f(this.uniformLocations.uLumaLow, filterState.lumaLow);
-    gl.uniform1f(this.uniformLocations.uLumaHigh, filterState.lumaHigh);
-    gl.uniform1f(this.uniformLocations.uLumaKnee, filterState.lumaKnee);
-    gl.uniform1f(this.uniformLocations.uSaturationAmount, filterState.saturationAmount);
-    gl.uniform1f(this.uniformLocations.uSaturationLow, filterState.saturationLow);
-    gl.uniform1f(this.uniformLocations.uSaturationHigh, filterState.saturationHigh);
-    gl.uniform1f(this.uniformLocations.uSaturationKnee, filterState.saturationKnee);
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotLightBalance,
-      filterState.phosphorDotLightBalance,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uPixelAspect,
+      this.pass2Locs.uPixelAspect,
       (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
         (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
     );
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotMode,
-      isPhosphorDotMode ? 1 : 0,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotInternalScale,
-      filterState.phosphorDotInternalScale ? 1 : 0,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotBrightCore,
-      filterState.phosphorDotBrightCore ? 1 : 0,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotCellFill,
-      filterState.phosphorDotCellFill,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotFlatDisc,
-      filterState.phosphorDotFlatDisc ? 1 : 0,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uPhosphorDotNeighborBlend,
-      filterState.phosphorDotNeighborBlend ? 1 : 0,
-    );
-    gl.uniform1f(
-      this.uniformLocations.uCloseUpNoiseStrength,
-      filterState.closeUpNoiseStrength,
-    );
-    gl.uniform3f(
-      this.uniformLocations.uMonoTint,
-      ...MONO_TINTS[filterState.monoTint].rgb,
-    );
-    gl.uniform1f(this.uniformLocations.uNeonBoost, filterState.neonBoost);
-    gl.uniform1f(this.uniformLocations.uNeonSaturation, filterState.neonSaturation);
-    gl.uniform1f(this.uniformLocations.uNeonDetail, filterState.neonDetail);
-    gl.uniform1f(
-      this.uniformLocations.uTime,
-      (nowMs() - this.startedAt) / 1000,
-    );
+    gl.uniform1f(this.pass2Locs.uPhosphorDotMode, isPhosphorDotMode ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotInternalScale, filterState.phosphorDotInternalScale ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uCloseUpNoiseStrength, filterState.closeUpNoiseStrength);
+    gl.uniform1f(this.pass2Locs.uTime, (nowMs() - this.startedAt) / 1000);
   }
 }

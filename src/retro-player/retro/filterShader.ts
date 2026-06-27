@@ -31,7 +31,7 @@ void main(void)
 `;
 
 export const FILTER_FRAGMENT = `#version 300 es
-precision highp float;
+precision mediump float;
 
 in vec2 vTextureCoord;
 in vec2 vMaskCoord;
@@ -414,8 +414,9 @@ vec3 nearestColorAnime(vec3 color)
 
 vec3 monochromePalette(vec3 color, float levels, vec3 tint)
 {
-  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-  float stepped = floor(luminance * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+  // highp needed: mediump floor() loses precision on older mobile GPUs, producing all-black output
+  highp float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  highp float stepped = floor(luminance * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
 
   return mix(vec3(0.0), tint, stepped);
 }
@@ -653,7 +654,10 @@ vec3 applyCloseUpTubeNoise(vec3 color, vec2 uv, vec2 cell, float time, float amo
 vec3 applyPalette(vec3 color, float levels, float paletteMode, vec3 monoTint, vec2 cell)
 {
   if (paletteMode < 0.5) {
-    return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+    // highp needed: mediump floor() loses precision on older mobile GPUs
+    highp vec3 c = color;
+    highp float l = levels;
+    return floor(c * (l - 1.0) + 0.5) / max(l - 1.0, 1.0);
   }
 
   if (paletteMode < 1.5) {
