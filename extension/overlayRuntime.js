@@ -747,6 +747,10 @@ function createOverlay(settings) {
       }
     }
 
+    if (!lastHoveredDRMVideo) {
+      lastHoveredDRMVideo = findAutoDrmVideoElement();
+    }
+
     // Read all rects first (batch reads before any DOM writes to avoid forced reflow)
     const targetRects = targets.map((t) => t?.getBoundingClientRect() ?? null);
 
@@ -850,6 +854,23 @@ function createOverlay(settings) {
     }
 
     return targets.slice(0, currentSettings.overlayTargetCount);
+  }
+
+  function findAutoDrmVideoElement() {
+    const candidates = [...document.querySelectorAll("video")]
+      .filter((el) => el instanceof HTMLVideoElement && el.mediaKeys != null && isInViewport(el));
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    candidates.sort((a, b) => {
+      const rectA = a.getBoundingClientRect();
+      const rectB = b.getBoundingClientRect();
+      return (rectB.width * rectB.height) - (rectA.width * rectA.height);
+    });
+
+    return candidates[0] ?? null;
   }
 
   function syncSurfaceCount(count) {
