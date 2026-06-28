@@ -1157,5 +1157,6 @@ export function usePixiVideoPlayer(
     setDelayAmount,
     setReverbAmount,
     setChorusAmount,
+    analyserRef: audio.analyserRef,
   };
 }

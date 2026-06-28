@@ -153,6 +153,7 @@ export class TetoricaRetroAudioNode {
     tapeSaturator: null as WaveShaperNode | null,
     busCompressor: null as DynamicsCompressorNode | null,
     fxOutputGain: null as GainNode | null,
+    analyser: null as AnalyserNode | null,
   };
 
   constructor({
@@ -310,6 +311,10 @@ export class TetoricaRetroAudioNode {
 
   get crackleGain() {
     return this.nodes.crackleGain;
+  }
+
+  get analyser() {
+    return this.nodes.analyser;
   }
 
   debugAudio(label: string, payload?: Record<string, unknown>) {
@@ -717,6 +722,9 @@ export class TetoricaRetroAudioNode {
     const chorusLfoGain2 = context.createGain();
     const chorusWetGain = context.createGain();
     const fxOutputGain = context.createGain();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.8;
     const noiseSource = context.createBufferSource();
     const noiseHighpass = context.createBiquadFilter();
     const noiseLowpass = context.createBiquadFilter();
@@ -866,6 +874,7 @@ export class TetoricaRetroAudioNode {
     chorusWetGain.connect(outputBus);
     outputBus.connect(busCompressor);
     busCompressor.connect(fxOutputGain);
+    fxOutputGain.connect(analyser);
 
     // --- Wire noise / crackle chain ---
     noiseSource.connect(noiseHighpass);
@@ -937,6 +946,7 @@ export class TetoricaRetroAudioNode {
       tapeSaturator,
       busCompressor,
       fxOutputGain,
+      analyser,
     };
   }
 

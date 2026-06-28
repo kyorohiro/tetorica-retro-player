@@ -11,6 +11,7 @@ import {
 } from "../hooks/persistedRetroSettings";
 import { useRetroAlarm } from "../hooks/useRetroAlarm";
 import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
+import { AudioSpectrum } from "./AudioSpectrum";
 
 // Subset of the player object that RetroPreviewView needs.
 // Add new player capabilities here, not in RetroPlayer.
@@ -64,6 +65,7 @@ export type RetroPreviewViewProps = {
   onError?: (error: Error) => void;
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
+  analyserRef?: React.RefObject<AnalyserNode | null>;
 };
 
 export function RetroPreviewView({
@@ -80,6 +82,7 @@ export function RetroPreviewView({
   onError,
   fillHeight = false,
   onIsPinnedPreviewChange,
+  analyserRef,
 }: RetroPreviewViewProps) {
   // --- Internal UI state: everything layout/pin/maximize lives here ---
 
@@ -609,8 +612,18 @@ export function RetroPreviewView({
               </div>
             )}
             {player.hasAudioOnly && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border border-dashed border-slate-700 text-center text-sm text-slate-400">
-                Audio preview is playing through the retro audio chain.
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-700 px-4">
+                {analyserRef && (
+                  <AudioSpectrum analyserRef={analyserRef} className="w-4/5 rounded bg-slate-900/60" />
+                )}
+                <p className="text-center text-sm text-slate-400">
+                  Audio preview is playing through the retro audio chain.
+                </p>
+              </div>
+            )}
+            {!player.hasAudioOnly && analyserRef && (
+              <div className="pointer-events-none absolute bottom-1 left-1 right-1 z-10">
+                <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-black/50" />
               </div>
             )}
           </div>

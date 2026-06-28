@@ -38,6 +38,8 @@ export type AudioChainNodes = {
   trebleEqNode: BiquadFilterNode;
   tapeSaturatorNode: WaveShaperNode;
   stereoWidthNode: AudioWorkletNode | null;
+  stereoWidthBypassGainNode: GainNode;
+  stereoWidthWetGainNode: GainNode;
   roomDryGainNode: GainNode;
   roomConvolverNode: ConvolverNode;
   roomWetGainNode: GainNode;
@@ -61,6 +63,7 @@ export type AudioChainNodes = {
   chorusWetGainNode: GainNode;
   busCompressorNode: DynamicsCompressorNode;
   fxOutputGainNode: GainNode;
+  analyserNode: AnalyserNode;
   noiseSourceNode: AudioBufferSourceNode;
   noiseGainNode: GainNode;
   noiseLfoNode: OscillatorNode;
@@ -73,7 +76,7 @@ export type AudioChainNodes = {
 };
 
 export function createDriveCurve(amount: number): Float32Array<ArrayBuffer> {
-  const samples = 256;
+  const samples = 4096;
   const curve = new Float32Array(samples) as Float32Array<ArrayBuffer>;
   const drive = 1 + amount * 5;
   for (let i = 0; i < samples; i++) {
@@ -84,9 +87,9 @@ export function createDriveCurve(amount: number): Float32Array<ArrayBuffer> {
 }
 
 export function createTapeSaturationCurve(amount: number): Float32Array<ArrayBuffer> {
-  const samples = 256;
+  const samples = 4096;
   const curve = new Float32Array(samples) as Float32Array<ArrayBuffer>;
-  const k = amount * 8;
+  const k = amount * 6;// saturation factor 4 is mild, 8 is heavy
   for (let i = 0; i < samples; i++) {
     const x = (i * 2) / (samples - 1) - 1;
     if (k < 0.001) {
@@ -303,13 +306,20 @@ export async function buildAudioChain(
   const roomWetGainNode = audioCtx.createGain();
   roomConvolverNode.buffer = createSmallRoomImpulse(audioCtx);
 
+  const stereoWidthBypassGainNode = audioCtx.createGain();
+  const stereoWidthWetGainNode = audioCtx.createGain();
+  stereoWidthBypassGainNode.gain.value = 1; // default: bypass (no processing)
+  stereoWidthWetGainNode.gain.value = 0;
+
+  tapeSaturatorNode.connect(stereoWidthBypassGainNode);
+  stereoWidthBypassGainNode.connect(roomDryGainNode);
+  stereoWidthBypassGainNode.connect(roomConvolverNode);
+
   if (stereoWidthNode) {
     tapeSaturatorNode.connect(stereoWidthNode);
-    stereoWidthNode.connect(roomDryGainNode);
-    stereoWidthNode.connect(roomConvolverNode);
-  } else {
-    tapeSaturatorNode.connect(roomDryGainNode);
-    tapeSaturatorNode.connect(roomConvolverNode);
+    stereoWidthNode.connect(stereoWidthWetGainNode);
+    stereoWidthWetGainNode.connect(roomDryGainNode);
+    stereoWidthWetGainNode.connect(roomConvolverNode);
   }
   roomConvolverNode.connect(roomWetGainNode);
   roomDryGainNode.connect(masterGainNode);
@@ -377,9 +387,14 @@ export async function buildAudioChain(
   const fxOutputGainNode = audioCtx.createGain();
   fxOutputGainNode.gain.value = 1;
 
+  const analyserNode = audioCtx.createAnalyser();
+  analyserNode.fftSize = 512;
+  analyserNode.smoothingTimeConstant = 0.8;
+
   outputBusNode.connect(busCompressorNode);
   busCompressorNode.connect(fxOutputGainNode);
   fxOutputGainNode.connect(audioCtx.destination);
+  fxOutputGainNode.connect(analyserNode);
 
   // Noise chain
   const noiseSourceNode = audioCtx.createBufferSource();
@@ -463,6 +478,7 @@ export async function buildAudioChain(
     radioToneHighpassNode, radioToneLowpassNode, radioTonePresenceNode,
     lofiLowpassNode, lofiHighshelfNode, lofiDriveNode,
     bitcrusherNode, stereoWidthNode,
+    stereoWidthBypassGainNode, stereoWidthWetGainNode,
     postCrushLowpassNode,
     bassEqNode, midEqNode, trebleEqNode,
     tapeSaturatorNode,
@@ -476,7 +492,7 @@ export async function buildAudioChain(
     chorusLfo1Node, chorusLfo2Node,
     chorusLfoGain1Node, chorusLfoGain2Node,
     chorusWetGainNode,
-    busCompressorNode, fxOutputGainNode,
+    busCompressorNode, fxOutputGainNode, analyserNode,
     noiseSourceNode, noiseGainNode,
     noiseLfoNode, noiseLfoGainNode,
     crackleSourceNode, crackleFilterNode,
@@ -489,6 +505,7 @@ export function updateAudioChainNodes(nodes: AudioChainNodes, settings: AudioCha
     radioToneHighpassNode, radioToneLowpassNode, radioTonePresenceNode,
     lofiLowpassNode, lofiHighshelfNode, lofiDriveNode,
     bitcrusherNode, stereoWidthNode,
+    stereoWidthBypassGainNode, stereoWidthWetGainNode,
     postCrushLowpassNode,
     bassEqNode, midEqNode, trebleEqNode,
     tapeSaturatorNode,
@@ -517,7 +534,7 @@ export function updateAudioChainNodes(nodes: AudioChainNodes, settings: AudioCha
   {
     const amount = settings.isAudioFxEnabled ? settings.lofiAmount : 0;
     lofiLowpassNode.frequency.value = 16000 - amount * 14200;
-    lofiLowpassNode.Q.value = 0.3 + amount * 1.8;
+    lofiLowpassNode.Q.value = 0.3 + amount * 0.5;
     lofiHighshelfNode.gain.value = -amount * 18;
     lofiDriveNode.curve = createDriveCurve(amount * 0.6);
   }
@@ -556,8 +573,19 @@ export function updateAudioChainNodes(nodes: AudioChainNodes, settings: AudioCha
   }
 
   if (stereoWidthNode) {
-    const width = settings.isAudioFxEnabled ? 1 + settings.stereoWidthAmount : 1;
-    stereoWidthNode.parameters.get("width")?.setValueAtTime(width, stereoWidthNode.context.currentTime);
+    const amount = settings.isAudioFxEnabled ? settings.stereoWidthAmount : 0;
+    const now = stereoWidthNode.context.currentTime;
+    const ramp = 0.05;
+    if (amount === 0) {
+      // bypass: route through dry gain, mute worklet output
+      stereoWidthBypassGainNode.gain.setTargetAtTime(1, now, ramp);
+      stereoWidthWetGainNode.gain.setTargetAtTime(0, now, ramp);
+    } else {
+      // processing active
+      stereoWidthBypassGainNode.gain.setTargetAtTime(0, now, ramp);
+      stereoWidthWetGainNode.gain.setTargetAtTime(1, now, ramp);
+      stereoWidthNode.parameters.get("width")?.setValueAtTime(1 + amount, now);
+    }
   }
 
   {
