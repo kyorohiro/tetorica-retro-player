@@ -1102,15 +1102,18 @@ function createOverlay(settings) {
 
   function startRecording() {
     const activeSurface = surfaces[0];
-    if (!activeSurface?.targetElement || activeSurface.canvas.style.display === "none") {
+    const targetElement = activeSurface?.targetElement ?? activePrimaryTarget ?? null;
+    const directVideoStream = shouldUseDirectVideoFallback(targetElement)
+      ? getElementVideoStream(targetElement)
+      : null;
+    const canUseCanvas = !!activeSurface?.targetElement && activeSurface.canvas.style.display !== "none";
+
+    if (!targetElement || (!directVideoStream && !canUseCanvas)) {
       window.alert("Move the pointer over a visible video or image first.");
       return;
     }
 
     const nextRecordingStream = new MediaStream();
-    const directVideoStream = shouldUseDirectVideoFallback(activeSurface.targetElement)
-      ? getElementVideoStream(activeSurface.targetElement)
-      : null;
 
     if (directVideoStream) {
       directVideoStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
@@ -1119,7 +1122,7 @@ function createOverlay(settings) {
       canvasStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
     }
 
-    const audioStream = getElementAudioStream(activeSurface.targetElement);
+    const audioStream = getElementAudioStream(targetElement);
     audioStream?.getAudioTracks().forEach((track) => nextRecordingStream.addTrack(track));
 
     const mimeType = getRecordingMimeType();
