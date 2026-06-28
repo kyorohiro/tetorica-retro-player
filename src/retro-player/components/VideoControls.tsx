@@ -988,16 +988,16 @@ export const VideoControls = memo(function VideoControls({
               )}
             </div>
 
-            {hasVideo ? (
+            {true ? (
               <div className="col-span-4 grid grid-cols-6 gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    onStepFrame(-1);
-                  }}
+                  onClick={() => { if (hasVideo) onStepFrame(-1); }}
+                  disabled={!hasVideo}
                   aria-label="Previous frame"
                   title="Previous frame"
-                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                  className={["col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border px-2 py-2",
+                    hasVideo ? "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]" : "border-[#bcb4a6]/40 bg-[#f5f1ea]/40 text-[#12141c]/30 cursor-default"].join(" ")}
                 >
                   <StepBack size={16} />
                 </button>
@@ -1029,12 +1029,12 @@ export const VideoControls = memo(function VideoControls({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    onStepFrame(1);
-                  }}
+                  onClick={() => { if (hasVideo) onStepFrame(1); }}
+                  disabled={!hasVideo}
                   aria-label="Next frame"
                   title="Next frame"
-                  className="col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                  className={["col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border px-2 py-2",
+                    hasVideo ? "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]" : "border-[#bcb4a6]/40 bg-[#f5f1ea]/40 text-[#12141c]/30 cursor-default"].join(" ")}
                 >
                   <StepForward size={16} />
                 </button>
