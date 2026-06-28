@@ -66,6 +66,7 @@ export type RetroPreviewViewProps = {
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
   analyserRef?: React.RefObject<AnalyserNode | null>;
+  showVideoSpectrum?: boolean;
 };
 
 export function RetroPreviewView({
@@ -83,6 +84,7 @@ export function RetroPreviewView({
   fillHeight = false,
   onIsPinnedPreviewChange,
   analyserRef,
+  showVideoSpectrum,
 }: RetroPreviewViewProps) {
   // --- Internal UI state: everything layout/pin/maximize lives here ---
 
@@ -533,7 +535,7 @@ export function RetroPreviewView({
         >
           {/* Canvas area + overlays */}
           <div
-            className="relative h-full w-full overflow-visible rounded-xl bg-slate-950"
+            className={`relative w-full overflow-visible rounded-xl bg-slate-950 ${previewAspectRatio ? "h-full" : "h-full min-h-[100px]"}`}
             style={{
               filter: brightness !== 1.0 ? `brightness(${brightness})` : undefined,
               transform: (flipH || flipV) ? `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` : undefined,
@@ -621,7 +623,7 @@ export function RetroPreviewView({
                 </p>
               </div>
             )}
-            {!player.hasAudioOnly && analyserRef && (
+            {!player.hasAudioOnly && analyserRef && showVideoSpectrum && (
               <div className="pointer-events-none absolute bottom-1 left-1 right-1 z-10">
                 <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-black/50" />
               </div>

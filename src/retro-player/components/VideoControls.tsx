@@ -1,4 +1,5 @@
 import { memo, useCallback, useRef, useState } from "react";
+import { AudioSpectrum } from "./AudioSpectrum";
 import { useLongPress } from "../hooks/useLongPress";
 import {
   ChevronsRight,
@@ -43,6 +44,7 @@ type VideoControlsProps = {
   isVideoFxEnabled: boolean;
   isNoiseEnabled: boolean;
   hasVideo: boolean;
+  analyserRef?: React.RefObject<AnalyserNode | null>;
   isVideoSettingsOpen: boolean;
   lofiAmount: number;
   radioToneAmount: number;
@@ -100,6 +102,8 @@ type VideoControlsProps = {
   onToggleLoop: () => void;
   onToggleAudioFx: () => void;
   onToggleVideoFx: () => void;
+  showVideoSpectrum?: boolean;
+  onToggleVideoSpectrum?: () => void;
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
@@ -140,6 +144,7 @@ export const VideoControls = memo(function VideoControls({
   isVideoFxEnabled,
   isNoiseEnabled,
   hasVideo,
+  analyserRef,
   isVideoSettingsOpen,
   lofiAmount,
   radioToneAmount,
@@ -197,6 +202,8 @@ export const VideoControls = memo(function VideoControls({
   onToggleLoop,
   onToggleAudioFx,
   onToggleVideoFx,
+  showVideoSpectrum,
+  onToggleVideoSpectrum,
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
@@ -228,6 +235,10 @@ export const VideoControls = memo(function VideoControls({
     }
   };
   const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
+  const { isHolding: isEffectsHolding, ...effectsButtonHandlers } = useLongPress(
+    useCallback(() => { onToggleVideoSpectrum?.(); }, [onToggleVideoSpectrum]),
+    onToggleAudioFx,
+  );
   const noop = useCallback(() => {}, []);
   const { isHolding: isPrevHolding, ...prevTrackHandlers } = useLongPress(
     onPrevTrack ?? noop,
@@ -365,19 +376,37 @@ export const VideoControls = memo(function VideoControls({
           </button>
         </div>
 
+        {!hasVideo && analyserRef && (
+          <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-[#1a1814]" />
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={onToggleAudioFx}
+            {...effectsButtonHandlers}
             className={[
-              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
-              isAudioFxEnabled
-                ? "border-amber-400 bg-amber-500/20"
-                : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+              isEffectsHolding
+                ? "border-amber-500 bg-amber-500/30"
+                : isAudioFxEnabled && showVideoSpectrum
+                  ? "border-amber-500 bg-amber-400/30"
+                  : isAudioFxEnabled
+                    ? "border-amber-400 bg-amber-500/20"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
             ].join(" ")}
           >
-            <Waves size={16} />
-            {isAudioFxEnabled ? "Effects on" : "Effects off"}
+            {isEffectsHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <Waves size={16} className="relative z-10" />
+            <span className="relative z-10">
+              {isAudioFxEnabled
+                ? showVideoSpectrum ? "on & FFT" : "Effects on"
+                : showVideoSpectrum ? "off & FFT" : "Effects off"}
+            </span>
           </button>
           <button
             type="button"
@@ -915,6 +944,9 @@ export const VideoControls = memo(function VideoControls({
       />
       {hasPlayback && (
         <>
+          {!hasVideo && analyserRef && (
+            <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-[#1a1814]" />
+          )}
           <div>
             <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
               <span>{formatTime(currentTime)}</span>

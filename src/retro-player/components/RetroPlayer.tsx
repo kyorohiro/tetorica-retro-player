@@ -74,6 +74,7 @@ export function RetroPlayer({
     "playback" | "audio-settings" | "video-settings"
   >("playback");
   const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
+  const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
 
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
@@ -308,6 +309,7 @@ export function RetroPlayer({
             onFitWidthChange={setIsFitWidthEnabled}
             onError={onError}
             analyserRef={player.analyserRef}
+            showVideoSpectrum={showVideoSpectrum}
           />
           <RetroControlPanel
             locale={locale}
@@ -354,6 +356,8 @@ export function RetroPlayer({
     onNextTrack,
     loopMode,
     onCycleLoopMode,
+    showVideoSpectrum,
+    onToggleVideoSpectrum: () => setShowVideoSpectrum(v => !v),
   } as const;
 
   return (
@@ -382,6 +386,7 @@ export function RetroPlayer({
               onError={onError}
               onIsPinnedPreviewChange={setIsPinnedInPreview}
               analyserRef={player.analyserRef}
+              showVideoSpectrum={showVideoSpectrum}
             />
           }
           playbackControls={

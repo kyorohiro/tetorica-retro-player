@@ -88,6 +88,7 @@ export type RetroControlPlayerSlice = {
   toggleNoise: () => void;
   togglePlayback: () => Promise<void>;
   playVideoWithAudio: () => Promise<void>;
+  analyserRef?: React.RefObject<AnalyserNode | null>;
 };
 
 export type RetroControlPanelProps = {
@@ -108,6 +109,8 @@ export type RetroControlPanelProps = {
   onNextTrack?: () => void;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
+  showVideoSpectrum?: boolean;
+  onToggleVideoSpectrum?: () => void;
 };
 
 const controlsFallback = (
@@ -151,6 +154,8 @@ export function RetroControlPanel({
   onNextTrack,
   loopMode,
   onCycleLoopMode,
+  showVideoSpectrum,
+  onToggleVideoSpectrum,
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
   if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
@@ -254,6 +259,9 @@ export function RetroControlPanel({
               onNextTrack={onNextTrack}
               loopMode={loopMode}
               onCycleLoopMode={onCycleLoopMode}
+              showVideoSpectrum={showVideoSpectrum}
+              onToggleVideoSpectrum={onToggleVideoSpectrum}
+              analyserRef={player.analyserRef}
             />
           </React.Suspense>
         )}
