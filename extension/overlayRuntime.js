@@ -1563,7 +1563,10 @@ function createOverlaySurface(index, onReady) {
         this.targetElement.style.transform = "";
         this.targetElement.style.transformOrigin = "";
       }
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      // cancel() defers loseContext() until after the D3D shader cache load
+      // is done. Calling loseContext() while linkProgram is pending on
+      // Windows/ANGLE blocks the JS main thread for ~3 s (the cache load).
+      renderer.cancel();
       canvas.remove();
       failureOverlay.remove();
     },
@@ -1953,28 +1956,52 @@ function setupRenderer(webgl, onReady) {
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.CLAMP_TO_EDGE);
 
-  const renderer = { program: passthruProg, texture, uniformLocations: null };
+  // destroyed: set by cancel() when the surface is torn down before compilation
+  // finishes. compiling: true until the async block below exits. Together they
+  // ensure loseContext() is called exactly once — either immediately (if the
+  // surface is torn down after compilation) or deferred inside the async block
+  // (to avoid freezing while D3D DXBC is still loading from the shader cache).
+  let destroyed = false;
+  let compiling = true;
+
+  const renderer = {
+    program: passthruProg,
+    texture,
+    uniformLocations: null,
+    cancel() {
+      destroyed = true;
+      if (!compiling) {
+        // Compilation already done; safe to lose context immediately.
+        webgl.getExtension("WEBGL_lose_context")?.loseContext();
+      }
+      // else: IIFE will call loseContext() after the 3 s wait completes.
+    },
+  };
 
   (async () => {
-    const ext =
-      webgl.getExtension("WEBGL_parallel_shader_compile") ??
-      webgl.getExtension("KHR_parallel_shader_compile");
+    // Wait 3 s before reading back: on Windows/Chrome ANGLE, calling
+    // getProgramParameter immediately after linkProgram blocks while the GPU
+    // process loads pre-compiled DXBC bytecode from the D3D shader cache.
+    // COMPLETION_STATUS_KHR is intentionally NOT used here — on some
+    // Windows/ANGLE configurations it never returns true for large shaders.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    if (ext) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      await new Promise((resolve) => {
-        const poll = () => {
-          if (webgl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR)) resolve();
-          else requestAnimationFrame(poll);
-        };
-        requestAnimationFrame(poll);
-      });
-    } else {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (destroyed) {
+      // Surface was torn down during the wait; loseContext() is now safe.
+      webgl.getExtension("WEBGL_lose_context")?.loseContext();
+      compiling = false;
+      return;
     }
 
     if (!webgl.getProgramParameter(prog, webgl.LINK_STATUS)) {
       console.error("[overlay] Filter shader link failed:", webgl.getProgramInfoLog(prog) || "unknown");
+      compiling = false;
+      return;
+    }
+
+    if (destroyed) {
+      webgl.getExtension("WEBGL_lose_context")?.loseContext();
+      compiling = false;
       return;
     }
 
@@ -2029,6 +2056,7 @@ function setupRenderer(webgl, onReady) {
     };
 
     renderer.program = prog;
+    compiling = false;
     onReady?.(renderer);
   })();
 
