@@ -1107,9 +1107,17 @@ function createOverlay(settings) {
       return;
     }
 
-    const canvasStream = activeSurface.canvas.captureStream(30);
     const nextRecordingStream = new MediaStream();
-    canvasStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
+    const directVideoStream = shouldUseDirectVideoFallback(activeSurface.targetElement)
+      ? getElementVideoStream(activeSurface.targetElement)
+      : null;
+
+    if (directVideoStream) {
+      directVideoStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
+    } else {
+      const canvasStream = activeSurface.canvas.captureStream(30);
+      canvasStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
+    }
 
     const audioStream = getElementAudioStream(activeSurface.targetElement);
     audioStream?.getAudioTracks().forEach((track) => nextRecordingStream.addTrack(track));
@@ -2169,6 +2177,19 @@ function getElementAudioStream(targetElement) {
     return null;
   }
 
+  const stream = getElementVideoStream(targetElement);
+  if (!stream) {
+    return null;
+  }
+
+  return stream.getAudioTracks().length > 0 ? stream : null;
+}
+
+function getElementVideoStream(targetElement) {
+  if (!(targetElement instanceof HTMLVideoElement)) {
+    return null;
+  }
+
   const captureStream =
     targetElement.captureStream?.bind(targetElement) ||
     targetElement.mozCaptureStream?.bind(targetElement);
@@ -2178,8 +2199,7 @@ function getElementAudioStream(targetElement) {
   }
 
   try {
-    const stream = captureStream();
-    return stream.getAudioTracks().length > 0 ? stream : null;
+    return captureStream();
   } catch {
     return null;
   }
