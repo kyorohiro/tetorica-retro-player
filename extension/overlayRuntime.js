@@ -374,6 +374,19 @@ function createOverlay(settings) {
   moreButton.style.lineHeight = "1";
   moreButton.textContent = "⋯";
 
+  const fallbackFrame = document.createElement("div");
+  fallbackFrame.style.position = "fixed";
+  fallbackFrame.style.left = "-9999px";
+  fallbackFrame.style.top = "-9999px";
+  fallbackFrame.style.zIndex = "2147483499";
+  fallbackFrame.style.pointerEvents = "none";
+  fallbackFrame.style.display = "none";
+  fallbackFrame.style.boxSizing = "border-box";
+  fallbackFrame.style.border = "1px solid rgba(196, 230, 125, 0.65)";
+  fallbackFrame.style.boxShadow = "0 0 0 1px rgba(18, 31, 7, 0.5) inset, 0 0 18px rgba(196, 230, 125, 0.22)";
+  fallbackFrame.style.borderRadius = "2px";
+  fallbackFrame.dataset.tetoricaOverlayFrame = "true";
+
   const surfaces = [];
   let rafId = 0;
   let frameCount = 0;
@@ -388,6 +401,8 @@ function createOverlay(settings) {
   let detachPointerTracking = null;
   let lastHoveredElement = null;
   let lastHoveredDRMVideo = null;
+  let activePrimaryTarget = null;
+  let rendererInitFailed = false;
 
   const BRIGHTNESS_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 2.0];
   const BRIGHTNESS_DEFAULT_IDX = 5; // 1.0
@@ -662,7 +677,7 @@ function createOverlay(settings) {
   });
 
   function start() {
-    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup);
+    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup, fallbackFrame);
     updateOpacityButton();
     updateAudioFxButton();
     attachSettingsSync();
@@ -707,6 +722,7 @@ function createOverlay(settings) {
     moreButton.remove();
     expandedPanel.remove();
     frameGroup.remove();
+    fallbackFrame.remove();
   }
 
   function attachSettingsSync() {
@@ -734,7 +750,7 @@ function createOverlay(settings) {
   function draw() {
     frameCount += 1;
     const targets = collectPreferredTargets();
-    syncSurfaceCount(currentSettings.overlayTargetCount);
+    activePrimaryTarget = targets[0] ?? lastHoveredDRMVideo ?? null;
 
     // Track hovered DRM video separately
     const drmHovered = findHoveredDRMVideoElement(pointerClientX, pointerClientY);
@@ -753,6 +769,20 @@ function createOverlay(settings) {
 
     // Read all rects first (batch reads before any DOM writes to avoid forced reflow)
     const targetRects = targets.map((t) => t?.getBoundingClientRect() ?? null);
+    const primaryRect = targetRects[0] ?? null;
+
+    updateButtonPositions(primaryRect);
+    updateFallbackFrame(primaryRect);
+
+    if (!rendererInitFailed) {
+      try {
+        syncSurfaceCount(currentSettings.overlayTargetCount);
+      } catch (error) {
+        rendererInitFailed = true;
+        console.warn("Overlay renderer initialization failed; keeping control UI active.", error);
+        destroySurfaces();
+      }
+    }
 
     for (let index = 0; index < surfaces.length; index += 1) {
       const surface = surfaces[index];
@@ -762,7 +792,6 @@ function createOverlay(settings) {
       updateSurfaceSpotlight(surface, rect);
     }
 
-    updateButtonPositions(targetRects[0] ?? null);
     updateOpacityButton();
     updateSpeedButtonLabel();
     if (audioFxEnabled) {
@@ -1153,7 +1182,7 @@ function createOverlay(settings) {
   }
 
   function getActiveVideoForSpeed() {
-    const el = surfaces[0]?.targetElement;
+    const el = surfaces[0]?.targetElement ?? activePrimaryTarget;
     if (el instanceof HTMLVideoElement) return el;
     if (lastHoveredDRMVideo instanceof HTMLVideoElement) return lastHoveredDRMVideo;
     return null;
@@ -1391,7 +1420,8 @@ function createOverlay(settings) {
   }
 
   function updateButtonPositions(rect) {
-    const isDRM = !surfaces[0]?.targetElement && lastHoveredDRMVideo != null;
+    const activeTarget = surfaces[0]?.targetElement ?? activePrimaryTarget;
+    const isDRM = !(activeTarget instanceof HTMLVideoElement) && lastHoveredDRMVideo != null;
     const drmRect = isDRM ? lastHoveredDRMVideo.getBoundingClientRect() : null;
     const activeRect = rect ?? drmRect;
 
@@ -1413,7 +1443,7 @@ function createOverlay(settings) {
       return;
     }
 
-    const isVideo = isDRM || surfaces[0]?.targetElement instanceof HTMLVideoElement;
+    const isVideo = isDRM || activeTarget instanceof HTMLVideoElement;
     const isNarrow = activeRect.width < 320;
     const rectKey = `${Math.round(activeRect.right)}:${Math.round(activeRect.top)}:${Math.round(activeRect.width)}:${isDRM ? "d" : ""}:${panelOpen ? "o" : ""}`;
     if (rectKey === lastButtonRectKey) return;
@@ -1515,6 +1545,21 @@ function createOverlay(settings) {
         brightnessGroup.style.left = "-9999px";
       }
     }
+  }
+
+  function updateFallbackFrame(rect) {
+    const activeRect = rect ?? (lastHoveredDRMVideo ? lastHoveredDRMVideo.getBoundingClientRect() : null);
+    if (!activeRect) {
+      fallbackFrame.style.display = "none";
+      fallbackFrame.style.left = "-9999px";
+      return;
+    }
+
+    fallbackFrame.style.display = "block";
+    fallbackFrame.style.left = `${activeRect.left}px`;
+    fallbackFrame.style.top = `${activeRect.top}px`;
+    fallbackFrame.style.width = `${activeRect.width}px`;
+    fallbackFrame.style.height = `${activeRect.height}px`;
   }
 }
 
