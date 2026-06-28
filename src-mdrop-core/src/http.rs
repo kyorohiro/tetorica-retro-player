@@ -161,6 +161,7 @@ pub struct HttpServerContext {
     pub status: ServerStatus,
     pub shutdown_tx: Option<oneshot::Sender<()>>,
     pub local_only: bool,
+    pub web_enabled: bool,
     pub files: HashMap<String, PathBuf>,
     pub hls_sessions: HashMap<String, PathBuf>,
     pub hls_children: HashMap<String, tokio::process::Child>,
@@ -201,6 +202,7 @@ impl HttpServerContext {
             status: ServerStatus::new(),
             shutdown_tx: None,
             local_only: true,
+            web_enabled: false,
             files: HashMap::new(),
             hls_sessions: HashMap::new(),
             hls_children: HashMap::new(),
@@ -529,10 +531,11 @@ impl SharedHttpServerContext {
         password: Option<String>,
         is_https: Option<bool>,
         local_only: Option<bool>,
+        web_enabled: Option<bool>,
     ) -> Result<ServerStatus, String> {
         println!(
-            ">>> start_server isHttp:{:?} localOnly:{:?}",
-            is_https, local_only
+            ">>> start_server isHttp:{:?} localOnly:{:?} webEnabled:{:?}",
+            is_https, local_only, web_enabled
         );
 
         let mut ctx = self.inner.lock().map_err(|e| e.to_string())?;
@@ -542,6 +545,7 @@ impl SharedHttpServerContext {
         }
 
         ctx.local_only = local_only.unwrap_or(true);
+        ctx.web_enabled = web_enabled.unwrap_or(false);
 
         let (std_listener, port) = bind_to_free_port(preferred_port.unwrap_or(7878))
             .map_err(|e| format!("bind failed: {e}"))?;

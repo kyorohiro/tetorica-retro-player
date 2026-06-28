@@ -65,6 +65,7 @@ struct StartServerRequest {
     password: Option<String>,
     is_https: Option<bool>,
     local_only: Option<bool>,
+    web_enabled: Option<bool>,
 }
 
 #[tauri::command]
@@ -95,6 +96,7 @@ async fn mdrop_start_server(
             req.password,
             req.is_https,
             req.local_only,
+            req.web_enabled,
         )
     }
 }
@@ -379,6 +381,7 @@ pub fn run() {
                     None,
                     Some(false),
                     Some(true),
+                    Some(false), // web_enabled: false by default
                 ) {
                     Ok(status) => println!("[mDrop] server started: {:?}", status.url),
                     Err(e) => eprintln!("[mDrop] server failed to start: {e}"),

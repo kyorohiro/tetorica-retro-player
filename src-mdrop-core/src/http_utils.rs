@@ -277,7 +277,7 @@ pub async fn access_guard_middleware(
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, Response<Body>> {
-    let local_only = {
+    let (local_only, web_enabled) = {
         let server = state
             .inner
             .lock()
@@ -286,13 +286,26 @@ pub async fn access_guard_middleware(
                 *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
                 res
             })?;
-        server.local_only
+        (server.local_only, server.web_enabled)
     };
 
     if local_only && !is_local_ip(addr.ip()) {
         let mut res = Response::new(Body::from("Forbidden"));
         *res.status_mut() = StatusCode::FORBIDDEN;
         return Err(res);
+    }
+
+    if !web_enabled {
+        let path = req.uri().path();
+        let is_web_route = path == "/"
+            || path.starts_with("/assets/")
+            || path == "/unrar.wasm"
+            || path.starts_with("/pdfjs/");
+        if is_web_route {
+            let mut res = Response::new(Body::from("Not Found"));
+            *res.status_mut() = StatusCode::NOT_FOUND;
+            return Err(res);
+        }
     }
 
     let (expected_id, expected_password) = {
