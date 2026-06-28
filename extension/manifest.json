@@ -33,6 +33,8 @@
         "overlayRuntime.js",
         "shared/TetoricaRetroAudioNode.js",
         "shared/bitcrusherWorklet.js",
+        "shared/filterPass1Shader.js",
+        "shared/filterPass2Shader.js",
         "shared/filterShader.js",
         "shared/stereoWidthWorklet.js",
         "shared/settings.js"
