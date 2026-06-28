@@ -307,6 +307,7 @@ export function RetroPlayer({
             onHighResolutionChange={setIsHighResolution}
             onFitWidthChange={setIsFitWidthEnabled}
             onError={onError}
+            analyserRef={player.analyserRef}
           />
           <RetroControlPanel
             locale={locale}
@@ -380,6 +381,7 @@ export function RetroPlayer({
               onFitWidthChange={setIsFitWidthEnabled}
               onError={onError}
               onIsPinnedPreviewChange={setIsPinnedInPreview}
+              analyserRef={player.analyserRef}
             />
           }
           playbackControls={

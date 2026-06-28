@@ -303,6 +303,7 @@ export function useRetroAudioEngine({
     vinylDustBedFilterRef: createCurrentAccessor(() => audioEngineRef.current?.vinylDustBedFilter ?? null),
     vinylDustBedGainRef: createCurrentAccessor(() => audioEngineRef.current?.vinylDustBedGain ?? null),
     crackleGainRef: createCurrentAccessor(() => audioEngineRef.current?.crackleGain ?? null),
+    analyserRef: createCurrentAccessor(() => audioEngineRef.current?.analyser ?? null),
   }));
 
   const {
@@ -339,6 +340,7 @@ export function useRetroAudioEngine({
     vinylDustBedFilterRef,
     vinylDustBedGainRef,
     crackleGainRef,
+    analyserRef,
   } = audioNodeRefs;
 
   const getCurrentAudioSettings = (): RetroAudioSettings => ({
@@ -859,6 +861,7 @@ export function useRetroAudioEngine({
     vinylDustBedFilterRef,
     vinylDustBedGainRef,
     crackleGainRef,
+    analyserRef,
     audioOptimizationModeRef,
     audioOptimizationMode,
     setAudioOptimizationMode,

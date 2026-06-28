@@ -37,10 +37,12 @@ class RetroStereoWidthProcessor extends AudioWorkletProcessor {
       const right = rightIn[index] ?? left;
       const mid = (left + right) * 0.5;
       const side = (left - right) * 0.5 * width;
+      // gain compensation to prevent clipping when width > 1
+      const gain = width > 1.0 ? 1.0 / width : 1.0;
 
-      leftOut[index] = mid + side;
+      leftOut[index] = (mid + side) * gain;
       if (output[1]) {
-        rightOut[index] = mid - side;
+        rightOut[index] = (mid - side) * gain;
       }
     }
 
