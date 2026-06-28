@@ -1,4 +1,5 @@
-import { FILTER_FRAGMENT } from "./shared/filterShader.js";
+import { FILTER_FRAGMENT_PASS1 } from "./shared/filterPass1Shader.js";
+import { FILTER_FRAGMENT_PASS2 } from "./shared/filterPass2Shader.js";
 import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
@@ -821,10 +822,8 @@ function createOverlay(settings) {
     while (surfaces.length < count) {
       const surface = createOverlaySurface(surfaces.length, (renderer) => {
         if (!renderer.uniformLocations) return;
-        applySettings(surface.gl, renderer.program, renderer.uniformLocations, currentSettings);
-        surface.gl.useProgram(renderer.program);
-        surface.gl.uniform1f(renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
-        surface.gl.uniform1f(renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
+        applySettings(surface.gl, renderer, currentSettings);
+        applyFlipUniforms(surface.gl, renderer, flipH, flipV);
       });
       surface.canvas.style.opacity = String(overlayOpacity);
       const bLevel = BRIGHTNESS_PRESETS[brightnessIdx];
@@ -849,7 +848,7 @@ function createOverlay(settings) {
 
   function applySettingsToSurfaces() {
     for (const surface of surfaces) {
-      applySettings(surface.gl, surface.renderer.program, surface.renderer.uniformLocations, currentSettings);
+      applySettings(surface.gl, surface.renderer, currentSettings);
     }
   }
 
@@ -889,13 +888,6 @@ function createOverlay(settings) {
     surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
     surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
     surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
-    surface.gl.useProgram(surface.renderer.program);
-    if (surface.renderer.uniformLocations) {
-      surface.gl.uniform1f(
-        surface.renderer.uniformLocations.uTime,
-        (performance.now() - surface.startedAt) / 1000,
-      );
-    }
     surface.gl.activeTexture(surface.gl.TEXTURE0);
     surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
 
@@ -920,7 +912,31 @@ function createOverlay(settings) {
           return;
         }
       }
-      surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+      if (surface.renderer.pass1Program && surface.renderer.pass1UniformLocations && surface.renderer.uniformLocations) {
+        ensureRendererFramebuffer(surface.gl, surface.renderer);
+        surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.fbo);
+        surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+        surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
+        surface.gl.useProgram(surface.renderer.pass1Program);
+        surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+
+        surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, null);
+        surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+        surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
+        surface.gl.useProgram(surface.renderer.program);
+        surface.gl.uniform1f(
+          surface.renderer.uniformLocations.uTime,
+          (performance.now() - surface.startedAt) / 1000,
+        );
+        surface.gl.activeTexture(surface.gl.TEXTURE0);
+        surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.fboTexture);
+        surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+      } else {
+        surface.gl.useProgram(surface.renderer.program);
+        surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "SecurityError") {
         rejectedElements.add(targetElement);
@@ -1101,9 +1117,7 @@ function createOverlay(settings) {
     const t = sx === 1 && sy === 1 ? "" : `scale(${sx},${sy})`;
     for (const surface of surfaces) {
       if (!surface.renderer.uniformLocations) continue;
-      surface.gl.useProgram(surface.renderer.program);
-      surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
-      surface.gl.uniform1f(surface.renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
+      applyFlipUniforms(surface.gl, surface.renderer, flipH, flipV);
       if (surface.targetElement instanceof HTMLVideoElement) {
         surface.targetElement.style.transformOrigin = "center";
         surface.targetElement.style.transform = t;
@@ -1784,19 +1798,30 @@ function getRecordingMimeType() {
   return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
-function applySettings(gl, program, uniformLocations, settings) {
-  if (!program || !uniformLocations) return;
-  gl.useProgram(program);
+function applySettings(gl, renderer, settings) {
+  if (!renderer) return;
+  if (renderer.pass1Program && renderer.pass1UniformLocations) {
+    gl.useProgram(renderer.pass1Program);
+    gl.uniform2f(renderer.pass1UniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
+    gl.uniform1f(renderer.pass1UniformLocations.uColorLevels, settings.colorLevels);
+    gl.uniform1f(renderer.pass1UniformLocations.uDitherStrength, settings.ditherStrength);
+    gl.uniform1f(renderer.pass1UniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
+    gl.uniform1f(renderer.pass1UniformLocations.uGlowStrength, settings.glowStrength);
+    gl.uniform1f(renderer.pass1UniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uToonSteps, settings.toonSteps ?? 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uEdgeBoost, settings.edgeBoost ?? 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uAnimeEdgeLow, settings.animeEdgeLow ?? 0.08);
+    gl.uniform1f(renderer.pass1UniformLocations.uAnimeEdgeHigh, settings.animeEdgeHigh ?? 0.55);
+    gl.uniform3f(renderer.pass1UniformLocations.uMonoTint, ...toShaderMonoTint(settings.monoTint));
+    gl.uniform1f(renderer.pass1UniformLocations.uNeonBoost, settings.neonBoost ?? 1);
+    gl.uniform1f(renderer.pass1UniformLocations.uNeonSaturation, settings.neonSaturation ?? 1);
+    gl.uniform1f(renderer.pass1UniformLocations.uNeonDetail, settings.neonDetail ?? 1);
+  }
+
+  if (!renderer.program || !renderer.uniformLocations) return;
+  const uniformLocations = renderer.uniformLocations;
+  gl.useProgram(renderer.program);
   gl.uniform2f(uniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
-  const phosphorDotInternalScale = settings.phosphorDotInternalScale ? 2 : 1;
-  gl.uniform2f(
-    uniformLocations.uSampleTargetSize,
-    settings.targetWidth * phosphorDotInternalScale,
-    settings.targetHeight * phosphorDotInternalScale,
-  );
-  gl.uniform1f(uniformLocations.uColorLevels, settings.colorLevels);
-  gl.uniform1f(uniformLocations.uDitherStrength, settings.ditherStrength);
-  gl.uniform1f(uniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
   gl.uniform1f(uniformLocations.uCurvature, settings.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, settings.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, settings.scanline2Strength);
@@ -1815,46 +1840,32 @@ function applySettings(gl, program, uniformLocations, settings) {
   gl.uniform1f(uniformLocations.uSaturationLow, settings.saturationLow ?? 0);
   gl.uniform1f(uniformLocations.uSaturationHigh, settings.saturationHigh ?? 1);
   gl.uniform1f(uniformLocations.uSaturationKnee, settings.saturationKnee ?? 0.2);
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotLightBalance,
-    settings.phosphorDotLightBalance ?? 1,
-  );
+  gl.uniform1f(uniformLocations.uPhosphorDotLightBalance, settings.phosphorDotLightBalance ?? 1);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(settings.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(settings.targetWidth, 1)),
   );
   gl.uniform1f(uniformLocations.uPhosphorDotMode, settings.phosphorDotMode ? 1 : 0);
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotInternalScale,
-    settings.phosphorDotInternalScale ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotBrightCore,
-    settings.phosphorDotBrightCore ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotCellFill,
-    settings.phosphorDotCellFill ?? 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotFlatDisc,
-    settings.phosphorDotFlatDisc ? 1 : 0,
-  );
-  gl.uniform1f(
-    uniformLocations.uPhosphorDotNeighborBlend,
-    settings.phosphorDotNeighborBlend ? 1 : 0,
-  );
+  gl.uniform1f(uniformLocations.uPhosphorDotInternalScale, settings.phosphorDotInternalScale ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotBrightCore, settings.phosphorDotBrightCore ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotCellFill, settings.phosphorDotCellFill ?? 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotFlatDisc, settings.phosphorDotFlatDisc ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotNeighborBlend, settings.phosphorDotNeighborBlend ? 1 : 0);
   gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, settings.closeUpNoiseStrength);
-  gl.uniform3f(uniformLocations.uMonoTint, ...toShaderMonoTint(settings.monoTint));
-  gl.uniform1f(uniformLocations.uNeonBoost, settings.neonBoost ?? 1);
-  gl.uniform1f(uniformLocations.uNeonSaturation, settings.neonSaturation ?? 1);
-  gl.uniform1f(uniformLocations.uNeonDetail, settings.neonDetail ?? 1);
-  gl.uniform1f(uniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
-  gl.uniform1f(uniformLocations.uToonSteps, settings.toonSteps ?? 0);
-  gl.uniform1f(uniformLocations.uEdgeBoost, settings.edgeBoost ?? 0);
-  gl.uniform1f(uniformLocations.uAnimeEdgeLow, settings.animeEdgeLow ?? 0.08);
-  gl.uniform1f(uniformLocations.uAnimeEdgeHigh, settings.animeEdgeHigh ?? 0.55);
+}
+
+function applyFlipUniforms(gl, renderer, flipH, flipV) {
+  if (renderer.pass1Program && renderer.pass1UniformLocations) {
+    gl.useProgram(renderer.pass1Program);
+    gl.uniform1f(renderer.pass1UniformLocations.uFlipH, flipH ? 1 : 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uFlipV, flipV ? 1 : 0);
+  }
+  if (renderer.program && renderer.uniformLocations) {
+    gl.useProgram(renderer.program);
+    gl.uniform1f(renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
+    gl.uniform1f(renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
+  }
 }
 
 async function loadLatestSettings(fallbackSettings) {
@@ -1911,18 +1922,23 @@ function setupRenderer(webgl, onReady) {
     }
   }
 
-  // --- Full filter program (async; D3D cache can block if checked immediately) ---
+  // --- Full filter programs (async; D3D cache can block if checked immediately) ---
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const fragmentShader = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT);
-  const prog = webgl.createProgram();
+  const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT_PASS1);
+  const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT_PASS2);
+  const prog1 = webgl.createProgram();
+  const prog2 = webgl.createProgram();
 
-  if (!prog) {
+  if (!prog1 || !prog2) {
     throw new Error("Failed to create WebGL program.");
   }
 
-  webgl.attachShader(prog, vertexShader);
-  webgl.attachShader(prog, fragmentShader);
-  webgl.linkProgram(prog);
+  webgl.attachShader(prog1, vertexShader);
+  webgl.attachShader(prog1, pass1Frag);
+  webgl.linkProgram(prog1);
+  webgl.attachShader(prog2, vertexShader);
+  webgl.attachShader(prog2, pass2Frag);
+  webgl.linkProgram(prog2);
 
   // CRITICAL: Do NOT call getProgramParameter here. On Windows/ANGLE, Chrome's
   // D3D GPU shader cache causes any readback during cache loading to freeze the
@@ -1966,8 +1982,14 @@ function setupRenderer(webgl, onReady) {
 
   const renderer = {
     program: passthruProg,
+    pass1Program: null,
     texture,
     uniformLocations: null,
+    pass1UniformLocations: null,
+    fbo: null,
+    fboTexture: null,
+    fboWidth: 0,
+    fboHeight: 0,
     cancel() {
       destroyed = true;
       if (!compiling) {
@@ -1986,8 +2008,9 @@ function setupRenderer(webgl, onReady) {
     if (ext) {
       await new Promise((resolve) => {
         const poll = () => {
-          const ready = webgl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR);
-          if (ready) {
+          const ready1 = webgl.getProgramParameter(prog1, ext.COMPLETION_STATUS_KHR);
+          const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
+          if (ready1 && ready2) {
             resolve();
             return;
           }
@@ -2008,8 +2031,14 @@ function setupRenderer(webgl, onReady) {
       return;
     }
 
-    if (!webgl.getProgramParameter(prog, webgl.LINK_STATUS)) {
-      console.error("[overlay] Filter shader link failed:", webgl.getProgramInfoLog(prog) || "unknown");
+    if (!webgl.getProgramParameter(prog1, webgl.LINK_STATUS)) {
+      console.error("[overlay] Filter shader link failed:", webgl.getProgramInfoLog(prog1) || "unknown");
+      compiling = false;
+      return;
+    }
+
+    if (!webgl.getProgramParameter(prog2, webgl.LINK_STATUS)) {
+      console.error("[overlay] Filter shader link failed:", webgl.getProgramInfoLog(prog2) || "unknown");
       compiling = false;
       return;
     }
@@ -2020,62 +2049,125 @@ function setupRenderer(webgl, onReady) {
       return;
     }
 
-    webgl.useProgram(prog);
-    webgl.uniform1i(webgl.getUniformLocation(prog, "uTexture"), 0);
-
-    renderer.uniformLocations = {
-      uTargetSize: webgl.getUniformLocation(prog, "uTargetSize"),
-      uSampleTargetSize: webgl.getUniformLocation(prog, "uSampleTargetSize"),
-      uColorLevels: webgl.getUniformLocation(prog, "uColorLevels"),
-      uDitherStrength: webgl.getUniformLocation(prog, "uDitherStrength"),
-      uPaletteMode: webgl.getUniformLocation(prog, "uPaletteMode"),
-      uCurvature: webgl.getUniformLocation(prog, "uCurvature"),
-      uScanlineStrength: webgl.getUniformLocation(prog, "uScanlineStrength"),
-      uScanline2Strength: webgl.getUniformLocation(prog, "uScanline2Strength"),
-      uScanlineBrightnessFade: webgl.getUniformLocation(prog, "uScanlineBrightnessFade"),
-      uVignetteStrength: webgl.getUniformLocation(prog, "uVignetteStrength"),
-      uGlowStrength: webgl.getUniformLocation(prog, "uGlowStrength"),
-      uPhosphorStrength: webgl.getUniformLocation(prog, "uPhosphorStrength"),
-      uSpotMaskStrength: webgl.getUniformLocation(prog, "uSpotMaskStrength"),
-      uBulbRadius: webgl.getUniformLocation(prog, "uBulbRadius"),
-      uBlackFloor: webgl.getUniformLocation(prog, "uBlackFloor"),
-      uLumaAmount: webgl.getUniformLocation(prog, "uLumaAmount"),
-      uLumaLow: webgl.getUniformLocation(prog, "uLumaLow"),
-      uLumaHigh: webgl.getUniformLocation(prog, "uLumaHigh"),
-      uLumaKnee: webgl.getUniformLocation(prog, "uLumaKnee"),
-      uSaturationAmount: webgl.getUniformLocation(prog, "uSaturationAmount"),
-      uSaturationLow: webgl.getUniformLocation(prog, "uSaturationLow"),
-      uSaturationHigh: webgl.getUniformLocation(prog, "uSaturationHigh"),
-      uSaturationKnee: webgl.getUniformLocation(prog, "uSaturationKnee"),
-      uPhosphorDotLightBalance: webgl.getUniformLocation(prog, "uPhosphorDotLightBalance"),
-      uPixelAspect: webgl.getUniformLocation(prog, "uPixelAspect"),
-      uPhosphorDotMode: webgl.getUniformLocation(prog, "uPhosphorDotMode"),
-      uPhosphorDotInternalScale: webgl.getUniformLocation(prog, "uPhosphorDotInternalScale"),
-      uPhosphorDotBrightCore: webgl.getUniformLocation(prog, "uPhosphorDotBrightCore"),
-      uPhosphorDotCellFill: webgl.getUniformLocation(prog, "uPhosphorDotCellFill"),
-      uPhosphorDotFlatDisc: webgl.getUniformLocation(prog, "uPhosphorDotFlatDisc"),
-      uPhosphorDotNeighborBlend: webgl.getUniformLocation(prog, "uPhosphorDotNeighborBlend"),
-      uCloseUpNoiseStrength: webgl.getUniformLocation(prog, "uCloseUpNoiseStrength"),
-      uMonoTint: webgl.getUniformLocation(prog, "uMonoTint"),
-      uNeonBoost: webgl.getUniformLocation(prog, "uNeonBoost"),
-      uNeonSaturation: webgl.getUniformLocation(prog, "uNeonSaturation"),
-      uNeonDetail: webgl.getUniformLocation(prog, "uNeonDetail"),
-      uSmoothStrength: webgl.getUniformLocation(prog, "uSmoothStrength"),
-      uToonSteps: webgl.getUniformLocation(prog, "uToonSteps"),
-      uEdgeBoost: webgl.getUniformLocation(prog, "uEdgeBoost"),
-      uAnimeEdgeLow: webgl.getUniformLocation(prog, "uAnimeEdgeLow"),
-      uAnimeEdgeHigh: webgl.getUniformLocation(prog, "uAnimeEdgeHigh"),
-      uTime: webgl.getUniformLocation(prog, "uTime"),
-      uFlipH: webgl.getUniformLocation(prog, "uFlipH"),
-      uFlipV: webgl.getUniformLocation(prog, "uFlipV"),
+    webgl.useProgram(prog1);
+    webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
+    renderer.pass1UniformLocations = {
+      uTargetSize: webgl.getUniformLocation(prog1, "uTargetSize"),
+      uColorLevels: webgl.getUniformLocation(prog1, "uColorLevels"),
+      uDitherStrength: webgl.getUniformLocation(prog1, "uDitherStrength"),
+      uPaletteMode: webgl.getUniformLocation(prog1, "uPaletteMode"),
+      uGlowStrength: webgl.getUniformLocation(prog1, "uGlowStrength"),
+      uSmoothStrength: webgl.getUniformLocation(prog1, "uSmoothStrength"),
+      uToonSteps: webgl.getUniformLocation(prog1, "uToonSteps"),
+      uEdgeBoost: webgl.getUniformLocation(prog1, "uEdgeBoost"),
+      uAnimeEdgeLow: webgl.getUniformLocation(prog1, "uAnimeEdgeLow"),
+      uAnimeEdgeHigh: webgl.getUniformLocation(prog1, "uAnimeEdgeHigh"),
+      uMonoTint: webgl.getUniformLocation(prog1, "uMonoTint"),
+      uNeonBoost: webgl.getUniformLocation(prog1, "uNeonBoost"),
+      uNeonSaturation: webgl.getUniformLocation(prog1, "uNeonSaturation"),
+      uNeonDetail: webgl.getUniformLocation(prog1, "uNeonDetail"),
+      uFlipH: webgl.getUniformLocation(prog1, "uFlipH"),
+      uFlipV: webgl.getUniformLocation(prog1, "uFlipV"),
     };
 
-    renderer.program = prog;
+    webgl.useProgram(prog2);
+    webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
+    renderer.uniformLocations = {
+      uTargetSize: webgl.getUniformLocation(prog2, "uTargetSize"),
+      uCurvature: webgl.getUniformLocation(prog2, "uCurvature"),
+      uScanlineStrength: webgl.getUniformLocation(prog2, "uScanlineStrength"),
+      uScanline2Strength: webgl.getUniformLocation(prog2, "uScanline2Strength"),
+      uScanlineBrightnessFade: webgl.getUniformLocation(prog2, "uScanlineBrightnessFade"),
+      uVignetteStrength: webgl.getUniformLocation(prog2, "uVignetteStrength"),
+      uGlowStrength: webgl.getUniformLocation(prog2, "uGlowStrength"),
+      uPhosphorStrength: webgl.getUniformLocation(prog2, "uPhosphorStrength"),
+      uSpotMaskStrength: webgl.getUniformLocation(prog2, "uSpotMaskStrength"),
+      uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
+      uBlackFloor: webgl.getUniformLocation(prog2, "uBlackFloor"),
+      uLumaAmount: webgl.getUniformLocation(prog2, "uLumaAmount"),
+      uLumaLow: webgl.getUniformLocation(prog2, "uLumaLow"),
+      uLumaHigh: webgl.getUniformLocation(prog2, "uLumaHigh"),
+      uLumaKnee: webgl.getUniformLocation(prog2, "uLumaKnee"),
+      uSaturationAmount: webgl.getUniformLocation(prog2, "uSaturationAmount"),
+      uSaturationLow: webgl.getUniformLocation(prog2, "uSaturationLow"),
+      uSaturationHigh: webgl.getUniformLocation(prog2, "uSaturationHigh"),
+      uSaturationKnee: webgl.getUniformLocation(prog2, "uSaturationKnee"),
+      uPhosphorDotLightBalance: webgl.getUniformLocation(prog2, "uPhosphorDotLightBalance"),
+      uPixelAspect: webgl.getUniformLocation(prog2, "uPixelAspect"),
+      uPhosphorDotMode: webgl.getUniformLocation(prog2, "uPhosphorDotMode"),
+      uPhosphorDotInternalScale: webgl.getUniformLocation(prog2, "uPhosphorDotInternalScale"),
+      uPhosphorDotBrightCore: webgl.getUniformLocation(prog2, "uPhosphorDotBrightCore"),
+      uPhosphorDotCellFill: webgl.getUniformLocation(prog2, "uPhosphorDotCellFill"),
+      uPhosphorDotFlatDisc: webgl.getUniformLocation(prog2, "uPhosphorDotFlatDisc"),
+      uPhosphorDotNeighborBlend: webgl.getUniformLocation(prog2, "uPhosphorDotNeighborBlend"),
+      uCloseUpNoiseStrength: webgl.getUniformLocation(prog2, "uCloseUpNoiseStrength"),
+      uTime: webgl.getUniformLocation(prog2, "uTime"),
+      uFlipH: webgl.getUniformLocation(prog2, "uFlipH"),
+      uFlipV: webgl.getUniformLocation(prog2, "uFlipV"),
+    };
+
+    renderer.pass1Program = prog1;
+    renderer.program = prog2;
     compiling = false;
     onReady?.(renderer);
   })();
 
   return renderer;
+}
+
+function ensureRendererFramebuffer(gl, renderer) {
+  if (
+    renderer.fbo &&
+    renderer.fboTexture &&
+    renderer.fboWidth === gl.drawingBufferWidth &&
+    renderer.fboHeight === gl.drawingBufferHeight
+  ) {
+    return;
+  }
+
+  if (renderer.fbo) {
+    gl.deleteFramebuffer(renderer.fbo);
+    renderer.fbo = null;
+  }
+  if (renderer.fboTexture) {
+    gl.deleteTexture(renderer.fboTexture);
+    renderer.fboTexture = null;
+  }
+
+  const texture = gl.createTexture();
+  if (!texture) {
+    throw new Error("Failed to create overlay FBO texture.");
+  }
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    gl.drawingBufferWidth,
+    gl.drawingBufferHeight,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    null,
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const fbo = gl.createFramebuffer();
+  if (!fbo) {
+    gl.deleteTexture(texture);
+    throw new Error("Failed to create overlay framebuffer.");
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  renderer.fbo = fbo;
+  renderer.fboTexture = texture;
+  renderer.fboWidth = gl.drawingBufferWidth;
+  renderer.fboHeight = gl.drawingBufferHeight;
 }
 
 function compileShader(webgl, type, source) {
