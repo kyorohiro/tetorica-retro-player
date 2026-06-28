@@ -940,6 +940,9 @@ function createOverlay(settings) {
 
   function applySettingsToSurfaces() {
     for (const surface of surfaces) {
+      if (!surface.gl || !surface.renderer) {
+        continue;
+      }
       applySettings(surface.gl, surface.renderer, currentSettings);
     }
   }
@@ -977,6 +980,24 @@ function createOverlay(settings) {
 
     surface.canvas.style.display = "block";
     surface.hideFailureOverlay();
+
+    if (!surface.gl || !surface.renderer) {
+      try {
+        surface.renderRaw(targetElement);
+        surface.didTargetChange = false;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "SecurityError") {
+          rejectedElements.add(targetElement);
+          surface.canvas.style.display = "none";
+          surface.showFailureOverlay(rect);
+          return;
+        }
+        console.warn("Failed to draw overlay source on 2d canvas.", error);
+        surface.hide();
+      }
+      return;
+    }
+
     surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
     surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
     surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
@@ -1040,8 +1061,20 @@ function createOverlay(settings) {
       if (!rejectedElements.has(targetElement)) {
         console.warn("Failed to upload overlay source to WebGL texture.", error);
       }
-      rejectedElements.add(targetElement);
-      surface.hide();
+      surface.fallbackTo2d(error);
+      try {
+        surface.renderRaw(targetElement);
+        surface.didTargetChange = false;
+      } catch (fallbackError) {
+        if (fallbackError instanceof DOMException && fallbackError.name === "SecurityError") {
+          rejectedElements.add(targetElement);
+          surface.canvas.style.display = "none";
+          surface.showFailureOverlay(rect);
+          return;
+        }
+        rejectedElements.add(targetElement);
+        surface.hide();
+      }
     }
   }
 
@@ -1208,7 +1241,7 @@ function createOverlay(settings) {
     const sy = flipV ? -1 : 1;
     const t = sx === 1 && sy === 1 ? "" : `scale(${sx},${sy})`;
     for (const surface of surfaces) {
-      if (!surface.renderer.uniformLocations) continue;
+      if (!surface.gl || !surface.renderer?.uniformLocations) continue;
       applyFlipUniforms(surface.gl, surface.renderer, flipH, flipV);
       if (surface.targetElement instanceof HTMLVideoElement) {
         surface.targetElement.style.transformOrigin = "center";
@@ -1699,24 +1732,24 @@ function createOverlaySurface(index, onReady) {
   failureOverlayLabel.style.boxShadow = "0 0 18px rgba(255, 180, 82, 0.16)";
   failureOverlay.append(failureOverlayLabel);
 
-  const gl = canvas.getContext("webgl2", {
+  let gl = canvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
     depth: false,
     stencil: false,
     preserveDrawingBuffer: false,
   });
-
-  if (!gl) {
-    throw new Error("WebGL2 is not available on this page.");
+  const ctx2d = gl ? null : canvas.getContext("2d");
+  let renderer = null;
+  if (gl) {
+    renderer = setupRenderer(gl, onReady);
   }
-
-  const renderer = setupRenderer(gl, onReady);
 
   return {
     canvas,
     failureOverlay,
     gl,
+    ctx2d,
     renderer,
     targetElement: null,
     startedAt: performance.now(),
@@ -1733,7 +1766,7 @@ function createOverlaySurface(index, onReady) {
       // cancel() defers loseContext() until after the D3D shader cache load
       // is done. Calling loseContext() while linkProgram is pending on
       // Windows/ANGLE blocks the JS main thread for ~3 s (the cache load).
-      renderer.cancel();
+      this.renderer?.cancel?.();
       canvas.remove();
       failureOverlay.remove();
     },
@@ -1780,6 +1813,26 @@ function createOverlaySurface(index, onReady) {
         canvas.width = width;
         canvas.height = height;
       }
+    },
+    renderRaw(targetElement) {
+      if (!this.ctx2d) {
+        return;
+      }
+      this.ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+      this.ctx2d.drawImage(targetElement, 0, 0, canvas.width, canvas.height);
+    },
+    fallbackTo2d(error) {
+      if (!this.ctx2d) {
+        const nextCtx = canvas.getContext("2d");
+        if (!nextCtx) {
+          throw error;
+        }
+        this.ctx2d = nextCtx;
+      }
+      this.renderer?.cancel?.();
+      this.renderer = null;
+      this.gl = null;
+      canvas.style.background = "transparent";
     },
     showFailureOverlay(rect) {
       failureOverlay.style.display = "flex";
@@ -2039,6 +2092,9 @@ function applySettings(gl, renderer, settings) {
 }
 
 function applyFlipUniforms(gl, renderer, flipH, flipV) {
+  if (!gl || !renderer) {
+    return;
+  }
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
     gl.uniform1f(renderer.pass1UniformLocations.uFlipH, flipH ? 1 : 0);
