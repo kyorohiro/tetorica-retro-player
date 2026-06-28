@@ -34,7 +34,7 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
-import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer } from "./mdrop-web/tauri";
+import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 
@@ -78,6 +78,9 @@ function App() {
   const [mDropPort, setMDropPort] = React.useState<number | null>(null);
   const [mDropIp, setMDropIp] = React.useState<string | null>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
+  const [isShareMode, setIsShareMode] = React.useState(false);
+  const isShareModeRef = React.useRef(isShareMode);
+  React.useEffect(() => { isShareModeRef.current = isShareMode; }, [isShareMode]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   type PlaylistItem = { kind: "file"; file: File } | { kind: "path"; url: string; path: string };
@@ -202,7 +205,8 @@ function App() {
 
         try {
           if (isMDropReadyRef.current) {
-            // mDrop ON: share all files, play single or show list
+            // mDrop ON: clear stale list first, then share new files
+            await mdropUnshareAll().catch(() => {});
             const raw = await Promise.all(paths.map((p) => mdropShareFile(p)));
             const sharedFiles = isFfmpegEnabledRef.current
               ? raw.map((f) => ({
@@ -685,7 +689,6 @@ function App() {
 
     if (isNativeMdropAvailable && isMDropReady) {
       const { open } = await import("@tauri-apps/plugin-dialog");
-      const { invoke } = await import("@tauri-apps/api/core");
       setIsMobileMenuOpen(false);
       const selected = await open({
         multiple: false,
@@ -696,6 +699,8 @@ function App() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
+      const { invoke } = await import("@tauri-apps/api/core");
+      await mdropUnshareAll().catch(() => {});
       const shared = await invoke<{ id: string; name: string; path: string; url: string }>(
         "mdrop_share_file",
         { req: { path: selected } }
@@ -775,6 +780,7 @@ function App() {
     if (isMDropReady) {
       await mdropStopServer().catch(() => {});
       setIsMDropReady(false);
+      setIsShareMode(false);
     } else {
       const status = await mdropStartServer({ hostname: "localhost", localOnly: true }).catch(() => null);
       setIsMDropReady(status?.running ?? false);
@@ -782,10 +788,34 @@ function App() {
         if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
         window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
         setMDropPort(status.port);
-        setMDropIp(status.ips?.[0] ?? null);
+        setMDropIp(null);
       }
     }
   }, [isMDropReady, isNativeMdropAvailable]);
+
+  const handleMDropWebToggle = useCallback(async () => {
+    if (!isNativeMdropAvailable) return;
+    const nextWeb = !isShareMode;
+    await mdropStopServer().catch(() => {});
+    const status = await mdropStartServer({
+      hostname: "localhost",
+      localOnly: true,
+      webEnabled: nextWeb,
+    }).catch(() => null);
+    setIsMDropReady(status?.running ?? false);
+    setIsShareMode(nextWeb);
+    if (status?.running && status.port) {
+      if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
+      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
+      setMDropPort(status.port);
+      setMDropIp(nextWeb ? (status.ips?.[0] ?? null) : null);
+    }
+  }, [isNativeMdropAvailable, isShareMode]);
+
+  const { isHolding: isMDropHolding, ...mDropLongPressHandlers } = useLongPress(
+    useCallback(() => { void handleMDropWebToggle(); }, [handleMDropWebToggle]),
+    useCallback(() => { void handleMDropToggle(); }, [handleMDropToggle]),
+  );
 
   const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
     setLocalePreference(nextPreference);
@@ -862,20 +892,32 @@ function App() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              aria-label={isMDropReady ? "mDrop: ON" : "mDrop: OFF"}
+              aria-label={isMDropReady ? (isShareMode ? "mDrop: Share" : "mDrop: ON") : "mDrop: OFF"}
               title={locale === "ja"
-                ? isMDropReady ? "mDrop サーバー: 起動中 (クリックで停止)" : "mDrop サーバー: 停止中 (クリックで起動)"
-                : isMDropReady ? "mDrop server: running (click to stop)" : "mDrop server: stopped (click to start)"}
-              onClick={() => { void handleMDropToggle(); }}
+                ? isMDropReady
+                  ? isShareMode
+                    ? "mDrop シェアモード: ON (長押しで OFF)"
+                    : "mDrop サーバー: 起動中 (クリックで停止 / 長押しでシェアモード ON)"
+                  : "mDrop サーバー: 停止中 (クリックで起動)"
+                : isMDropReady
+                  ? isShareMode
+                    ? "mDrop share mode: ON (long press to disable)"
+                    : "mDrop server: running (click to stop / long press for share mode)"
+                  : "mDrop server: stopped (click to start)"}
+              {...mDropLongPressHandlers}
               className={[
                 "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
-                isMDropReady
+                isMDropHolding
+                  ? "border-amber-400/80 bg-amber-500/30 text-amber-700"
+                  : isMDropReady && isShareMode
+                  ? "border-amber-400/80 bg-amber-500/20 text-amber-700 hover:bg-amber-500/30"
+                  : isMDropReady
                   ? "border-emerald-400/80 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30"
                   : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
               ].join(" ")}
             >
               <Wifi size={13} />
-              <span>mDrop</span>
+              <span>mDrop{isShareMode ? " ↑" : ""}</span>
             </button>
             {isMDropReady && (
               <button

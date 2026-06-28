@@ -43,6 +43,7 @@ export interface StartServerRequest {
   password?: string;
   isHttps?: boolean;
   localOnly?: boolean;
+  webEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
