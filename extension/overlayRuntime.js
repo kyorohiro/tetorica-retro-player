@@ -402,7 +402,6 @@ function createOverlay(settings) {
   let lastHoveredElement = null;
   let lastHoveredDRMVideo = null;
   let activePrimaryTarget = null;
-  let rendererInitFailed = false;
 
   const BRIGHTNESS_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 2.0];
   const BRIGHTNESS_DEFAULT_IDX = 5; // 1.0
@@ -774,15 +773,7 @@ function createOverlay(settings) {
     updateButtonPositions(primaryRect);
     updateFallbackFrame(primaryRect);
 
-    if (!rendererInitFailed) {
-      try {
-        syncSurfaceCount(currentSettings.overlayTargetCount);
-      } catch (error) {
-        rendererInitFailed = true;
-        console.warn("Overlay renderer initialization failed; keeping control UI active.", error);
-        destroySurfaces();
-      }
-    }
+    syncSurfaceCount(currentSettings.overlayTargetCount);
 
     for (let index = 0; index < surfaces.length; index += 1) {
       const surface = surfaces[index];
@@ -1739,10 +1730,16 @@ function createOverlaySurface(index, onReady) {
     stencil: false,
     preserveDrawingBuffer: false,
   });
-  const ctx2d = gl ? null : canvas.getContext("2d");
+  let ctx2d = gl ? null : canvas.getContext("2d");
   let renderer = null;
   if (gl) {
-    renderer = setupRenderer(gl, onReady);
+    try {
+      renderer = setupRenderer(gl, onReady);
+    } catch (error) {
+      console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
+      gl = null;
+      ctx2d = canvas.getContext("2d");
+    }
   }
 
   return {
