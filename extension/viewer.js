@@ -880,28 +880,14 @@ function setupRenderer(webgl) {
 }
 
 async function finalizeFilterProgram(webgl, prog) {
-  // On Windows/Chrome (the only environment this extension runs in), the D3D
-  // shader cache causes linkProgram to load pre-compiled DXBC bytecode in the
-  // GPU process. Any getProgramParameter call during this window blocks the JS
-  // main thread — causing a visible freeze. Wait 3 s via setTimeout (not RAF)
-  // so the GPU process finishes loading before we issue any read-back command.
-  const ext =
-    webgl.getExtension("WEBGL_parallel_shader_compile") ??
-    webgl.getExtension("KHR_parallel_shader_compile");
-
-  if (ext) {
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    await new Promise((resolve) => {
-      const poll = () => {
-        if (webgl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR)) resolve();
-        else requestAnimationFrame(poll);
-      };
-      requestAnimationFrame(poll);
-    });
-  } else {
-    // Non-Chromium fallback: yield one frame then block briefly on LINK_STATUS.
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  }
+  // On Windows/Chrome ANGLE, calling getProgramParameter immediately after
+  // linkProgram blocks the JS main thread while the GPU process loads
+  // pre-compiled DXBC bytecode from the D3D shader cache (~3 s on first load).
+  // Wait 3 s via setTimeout (not RAF) so the GPU process finishes loading
+  // before we issue the read-back. COMPLETION_STATUS_KHR is intentionally NOT
+  // used here: on some Windows/ANGLE configurations it never returns true for
+  // large shaders, causing the filter to never be applied.
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 
   if (!webgl.getProgramParameter(prog, webgl.LINK_STATUS)) {
     const message = webgl.getProgramInfoLog(prog) || "Unknown program link error.";
