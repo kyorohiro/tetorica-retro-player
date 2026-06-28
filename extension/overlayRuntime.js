@@ -953,15 +953,27 @@ function createOverlay(settings) {
 
     surface.updateTarget(targetElement);
     surface.syncRect(rect);
+    const drawableSource = surface.getDrawableSource(targetElement);
 
     if (shouldUseDirectVideoFallback(targetElement)) {
-      surface.hide();
-      surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
-      surface.didTargetChange = false;
+      surface.fallbackTo2d(new Error("Direct raw overlay fallback"));
+      if (!drawableSource) {
+        surface.canvas.style.display = "none";
+        surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
+        return;
+      }
+      try {
+        surface.canvas.style.display = "block";
+        surface.hideFailureOverlay();
+        surface.renderRaw(drawableSource);
+        surface.didTargetChange = false;
+      } catch (error) {
+        surface.canvas.style.display = "none";
+        surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
+      }
       return;
     }
 
-    const drawableSource = surface.getDrawableSource(targetElement);
     if (!drawableSource) {
       surface.canvas.style.display = "block";
       surface.hideFailureOverlay();
