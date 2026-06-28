@@ -1979,12 +1979,27 @@ function setupRenderer(webgl, onReady) {
   };
 
   (async () => {
-    // Wait 3 s before reading back: on Windows/Chrome ANGLE, calling
-    // getProgramParameter immediately after linkProgram blocks while the GPU
-    // process loads pre-compiled DXBC bytecode from the D3D shader cache.
-    // COMPLETION_STATUS_KHR is intentionally NOT used here — on some
-    // Windows/ANGLE configurations it never returns true for large shaders.
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const ext =
+      webgl.getExtension("WEBGL_parallel_shader_compile")
+      || webgl.getExtension("KHR_parallel_shader_compile");
+
+    if (ext) {
+      await new Promise((resolve) => {
+        const poll = () => {
+          const ready = webgl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR);
+          if (ready) {
+            resolve();
+            return;
+          }
+          requestAnimationFrame(poll);
+        };
+        requestAnimationFrame(poll);
+      });
+    } else {
+      // Chromium should normally expose parallel shader compile. Keep a small
+      // fallback for unexpected runtimes instead of breaking the overlay.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
 
     if (destroyed) {
       // Surface was torn down during the wait; loseContext() is now safe.
