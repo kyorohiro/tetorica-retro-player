@@ -853,6 +853,14 @@ function createOverlay(settings) {
       }
     }
 
+    if (targets.length === 0 && currentSettings.overlayVideo) {
+      appendUniqueDrawableTarget(targets, findLargestVisibleVideoElement({ relaxed: true }), { relaxed: true });
+    }
+
+    if (targets.length === 0 && currentSettings.overlayImage) {
+      appendUniqueDrawableTarget(targets, findLargestVisibleImageElement({ relaxed: true }), { relaxed: true });
+    }
+
     return targets.slice(0, currentSettings.overlayTargetCount);
   }
 
@@ -1514,6 +1522,38 @@ function findPrimaryDrawableElement() {
   return findAutoDrawableTargets(_autoDrawableCacheFrame)[0] ?? null;
 }
 
+function findLargestVisibleVideoElement(options = {}) {
+  const { relaxed = false } = options;
+  const candidates = [...document.querySelectorAll("video")]
+    .filter((element) =>
+      element instanceof HTMLVideoElement
+      && isVisibleMediaRect(element)
+      && (relaxed ? isRelaxedVideoCandidate(element) : isUsableVideo(element)));
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort(compareElementAreaDesc);
+  return candidates[0] ?? null;
+}
+
+function findLargestVisibleImageElement(options = {}) {
+  const { relaxed = false } = options;
+  const candidates = [...document.querySelectorAll("img")]
+    .filter((element) =>
+      element instanceof HTMLImageElement
+      && isVisibleMediaRect(element)
+      && (relaxed ? isRelaxedImageCandidate(element) : isUsableImage(element)));
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort(compareElementAreaDesc);
+  return candidates[0] ?? null;
+}
+
 function findPreferredHoverElement(clientX, clientY) {
   const hoveredImage = findHoveredImage(clientX, clientY);
   if (hoveredImage) {
@@ -1541,8 +1581,21 @@ function findAutoDrawableTargets(frameCount) {
   return _autoDrawableCache;
 }
 
-function appendUniqueDrawableTarget(targets, candidate) {
-  if (!candidate || !isDrawableElement(candidate) || targets.includes(candidate)) {
+function compareElementAreaDesc(a, b) {
+  const rectA = a.getBoundingClientRect();
+  const rectB = b.getBoundingClientRect();
+  return (rectB.width * rectB.height) - (rectA.width * rectA.height);
+}
+
+function isVisibleMediaRect(element) {
+  const rect = element.getBoundingClientRect();
+  return rect.width > 32 && rect.height > 32 && isInViewport(element);
+}
+
+function appendUniqueDrawableTarget(targets, candidate, options = {}) {
+  const { relaxed = false } = options;
+  const isDrawable = relaxed ? isRelaxedDrawableElement(candidate) : isDrawableElement(candidate);
+  if (!candidate || !isDrawable || targets.includes(candidate)) {
     return;
   }
 
@@ -1801,6 +1854,18 @@ function isDrawableElement(candidate) {
   return false;
 }
 
+function isRelaxedDrawableElement(candidate) {
+  if (candidate instanceof HTMLVideoElement) {
+    return isRelaxedVideoCandidate(candidate);
+  }
+
+  if (candidate instanceof HTMLImageElement) {
+    return isRelaxedImageCandidate(candidate);
+  }
+
+  return false;
+}
+
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
   const rect = candidate.getBoundingClientRect();
@@ -1815,6 +1880,12 @@ function isUsableVideo(candidate) {
     (hasVisiblePixels || hasEnoughMediaState);
 }
 
+function isRelaxedVideoCandidate(candidate) {
+  if (!(candidate instanceof HTMLVideoElement)) return false;
+  if (!isVisibleMediaRect(candidate)) return false;
+  return !!candidate.currentSrc || !!candidate.srcObject || candidate.readyState >= HTMLMediaElement.HAVE_NOTHING;
+}
+
 function isUsableImage(candidate) {
   if (!(candidate instanceof HTMLImageElement)) return false;
   if (!candidate.complete || candidate.naturalWidth < 1 || candidate.naturalHeight < 1) {
@@ -1822,6 +1893,12 @@ function isUsableImage(candidate) {
   }
   const rect = candidate.getBoundingClientRect();
   return rect.width > 32 && rect.height > 32;
+}
+
+function isRelaxedImageCandidate(candidate) {
+  if (!(candidate instanceof HTMLImageElement)) return false;
+  if (!isVisibleMediaRect(candidate)) return false;
+  return !!candidate.currentSrc || !!candidate.src;
 }
 
 function getElementAudioStream(targetElement) {
