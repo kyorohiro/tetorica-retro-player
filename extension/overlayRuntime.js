@@ -1758,6 +1758,9 @@ function createOverlaySurface(index, onReady) {
     proxyTargetElement: null,
     proxyVideo: null,
     proxyStream: null,
+    proxyImageCapture: null,
+    proxyBitmap: null,
+    proxyFramePending: false,
     proxyReady: false,
     startedAt: performance.now(),
     lastRectKey: "",
@@ -1847,6 +1850,7 @@ function createOverlaySurface(index, onReady) {
 
       try {
         const stream = captureStream();
+        const videoTrack = stream.getVideoTracks()[0] ?? null;
         const proxyVideo = document.createElement("video");
         proxyVideo.muted = true;
         proxyVideo.autoplay = true;
@@ -1861,9 +1865,38 @@ function createOverlaySurface(index, onReady) {
         this.proxyTargetElement = targetElement;
         this.proxyStream = stream;
         this.proxyVideo = proxyVideo;
+        this.proxyImageCapture =
+          typeof ImageCapture !== "undefined" && videoTrack
+            ? new ImageCapture(videoTrack)
+            : null;
       } catch {}
     },
+    requestProxyBitmapFrame() {
+      if (!this.proxyImageCapture || this.proxyFramePending) {
+        return;
+      }
+      this.proxyFramePending = true;
+      void this.proxyImageCapture.grabFrame()
+        .then((bitmap) => {
+          if (this.proxyBitmap && this.proxyBitmap !== bitmap) {
+            try {
+              this.proxyBitmap.close();
+            } catch {}
+          }
+          this.proxyBitmap = bitmap;
+          this.proxyReady = true;
+        })
+        .catch(() => {})
+        .finally(() => {
+          this.proxyFramePending = false;
+        });
+    },
     disposeProxyVideo() {
+      if (this.proxyBitmap) {
+        try {
+          this.proxyBitmap.close();
+        } catch {}
+      }
       if (this.proxyVideo) {
         try {
           this.proxyVideo.pause();
@@ -1878,6 +1911,9 @@ function createOverlaySurface(index, onReady) {
       this.proxyTargetElement = null;
       this.proxyVideo = null;
       this.proxyStream = null;
+      this.proxyImageCapture = null;
+      this.proxyBitmap = null;
+      this.proxyFramePending = false;
       this.proxyReady = false;
     },
     getDrawableSource(targetElement) {
@@ -1887,6 +1923,10 @@ function createOverlaySurface(index, onReady) {
         && targetElement.mediaKeys == null
         && this.proxyTargetElement === targetElement
       ) {
+        this.requestProxyBitmapFrame();
+        if (this.proxyBitmap) {
+          return this.proxyBitmap;
+        }
         if (
           this.proxyVideo
           && (this.proxyReady || this.proxyVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
