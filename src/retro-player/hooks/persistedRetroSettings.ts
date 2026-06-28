@@ -77,6 +77,7 @@ export type PersistedRetroAudioSettings = {
   tapeSaturationAmount: number;
   compressorAmount: number;
   fxOutputTrimAmount: number;
+  inputTrimAmount: number;
 };
 
 export type PersistedRetroUiSettings = {

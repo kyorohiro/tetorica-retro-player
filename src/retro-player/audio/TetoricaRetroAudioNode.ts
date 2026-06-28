@@ -153,6 +153,7 @@ export class TetoricaRetroAudioNode {
     tapeSaturator: null as WaveShaperNode | null,
     busCompressor: null as DynamicsCompressorNode | null,
     fxOutputGain: null as GainNode | null,
+    inputTrimGain: null as GainNode | null,
     analyser: null as AnalyserNode | null,
   };
 
@@ -174,7 +175,7 @@ export class TetoricaRetroAudioNode {
   }
 
   get input() {
-    return this.nodes.wowFlutterDelay ?? this.nodes.lofiLowpass;
+    return this.nodes.inputTrimGain ?? this.nodes.wowFlutterDelay ?? this.nodes.lofiLowpass;
   }
 
   get output() {
@@ -639,6 +640,13 @@ export class TetoricaRetroAudioNode {
         ? settings.fxOutputTrimAmount
         : 1;
     }
+
+    const inputTrimGain = this.nodes.inputTrimGain;
+    if (inputTrimGain) {
+      inputTrimGain.gain.value = settings.isAudioFxEnabled
+        ? settings.inputTrimAmount
+        : 1;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -722,6 +730,7 @@ export class TetoricaRetroAudioNode {
     const chorusLfoGain2 = context.createGain();
     const chorusWetGain = context.createGain();
     const fxOutputGain = context.createGain();
+    const inputTrimGain = context.createGain();
     const analyser = context.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
@@ -785,6 +794,7 @@ export class TetoricaRetroAudioNode {
     chorusLfoGain2.gain.value = 0;
     chorusWetGain.gain.value = 0;
     fxOutputGain.gain.value = 1;
+    inputTrimGain.gain.value = 1;
     masterGain.gain.value = 0;
     noiseGain.gain.value = 0;
     noiseSource.buffer = createTintedNoiseBuffer(context);
@@ -825,6 +835,7 @@ export class TetoricaRetroAudioNode {
     flutterLfo.connect(flutterLfoGain);
     flutterLfoGain.connect(wowFlutterDelay.delayTime);
 
+    inputTrimGain.connect(wowFlutterDelay);
     wowFlutterDelay.connect(radioToneHighpass);
     radioToneHighpass.connect(radioToneLowpass);
     radioToneLowpass.connect(radioTonePresence);
@@ -946,6 +957,7 @@ export class TetoricaRetroAudioNode {
       tapeSaturator,
       busCompressor,
       fxOutputGain,
+      inputTrimGain,
       analyser,
     };
   }

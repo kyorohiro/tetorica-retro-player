@@ -74,6 +74,8 @@ export type RetroControlPlayerSlice = {
   setTapeSaturationAmount: (v: number) => void;
   setCompressorAmount: (v: number) => void;
   setFxOutputTrimAmount: (v: number) => void;
+  inputTrimAmount: number;
+  setInputTrimAmount: (v: number) => void;
   changePlaybackRate: (v: number) => void;
   changeVolume: (v: number) => void;
   seekTo: (time: number) => void;
@@ -221,6 +223,8 @@ export function RetroControlPanel({
               onChangeTapeSaturationAmount={player.setTapeSaturationAmount}
               onChangeCompressorAmount={player.setCompressorAmount}
               onChangeFxOutputTrimAmount={player.setFxOutputTrimAmount}
+              inputTrimAmount={player.inputTrimAmount}
+              onChangeInputTrimAmount={player.setInputTrimAmount}
               onChangePlaybackRate={player.changePlaybackRate}
               onChangeVolume={player.changeVolume}
               onRestart={() => {

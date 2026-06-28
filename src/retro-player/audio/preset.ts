@@ -28,6 +28,7 @@ export type RetroAudioSettings = {
   tapeSaturationAmount: number;
   compressorAmount: number;
   fxOutputTrimAmount: number;
+  inputTrimAmount: number;
 };
 
 export const DEFAULT_AUDIO_SETTINGS = {
@@ -60,6 +61,7 @@ export const DEFAULT_AUDIO_SETTINGS = {
   tapeSaturationAmount: 0,
   compressorAmount: 0,
   fxOutputTrimAmount: 0.66,
+  inputTrimAmount: 1.0,
 } as const satisfies RetroAudioSettings;
 
 export type RetroAudioPresetKey =

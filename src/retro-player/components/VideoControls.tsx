@@ -66,6 +66,7 @@ type VideoControlsProps = {
   tapeSaturationAmount: number;
   compressorAmount: number;
   fxOutputTrimAmount: number;
+  inputTrimAmount: number;
   playbackRate: number;
   volume: number;
   onChangeLofiAmount: (amount: number) => void;
@@ -90,6 +91,7 @@ type VideoControlsProps = {
   onChangeTapeSaturationAmount: (amount: number) => void;
   onChangeCompressorAmount: (amount: number) => void;
   onChangeFxOutputTrimAmount: (amount: number) => void;
+  onChangeInputTrimAmount: (amount: number) => void;
   onChangePlaybackRate: (rate: number) => void;
   onChangeVolume: (volume: number) => void;
   onRestart: () => void;
@@ -161,6 +163,7 @@ export const VideoControls = memo(function VideoControls({
   tapeSaturationAmount,
   compressorAmount,
   fxOutputTrimAmount,
+  inputTrimAmount,
   playbackRate,
   volume,
   onChangeLofiAmount,
@@ -185,6 +188,7 @@ export const VideoControls = memo(function VideoControls({
   onChangeTapeSaturationAmount,
   onChangeCompressorAmount,
   onChangeFxOutputTrimAmount,
+  onChangeInputTrimAmount,
   onChangePlaybackRate,
   onChangeVolume,
   onRestart: _onRestart,
@@ -341,6 +345,7 @@ export const VideoControls = memo(function VideoControls({
     onChangeTapeSaturationAmount(presetSettings.tapeSaturationAmount);
     onChangeCompressorAmount(presetSettings.compressorAmount);
     onChangeFxOutputTrimAmount(presetSettings.fxOutputTrimAmount);
+    onChangeInputTrimAmount(presetSettings.inputTrimAmount);
   };
 
   if (mode === "audio-settings") {
@@ -692,7 +697,7 @@ export const VideoControls = memo(function VideoControls({
 
         <div className="rounded-xl border border-[#cac0b2] bg-[#eae6df] p-3">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7268]">
-            Output
+            Output / Input
           </p>
           <div className="space-y-3">
             <div>
@@ -768,6 +773,24 @@ export const VideoControls = memo(function VideoControls({
                 value={fxOutputTrimAmount}
                 onChange={(ev) => {
                   onChangeFxOutputTrimAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+                <span>Input Trim</span>
+                <span>{Math.round(inputTrimAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={inputTrimAmount}
+                onChange={(ev) => {
+                  onChangeInputTrimAmount(Number(ev.currentTarget.value));
                 }}
                 className="w-full"
               />
