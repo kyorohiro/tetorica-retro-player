@@ -847,7 +847,7 @@ export class TetoricaRetroVideoPipeline {
     const uploadSource = this.getUploadSource(source, filterState);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
-    const textureFilter = filterState.isFilterEnabled ? gl.LINEAR : gl.NEAREST;
+    const textureFilter = gl.NEAREST;
     this.syncTextureSamplingFilter(textureFilter);
     if (isRawRetroVideoFrame(uploadSource)) {
       gl.texImage2D(
