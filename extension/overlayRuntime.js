@@ -1803,10 +1803,16 @@ function isDrawableElement(candidate) {
 
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
-  if (candidate.mediaKeys != null) return false;
-  if (!candidate.seeking && candidate.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
   const rect = candidate.getBoundingClientRect();
-  return rect.width > 32 && rect.height > 32;
+  const hasVisiblePixels =
+    candidate.videoWidth > 0 &&
+    candidate.videoHeight > 0;
+  const hasEnoughMediaState =
+    candidate.seeking ||
+    candidate.readyState >= HTMLMediaElement.HAVE_METADATA;
+  return rect.width > 32 &&
+    rect.height > 32 &&
+    (hasVisiblePixels || hasEnoughMediaState);
 }
 
 function isUsableImage(candidate) {
