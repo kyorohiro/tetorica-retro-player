@@ -1,5 +1,4 @@
 import { memo, useCallback, useRef, useState } from "react";
-import { AudioSpectrum } from "./AudioSpectrum";
 import { useLongPress } from "../hooks/useLongPress";
 import {
   ChevronsRight,
@@ -144,7 +143,7 @@ export const VideoControls = memo(function VideoControls({
   isVideoFxEnabled,
   isNoiseEnabled,
   hasVideo,
-  analyserRef,
+  analyserRef: _analyserRef,
   isVideoSettingsOpen,
   lofiAmount,
   radioToneAmount,
@@ -375,10 +374,6 @@ export const VideoControls = memo(function VideoControls({
             Back to Playback
           </button>
         </div>
-
-        {!hasVideo && analyserRef && (
-          <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-[#1a1814]" />
-        )}
 
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -944,9 +939,6 @@ export const VideoControls = memo(function VideoControls({
       />
       {hasPlayback && (
         <>
-          {!hasVideo && analyserRef && (
-            <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-[#1a1814]" />
-          )}
           <div>
             <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
               <span>{formatTime(currentTime)}</span>
