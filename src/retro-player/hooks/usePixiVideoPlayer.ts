@@ -278,6 +278,8 @@ export function usePixiVideoPlayer(
     setCompressorAmount,
     fxOutputTrimAmount,
     setFxOutputTrimAmount,
+    inputTrimAmount,
+    setInputTrimAmount,
     debugAudio,
     ensureAudioContext,
     ensureAudioContextWithRecovery,
@@ -1087,6 +1089,8 @@ export function usePixiVideoPlayer(
     setCompressorAmount,
     fxOutputTrimAmount,
     setFxOutputTrimAmount,
+    inputTrimAmount,
+    setInputTrimAmount,
     hasPlayableMedia:
       previewKind === "video" || previewKind === "audio" || previewKind === "capture",
     hasAudibleMedia,
