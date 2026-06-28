@@ -936,7 +936,6 @@ function createOverlay(settings) {
       }
       applySettings(surface.gl, surface.renderer, currentSettings);
     }
-    syncDirectVideoFallbackStyles();
   }
 
   function renderSurface(surface, targetElement, rect, priorityIndex) {
@@ -956,10 +955,8 @@ function createOverlay(settings) {
     surface.syncRect(rect);
 
     if (shouldUseDirectVideoFallback(targetElement)) {
-      surface.canvas.style.display = "block";
-      surface.hideFailureOverlay();
-      applyDirectVideoFallback(targetElement);
-      surface.renderDirectFallbackOverlay(currentSettings, rect, brightnessIdx);
+      surface.hide();
+      surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
       surface.didTargetChange = false;
       return;
     }
@@ -1408,37 +1405,13 @@ function createOverlay(settings) {
     const filterValue = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${level})` : "";
     for (const surface of surfaces) {
       surface.canvas.style.filter = filterValue;
-      if (surface.targetElement instanceof HTMLVideoElement && !shouldUseDirectVideoFallback(surface.targetElement)) {
+      if (surface.targetElement instanceof HTMLVideoElement) {
         surface.targetElement.style.filter = filterValue;
       }
     }
     if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
       lastHoveredDRMVideo.style.filter = filterValue;
     }
-    syncDirectVideoFallbackStyles();
-  }
-
-  function syncDirectVideoFallbackStyles() {
-    for (const surface of surfaces) {
-      if (shouldUseDirectVideoFallback(surface.targetElement)) {
-        applyDirectVideoFallback(surface.targetElement);
-      }
-    }
-    if (shouldUseDirectVideoFallback(activePrimaryTarget)) {
-      applyDirectVideoFallback(activePrimaryTarget);
-    }
-  }
-
-  function applyDirectVideoFallback(targetElement) {
-    if (!shouldUseDirectVideoFallback(targetElement)) {
-      return;
-    }
-
-    targetElement.style.setProperty("filter", buildDirectVideoFallbackFilter(currentSettings, brightnessIdx), "important");
-    targetElement.style.transformOrigin = "center";
-    const sx = flipH ? -1 : 1;
-    const sy = flipV ? -1 : 1;
-    targetElement.style.transform = sx === 1 && sy === 1 ? "" : `scale(${sx},${sy})`;
   }
 
   function activateLoop() {
@@ -1625,6 +1598,7 @@ function createOverlay(settings) {
     fallbackFrame.style.top = `${activeRect.top}px`;
     fallbackFrame.style.width = `${activeRect.width}px`;
     fallbackFrame.style.height = `${activeRect.height}px`;
+    fallbackFrame.style.background = "";
   }
 }
 
@@ -1832,6 +1806,7 @@ function createOverlaySurface(index, onReady) {
       this.lastRectKey = "";
       this.didTargetChange = true;
       this.hideFailureOverlay();
+      this.setFailureMessage("Cross-origin image");
       this.ensureProxyVideo(nextTarget);
     },
     syncRect(rect) {
@@ -1986,89 +1961,12 @@ function createOverlaySurface(index, onReady) {
       this.ctx2d.clearRect(0, 0, canvas.width, canvas.height);
       this.ctx2d.drawImage(drawableSource, 0, 0, canvas.width, canvas.height);
     },
-    ensure2dContext() {
-      if (!this.ctx2d) {
-        this.ctx2d = canvas.getContext("2d");
-      }
-    },
-    renderDirectFallbackOverlay(settings, rect, brightnessIdx) {
-      this.ensure2dContext();
-      if (!this.ctx2d) {
-        return;
-      }
-
-      const ctx = this.ctx2d;
-      const width = canvas.width;
-      const height = canvas.height;
-      const dpr = window.devicePixelRatio || 1;
-      ctx.clearRect(0, 0, width, height);
-
-      const scanlineStrength = Math.max(0, settings.scanlineStrength ?? 0);
-      const scanline2Strength = Math.max(0, settings.scanline2Strength ?? 0);
-      const vignetteStrength = Math.max(0, settings.vignetteStrength ?? 0);
-      const glowStrength = Math.max(0, settings.glowStrength ?? 0);
-      const brightness = BRIGHTNESS_PRESETS[brightnessIdx] ?? 1;
-
-      if (scanlineStrength > 0.01 || scanline2Strength > 0.01) {
-        const lineGap = Math.max(2, Math.round(3 * dpr));
-        const darkAlpha = Math.min(0.28, 0.04 + scanlineStrength * 0.18);
-        const brightAlpha = Math.min(0.18, scanline2Strength * 0.12);
-        ctx.fillStyle = `rgba(0, 0, 0, ${darkAlpha})`;
-        for (let y = 0; y < height; y += lineGap) {
-          ctx.fillRect(0, y, width, 1);
-        }
-        if (brightAlpha > 0.001) {
-          ctx.fillStyle = `rgba(220, 255, 180, ${brightAlpha})`;
-          for (let y = Math.floor(lineGap / 2); y < height; y += lineGap) {
-            ctx.fillRect(0, y, width, 1);
-          }
-        }
-      }
-
-      if (
-        settings.paletteMode === "pc98"
-        || settings.paletteMode === "pc98_tile"
-        || settings.paletteMode === "pc98_512"
-        || settings.paletteMode === "pc98_512_sat"
-        || settings.paletteMode === "pc98_4096"
-      ) {
-        const dotGap = Math.max(4, Math.round(6 * dpr));
-        ctx.fillStyle = "rgba(255, 170, 110, 0.06)";
-        for (let y = 0; y < height; y += dotGap) {
-          for (let x = 0; x < width; x += dotGap) {
-            ctx.fillRect(x, y, 1, 1);
-          }
-        }
-      }
-
-      if (settings.paletteMode === "mono") {
-        ctx.fillStyle = "rgba(210, 235, 180, 0.08)";
-        ctx.fillRect(0, 0, width, height);
-      } else if (settings.paletteMode === "neon") {
-        ctx.fillStyle = "rgba(120, 255, 220, 0.07)";
-        ctx.fillRect(0, 0, width, height);
-      }
-
-      if (vignetteStrength > 0.01 || glowStrength > 0.01) {
-        const vignetteAlpha = Math.min(0.4, vignetteStrength * 0.22 + glowStrength * 0.04);
-        const gradient = ctx.createRadialGradient(
-          width * 0.5,
-          height * 0.5,
-          Math.min(width, height) * 0.18,
-          width * 0.5,
-          height * 0.5,
-          Math.max(width, height) * 0.72,
-        );
-        gradient.addColorStop(0, `rgba(255,255,255,${Math.max(0, (brightness - 1) * 0.04)})`);
-        gradient.addColorStop(0.68, "rgba(0,0,0,0)");
-        gradient.addColorStop(1, `rgba(0,0,0,${vignetteAlpha})`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-      }
+    setFailureMessage(message) {
+      failureOverlayLabel.textContent = message;
     },
     fallbackTo2d(error) {
       if (!this.ctx2d) {
-        this.ensure2dContext();
+        this.ctx2d = canvas.getContext("2d");
         if (!this.ctx2d) {
           throw error;
         }
@@ -2078,7 +1976,10 @@ function createOverlaySurface(index, onReady) {
       this.gl = null;
       canvas.style.background = "transparent";
     },
-    showFailureOverlay(rect) {
+    showFailureOverlay(rect, message = null) {
+      if (message) {
+        this.setFailureMessage(message);
+      }
       failureOverlay.style.display = "flex";
       failureOverlay.style.left = `${rect.left}px`;
       failureOverlay.style.top = `${rect.top}px`;
@@ -2202,50 +2103,6 @@ function shouldUseDirectVideoFallback(candidate) {
     && candidate instanceof HTMLVideoElement
     && candidate.mediaKeys == null
   );
-}
-
-function buildDirectVideoFallbackFilter(settings, brightnessIdx) {
-  const parts = [];
-  const brightness = BRIGHTNESS_PRESETS[brightnessIdx] ?? 1;
-  const contrast = Math.max(0.78, 1 + (settings.glowStrength ?? 0) * 0.18 + (settings.scanlineStrength ?? 0) * 0.08);
-  const saturate = Math.max(0, (settings.saturationAmount ?? 1) * 1.08);
-  const blurPx = Math.max(0, (settings.smoothStrength ?? 0) * 0.9);
-
-  if (Math.abs(brightness - 1) > 0.001) {
-    parts.push(`brightness(${brightness})`);
-  }
-  if (Math.abs(contrast - 1) > 0.001) {
-    parts.push(`contrast(${contrast})`);
-  }
-  if (Math.abs(saturate - 1) > 0.001) {
-    parts.push(`saturate(${saturate})`);
-  }
-  if (blurPx > 0.01) {
-    parts.push(`blur(${blurPx.toFixed(2)}px)`);
-  }
-
-  if (settings.paletteMode === "mono") {
-    parts.push("grayscale(1)");
-    parts.push("sepia(0.5)");
-  } else if (settings.paletteMode === "neon") {
-    parts.push("saturate(2.2)");
-    parts.push("contrast(1.28)");
-    parts.push("hue-rotate(-8deg)");
-  } else if (settings.paletteMode === "anime") {
-    parts.push("contrast(1.18)");
-    parts.push("saturate(1.2)");
-  } else if (settings.paletteMode === "pc98" || settings.paletteMode === "pc98_tile") {
-    parts.push("contrast(1.22)");
-    parts.push("saturate(0.82)");
-    parts.push("sepia(0.18)");
-  } else if (settings.paletteMode === "pc98_512" || settings.paletteMode === "pc98_512_sat" || settings.paletteMode === "pc98_4096") {
-    parts.push("contrast(1.16)");
-    parts.push("saturate(0.9)");
-  } else if (settings.paletteMode === "color32" || settings.paletteMode === "color64") {
-    parts.push("contrast(1.14)");
-  }
-
-  return parts.join(" ");
 }
 
 function isRelaxedDrawableElement(candidate) {
