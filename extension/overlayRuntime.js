@@ -1,5 +1,9 @@
 import { FILTER_FRAGMENT_PASS1 } from "./shared/filterPass1Shader.js";
 import { FILTER_FRAGMENT_PASS2 } from "./shared/filterPass2Shader.js";
+import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
+import { FILTER_FRAGMENT_PASS2_LITE } from "./shared/filterPass2LiteShader.js";
+import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "./shared/filterPass1Pc98LiteShader.js";
+import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "./shared/filterPass2PhosphorLiteShader.js";
 import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
@@ -40,6 +44,36 @@ void main() {
   gl_Position = vec4(aPosition, 0.0, 1.0);
 }
 `;
+
+const isWindowsChromiumAngleRisk = () => {
+  const userAgent = navigator.userAgent || "";
+  const isWindows = /Windows/i.test(userAgent);
+  const userAgentDataBrands = navigator.userAgentData?.brands;
+  const isChromium =
+    /\b(?:Chrome|Chromium|Edg|OPR|Brave)\//i.test(userAgent)
+    || (Array.isArray(userAgentDataBrands) && userAgentDataBrands.some(({ brand }) => /Chrom/i.test(brand)));
+  return isWindows && isChromium;
+};
+
+const isPc98PaletteMode = (mode) =>
+  mode === "pc98"
+  || mode === "pc98_tile"
+  || mode === "pc98_512"
+  || mode === "pc98_512_sat"
+  || mode === "pc98_4096";
+
+function getWindowsLiteShaderSources(settings) {
+  const pass1 = isPc98PaletteMode(settings.paletteMode)
+    ? FILTER_FRAGMENT_PASS1_PC98_LITE
+    : FILTER_FRAGMENT_PASS1_LITE;
+  const pass2 =
+    settings.phosphorStrength > 0.001
+    || settings.spotMaskStrength > 0.001
+    || settings.phosphorDotMode
+      ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
+      : FILTER_FRAGMENT_PASS2_LITE;
+  return { pass1, pass2 };
+}
 
 export function isRetroOverlayActive() {
   return !!globalThis[OVERLAY_KEY];
@@ -1924,8 +1958,12 @@ function setupRenderer(webgl, onReady) {
 
   // --- Full filter programs (async; D3D cache can block if checked immediately) ---
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT_PASS1);
-  const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, FILTER_FRAGMENT_PASS2);
+  const shouldUseWindowsLiteMode = isWindowsChromiumAngleRisk();
+  const shaderSources = shouldUseWindowsLiteMode
+    ? getWindowsLiteShaderSources(currentSettings)
+    : { pass1: FILTER_FRAGMENT_PASS1, pass2: FILTER_FRAGMENT_PASS2 };
+  const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1);
+  const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2);
   const prog1 = webgl.createProgram();
   const prog2 = webgl.createProgram();
 
