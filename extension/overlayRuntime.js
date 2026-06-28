@@ -936,6 +936,7 @@ function createOverlay(settings) {
       }
       applySettings(surface.gl, surface.renderer, currentSettings);
     }
+    syncDirectVideoFallbackStyles();
   }
 
   function renderSurface(surface, targetElement, rect, priorityIndex) {
@@ -953,6 +954,14 @@ function createOverlay(settings) {
 
     surface.updateTarget(targetElement);
     surface.syncRect(rect);
+
+    if (shouldUseDirectVideoFallback(targetElement)) {
+      surface.hide();
+      applyDirectVideoFallback(targetElement);
+      surface.didTargetChange = false;
+      return;
+    }
+
     const drawableSource = surface.getDrawableSource(targetElement);
     if (!drawableSource) {
       surface.canvas.style.display = "block";
@@ -1397,13 +1406,37 @@ function createOverlay(settings) {
     const filterValue = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${level})` : "";
     for (const surface of surfaces) {
       surface.canvas.style.filter = filterValue;
-      if (surface.targetElement instanceof HTMLVideoElement) {
+      if (surface.targetElement instanceof HTMLVideoElement && !shouldUseDirectVideoFallback(surface.targetElement)) {
         surface.targetElement.style.filter = filterValue;
       }
     }
     if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
       lastHoveredDRMVideo.style.filter = filterValue;
     }
+    syncDirectVideoFallbackStyles();
+  }
+
+  function syncDirectVideoFallbackStyles() {
+    for (const surface of surfaces) {
+      if (shouldUseDirectVideoFallback(surface.targetElement)) {
+        applyDirectVideoFallback(surface.targetElement);
+      }
+    }
+    if (shouldUseDirectVideoFallback(activePrimaryTarget)) {
+      applyDirectVideoFallback(activePrimaryTarget);
+    }
+  }
+
+  function applyDirectVideoFallback(targetElement) {
+    if (!shouldUseDirectVideoFallback(targetElement)) {
+      return;
+    }
+
+    targetElement.style.filter = buildDirectVideoFallbackFilter(currentSettings, brightnessIdx);
+    targetElement.style.transformOrigin = "center";
+    const sx = flipH ? -1 : 1;
+    const sy = flipV ? -1 : 1;
+    targetElement.style.transform = sx === 1 && sy === 1 ? "" : `scale(${sx},${sy})`;
   }
 
   function activateLoop() {
@@ -2080,6 +2113,48 @@ function isDrawableElement(candidate) {
   }
 
   return false;
+}
+
+function shouldUseDirectVideoFallback(candidate) {
+  return (
+    isWindowsChromiumAngleRisk()
+    && candidate instanceof HTMLVideoElement
+    && candidate.mediaKeys == null
+  );
+}
+
+function buildDirectVideoFallbackFilter(settings, brightnessIdx) {
+  const parts = [];
+  const brightness = BRIGHTNESS_PRESETS[brightnessIdx] ?? 1;
+  const contrast = Math.max(0.8, 1 + (settings.glowStrength ?? 0) * 0.08 + (settings.scanlineStrength ?? 0) * 0.03);
+  const saturate = Math.max(0, settings.saturationAmount ?? 1);
+  const blurPx = Math.max(0, (settings.smoothStrength ?? 0) * 0.6);
+
+  if (Math.abs(brightness - 1) > 0.001) {
+    parts.push(`brightness(${brightness})`);
+  }
+  if (Math.abs(contrast - 1) > 0.001) {
+    parts.push(`contrast(${contrast})`);
+  }
+  if (Math.abs(saturate - 1) > 0.001) {
+    parts.push(`saturate(${saturate})`);
+  }
+  if (blurPx > 0.01) {
+    parts.push(`blur(${blurPx.toFixed(2)}px)`);
+  }
+
+  if (settings.paletteMode === "mono") {
+    parts.push("grayscale(1)");
+    parts.push("sepia(0.35)");
+  } else if (settings.paletteMode === "neon") {
+    parts.push("saturate(1.8)");
+    parts.push("contrast(1.2)");
+  } else if (settings.paletteMode === "anime") {
+    parts.push("contrast(1.08)");
+    parts.push("saturate(1.12)");
+  }
+
+  return parts.join(" ");
 }
 
 function isRelaxedDrawableElement(candidate) {
