@@ -953,6 +953,12 @@ function createOverlay(settings) {
 
     surface.updateTarget(targetElement);
     surface.syncRect(rect);
+    const drawableSource = surface.getDrawableSource(targetElement);
+    if (!drawableSource) {
+      surface.canvas.style.display = "block";
+      surface.hideFailureOverlay();
+      return;
+    }
 
     if (rejectedElements.has(targetElement)) {
       surface.canvas.style.display = "none";
@@ -974,7 +980,7 @@ function createOverlay(settings) {
 
     if (!surface.gl || !surface.renderer) {
       try {
-        surface.renderRaw(targetElement);
+        surface.renderRaw(drawableSource);
         surface.didTargetChange = false;
       } catch (error) {
         if (error instanceof DOMException && error.name === "SecurityError") {
@@ -1005,7 +1011,7 @@ function createOverlay(settings) {
           surface.gl.RGBA,
           surface.gl.RGBA,
           surface.gl.UNSIGNED_BYTE,
-          targetElement,
+          drawableSource,
         );
         const uploadMs = performance.now() - uploadStart;
         surface.didTargetChange = false;
@@ -1054,7 +1060,7 @@ function createOverlay(settings) {
       }
       surface.fallbackTo2d(error);
       try {
-        surface.renderRaw(targetElement);
+        surface.renderRaw(drawableSource);
         surface.didTargetChange = false;
       } catch (fallbackError) {
         if (fallbackError instanceof DOMException && fallbackError.name === "SecurityError") {
@@ -1749,6 +1755,10 @@ function createOverlaySurface(index, onReady) {
     ctx2d,
     renderer,
     targetElement: null,
+    proxyTargetElement: null,
+    proxyVideo: null,
+    proxyStream: null,
+    proxyReady: false,
     startedAt: performance.now(),
     lastRectKey: "",
     didTargetChange: true,
@@ -1764,6 +1774,7 @@ function createOverlaySurface(index, onReady) {
       // is done. Calling loseContext() while linkProgram is pending on
       // Windows/ANGLE blocks the JS main thread for ~3 s (the cache load).
       this.renderer?.cancel?.();
+      this.disposeProxyVideo();
       canvas.remove();
       failureOverlay.remove();
     },
@@ -1777,11 +1788,13 @@ function createOverlaySurface(index, onReady) {
         this.targetElement.style.transform = "";
         this.targetElement.style.transformOrigin = "";
       }
+      this.disposeProxyVideo();
       this.targetElement = nextTarget;
       this.startedAt = performance.now();
       this.lastRectKey = "";
       this.didTargetChange = true;
       this.hideFailureOverlay();
+      this.ensureProxyVideo(nextTarget);
     },
     syncRect(rect) {
       const dpr = window.devicePixelRatio || 1;
@@ -1811,12 +1824,92 @@ function createOverlaySurface(index, onReady) {
         canvas.height = height;
       }
     },
-    renderRaw(targetElement) {
+    ensureProxyVideo(targetElement) {
+      if (!isWindowsChromiumAngleRisk()) {
+        return;
+      }
+      if (!(targetElement instanceof HTMLVideoElement)) {
+        return;
+      }
+      if (targetElement.mediaKeys != null) {
+        return;
+      }
+      if (this.proxyTargetElement === targetElement || this.proxyVideo) {
+        return;
+      }
+
+      const captureStream =
+        targetElement.captureStream?.bind(targetElement)
+        || targetElement.mozCaptureStream?.bind(targetElement);
+      if (!captureStream) {
+        return;
+      }
+
+      try {
+        const stream = captureStream();
+        const proxyVideo = document.createElement("video");
+        proxyVideo.muted = true;
+        proxyVideo.autoplay = true;
+        proxyVideo.playsInline = true;
+        proxyVideo.srcObject = stream;
+        proxyVideo.addEventListener("loadeddata", () => {
+          this.proxyReady = true;
+        });
+        void proxyVideo.play().then(() => {
+          this.proxyReady = true;
+        }).catch(() => {});
+        this.proxyTargetElement = targetElement;
+        this.proxyStream = stream;
+        this.proxyVideo = proxyVideo;
+      } catch {}
+    },
+    disposeProxyVideo() {
+      if (this.proxyVideo) {
+        try {
+          this.proxyVideo.pause();
+        } catch {}
+        this.proxyVideo.srcObject = null;
+      }
+      this.proxyStream?.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {}
+      });
+      this.proxyTargetElement = null;
+      this.proxyVideo = null;
+      this.proxyStream = null;
+      this.proxyReady = false;
+    },
+    getDrawableSource(targetElement) {
+      if (
+        isWindowsChromiumAngleRisk()
+        && targetElement instanceof HTMLVideoElement
+        && targetElement.mediaKeys == null
+        && this.proxyTargetElement === targetElement
+      ) {
+        if (
+          this.proxyVideo
+          && (this.proxyReady || this.proxyVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
+        ) {
+          return this.proxyVideo;
+        }
+        return null;
+      }
+      if (
+        this.proxyTargetElement === targetElement
+        && this.proxyVideo
+        && (this.proxyReady || this.proxyVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
+      ) {
+        return this.proxyVideo;
+      }
+      return targetElement;
+    },
+    renderRaw(drawableSource) {
       if (!this.ctx2d) {
         return;
       }
       this.ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      this.ctx2d.drawImage(targetElement, 0, 0, canvas.width, canvas.height);
+      this.ctx2d.drawImage(drawableSource, 0, 0, canvas.width, canvas.height);
     },
     fallbackTo2d(error) {
       if (!this.ctx2d) {
