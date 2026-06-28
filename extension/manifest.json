@@ -35,6 +35,10 @@
         "shared/bitcrusherWorklet.js",
         "shared/filterPass1Shader.js",
         "shared/filterPass2Shader.js",
+        "shared/filterPass1LiteShader.js",
+        "shared/filterPass2LiteShader.js",
+        "shared/filterPass1Pc98LiteShader.js",
+        "shared/filterPass2PhosphorLiteShader.js",
         "shared/filterShader.js",
         "shared/stereoWidthWorklet.js",
         "shared/settings.js"
