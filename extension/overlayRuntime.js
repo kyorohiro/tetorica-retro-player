@@ -956,8 +956,10 @@ function createOverlay(settings) {
     surface.syncRect(rect);
 
     if (shouldUseDirectVideoFallback(targetElement)) {
-      surface.hide();
+      surface.canvas.style.display = "block";
+      surface.hideFailureOverlay();
       applyDirectVideoFallback(targetElement);
+      surface.renderDirectFallbackOverlay(currentSettings, rect, brightnessIdx);
       surface.didTargetChange = false;
       return;
     }
@@ -1432,7 +1434,7 @@ function createOverlay(settings) {
       return;
     }
 
-    targetElement.style.filter = buildDirectVideoFallbackFilter(currentSettings, brightnessIdx);
+    targetElement.style.setProperty("filter", buildDirectVideoFallbackFilter(currentSettings, brightnessIdx), "important");
     targetElement.style.transformOrigin = "center";
     const sx = flipH ? -1 : 1;
     const sy = flipV ? -1 : 1;
@@ -1984,13 +1986,92 @@ function createOverlaySurface(index, onReady) {
       this.ctx2d.clearRect(0, 0, canvas.width, canvas.height);
       this.ctx2d.drawImage(drawableSource, 0, 0, canvas.width, canvas.height);
     },
+    ensure2dContext() {
+      if (!this.ctx2d) {
+        this.ctx2d = canvas.getContext("2d");
+      }
+    },
+    renderDirectFallbackOverlay(settings, rect, brightnessIdx) {
+      this.ensure2dContext();
+      if (!this.ctx2d) {
+        return;
+      }
+
+      const ctx = this.ctx2d;
+      const width = canvas.width;
+      const height = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      ctx.clearRect(0, 0, width, height);
+
+      const scanlineStrength = Math.max(0, settings.scanlineStrength ?? 0);
+      const scanline2Strength = Math.max(0, settings.scanline2Strength ?? 0);
+      const vignetteStrength = Math.max(0, settings.vignetteStrength ?? 0);
+      const glowStrength = Math.max(0, settings.glowStrength ?? 0);
+      const brightness = BRIGHTNESS_PRESETS[brightnessIdx] ?? 1;
+
+      if (scanlineStrength > 0.01 || scanline2Strength > 0.01) {
+        const lineGap = Math.max(2, Math.round(3 * dpr));
+        const darkAlpha = Math.min(0.28, 0.04 + scanlineStrength * 0.18);
+        const brightAlpha = Math.min(0.18, scanline2Strength * 0.12);
+        ctx.fillStyle = `rgba(0, 0, 0, ${darkAlpha})`;
+        for (let y = 0; y < height; y += lineGap) {
+          ctx.fillRect(0, y, width, 1);
+        }
+        if (brightAlpha > 0.001) {
+          ctx.fillStyle = `rgba(220, 255, 180, ${brightAlpha})`;
+          for (let y = Math.floor(lineGap / 2); y < height; y += lineGap) {
+            ctx.fillRect(0, y, width, 1);
+          }
+        }
+      }
+
+      if (
+        settings.paletteMode === "pc98"
+        || settings.paletteMode === "pc98_tile"
+        || settings.paletteMode === "pc98_512"
+        || settings.paletteMode === "pc98_512_sat"
+        || settings.paletteMode === "pc98_4096"
+      ) {
+        const dotGap = Math.max(4, Math.round(6 * dpr));
+        ctx.fillStyle = "rgba(255, 170, 110, 0.06)";
+        for (let y = 0; y < height; y += dotGap) {
+          for (let x = 0; x < width; x += dotGap) {
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+      }
+
+      if (settings.paletteMode === "mono") {
+        ctx.fillStyle = "rgba(210, 235, 180, 0.08)";
+        ctx.fillRect(0, 0, width, height);
+      } else if (settings.paletteMode === "neon") {
+        ctx.fillStyle = "rgba(120, 255, 220, 0.07)";
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      if (vignetteStrength > 0.01 || glowStrength > 0.01) {
+        const vignetteAlpha = Math.min(0.4, vignetteStrength * 0.22 + glowStrength * 0.04);
+        const gradient = ctx.createRadialGradient(
+          width * 0.5,
+          height * 0.5,
+          Math.min(width, height) * 0.18,
+          width * 0.5,
+          height * 0.5,
+          Math.max(width, height) * 0.72,
+        );
+        gradient.addColorStop(0, `rgba(255,255,255,${Math.max(0, (brightness - 1) * 0.04)})`);
+        gradient.addColorStop(0.68, "rgba(0,0,0,0)");
+        gradient.addColorStop(1, `rgba(0,0,0,${vignetteAlpha})`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+      }
+    },
     fallbackTo2d(error) {
       if (!this.ctx2d) {
-        const nextCtx = canvas.getContext("2d");
-        if (!nextCtx) {
+        this.ensure2dContext();
+        if (!this.ctx2d) {
           throw error;
         }
-        this.ctx2d = nextCtx;
       }
       this.renderer?.cancel?.();
       this.renderer = null;
@@ -2126,9 +2207,9 @@ function shouldUseDirectVideoFallback(candidate) {
 function buildDirectVideoFallbackFilter(settings, brightnessIdx) {
   const parts = [];
   const brightness = BRIGHTNESS_PRESETS[brightnessIdx] ?? 1;
-  const contrast = Math.max(0.8, 1 + (settings.glowStrength ?? 0) * 0.08 + (settings.scanlineStrength ?? 0) * 0.03);
-  const saturate = Math.max(0, settings.saturationAmount ?? 1);
-  const blurPx = Math.max(0, (settings.smoothStrength ?? 0) * 0.6);
+  const contrast = Math.max(0.78, 1 + (settings.glowStrength ?? 0) * 0.18 + (settings.scanlineStrength ?? 0) * 0.08);
+  const saturate = Math.max(0, (settings.saturationAmount ?? 1) * 1.08);
+  const blurPx = Math.max(0, (settings.smoothStrength ?? 0) * 0.9);
 
   if (Math.abs(brightness - 1) > 0.001) {
     parts.push(`brightness(${brightness})`);
@@ -2145,13 +2226,23 @@ function buildDirectVideoFallbackFilter(settings, brightnessIdx) {
 
   if (settings.paletteMode === "mono") {
     parts.push("grayscale(1)");
-    parts.push("sepia(0.35)");
+    parts.push("sepia(0.5)");
   } else if (settings.paletteMode === "neon") {
-    parts.push("saturate(1.8)");
-    parts.push("contrast(1.2)");
+    parts.push("saturate(2.2)");
+    parts.push("contrast(1.28)");
+    parts.push("hue-rotate(-8deg)");
   } else if (settings.paletteMode === "anime") {
-    parts.push("contrast(1.08)");
-    parts.push("saturate(1.12)");
+    parts.push("contrast(1.18)");
+    parts.push("saturate(1.2)");
+  } else if (settings.paletteMode === "pc98" || settings.paletteMode === "pc98_tile") {
+    parts.push("contrast(1.22)");
+    parts.push("saturate(0.82)");
+    parts.push("sepia(0.18)");
+  } else if (settings.paletteMode === "pc98_512" || settings.paletteMode === "pc98_512_sat" || settings.paletteMode === "pc98_4096") {
+    parts.push("contrast(1.16)");
+    parts.push("saturate(0.9)");
+  } else if (settings.paletteMode === "color32" || settings.paletteMode === "color64") {
+    parts.push("contrast(1.14)");
   }
 
   return parts.join(" ");
