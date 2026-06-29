@@ -1,1 +1,0 @@
-import{i as t,e as s}from"./index-Bt0EpO9o.js";class p extends t{constructor(){super(...arguments),this.name="Negate",this._multiply=new s({context:this.context,value:-1}),this.input=this._multiply,this.output=this._multiply}dispose(){return super.dispose(),this._multiply.dispose(),this}}export{p as N};
