@@ -252,7 +252,7 @@ export function useRetroAudioEngine({
   const [inputTrimAmount, setInputTrimAmount] = useState<number>(
     initialAudioSettings.inputTrimAmount,
   );
-  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null>(null);
   // Lazy: AudioContext is created only on first audio operation (ensureInitialized /
   // connectSourceNode) to avoid Chrome auto-resuming a suspended context on the first
   // user gesture, which triggers repeated "audio device error" log spam.
@@ -479,24 +479,44 @@ export function useRetroAudioEngine({
     }
 
     try {
-      const mediaSource = context.createMediaElementSource(media);
-      mediaSource.connect(engine.input);
-      mediaSourceRef.current = mediaSource;
+      let mediaSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode;
 
-      // Apply initial state using best current knowledge (static fallback until probe runs)
-      if (resolveNativeAudioSuppression(audioOptimizationModeRef.current)) {
-        media.muted = false;
+      if (media.srcObject instanceof MediaStream) {
+        // For MediaStream sources (Tone.js, etc.): createMediaElementSource does not
+        // route audio through the Web Audio chain on Safari when srcObject is a
+        // MediaStream from a different AudioContext. Use createMediaStreamSource directly.
+        mediaSource = context.createMediaStreamSource(media.srcObject);
+        mediaSource.connect(engine.input);
+        // Mute the HTML element — audio flows exclusively through Web Audio chain.
+        media.muted = true;
         media.volume = 0;
       } else {
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
+        mediaSource = context.createMediaElementSource(media);
+        mediaSource.connect(engine.input);
+        if (resolveNativeAudioSuppression(audioOptimizationModeRef.current)) {
+          media.muted = false;
+          media.volume = 0;
+        } else {
+          media.muted = isMutedRef.current;
+          media.volume = isMutedRef.current ? 0 : volumeRef.current;
+        }
       }
+      mediaSourceRef.current = mediaSource;
 
       debugAudio("connectMediaAudio:connected", {
         audioContextState: context.state,
         mediaTag: media.tagName,
         previewKind: previewKindRef.current,
       });
+      // Sync isOutputEnabled immediately from the current previewKindRef so that
+      // updateAudioNodes() uses the correct masterGain value. Without this, Safari
+      // mode (Web Audio path) would compute masterGain=0 because the React effect
+      // that calls setOutputEnabled hasn't re-rendered yet at this point.
+      engine.setOutputEnabled(
+        previewKindRef.current === "video" ||
+          previewKindRef.current === "audio" ||
+          previewKindRef.current === "capture",
+      );
       updateAudioNodes();
     } catch (error) {
       debugAudio("connectMediaAudio:error", {

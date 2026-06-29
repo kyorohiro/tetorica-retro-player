@@ -8,7 +8,9 @@ export interface LofiSession {
 }
 
 export async function startLofiSession(): Promise<LofiSession> {
-  await Tone.start();
+  // Do NOT call Tone.start() here — on Safari without a user gesture the promise
+  // may never settle (neither resolve nor reject), hanging the entire function.
+  // The caller is responsible for calling Tone.start() on the first user gesture.
   Tone.getTransport().stop();
   Tone.getTransport().cancel();
   Tone.getTransport().bpm.value = 72;
@@ -91,9 +93,12 @@ export async function startLofiSession(): Promise<LofiSession> {
   bassPart.start(0);
 
   // --- Piano pad: PolySynth triangle + reverb + delay ---
+  // Don't await padReverb.ready — on Safari without a user gesture, OfflineAudioContext
+  // may reject, causing startLofiSession() to throw before the stream is ever set.
+  // The reverb node is connected immediately; it plays dry until the IR is ready.
   const padReverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.02 });
-  await padReverb.ready;
   padReverb.connect(comp);
+  padReverb.ready.catch(() => {});
 
   const padDelay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.3 });
   padDelay.connect(padReverb);

@@ -20,7 +20,7 @@ type UseRetroPreviewMediaParams = {
   isPlayingRef: CurrentRef<boolean>;
   previewKindRef: CurrentRef<PreviewKind>;
   audioContextRef: CurrentRef<AudioContext | null>;
-  mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | null>;
+  mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null>;
   masterGainRef: CurrentRef<GainNode | null>;
   noiseGainRef: CurrentRef<GainNode | null>;
   audioOptimizationModeRef: CurrentRef<RetroAudioSettings["audioOptimizationMode"]>;
@@ -363,6 +363,14 @@ export function useRetroPreviewMedia({
       };
 
       if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        resolve();
+        return;
+      }
+
+      // For MediaStream sources (Tone.js, screen capture audio), Safari does not
+      // fire loadedmetadata/canplay after audio.load(), causing a permanent hang.
+      // Skip load() and resolve immediately — playVideoWithAudio() handles errors.
+      if (audio.srcObject instanceof MediaStream) {
         resolve();
         return;
       }
