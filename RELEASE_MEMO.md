@@ -10,7 +10,7 @@ npm run version:set -- 0.32.6
 sh deploy_mac.sh
 ~/bin/butler login
 ~/bin/butler push target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.32.6_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.32.6
-~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.32.6_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion history
+~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.32.6_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.32.6
 ~/bin/butler push "tetorica-retro-player_0.32.6_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.32.6
 ~/bin/butler push "tetorica-retro-player_0.32.6_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.32.6
 ~/bin/butler push "tetorica-retro-player_0.32.6_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.32.6

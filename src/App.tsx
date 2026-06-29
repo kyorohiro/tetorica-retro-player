@@ -948,61 +948,40 @@ function App() {
       )}
       {isMobileMenuOpen && (
         <div className="safe-top-menu fixed left-3 z-9999 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-1.5">
                   <button
                     type="button"
                     onClick={handleOpenFilePicker}
-                    className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                    className="flex items-center gap-2 rounded-xl border border-dashed border-slate-400 bg-slate-50 px-3 py-2.5 transition hover:border-sky-500 hover:bg-white"
                   >
-                    <span className="flex items-start gap-3">
-                      <FileUp className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
-                      <span>
-                        <span className="block font-medium text-slate-900">{t(locale, "openFile")}</span>
-                        <span className="block text-slate-500">
-                          {t(locale, "openFileDetail")}
-                        </span>
-                      </span>
+                    <FileUp className="h-4 w-4 shrink-0 text-sky-600" />
+                    <span className="text-sm font-medium text-slate-800">{t(locale, "openFile")}</span>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      mp4 · jpg · mp3 · zip · pdf · epub · txt · …
                     </span>
                   </button>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-xs text-amber-900">
-                    <p className="font-semibold">{t(locale, "localFileRecommendationTitle")}</p>
-                    <p className="mt-1 leading-5 text-amber-800">
-                      {t(locale, "localFileRecommendationDetail")}
-                    </p>
-                  </div>
+                  <p className="px-1 text-[11px] text-amber-700">
+                    ⚠ {t(locale, "localFileRecommendationTitle")}
+                  </p>
                   {!isIosOrAndroid && (
-                    <>
+                    <div className="grid grid-cols-2 gap-1.5">
                       <button
                         type="button"
                         onClick={handleOpenFolderPicker}
-                        className="rounded-xl border border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-500 hover:bg-white"
+                        className="flex items-center gap-2 rounded-xl border border-dashed border-slate-400 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:border-sky-500 hover:bg-white"
                       >
-                        <span className="flex items-start gap-3">
-                          <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                          <span>
-                            <span className="block font-medium text-slate-900">{t(locale, "openFolder")}</span>
-                            <span className="block text-slate-500">
-                              {t(locale, "openFolderDetail")}
-                            </span>
-                          </span>
-                        </span>
+                        <FolderOpen className="h-4 w-4 shrink-0 text-amber-600" />
+                        {t(locale, "openFolder")}
                       </button>
                       <button
                         type="button"
                         onClick={handleOpenDisplayCapture}
-                        className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-emerald-500/20"
+                        className="flex items-center gap-2 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-emerald-500/20"
                       >
-                        <span className="flex items-start gap-3">
-                          <MonitorUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                          <span>
-                            <span className="block font-medium text-slate-900">{t(locale, "captureScreen")}</span>
-                            <span className="block text-slate-500">
-                              {t(locale, "captureScreenDetail")}
-                            </span>
-                          </span>
-                        </span>
+                        <MonitorUp className="h-4 w-4 shrink-0 text-emerald-700" />
+                        {t(locale, "captureScreen")}
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
                 <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
