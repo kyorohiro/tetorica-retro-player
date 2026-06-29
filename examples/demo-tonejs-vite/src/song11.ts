@@ -24,16 +24,18 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   }).toDestination();
   // MetalSynth as hi-hat (different settings from song7 — higher freq, shorter)
   const metal = new Tone.MetalSynth({
-    frequency: 600, envelope: { attack: 0.001, decay: 0.03, release: 0.008 },
+    envelope: { attack: 0.001, decay: 0.03, release: 0.008 },
     harmonicity: 8.5, modulationIndex: 40, resonance: 5000, octaves: 1.2,
     volume: -22,
   });
+  metal.frequency.value = 600;
   metal.connect(warm);
   const openMetal = new Tone.MetalSynth({
-    frequency: 350, envelope: { attack: 0.001, decay: 0.15, release: 0.05 },
+    envelope: { attack: 0.001, decay: 0.15, release: 0.05 },
     harmonicity: 5.1, modulationIndex: 28, resonance: 3000, octaves: 1.5,
     volume: -26,
   });
+  openMetal.frequency.value = 350;
   openMetal.connect(warm);
 
   const dp = {

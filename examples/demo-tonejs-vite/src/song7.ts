@@ -24,10 +24,11 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   }).toDestination();
   // MetalSynth as hi-hat (browser only)
   const metal = new Tone.MetalSynth({
-    frequency: 400, envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
+    envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
     harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
     volume: -20,
   });
+  metal.frequency.value = 400;
   metal.connect(warm);
   const clap = new Tone.NoiseSynth({
     noise: { type: 'pink' },

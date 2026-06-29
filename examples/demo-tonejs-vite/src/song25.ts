@@ -69,15 +69,15 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
       envelope: { attack: 0.01, decay: 0.5, sustain: 0.85, release: 1.5 },
       filter: { Q: 2, type: 'lowpass', rolloff: -24, frequency: 350 },
       filterEnvelope: { attack: 0.01, decay: 0.6, sustain: 0.7, release: 1.5, baseFrequency: 120, octaves: 3 },
-      volume: -6,
     },
     voice1: {
       oscillator: { type: 'sine' },
       envelope: { attack: 0.01, decay: 0.5, sustain: 0.85, release: 1.5 },
-      volume: -12,
     },
     volume: -5,
   }).toDestination();
+  bass.voice0.volume.value = -6;
+  bass.voice1.volume.value = -12;
 
   // --- pad: PolySynth(fattriangle) + Reverb — dark atmospheric (fattriangle 初使用!) ---
   const padReverb = new Tone.Reverb({ decay: 5.0, preDelay: 0.05 });

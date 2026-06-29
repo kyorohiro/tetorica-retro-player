@@ -86,15 +86,16 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
     voice0: {
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.02, decay: 0.3, sustain: 0.72, release: 0.55 },
-      volume: 0,
     },
     voice1: {
       oscillator: { type: 'sine' },
       envelope: { attack: 0.02, decay: 0.3, sustain: 0.60, release: 0.55 },
-      volume: -8,
     },
     volume: -14,
-  }).connect(melRev);
+  });
+  mel.voice0.volume.value = 0;
+  mel.voice1.volume.value = -8;
+  mel.connect(melRev);
 
   // Spain chord progression: Dmaj7→C#7→F#m7→Bm7→Em7→A7→Dmaj7→A7 (各1小節)
   // C#7 (= V7/F#m) が Spain 特有のセカンダリ・ドミナント: C# E# G# B = Db F Ab B
