@@ -111,7 +111,7 @@ function App() {
   // 'blocked' = AudioContext suspended (Safari) → shows Touch & Play button
   // 'done'    = playing or user chose something else
   type AutoStartState = 'pending' | 'blocked' | 'done';
-  const [autoStartState, setAutoStartState] = React.useState<AutoStartState>('pending');
+  const [autoStartState, setAutoStartState] = React.useState<AutoStartState>('blocked');
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -156,51 +156,18 @@ function App() {
   }, [localePreference]);
 
   // Restore startup preset on mount.
-  // For ToneJS presets: Tone.start() may hang on Safari without a user gesture,
-  // so we race a 500ms timeout. On success → play immediately. On timeout →
-  // create session (audio UI shows) + "Touch & Play" button.
-  // For URL/ColorBar presets: set directly, no audio context involved.
+  // ToneJS presets: do nothing — stay 'blocked' so Touch & Play shows.
+  //   handleRetry builds the session when the user taps.
+  // URL/ColorBar presets: load immediately and mark 'done'.
   React.useEffect(() => {
     let cancelled = false;
-
-    const startToneSession = async (
-      loader: () => Promise<{ stream: MediaStream; dispose: () => void }>,
-      label: string,
-    ) => {
-      const Tone = await import('tone');
-      let contextRunning = false;
-      try {
-        await Promise.race([
-          Tone.start().then(() => { contextRunning = true; }),
-          new Promise<void>(resolve => setTimeout(resolve, 500)),
-        ]);
-      } catch { /* autoplay blocked */ }
-      if (cancelled) return;
-      const session = await loader();
-      if (cancelled) { session.dispose(); return; }
-      toneCleanupRef.current = session.dispose;
-      previewSourceRef.current.previewAudioStream(session.stream, label);
-      setAutoStartState(contextRunning ? 'done' : 'blocked');
-    };
 
     (async () => {
       if (cancelled) return;
       try {
         const preset = currentPresetConfigRef.current;
-        if (preset.type === 'lofi') {
-          const { startLofiSession } = await import('./builtin-content/lofi-engine');
-          await startToneSession(startLofiSession, 'Lo-fi Chill');
-        } else if (preset.type === 'demo-song') {
-          const [{ DEMO_SONGS }, { startDemoSongSession }] = await Promise.all([
-            import('./builtin-content/demo-songs'),
-            import('./builtin-content/demo-song-session'),
-          ]);
-          const meta = DEMO_SONGS.find(s => s.id === preset.songId);
-          if (meta) {
-            await startToneSession(() => startDemoSongSession(meta), meta.name);
-          } else {
-            setAutoStartState('done'); // song not found, just clear overlay
-          }
+        if (preset.type === 'lofi' || preset.type === 'demo-song') {
+          // Stay 'blocked' — Touch & Play required before audio starts.
         } else if (preset.type === 'colorbars-video') {
           previewSourceRef.current.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
           setAutoStartState('done');
@@ -211,7 +178,7 @@ function App() {
           previewSourceRef.current.previewPath(preset.url, preset.label);
           setAutoStartState('done');
         }
-      } catch { setAutoStartState('done'); /* unexpected — clear overlay */ }
+      } catch { setAutoStartState('done'); }
     })();
 
     return () => { cancelled = true; };
@@ -1196,9 +1163,18 @@ function App() {
               streamName={previewSource.previewLabel}
               kind={previewSource.previewKind ?? defaultPreviewKind}
               looping={!isUsingDefaultPreview && loopMode === "one"}
+              autoPlay={autoStartState === 'done'}
               onEnded={handleEnded}
               onError={handlePlayerError}
               onRetry={() => { void handleRetry(); }}
+              onPlaybackChange={(playing) => {
+                const preset = currentPresetConfigRef.current;
+                if (preset.type !== 'lofi' && preset.type !== 'demo-song') return;
+                void import('tone').then(({ getTransport }) => {
+                  if (playing) getTransport().start();
+                  else getTransport().pause();
+                });
+              }}
               onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
               onNextTrack={playlistLength > 1 ? nextTrack : undefined}
               loopMode={loopMode}

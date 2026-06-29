@@ -31,6 +31,8 @@ type RetroPlayerProps = {
   className?: string;
   onError?: (error: Error) => void;
   onRetry?: () => void;
+  autoPlay?: boolean;
+  onPlaybackChange?: (playing: boolean) => void;
   initialFilterState?: RetroFilterInitialState;
   confirmDialog?: ConfirmDialogFn;
   onEnded?: () => void;
@@ -50,6 +52,8 @@ export function RetroPlayer({
   className,
   onError,
   onRetry,
+  autoPlay,
+  onPlaybackChange,
   initialFilterState,
   confirmDialog: confirmDialogProp,
   onEnded,
@@ -91,7 +95,7 @@ export function RetroPlayer({
     filterState,
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
-    { onEnded, onError, onRetry },
+    { onEnded, onError, onRetry, autoPlay, onPlaybackChange },
   );
 
   // --- Callbacks ---

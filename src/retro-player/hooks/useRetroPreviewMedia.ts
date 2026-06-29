@@ -73,6 +73,7 @@ type UseRetroPreviewMediaParams = {
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
   debugAudio: (label: string, payload?: Record<string, unknown>) => void;
   onEndedRef?: CurrentRef<(() => void) | undefined>;
+  autoPlayRef: CurrentRef<boolean>;
 };
 
 const isAndroidRuntime = () =>
@@ -168,6 +169,7 @@ export function useRetroPreviewMedia({
   debugVideo,
   debugAudio,
   onEndedRef,
+  autoPlayRef,
 }: UseRetroPreviewMediaParams) {
   const _setPreviewError = setPreviewError;
 
@@ -903,7 +905,7 @@ export function useRetroPreviewMedia({
         await connectMediaAudio(media);
         syncVideoState();
         await waitForMediaSwitchCooldown();
-        await playVideoWithAudio();
+        if (autoPlayRef.current) await playVideoWithAudio();
         if (requestId === previewRequestIdRef.current) {
           finishLoading();
         }
@@ -1092,7 +1094,7 @@ export function useRetroPreviewMedia({
       if (requestId !== previewRequestIdRef.current) return;
 
       await waitForMediaSwitchCooldown();
-      await playVideoWithAudio();
+      if (autoPlayRef.current) await playVideoWithAudio();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
       }
@@ -1215,7 +1217,7 @@ export function useRetroPreviewMedia({
 
       if (requestId !== previewRequestIdRef.current) return;
 
-      if (kind === "video" || kind === "audio") {
+      if ((kind === "video" || kind === "audio") && autoPlayRef.current) {
         await waitForMediaSwitchCooldown();
         await playVideoWithAudio();
       }

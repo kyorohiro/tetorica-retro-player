@@ -61,7 +61,7 @@ export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
   renderResolutionScale = 1,
-  options?: { onEnded?: () => void; onError?: (error: Error) => void; onRetry?: () => void },
+  options?: { onEnded?: () => void; onError?: (error: Error) => void; onRetry?: () => void; autoPlay?: boolean; onPlaybackChange?: (playing: boolean) => void },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const objectUrlRef = useRef<string | null>(null);
@@ -82,6 +82,8 @@ export function usePixiVideoPlayer(
   const onEndedRef = useRef<(() => void) | undefined>(options?.onEnded);
   const onErrorRef = useRef<((error: Error) => void) | undefined>(options?.onError);
   const onRetryRef = useRef<(() => void) | undefined>(options?.onRetry);
+  const autoPlayRef = useRef<boolean>(options?.autoPlay ?? true);
+  const onPlaybackChangeRef = useRef<((playing: boolean) => void) | undefined>(options?.onPlaybackChange);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -219,6 +221,8 @@ export function usePixiVideoPlayer(
     audioOptimizationModeRef,
     audioOptimizationMode,
     setAudioOptimizationMode,
+    latencyHint,
+    setLatencyHint,
     isMutedRef,
     volumeRef,
     playbackRateRef,
@@ -508,6 +512,7 @@ export function usePixiVideoPlayer(
     debugVideo,
     debugAudio,
     onEndedRef,
+    autoPlayRef,
   });
 
   const {
@@ -533,6 +538,18 @@ export function usePixiVideoPlayer(
   useEffect(() => {
     onRetryRef.current = options?.onRetry;
   }, [options?.onRetry]);
+
+  useEffect(() => {
+    autoPlayRef.current = options?.autoPlay ?? true;
+  }, [options?.autoPlay]);
+
+  useEffect(() => {
+    onPlaybackChangeRef.current = options?.onPlaybackChange;
+  }, [options?.onPlaybackChange]);
+
+  useEffect(() => {
+    onPlaybackChangeRef.current?.(isPlaying);
+  }, [isPlaying]);
 
   useEffect(() => {
     cleanupPreviewRef.current = cleanupPreview;
@@ -1132,6 +1149,8 @@ export function usePixiVideoPlayer(
     applyAudioSettings,
     resetAudioSettings,
     setAudioOptimizationMode,
+    latencyHint,
+    setLatencyHint,
     playVideoWithAudio,
     isPoweredOn,
     powerOn,
