@@ -1,10 +1,7 @@
 import React, { useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import {
-  FileUp,
-  FolderOpen,
   Menu,
-  MonitorUp,
   Pin,
   RefreshCw,
   Waves,
@@ -34,6 +31,8 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
+import { MobileMenu } from "./MobileMenu";
+import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
@@ -94,6 +93,7 @@ function App() {
   const cycleLoopMode = React.useCallback(() => {
     setLoopMode((m) => m === "one" ? "autoplay" : m === "autoplay" ? "all" : m === "all" ? "off" : "one");
   }, []);
+  const toneCleanupRef = React.useRef<(() => void) | null>(null);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -136,6 +136,21 @@ function App() {
   React.useEffect(() => {
     saveLocalePreference(localePreference);
   }, [localePreference]);
+
+  // Auto-start Lo-fi Chill on mount. Falls back silently if autoplay is blocked.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { startLofiSession } = await import('./builtin-content/lofi-engine');
+        const session = await startLofiSession();
+        if (cancelled) { session.dispose(); return; }
+        toneCleanupRef.current = session.dispose;
+        previewSourceRef.current.previewAudioStream(session.stream, 'Lo-fi Chill');
+      } catch { /* autoplay blocked — stays on default image */ }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Desktop: auto-start mDrop server on mount.
   // isMDropReady drives the file picker choice (Tauri dialog vs <input>).
@@ -751,6 +766,41 @@ function App() {
     void handleDisplayCapture();
   }, [handleDisplayCapture, isIosOrAndroid]);
 
+  const stopTone = useCallback(() => {
+    toneCleanupRef.current?.();
+    toneCleanupRef.current = null;
+  }, []);
+
+  const handlePresetVideo = useCallback(() => {
+    stopTone();
+    previewSource.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
+    setIsMobileMenuOpen(false);
+  }, [previewSource, stopTone]);
+
+  const handlePresetImage = useCallback(() => {
+    stopTone();
+    previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
+    setIsMobileMenuOpen(false);
+  }, [previewSource, stopTone]);
+
+  const handlePresetLofi = useCallback(async () => {
+    stopTone();
+    setIsMobileMenuOpen(false);
+    const { startLofiSession } = await import('./builtin-content/lofi-engine');
+    const session = await startLofiSession();
+    toneCleanupRef.current = session.dispose;
+    previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
+  }, [previewSource, stopTone]);
+
+  const handlePresetDemoSong = useCallback(async (meta: DemoSongMeta) => {
+    stopTone();
+    setIsMobileMenuOpen(false);
+    const { startDemoSongSession } = await import('./builtin-content/demo-song-session');
+    const session = await startDemoSongSession(meta);
+    toneCleanupRef.current = session.dispose;
+    previewSource.previewAudioStream(session.stream, meta.name);
+  }, [previewSource, stopTone]);
+
   const handleReloadApp = useCallback(() => {
     setIsMobileMenuOpen(false);
     window.setTimeout(() => {
@@ -947,73 +997,20 @@ function App() {
         </div>
       )}
       {isMobileMenuOpen && (
-        <div className="safe-top-menu fixed left-3 z-9999 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
-                <div className="grid grid-cols-1 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleOpenFilePicker}
-                    className="flex items-center gap-2 rounded-xl border border-dashed border-slate-400 bg-slate-50 px-3 py-2.5 transition hover:border-sky-500 hover:bg-white"
-                  >
-                    <FileUp className="h-4 w-4 shrink-0 text-sky-600" />
-                    <span className="text-sm font-medium text-slate-800">{t(locale, "openFile")}</span>
-                    <span className="font-mono text-[11px] text-slate-400">
-                      mp4 · jpg · mp3 · zip · pdf · epub · txt · …
-                    </span>
-                  </button>
-                  <p className="px-1 text-[11px] text-amber-700">
-                    ⚠ {t(locale, "localFileRecommendationTitle")}
-                  </p>
-                  {!isIosOrAndroid && (
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleOpenFolderPicker}
-                        className="flex items-center gap-2 rounded-xl border border-dashed border-slate-400 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:border-sky-500 hover:bg-white"
-                      >
-                        <FolderOpen className="h-4 w-4 shrink-0 text-amber-600" />
-                        {t(locale, "openFolder")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleOpenDisplayCapture}
-                        className="flex items-center gap-2 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-emerald-500/20"
-                      >
-                        <MonitorUp className="h-4 w-4 shrink-0 text-emerald-700" />
-                        {t(locale, "captureScreen")}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    {t(locale, "language")}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      ["auto", t(locale, "auto")],
-                      ["en", t(locale, "english")],
-                      ["ja", t(locale, "japanese")],
-                    ] as const).map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => {
-                          handleChangeLocale(value);
-                        }}
-                        className={[
-                          "rounded-lg border px-3 py-2 text-sm transition",
-                          localePreference === value
-                            ? "border-sky-500 bg-sky-500/10 text-sky-700"
-                            : "border-slate-300 bg-white text-slate-600 hover:border-slate-400",
-                        ].join(" ")}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+        <MobileMenu
+          locale={locale}
+          localePreference={localePreference}
+          isIosOrAndroid={isIosOrAndroid}
+          onOpenFile={handleOpenFilePicker}
+          onOpenFolder={handleOpenFolderPicker}
+          onCapture={handleOpenDisplayCapture}
+          onPresetVideo={handlePresetVideo}
+          onPresetImage={handlePresetImage}
+          onPresetLofi={() => { void handlePresetLofi(); }}
+          onPresetDemoSong={(meta: DemoSongMeta) => { void handlePresetDemoSong(meta); }}
+          onChangeLocale={handleChangeLocale}
+        />
+      )}
       <main
         className="safe-top-pad h-dvh flex flex-col overflow-x-hidden bg-slate-700 text-slate-800"
         onDrop={onDrop}
@@ -1022,7 +1019,7 @@ function App() {
         <div className="relative flex flex-col flex-1 min-h-0 w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
           <header className="shrink-0 mb-3" />
 
-          {previewSource.previewStream && (
+          {previewSource.previewStream && previewSource.previewKind !== "audio" && (
           <div className="mb-4">
             <button
               type="button"
