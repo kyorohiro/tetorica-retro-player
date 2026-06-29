@@ -642,7 +642,7 @@ function App() {
       }
       previewSource.previewPath(item.url, item.path);
     }
-  }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath]);
+  }, [shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath]);
 
   const nextTrack = useCallback(() => {
     const list = playlistRef.current;
@@ -809,6 +809,16 @@ function App() {
     toneCleanupRef.current?.();
     toneCleanupRef.current = null;
   }, []);
+
+  // When a file/URL is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
+  React.useEffect(() => {
+    if (!previewSource.previewSrc) return;
+    if (autoStartState !== 'blocked') return;
+    toneCleanupRef.current?.();
+    toneCleanupRef.current = null;
+    setAutoStartState('done');
+  }, [previewSource.previewSrc, autoStartState]);
+
 
   const savePreset = React.useCallback((config: PresetConfig) => {
     currentPresetConfigRef.current = config;
