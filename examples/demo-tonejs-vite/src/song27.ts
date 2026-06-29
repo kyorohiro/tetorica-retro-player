@@ -165,7 +165,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   }, rasEvt).start(0);
 
   const mp = new Tone.Part((time, ev) => {
-    guitar.triggerAttack(ev.n, time, ev.v);
+    guitar.triggerAttack(ev.n, time);
   }, melEvt).start(0);
 
   return () => {

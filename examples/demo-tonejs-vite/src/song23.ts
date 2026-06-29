@@ -17,14 +17,15 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
 
   // --- minimal percussion: soft triangle bell on beat 1 (step 0) ---
   const bell = new Tone.MetalSynth({
-    frequency: 900,
     envelope: { attack: 0.001, decay: 1.5, release: 0.4, sustain: 0 },
     harmonicity: 5.1,
     modulationIndex: 16,
     resonance: 3000,
     octaves: 1.5,
     volume: -22,
-  }).connect(warm);
+  });
+  bell.frequency.value = 900;
+  bell.connect(warm);
 
   const dp = { bell: [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0] };
 

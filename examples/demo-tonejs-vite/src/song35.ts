@@ -79,7 +79,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   pad.connect(padReverb);
 
   // Chord progression (D Dorian): Dm7 → C → G → Am
-  const NAMES = ['Dm7', 'C', 'G', 'Am'];
+
   const chordDefs = [
     { time: '0:0:0', notes: ['D3','F3','A3','C4'], name: 'Dm7', bar: 0 },
     { time: '2:0:0', notes: ['C3','E3','G3'],      name: 'C',   bar: 2 },

@@ -149,7 +149,7 @@ export function create(onStep: StepCb, onChord: ChordCb): () => void {
   }, bassLine).start(0);
 
   const mp = new Tone.Part((time, ev) => {
-    mel.triggerAttack(ev.n, time, ev.v);  // PluckSynth: triggerAttack only
+    mel.triggerAttack(ev.n, time);
   }, melNotes).start(0);
 
   return () => {
