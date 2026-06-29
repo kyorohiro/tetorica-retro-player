@@ -121,6 +121,17 @@ export function usePreviewSourceState() {
     setPreviewKind(kindFromPath(filePath));
   }, [revokePreviewSrc, stopPreviewStream]);
 
+  const previewAudioStream = useCallback((stream: MediaStream, label: string) => {
+    clearPreviewSrc();
+    setCaptureError("");
+    setPreviewLabel(label);
+    setPreviewKind("audio");
+    setPreviewStream((current) => {
+      current?.getTracks().forEach((track) => track.stop());
+      return stream;
+    });
+  }, [clearPreviewSrc]);
+
   return {
     previewSrc,
     previewStream,
@@ -129,6 +140,7 @@ export function usePreviewSourceState() {
     previewKind,
     previewFile,
     previewPath,
+    previewAudioStream,
     startDisplayCapture,
     stopPreviewStream,
   };
