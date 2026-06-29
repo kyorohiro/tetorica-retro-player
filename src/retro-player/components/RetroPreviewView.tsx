@@ -28,6 +28,7 @@ export type RetroPreviewPlayerSlice = {
   sourceDimensions: { width: number; height: number } | null;
   viewportRect: { width: number; height: number; x: number; y: number } | null;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
+  latencyHint: AudioContextLatencyCategory;
   hasPlayableMedia: boolean;
   hasAudibleMedia: boolean;
   canRecord: boolean;
@@ -37,6 +38,7 @@ export type RetroPreviewPlayerSlice = {
   togglePlayback: () => Promise<void>;
   setLoopingEnabled: (nextLooping: boolean) => void;
   setAudioOptimizationMode: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
+  setLatencyHint: (hint: AudioContextLatencyCategory) => void;
   powerOn: () => void;
   powerOff: () => void;
   playVideoWithAudio: () => Promise<void>;
@@ -688,6 +690,7 @@ export function RetroPreviewView({
                 onFlipHToggle={() => { setFlipH((v) => !v); }}
                 onFlipVToggle={() => { setFlipV((v) => !v); }}
                 onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+                onLatencyHintChange={player.setLatencyHint}
               />
             </div>
           )}
@@ -753,6 +756,7 @@ export function RetroPreviewView({
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
               onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+              onLatencyHintChange={player.setLatencyHint}
             />
           </div>
         )}
@@ -817,6 +821,7 @@ export function RetroPreviewView({
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
               onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+              onLatencyHintChange={player.setLatencyHint}
             />
           </div>
         )}
@@ -880,6 +885,7 @@ export function RetroPreviewView({
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            onLatencyHintChange={player.setLatencyHint}
           />
         </div>
       )}
@@ -944,6 +950,7 @@ export function RetroPreviewView({
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            onLatencyHintChange={player.setLatencyHint}
           />
         </div>
       )}

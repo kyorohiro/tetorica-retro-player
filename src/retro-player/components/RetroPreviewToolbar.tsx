@@ -23,6 +23,7 @@ type RetroPreviewToolbarPlayerSlice = {
   isRecording: boolean;
   isPoweredOn: boolean;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
+  latencyHint: AudioContextLatencyCategory;
 };
 
 type RetroPreviewToolbarProps = {
@@ -56,6 +57,7 @@ type RetroPreviewToolbarProps = {
   onAudioOptimizationModeChange: (
     nextMode: RetroAudioSettings["audioOptimizationMode"],
   ) => void;
+  onLatencyHintChange: (hint: AudioContextLatencyCategory) => void;
 };
 
 export function RetroPreviewToolbar({
@@ -87,6 +89,7 @@ export function RetroPreviewToolbar({
   onFlipHToggle,
   onFlipVToggle,
   onAudioOptimizationModeChange,
+  onLatencyHintChange,
 }: RetroPreviewToolbarProps) {
   const tooltipText =
     locale === "ja"
@@ -234,6 +237,35 @@ export function RetroPreviewToolbar({
                   );
                 })}
               </div>
+            </div>
+            <div className="mb-3 border-b border-slate-700 pb-3">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Latency</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  {player.latencyHint}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["interactive", "balanced", "playback"] as const).map((hint) => {
+                  const isActive = player.latencyHint === hint;
+                  return (
+                    <button
+                      key={hint}
+                      type="button"
+                      onClick={() => { onLatencyHintChange(hint); }}
+                      className={[
+                        "inline-flex min-h-8 items-center justify-center rounded-md border px-1.5 py-1 text-[11px] font-medium capitalize transition",
+                        isActive
+                          ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                          : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                      ].join(" ")}
+                    >
+                      {hint}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[10px] text-slate-600">Takes effect after power off/on</p>
             </div>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">

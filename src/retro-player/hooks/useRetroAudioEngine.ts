@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
   loadPersistedRetroSettings,
   savePersistedRetroAudioSettings,
@@ -13,6 +13,20 @@ import {
   DEFAULT_AUDIO_SETTINGS,
   type RetroAudioSettings,
 } from "../audio/preset";
+
+const LATENCY_HINT_STORAGE_KEY = "tetorica-retro-player.latency-hint";
+
+function loadLatencyHint(): AudioContextLatencyCategory {
+  try {
+    const v = localStorage.getItem(LATENCY_HINT_STORAGE_KEY);
+    if (v === "interactive" || v === "balanced" || v === "playback") return v;
+  } catch {}
+  return "balanced";
+}
+
+function saveLatencyHint(hint: AudioContextLatencyCategory): void {
+  try { localStorage.setItem(LATENCY_HINT_STORAGE_KEY, hint); } catch {}
+}
 
 type UseRetroAudioEngineParams = {
   instanceLabel: string;
@@ -75,6 +89,14 @@ export function useRetroAudioEngine({
   isPlaying,
   isPlayingRef,
 }: UseRetroAudioEngineParams) {
+  const [latencyHint, setLatencyHintState] = useState<AudioContextLatencyCategory>(loadLatencyHint);
+  const latencyHintRef = useRef<AudioContextLatencyCategory>(latencyHint);
+
+  const setLatencyHint = useCallback((hint: AudioContextLatencyCategory) => {
+    latencyHintRef.current = hint;
+    saveLatencyHint(hint);
+    setLatencyHintState(hint);
+  }, []);
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
 
@@ -261,7 +283,7 @@ export function useRetroAudioEngine({
 
   const getOrCreateEngine = (): TetoricaRetroAudioNode => {
     if (!audioEngineRef.current) {
-      const context = new AudioContext({ latencyHint: "interactive" });
+      const context = new AudioContext({ latencyHint: latencyHintRef.current });
       audioContextOwnedRef.current = context;
       audioEngineRef.current = createRetroAudioEngine({
         context,
@@ -429,7 +451,7 @@ export function useRetroAudioEngine({
     if (previousEngine) await previousEngine.dispose();
     if (previousContext) await closeOwnedAudioContext(previousContext);
 
-    const nextContext = new AudioContext({ latencyHint: "interactive" });
+    const nextContext = new AudioContext({ latencyHint: latencyHintRef.current });
     const nextEngine = createRetroAudioEngine({
       context: nextContext,
       instanceLabel,
@@ -899,6 +921,8 @@ export function useRetroAudioEngine({
     audioOptimizationModeRef,
     audioOptimizationMode,
     setAudioOptimizationMode,
+    latencyHint,
+    setLatencyHint,
     isMutedRef,
     volumeRef,
     playbackRateRef,

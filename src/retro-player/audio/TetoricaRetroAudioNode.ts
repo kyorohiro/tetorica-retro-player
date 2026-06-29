@@ -26,6 +26,8 @@ export type TetoricaRetroAudioNodeOptions = {
   previewKind?: RetroAudioPreviewKind;
   isPlaying?: boolean;
   enableAudioWorklet?: boolean;
+  /** Default: "balanced". Use "playback" for audio-only, "interactive" for low-latency instrument use. */
+  latencyHint?: AudioContextLatencyCategory | number;
 };
 
 export type CreateRetroAudioEngineParams = {
