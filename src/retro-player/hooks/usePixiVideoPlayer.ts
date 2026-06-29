@@ -61,7 +61,7 @@ export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
   renderResolutionScale = 1,
-  options?: { onEnded?: () => void; onError?: (error: Error) => void },
+  options?: { onEnded?: () => void; onError?: (error: Error) => void; onRetry?: () => void },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const objectUrlRef = useRef<string | null>(null);
@@ -81,6 +81,7 @@ export function usePixiVideoPlayer(
   const wasPlayingBeforePowerOffRef = useRef(false);
   const onEndedRef = useRef<(() => void) | undefined>(options?.onEnded);
   const onErrorRef = useRef<((error: Error) => void) | undefined>(options?.onError);
+  const onRetryRef = useRef<(() => void) | undefined>(options?.onRetry);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -530,6 +531,10 @@ export function usePixiVideoPlayer(
   }, [options?.onError]);
 
   useEffect(() => {
+    onRetryRef.current = options?.onRetry;
+  }, [options?.onRetry]);
+
+  useEffect(() => {
     cleanupPreviewRef.current = cleanupPreview;
   }, [cleanupPreview]);
 
@@ -540,9 +545,14 @@ export function usePixiVideoPlayer(
   const togglePlayback = async () => {
     if (!mediaRef.current) return;
 
-    if (mediaRef.current.paused) {
+    if (mediaRef.current.paused || mediaRef.current.ended) {
       if (!isPoweredOn) {
         powerOn();
+      }
+      // Media is in error state → ask App.tsx to restart the current preset.
+      if (mediaRef.current.error || mediaRef.current.ended) {
+        onRetryRef.current?.();
+        return;
       }
       await playVideoWithAudio();
       syncVideoState();

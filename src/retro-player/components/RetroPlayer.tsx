@@ -30,6 +30,7 @@ type RetroPlayerProps = {
   looping?: boolean;
   className?: string;
   onError?: (error: Error) => void;
+  onRetry?: () => void;
   initialFilterState?: RetroFilterInitialState;
   confirmDialog?: ConfirmDialogFn;
   onEnded?: () => void;
@@ -48,6 +49,7 @@ export function RetroPlayer({
   looping,
   className,
   onError,
+  onRetry,
   initialFilterState,
   confirmDialog: confirmDialogProp,
   onEnded,
@@ -89,7 +91,7 @@ export function RetroPlayer({
     filterState,
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
-    { onEnded, onError },
+    { onEnded, onError, onRetry },
   );
 
   // --- Callbacks ---

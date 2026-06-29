@@ -33,6 +33,7 @@ import {
 import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
 import { MobileMenu } from "./MobileMenu";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
+import { type PresetConfig, loadStartupPreset, saveStartupPreset } from "./builtin-content/preset-config";
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
@@ -67,8 +68,19 @@ const isAndroidRuntime = () => {
 const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));
 
 function App() {
-  const defaultPreviewSrc = "./test_colorbars.png";
-  const defaultPreviewKind = "image";
+  // Initialize from localStorage so the first render never shows colorbars
+  // when the startup preset is a ToneJS or URL type.
+  const [startupPreset] = React.useState<PresetConfig>(() => loadStartupPreset());
+  const defaultPreviewSrc: string | undefined =
+    startupPreset.type === 'colorbars-image' ? './test_colorbars.png' :
+    startupPreset.type === 'colorbars-video' ? './test_colorbars.mp4' :
+    startupPreset.type === 'url' ? startupPreset.url :
+    undefined; // lofi / demo-song → audio UI, no src needed
+  const defaultPreviewKind: "video" | "audio" | "image" =
+    startupPreset.type === 'colorbars-image' ? 'image' :
+    startupPreset.type === 'colorbars-video' ? 'video' :
+    startupPreset.type === 'url' ? 'video' :
+    'audio'; // lofi / demo-song
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
@@ -94,6 +106,12 @@ function App() {
     setLoopMode((m) => m === "one" ? "autoplay" : m === "autoplay" ? "all" : m === "all" ? "off" : "one");
   }, []);
   const toneCleanupRef = React.useRef<(() => void) | null>(null);
+  const currentPresetConfigRef = React.useRef<PresetConfig>(startupPreset);
+  // 'pending' = loading (dark overlay covers colorbars flash)
+  // 'blocked' = AudioContext suspended (Safari) → shows Touch & Play button
+  // 'done'    = playing or user chose something else
+  type AutoStartState = 'pending' | 'blocked' | 'done';
+  const [autoStartState, setAutoStartState] = React.useState<AutoStartState>('pending');
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -137,18 +155,65 @@ function App() {
     saveLocalePreference(localePreference);
   }, [localePreference]);
 
-  // Auto-start Lo-fi Chill on mount. Falls back silently if autoplay is blocked.
+  // Restore startup preset on mount.
+  // For ToneJS presets: Tone.start() may hang on Safari without a user gesture,
+  // so we race a 500ms timeout. On success → play immediately. On timeout →
+  // create session (audio UI shows) + "Touch & Play" button.
+  // For URL/ColorBar presets: set directly, no audio context involved.
   React.useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const startToneSession = async (
+      loader: () => Promise<{ stream: MediaStream; dispose: () => void }>,
+      label: string,
+    ) => {
+      const Tone = await import('tone');
+      let contextRunning = false;
       try {
-        const { startLofiSession } = await import('./builtin-content/lofi-engine');
-        const session = await startLofiSession();
-        if (cancelled) { session.dispose(); return; }
-        toneCleanupRef.current = session.dispose;
-        previewSourceRef.current.previewAudioStream(session.stream, 'Lo-fi Chill');
-      } catch { /* autoplay blocked — stays on default image */ }
+        await Promise.race([
+          Tone.start().then(() => { contextRunning = true; }),
+          new Promise<void>(resolve => setTimeout(resolve, 500)),
+        ]);
+      } catch { /* autoplay blocked */ }
+      if (cancelled) return;
+      const session = await loader();
+      if (cancelled) { session.dispose(); return; }
+      toneCleanupRef.current = session.dispose;
+      previewSourceRef.current.previewAudioStream(session.stream, label);
+      setAutoStartState(contextRunning ? 'done' : 'blocked');
+    };
+
+    (async () => {
+      if (cancelled) return;
+      try {
+        const preset = currentPresetConfigRef.current;
+        if (preset.type === 'lofi') {
+          const { startLofiSession } = await import('./builtin-content/lofi-engine');
+          await startToneSession(startLofiSession, 'Lo-fi Chill');
+        } else if (preset.type === 'demo-song') {
+          const [{ DEMO_SONGS }, { startDemoSongSession }] = await Promise.all([
+            import('./builtin-content/demo-songs'),
+            import('./builtin-content/demo-song-session'),
+          ]);
+          const meta = DEMO_SONGS.find(s => s.id === preset.songId);
+          if (meta) {
+            await startToneSession(() => startDemoSongSession(meta), meta.name);
+          } else {
+            setAutoStartState('done'); // song not found, just clear overlay
+          }
+        } else if (preset.type === 'colorbars-video') {
+          previewSourceRef.current.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
+          setAutoStartState('done');
+        } else if (preset.type === 'colorbars-image') {
+          previewSourceRef.current.previewPath('./test_colorbars.png', 'test_colorbars.png');
+          setAutoStartState('done');
+        } else if (preset.type === 'url') {
+          previewSourceRef.current.previewPath(preset.url, preset.label);
+          setAutoStartState('done');
+        }
+      } catch { setAutoStartState('done'); /* unexpected — clear overlay */ }
     })();
+
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -580,6 +645,8 @@ function App() {
         return;
       }
       previewSourceRef.current.previewPath(hlsUrl, path);
+      currentPresetConfigRef.current = { type: 'url', url: hlsUrl, label: path };
+      saveStartupPreset(currentPresetConfigRef.current);
     } catch (e) {
       console.error("[ffmpeg retry] failed:", e);
     }
@@ -730,6 +797,11 @@ function App() {
         return;
       }
       previewSource.previewPath(playUrl, selected);
+      // Save restorable URLs (HTTP) as startup preset so the player retries on next launch.
+      if (playUrl.startsWith('http')) {
+        currentPresetConfigRef.current = { type: 'url', url: playUrl, label: selected };
+        saveStartupPreset(currentPresetConfigRef.current);
+      }
       return;
     }
 
@@ -771,34 +843,83 @@ function App() {
     toneCleanupRef.current = null;
   }, []);
 
+  const savePreset = React.useCallback((config: PresetConfig) => {
+    currentPresetConfigRef.current = config;
+    saveStartupPreset(config);
+    setAutoStartState('done');
+  }, []);
+
   const handlePresetVideo = useCallback(() => {
+    savePreset({ type: 'colorbars-video' });
     stopTone();
     previewSource.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
     setIsMobileMenuOpen(false);
-  }, [previewSource, stopTone]);
+  }, [previewSource, savePreset, stopTone]);
 
   const handlePresetImage = useCallback(() => {
+    savePreset({ type: 'colorbars-image' });
     stopTone();
     previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
     setIsMobileMenuOpen(false);
-  }, [previewSource, stopTone]);
+  }, [previewSource, savePreset, stopTone]);
 
   const handlePresetLofi = useCallback(async () => {
+    savePreset({ type: 'lofi' });
     stopTone();
     setIsMobileMenuOpen(false);
-    const { startLofiSession } = await import('./builtin-content/lofi-engine');
+    const [{ startLofiSession }, Tone] = await Promise.all([
+      import('./builtin-content/lofi-engine'),
+      import('tone'),
+    ]);
+    await Tone.start().catch(() => {});
     const session = await startLofiSession();
     toneCleanupRef.current = session.dispose;
     previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
-  }, [previewSource, stopTone]);
+  }, [previewSource, savePreset, stopTone]);
 
   const handlePresetDemoSong = useCallback(async (meta: DemoSongMeta) => {
+    savePreset({ type: 'demo-song', songId: meta.id });
     stopTone();
     setIsMobileMenuOpen(false);
     const { startDemoSongSession } = await import('./builtin-content/demo-song-session');
     const session = await startDemoSongSession(meta);
     toneCleanupRef.current = session.dispose;
     previewSource.previewAudioStream(session.stream, meta.name);
+  }, [previewSource, savePreset, stopTone]);
+
+  // Restart the currently saved preset. Called from RetroPlayer's onRetry
+  // (play button pressed while media is in error/ended state).
+  const handleRetry = useCallback(async () => {
+    setAutoStartState('done');
+    const preset = currentPresetConfigRef.current;
+    stopTone();
+    if (preset.type === 'lofi') {
+      const [{ startLofiSession }, Tone] = await Promise.all([
+        import('./builtin-content/lofi-engine'),
+        import('tone'),
+      ]);
+      await Tone.start().catch(() => {});
+      const session = await startLofiSession();
+      toneCleanupRef.current = session.dispose;
+      previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
+    } else if (preset.type === 'demo-song') {
+      const [{ DEMO_SONGS }, { startDemoSongSession }] = await Promise.all([
+        import('./builtin-content/demo-songs'),
+        import('./builtin-content/demo-song-session'),
+      ]);
+      const meta = DEMO_SONGS.find(s => s.id === preset.songId);
+      if (meta) {
+        const session = await startDemoSongSession(meta);
+        toneCleanupRef.current = session.dispose;
+        previewSource.previewAudioStream(session.stream, meta.name);
+      }
+    } else if (preset.type === 'colorbars-video') {
+      previewSource.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
+    } else if (preset.type === 'colorbars-image') {
+      previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
+    } else if (preset.type === 'url') {
+      previewSource.previewPath(preset.url, preset.label);
+    }
   }, [previewSource, stopTone]);
 
   const handleReloadApp = useCallback(() => {
@@ -1077,6 +1198,7 @@ function App() {
               looping={!isUsingDefaultPreview && loopMode === "one"}
               onEnded={handleEnded}
               onError={handlePlayerError}
+              onRetry={() => { void handleRetry(); }}
               onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
               onNextTrack={playlistLength > 1 ? nextTrack : undefined}
               loopMode={loopMode}
@@ -1103,6 +1225,17 @@ function App() {
                   ✕
                 </button>
               </div>
+            </div>
+          )}
+          {autoStartState === 'blocked' && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <button
+                type="button"
+                className="pointer-events-auto rounded-full border border-amber-400/40 bg-amber-500/15 px-8 py-3 text-sm text-amber-200 shadow-lg backdrop-blur-sm transition hover:bg-amber-500/25 active:scale-95"
+                onClick={() => { void handleRetry(); }}
+              >
+                ▶ Touch &amp; Play
+              </button>
             </div>
           )}
         </div>
