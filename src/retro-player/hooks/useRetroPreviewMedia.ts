@@ -79,6 +79,13 @@ type UseRetroPreviewMediaParams = {
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
+const isTauriRuntime = () =>
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
+const isWindowsRuntime = () =>
+  typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
+
 // navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
 // Chrome DevTools UA emulation does NOT change navigator.vendor, so this
 // correctly returns false even when the DevTools UA is set to iOS Safari.
@@ -330,6 +337,60 @@ export function useRetroPreviewMedia({
       video.load();
     });
 
+  const waitForConfirmedPlaybackStart = (media: HTMLMediaElement) =>
+    new Promise<void>((resolve, reject) => {
+      const startTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+
+      const cleanup = () => {
+        media.removeEventListener("playing", handleMaybeReady);
+        media.removeEventListener("timeupdate", handleMaybeReady);
+        media.removeEventListener("error", handleError);
+        if (timer !== null) {
+          window.clearTimeout(timer);
+        }
+      };
+
+      const isAdvanced = () => {
+        const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+        return currentTime > startTime + 0.01;
+      };
+
+      const finish = () => {
+        cleanup();
+        resolve();
+      };
+
+      const handleMaybeReady = () => {
+        if (!media.paused && isAdvanced()) {
+          finish();
+        }
+      };
+
+      const handleError = () => {
+        cleanup();
+        reject(new Error("動画の再生開始確認に失敗しました。"));
+      };
+
+      if (!media.paused && isAdvanced()) {
+        resolve();
+        return;
+      }
+
+      media.addEventListener("playing", handleMaybeReady);
+      media.addEventListener("timeupdate", handleMaybeReady);
+      media.addEventListener("error", handleError, { once: true });
+
+      const timer = window.setTimeout(() => {
+        cleanup();
+        const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+        reject(
+          new Error(
+            `動画の再生開始を確認できませんでした。 src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${currentTime}`,
+          ),
+        );
+      }, 1200);
+    });
+
   const waitForAudioReady = (audio: HTMLAudioElement) =>
     new Promise<void>((resolve, reject) => {
       const describeMediaError = (mediaError: MediaError | null) => {
@@ -439,9 +500,25 @@ export function useRetroPreviewMedia({
       }
       quietAudioOutputImmediately();
     };
+    const debugMediaEvent = (label: string) => {
+      if (!isCurrentMedia()) {
+        return;
+      }
+      debugVideo(`media:${label}`, {
+        currentTime: media.currentTime,
+        duration: media.duration,
+        ended: media.ended,
+        paused: media.paused,
+        previewKind: previewKindRef.current,
+        readyState: media.readyState,
+        src: media.currentSrc || media.src || null,
+      });
+    };
 
     media.addEventListener("play", syncIfCurrentMedia);
+    media.addEventListener("play", () => debugMediaEvent("play"));
     media.addEventListener("pause", syncIfCurrentMedia);
+    media.addEventListener("pause", () => debugMediaEvent("pause"));
     media.addEventListener("pause", () => {
       if (!isCurrentMedia()) {
         return;
@@ -466,8 +543,19 @@ export function useRetroPreviewMedia({
     // on their own. Silencing on these and immediately restoring on "playing"
     // caused repeated click noise during media loading and file switching.
     // We DO track buffering state for the UI loading indicator (no audio impact).
-    media.addEventListener("waiting", () => { if (isCurrentMedia()) setIsBuffering(true); });
-    media.addEventListener("playing", () => { if (isCurrentMedia()) setIsBuffering(false); });
+    media.addEventListener("waiting", () => {
+      if (isCurrentMedia()) setIsBuffering(true);
+      debugMediaEvent("waiting");
+    });
+    media.addEventListener("playing", () => {
+      if (isCurrentMedia()) setIsBuffering(false);
+      debugMediaEvent("playing");
+    });
+    media.addEventListener("loadeddata", () => debugMediaEvent("loadeddata"));
+    media.addEventListener("canplay", () => debugMediaEvent("canplay"));
+    media.addEventListener("stalled", () => debugMediaEvent("stalled"));
+    media.addEventListener("suspend", () => debugMediaEvent("suspend"));
+    media.addEventListener("error", () => debugMediaEvent("error"));
     media.addEventListener("volumechange", syncIfCurrentMedia);
 
     // Lightweight timeupdate handler: only update the scrubber position.
@@ -481,6 +569,7 @@ export function useRetroPreviewMedia({
       const t = mediaRef.current?.currentTime ?? 0;
       if (Math.abs(t - lastTimeupdateTime) < 0.08) return;
       lastTimeupdateTime = t;
+      debugMediaEvent("timeupdate");
       setCurrentTime(t);
     };
     media.addEventListener("timeupdate", handleTimeUpdate);
@@ -733,7 +822,30 @@ export function useRetroPreviewMedia({
       if (contextWasSuspended && !isHiddenDoc) {
         await new Promise<void>((resolve) => { setTimeout(resolve, 30); });
       }
+      const shouldConfirmPlaybackStart =
+        media instanceof HTMLVideoElement &&
+        media.src.includes(".m3u8") &&
+        isTauriRuntime() &&
+        isWindowsRuntime();
+      const startedAtTime = media.currentTime;
       await media.play();
+      if (shouldConfirmPlaybackStart) {
+        debugVideo("playVideoWithAudio:play-resolved", {
+          currentTime: media.currentTime,
+          paused: media.paused,
+          readyState: media.readyState,
+          src: media.currentSrc || media.src || null,
+          startedAtTime,
+        });
+        await waitForConfirmedPlaybackStart(media);
+        debugVideo("playVideoWithAudio:confirmed-start", {
+          currentTime: media.currentTime,
+          paused: media.paused,
+          readyState: media.readyState,
+          src: media.currentSrc || media.src || null,
+          startedAtTime,
+        });
+      }
       isPlayingRef.current = true;
       setEngineIsPlaying(true);
       setIsPlaying(true);
