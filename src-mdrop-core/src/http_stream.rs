@@ -228,6 +228,17 @@ async fn start_hls_for_path(
         input,
         tmp_dir.display()
     );
+    let should_try_copy = should_try_stream_copy(file_path);
+    if !should_try_copy {
+        println!(
+            "[HLS] session={} skipping copy path for extension={}",
+            session_id,
+            file_path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("(unknown)")
+        );
+    }
 
     // Helper: spawn ffmpeg with given args, poll until a .ts segment appears.
     // Returns (child, ready). Kills and cleans up playlist on failure before returning.
@@ -265,10 +276,18 @@ async fn start_hls_for_path(
     }
 
     // Phase 1: copy (6 s timeout)
-    let (mut child, mut ready) = try_ffmpeg!(
-        ["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"],
-        30
-    );
+    let started_with_qsv = !should_try_copy;
+    let (mut child, mut ready) = if should_try_copy {
+        try_ffmpeg!(
+            ["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"],
+            30
+        )
+    } else {
+        try_ffmpeg!(
+            ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
+            50
+        )
+    };
 
     // Guard: VP8/VP9/AV1 inputs can make ffmpeg silently produce audio-only TS
     // (codec not supported in container, video stream dropped without error).
@@ -295,7 +314,7 @@ async fn start_hls_for_path(
     }
 
     // Phase 2: h264_qsv hardware encode (10 s — fails fast if GPU unavailable)
-    if !ready {
+    if !ready && should_try_copy {
         println!(
             "[HLS] copy path not ready for session={}, retrying with h264_qsv",
             session_id
@@ -309,8 +328,9 @@ async fn start_hls_for_path(
     // Phase 3: libx264 software fallback (30 s)
     if !ready {
         println!(
-            "[HLS] h264_qsv not ready for session={}, retrying with libx264",
-            session_id
+            "[HLS] {} not ready for session={}, retrying with libx264",
+            if started_with_qsv { "initial h264_qsv path" } else { "h264_qsv" },
+            session_id,
         );
         (child, ready) = try_ffmpeg!(
             [
@@ -418,6 +438,14 @@ fn first_segment_from_playlist(content: &str) -> Option<String> {
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with('#') && line.ends_with(".ts"))
         .map(ToOwned::to_owned)
+}
+
+fn should_try_stream_copy(path: &FsPath) -> bool {
+    let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+        return true;
+    };
+
+    !matches!(ext.to_ascii_lowercase().as_str(), "webm" | "ogv")
 }
 
 async fn wait_for_playlist_ready(
