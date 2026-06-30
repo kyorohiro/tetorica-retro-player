@@ -82,6 +82,45 @@ vec3 quantizeColor(vec3 color, float levels)
   return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
 }
 
+vec3 rgb2hsv(vec3 c)
+{
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1.0e-10)), d / (q.x + 1.0e-10), q.x);
+}
+
+vec3 hsv2rgb(vec3 c)
+{
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+vec3 nearestColorAnime(vec3 color)
+{
+  vec3 hsv = rgb2hsv(color);
+  float h = hsv.x;
+  float s = hsv.y;
+  float v = hsv.z;
+
+  float skinWeight = max(
+    1.0 - smoothstep(0.05, 0.10, h),
+    smoothstep(0.90, 0.95, h)
+  ) * smoothstep(0.08, 0.20, s);
+
+  float vQ = 0.22 + round(v * 2.0) / 2.0 * 0.72;
+
+  float shadowDepth = max(0.0, v - vQ);
+  float hQ = fract(h + skinWeight * shadowDepth * 0.12);
+
+  float satScale = mix(1.35, 0.85, vQ);
+  float sQ = clamp(s * satScale, 0.0, 1.0);
+
+  return hsv2rgb(vec3(hQ, sQ, vQ));
+}
+
 float computeSourceEdge(vec2 uv, vec2 texel)
 {
   float tl = dot(texture(uTexture, clamp(uv + vec2(-texel.x, -texel.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.299, 0.587, 0.114));
@@ -115,7 +154,9 @@ void main(void)
     float edge = pow(computeSourceEdge(pixelatedUv, texel), 0.7);
     vec3 neonTint = mix(uMonoTint, vec3(0.1, 1.0, 0.9), 0.45);
     color = neonTint * edge * (0.7 + clamp(uNeonBoost, 0.0, 2.0) * 0.5);
-  } else if (uPaletteMode > 9.5) {
+  } else if (uPaletteMode > 9.5 && uPaletteMode < 10.5) {
+    color = nearestColorAnime(color);
+  } else if (uPaletteMode > 10.5) {
     color = quantizeColor(color, max(min(uColorLevels, 24.0), 6.0));
   } else {
     color = quantizeColor(color, max(uColorLevels, 2.0));
