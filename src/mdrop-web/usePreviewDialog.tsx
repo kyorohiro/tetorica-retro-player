@@ -236,7 +236,7 @@ function PreviewDialog({
                     Next
                 </button>
 
-                {(!!preivewGlobalSetting.isOpen) && (
+                {(!!preivewGlobalSetting.isOpen) && !useHls && (
                     <button
                         type="button"
                         onClick={() => {
