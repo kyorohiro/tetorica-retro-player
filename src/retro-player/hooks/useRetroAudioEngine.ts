@@ -507,6 +507,20 @@ export function useRetroAudioEngine({
       let mediaSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode;
 
       if (media.srcObject instanceof MediaStream) {
+        const audioTracks = media.srcObject.getAudioTracks();
+        if (audioTracks.length === 0) {
+          media.muted = true;
+          media.volume = 0;
+          engine.setOutputEnabled(false);
+          updateAudioNodes();
+          debugAudio("connectMediaAudio:no-audio-tracks", {
+            audioContextState: context.state,
+            mediaTag: media.tagName,
+            previewKind: previewKindRef.current,
+          });
+          return;
+        }
+
         // For MediaStream sources (Tone.js, etc.): createMediaElementSource does not
         // route audio through the Web Audio chain on Safari when srcObject is a
         // MediaStream from a different AudioContext. Use createMediaStreamSource directly.
