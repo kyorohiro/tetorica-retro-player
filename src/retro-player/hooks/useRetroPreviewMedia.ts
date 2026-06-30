@@ -86,6 +86,12 @@ const isTauriRuntime = () =>
 const isWindowsRuntime = () =>
   typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
 
+const shouldBypassWebAudioForMedia = (media: HTMLMediaElement) =>
+  isTauriRuntime() &&
+  isWindowsRuntime() &&
+  media instanceof HTMLVideoElement &&
+  media.src.includes(".m3u8");
+
 // navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
 // Chrome DevTools UA emulation does NOT change navigator.vendor, so this
 // correctly returns false even when the DevTools UA is set to iOS Safari.
@@ -802,9 +808,14 @@ export function useRetroPreviewMedia({
 
     try {
       const media = mediaRef.current;
+      const bypassWebAudio = shouldBypassWebAudioForMedia(media);
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
       const context = await ensureAudioContext();
-      if (staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) && mediaSourceRef.current) {
+      if (
+        (staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
+          mediaSourceRef.current) ||
+        bypassWebAudio
+      ) {
         media.muted = false;
         media.volume = 0;
       } else {
@@ -865,14 +876,16 @@ export function useRetroPreviewMedia({
         return;
       }
       if (
-        audioContextState !== "running" &&
-        staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
-        mediaSourceRef.current
+        (audioContextState !== "running" &&
+          staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
+          mediaSourceRef.current) ||
+        bypassWebAudio
       ) {
         media.muted = isMutedRef.current;
         media.volume = isMutedRef.current ? 0 : volumeRef.current;
         debugAudio("playVideoWithAudio:native-audio-fallback", {
           audioContextState,
+          bypassWebAudio,
           currentTime: media.currentTime,
         });
       }
@@ -1277,7 +1290,16 @@ export function useRetroPreviewMedia({
         mediaRef.current = media;
         await attachVisualPreview(media, "video");
         await ensureVisualStartupReady("video");
-        await connectMediaAudio(media);
+        if (shouldBypassWebAudioForMedia(media)) {
+          debugAudio("connectMediaAudio:bypass-native-hls", {
+            currentSrc: media.currentSrc || media.src || null,
+            previewKind: "video",
+          });
+          mediaSourceRef.current?.disconnect();
+          mediaSourceRef.current = null;
+        } else {
+          await connectMediaAudio(media);
+        }
         syncVideoState();
       } else if (kind === "image") {
         const image = new Image();
