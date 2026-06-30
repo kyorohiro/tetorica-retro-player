@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   RETRO_PRESETS,
   type MonoTintMode,
@@ -214,32 +214,32 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     resolvePresetKeyFromState(resolvedInitialState),
   );
 
-  const setTargetWidth = (targetWidth: number) => {
+  const setTargetWidth = useCallback((targetWidth: number) => {
     setSelectedPreset(null);
     setSettings((current) => (
       current.targetWidth === targetWidth
         ? current
         : { ...current, targetWidth }
     ));
-  };
+  }, []);
 
-  const setTargetHeight = (targetHeight: number) => {
+  const setTargetHeight = useCallback((targetHeight: number) => {
     setSelectedPreset(null);
     setSettings((current) => (
       current.targetHeight === targetHeight
         ? current
         : { ...current, targetHeight }
     ));
-  };
+  }, []);
 
-  const setMatchTargetAspect = (matchTargetAspect: boolean) => {
+  const setMatchTargetAspect = useCallback((matchTargetAspect: boolean) => {
     setSelectedPreset(null);
     setSettings((current) => (
       current.matchTargetAspect === matchTargetAspect
         ? current
         : { ...current, matchTargetAspect }
     ));
-  };
+  }, []);
 
   const setColorLevels = (colorLevels: number) => {
     setSelectedPreset(null);
@@ -434,7 +434,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, isFilterEnabled }));
   };
 
-  const applyPreset = (preset: RetroPresetKey) => {
+  const applyPreset = useCallback((preset: RetroPresetKey) => {
     const presetSettings: RetroPresetDefinition = RETRO_PRESETS[preset];
 
     setSelectedPreset(preset);
@@ -481,7 +481,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       neonDetail: presetSettings.neonDetail,
       isFilterEnabled: preset !== "none",
     }));
-  };
+  }, []);
 
   const applyAllFilterSettings = (s: RetroFilterSettings) => {
     setSelectedPreset(resolvePresetKeyFromState(s));

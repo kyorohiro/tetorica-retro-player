@@ -375,3 +375,12 @@ python -m http.server 8080
 | 5x〜20x | 再エンコードだが PC に余裕あり |
 | 1x〜5x  | ギリギリ。バッファ不足で途切れる可能性 |
 | 1x 未満 | リアルタイム変換不可。再生が止まる |
+
+
+-y -i "17.mp4" `
+  -c:v libx264 -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" `
+  -preset ultrafast -tune zerolatency `
+  -c:a aac -b:a 128k `
+  -f hls -hls_time 2 -hls_list_size 0 `
+  -hls_segment_filename seg%03d.ts `
+  index.m3u8
