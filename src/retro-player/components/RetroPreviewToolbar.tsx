@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import {
   Aperture,
   ArrowLeftRight,
@@ -58,6 +59,8 @@ type RetroPreviewToolbarProps = {
     nextMode: RetroAudioSettings["audioOptimizationMode"],
   ) => void;
   onLatencyHintChange: (hint: AudioContextLatencyCategory) => void;
+  ffmpegUseQsv: boolean;
+  onToggleFfmpegUseQsv: () => void;
 };
 
 export function RetroPreviewToolbar({
@@ -90,6 +93,8 @@ export function RetroPreviewToolbar({
   onFlipVToggle,
   onAudioOptimizationModeChange,
   onLatencyHintChange,
+  ffmpegUseQsv,
+  onToggleFfmpegUseQsv,
 }: RetroPreviewToolbarProps) {
   const tooltipText =
     locale === "ja"
@@ -108,6 +113,10 @@ export function RetroPreviewToolbar({
           maximizeOff: "Maximize: プレビューを全画面表示します。",
           alarmIdle: "Alarm: 指定時刻にメディア再生か通知音を鳴らします。",
           alarmArmed: "Alarm: 時刻を待っています。",
+          qsv: "Use QSV when available",
+          qsvDescription: "Intel Quick Sync 対応の Windows 環境のみ",
+          enabled: "有効",
+          disabled: "無効",
         }
       : {
           recordIdle: "Record: capture the current retro output.",
@@ -124,6 +133,10 @@ export function RetroPreviewToolbar({
           maximizeOff: "Maximize: open the preview full screen.",
           alarmIdle: "Alarm: play media or a fallback tone at the selected time.",
           alarmArmed: "Alarm: armed and waiting for the selected time.",
+          qsv: "Use QSV when available",
+          qsvDescription: "Intel Quick Sync capable Windows environments only",
+          enabled: "On",
+          disabled: "Off",
         };
 
   const [isMoreOpen, setIsMoreOpen] = React.useState(false);
@@ -131,6 +144,9 @@ export function RetroPreviewToolbar({
     () => typeof window !== "undefined" && window.innerWidth < 360,
   );
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
+  const [moreMenuStyle, setMoreMenuStyle] = React.useState<React.CSSProperties | null>(null);
+  const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
 
   const scheduleTooltip = React.useCallback((key: string) => {
@@ -167,6 +183,80 @@ export function RetroPreviewToolbar({
     return () => { window.removeEventListener("resize", handler); };
   }, []);
 
+  const updateMoreMenuPosition = React.useCallback(() => {
+    if (typeof window === "undefined" || !moreButtonRef.current) return;
+
+    const rect = moreButtonRef.current.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(256, Math.max(220, window.innerWidth - margin * 2));
+    const menuHeight = moreMenuRef.current?.offsetHeight ?? 360;
+    const spaceAbove = Math.max(0, rect.top - margin);
+    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - margin);
+    const openUp = spaceAbove > spaceBelow && spaceAbove >= 180;
+    const maxHeight = Math.min(
+      512,
+      Math.max(180, openUp ? spaceAbove : spaceBelow),
+    );
+
+    const left = Math.min(
+      Math.max(margin, rect.left),
+      Math.max(margin, window.innerWidth - width - margin),
+    );
+
+    const top = openUp
+      ? Math.max(margin, rect.top - Math.min(menuHeight, maxHeight) - margin)
+      : Math.min(
+          rect.bottom + margin,
+          Math.max(margin, window.innerHeight - Math.min(menuHeight, maxHeight) - margin),
+        );
+
+    setMoreMenuStyle({
+      position: "fixed",
+      left,
+      top,
+      width,
+      maxHeight,
+      zIndex: 1000,
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (!isMoreOpen) return;
+
+    updateMoreMenuPosition();
+
+    const handleWindowChange = () => {
+      updateMoreMenuPosition();
+    };
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        !moreMenuRef.current?.contains(target) &&
+        !moreButtonRef.current?.contains(target)
+      ) {
+        setIsMoreOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMoreOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleWindowChange, { passive: true });
+    window.addEventListener("scroll", handleWindowChange, { passive: true });
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("resize", handleWindowChange);
+      window.removeEventListener("scroll", handleWindowChange);
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMoreOpen, updateMoreMenuPosition]);
+
   const floatingButtonClass =
     "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm";
   const glowingFloatingButtonClass =
@@ -194,6 +284,7 @@ export function RetroPreviewToolbar({
     <>
       <div className="relative">
         <button
+          ref={moreButtonRef}
           type="button"
           aria-label="More options"
           onClick={() => { hideTooltip(); setIsMoreOpen((v) => !v); }}
@@ -206,8 +297,15 @@ export function RetroPreviewToolbar({
         >
           <MoreHorizontal size={16} />
         </button>
-            {isMoreOpen && (
-          <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl border border-slate-600/80 bg-slate-950/96 p-3 shadow-xl backdrop-blur-sm">
+        {isMoreOpen && moreMenuStyle && typeof document !== "undefined" && createPortal(
+          <div
+            ref={moreMenuRef}
+            style={moreMenuStyle}
+            className="overflow-y-auto overscroll-contain rounded-xl border border-slate-600/80 bg-slate-950/96 p-3 shadow-xl backdrop-blur-sm"
+          >
+            <div className="sticky top-0 z-10 mb-3 border-b border-slate-700/90 bg-slate-950/98 py-2 text-[10px] uppercase tracking-[0.24em] text-slate-500 backdrop-blur-sm">
+              menu
+            </div>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
                 <span>Audio Optimize</span>
@@ -266,6 +364,25 @@ export function RetroPreviewToolbar({
                 })}
               </div>
               <p className="mt-1.5 text-[10px] text-slate-600">Takes effect after power off/on</p>
+            </div>
+            <div className="mb-3 border-b border-slate-700 pb-3">
+              <div className="mb-2 flex items-center justify-between gap-3 text-[11px] text-slate-400">
+                <div>
+                  <div className="text-slate-300">{tooltipText.qsv}</div>
+                  <p className="mt-1 text-[10px] leading-[1.45] text-slate-500">
+                    {tooltipText.qsvDescription}
+                  </p>
+                </div>
+                <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-[11px] text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={ffmpegUseQsv}
+                    onChange={onToggleFfmpegUseQsv}
+                    className="h-4 w-4 rounded border-slate-500 bg-slate-900 text-cyan-400 focus:ring-cyan-400"
+                  />
+                  <span>{ffmpegUseQsv ? tooltipText.enabled : tooltipText.disabled}</span>
+                </label>
+              </div>
             </div>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
@@ -404,7 +521,8 @@ export function RetroPreviewToolbar({
                 Flip V
               </button>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
 

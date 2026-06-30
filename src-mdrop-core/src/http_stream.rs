@@ -193,11 +193,12 @@ async fn start_hls_for_path(
     // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
     let base_url = format!("http://localhost:{}/hls/{}/", port, session_id);
 
-    let (ffmpeg_cmd, prewarm_rx) = {
+    let (ffmpeg_cmd, prewarm_rx, use_qsv) = {
         let ctx = state.inner.lock().unwrap();
         (
             ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
             ctx.ffmpeg_prewarm_rx.clone(),
+            ctx.ffmpeg_use_qsv,
         )
     };
 
@@ -211,7 +212,7 @@ async fn start_hls_for_path(
     }
 
     // Phase 1: stream-copy (no re-encode, near-zero CPU — works for H.264/AAC sources).
-    // Phase 2: h264_qsv hardware encode (Intel Quick Sync / NVIDIA / AMD if available).
+    // Phase 2: optional hardware encode on supported platforms.
     // Phase 3: libx264 software fallback.
     let hls_common_args: Vec<&str> = vec![
         "-f", "hls",
@@ -275,17 +276,33 @@ async fn start_hls_for_path(
         }};
     }
 
-    // Phase 1: copy (6 s timeout)
-    let started_with_qsv = !should_try_copy;
+    let should_try_qsv = cfg!(target_os = "windows") && use_qsv;
+
+    // Phase 1: copy (6 s timeout) or direct software fallback for formats that
+    // always need re-encode on non-Windows platforms (e.g. webm on macOS).
+    let started_with_hw = !should_try_copy && should_try_qsv;
     let (mut child, mut ready) = if should_try_copy {
         try_ffmpeg!(
             ["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"],
             30
         )
-    } else {
+    } else if should_try_qsv {
         try_ffmpeg!(
             ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
             50
+        )
+    } else {
+        try_ffmpeg!(
+            [
+                "-y", "-i", &input,
+                "-c:v", "libx264",
+                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                "-pix_fmt", "yuv420p",
+                "-preset", "ultrafast",
+                "-tune", "zerolatency",
+                "-c:a", "aac", "-b:a", "128k",
+            ],
+            150
         )
     };
 
@@ -313,8 +330,8 @@ async fn start_hls_for_path(
         }
     }
 
-    // Phase 2: h264_qsv hardware encode (10 s — fails fast if GPU unavailable)
-    if !ready && should_try_copy {
+    // Phase 2: h264_qsv hardware encode (10 s — Windows only, fails fast if unavailable)
+    if !ready && should_try_copy && should_try_qsv {
         println!(
             "[HLS] copy path not ready for session={}, retrying with h264_qsv",
             session_id
@@ -329,7 +346,7 @@ async fn start_hls_for_path(
     if !ready {
         println!(
             "[HLS] {} not ready for session={}, retrying with libx264",
-            if started_with_qsv { "initial h264_qsv path" } else { "h264_qsv" },
+            if started_with_hw { "initial hardware path" } else { "copy/hardware path" },
             session_id,
         );
         (child, ready) = try_ffmpeg!(

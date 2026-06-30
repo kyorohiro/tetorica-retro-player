@@ -173,6 +173,7 @@ export const clearPersistedRetroSettings = () => {
 };
 
 const NATIVE_MODE_KEY = "tetorica-retro-player.nativeMode";
+const FFMPEG_USE_QSV_KEY = "tetorica-retro-player.ffmpegUseQsv";
 
 export const getNativePlaybackMode = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -190,6 +191,26 @@ export const setNativePlaybackMode = (enabled: boolean): void => {
       window.localStorage.setItem(NATIVE_MODE_KEY, "true");
     } else {
       window.localStorage.removeItem(NATIVE_MODE_KEY);
+    }
+  } catch {}
+};
+
+export const getFfmpegUseQsv = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(FFMPEG_USE_QSV_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+
+export const setFfmpegUseQsv = (enabled: boolean): void => {
+  if (typeof window === "undefined") return;
+  try {
+    if (enabled) {
+      window.localStorage.setItem(FFMPEG_USE_QSV_KEY, "true");
+    } else {
+      window.localStorage.removeItem(FFMPEG_USE_QSV_KEY);
     }
   } catch {}
 };

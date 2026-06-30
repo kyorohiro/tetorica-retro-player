@@ -169,6 +169,7 @@ pub struct HttpServerContext {
     pub api_key: String,
     pub has_ffmpeg: bool,
     pub ffmpeg_path: Option<PathBuf>,
+    pub ffmpeg_use_qsv: bool,
     /// Receives `true` once the ffmpeg pre-warm finishes so HLS requests can
     /// wait for GateKeeper to clear before spawning a new ffmpeg process.
     pub ffmpeg_prewarm_rx: Option<watch::Receiver<bool>>,
@@ -210,6 +211,7 @@ impl HttpServerContext {
             api_key: create_api_key(),
             has_ffmpeg: detect_ffmpeg(),
             ffmpeg_path: None,
+            ffmpeg_use_qsv: false,
             ffmpeg_prewarm_rx: None,
         }
     }
@@ -368,6 +370,12 @@ impl SharedHttpServerContext {
                 ctx.has_ffmpeg = true;
                 ctx.ffmpeg_path = Some(path);
             }
+        }
+    }
+
+    pub fn set_ffmpeg_use_qsv(&self, enabled: bool) {
+        if let Ok(mut ctx) = self.inner.lock() {
+            ctx.ffmpeg_use_qsv = enabled;
         }
     }
 
