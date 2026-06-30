@@ -13,7 +13,14 @@ export async function startDemoSongSession(meta: DemoSongMeta): Promise<DemoSong
   await Tone.start();
   Tone.getTransport().stop();
   Tone.getTransport().cancel();
+  Tone.getTransport().position = 0;
   Tone.getTransport().bpm.value = meta.bpm;
+  const prevLoop = Tone.getTransport().loop;
+  const prevLoopStart = Tone.getTransport().loopStart;
+  const prevLoopEnd = Tone.getTransport().loopEnd;
+  Tone.getTransport().loop = false;
+  Tone.getTransport().loopStart = 0;
+  Tone.getTransport().loopEnd = "8m";
 
   const ctx = Tone.getContext().rawContext as AudioContext;
   const streamDest = ctx.createMediaStreamDestination();
@@ -26,14 +33,18 @@ export async function startDemoSongSession(meta: DemoSongMeta): Promise<DemoSong
 
   const mod = await meta.load();
   const disposeCreate = mod.create(() => {}, () => {});
-  Tone.getTransport().start();
+  Tone.getTransport().loop = true;
 
   return {
     stream: streamDest.stream,
     dispose: () => {
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
+      Tone.getTransport().position = 0;
       try { disposeCreate(); } catch {}
+      Tone.getTransport().loop = prevLoop;
+      Tone.getTransport().loopStart = prevLoopStart;
+      Tone.getTransport().loopEnd = prevLoopEnd;
       // Restore Tone.Destination.output → speakers
       try {
         toneOutput.disconnect();

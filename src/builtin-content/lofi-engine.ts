@@ -129,8 +129,6 @@ export async function startLofiSession(): Promise<LofiSession> {
   padPart.loopEnd = '4m';
   padPart.start(0);
 
-  Tone.getTransport().start();
-
   return {
     stream: streamDest.stream,
     dispose: () => {
