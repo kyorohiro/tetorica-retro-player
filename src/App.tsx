@@ -836,14 +836,14 @@ function App() {
     });
   }, []);
 
-  // When a file/URL is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
+  // When a file/URL/stream is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
   React.useEffect(() => {
-    if (!previewSource.previewSrc) return;
+    if (!previewSource.previewSrc && !previewSource.previewStream) return;
     if (autoStartState !== 'blocked') return;
     toneCleanupRef.current?.();
     toneCleanupRef.current = null;
     setAutoStartState('done');
-  }, [previewSource.previewSrc, autoStartState]);
+  }, [previewSource.previewSrc, previewSource.previewStream, autoStartState]);
 
 
   const savePreset = React.useCallback((config: PresetConfig) => {
