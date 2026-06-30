@@ -165,6 +165,7 @@ export function RetroControlPanel({
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
   if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
+  const effectiveIsPlaying = player.isPlaying && !player.previewError;
 
   return (
     <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
@@ -185,7 +186,7 @@ export function RetroControlPanel({
               isLooping={player.isLooping}
               isMuted={player.isMuted}
               isNoiseEnabled={player.isNoiseEnabled}
-              isPlaying={player.isPlaying}
+              isPlaying={effectiveIsPlaying}
               hasVideo={player.hasVideo}
               isVideoSettingsOpen={false}
               lofiAmount={player.lofiAmount}

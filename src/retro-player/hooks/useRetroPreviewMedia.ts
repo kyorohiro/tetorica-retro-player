@@ -94,6 +94,7 @@ const shouldBypassWebAudioForMedia = (media: HTMLMediaElement) =>
   media.src.includes(".m3u8");
 
 const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
+const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900];
 
 const shouldUseNativeVideoSurfaceForMedia = (
   media: HTMLMediaElement,
@@ -470,6 +471,11 @@ export function useRetroPreviewMedia({
       audio.addEventListener("canplay", handleReady, { once: true });
       audio.addEventListener("error", handleError, { once: true });
       audio.load();
+    });
+
+  const waitMs = (ms: number) =>
+    new Promise<void>((resolve) => {
+      window.setTimeout(resolve, ms);
     });
 
   const restartCurrentMedia = async () => {
@@ -938,6 +944,9 @@ export function useRetroPreviewMedia({
           startedAtTime,
         });
       }
+      if (media instanceof HTMLVideoElement) {
+        delete media.dataset[HLS_STARTUP_RETRY_DATASET_KEY];
+      }
       isPlayingRef.current = true;
       setEngineIsPlaying(true);
       setIsPlaying(true);
@@ -992,31 +1001,42 @@ export function useRetroPreviewMedia({
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
       const media = mediaRef.current;
+      const retryAttempt =
+        media instanceof HTMLVideoElement
+          ? Number.parseInt(media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] ?? "0", 10) || 0
+          : 0;
       const shouldRetryHlsStartup =
         media instanceof HTMLVideoElement &&
         media.src.includes(".m3u8") &&
         isTauriRuntime() &&
         isWindowsRuntime() &&
         (media.currentTime ?? 0) <= 0.05 &&
-        media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] !== "1";
+        retryAttempt < HLS_STARTUP_RETRY_DELAYS_MS.length;
 
       if (shouldRetryHlsStartup) {
-        media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] = "1";
+        const retryDelayMs = HLS_STARTUP_RETRY_DELAYS_MS[retryAttempt] ?? 0;
+        media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] = String(retryAttempt + 1);
         debugVideo("playVideoWithAudio:hls-startup-retry", {
+          attempt: retryAttempt + 1,
           error: error instanceof Error ? error.message : String(error),
           currentTime: media.currentTime,
           paused: media.paused,
           readyState: media.readyState,
+          retryDelayMs,
           src: media.currentSrc || media.src || null,
         });
         try {
           media.pause();
+          if (retryDelayMs > 0) {
+            await waitMs(retryDelayMs);
+          }
           media.load();
           await waitForVideoFrame(media);
           await playVideoWithAudio();
           return;
         } catch (retryError) {
           debugVideo("playVideoWithAudio:hls-startup-retry-failed", {
+            attempt: retryAttempt + 1,
             error: retryError instanceof Error ? retryError.message : String(retryError),
             currentTime: media.currentTime,
             paused: media.paused,
