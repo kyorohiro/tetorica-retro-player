@@ -1026,6 +1026,7 @@ export function useRetroPreviewMedia({
         }
       }
 
+      isPlayingRef.current = false;
       debugVideo("playVideoWithAudio:error", {
         error: error instanceof Error ? error.message : String(error),
         name: error instanceof Error ? error.name : null,
@@ -1035,14 +1036,17 @@ export function useRetroPreviewMedia({
         src: mediaRef.current?.currentSrc || mediaRef.current?.src || null,
       });
       setEngineIsPlaying(false);
+      setIsPlaying(false);
       finishLoading();
       if (isAutoplayBlockedError(error)) {
+        syncVideoState();
         setNeedsUserPlay(true);
         _setPreviewError("");
         return;
       }
 
       setNeedsUserPlay(false);
+      syncVideoState();
       _setPreviewError(
         error instanceof Error
           ? error.message
