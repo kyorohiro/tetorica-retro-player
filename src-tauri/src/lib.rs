@@ -405,7 +405,7 @@ pub fn run() {
                     #[cfg(windows)]
                     {
                         use std::os::windows::process::CommandExt;
-                        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
                     }
                     let _ = cmd.output();
                     prewarm.complete();
