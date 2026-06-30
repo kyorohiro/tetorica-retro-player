@@ -111,6 +111,9 @@ export type RetroControlPanelProps = {
   onCycleLoopMode?: () => void;
   showVideoSpectrum?: boolean;
   onToggleVideoSpectrum?: () => void;
+  isNativePlaybackMode?: boolean;
+  nativePlaybackNeedsReload?: boolean;
+  onToggleNativePlaybackMode?: () => void;
 };
 
 const controlsFallback = (
@@ -156,6 +159,9 @@ export function RetroControlPanel({
   onCycleLoopMode,
   showVideoSpectrum,
   onToggleVideoSpectrum,
+  isNativePlaybackMode,
+  nativePlaybackNeedsReload,
+  onToggleNativePlaybackMode,
 }: RetroControlPanelProps) {
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
   if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
@@ -262,6 +268,9 @@ export function RetroControlPanel({
               showVideoSpectrum={showVideoSpectrum}
               onToggleVideoSpectrum={onToggleVideoSpectrum}
               analyserRef={player.analyserRef}
+              isNativePlaybackMode={isNativePlaybackMode}
+              nativePlaybackNeedsReload={nativePlaybackNeedsReload}
+              onToggleNativePlaybackMode={onToggleNativePlaybackMode}
             />
           </React.Suspense>
         )}
