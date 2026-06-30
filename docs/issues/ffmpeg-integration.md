@@ -127,6 +127,66 @@ npm run build:tauri
 # 内部: npx tauri build
 ```
 
+### サイドカービルド（Windows）
+
+#### ffmpeg バイナリの準備
+
+Windows 向けには **BtbN/FFmpeg-Builds** が GPL 静的ビルドを提供している。
+`ffmpeg-master-latest-win64-gpl.zip` 内の `ffmpeg.exe` を使用する。
+
+```powershell
+# PowerShell で取得する場合
+Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile ffmpeg-win64.zip
+Expand-Archive ffmpeg-win64.zip -DestinationPath ffmpeg-win64
+copy ffmpeg-win64\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe src-tauri\binaries\ffmpeg-x86_64-pc-windows-msvc.exe
+```
+
+#### Windows SmartScreen への対応
+
+macOS の GateKeeper と同様に、Windows SmartScreen が初回起動時にブロックする可能性がある。
+macOS では `ffmpeg -version` を事前実行する pre-warm 機構で対処しているが、
+SmartScreen は**実行回数・評判ベース**のチェックのため同じ手法では回避できない。
+
+| 項目 | macOS GateKeeper | Windows SmartScreen |
+|------|-----------------|---------------------|
+| チェック方式 | コード署名の有無 | 署名 + 評判（ダウンロード数等） |
+| pre-warm で回避 | ✅ 初回のみ遅延を吸収 | ❌ 評判がないと毎回ブロックの可能性 |
+| 根本解決 | 署名（公証） | アプリ全体のコード署名 |
+
+**現状の方針**: サイドカービルドをリリースする場合はアプリ全体をコード署名する。
+未署名の開発ビルドでは SmartScreen の警告が出ることを許容する。
+
+> **TODO**: Windows コード署名の仕組みを整備する（証明書取得・署名手順）。
+
+#### ビルドコマンド（Windows）
+
+Windows マシン上でビルドする場合:
+
+```powershell
+# サイドカービルド
+npx tauri build --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-sidecar
+
+# 通常ビルド（システム ffmpeg）
+npx tauri build
+```
+
+#### WebView2 での HLS 再生と Web Audio の動作（要確認）
+
+Windows Tauri は WebView2（Edge/Chromium ベース）を使用する。
+Chromium は HLS をネイティブサポートしていないが、Edge は Windows Media Foundation 経由で
+HLS を再生できる可能性がある。WebView2 がこれを継承するかは **未確認**。
+
+| ケース | 状況 | Web Audio エフェクター |
+|--------|------|----------------------|
+| WebView2 が HLS を再生できない | `.m3u8` が再生不可 | — |
+| WebView2 が MSE 経由で HLS 再生 | hls.js 相当の挙動 | ✅ 効く |
+| WebView2 が Media Foundation 経由で HLS 再生 | macOS の AVFoundation と同じ構造 | ❌ 効かない可能性 |
+
+Windows で ffmpeg HLS を実際に動かして検証が必要。
+→ 詳細は [`wkwebview-hls-webaudio.md`](wkwebview-hls-webaudio.md) 参照。
+
+---
+
 ### サイドカービルド（macOS）
 
 #### ffmpeg バイナリの準備
