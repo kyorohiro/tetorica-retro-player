@@ -398,11 +398,16 @@ pub fn run() {
                 // FfmpegPrewarmHandle::complete() signals HLS requests to proceed.
                 let prewarm = mdrop_server.setup_ffmpeg_prewarm();
                 tauri::async_runtime::spawn_blocking(move || {
-                    let _ = std::process::Command::new(ffmpeg_path)
-                        .arg("-version")
+                    let mut cmd = std::process::Command::new(ffmpeg_path);
+                    cmd.arg("-version")
                         .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .output();
+                        .stderr(std::process::Stdio::null());
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                    }
+                    let _ = cmd.output();
                     prewarm.complete();
                 });
             }
