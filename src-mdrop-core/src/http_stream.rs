@@ -207,9 +207,9 @@ async fn start_hls_for_path(
         }
     }
 
-    // Phase 1: try stream-copy (no re-encode, near-zero CPU).
-    // Works when the source is already H.264/AAC — the common case.
-    // Phase 2: fall back to libx264 re-encode if copy produces no output.
+    // Phase 1: stream-copy (no re-encode, near-zero CPU — works for H.264/AAC sources).
+    // Phase 2: h264_qsv hardware encode (Intel Quick Sync / NVIDIA / AMD if available).
+    // Phase 3: libx264 software fallback.
     let hls_common_args: Vec<&str> = vec![
         "-f", "hls",
         "-hls_time", "2",
@@ -219,14 +219,6 @@ async fn start_hls_for_path(
         playlist.to_str().unwrap(),
     ];
 
-    let mut child = Command::new(&ffmpeg_cmd)
-        .args(["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"])
-        .args(&hls_common_args)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ffmpeg launch failed: {e}")))?;
-
     println!(
         "[HLS] start session={} input={} tmp_dir={}",
         session_id,
@@ -234,45 +226,75 @@ async fn start_hls_for_path(
         tmp_dir.display()
     );
 
-    // Wait up to 6 s for the copy path to produce a readable first segment.
-    let mut ready = wait_for_playlist_ready(&playlist, 30, Duration::from_millis(200))
-        .await
-        .is_ok();
+    // Helper: spawn ffmpeg with given args, poll until a .ts segment appears.
+    // Returns (child, ready). Kills and cleans up playlist on failure before returning.
+    macro_rules! try_ffmpeg {
+        ($extra_args:expr, $poll_count:expr) => {{
+            let mut c = Command::new(&ffmpeg_cmd)
+                .args($extra_args)
+                .args(&hls_common_args)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("ffmpeg launch failed: {e}"),
+                    )
+                })?;
+            let ok = wait_for_playlist_ready(&playlist, $poll_count, Duration::from_millis(200))
+                .await
+                .is_ok();
+            if !ok {
+                let _ = c.start_kill();
+                let _ = c.wait().await;
+                let _ = std::fs::remove_dir_all(&tmp_dir);
+                std::fs::create_dir_all(&tmp_dir).map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("failed to recreate temp dir: {e}"),
+                    )
+                })?;
+            }
+            (c, ok)
+        }};
+    }
 
-    // If copy path failed, kill it and fall back to re-encode.
+    // Phase 1: copy (6 s timeout)
+    let (mut child, mut ready) = try_ffmpeg!(
+        ["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"],
+        30
+    );
+
+    // Phase 2: h264_qsv hardware encode (10 s — fails fast if GPU unavailable)
     if !ready {
-        println!("[HLS] copy path not ready for session={}, retrying with re-encode", session_id);
-        let _ = child.start_kill();
-        let _ = child.wait().await;
-        // Clean up any partial output so re-encode starts fresh.
-        let _ = std::fs::remove_dir_all(&tmp_dir);
-        std::fs::create_dir_all(&tmp_dir).map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("failed to recreate temp dir: {e}"),
-            )
-        })?;
+        println!(
+            "[HLS] copy path not ready for session={}, retrying with h264_qsv",
+            session_id
+        );
+        (child, ready) = try_ffmpeg!(
+            ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
+            50
+        );
+    }
 
-        child = Command::new(&ffmpeg_cmd)
-            .args([
+    // Phase 3: libx264 software fallback (30 s)
+    if !ready {
+        println!(
+            "[HLS] h264_qsv not ready for session={}, retrying with libx264",
+            session_id
+        );
+        (child, ready) = try_ffmpeg!(
+            [
                 "-y", "-i", &input,
                 "-c:v", "libx264",
                 "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
-                "-c:a", "aac",
-                "-b:a", "128k",
-            ])
-            .args(&hls_common_args)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ffmpeg launch failed: {e}")))?;
-
-        // Poll up to 30 s for re-encode path.
-        ready = wait_for_playlist_ready(&playlist, 150, Duration::from_millis(200))
-            .await
-            .is_ok();
+                "-c:a", "aac", "-b:a", "128k",
+            ],
+            150
+        );
     }
 
     if !ready {
