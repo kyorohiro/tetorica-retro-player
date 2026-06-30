@@ -204,51 +204,29 @@ async fn start_hls_for_path(
         }
     }
 
+    // Phase 1: try stream-copy (no re-encode, near-zero CPU).
+    // Works when the source is already H.264/AAC — the common case.
+    // Phase 2: fall back to libx264 re-encode if copy produces no output.
+    let hls_common_args: Vec<&str> = vec![
+        "-f", "hls",
+        "-hls_time", "2",
+        "-hls_list_size", "0",
+        "-hls_base_url", &base_url,
+        "-hls_segment_filename", segment_pattern.to_str().unwrap(),
+        playlist.to_str().unwrap(),
+    ];
+
     let mut child = Command::new(&ffmpeg_cmd)
-        .args([
-            "-y",
-            "-i",
-            &input,
-            "-c:v",
-            "libx264",
-            "-vf",
-            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-            "-preset",
-            "ultrafast",
-            "-tune",
-            "zerolatency",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-f",
-            "hls",
-            "-hls_time",
-            "2",
-            "-hls_list_size",
-            "0",
-            "-hls_base_url",
-            &base_url,
-            "-hls_segment_filename",
-            segment_pattern.to_str().unwrap(),
-            playlist.to_str().unwrap(),
-        ])
+        .args(["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"])
+        .args(&hls_common_args)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("ffmpeg launch failed: {e}"),
-            )
-        })?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ffmpeg launch failed: {e}")))?;
 
-    // Poll until the playlist references at least one segment (up to 30 s).
-    // Pre-warm ensures ffmpeg starts immediately (no GateKeeper delay), so the
-    // first segment typically appears within 1-2 s. WKWebView re-fetches the
-    // playlist periodically and discovers remaining segments as ffmpeg encodes.
+    // Wait up to 6 s for the copy path to produce a segment.
     let mut ready = false;
-    for _ in 0..150 {
+    for _ in 0..30 {
         if playlist.exists() {
             if let Ok(text) = std::fs::read_to_string(&playlist) {
                 if text.contains(".ts") {
@@ -258,6 +236,43 @@ async fn start_hls_for_path(
             }
         }
         sleep(Duration::from_millis(200)).await;
+    }
+
+    // If copy path failed, kill it and fall back to re-encode.
+    if !ready {
+        let _ = child.start_kill();
+        let _ = child.wait().await;
+        // Clean up any partial output so re-encode starts fresh.
+        let _ = std::fs::remove_file(&playlist);
+
+        child = Command::new(&ffmpeg_cmd)
+            .args([
+                "-y", "-i", &input,
+                "-c:v", "libx264",
+                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                "-preset", "ultrafast",
+                "-tune", "zerolatency",
+                "-c:a", "aac",
+                "-b:a", "128k",
+            ])
+            .args(&hls_common_args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ffmpeg launch failed: {e}")))?;
+
+        // Poll up to 30 s for re-encode path.
+        for _ in 0..150 {
+            if playlist.exists() {
+                if let Ok(text) = std::fs::read_to_string(&playlist) {
+                    if text.contains(".ts") {
+                        ready = true;
+                        break;
+                    }
+                }
+            }
+            sleep(Duration::from_millis(200)).await;
+        }
     }
 
     if !ready {
