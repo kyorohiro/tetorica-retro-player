@@ -61,7 +61,14 @@ export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
   renderResolutionScale = 1,
-  options?: { onEnded?: () => void; onError?: (error: Error) => void; onRetry?: () => void; autoPlay?: boolean; onPlaybackChange?: (playing: boolean) => void },
+  options?: {
+    onEnded?: () => void;
+    onError?: (error: Error) => void;
+    onRetry?: () => void;
+    autoPlay?: boolean;
+    onPlaybackChange?: (playing: boolean) => void;
+    preferNativeVideoSurface?: boolean;
+  },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
   const objectUrlRef = useRef<string | null>(null);
@@ -311,6 +318,14 @@ export function usePixiVideoPlayer(
     setPreviewKind(nextKind);
   };
 
+  const nativeVideoElement =
+    mediaRef.current instanceof HTMLVideoElement ? mediaRef.current : null;
+  const shouldUseNativeVideoSurface =
+    Boolean(options?.preferNativeVideoSurface) &&
+    previewKind === "video" &&
+    nativeVideoElement !== null &&
+    nativeVideoElement.src.includes(".m3u8");
+
   const beginLoading = (label: string) => {
     setLoadingLabel(label);
     setIsLoading(true);
@@ -448,6 +463,7 @@ export function usePixiVideoPlayer(
     syncVideoState();
   };
   const media = useRetroPreviewMedia({
+    preferNativeVideoSurface: options?.preferNativeVideoSurface ?? false,
     filterState,
     appRef,
     spriteRef,
@@ -1071,6 +1087,8 @@ export function usePixiVideoPlayer(
 
   return {
     canvasHostRef,
+    nativeVideoElement,
+    shouldUseNativeVideoSurface,
     previewName,
     previewError,
     isRendererReady,

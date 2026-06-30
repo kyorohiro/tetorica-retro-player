@@ -109,7 +109,14 @@ export function RetroPlayer({
     filterState,
     isFitWidthEnabled ? "width" : "contain",
     renderResolutionScale,
-    { onEnded, onError, onRetry, autoPlay, onPlaybackChange },
+    {
+      onEnded,
+      onError,
+      onRetry,
+      autoPlay,
+      onPlaybackChange,
+      preferNativeVideoSurface: nativePlaybackMode,
+    },
   );
 
   // --- Callbacks ---

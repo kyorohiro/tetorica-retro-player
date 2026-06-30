@@ -6,6 +6,7 @@ type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type CurrentRef<T> = { current: T };
 
 type UseRetroPreviewMediaParams = {
+  preferNativeVideoSurface: boolean;
   filterState: RetroFilterState;
   appRef: CurrentRef<CanvasStageApp | null>;
   spriteRef: CurrentRef<null>;
@@ -92,6 +93,16 @@ const shouldBypassWebAudioForMedia = (media: HTMLMediaElement) =>
   media instanceof HTMLVideoElement &&
   media.src.includes(".m3u8");
 
+const shouldUseNativeVideoSurfaceForMedia = (
+  media: HTMLMediaElement,
+  preferNativeVideoSurface: boolean,
+) =>
+  preferNativeVideoSurface &&
+  isTauriRuntime() &&
+  isWindowsRuntime() &&
+  media instanceof HTMLVideoElement &&
+  media.src.includes(".m3u8");
+
 // navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
 // Chrome DevTools UA emulation does NOT change navigator.vendor, so this
 // correctly returns false even when the DevTools UA is set to iOS Safari.
@@ -118,6 +129,7 @@ const staticNeedsNativeAudioSuppression = (
 };
 
 export function useRetroPreviewMedia({
+  preferNativeVideoSurface,
   filterState,
   appRef,
   spriteRef,
@@ -970,6 +982,17 @@ export function useRetroPreviewMedia({
     appRef.current?.ticker.start();
   };
 
+  const attachNativeVideoPreview = (video: HTMLVideoElement) => {
+    previewElementRef.current = null;
+    setPreviewKindState("video");
+    setSourceDimensions({ width: video.videoWidth, height: video.videoHeight });
+    setViewportRect(null);
+    safeRender();
+    refreshLayout();
+    scheduleRefreshLayout();
+    appRef.current?.ticker.stop();
+  };
+
   const previewFile = async (file: File) => {
     const isVideo = file.type.startsWith("video/");
     const isAudio = file.type.startsWith("audio/");
@@ -1288,8 +1311,12 @@ export function useRetroPreviewMedia({
         }
 
         mediaRef.current = media;
-        await attachVisualPreview(media, "video");
-        await ensureVisualStartupReady("video");
+        if (shouldUseNativeVideoSurfaceForMedia(media, preferNativeVideoSurface)) {
+          attachNativeVideoPreview(media);
+        } else {
+          await attachVisualPreview(media, "video");
+          await ensureVisualStartupReady("video");
+        }
         if (shouldBypassWebAudioForMedia(media)) {
           debugAudio("connectMediaAudio:bypass-native-hls", {
             currentSrc: media.currentSrc || media.src || null,

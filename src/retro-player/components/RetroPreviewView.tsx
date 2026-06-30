@@ -17,6 +17,8 @@ import { AudioSpectrum } from "./AudioSpectrum";
 // Add new player capabilities here, not in RetroPlayer.
 export type RetroPreviewPlayerSlice = {
   canvasHostRef: React.RefObject<HTMLDivElement | null>;
+  nativeVideoElement: HTMLVideoElement | null;
+  shouldUseNativeVideoSurface: boolean;
   isPoweredOn: boolean;
   isLoading: boolean;
   isBuffering: boolean;
@@ -119,6 +121,7 @@ export function RetroPreviewView({
   const previewFrameRef = React.useRef<HTMLDivElement | null>(null);
   const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
+  const nativeVideoHostRef = React.useRef<HTMLDivElement | null>(null);
 
   // --- Stable callbacks (defined before effects that use them) ---
 
@@ -344,6 +347,38 @@ export function RetroPreviewView({
     }
   }, [player.isRendererReady, player.isLoading]);
 
+  React.useEffect(() => {
+    const host = nativeVideoHostRef.current;
+    const video = player.nativeVideoElement;
+
+    if (!host || !player.shouldUseNativeVideoSurface || !video) {
+      return;
+    }
+
+    video.controls = false;
+    video.playsInline = true;
+    video.style.width = "100%";
+    video.style.height = "100%";
+    video.style.display = "block";
+    video.style.objectFit = "contain";
+    video.style.backgroundColor = "black";
+
+    if (video.parentElement !== host) {
+      host.replaceChildren(video);
+    }
+
+    return () => {
+      if (video.parentElement === host) {
+        host.replaceChildren();
+      }
+    };
+  }, [
+    player.nativeVideoElement,
+    player.shouldUseNativeVideoSurface,
+    player.sourceDimensions?.height,
+    player.sourceDimensions?.width,
+  ]);
+
   // 一度表示されたら次回以降は短いフェードにする
   React.useEffect(() => {
     if (!isCanvasVisible) return;
@@ -546,8 +581,22 @@ export function RetroPreviewView({
             <div
               ref={player.canvasHostRef}
               className="pointer-events-none relative h-full w-full touch-manipulation"
-              style={{ opacity: isCanvasVisible ? 1 : 0, transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease` }}
+              style={{
+                opacity:
+                  player.shouldUseNativeVideoSurface
+                    ? 0
+                    : isCanvasVisible
+                      ? 1
+                      : 0,
+                transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease`,
+              }}
             />
+            {player.shouldUseNativeVideoSurface && (
+              <div
+                ref={nativeVideoHostRef}
+                className="absolute inset-0 overflow-hidden rounded-xl bg-black"
+              />
+            )}
             {!player.isPoweredOn && (
               <div className="absolute z-100 inset-0 flex items-center justify-center bg-black/72">
                 <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
