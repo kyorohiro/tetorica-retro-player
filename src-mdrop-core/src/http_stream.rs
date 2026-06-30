@@ -11,6 +11,9 @@ use tokio::time::{sleep, Duration};
 use crate::http::SharedHttpServerContext;
 use crate::http_utils::apply_shared_security_headers;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 /// Serve HLS playlist for a directly registered file.
 pub async fn hls_playlist(
     AxumState(state): AxumState<SharedHttpServerContext>,
@@ -230,11 +233,16 @@ async fn start_hls_for_path(
     // Returns (child, ready). Kills and cleans up playlist on failure before returning.
     macro_rules! try_ffmpeg {
         ($extra_args:expr, $poll_count:expr) => {{
-            let mut c = Command::new(&ffmpeg_cmd)
-                .args($extra_args)
+            let mut c = Command::new(&ffmpeg_cmd);
+            c.args($extra_args)
                 .args(&hls_common_args)
                 .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+            #[cfg(windows)]
+            {
+                c.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            let mut c = c
                 .spawn()
                 .map_err(|e| {
                     (
@@ -381,14 +389,20 @@ fn is_segment_ready(path: &FsPath) -> bool {
 /// Run `ffmpeg -i <segment>` and check stderr for "Video:" to detect video streams.
 /// Returns true when a video stream is found, or when the probe itself fails (safe default).
 async fn segment_has_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
-    let Some(path_str) = path.to_str() else { return true };
-    let Ok(out) = Command::new(ffmpeg_cmd)
-        .args(["-v", "error", "-i", path_str])
+    let Some(path_str) = path.to_str() else {
+        return true;
+    };
+    let mut cmd = Command::new(ffmpeg_cmd);
+    cmd.args(["-hide_banner", "-i", path_str])
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .output()
-        .await
-    else { return true };
+        .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let Ok(out) = cmd.output().await else {
+        return true;
+    };
     String::from_utf8_lossy(&out.stderr).contains("Video:")
 }
 
