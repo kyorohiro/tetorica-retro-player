@@ -32,6 +32,7 @@ const messages = {
     preparingSelection: "Preparing your files...",
     preparingSelectionDetail:
       "This can take a moment on phones or with large folders, but the app is still working.",
+    playbackRetryHint: "Playback did not start. Press Play to retry.",
   },
   ja: {
     reloadApp: "再読み込み",
@@ -61,6 +62,7 @@ const messages = {
     preparingSelection: "ファイルを準備しています...",
     preparingSelectionDetail:
       "スマホや大きなフォルダでは少し時間がかかりますが、アプリは動作中です。",
+    playbackRetryHint: "再生の開始に失敗しました。再生ボタンを押して再試行してください。",
   },
 } as const;
 
