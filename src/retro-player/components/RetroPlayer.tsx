@@ -6,10 +6,13 @@ import {
 } from "../hooks/useRetroFilterState";
 import {
   clearPersistedRetroSettings,
+  getFfmpegUseQsv,
   getNativePlaybackMode,
+  setFfmpegUseQsv,
   loadPersistedRetroSettings,
   setNativePlaybackMode,
 } from "../hooks/persistedRetroSettings";
+import { mdropSetFfmpegUseQsv } from "../../mdrop-web/tauri";
 import { saveLocalePreference } from "../../i18n";
 import type { PresetFileData } from "../hooks/presetFile";
 import {
@@ -22,6 +25,10 @@ import { RetroPreviewView } from "./RetroPreviewView";
 import { RetroControlPanel } from "./RetroControlPanel";
 import { RetroPlayerLayout, type RetroLayoutMode } from "./RetroPlayerLayout";
 import { useDialog } from "../../useDialog";
+
+const isTauriRuntime = () =>
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
 type RetroPlayerProps = {
   locale?: RetroPlayerLocale;
@@ -76,13 +83,31 @@ export function RetroPlayer({
   );
 
   const startupNativeMode = React.useRef(getNativePlaybackMode()).current;
+  const startupUseQsv = React.useRef(getFfmpegUseQsv()).current;
   const [nativePlaybackMode, setNativePlaybackModeState] = React.useState(startupNativeMode);
+  const [ffmpegUseQsv, setFfmpegUseQsvState] = React.useState(startupUseQsv);
 
   const handleToggleNativePlaybackMode = React.useCallback(() => {
     const next = !nativePlaybackMode;
     setNativePlaybackMode(next);
     setNativePlaybackModeState(next);
   }, [nativePlaybackMode]);
+
+  const syncFfmpegUseQsv = React.useCallback(async (enabled: boolean) => {
+    if (!isTauriRuntime()) return;
+    try {
+      await mdropSetFfmpegUseQsv(enabled);
+    } catch (error) {
+      console.warn("[retro-player] failed to sync ffmpeg QSV setting", error);
+    }
+  }, []);
+
+  const handleToggleFfmpegUseQsv = React.useCallback(() => {
+    const next = !ffmpegUseQsv;
+    setFfmpegUseQsv(next);
+    setFfmpegUseQsvState(next);
+    void syncFfmpegUseQsv(next);
+  }, [ffmpegUseQsv, syncFfmpegUseQsv]);
 
   const [isHighResolution, setIsHighResolution] = React.useState(
     persistedUiSettings?.isHighResolution ?? false,
@@ -93,6 +118,10 @@ export function RetroPlayer({
   >("playback");
   const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
   const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
+
+  React.useEffect(() => {
+    void syncFfmpegUseQsv(startupUseQsv);
+  }, [startupUseQsv, syncFfmpegUseQsv]);
 
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
@@ -336,6 +365,8 @@ export function RetroPlayer({
             onError={onError}
             analyserRef={player.analyserRef}
             showVideoSpectrum={showVideoSpectrum}
+            ffmpegUseQsv={ffmpegUseQsv}
+            onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
           />
           <RetroControlPanel
             locale={locale}
@@ -419,6 +450,8 @@ export function RetroPlayer({
               onIsPinnedPreviewChange={setIsPinnedInPreview}
               analyserRef={player.analyserRef}
               showVideoSpectrum={showVideoSpectrum}
+              ffmpegUseQsv={ffmpegUseQsv}
+              onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
             />
           }
           playbackControls={

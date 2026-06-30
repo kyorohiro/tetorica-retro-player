@@ -91,3 +91,6 @@ export const mdropGetBonjourStatus = () =>
 
 export const mdropGetConfig = () =>
   invoke<MdropConfig>("mdrop_get_config");
+
+export const mdropSetFfmpegUseQsv = (enabled: boolean) =>
+  invoke<void>("mdrop_set_ffmpeg_use_qsv", { enabled });

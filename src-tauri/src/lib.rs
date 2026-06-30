@@ -324,6 +324,25 @@ async fn mdrop_get_config(state: State<'_, MDropState>) -> Result<MdropConfig, S
     }
 }
 
+#[tauri::command]
+async fn mdrop_set_ffmpeg_use_qsv(
+    state: State<'_, MDropState>,
+    enabled: bool,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        let _ = enabled;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        state.server.set_ffmpeg_use_qsv(enabled);
+        Ok(())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // App entry point
 // ---------------------------------------------------------------------------
@@ -445,6 +464,7 @@ pub fn run() {
             mdrop_stop_bonjour,
             mdrop_get_bonjour_status,
             mdrop_get_config,
+            mdrop_set_ffmpeg_use_qsv,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -66,6 +66,8 @@ export type RetroPreviewViewProps = {
   confirmDialog: ConfirmDialogFn;
   onHighResolutionChange: (enabled: boolean) => void;
   onFitWidthChange: (enabled: boolean) => void;
+  ffmpegUseQsv: boolean;
+  onToggleFfmpegUseQsv: () => void;
   onError?: (error: Error) => void;
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
@@ -84,6 +86,8 @@ export function RetroPreviewView({
   confirmDialog,
   onHighResolutionChange,
   onFitWidthChange,
+  ffmpegUseQsv,
+  onToggleFfmpegUseQsv,
   onError,
   fillHeight = false,
   onIsPinnedPreviewChange,
@@ -740,6 +744,8 @@ export function RetroPreviewView({
                 onFlipVToggle={() => { setFlipV((v) => !v); }}
                 onAudioOptimizationModeChange={player.setAudioOptimizationMode}
                 onLatencyHintChange={player.setLatencyHint}
+                ffmpegUseQsv={ffmpegUseQsv}
+                onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               />
             </div>
           )}
@@ -806,6 +812,8 @@ export function RetroPreviewView({
               onFlipVToggle={() => { setFlipV((v) => !v); }}
               onAudioOptimizationModeChange={player.setAudioOptimizationMode}
               onLatencyHintChange={player.setLatencyHint}
+              ffmpegUseQsv={ffmpegUseQsv}
+              onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             />
           </div>
         )}
@@ -871,6 +879,8 @@ export function RetroPreviewView({
               onFlipVToggle={() => { setFlipV((v) => !v); }}
               onAudioOptimizationModeChange={player.setAudioOptimizationMode}
               onLatencyHintChange={player.setLatencyHint}
+              ffmpegUseQsv={ffmpegUseQsv}
+              onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             />
           </div>
         )}
@@ -935,6 +945,8 @@ export function RetroPreviewView({
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
             onLatencyHintChange={player.setLatencyHint}
+            ffmpegUseQsv={ffmpegUseQsv}
+            onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
           />
         </div>
       )}
@@ -1000,6 +1012,8 @@ export function RetroPreviewView({
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
             onLatencyHintChange={player.setLatencyHint}
+            ffmpegUseQsv={ffmpegUseQsv}
+            onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
           />
         </div>
       )}

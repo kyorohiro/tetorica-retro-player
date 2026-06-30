@@ -48,7 +48,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/quicktime" />
+                <data android:mimeType="video/mp4" />
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.m4v" />
                 <data android:pathPattern=".*\\.mov" />
@@ -67,7 +67,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/mp4" />
+                <data android:mimeType="video/quicktime" />
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.m4v" />
                 <data android:pathPattern=".*\\.mov" />
@@ -105,7 +105,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="audio/mpeg" />
+                <data android:mimeType="audio/wav" />
                 <data android:pathPattern=".*\\.mp3" />
                 <data android:pathPattern=".*\\.wav" />
                 <data android:pathPattern=".*\\.ogg" />
@@ -120,7 +120,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="audio/aac" />
+                <data android:mimeType="audio/mpeg" />
                 <data android:pathPattern=".*\\.mp3" />
                 <data android:pathPattern=".*\\.wav" />
                 <data android:pathPattern=".*\\.ogg" />
@@ -150,7 +150,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="audio/wav" />
+                <data android:mimeType="audio/aac" />
                 <data android:pathPattern=".*\\.mp3" />
                 <data android:pathPattern=".*\\.wav" />
                 <data android:pathPattern=".*\\.ogg" />
@@ -179,7 +179,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="image/gif" />
+                <data android:mimeType="image/webp" />
                 <data android:pathPattern=".*\\.png" />
                 <data android:pathPattern=".*\\.jpg" />
                 <data android:pathPattern=".*\\.jpeg" />
@@ -207,7 +207,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="image/webp" />
+                <data android:mimeType="image/gif" />
                 <data android:pathPattern=".*\\.png" />
                 <data android:pathPattern=".*\\.jpg" />
                 <data android:pathPattern=".*\\.jpeg" />
