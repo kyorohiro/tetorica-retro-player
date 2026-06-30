@@ -590,11 +590,14 @@ function App() {
 
   const currentPlayingPathRef = React.useRef<string | null>(null);
   const [showFfmpegRetry, setShowFfmpegRetry] = React.useState(false);
+  const [showPlaybackRetryHint, setShowPlaybackRetryHint] = React.useState(false);
+  const shouldShowFfmpegRetry = false;
 
   const handleFfmpegRetry = useCallback(async () => {
     const path = currentPlayingPathRef.current;
     if (!path || !isMDropReadyRef.current) return;
     setShowFfmpegRetry(false);
+    setShowPlaybackRetryHint(false);
     try {
       const shared = await mdropShareFile(path);
       const hlsUrl = `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`;
@@ -612,6 +615,7 @@ function App() {
   }, [shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
   const handlePlayerError = useCallback((_error: Error) => {
+    setShowPlaybackRetryHint(true);
     if (isMDropReadyRef.current && currentPlayingPathRef.current) {
       setShowFfmpegRetry(true);
     }
@@ -619,6 +623,7 @@ function App() {
 
   const previewItem = useCallback((item: PlaylistItem) => {
     setShowFfmpegRetry(false);
+    setShowPlaybackRetryHint(false);
     if (item.kind === "file") {
       currentPlayingPathRef.current = null;
       if (shouldPreferDialogRetroPreview) {
@@ -1170,6 +1175,9 @@ function App() {
               onError={handlePlayerError}
               onRetry={() => { void handleRetry(); }}
               onPlaybackChange={(playing) => {
+                if (playing) {
+                  setShowPlaybackRetryHint(false);
+                }
                 const preset = currentPresetConfigRef.current;
                 if (preset.type !== 'lofi' && preset.type !== 'demo-song') return;
                 void import('tone').then(({ getTransport }) => {
@@ -1184,7 +1192,7 @@ function App() {
             />
             }
           </React.Suspense>
-          {showFfmpegRetry && (
+          {shouldShowFfmpegRetry && showFfmpegRetry && (
             <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">
               <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-400/60 bg-slate-900/80 px-4 py-2 text-sm shadow-lg backdrop-blur-sm">
                 <span className="text-amber-300">{locale === "ja" ? "再生できません" : "Playback failed"}</span>
@@ -1202,6 +1210,13 @@ function App() {
                 >
                   ✕
                 </button>
+              </div>
+            </div>
+          )}
+          {showPlaybackRetryHint && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">
+              <div className="pointer-events-auto rounded-full border border-amber-400/60 bg-slate-900/80 px-4 py-2 text-sm text-amber-200 shadow-lg backdrop-blur-sm">
+                {t(locale, "playbackRetryHint")}
               </div>
             </div>
           )}
