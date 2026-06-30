@@ -386,7 +386,11 @@ export function useRetroPreviewMedia({
 
       const handleError = () => {
         cleanup();
-        reject(new Error("動画の再生開始確認に失敗しました。"));
+        reject(
+          new Error(
+            `動画の再生開始確認に失敗しました。 src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${media.currentTime}`,
+          ),
+        );
       };
 
       if (!media.paused && isAdvanced()) {
@@ -401,12 +405,16 @@ export function useRetroPreviewMedia({
       const timer = window.setTimeout(() => {
         cleanup();
         const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+        if (!media.paused && media.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          resolve();
+          return;
+        }
         reject(
           new Error(
             `動画の再生開始を確認できませんでした。 src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${currentTime}`,
           ),
         );
-      }, 1200);
+      }, 5000);
     });
 
   const waitForAudioReady = (audio: HTMLAudioElement) =>
@@ -922,6 +930,14 @@ export function useRetroPreviewMedia({
       scheduleRefreshLayout();
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
+      debugVideo("playVideoWithAudio:error", {
+        error: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : null,
+        currentTime: mediaRef.current?.currentTime ?? null,
+        paused: mediaRef.current?.paused ?? null,
+        readyState: mediaRef.current?.readyState ?? null,
+        src: mediaRef.current?.currentSrc || mediaRef.current?.src || null,
+      });
       setEngineIsPlaying(false);
       finishLoading();
       if (isAutoplayBlockedError(error)) {
