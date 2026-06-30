@@ -272,10 +272,6 @@ function App() {
               setPlaylistIndex(0);
               currentPlayingPathRef.current = f.path;
               setShowFfmpegRetry(false);
-              if (shouldPreferDialogRetroPreview) {
-                await showDialogPreviewForPath(f.url, f.path);
-                return;
-              }
               previewSourceRef.current.previewPath(f.url, f.path);
             } else if (isPlaylistMode) {
               playlistRef.current = mediaShared.map((f) => ({ kind: "path" as const, url: f.url, path: f.path }));
@@ -308,10 +304,6 @@ function App() {
               setPlaylistIndex(0);
               currentPlayingPathRef.current = paths[0];
               setShowFfmpegRetry(false);
-              if (shouldPreferDialogRetroPreview) {
-                await showDialogPreviewForPath(convertFileSrc(paths[0]), paths[0]);
-                return;
-              }
               previewSourceRef.current.previewPath(convertFileSrc(paths[0]), paths[0]);
             } else if (isPlaylistMode) {
               const items = paths.map((p) => ({ kind: "path" as const, url: convertFileSrc(p), path: p }));
