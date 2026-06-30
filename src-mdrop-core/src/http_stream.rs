@@ -230,7 +230,7 @@ async fn start_hls_for_path(
     // Returns (child, ready). Kills and cleans up playlist on failure before returning.
     macro_rules! try_ffmpeg {
         ($extra_args:expr, $poll_count:expr) => {{
-            let mut c = Command::new(&ffmpeg_cmd)
+            let mut c = new_ffmpeg_command(&ffmpeg_cmd)
                 .args($extra_args)
                 .args(&hls_common_args)
                 .stdout(std::process::Stdio::null())
@@ -380,16 +380,30 @@ fn is_segment_ready(path: &FsPath) -> bool {
 
 /// Run `ffmpeg -i <segment>` and check stderr for "Video:" to detect video streams.
 /// Returns true when a video stream is found, or when the probe itself fails (safe default).
+/// Note: ffmpeg -i always exits with error code 1 when no output is specified;
+/// we only care about the stderr content, not the exit code.
 async fn segment_has_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
     let Some(path_str) = path.to_str() else { return true };
-    let Ok(out) = Command::new(ffmpeg_cmd)
-        .args(["-v", "error", "-i", path_str])
+    let Ok(out) = new_ffmpeg_command(ffmpeg_cmd)
+        .args(["-i", path_str])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
         .output()
         .await
     else { return true };
+    // Stream info ("Video: h264 ...") is printed at INFO level (default).
+    // An audio-only segment will have no "Video:" line.
     String::from_utf8_lossy(&out.stderr).contains("Video:")
+}
+
+/// Create a Command for ffmpeg with platform-specific flags.
+/// On Windows, CREATE_NO_WINDOW prevents ffmpeg from flashing a console window.
+fn new_ffmpeg_command(ffmpeg_cmd: &PathBuf) -> Command {
+    let mut cmd = Command::new(ffmpeg_cmd);
+    // tokio::process::Command exposes creation_flags() directly on Windows.
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
 }
 
 fn first_segment_from_playlist(content: &str) -> Option<String> {
