@@ -4,7 +4,7 @@ use axum::{
     http::{header, StatusCode},
     response::{IntoResponse, Response},
 };
-use std::path::PathBuf;
+use std::path::{Path as FsPath, PathBuf};
 use tokio::process::Command;
 use tokio::time::{sleep, Duration};
 
@@ -87,7 +87,7 @@ pub async fn hls_segment(
 
     // Wait for the segment to be written (ffmpeg may still be transcoding)
     for _ in 0..50 {
-        if file_path.exists() {
+        if is_segment_ready(&file_path) {
             break;
         }
         sleep(Duration::from_millis(200)).await;
@@ -114,9 +114,9 @@ pub async fn hls_segment(
 /// Read and return the playlist file as an HTTP response.
 async fn serve_playlist(tmp_dir: &PathBuf) -> Result<Response<Body>, (StatusCode, String)> {
     let playlist = tmp_dir.join("index.m3u8");
-    let content = tokio::fs::read_to_string(&playlist)
+    let content = wait_for_playlist_ready(&playlist, 50, Duration::from_millis(200))
         .await
-        .map_err(|e| (StatusCode::NOT_FOUND, format!("playlist not ready: {e}")))?;
+        .map_err(|e| (StatusCode::NOT_FOUND, e))?;
 
     let mut res = Response::builder()
         .status(StatusCode::OK)
@@ -174,6 +174,9 @@ async fn start_hls_for_path(
         .to_string();
 
     let tmp_dir = std::env::temp_dir().join(format!("retro-hls-{}", session_id));
+    if tmp_dir.exists() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
     std::fs::create_dir_all(&tmp_dir).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -224,26 +227,31 @@ async fn start_hls_for_path(
         .spawn()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ffmpeg launch failed: {e}")))?;
 
-    // Wait up to 6 s for the copy path to produce a segment.
-    let mut ready = false;
-    for _ in 0..30 {
-        if playlist.exists() {
-            if let Ok(text) = std::fs::read_to_string(&playlist) {
-                if text.contains(".ts") {
-                    ready = true;
-                    break;
-                }
-            }
-        }
-        sleep(Duration::from_millis(200)).await;
-    }
+    println!(
+        "[HLS] start session={} input={} tmp_dir={}",
+        session_id,
+        input,
+        tmp_dir.display()
+    );
+
+    // Wait up to 6 s for the copy path to produce a readable first segment.
+    let mut ready = wait_for_playlist_ready(&playlist, 30, Duration::from_millis(200))
+        .await
+        .is_ok();
 
     // If copy path failed, kill it and fall back to re-encode.
     if !ready {
+        println!("[HLS] copy path not ready for session={}, retrying with re-encode", session_id);
         let _ = child.start_kill();
         let _ = child.wait().await;
         // Clean up any partial output so re-encode starts fresh.
-        let _ = std::fs::remove_file(&playlist);
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        std::fs::create_dir_all(&tmp_dir).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to recreate temp dir: {e}"),
+            )
+        })?;
 
         child = Command::new(&ffmpeg_cmd)
             .args([
@@ -262,20 +270,13 @@ async fn start_hls_for_path(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ffmpeg launch failed: {e}")))?;
 
         // Poll up to 30 s for re-encode path.
-        for _ in 0..150 {
-            if playlist.exists() {
-                if let Ok(text) = std::fs::read_to_string(&playlist) {
-                    if text.contains(".ts") {
-                        ready = true;
-                        break;
-                    }
-                }
-            }
-            sleep(Duration::from_millis(200)).await;
-        }
+        ready = wait_for_playlist_ready(&playlist, 150, Duration::from_millis(200))
+            .await
+            .is_ok();
     }
 
     if !ready {
+        eprintln!("[HLS] ffmpeg did not produce readable HLS output in time for session={session_id}");
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             "ffmpeg did not produce HLS output in time".to_string(),
@@ -291,6 +292,8 @@ async fn start_hls_for_path(
         ctx.hls_children.insert(session_id.to_string(), child);
     }
 
+    println!("[HLS] session ready session={} playlist={}", session_id, playlist.display());
+
     Ok(tmp_dir)
 }
 
@@ -298,12 +301,14 @@ async fn start_hls_for_path(
 pub async fn hls_cleanup_all(
     AxumState(state): AxumState<SharedHttpServerContext>,
 ) -> impl IntoResponse {
-    let children: Vec<tokio::process::Child> = {
+    let (children, session_dirs): (Vec<tokio::process::Child>, Vec<PathBuf>) = {
         let mut ctx = match state.inner.lock() {
             Ok(c) => c,
             Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
         };
-        ctx.hls_children.drain().map(|(_, child)| child).collect()
+        let children = ctx.hls_children.drain().map(|(_, child)| child).collect();
+        let session_dirs = ctx.hls_sessions.drain().map(|(_, dir)| dir).collect();
+        (children, session_dirs)
     };
 
     for mut child in children {
@@ -311,7 +316,50 @@ pub async fn hls_cleanup_all(
         tokio::spawn(async move { let _ = child.wait().await; });
     }
 
+    for dir in session_dirs {
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    println!("[HLS] cleanup completed");
+
     StatusCode::NO_CONTENT
+}
+
+fn is_segment_ready(path: &FsPath) -> bool {
+    std::fs::metadata(path)
+        .map(|meta| meta.is_file() && meta.len() > 0)
+        .unwrap_or(false)
+}
+
+fn first_segment_from_playlist(content: &str) -> Option<String> {
+    content
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with('#') && line.ends_with(".ts"))
+        .map(ToOwned::to_owned)
+}
+
+async fn wait_for_playlist_ready(
+    playlist: &FsPath,
+    attempts: usize,
+    delay: Duration,
+) -> Result<String, String> {
+    for _ in 0..attempts {
+        if let Ok(content) = std::fs::read_to_string(playlist) {
+            if let Some(segment_name) = first_segment_from_playlist(&content) {
+                let segment_path = playlist
+                    .parent()
+                    .unwrap_or_else(|| FsPath::new("."))
+                    .join(segment_name.rsplit('/').next().unwrap_or(&segment_name));
+                if is_segment_ready(&segment_path) {
+                    return Ok(content);
+                }
+            }
+        }
+        sleep(delay).await;
+    }
+
+    Err(format!("playlist not ready: {}", playlist.display()))
 }
 
 /// Deterministic session id for a file inside a registered folder.
