@@ -266,6 +266,30 @@ async fn start_hls_for_path(
         30
     );
 
+    // Guard: VP8/VP9/AV1 inputs can make ffmpeg silently produce audio-only TS
+    // (codec not supported in container, video stream dropped without error).
+    // If the first segment has no video stream, treat copy as failed and re-encode.
+    if ready {
+        let seg_path = std::fs::read_to_string(&playlist)
+            .ok()
+            .and_then(|c| first_segment_from_playlist(&c).map(|n| {
+                tmp_dir.join(n.rsplit('/').next().unwrap_or(&n).to_owned())
+            }));
+        if let Some(seg) = seg_path {
+            if !segment_has_video_stream(&ffmpeg_cmd, &seg).await {
+                println!("[HLS] Phase 1 copy: no video stream in segment for session={session_id}, falling back to re-encode");
+                ready = false;
+                let _ = child.start_kill();
+                let _ = child.wait().await;
+                let _ = std::fs::remove_dir_all(&tmp_dir);
+                std::fs::create_dir_all(&tmp_dir).map_err(|e| (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("failed to recreate temp dir: {e}"),
+                ))?;
+            }
+        }
+    }
+
     // Phase 2: h264_qsv hardware encode (10 s — fails fast if GPU unavailable)
     if !ready {
         println!(
@@ -289,6 +313,7 @@ async fn start_hls_for_path(
                 "-y", "-i", &input,
                 "-c:v", "libx264",
                 "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                "-pix_fmt", "yuv420p",   // force 8-bit; VP9 10-bit inputs would produce h264 high10 otherwise
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
                 "-c:a", "aac", "-b:a", "128k",
@@ -351,6 +376,20 @@ fn is_segment_ready(path: &FsPath) -> bool {
     std::fs::metadata(path)
         .map(|meta| meta.is_file() && meta.len() > 0)
         .unwrap_or(false)
+}
+
+/// Run `ffmpeg -i <segment>` and check stderr for "Video:" to detect video streams.
+/// Returns true when a video stream is found, or when the probe itself fails (safe default).
+async fn segment_has_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
+    let Some(path_str) = path.to_str() else { return true };
+    let Ok(out) = Command::new(ffmpeg_cmd)
+        .args(["-v", "error", "-i", path_str])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .await
+    else { return true };
+    String::from_utf8_lossy(&out.stderr).contains("Video:")
 }
 
 fn first_segment_from_playlist(content: &str) -> Option<String> {
