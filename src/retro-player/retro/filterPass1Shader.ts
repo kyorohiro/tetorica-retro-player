@@ -330,7 +330,7 @@ vec3 nearestColorAnime(vec3 color)
   float v = hsv.z;
 
   float skinWeight = max(
-    smoothstep(0.10, 0.05, h),
+    1.0 - smoothstep(0.05, 0.10, h),
     smoothstep(0.90, 0.95, h)
   ) * smoothstep(0.08, 0.20, s);
 
