@@ -67,6 +67,13 @@ const isAndroidRuntime = () => {
 
 const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));
 
+const preloadToneBuiltins = () => {
+  void import("tone");
+  void import("./builtin-content/lofi-engine");
+  void import("./builtin-content/demo-song-session");
+  void import("./builtin-content/demo-songs");
+};
+
 function App() {
   // Initialize from localStorage so the first render never shows colorbars
   // when the startup preset is a ToneJS or URL type.
@@ -144,6 +151,15 @@ function App() {
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const { showPreviewDialog } = usePreviewDialog();
+
+  React.useEffect(() => {
+    const idleCallback = window.setTimeout(() => {
+      preloadToneBuiltins();
+    }, 800);
+    return () => {
+      window.clearTimeout(idleCallback);
+    };
+  }, []);
 
   const finishPreparingSelection = useCallback(() => {
     pickerStateRef.current = "idle";
@@ -807,6 +823,19 @@ function App() {
     toneCleanupRef.current = null;
   }, []);
 
+  const syncToneTransportPlayback = useCallback((playing: boolean) => {
+    const preset = currentPresetConfigRef.current;
+    if (preset.type !== 'lofi' && preset.type !== 'demo-song') return;
+    void import('tone').then(({ getTransport }) => {
+      const transport = getTransport();
+      if (playing) {
+        transport.start();
+      } else {
+        transport.pause();
+      }
+    });
+  }, []);
+
   // When a file/URL is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
   React.useEffect(() => {
     if (!previewSource.previewSrc) return;
@@ -1178,12 +1207,7 @@ function App() {
                 if (playing) {
                   setShowPlaybackRetryHint(false);
                 }
-                const preset = currentPresetConfigRef.current;
-                if (preset.type !== 'lofi' && preset.type !== 'demo-song') return;
-                void import('tone').then(({ getTransport }) => {
-                  if (playing) getTransport().start();
-                  else getTransport().pause();
-                });
+                syncToneTransportPlayback(playing);
               }}
               onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
               onNextTrack={playlistLength > 1 ? nextTrack : undefined}
