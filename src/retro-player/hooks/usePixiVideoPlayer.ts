@@ -535,6 +535,7 @@ export function usePixiVideoPlayer(
     cleanupPreview,
     cleanupForPageLeave,
     playVideoWithAudio,
+    restartCurrentMedia,
     previewFile,
     previewStream,
     previewUrl,
@@ -582,8 +583,18 @@ export function usePixiVideoPlayer(
       if (!isPoweredOn) {
         powerOn();
       }
-      // Media is in error state → ask App.tsx to restart the current preset.
       if (mediaRef.current.error || mediaRef.current.ended) {
+        try {
+          const restarted = await restartCurrentMedia();
+          if (restarted) {
+            await playVideoWithAudio();
+            syncVideoState();
+            return;
+          }
+        } catch (error) {
+          console.warn("[retro-player] restartCurrentMedia failed", error);
+        }
+        // Fallback: ask App.tsx to restart the current preset.
         onRetryRef.current?.();
         return;
       }

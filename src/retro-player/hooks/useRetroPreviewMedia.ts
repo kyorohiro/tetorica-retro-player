@@ -93,6 +93,8 @@ const shouldBypassWebAudioForMedia = (media: HTMLMediaElement) =>
   media instanceof HTMLVideoElement &&
   media.src.includes(".m3u8");
 
+const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
+
 const shouldUseNativeVideoSurfaceForMedia = (
   media: HTMLMediaElement,
   preferNativeVideoSurface: boolean,
@@ -469,6 +471,65 @@ export function useRetroPreviewMedia({
       audio.addEventListener("error", handleError, { once: true });
       audio.load();
     });
+
+  const restartCurrentMedia = async () => {
+    const media = mediaRef.current;
+    if (!media) {
+      return false;
+    }
+
+    const src = media.currentSrc || media.src;
+    if (!src) {
+      return false;
+    }
+
+    const resumeTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+    const isVideo = media instanceof HTMLVideoElement;
+    const isAudio = media instanceof HTMLAudioElement;
+
+    debugVideo("restartCurrentMedia:start", {
+      currentTime: resumeTime,
+      paused: media.paused,
+      readyState: media.readyState,
+      src,
+      isVideo,
+      isAudio,
+    });
+
+    media.pause();
+    media.removeAttribute("src");
+    media.load();
+    media.src = src;
+    applyMediaSettings(media);
+    media.load();
+
+    if (isVideo) {
+      await waitForVideoFrame(media);
+    } else if (isAudio) {
+      await waitForAudioReady(media);
+    }
+
+    if (resumeTime > 0) {
+      try {
+        media.currentTime = resumeTime;
+      } catch (error) {
+        debugVideo("restartCurrentMedia:seek-failed", {
+          currentTime: resumeTime,
+          error: error instanceof Error ? error.message : String(error),
+          src,
+        });
+      }
+    }
+
+    syncVideoState();
+    debugVideo("restartCurrentMedia:ready", {
+      currentTime: media.currentTime,
+      paused: media.paused,
+      readyState: media.readyState,
+      src,
+    });
+    return true;
+  };
 
   const waitForImageFrame = (image: HTMLImageElement) =>
     new Promise<void>((resolve, reject) => {
@@ -930,6 +991,41 @@ export function useRetroPreviewMedia({
       scheduleRefreshLayout();
       window.requestAnimationFrame(updateAudioNodes);
     } catch (error) {
+      const media = mediaRef.current;
+      const shouldRetryHlsStartup =
+        media instanceof HTMLVideoElement &&
+        media.src.includes(".m3u8") &&
+        isTauriRuntime() &&
+        isWindowsRuntime() &&
+        (media.currentTime ?? 0) <= 0.05 &&
+        media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] !== "1";
+
+      if (shouldRetryHlsStartup) {
+        media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] = "1";
+        debugVideo("playVideoWithAudio:hls-startup-retry", {
+          error: error instanceof Error ? error.message : String(error),
+          currentTime: media.currentTime,
+          paused: media.paused,
+          readyState: media.readyState,
+          src: media.currentSrc || media.src || null,
+        });
+        try {
+          media.pause();
+          media.load();
+          await waitForVideoFrame(media);
+          await playVideoWithAudio();
+          return;
+        } catch (retryError) {
+          debugVideo("playVideoWithAudio:hls-startup-retry-failed", {
+            error: retryError instanceof Error ? retryError.message : String(retryError),
+            currentTime: media.currentTime,
+            paused: media.paused,
+            readyState: media.readyState,
+            src: media.currentSrc || media.src || null,
+          });
+        }
+      }
+
       debugVideo("playVideoWithAudio:error", {
         error: error instanceof Error ? error.message : String(error),
         name: error instanceof Error ? error.name : null,
@@ -1427,6 +1523,7 @@ export function useRetroPreviewMedia({
     cleanupPreview,
     cleanupForPageLeave,
     playVideoWithAudio,
+    restartCurrentMedia,
     previewFile,
     previewStream,
     previewUrl,
