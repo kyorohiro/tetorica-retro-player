@@ -1215,8 +1215,22 @@ function App() {
           )}
           {showPlaybackRetryHint && (
             <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">
-              <div className="pointer-events-auto rounded-full border border-amber-400/60 bg-slate-900/80 px-4 py-2 text-sm text-amber-200 shadow-lg backdrop-blur-sm">
-                {t(locale, "playbackRetryHint")}
+              <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-400/60 bg-slate-900/80 px-4 py-2 text-sm text-amber-200 shadow-lg backdrop-blur-sm">
+                <button
+                  type="button"
+                  onClick={() => setShowPlaybackRetryHint(false)}
+                  className="text-left"
+                >
+                  {t(locale, "playbackRetryHint")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPlaybackRetryHint(false)}
+                  aria-label={t(locale, "hideLoadingOverlay")}
+                  className="shrink-0 text-slate-400 transition hover:text-slate-200"
+                >
+                  <X size={14} />
+                </button>
               </div>
             </div>
           )}
