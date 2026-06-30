@@ -215,6 +215,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   );
 
   const setTargetWidth = useCallback((targetWidth: number) => {
+    if (!Number.isFinite(targetWidth) || targetWidth < 1) return;
     setSelectedPreset(null);
     setSettings((current) => (
       current.targetWidth === targetWidth
@@ -224,6 +225,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   }, []);
 
   const setTargetHeight = useCallback((targetHeight: number) => {
+    if (!Number.isFinite(targetHeight) || targetHeight < 1) return;
     setSelectedPreset(null);
     setSettings((current) => (
       current.targetHeight === targetHeight

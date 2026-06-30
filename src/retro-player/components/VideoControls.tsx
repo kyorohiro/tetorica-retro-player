@@ -115,6 +115,9 @@ type VideoControlsProps = {
   onNextTrack?: () => void;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
+  isNativePlaybackMode?: boolean;
+  nativePlaybackNeedsReload?: boolean;
+  onToggleNativePlaybackMode?: () => void;
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -215,6 +218,9 @@ export const VideoControls = memo(function VideoControls({
   onNextTrack,
   loopMode,
   onCycleLoopMode,
+  isNativePlaybackMode = false,
+  nativePlaybackNeedsReload = false,
+  onToggleNativePlaybackMode,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
@@ -250,6 +256,10 @@ export const VideoControls = memo(function VideoControls({
   const { isHolding: isVolumeHolding, ...volumeLongPressHandlers } = useLongPress(
     onToggleMute,
     () => setIsVolumeOpen((v) => !v),
+  );
+  const { isHolding: isResetHolding, ...resetButtonHandlers } = useLongPress(
+    useCallback(() => { onToggleNativePlaybackMode?.(); }, [onToggleNativePlaybackMode]),
+    onResetSettings,
   );
 
   // Keep the restart callback in the surface area for future UI revival.
@@ -1149,6 +1159,18 @@ export const VideoControls = memo(function VideoControls({
         </>
       )}
 
+      {nativePlaybackNeedsReload && (
+        <p className="mb-1 flex items-center justify-center gap-2 rounded-lg bg-amber-500/15 px-2 py-1.5 text-[11px] text-amber-800">
+          リロードしてください
+          <button
+            type="button"
+            onClick={() => { window.location.reload(); }}
+            className="rounded border border-amber-600/40 bg-amber-500/20 px-1.5 py-0.5 text-[10px] hover:bg-amber-500/40"
+          >
+            Reload
+          </button>
+        </p>
+      )}
       <div className="flex gap-2">
         <div className="grid flex-1 grid-cols-3 gap-2">
           <button
@@ -1191,14 +1213,26 @@ export const VideoControls = memo(function VideoControls({
             <Mic2 size={16} className="relative z-10" />
             <span className="relative z-10">Audio</span>
           </button>
-          {/* Keep restart wired for future UX experiments; hiding the button is intentional. */}
+          {/* Short press: reset settings. Long press: toggle native playback mode. */}
           <button
             type="button"
-            onClick={onResetSettings}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-xs text-[#12141c] hover:bg-rose-500/20"
+            {...resetButtonHandlers}
+            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+              isResetHolding
+                ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
+                : isNativePlaybackMode
+                  ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  : "border-rose-500/40 bg-rose-500/10 text-[#12141c] hover:bg-rose-500/20"
+            }`}
           >
-            <RotateCcw size={15} />
-            Reset
+            {isResetHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <RotateCcw size={15} className="relative z-10" />
+            <span className="relative z-10">{isNativePlaybackMode ? "Native" : "Reset"}</span>
           </button>
         </div>
         {!hasPlayback && (

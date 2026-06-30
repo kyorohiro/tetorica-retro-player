@@ -6,7 +6,9 @@ import {
 } from "../hooks/useRetroFilterState";
 import {
   clearPersistedRetroSettings,
+  getNativePlaybackMode,
   loadPersistedRetroSettings,
+  setNativePlaybackMode,
 } from "../hooks/persistedRetroSettings";
 import { saveLocalePreference } from "../../i18n";
 import type { PresetFileData } from "../hooks/presetFile";
@@ -72,6 +74,16 @@ export function RetroPlayer({
     () => loadPersistedRetroSettings()?.ui,
     [],
   );
+
+  const startupNativeMode = React.useRef(getNativePlaybackMode()).current;
+  const [nativePlaybackMode, setNativePlaybackModeState] = React.useState(startupNativeMode);
+
+  const handleToggleNativePlaybackMode = React.useCallback(() => {
+    const next = !nativePlaybackMode;
+    setNativePlaybackMode(next);
+    setNativePlaybackModeState(next);
+  }, [nativePlaybackMode]);
+
   const [isHighResolution, setIsHighResolution] = React.useState(
     persistedUiSettings?.isHighResolution ?? false,
   );
@@ -85,7 +97,9 @@ export function RetroPlayer({
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
 
-  const filterState = useRetroFilterState(initialFilterState);
+  const filterState = useRetroFilterState(
+    startupNativeMode ? { ...initialFilterState, isFilterEnabled: false } : initialFilterState,
+  );
   const renderResolutionScale = isHighResolution
     ? typeof window !== "undefined"
       ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))
@@ -115,18 +129,17 @@ export function RetroPlayer({
   }, [filterState, player]);
 
   const syncTargetAspect = React.useCallback(() => {
-    if (!player.sourceDimensions) return;
+    const dims = player.sourceDimensions;
+    if (!dims || dims.width <= 0 || dims.height <= 0) return;
 
     const nextHeight = Math.max(
       8,
       Math.round(
-        (filterState.targetWidth / player.sourceDimensions.width) *
-          player.sourceDimensions.height /
-          8,
+        (filterState.targetWidth / dims.width) * dims.height / 8,
       ) * 8,
     );
 
-    if (nextHeight !== filterState.targetHeight) {
+    if (Number.isFinite(nextHeight) && nextHeight !== filterState.targetHeight) {
       filterState.setTargetHeight(nextHeight);
     }
   }, [
@@ -329,6 +342,9 @@ export function RetroPlayer({
             onSetMatchTargetAspect={handleSetMatchTargetAspect}
             onResetSettings={resetAllSettings}
             onImportSettings={handleImportSettings}
+            isNativePlaybackMode={nativePlaybackMode}
+            nativePlaybackNeedsReload={nativePlaybackMode !== startupNativeMode}
+            onToggleNativePlaybackMode={handleToggleNativePlaybackMode}
           />
         </div>
       </section>
@@ -364,6 +380,9 @@ export function RetroPlayer({
     onCycleLoopMode,
     showVideoSpectrum,
     onToggleVideoSpectrum: () => setShowVideoSpectrum(v => !v),
+    isNativePlaybackMode: nativePlaybackMode,
+    nativePlaybackNeedsReload: nativePlaybackMode !== startupNativeMode,
+    onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
   } as const;
 
   return (

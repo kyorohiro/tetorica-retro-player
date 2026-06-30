@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
+  getNativePlaybackMode,
   loadPersistedRetroSettings,
   savePersistedRetroAudioSettings,
 } from "./persistedRetroSettings";
@@ -99,6 +100,7 @@ export function useRetroAudioEngine({
   }, []);
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
+    const isNativeMode = getNativePlaybackMode();
 
     return {
       audioOptimizationMode:
@@ -107,8 +109,9 @@ export function useRetroAudioEngine({
       volume: persisted?.volume ?? DEFAULT_AUDIO_SETTINGS.volume,
       playbackRate: persisted?.playbackRate ?? DEFAULT_AUDIO_SETTINGS.playbackRate,
       isLooping: persisted?.isLooping ?? DEFAULT_AUDIO_SETTINGS.isLooping,
-      isAudioFxEnabled:
-        persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_SETTINGS.isAudioFxEnabled,
+      isAudioFxEnabled: isNativeMode
+        ? false
+        : (persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_SETTINGS.isAudioFxEnabled),
       lofiAmount: persisted?.lofiAmount ?? DEFAULT_AUDIO_SETTINGS.lofiAmount,
       radioToneAmount:
         persisted?.radioToneAmount ?? DEFAULT_AUDIO_SETTINGS.radioToneAmount,
