@@ -24,7 +24,14 @@ pub async fn ffmpeg_exec(args: Vec<String>) -> Result<FfmpegOutput, String> {
     {
         let bin = ffmpeg_bin();
         let output = tauri::async_runtime::spawn_blocking(move || {
-            std::process::Command::new(&bin).args(&args).output()
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.args(&args);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            cmd.output()
         })
         .await
         .map_err(|e| e.to_string())?
