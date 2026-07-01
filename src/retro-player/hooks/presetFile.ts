@@ -61,6 +61,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
 const DEFAULT_UI_SETTINGS: PersistedRetroUiSettings = {
   isPreviewMaximized: false,
   isHighResolution: false,
+  renderResolutionPreset: 1,
   brightness: 1.0,
   flipH: false,
   flipV: false,

@@ -1,5 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
+import { useLongPress } from "../hooks/useLongPress";
 import {
   Aperture,
   ArrowLeftRight,
@@ -31,6 +32,7 @@ type RetroPreviewToolbarProps = {
   locale: RetroPlayerLocale;
   player: RetroPreviewToolbarPlayerSlice;
   isHighResolution: boolean;
+  renderResolutionPreset: 1 | 2 | 3;
   isFitWidthEnabled: boolean;
   isPinnedPreview: boolean;
   isPreviewMaximized: boolean;
@@ -48,7 +50,8 @@ type RetroPreviewToolbarProps = {
   onTestAlarm: () => void;
   onRecordClick: () => void;
   onPowerToggle: () => void;
-  onHighResolutionChange: (enabled: boolean) => void;
+  onHighResolutionToggle: () => void;
+  onCycleHighResolutionMode: () => void;
   onFitWidthToggle: () => void;
   onPinToggle: () => void;
   onMaximizeToggle: () => void;
@@ -69,6 +72,7 @@ export function RetroPreviewToolbar({
   locale,
   player,
   isHighResolution,
+  renderResolutionPreset,
   isFitWidthEnabled,
   isPinnedPreview,
   isPreviewMaximized,
@@ -86,7 +90,8 @@ export function RetroPreviewToolbar({
   onTestAlarm,
   onRecordClick,
   onPowerToggle,
-  onHighResolutionChange,
+  onHighResolutionToggle,
+  onCycleHighResolutionMode,
   onFitWidthToggle,
   onPinToggle,
   onMaximizeToggle,
@@ -107,7 +112,7 @@ export function RetroPreviewToolbar({
           recordStop: "録画: 停止して書き出します。",
           powerOn: "Power: フィルターをオンにします。",
           powerOff: "Power: フィルターをオフにします。",
-          hiRes: "Hi-res: よりシャープになりますが GPU 負荷は上がります。",
+          hiRes: `Hi-res: 短押しで 2x、長押しで 3x。現在 ${renderResolutionPreset}x。`,
           fitWidthOn: "Fit width: 有効です。",
           fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
           pinUnavailable: "Pin: 最大化中は使えません。",
@@ -129,7 +134,7 @@ export function RetroPreviewToolbar({
           recordStop: "Record: stop and export clip.",
           powerOn: "Power: turn filter on.",
           powerOff: "Power: turn filter off.",
-          hiRes: "Hi-res: sharper preview, higher GPU cost.",
+          hiRes: `Hi-res: click for 2x, long press for 3x. Current ${renderResolutionPreset}x.`,
           fitWidthOn: "Fit width: enabled.",
           fitWidthOff: "Fit width: stretch preview to the frame width.",
           pinUnavailable: "Pin: unavailable while maximize is active.",
@@ -145,8 +150,7 @@ export function RetroPreviewToolbar({
           hlsSlotsDescription: "Maximum concurrent ffmpeg HLS jobs. Persisted and safe to apply on the next playback cycle.",
           enabled: "On",
           disabled: "Off",
-        };
-
+      };
   const [isMoreOpen, setIsMoreOpen] = React.useState(false);
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== "undefined" && window.innerWidth < 360,
@@ -176,6 +180,12 @@ export function RetroPreviewToolbar({
 
     setActiveTooltipKey(null);
   }, []);
+
+  const { isHolding: isHiResHolding, ...hiResButtonHandlers } = useLongPress(
+    () => { hideTooltip(); onCycleHighResolutionMode(); },
+    () => { hideTooltip(); onHighResolutionToggle(); },
+  );
+  void isHiResHolding;
 
   React.useEffect(() => {
     return () => {
@@ -269,6 +279,8 @@ export function RetroPreviewToolbar({
     "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm";
   const glowingFloatingButtonClass =
     "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_16px_rgba(74,222,128,0.68)] hover:bg-emerald-400/28";
+  const dangerFloatingButtonClass =
+    "border-rose-300/80 bg-rose-500/20 text-rose-100 shadow-[0_0_16px_rgba(244,63,94,0.56)] hover:bg-rose-500/28";
   const idleFloatingButtonClass =
     "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90";
   const pillButtonClass =
@@ -604,15 +616,23 @@ export function RetroPreviewToolbar({
       <div className="relative">
         <button
           type="button"
-          aria-label={isHighResolution ? "Disable high resolution" : "Enable high resolution"}
-          onClick={() => { hideTooltip(); onHighResolutionChange(!isHighResolution); }}
+          aria-label={
+            renderResolutionPreset > 1
+              ? `Disable high resolution (current ${renderResolutionPreset}x)`
+              : "Enable high resolution"
+          }
+          {...hiResButtonHandlers}
           onMouseEnter={() => scheduleTooltip("hi-res")}
           onMouseLeave={hideTooltip}
           onFocus={() => scheduleTooltip("hi-res")}
           onBlur={hideTooltip}
           className={[
             floatingButtonClass,
-            isHighResolution ? glowingFloatingButtonClass : idleFloatingButtonClass,
+            renderResolutionPreset >= 3
+              ? dangerFloatingButtonClass
+              : isHighResolution
+                ? glowingFloatingButtonClass
+                : idleFloatingButtonClass,
           ].join(" ")}
         >
           <Aperture size={16} />

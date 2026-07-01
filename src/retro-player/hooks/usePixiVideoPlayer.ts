@@ -7,6 +7,7 @@ import { useRetroPixiStage } from "./useRetroPixiStage";
 import { useRetroPreviewMedia } from "./useRetroPreviewMedia";
 import {
   RETRO_PLAYER_ENSURE_AUDIO_CONTEXT_EVENT,
+  RETRO_PLAYER_PAUSE_PLAYBACK_EVENT,
   RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
 } from "../events";
 
@@ -1077,6 +1078,32 @@ export function usePixiVideoPlayer(
       );
     };
   }, [syncVideoState]);
+
+  useEffect(() => {
+    const handlePausePlayback = () => {
+      if (!mediaRef.current) {
+        return;
+      }
+
+      cancelPendingPlaybackStart();
+      mediaRef.current.pause();
+      setIsBuffering(false);
+      finishLoading();
+      syncVideoState();
+    };
+
+    window.addEventListener(
+      RETRO_PLAYER_PAUSE_PLAYBACK_EVENT,
+      handlePausePlayback as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        RETRO_PLAYER_PAUSE_PLAYBACK_EVENT,
+        handlePausePlayback as EventListener,
+      );
+    };
+  }, [cancelPendingPlaybackStart, syncVideoState]);
 
   useLayoutEffect(() => {
     applyFilterState();

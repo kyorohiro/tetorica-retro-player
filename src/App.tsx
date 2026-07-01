@@ -18,7 +18,7 @@ import {
 } from "./i18n";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import { useLongPress } from "./retro-player/hooks/useLongPress";
-import { useDialog } from "./useDialog";
+import { DIALOG_STACK_ACTIVE_EVENT, useDialog } from "./useDialog";
 import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
@@ -31,6 +31,7 @@ import {
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import {
+  dispatchRetroPlayerPausePlayback,
   dispatchRetroPlayerEnsureAudioContext,
   dispatchRetroPlayerPrepareExternalNavigation,
 } from "./retro-player/events";
@@ -39,7 +40,7 @@ import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { type PresetConfig, loadStartupPreset, saveStartupPreset } from "./builtin-content/preset-config";
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
-import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
+import { RETRO_PREVIEW_DIALOG_EVENT, usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import type { RetroPlaybackEvent } from "./retro-player/hooks/usePixiVideoPlayer";
 
 const waitForNextPaint = async () => {
@@ -123,6 +124,9 @@ function App() {
   // 'done'    = playing or user chose something else
   type AutoStartState = 'pending' | 'blocked' | 'done';
   const [autoStartState, setAutoStartState] = React.useState<AutoStartState>('blocked');
+  const [isDialogActive, setIsDialogActive] = React.useState(false);
+  const [isPreviewDialogActive, setIsPreviewDialogActive] = React.useState(false);
+  const isPreviewDialogActiveRef = React.useRef(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -162,6 +166,48 @@ function App() {
     }, 800);
     return () => {
       window.clearTimeout(idleCallback);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    isPreviewDialogActiveRef.current = isPreviewDialogActive;
+  }, [isPreviewDialogActive]);
+
+  React.useEffect(() => {
+    const handleDialogActive = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      setIsDialogActive(Boolean(detail?.active));
+    };
+
+    window.addEventListener(
+      DIALOG_STACK_ACTIVE_EVENT,
+      handleDialogActive as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        DIALOG_STACK_ACTIVE_EVENT,
+        handleDialogActive as EventListener,
+      );
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const handlePreviewDialogActive = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      setIsPreviewDialogActive(Boolean(detail?.active));
+    };
+
+    window.addEventListener(
+      RETRO_PREVIEW_DIALOG_EVENT,
+      handlePreviewDialogActive as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        RETRO_PREVIEW_DIALOG_EVENT,
+        handlePreviewDialogActive as EventListener,
+      );
     };
   }, []);
 
@@ -913,6 +959,13 @@ function App() {
     [previewSource.previewStreamSource],
   );
 
+  React.useEffect(() => {
+    if (!isPreviewDialogActive) return;
+    if (currentPlaybackSource !== "builtin-tone") return;
+    dispatchRetroPlayerPausePlayback();
+    syncToneTransportPlayback(false);
+  }, [currentPlaybackSource, isPreviewDialogActive, syncToneTransportPlayback]);
+
   // When a file/URL/stream is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
   React.useEffect(() => {
     if (!previewSource.previewSrc && !previewSource.previewStream) return;
@@ -1289,6 +1342,10 @@ function App() {
                   setShowPlaybackRetryHint(false);
                 }
                 if (event.source === "builtin-tone") {
+                  if (isPreviewDialogActiveRef.current) {
+                    syncToneTransportPlayback(false);
+                    return;
+                  }
                   syncToneTransportPlayback(event.playing);
                   return;
                 }
@@ -1345,7 +1402,7 @@ function App() {
               </div>
             </div>
           )}
-          {autoStartState === 'blocked' && (
+          {autoStartState === 'blocked' && !isDialogActive && (
             <div className="pointer-events-none fixed inset-0 z-60 flex items-center justify-center">
               <button
                 type="button"

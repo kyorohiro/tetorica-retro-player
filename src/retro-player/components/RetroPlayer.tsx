@@ -13,6 +13,7 @@ import {
   setFfmpegMaxConcurrentHlsSessions,
   loadPersistedRetroSettings,
   setNativePlaybackMode,
+  type PersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
 import {
   mdropSetFfmpegMaxConcurrentHlsSessions,
@@ -30,6 +31,22 @@ import { RetroPreviewView } from "./RetroPreviewView";
 import { RetroControlPanel } from "./RetroControlPanel";
 import { RetroPlayerLayout, type RetroLayoutMode } from "./RetroPlayerLayout";
 import { useDialog } from "../../useDialog";
+
+const clampRenderResolutionPreset = (value: number): 1 | 2 | 3 => {
+  if (value >= 3) return 3;
+  if (value >= 2) return 2;
+  return 1;
+};
+
+const resolveRenderResolutionPreset = (
+  ui: PersistedRetroUiSettings | undefined,
+): 1 | 2 | 3 => {
+  const explicitPreset = ui?.renderResolutionPreset;
+  if (typeof explicitPreset === "number" && Number.isFinite(explicitPreset)) {
+    return clampRenderResolutionPreset(explicitPreset);
+  }
+  return ui?.isHighResolution ? 2 : 1;
+};
 
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
@@ -136,9 +153,10 @@ export function RetroPlayer({
     void syncFfmpegMaxConcurrentHlsSessions(normalized);
   }, [syncFfmpegMaxConcurrentHlsSessions]);
 
-  const [isHighResolution, setIsHighResolution] = React.useState(
-    persistedUiSettings?.isHighResolution ?? false,
+  const [renderResolutionPreset, setRenderResolutionPreset] = React.useState<1 | 2 | 3>(
+    resolveRenderResolutionPreset(persistedUiSettings),
   );
+  const isHighResolution = renderResolutionPreset > 1;
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
@@ -160,11 +178,7 @@ export function RetroPlayer({
   const filterState = useRetroFilterState(
     startupNativeMode ? { ...initialFilterState, isFilterEnabled: false } : initialFilterState,
   );
-  const renderResolutionScale = isHighResolution
-    ? typeof window !== "undefined"
-      ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2))
-      : 1
-    : 1;
+  const renderResolutionScale = renderResolutionPreset;
   const player = usePixiVideoPlayer(
     filterState,
     isFitWidthEnabled ? "width" : "contain",
@@ -186,15 +200,27 @@ export function RetroPlayer({
     clearPersistedRetroSettings();
     filterState.resetSettings();
     player.resetAudioSettings();
-    setIsHighResolution(false);
+    setRenderResolutionPreset(1);
   }, [filterState, player]);
 
   const handleImportSettings = React.useCallback((data: PresetFileData) => {
     filterState.applyAllFilterSettings(data.filter);
     player.applyAudioSettings(data.audio);
-    setIsHighResolution(data.ui.isHighResolution);
+    setRenderResolutionPreset(resolveRenderResolutionPreset(data.ui));
     saveLocalePreference(data.locale);
   }, [filterState, player]);
+
+  const handleToggleHighResolution = React.useCallback(() => {
+    setRenderResolutionPreset((current) => (current > 1 ? 1 : 2));
+  }, []);
+
+  const handleCycleHighResolutionMode = React.useCallback(() => {
+    setRenderResolutionPreset((current) => {
+      if (current === 1) return 3;
+      if (current === 2) return 3;
+      return 1;
+    });
+  }, []);
 
   const syncTargetAspect = React.useCallback(() => {
     const dims = player.sourceDimensions;
@@ -389,10 +415,12 @@ export function RetroPlayer({
             kind={kind}
             player={player}
             isHighResolution={isHighResolution}
+            renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
             controlPanelMode={controlPanelMode}
             confirmDialog={confirmDialog}
-            onHighResolutionChange={setIsHighResolution}
+            onHighResolutionToggle={handleToggleHighResolution}
+            onCycleHighResolutionMode={handleCycleHighResolutionMode}
             onFitWidthChange={setIsFitWidthEnabled}
             onError={onError}
             analyserRef={player.analyserRef}
@@ -474,11 +502,13 @@ export function RetroPlayer({
               kind={kind}
               player={player}
               isHighResolution={isHighResolution}
+              renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
               controlPanelMode={controlPanelMode}
               confirmDialog={confirmDialog}
               fillHeight={fillHeight}
-              onHighResolutionChange={setIsHighResolution}
+              onHighResolutionToggle={handleToggleHighResolution}
+              onCycleHighResolutionMode={handleCycleHighResolutionMode}
               onFitWidthChange={setIsFitWidthEnabled}
               onError={onError}
               onIsPinnedPreviewChange={setIsPinnedInPreview}

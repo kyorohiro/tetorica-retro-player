@@ -61,11 +61,13 @@ export type RetroPreviewViewProps = {
   // These two affect usePixiVideoPlayer args so they live in RetroPlayer,
   // but their toggle buttons live here.
   isHighResolution: boolean;
+  renderResolutionPreset: 1 | 2 | 3;
   isFitWidthEnabled: boolean;
   // The control panel mode drives the auto-pin trigger.
   controlPanelMode: "playback" | "audio-settings" | "video-settings";
   confirmDialog: ConfirmDialogFn;
-  onHighResolutionChange: (enabled: boolean) => void;
+  onHighResolutionToggle: () => void;
+  onCycleHighResolutionMode: () => void;
   onFitWidthChange: (enabled: boolean) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
@@ -84,10 +86,12 @@ export function RetroPreviewView({
   kind: _kind,
   player,
   isHighResolution,
+  renderResolutionPreset,
   isFitWidthEnabled,
   controlPanelMode,
   confirmDialog,
-  onHighResolutionChange,
+  onHighResolutionToggle,
+  onCycleHighResolutionMode,
   onFitWidthChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
@@ -210,8 +214,15 @@ export function RetroPreviewView({
   // Persist UI settings. isHighResolution is owned by RetroPlayer but
   // persisted here since we know both values.
   React.useEffect(() => {
-    savePersistedRetroUiSettings({ isPreviewMaximized, isHighResolution, brightness, flipH, flipV });
-  }, [isHighResolution, isPreviewMaximized, brightness, flipH, flipV]);
+    savePersistedRetroUiSettings({
+      isPreviewMaximized,
+      isHighResolution,
+      renderResolutionPreset,
+      brightness,
+      flipH,
+      flipV,
+    });
+  }, [isHighResolution, isPreviewMaximized, renderResolutionPreset, brightness, flipH, flipV]);
 
   // Tooltip timer cleanup on unmount.
   React.useEffect(() => {
@@ -744,6 +755,7 @@ export function RetroPreviewView({
                 locale={locale}
                 player={player}
                 isHighResolution={isHighResolution}
+                renderResolutionPreset={renderResolutionPreset}
                 isFitWidthEnabled={isFitWidthEnabled}
                 isPinnedPreview={isPinnedPreview}
                 isPreviewMaximized={isPreviewMaximized}
@@ -767,7 +779,8 @@ export function RetroPreviewView({
                   }
                   player.powerOn();
                 }}
-                onHighResolutionChange={onHighResolutionChange}
+                onHighResolutionToggle={onHighResolutionToggle}
+                onCycleHighResolutionMode={onCycleHighResolutionMode}
                 onFitWidthToggle={() => {
                   if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                   onFitWidthChange(!isFitWidthEnabled);
@@ -799,6 +812,7 @@ export function RetroPreviewView({
               locale={locale}
               player={player}
               isHighResolution={isHighResolution}
+              renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
               isPinnedPreview={isPinnedPreview}
               isPreviewMaximized={isPreviewMaximized}
@@ -822,7 +836,8 @@ export function RetroPreviewView({
                 }
                 player.powerOn();
               }}
-              onHighResolutionChange={onHighResolutionChange}
+              onHighResolutionToggle={onHighResolutionToggle}
+              onCycleHighResolutionMode={onCycleHighResolutionMode}
               onFitWidthToggle={() => {
                 if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                 onFitWidthChange(!isFitWidthEnabled);
@@ -853,6 +868,7 @@ export function RetroPreviewView({
               locale={locale}
               player={player}
               isHighResolution={isHighResolution}
+              renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
               isPinnedPreview={isPinnedPreview}
               isPreviewMaximized={isPreviewMaximized}
@@ -876,7 +892,8 @@ export function RetroPreviewView({
                 }
                 player.powerOn();
               }}
-              onHighResolutionChange={onHighResolutionChange}
+              onHighResolutionToggle={onHighResolutionToggle}
+              onCycleHighResolutionMode={onCycleHighResolutionMode}
               onFitWidthToggle={() => {
                 if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                 onFitWidthChange(!isFitWidthEnabled);
@@ -907,6 +924,7 @@ export function RetroPreviewView({
             locale={locale}
             player={player}
             isHighResolution={isHighResolution}
+            renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
             isPinnedPreview={isPinnedPreview}
             isPreviewMaximized={isPreviewMaximized}
@@ -930,7 +948,8 @@ export function RetroPreviewView({
               }
               player.powerOn();
             }}
-            onHighResolutionChange={onHighResolutionChange}
+            onHighResolutionToggle={onHighResolutionToggle}
+            onCycleHighResolutionMode={onCycleHighResolutionMode}
             onFitWidthToggle={() => {
               if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);
@@ -958,10 +977,11 @@ export function RetroPreviewView({
       {isFitWidthEnabled && !isPreviewMaximized && (
         <div className="flex items-center justify-end gap-2 pt-2 pr-0">
           <RetroPreviewToolbar
-            locale={locale}
-            player={player}
-            isHighResolution={isHighResolution}
-            isFitWidthEnabled={isFitWidthEnabled}
+          locale={locale}
+          player={player}
+          isHighResolution={isHighResolution}
+          renderResolutionPreset={renderResolutionPreset}
+          isFitWidthEnabled={isFitWidthEnabled}
             isPinnedPreview={isPinnedPreview}
             isPreviewMaximized={isPreviewMaximized}
             brightness={brightness}
@@ -984,7 +1004,8 @@ export function RetroPreviewView({
               }
               player.powerOn();
             }}
-            onHighResolutionChange={onHighResolutionChange}
+            onHighResolutionToggle={onHighResolutionToggle}
+            onCycleHighResolutionMode={onCycleHighResolutionMode}
             onFitWidthToggle={() => {
               if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);
