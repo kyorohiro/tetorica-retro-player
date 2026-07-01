@@ -61,13 +61,12 @@ export type RetroPreviewViewProps = {
   // These two affect usePixiVideoPlayer args so they live in RetroPlayer,
   // but their toggle buttons live here.
   isHighResolution: boolean;
-  renderResolutionPreset: 1 | 2 | 3;
+  renderResolutionPreset: 1 | 2;
   isFitWidthEnabled: boolean;
   // The control panel mode drives the auto-pin trigger.
   controlPanelMode: "playback" | "audio-settings" | "video-settings";
   confirmDialog: ConfirmDialogFn;
   onHighResolutionToggle: () => void;
-  onCycleHighResolutionMode: () => void;
   onFitWidthChange: (enabled: boolean) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
@@ -91,7 +90,6 @@ export function RetroPreviewView({
   controlPanelMode,
   confirmDialog,
   onHighResolutionToggle,
-  onCycleHighResolutionMode,
   onFitWidthChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
@@ -780,7 +778,6 @@ export function RetroPreviewView({
                   player.powerOn();
                 }}
                 onHighResolutionToggle={onHighResolutionToggle}
-                onCycleHighResolutionMode={onCycleHighResolutionMode}
                 onFitWidthToggle={() => {
                   if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                   onFitWidthChange(!isFitWidthEnabled);
@@ -837,7 +834,6 @@ export function RetroPreviewView({
                 player.powerOn();
               }}
               onHighResolutionToggle={onHighResolutionToggle}
-              onCycleHighResolutionMode={onCycleHighResolutionMode}
               onFitWidthToggle={() => {
                 if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                 onFitWidthChange(!isFitWidthEnabled);
@@ -893,7 +889,6 @@ export function RetroPreviewView({
                 player.powerOn();
               }}
               onHighResolutionToggle={onHighResolutionToggle}
-              onCycleHighResolutionMode={onCycleHighResolutionMode}
               onFitWidthToggle={() => {
                 if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                 onFitWidthChange(!isFitWidthEnabled);
@@ -949,7 +944,6 @@ export function RetroPreviewView({
               player.powerOn();
             }}
             onHighResolutionToggle={onHighResolutionToggle}
-            onCycleHighResolutionMode={onCycleHighResolutionMode}
             onFitWidthToggle={() => {
               if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);
@@ -1005,7 +999,6 @@ export function RetroPreviewView({
               player.powerOn();
             }}
             onHighResolutionToggle={onHighResolutionToggle}
-            onCycleHighResolutionMode={onCycleHighResolutionMode}
             onFitWidthToggle={() => {
               if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);

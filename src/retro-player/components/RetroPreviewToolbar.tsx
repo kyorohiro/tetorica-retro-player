@@ -1,6 +1,5 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { useLongPress } from "../hooks/useLongPress";
 import {
   Aperture,
   ArrowLeftRight,
@@ -32,7 +31,7 @@ type RetroPreviewToolbarProps = {
   locale: RetroPlayerLocale;
   player: RetroPreviewToolbarPlayerSlice;
   isHighResolution: boolean;
-  renderResolutionPreset: 1 | 2 | 3;
+  renderResolutionPreset: 1 | 2;
   isFitWidthEnabled: boolean;
   isPinnedPreview: boolean;
   isPreviewMaximized: boolean;
@@ -51,7 +50,6 @@ type RetroPreviewToolbarProps = {
   onRecordClick: () => void;
   onPowerToggle: () => void;
   onHighResolutionToggle: () => void;
-  onCycleHighResolutionMode: () => void;
   onFitWidthToggle: () => void;
   onPinToggle: () => void;
   onMaximizeToggle: () => void;
@@ -91,7 +89,6 @@ export function RetroPreviewToolbar({
   onRecordClick,
   onPowerToggle,
   onHighResolutionToggle,
-  onCycleHighResolutionMode,
   onFitWidthToggle,
   onPinToggle,
   onMaximizeToggle,
@@ -112,7 +109,7 @@ export function RetroPreviewToolbar({
           recordStop: "録画: 停止して書き出します。",
           powerOn: "Power: フィルターをオンにします。",
           powerOff: "Power: フィルターをオフにします。",
-          hiRes: `Hi-res: 短押しで 2x、長押しで 3x。現在 ${renderResolutionPreset}x。`,
+          hiRes: `Hi-res: 1x / 2x を切り替えます。現在 ${renderResolutionPreset}x。`,
           fitWidthOn: "Fit width: 有効です。",
           fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
           pinUnavailable: "Pin: 最大化中は使えません。",
@@ -134,7 +131,7 @@ export function RetroPreviewToolbar({
           recordStop: "Record: stop and export clip.",
           powerOn: "Power: turn filter on.",
           powerOff: "Power: turn filter off.",
-          hiRes: `Hi-res: click for 2x, long press for 3x. Current ${renderResolutionPreset}x.`,
+          hiRes: `Hi-res: toggle between 1x and 2x. Current ${renderResolutionPreset}x.`,
           fitWidthOn: "Fit width: enabled.",
           fitWidthOff: "Fit width: stretch preview to the frame width.",
           pinUnavailable: "Pin: unavailable while maximize is active.",
@@ -180,12 +177,6 @@ export function RetroPreviewToolbar({
 
     setActiveTooltipKey(null);
   }, []);
-
-  const { isHolding: isHiResHolding, ...hiResButtonHandlers } = useLongPress(
-    () => { hideTooltip(); onCycleHighResolutionMode(); },
-    () => { hideTooltip(); onHighResolutionToggle(); },
-  );
-  void isHiResHolding;
 
   React.useEffect(() => {
     return () => {
@@ -279,8 +270,6 @@ export function RetroPreviewToolbar({
     "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm";
   const glowingFloatingButtonClass =
     "border-emerald-300/80 bg-emerald-400/20 text-emerald-100 shadow-[0_0_16px_rgba(74,222,128,0.68)] hover:bg-emerald-400/28";
-  const dangerFloatingButtonClass =
-    "border-rose-300/80 bg-rose-500/20 text-rose-100 shadow-[0_0_16px_rgba(244,63,94,0.56)] hover:bg-rose-500/28";
   const idleFloatingButtonClass =
     "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90";
   const pillButtonClass =
@@ -621,18 +610,16 @@ export function RetroPreviewToolbar({
               ? `Disable high resolution (current ${renderResolutionPreset}x)`
               : "Enable high resolution"
           }
-          {...hiResButtonHandlers}
+          onClick={() => { hideTooltip(); onHighResolutionToggle(); }}
           onMouseEnter={() => scheduleTooltip("hi-res")}
           onMouseLeave={hideTooltip}
           onFocus={() => scheduleTooltip("hi-res")}
           onBlur={hideTooltip}
           className={[
             floatingButtonClass,
-            renderResolutionPreset >= 3
-              ? dangerFloatingButtonClass
-              : isHighResolution
-                ? glowingFloatingButtonClass
-                : idleFloatingButtonClass,
+            isHighResolution
+              ? glowingFloatingButtonClass
+              : idleFloatingButtonClass,
           ].join(" ")}
         >
           <Aperture size={16} />
