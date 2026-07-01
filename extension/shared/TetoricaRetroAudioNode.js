@@ -9,6 +9,7 @@ var DEFAULT_AUDIO_SETTINGS = {
   lofiAmount: 0.58,
   radioToneAmount: 0,
   bitCrushAmount: 0.1,
+  bitCrushNoiseAmount: 0,
   sampleRateReductionAmount: 0.1,
   noiseReductionAmount: 0,
   bassAmount: 0,
@@ -28,7 +29,8 @@ var DEFAULT_AUDIO_SETTINGS = {
   chorusAmount: 0,
   tapeSaturationAmount: 0,
   compressorAmount: 0,
-  fxOutputTrimAmount: 0.66
+  fxOutputTrimAmount: 0.66,
+  inputTrimAmount: 1
 };
 var RETRO_AUDIO_PRESET_PARTIALS = {
   none: {
@@ -40,6 +42,7 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
       lofiAmount: 0,
       radioToneAmount: 0,
       bitCrushAmount: 0,
+      bitCrushNoiseAmount: 0,
       sampleRateReductionAmount: 0,
       bassAmount: 0,
       midAmount: 0,
@@ -307,7 +310,7 @@ var RETRO_AUDIO_PRESET_SETTINGS = Object.fromEntries(
 
 // src/retro-player/audio/audioChainEngine.ts
 function createDriveCurve(amount) {
-  const samples = 256;
+  const samples = 4096;
   const curve = new Float32Array(samples);
   const drive = 1 + amount * 5;
   for (let i = 0; i < samples; i++) {
@@ -317,9 +320,9 @@ function createDriveCurve(amount) {
   return curve;
 }
 function createTapeSaturationCurve(amount) {
-  const samples = 256;
+  const samples = 4096;
   const curve = new Float32Array(samples);
-  const k = amount * 8;
+  const k = amount * 6;
   for (let i = 0; i < samples; i++) {
     const x = i * 2 / (samples - 1) - 1;
     if (k < 1e-3) {
@@ -476,6 +479,11 @@ var TetoricaRetroAudioNode = class {
     lofiHighshelf: null,
     lofiDrive: null,
     bitcrusher: null,
+    bitcrusherDiff: null,
+    crushNoiseWetGain: null,
+    crushNoiseDryGain: null,
+    crushNoiseMixGain: null,
+    crushNoisePostLowpass: null,
     postCrushLowpass: null,
     bassEq: null,
     midEq: null,
@@ -519,7 +527,9 @@ var TetoricaRetroAudioNode = class {
     chorusWetGain: null,
     tapeSaturator: null,
     busCompressor: null,
-    fxOutputGain: null
+    fxOutputGain: null,
+    inputTrimGain: null,
+    analyser: null
   };
   constructor({
     context,
@@ -538,7 +548,7 @@ var TetoricaRetroAudioNode = class {
     this.enableAudioWorklet = enableAudioWorklet;
   }
   get input() {
-    return this.nodes.wowFlutterDelay ?? this.nodes.lofiLowpass;
+    return this.nodes.inputTrimGain ?? this.nodes.wowFlutterDelay ?? this.nodes.lofiLowpass;
   }
   get output() {
     return this.nodes.fxOutputGain ?? this.nodes.outputBus ?? this.nodes.masterGain;
@@ -642,6 +652,9 @@ var TetoricaRetroAudioNode = class {
   get crackleGain() {
     return this.nodes.crackleGain;
   }
+  get analyser() {
+    return this.nodes.analyser;
+  }
   debugAudio(label, payload) {
     if (!isRetroPlayerDebugEnabled()) {
       return;
@@ -684,6 +697,11 @@ var TetoricaRetroAudioNode = class {
       lofiHighshelf: null,
       lofiDrive: null,
       bitcrusher: null,
+      bitcrusherDiff: null,
+      crushNoiseWetGain: null,
+      crushNoiseDryGain: null,
+      crushNoiseMixGain: null,
+      crushNoisePostLowpass: null,
       postCrushLowpass: null,
       bassEq: null,
       midEq: null,
@@ -743,6 +761,9 @@ var TetoricaRetroAudioNode = class {
     const highshelf = this.nodes.lofiHighshelf;
     const drive = this.nodes.lofiDrive;
     const bitcrusher = this.nodes.bitcrusher;
+    const bitcrusherDiff = this.nodes.bitcrusherDiff;
+    const crushNoiseMixGain = this.nodes.crushNoiseMixGain;
+    const crushNoisePostLowpass = this.nodes.crushNoisePostLowpass;
     const bassEq = this.nodes.bassEq;
     const midEq = this.nodes.midEq;
     const trebleEq = this.nodes.trebleEq;
@@ -802,10 +823,36 @@ var TetoricaRetroAudioNode = class {
         bitcrusher.context.currentTime
       );
     }
+    if (bitcrusherDiff) {
+      const isEnabled = settings.isAudioFxEnabled;
+      const crushNoiseAmount = isEnabled ? settings.bitCrushNoiseAmount : 0;
+      const bitDepth = 16 - crushNoiseAmount * 12;
+      const holdFrames = 1;
+      bitcrusherDiff.parameters.get("bitDepth")?.setValueAtTime(
+        bitDepth,
+        bitcrusherDiff.context.currentTime
+      );
+      bitcrusherDiff.parameters.get("holdFrames")?.setValueAtTime(
+        holdFrames,
+        bitcrusherDiff.context.currentTime
+      );
+      bitcrusherDiff.parameters.get("mix")?.setValueAtTime(
+        1,
+        bitcrusherDiff.context.currentTime
+      );
+    }
     const postCrushLowpass = this.nodes.postCrushLowpass;
     if (postCrushLowpass) {
       const amount = settings.isAudioFxEnabled ? settings.noiseReductionAmount : 0;
       postCrushLowpass.frequency.value = Math.max(3e3, 18e3 - amount * 15e3);
+    }
+    if (crushNoisePostLowpass) {
+      const amount = settings.isAudioFxEnabled ? settings.noiseReductionAmount : 0;
+      crushNoisePostLowpass.frequency.value = Math.max(3e3, 18e3 - amount * 15e3);
+    }
+    if (crushNoiseMixGain) {
+      const amount = settings.isAudioFxEnabled ? settings.bitCrushNoiseAmount : 0;
+      crushNoiseMixGain.gain.value = amount * 0.85;
     }
     if (bassEq && midEq && trebleEq) {
       const eqScale = settings.isAudioFxEnabled ? 15 : 0;
@@ -907,18 +954,28 @@ var TetoricaRetroAudioNode = class {
     if (fxOutputGain) {
       fxOutputGain.gain.value = settings.isAudioFxEnabled ? settings.fxOutputTrimAmount : 1;
     }
+    const inputTrimGain = this.nodes.inputTrimGain;
+    if (inputTrimGain) {
+      inputTrimGain.gain.value = settings.isAudioFxEnabled ? settings.inputTrimAmount : 1;
+    }
   }
   // ---------------------------------------------------------------------------
   // Private initialization helpers
   // ---------------------------------------------------------------------------
   async loadWorklets(context) {
     let bitcrusher = null;
+    let bitcrusherDiff = null;
     let stereoWidth = null;
     const AudioWorkletNodeCtor = this.resolveAudioWorkletNodeCtor();
     if (this.enableAudioWorklet && "audioWorklet" in context && AudioWorkletNodeCtor) {
       const bitcrusherModuleUrl = new URL("./bitcrusherWorklet.js", import.meta.url);
       await context.audioWorklet.addModule(bitcrusherModuleUrl.href);
       bitcrusher = new AudioWorkletNodeCtor(context, "retro-bitcrusher", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2]
+      });
+      bitcrusherDiff = new AudioWorkletNodeCtor(context, "retro-bitcrusher", {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [2]
@@ -931,7 +988,7 @@ var TetoricaRetroAudioNode = class {
         outputChannelCount: [2]
       });
     }
-    return { bitcrusher, stereoWidth };
+    return { bitcrusher, bitcrusherDiff, stereoWidth };
   }
   buildAndWireNodes(context, worklets) {
     const masterGain = context.createGain();
@@ -950,6 +1007,10 @@ var TetoricaRetroAudioNode = class {
     const highshelf = context.createBiquadFilter();
     const drive = context.createWaveShaper();
     const postCrushLowpass = context.createBiquadFilter();
+    const crushNoiseWetGain = context.createGain();
+    const crushNoiseDryGain = context.createGain();
+    const crushNoiseMixGain = context.createGain();
+    const crushNoisePostLowpass = context.createBiquadFilter();
     const bassEq = context.createBiquadFilter();
     const midEq = context.createBiquadFilter();
     const trebleEq = context.createBiquadFilter();
@@ -977,6 +1038,10 @@ var TetoricaRetroAudioNode = class {
     const chorusLfoGain2 = context.createGain();
     const chorusWetGain = context.createGain();
     const fxOutputGain = context.createGain();
+    const inputTrimGain = context.createGain();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.8;
     const noiseSource = context.createBufferSource();
     const noiseHighpass = context.createBiquadFilter();
     const noiseLowpass = context.createBiquadFilter();
@@ -1001,6 +1066,12 @@ var TetoricaRetroAudioNode = class {
     postCrushLowpass.type = "lowpass";
     postCrushLowpass.frequency.value = 18e3;
     postCrushLowpass.Q.value = 0.5;
+    crushNoiseWetGain.gain.value = 1;
+    crushNoiseDryGain.gain.value = -1;
+    crushNoiseMixGain.gain.value = 0;
+    crushNoisePostLowpass.type = "lowpass";
+    crushNoisePostLowpass.frequency.value = 18e3;
+    crushNoisePostLowpass.Q.value = 0.5;
     bassEq.type = "lowshelf";
     bassEq.frequency.value = 180;
     midEq.type = "peaking";
@@ -1035,6 +1106,7 @@ var TetoricaRetroAudioNode = class {
     chorusLfoGain2.gain.value = 0;
     chorusWetGain.gain.value = 0;
     fxOutputGain.gain.value = 1;
+    inputTrimGain.gain.value = 1;
     masterGain.gain.value = 0;
     noiseGain.gain.value = 0;
     noiseSource.buffer = createTintedNoiseBuffer(context);
@@ -1066,11 +1138,12 @@ var TetoricaRetroAudioNode = class {
     vinylDustBedFilter.Q.value = 0.4;
     vinylDustBedGain.gain.value = 0;
     crackleGain.gain.value = 0;
-    const { bitcrusher, stereoWidth } = worklets;
+    const { bitcrusher, bitcrusherDiff, stereoWidth } = worklets;
     wowLfo.connect(wowLfoGain);
     wowLfoGain.connect(wowFlutterDelay.delayTime);
     flutterLfo.connect(flutterLfoGain);
     flutterLfoGain.connect(wowFlutterDelay.delayTime);
+    inputTrimGain.connect(wowFlutterDelay);
     wowFlutterDelay.connect(radioToneHighpass);
     radioToneHighpass.connect(radioToneLowpass);
     radioToneLowpass.connect(radioTonePresence);
@@ -1082,6 +1155,15 @@ var TetoricaRetroAudioNode = class {
       bitcrusher.connect(postCrushLowpass);
     } else {
       drive.connect(postCrushLowpass);
+    }
+    if (bitcrusherDiff) {
+      drive.connect(bitcrusherDiff);
+      bitcrusherDiff.connect(crushNoisePostLowpass);
+      crushNoisePostLowpass.connect(crushNoiseWetGain);
+      drive.connect(crushNoiseDryGain);
+      crushNoiseWetGain.connect(crushNoiseMixGain);
+      crushNoiseDryGain.connect(crushNoiseMixGain);
+      crushNoiseMixGain.connect(bassEq);
     }
     postCrushLowpass.connect(bassEq);
     bassEq.connect(midEq);
@@ -1118,6 +1200,7 @@ var TetoricaRetroAudioNode = class {
     chorusWetGain.connect(outputBus);
     outputBus.connect(busCompressor);
     busCompressor.connect(fxOutputGain);
+    fxOutputGain.connect(analyser);
     noiseSource.connect(noiseHighpass);
     noiseHighpass.connect(noiseLowpass);
     noiseLowpass.connect(noiseWarmth);
@@ -1143,6 +1226,11 @@ var TetoricaRetroAudioNode = class {
       lofiHighshelf: highshelf,
       lofiDrive: drive,
       bitcrusher,
+      bitcrusherDiff,
+      crushNoiseWetGain,
+      crushNoiseDryGain,
+      crushNoiseMixGain,
+      crushNoisePostLowpass,
       postCrushLowpass,
       bassEq,
       midEq,
@@ -1185,7 +1273,9 @@ var TetoricaRetroAudioNode = class {
       chorusWetGain,
       tapeSaturator,
       busCompressor,
-      fxOutputGain
+      fxOutputGain,
+      inputTrimGain,
+      analyser
     };
   }
   startSources() {
@@ -1361,6 +1451,11 @@ var TetoricaRetroAudioNode = class {
       this.nodes.lofiHighshelf,
       this.nodes.lofiDrive,
       this.nodes.bitcrusher,
+      this.nodes.bitcrusherDiff,
+      this.nodes.crushNoiseWetGain,
+      this.nodes.crushNoiseDryGain,
+      this.nodes.crushNoiseMixGain,
+      this.nodes.crushNoisePostLowpass,
       this.nodes.postCrushLowpass,
       this.nodes.bassEq,
       this.nodes.midEq,

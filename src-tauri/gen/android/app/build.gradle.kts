@@ -6,6 +6,18 @@ plugins {
     id("rust")
 }
 
+fun envOrBlank(name: String): String = System.getenv(name)?.trim().orEmpty()
+
+val androidKeystorePath = envOrBlank("ANDROID_KEYSTORE_PATH")
+val androidKeystorePassword = envOrBlank("ANDROID_KEYSTORE_PASSWORD")
+val androidKeyAlias = envOrBlank("ANDROID_KEY_ALIAS")
+val androidKeyPassword = envOrBlank("ANDROID_KEY_PASSWORD")
+val hasAndroidReleaseSigning =
+    androidKeystorePath.isNotEmpty() &&
+        androidKeystorePassword.isNotEmpty() &&
+        androidKeyAlias.isNotEmpty() &&
+        androidKeyPassword.isNotEmpty()
+
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
     if (propFile.exists()) {
@@ -16,6 +28,16 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 36
     namespace = "net.tetorica.retro_player"
+    if (hasAndroidReleaseSigning) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(androidKeystorePath)
+                storePassword = androidKeystorePassword
+                keyAlias = androidKeyAlias
+                keyPassword = androidKeyPassword
+            }
+        }
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "net.tetorica.retro_player"
@@ -38,6 +60,9 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = true
+            if (hasAndroidReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
