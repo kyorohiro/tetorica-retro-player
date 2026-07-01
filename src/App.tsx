@@ -40,7 +40,7 @@ import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { type PresetConfig, loadStartupPreset, saveStartupPreset } from "./builtin-content/preset-config";
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
-import { RETRO_PREVIEW_DIALOG_EVENT, usePreviewDialog } from "./mdrop-web/usePreviewDialog";
+import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import type { RetroPlaybackEvent } from "./retro-player/hooks/usePixiVideoPlayer";
 
 const waitForNextPaint = async () => {
@@ -125,8 +125,7 @@ function App() {
   type AutoStartState = 'pending' | 'blocked' | 'done';
   const [autoStartState, setAutoStartState] = React.useState<AutoStartState>('blocked');
   const [isDialogActive, setIsDialogActive] = React.useState(false);
-  const [isPreviewDialogActive, setIsPreviewDialogActive] = React.useState(false);
-  const isPreviewDialogActiveRef = React.useRef(false);
+  const isDialogActiveRef = React.useRef(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
   const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
   const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
@@ -170,8 +169,8 @@ function App() {
   }, []);
 
   React.useEffect(() => {
-    isPreviewDialogActiveRef.current = isPreviewDialogActive;
-  }, [isPreviewDialogActive]);
+    isDialogActiveRef.current = isDialogActive;
+  }, [isDialogActive]);
 
   React.useEffect(() => {
     const handleDialogActive = (event: Event) => {
@@ -188,25 +187,6 @@ function App() {
       window.removeEventListener(
         DIALOG_STACK_ACTIVE_EVENT,
         handleDialogActive as EventListener,
-      );
-    };
-  }, []);
-
-  React.useEffect(() => {
-    const handlePreviewDialogActive = (event: Event) => {
-      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
-      setIsPreviewDialogActive(Boolean(detail?.active));
-    };
-
-    window.addEventListener(
-      RETRO_PREVIEW_DIALOG_EVENT,
-      handlePreviewDialogActive as EventListener,
-    );
-
-    return () => {
-      window.removeEventListener(
-        RETRO_PREVIEW_DIALOG_EVENT,
-        handlePreviewDialogActive as EventListener,
       );
     };
   }, []);
@@ -960,11 +940,11 @@ function App() {
   );
 
   React.useEffect(() => {
-    if (!isPreviewDialogActive) return;
-    if (currentPlaybackSource !== "builtin-tone") return;
+    if (!isDialogActive) return;
     dispatchRetroPlayerPausePlayback();
+    if (currentPlaybackSource !== "builtin-tone") return;
     syncToneTransportPlayback(false);
-  }, [currentPlaybackSource, isPreviewDialogActive, syncToneTransportPlayback]);
+  }, [currentPlaybackSource, isDialogActive, syncToneTransportPlayback]);
 
   // When a file/URL/stream is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
   React.useEffect(() => {
@@ -1342,7 +1322,7 @@ function App() {
                   setShowPlaybackRetryHint(false);
                 }
                 if (event.source === "builtin-tone") {
-                  if (isPreviewDialogActiveRef.current) {
+                  if (isDialogActiveRef.current) {
                     syncToneTransportPlayback(false);
                     return;
                   }
