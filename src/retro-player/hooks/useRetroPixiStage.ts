@@ -21,6 +21,13 @@ const isTauriRuntime = () =>
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
 const TAURI_HIDDEN_TICK_MS = 250;
+const getPreferredOutputScale = () => {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+
+  return Math.max(1, Math.min(2, Math.round(window.devicePixelRatio || 1)));
+};
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 
@@ -54,6 +61,10 @@ export function useRetroPixiStage({
   previewKindRef,
   debugVideo,
 }: UseRetroPixiStageParams) {
+  const effectiveRenderResolutionScale = Math.max(
+    renderResolutionScale,
+    getPreferredOutputScale(),
+  );
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<CanvasStageApp | null>(null);
   const spriteRef = useRef<null>(null);
@@ -315,19 +326,19 @@ export function useRetroPixiStage({
 
     const displayBufferWidth = Math.max(
       1,
-      Math.round(styleWidth * Math.max(1, renderResolutionScale)),
+      Math.round(styleWidth * Math.max(1, effectiveRenderResolutionScale)),
     );
     const displayBufferHeight = Math.max(
       1,
-      Math.round(styleHeight * Math.max(1, renderResolutionScale)),
+      Math.round(styleHeight * Math.max(1, effectiveRenderResolutionScale)),
     );
     const logicalBufferWidth = Math.max(
       1,
-      Math.round(Math.max(1, effectiveTargetWidth) * Math.max(1, renderResolutionScale)),
+      Math.round(Math.max(1, effectiveTargetWidth) * Math.max(1, effectiveRenderResolutionScale)),
     );
     const logicalBufferHeight = Math.max(
       1,
-      Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, renderResolutionScale)),
+      Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, effectiveRenderResolutionScale)),
     );
     const shouldUseLogicalBufferUpscale = isPhosphorDotModeEnabled(currentFilterState);
     const nextWidth = currentFilterState.isFilterEnabled
@@ -356,7 +367,7 @@ export function useRetroPixiStage({
     app.canvas.style.imageRendering = "pixelated";
 
     renderFrame();
-  }, [fitCurrentSprite, renderFrame, renderResolutionScale]);
+  }, [effectiveRenderResolutionScale, fitCurrentSprite, renderFrame]);
 
   const scheduleRefreshLayout = useCallback(() => {
     if (layoutFrameRef.current !== null) {
@@ -395,7 +406,7 @@ export function useRetroPixiStage({
         hostConnected: host.isConnected,
         hostWidth: host.clientWidth ?? null,
         hostHeight: host.clientHeight ?? null,
-        resolution: renderResolutionScale,
+        resolution: effectiveRenderResolutionScale,
       });
 
       const canvas = document.createElement("canvas");
@@ -455,7 +466,7 @@ export function useRetroPixiStage({
       debugVideo("initWebGL:ready", {
         hostWidth: nextHost.clientWidth ?? null,
         hostHeight: nextHost.clientHeight ?? null,
-        resolution: renderResolutionScale,
+        resolution: effectiveRenderResolutionScale,
       });
       debugVideo("startup:initPixi:renderer-ready", {
         elapsedMs:
@@ -488,9 +499,9 @@ export function useRetroPixiStage({
     }
   }, [
     debugVideo,
+    effectiveRenderResolutionScale,
     isPoweredOn,
     refreshLayout,
-    renderResolutionScale,
     startTicker,
     stopTicker,
   ]);

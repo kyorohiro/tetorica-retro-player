@@ -32,15 +32,14 @@ import { RetroControlPanel } from "./RetroControlPanel";
 import { RetroPlayerLayout, type RetroLayoutMode } from "./RetroPlayerLayout";
 import { useDialog } from "../../useDialog";
 
-const clampRenderResolutionPreset = (value: number): 1 | 2 | 3 => {
-  if (value >= 3) return 3;
+const clampRenderResolutionPreset = (value: number): 1 | 2 => {
   if (value >= 2) return 2;
   return 1;
 };
 
 const resolveRenderResolutionPreset = (
   ui: PersistedRetroUiSettings | undefined,
-): 1 | 2 | 3 => {
+): 1 | 2 => {
   const explicitPreset = ui?.renderResolutionPreset;
   if (typeof explicitPreset === "number" && Number.isFinite(explicitPreset)) {
     return clampRenderResolutionPreset(explicitPreset);
@@ -153,7 +152,7 @@ export function RetroPlayer({
     void syncFfmpegMaxConcurrentHlsSessions(normalized);
   }, [syncFfmpegMaxConcurrentHlsSessions]);
 
-  const [renderResolutionPreset, setRenderResolutionPreset] = React.useState<1 | 2 | 3>(
+  const [renderResolutionPreset, setRenderResolutionPreset] = React.useState<1 | 2>(
     resolveRenderResolutionPreset(persistedUiSettings),
   );
   const isHighResolution = renderResolutionPreset > 1;
@@ -212,14 +211,6 @@ export function RetroPlayer({
 
   const handleToggleHighResolution = React.useCallback(() => {
     setRenderResolutionPreset((current) => (current > 1 ? 1 : 2));
-  }, []);
-
-  const handleCycleHighResolutionMode = React.useCallback(() => {
-    setRenderResolutionPreset((current) => {
-      if (current === 1) return 3;
-      if (current === 2) return 3;
-      return 1;
-    });
   }, []);
 
   const syncTargetAspect = React.useCallback(() => {
@@ -420,7 +411,6 @@ export function RetroPlayer({
             controlPanelMode={controlPanelMode}
             confirmDialog={confirmDialog}
             onHighResolutionToggle={handleToggleHighResolution}
-            onCycleHighResolutionMode={handleCycleHighResolutionMode}
             onFitWidthChange={setIsFitWidthEnabled}
             onError={onError}
             analyserRef={player.analyserRef}
@@ -508,7 +498,6 @@ export function RetroPlayer({
               confirmDialog={confirmDialog}
               fillHeight={fillHeight}
               onHighResolutionToggle={handleToggleHighResolution}
-              onCycleHighResolutionMode={handleCycleHighResolutionMode}
               onFitWidthChange={setIsFitWidthEnabled}
               onError={onError}
               onIsPinnedPreviewChange={setIsPinnedInPreview}
