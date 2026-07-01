@@ -3,9 +3,12 @@ import React, {
     createContext,
     useCallback,
     useContext,
+    useEffect,
     useState,
     type ReactNode,
 } from "react";
+
+export const DIALOG_STACK_ACTIVE_EVENT = "tetorica-dialog-stack-active";
 
 type DialogItem = {
     id: string;
@@ -31,6 +34,14 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
     const pop = useCallback((id: string) => {
         setStack((prev) => prev.filter((d) => d.id !== id));
     }, []);
+
+    useEffect(() => {
+        window.dispatchEvent(
+            new CustomEvent(DIALOG_STACK_ACTIVE_EVENT, {
+                detail: { active: stack.length > 0 },
+            })
+        );
+    }, [stack.length]);
 
     return (
         <DialogContext.Provider value={{ push, pop }}>

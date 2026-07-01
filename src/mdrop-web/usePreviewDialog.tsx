@@ -140,8 +140,6 @@ function PreviewDialog({
     );
 
     React.useEffect(() => {
-        if (!isRetro) return;
-
         window.dispatchEvent(
             new CustomEvent(RETRO_PREVIEW_DIALOG_EVENT, {
                 detail: { active: true },
@@ -155,7 +153,7 @@ function PreviewDialog({
                 })
             );
         };
-    }, [isRetro]);
+    }, []);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {

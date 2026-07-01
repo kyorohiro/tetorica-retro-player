@@ -196,6 +196,7 @@ export function PreviewPage({
                                     ? "audio"
                                 : "image"
                         }
+                        autoPlay={false}
                         className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
                     />
                 </React.Suspense>

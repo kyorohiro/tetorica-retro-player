@@ -84,6 +84,7 @@ export type PersistedRetroAudioSettings = {
 export type PersistedRetroUiSettings = {
   isPreviewMaximized: boolean;
   isHighResolution: boolean;
+  renderResolutionPreset?: number;
   brightness: number;
   flipH: boolean;
   flipV: boolean;

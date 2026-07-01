@@ -831,22 +831,13 @@ export function useRetroPreviewMedia({
 
     const currentMedia = mediaRef.current;
 
-    const currentSrcObject = currentMedia.srcObject;
-    const liveAudioStream =
-      previewKindRef.current === "audio" && currentSrcObject instanceof MediaStream
-        ? currentSrcObject
-        : null;
-    const hasActiveLiveAudioTrack = liveAudioStream
-      ? liveAudioStream
-          .getAudioTracks()
-          .some((track: MediaStreamTrack) => track.readyState === "live" && track.enabled)
-      : false;
-
     // During a loop transition Safari may briefly fire "pause" even though the
     // video is about to restart. Treat that window as still-playing.
     const isLoopTransition = isLikelyLoopTransition(currentMedia);
-    const effectivelyPlaying =
-      hasActiveLiveAudioTrack || !currentMedia.paused || isLoopTransition;
+    // A live MediaStream track only tells us the source still exists.
+    // It must not override an explicit user pause, otherwise paused Tone/audio
+    // previews can be treated as "playing" again when unrelated UI state syncs.
+    const effectivelyPlaying = !currentMedia.paused || isLoopTransition;
     isPlayingRef.current = effectivelyPlaying;
     setEngineIsPlaying(effectivelyPlaying);
     setIsPlaying(effectivelyPlaying);
@@ -1457,9 +1448,7 @@ export function useRetroPreviewMedia({
       if (requestId !== previewRequestIdRef.current) return;
 
       await waitForMediaSwitchCooldown();
-      const shouldAttemptImmediatePlay =
-        kind === "audio" || kind === "video" || autoPlayRef.current;
-      if (shouldAttemptImmediatePlay) {
+      if (autoPlayRef.current) {
         await playVideoWithAudio();
       }
       if (requestId === previewRequestIdRef.current) {
