@@ -48,6 +48,7 @@ type VideoControlsProps = {
   lofiAmount: number;
   radioToneAmount: number;
   bitCrushAmount: number;
+  bitCrushNoiseAmount: number;
   sampleRateReductionAmount: number;
   noiseReductionAmount: number;
   bassAmount: number;
@@ -73,6 +74,7 @@ type VideoControlsProps = {
   onChangeLofiAmount: (amount: number) => void;
   onChangeRadioToneAmount: (amount: number) => void;
   onChangeBitCrushAmount: (amount: number) => void;
+  onChangeBitCrushNoiseAmount: (amount: number) => void;
   onChangeSampleRateReductionAmount: (amount: number) => void;
   onChangeNoiseReductionAmount: (amount: number) => void;
   onChangeBassAmount: (amount: number) => void;
@@ -151,6 +153,7 @@ export const VideoControls = memo(function VideoControls({
   lofiAmount,
   radioToneAmount,
   bitCrushAmount,
+  bitCrushNoiseAmount,
   sampleRateReductionAmount,
   noiseReductionAmount,
   bassAmount,
@@ -176,6 +179,7 @@ export const VideoControls = memo(function VideoControls({
   onChangeLofiAmount,
   onChangeRadioToneAmount,
   onChangeBitCrushAmount,
+  onChangeBitCrushNoiseAmount,
   onChangeSampleRateReductionAmount,
   onChangeNoiseReductionAmount,
   onChangeBassAmount,
@@ -302,6 +306,7 @@ export const VideoControls = memo(function VideoControls({
         isNearlyEqual(settings.lofiAmount, lofiAmount) &&
         isNearlyEqual(settings.radioToneAmount, radioToneAmount) &&
         isNearlyEqual(settings.bitCrushAmount, bitCrushAmount) &&
+        isNearlyEqual(settings.bitCrushNoiseAmount, bitCrushNoiseAmount) &&
         isNearlyEqual(
           settings.sampleRateReductionAmount,
           sampleRateReductionAmount,
@@ -346,6 +351,7 @@ export const VideoControls = memo(function VideoControls({
     onChangeLofiAmount(presetSettings.lofiAmount);
     onChangeRadioToneAmount(presetSettings.radioToneAmount);
     onChangeBitCrushAmount(presetSettings.bitCrushAmount);
+    onChangeBitCrushNoiseAmount(presetSettings.bitCrushNoiseAmount);
     onChangeSampleRateReductionAmount(presetSettings.sampleRateReductionAmount);
     onChangeNoiseReductionAmount(presetSettings.noiseReductionAmount);
     onChangeBassAmount(presetSettings.bassAmount);
@@ -510,6 +516,24 @@ export const VideoControls = memo(function VideoControls({
                 value={bitCrushAmount}
                 onChange={(ev) => {
                   onChangeBitCrushAmount(Number(ev.currentTarget.value));
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+                <span>Crush noise</span>
+                <span>{Math.round(bitCrushNoiseAmount * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={bitCrushNoiseAmount}
+                onChange={(ev) => {
+                  onChangeBitCrushNoiseAmount(Number(ev.currentTarget.value));
                 }}
                 className="w-full"
               />

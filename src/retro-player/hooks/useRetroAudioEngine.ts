@@ -117,6 +117,8 @@ export function useRetroAudioEngine({
         persisted?.radioToneAmount ?? DEFAULT_AUDIO_SETTINGS.radioToneAmount,
       bitCrushAmount:
         persisted?.bitCrushAmount ?? DEFAULT_AUDIO_SETTINGS.bitCrushAmount,
+      bitCrushNoiseAmount:
+        persisted?.bitCrushNoiseAmount ?? DEFAULT_AUDIO_SETTINGS.bitCrushNoiseAmount,
       sampleRateReductionAmount:
         persisted?.sampleRateReductionAmount ??
         DEFAULT_AUDIO_SETTINGS.sampleRateReductionAmount,
@@ -171,6 +173,7 @@ export function useRetroAudioEngine({
   const lofiAmountRef = useRef<number>(initialAudioSettings.lofiAmount);
   const radioToneAmountRef = useRef<number>(initialAudioSettings.radioToneAmount);
   const bitCrushAmountRef = useRef<number>(initialAudioSettings.bitCrushAmount);
+  const bitCrushNoiseAmountRef = useRef<number>(initialAudioSettings.bitCrushNoiseAmount);
   const sampleRateReductionAmountRef = useRef<number>(
     initialAudioSettings.sampleRateReductionAmount,
   );
@@ -217,6 +220,9 @@ export function useRetroAudioEngine({
   );
   const [bitCrushAmount, setBitCrushAmount] = useState<number>(
     initialAudioSettings.bitCrushAmount,
+  );
+  const [bitCrushNoiseAmount, setBitCrushNoiseAmount] = useState<number>(
+    initialAudioSettings.bitCrushNoiseAmount,
   );
   const [sampleRateReductionAmount, setSampleRateReductionAmount] = useState<number>(
     initialAudioSettings.sampleRateReductionAmount,
@@ -384,6 +390,7 @@ export function useRetroAudioEngine({
     lofiAmount: lofiAmountRef.current,
     radioToneAmount: radioToneAmountRef.current,
     bitCrushAmount: bitCrushAmountRef.current,
+    bitCrushNoiseAmount: bitCrushNoiseAmountRef.current,
     sampleRateReductionAmount: sampleRateReductionAmountRef.current,
     noiseReductionAmount: noiseReductionAmountRef.current,
     bassAmount: bassAmountRef.current,
@@ -699,6 +706,7 @@ export function useRetroAudioEngine({
     lofiAmountRef.current = nextSettings.lofiAmount;
     radioToneAmountRef.current = nextSettings.radioToneAmount;
     bitCrushAmountRef.current = nextSettings.bitCrushAmount;
+    bitCrushNoiseAmountRef.current = nextSettings.bitCrushNoiseAmount;
     sampleRateReductionAmountRef.current = nextSettings.sampleRateReductionAmount;
     noiseReductionAmountRef.current = nextSettings.noiseReductionAmount;
     bassAmountRef.current = nextSettings.bassAmount;
@@ -730,6 +738,7 @@ export function useRetroAudioEngine({
     setLofiAmount(nextSettings.lofiAmount);
     setRadioToneAmount(nextSettings.radioToneAmount);
     setBitCrushAmount(nextSettings.bitCrushAmount);
+    setBitCrushNoiseAmount(nextSettings.bitCrushNoiseAmount);
     setSampleRateReductionAmount(nextSettings.sampleRateReductionAmount);
     setNoiseReductionAmount(nextSettings.noiseReductionAmount);
     setBassAmount(nextSettings.bassAmount);
@@ -780,6 +789,7 @@ export function useRetroAudioEngine({
     lofiAmountRef.current = lofiAmount;
     radioToneAmountRef.current = radioToneAmount;
     bitCrushAmountRef.current = bitCrushAmount;
+    bitCrushNoiseAmountRef.current = bitCrushNoiseAmount;
     sampleRateReductionAmountRef.current = sampleRateReductionAmount;
     noiseReductionAmountRef.current = noiseReductionAmount;
     bassAmountRef.current = bassAmount;
@@ -813,6 +823,7 @@ export function useRetroAudioEngine({
         lofiAmount,
         radioToneAmount,
         bitCrushAmount,
+        bitCrushNoiseAmount,
         sampleRateReductionAmount,
         noiseReductionAmount,
         bassAmount,
@@ -863,6 +874,7 @@ export function useRetroAudioEngine({
     lofiAmount,
     radioToneAmount,
     bitCrushAmount,
+    bitCrushNoiseAmount,
     sampleRateReductionAmount,
     noiseReductionAmount,
     bassAmount,
@@ -902,6 +914,7 @@ export function useRetroAudioEngine({
         lofiAmount,
         radioToneAmount,
         bitCrushAmount,
+        bitCrushNoiseAmount,
         sampleRateReductionAmount,
         noiseReductionAmount,
         bassAmount,
@@ -936,6 +949,7 @@ export function useRetroAudioEngine({
     lofiAmount,
     radioToneAmount,
     bitCrushAmount,
+    bitCrushNoiseAmount,
     sampleRateReductionAmount,
     noiseReductionAmount,
     bassAmount,
@@ -1008,6 +1022,7 @@ export function useRetroAudioEngine({
     lofiAmountRef,
     radioToneAmountRef,
     bitCrushAmountRef,
+    bitCrushNoiseAmountRef,
     sampleRateReductionAmountRef,
     bassAmountRef,
     midAmountRef,
@@ -1041,6 +1056,8 @@ export function useRetroAudioEngine({
     setRadioToneAmount,
     bitCrushAmount,
     setBitCrushAmount,
+    bitCrushNoiseAmount,
+    setBitCrushNoiseAmount,
     sampleRateReductionAmount,
     setSampleRateReductionAmount,
     noiseReductionAmount,
