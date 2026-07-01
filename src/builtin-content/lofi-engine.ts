@@ -13,6 +13,7 @@ export async function startLofiSession(): Promise<LofiSession> {
   // The caller is responsible for calling Tone.start() on the first user gesture.
   Tone.getTransport().stop();
   Tone.getTransport().cancel();
+  Tone.getTransport().position = 0;
   Tone.getTransport().bpm.value = 72;
 
   const ctx = Tone.getContext().rawContext as AudioContext;
@@ -128,6 +129,8 @@ export async function startLofiSession(): Promise<LofiSession> {
   padPart.loop = true;
   padPart.loopEnd = '4m';
   padPart.start(0);
+
+  Tone.getTransport().start();
 
   return {
     stream: streamDest.stream,
