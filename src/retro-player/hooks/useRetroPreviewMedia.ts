@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
@@ -95,7 +96,7 @@ const shouldBypassWebAudioForMedia = (media: HTMLMediaElement) =>
   media.src.includes(".m3u8");
 
 const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
-const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900];
+const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900, 1600];
 
 const shouldUseNativeVideoSurfaceForMedia = (
   media: HTMLMediaElement,
@@ -202,6 +203,7 @@ export function useRetroPreviewMedia({
   autoPlayRef,
 }: UseRetroPreviewMediaParams) {
   const _setPreviewError = setPreviewError;
+  const playbackStartAttemptRef = useRef(0);
 
   const waitForMediaSwitchCooldown = async () => {
     if (!isAndroidRuntime()) {
@@ -479,6 +481,30 @@ export function useRetroPreviewMedia({
     new Promise<void>((resolve) => {
       window.setTimeout(resolve, ms);
     });
+
+  const cancelPendingPlaybackStart = () => {
+    playbackStartAttemptRef.current += 1;
+  };
+
+  const isHlsStartupRetryableError = (
+    media: HTMLMediaElement | null | undefined,
+    error: unknown,
+  ) => {
+    if (!(media instanceof HTMLVideoElement)) {
+      return false;
+    }
+
+    if (!media.src.includes(".m3u8")) {
+      return false;
+    }
+
+    if ((media.currentTime ?? 0) > 0.05) {
+      return false;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    return /src-not-supported|network|読み込みに失敗|再生開始/i.test(message);
+  };
 
   const restartCurrentMedia = async () => {
     const media = mediaRef.current;
@@ -798,11 +824,14 @@ export function useRetroPreviewMedia({
       // updateAudioNodes() would snap masterGain back to full and re-enable
       // noiseGain, causing a brief noise burst.
       quietAudioOutputImmediately();
+      setIsBuffering(false);
       safeRender();
       return;
     }
 
-    const currentSrcObject = mediaRef.current.srcObject;
+    const currentMedia = mediaRef.current;
+
+    const currentSrcObject = currentMedia.srcObject;
     const liveAudioStream =
       previewKindRef.current === "audio" && currentSrcObject instanceof MediaStream
         ? currentSrcObject
@@ -815,19 +844,26 @@ export function useRetroPreviewMedia({
 
     // During a loop transition Safari may briefly fire "pause" even though the
     // video is about to restart. Treat that window as still-playing.
-    const isLoopTransition = isLikelyLoopTransition(mediaRef.current);
+    const isLoopTransition = isLikelyLoopTransition(currentMedia);
     const effectivelyPlaying =
-      hasActiveLiveAudioTrack || !mediaRef.current.paused || isLoopTransition;
+      hasActiveLiveAudioTrack || !currentMedia.paused || isLoopTransition;
     isPlayingRef.current = effectivelyPlaying;
     setEngineIsPlaying(effectivelyPlaying);
     setIsPlaying(effectivelyPlaying);
+    if (
+      currentMedia.paused ||
+      currentMedia.ended ||
+      currentMedia.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
+    ) {
+      setIsBuffering(false);
+    }
     if (effectivelyPlaying) {
       finishLoading();
     }
-    setCurrentTime(mediaRef.current.currentTime);
-    setDuration(mediaRef.current.duration || 0);
-    setPlaybackRate(mediaRef.current.playbackRate || 1);
-    setIsLooping(mediaRef.current.loop);
+    setCurrentTime(currentMedia.currentTime);
+    setDuration(currentMedia.duration || 0);
+    setPlaybackRate(currentMedia.playbackRate || 1);
+    setIsLooping(currentMedia.loop);
     updateAudioNodes();
     safeRender();
   };
@@ -907,12 +943,18 @@ export function useRetroPreviewMedia({
 
   const playVideoWithAudio = async () => {
     if (!mediaRef.current) return;
+    const playbackAttemptId = playbackStartAttemptRef.current + 1;
+    playbackStartAttemptRef.current = playbackAttemptId;
+    const isPlaybackAttemptStale = () => playbackStartAttemptRef.current !== playbackAttemptId;
 
     try {
       const media = mediaRef.current;
       const bypassWebAudio = shouldBypassWebAudioForMedia(media);
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
       const context = await ensureAudioContext();
+      if (isPlaybackAttemptStale()) {
+        return;
+      }
       if (
         (staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
           mediaSourceRef.current) ||
@@ -934,14 +976,19 @@ export function useRetroPreviewMedia({
       const isHiddenDoc = typeof document !== "undefined" && document.visibilityState === "hidden";
       if (contextWasSuspended && !isHiddenDoc) {
         await new Promise<void>((resolve) => { setTimeout(resolve, 30); });
+        if (isPlaybackAttemptStale()) {
+          return;
+        }
       }
       const shouldConfirmPlaybackStart =
         media instanceof HTMLVideoElement &&
-        media.src.includes(".m3u8") &&
-        isTauriRuntime() &&
-        isWindowsRuntime();
+        media.src.includes(".m3u8");
       const startedAtTime = media.currentTime;
       await media.play();
+      if (isPlaybackAttemptStale()) {
+        media.pause();
+        return;
+      }
       if (shouldConfirmPlaybackStart) {
         debugVideo("playVideoWithAudio:play-resolved", {
           currentTime: media.currentTime,
@@ -951,6 +998,10 @@ export function useRetroPreviewMedia({
           startedAtTime,
         });
         await waitForConfirmedPlaybackStart(media);
+        if (isPlaybackAttemptStale()) {
+          media.pause();
+          return;
+        }
         debugVideo("playVideoWithAudio:confirmed-start", {
           currentTime: media.currentTime,
           paused: media.paused,
@@ -1021,11 +1072,8 @@ export function useRetroPreviewMedia({
           ? Number.parseInt(media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] ?? "0", 10) || 0
           : 0;
       const shouldRetryHlsStartup =
-        media instanceof HTMLVideoElement &&
-        media.src.includes(".m3u8") &&
-        isTauriRuntime() &&
-        isWindowsRuntime() &&
-        (media.currentTime ?? 0) <= 0.05 &&
+        isHlsStartupRetryableError(media, error) &&
+        !isPlaybackAttemptStale() &&
         retryAttempt < HLS_STARTUP_RETRY_DELAYS_MS.length;
 
       if (shouldRetryHlsStartup) {
@@ -1044,9 +1092,15 @@ export function useRetroPreviewMedia({
           media.pause();
           if (retryDelayMs > 0) {
             await waitMs(retryDelayMs);
+            if (isPlaybackAttemptStale()) {
+              return;
+            }
           }
           media.load();
           await waitForVideoFrame(media);
+          if (isPlaybackAttemptStale()) {
+            return;
+          }
           await playVideoWithAudio();
           return;
         } catch (retryError) {
@@ -1073,6 +1127,16 @@ export function useRetroPreviewMedia({
       setEngineIsPlaying(false);
       setIsPlaying(false);
       finishLoading();
+      if (isHlsStartupRetryableError(media, error)) {
+        media?.pause();
+        setIsBuffering(false);
+        syncVideoState();
+        setNeedsUserPlay(true);
+        _setPreviewError(
+          "Playback is still preparing. Press Play to retry this video.",
+        );
+        return;
+      }
       if (isAutoplayBlockedError(error)) {
         syncVideoState();
         setNeedsUserPlay(true);
@@ -1452,6 +1516,12 @@ export function useRetroPreviewMedia({
         media.src = url;
         applyMediaSettings(media);
         attachMediaEventListeners(media);
+        previewElementRef.current = media;
+        mediaRef.current = media;
+        setPreviewKindState("video");
+        setSourceDimensions(null);
+        setViewportRect(null);
+        safeRender();
         await waitForVideoFrame(media);
         debugVideo("startup:previewUrl:video-ready", {
           elapsedMs: elapsedMs(),
@@ -1465,7 +1535,6 @@ export function useRetroPreviewMedia({
           return;
         }
 
-        mediaRef.current = media;
         if (shouldUseNativeVideoSurfaceForMedia(media, preferNativeVideoSurface)) {
           attachNativeVideoPreview(media);
         } else {
@@ -1556,6 +1625,14 @@ export function useRetroPreviewMedia({
         return;
       }
 
+      if (kind === "video" && isHlsStartupRetryableError(mediaRef.current, error)) {
+        finishLoading();
+        setNeedsUserPlay(false);
+        syncVideoState();
+        _setPreviewError(error instanceof Error ? error.message : String(error));
+        return;
+      }
+
       cleanupPreview();
       _setPreviewError(error instanceof Error ? error.message : String(error));
       await resetAudioGraphAfterPreviewFailure("previewUrl:error", error);
@@ -1563,6 +1640,7 @@ export function useRetroPreviewMedia({
   };
 
   return {
+    cancelPendingPlaybackStart,
     cleanupPreview,
     cleanupForPageLeave,
     playVideoWithAudio,

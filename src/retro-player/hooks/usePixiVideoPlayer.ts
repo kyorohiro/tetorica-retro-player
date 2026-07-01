@@ -60,6 +60,19 @@ const hasAudibleMediaTrack = (
   return false;
 };
 
+export type RetroPlaybackEvent = {
+  playing: boolean;
+  kind: "video" | "audio" | "image" | "capture" | null;
+  source: "builtin-tone" | "media";
+};
+
+export type RetroPreviewStatus =
+  | {
+      kind: "loading" | "buffering" | "retryable" | "unsupported";
+      message: string;
+    }
+  | null;
+
 export function usePixiVideoPlayer(
   filterState: RetroFilterState,
   fitMode: "contain" | "width",
@@ -69,7 +82,8 @@ export function usePixiVideoPlayer(
     onError?: (error: Error) => void;
     onRetry?: () => void;
     autoPlay?: boolean;
-    onPlaybackChange?: (playing: boolean) => void;
+    onPlaybackChange?: (event: RetroPlaybackEvent) => void;
+    playbackSource?: "builtin-tone" | "media";
     preferNativeVideoSurface?: boolean;
   },
 ) {
@@ -94,7 +108,7 @@ export function usePixiVideoPlayer(
   const onErrorRef = useRef<((error: Error) => void) | undefined>(options?.onError);
   const onRetryRef = useRef<(() => void) | undefined>(options?.onRetry);
   const autoPlayRef = useRef<boolean>(options?.autoPlay ?? true);
-  const onPlaybackChangeRef = useRef<((playing: boolean) => void) | undefined>(options?.onPlaybackChange);
+  const onPlaybackChangeRef = useRef<((event: RetroPlaybackEvent) => void) | undefined>(options?.onPlaybackChange);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -132,6 +146,39 @@ export function usePixiVideoPlayer(
   };
 
   const hasAudibleMedia = hasAudibleMediaTrack(mediaRef.current, previewKind);
+  const hasPlayableMedia =
+    previewKind === "video" || previewKind === "audio" || previewKind === "capture";
+  const previewStatus = useMemo<RetroPreviewStatus>(() => {
+    if (isLoading) {
+      return {
+        kind: "loading",
+        message: loadingLabel || "Loading preview...",
+      };
+    }
+
+    if (isBuffering && hasPlayableMedia && isPlaying) {
+      return {
+        kind: "buffering",
+        message: "Still buffering this video...",
+      };
+    }
+
+    if (!previewError) {
+      return null;
+    }
+
+    const normalized = previewError.toLowerCase();
+    const isRetryable =
+      needsUserPlay ||
+      /src-not-supported|network|failed to start|did not start|cannot confirm|buffer|waiting|stalled|読み込みに失敗|再生の開始|再試行|開始を確認できません/.test(
+        normalized,
+      );
+
+    return {
+      kind: isRetryable ? "retryable" : "unsupported",
+      message: previewError,
+    };
+  }, [hasPlayableMedia, isBuffering, isLoading, isPlaying, loadingLabel, needsUserPlay, previewError]);
 
   const logAudioRecovery = (
     label: string,
@@ -540,6 +587,7 @@ export function usePixiVideoPlayer(
   });
 
   const {
+    cancelPendingPlaybackStart,
     cleanupPreview,
     cleanupForPageLeave,
     playVideoWithAudio,
@@ -573,8 +621,12 @@ export function usePixiVideoPlayer(
   }, [options?.onPlaybackChange]);
 
   useEffect(() => {
-    onPlaybackChangeRef.current?.(isPlaying);
-  }, [isPlaying]);
+    onPlaybackChangeRef.current?.({
+      playing: isPlaying,
+      kind: previewKindRef.current,
+      source: options?.playbackSource ?? "media",
+    });
+  }, [isPlaying, options?.playbackSource]);
 
   useEffect(() => {
     cleanupPreviewRef.current = cleanupPreview;
@@ -591,7 +643,16 @@ export function usePixiVideoPlayer(
       if (!isPoweredOn) {
         powerOn();
       }
-      if (mediaRef.current.error || mediaRef.current.ended) {
+      const shouldRestartFromSource =
+        mediaRef.current.error ||
+        mediaRef.current.ended ||
+        (
+          mediaRef.current instanceof HTMLVideoElement &&
+          mediaRef.current.src.includes(".m3u8") &&
+          (previewError || needsUserPlay) &&
+          (mediaRef.current.currentTime ?? 0) <= 0.05
+        );
+      if (shouldRestartFromSource) {
         try {
           const restarted = await restartCurrentMedia();
           if (restarted) {
@@ -611,7 +672,10 @@ export function usePixiVideoPlayer(
       return;
     }
 
+    cancelPendingPlaybackStart();
     mediaRef.current.pause();
+    setIsBuffering(false);
+    finishLoading();
     syncVideoState();
   };
 
@@ -1083,12 +1147,19 @@ export function usePixiVideoPlayer(
   useEffect(() => {
     isPlayingRef.current = isPlaying;
 
+    const currentMedia = mediaRef.current;
+    const isVideoElement = currentMedia instanceof HTMLVideoElement;
+    const hasRenderableVideoFrame =
+      isVideoElement &&
+      currentMedia.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      currentMedia.videoWidth > 0 &&
+      currentMedia.videoHeight > 0;
     const isVideoReady =
       (previewKind === "video" || previewKind === "capture") &&
-      mediaRef.current?.tagName === "VIDEO";
+      hasRenderableVideoFrame;
     const isAtStart =
-      !mediaRef.current || Math.abs(mediaRef.current.currentTime) < 0.05;
-    const isEnded = mediaRef.current?.ended ?? false;
+      !currentMedia || Math.abs(currentMedia.currentTime) < 0.05;
+    const isEnded = currentMedia?.ended ?? false;
 
     if (isVideoReady && isFilterReady) {
       finishLoading();
@@ -1217,12 +1288,12 @@ export function usePixiVideoPlayer(
     setFxOutputTrimAmount,
     inputTrimAmount,
     setInputTrimAmount,
-    hasPlayableMedia:
-      previewKind === "video" || previewKind === "audio" || previewKind === "capture",
+    hasPlayableMedia,
     hasAudibleMedia,
     hasVideo: previewKind === "video" || previewKind === "capture",
     hasAudioOnly: previewKind === "audio",
     hasImage: previewKind === "image",
+    previewStatus,
     isRecording,
     pendingRecordingFilename,
     prefersShareExport: isTauriRuntime() && isAndroidRuntime(),

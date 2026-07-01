@@ -396,6 +396,28 @@ impl SharedHttpServerContext {
         }
     }
 
+    pub fn cleanup_hls_sessions(&self) {
+        let (children, session_dirs): (Vec<tokio::process::Child>, Vec<PathBuf>) = {
+            let mut ctx = match self.inner.lock() {
+                Ok(c) => c,
+                Err(_) => return,
+            };
+            let children = ctx.hls_children.drain().map(|(_, child)| child).collect();
+            let session_dirs = ctx.hls_sessions.drain().map(|(_, dir)| dir).collect();
+            (children, session_dirs)
+        };
+
+        for mut child in children {
+            let _ = child.start_kill();
+        }
+
+        for dir in session_dirs {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+
+        println!("[HLS] cleanup completed");
+    }
+
     fn build_router(self) -> Router {
         let cors = CorsLayer::new()
             .allow_origin(Any)
@@ -614,8 +636,12 @@ impl SharedHttpServerContext {
     }
 
     pub fn stop_server(&self) -> Result<ServerStatus, String> {
-        let mut ctx = self.inner.lock().map_err(|e| e.to_string())?;
-        ctx.stop_server()
+        let status = {
+            let mut ctx = self.inner.lock().map_err(|e| e.to_string())?;
+            ctx.stop_server()?
+        };
+        self.cleanup_hls_sessions();
+        Ok(status)
     }
 
     pub fn status(&self) -> Result<ServerStatus, String> {
