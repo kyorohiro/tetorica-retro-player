@@ -93,6 +93,7 @@ type PersistedRetroSettings = {
   filter?: PersistedRetroFilterSettings;
   audio?: PersistedRetroAudioSettings;
   ui?: PersistedRetroUiSettings;
+  preferredAudioInputDeviceId?: string;
 };
 
 const readSettings = (): PersistedRetroSettings | null => {
@@ -123,6 +124,9 @@ const writeSettings = (settings: PersistedRetroSettings) => {
 
 export const loadPersistedRetroSettings = () => readSettings();
 
+export const getPreferredAudioInputDeviceId = (): string | null =>
+  readSettings()?.preferredAudioInputDeviceId ?? null;
+
 export const savePersistedRetroFilterSettings = (
   filter: PersistedRetroFilterSettings,
 ) => {
@@ -133,6 +137,7 @@ export const savePersistedRetroFilterSettings = (
     audio: current?.audio,
     filter,
     ui: current?.ui,
+    preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
   });
 };
 
@@ -146,6 +151,7 @@ export const savePersistedRetroAudioSettings = (
     audio,
     filter: current?.filter,
     ui: current?.ui,
+    preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
   });
 };
 
@@ -159,6 +165,19 @@ export const savePersistedRetroUiSettings = (
     audio: current?.audio,
     filter: current?.filter,
     ui,
+    preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
+  });
+};
+
+export const setPreferredAudioInputDeviceId = (deviceId: string | null) => {
+  const current = readSettings();
+
+  writeSettings({
+    version: STORAGE_VERSION,
+    audio: current?.audio,
+    filter: current?.filter,
+    ui: current?.ui,
+    preferredAudioInputDeviceId: deviceId ?? undefined,
   });
 };
 

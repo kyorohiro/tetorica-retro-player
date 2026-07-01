@@ -568,6 +568,66 @@ export function useRetroAudioEngine({
     }
   };
 
+  const connectMediaStream = async (stream: MediaStream, mediaTag = "STREAM") => {
+    const context = await ensureInitialized();
+    const engine = audioEngineRef.current;
+    const streamInputTarget = engine?.input ?? null;
+    if (!context || !engine || !streamInputTarget) {
+      debugAudio("connectMediaStream:no-context", {
+        mediaTag,
+      });
+      return;
+    }
+
+    if (mediaSourceRef.current) {
+      debugAudio("connectMediaStream:disconnect-previous", {
+        mediaTag,
+      });
+      mediaSourceRef.current.disconnect();
+      mediaSourceRef.current = null;
+    }
+
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      engine.setOutputEnabled(false);
+      updateAudioNodes();
+      debugAudio("connectMediaStream:no-audio-tracks", {
+        audioContextState: context.state,
+        mediaTag,
+        previewKind: previewKindRef.current,
+      });
+      return;
+    }
+
+    try {
+      const mediaSource = context.createMediaStreamSource(stream);
+      mediaSource.connect(streamInputTarget);
+      mediaSourceRef.current = mediaSource;
+
+      debugAudio("connectMediaStream:connected", {
+        audioContextState: context.state,
+        mediaTag,
+        previewKind: previewKindRef.current,
+        trackCount: audioTracks.length,
+      });
+
+      engine.setOutputEnabled(
+        previewKindRef.current === "video" ||
+          previewKindRef.current === "audio" ||
+          previewKindRef.current === "capture",
+      );
+      updateAudioNodes();
+    } catch (error) {
+      debugAudio("connectMediaStream:error", {
+        audioContextState: context.state,
+        mediaTag,
+        message: error instanceof Error ? error.message : String(error),
+        previewKind: previewKindRef.current,
+      });
+      throw error;
+    }
+  };
+
   const reconnectCurrentMediaAudio = () => {
     const mediaSource = mediaSourceRef.current;
     const engine = audioEngineRef.current;
@@ -1030,6 +1090,7 @@ export function useRetroAudioEngine({
     updateAudioNodes,
     setEngineIsPlaying,
     connectSourceNode,
+    connectMediaStream,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
     rebuildAudioGraphForCurrentMedia,

@@ -1,21 +1,64 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  getPreferredAudioInputDeviceId,
+  setPreferredAudioInputDeviceId,
+} from "./persistedRetroSettings";
 
 export type PreviewSourceKind = "video" | "image" | "audio";
 export type DisplayCaptureResult = string | null;
 
+const attachStreamEndHandlers = (
+  stream: MediaStream,
+  onEnded: () => void,
+) => {
+  for (const track of stream.getTracks()) {
+    track.addEventListener("ended", onEnded);
+  }
+};
+
+const requestUserAudioStream = async (
+  preferredAudioInputDeviceId: string | null,
+  withVideo: boolean,
+) => {
+  const preferredAudioConstraint = preferredAudioInputDeviceId
+    ? { deviceId: { exact: preferredAudioInputDeviceId } }
+    : true;
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: preferredAudioConstraint,
+      video: withVideo,
+    });
+  } catch (error) {
+    if (!preferredAudioInputDeviceId) {
+      throw error;
+    }
+
+    setPreferredAudioInputDeviceId(null);
+    return navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: withVideo,
+    });
+  }
+};
+
 function kindFromPath(path: string): PreviewSourceKind {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   if (/^(mp4|m4v|mov|mkv|avi|wmv|flv|webm|ts|m2ts|mts|ogv)$/.test(ext)) return "video";
-  if (/^(mp3|wav|ogg|oga|m4a|aac|flac|opus|wma)$/.test(ext)) return "audio";
+  if (/^(mp3|wav|ogg|oga|m4a|aac|flac|opus|wma|weba)$/.test(ext)) return "audio";
   return "image";
 }
 
 export function usePreviewSourceState() {
+  const [preferredAudioInputDeviceId, setPreferredAudioInputDeviceIdState] = useState<string | null>(
+    () => getPreferredAudioInputDeviceId(),
+  );
   const [previewSrc, setPreviewSrc] = useState<string>();
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [previewLabel, setPreviewLabel] = useState<string>();
   const [captureError, setCaptureError] = useState<string>("");
   const [previewKind, setPreviewKind] = useState<PreviewSourceKind | undefined>(undefined);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
 
   const stopPreviewStream = useCallback(() => {
     setPreviewKind(undefined);
@@ -46,6 +89,27 @@ export function usePreviewSourceState() {
       previewStream?.getTracks().forEach((track) => track.stop());
     };
   }, [previewSrc, previewStream, revokePreviewSrc]);
+
+  const refreshAudioInputDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setAudioInputDevices([]);
+      return [];
+    }
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioInputs = devices.filter((device) => device.kind === "audioinput");
+    setAudioInputDevices(audioInputs);
+    return audioInputs;
+  }, []);
+
+  useEffect(() => {
+    void refreshAudioInputDevices();
+  }, [refreshAudioInputDevices]);
+
+  const updatePreferredAudioInputDeviceId = useCallback((deviceId: string | null) => {
+    setPreferredAudioInputDeviceId(deviceId);
+    setPreferredAudioInputDeviceIdState(deviceId);
+  }, []);
 
   const previewFile = useCallback((file: File) => {
     const isVideo = file.type.startsWith("video/");
@@ -88,7 +152,7 @@ export function usePreviewSourceState() {
         return stream;
       });
 
-      stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      attachStreamEndHandlers(stream, () => {
         setPreviewKind((current) => (current === "video" ? undefined : current));
         setPreviewLabel((current) => (current === "Display Capture" ? undefined : current));
         setCaptureError("");
@@ -107,6 +171,92 @@ export function usePreviewSourceState() {
       return message;
     }
   }, [clearPreviewSrc]);
+
+  const startMicrophoneInput = useCallback(async (
+    deviceIdOverride?: string | null,
+  ): Promise<DisplayCaptureResult> => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const message = "このブラウザではマイク入力に対応していません。";
+      setCaptureError(message);
+      return message;
+    }
+
+    try {
+      const stream = await requestUserAudioStream(
+        deviceIdOverride ?? preferredAudioInputDeviceId,
+        false,
+      );
+
+      void refreshAudioInputDevices();
+
+      clearPreviewSrc();
+      setPreviewKind("audio");
+      setPreviewLabel("Microphone");
+      setCaptureError("");
+      setPreviewStream((current) => {
+        current?.getTracks().forEach((track) => track.stop());
+        return stream;
+      });
+
+      attachStreamEndHandlers(stream, () => {
+        setPreviewKind((current) => (current === "audio" ? undefined : current));
+        setPreviewLabel((current) => (current === "Microphone" ? undefined : current));
+        setCaptureError("");
+        setPreviewStream((current) => (current === stream ? null : current));
+      });
+      return null;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "マイク入力を開始できませんでした。";
+      setCaptureError(message);
+      return message;
+    }
+  }, [clearPreviewSrc, preferredAudioInputDeviceId, refreshAudioInputDevices]);
+
+  const startCameraInput = useCallback(async (
+    deviceIdOverride?: string | null,
+  ): Promise<DisplayCaptureResult> => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const message = "このブラウザではカメラ入力に対応していません。";
+      setCaptureError(message);
+      return message;
+    }
+
+    try {
+      const stream = await requestUserAudioStream(
+        deviceIdOverride ?? preferredAudioInputDeviceId,
+        true,
+      );
+
+      void refreshAudioInputDevices();
+
+      clearPreviewSrc();
+      setPreviewKind("video");
+      setPreviewLabel("Camera");
+      setCaptureError("");
+      setPreviewStream((current) => {
+        current?.getTracks().forEach((track) => track.stop());
+        return stream;
+      });
+
+      attachStreamEndHandlers(stream, () => {
+        setPreviewKind((current) => (current === "video" ? undefined : current));
+        setPreviewLabel((current) => (current === "Camera" ? undefined : current));
+        setCaptureError("");
+        setPreviewStream((current) => (current === stream ? null : current));
+      });
+      return null;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "カメラ入力を開始できませんでした。";
+      setCaptureError(message);
+      return message;
+    }
+  }, [clearPreviewSrc, preferredAudioInputDeviceId, refreshAudioInputDevices]);
 
   // For Desktop: src is already a valid URL (convertFileSrc result or HTTP URL).
   // Does NOT create a blob — revokePreviewSrc only revokes blob: URLs, so cleanup is safe.
@@ -138,10 +288,16 @@ export function usePreviewSourceState() {
     previewLabel,
     captureError,
     previewKind,
+    audioInputDevices,
+    preferredAudioInputDeviceId,
     previewFile,
     previewPath,
     previewAudioStream,
+    refreshAudioInputDevices,
+    setPreferredAudioInputDeviceId: updatePreferredAudioInputDeviceId,
     startDisplayCapture,
+    startMicrophoneInput,
+    startCameraInput,
     stopPreviewStream,
   };
 }
