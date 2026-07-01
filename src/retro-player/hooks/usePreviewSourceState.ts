@@ -6,6 +6,11 @@ import {
 
 export type PreviewSourceKind = "video" | "image" | "audio";
 export type DisplayCaptureResult = string | null;
+export type PreviewStreamSource =
+  | "display-capture"
+  | "microphone"
+  | "camera"
+  | "audio-preview";
 
 const attachStreamEndHandlers = (
   stream: MediaStream,
@@ -55,6 +60,7 @@ export function usePreviewSourceState() {
   );
   const [previewSrc, setPreviewSrc] = useState<string>();
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [previewStreamSource, setPreviewStreamSource] = useState<PreviewStreamSource | null>(null);
   const [previewLabel, setPreviewLabel] = useState<string>();
   const [captureError, setCaptureError] = useState<string>("");
   const [previewKind, setPreviewKind] = useState<PreviewSourceKind | undefined>(undefined);
@@ -63,6 +69,7 @@ export function usePreviewSourceState() {
   const stopPreviewStream = useCallback(() => {
     setPreviewKind(undefined);
     setPreviewLabel(undefined);
+    setPreviewStreamSource(null);
     setCaptureError("");
     setPreviewStream((current) => {
       current?.getTracks().forEach((track) => track.stop());
@@ -146,6 +153,7 @@ export function usePreviewSourceState() {
       clearPreviewSrc();
       setPreviewKind("video");
       setPreviewLabel("Display Capture");
+      setPreviewStreamSource("display-capture");
       setCaptureError("");
       setPreviewStream((current) => {
         current?.getTracks().forEach((track) => track.stop());
@@ -155,6 +163,7 @@ export function usePreviewSourceState() {
       attachStreamEndHandlers(stream, () => {
         setPreviewKind((current) => (current === "video" ? undefined : current));
         setPreviewLabel((current) => (current === "Display Capture" ? undefined : current));
+        setPreviewStreamSource((current) => (current === "display-capture" ? null : current));
         setCaptureError("");
         setPreviewStream((current) => {
           if (current !== stream) return current;
@@ -192,6 +201,7 @@ export function usePreviewSourceState() {
       clearPreviewSrc();
       setPreviewKind("audio");
       setPreviewLabel("Microphone");
+      setPreviewStreamSource("microphone");
       setCaptureError("");
       setPreviewStream((current) => {
         current?.getTracks().forEach((track) => track.stop());
@@ -201,6 +211,7 @@ export function usePreviewSourceState() {
       attachStreamEndHandlers(stream, () => {
         setPreviewKind((current) => (current === "audio" ? undefined : current));
         setPreviewLabel((current) => (current === "Microphone" ? undefined : current));
+        setPreviewStreamSource((current) => (current === "microphone" ? null : current));
         setCaptureError("");
         setPreviewStream((current) => (current === stream ? null : current));
       });
@@ -235,6 +246,7 @@ export function usePreviewSourceState() {
       clearPreviewSrc();
       setPreviewKind("video");
       setPreviewLabel("Camera");
+      setPreviewStreamSource("camera");
       setCaptureError("");
       setPreviewStream((current) => {
         current?.getTracks().forEach((track) => track.stop());
@@ -244,6 +256,7 @@ export function usePreviewSourceState() {
       attachStreamEndHandlers(stream, () => {
         setPreviewKind((current) => (current === "video" ? undefined : current));
         setPreviewLabel((current) => (current === "Camera" ? undefined : current));
+        setPreviewStreamSource((current) => (current === "camera" ? null : current));
         setCaptureError("");
         setPreviewStream((current) => (current === stream ? null : current));
       });
@@ -276,6 +289,7 @@ export function usePreviewSourceState() {
     setCaptureError("");
     setPreviewLabel(label);
     setPreviewKind("audio");
+    setPreviewStreamSource("audio-preview");
     setPreviewStream((current) => {
       current?.getTracks().forEach((track) => track.stop());
       return stream;
@@ -285,6 +299,7 @@ export function usePreviewSourceState() {
   return {
     previewSrc,
     previewStream,
+    previewStreamSource,
     previewLabel,
     captureError,
     previewKind,
