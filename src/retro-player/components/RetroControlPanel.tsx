@@ -31,6 +31,7 @@ export type RetroControlPlayerSlice = {
   lofiAmount: number;
   radioToneAmount: number;
   bitCrushAmount: number;
+  bitCrushNoiseAmount: number;
   sampleRateReductionAmount: number;
   noiseReductionAmount: number;
   bassAmount: number;
@@ -55,6 +56,7 @@ export type RetroControlPlayerSlice = {
   setLofiAmount: (v: number) => void;
   setRadioToneAmount: (v: number) => void;
   setBitCrushAmount: (v: number) => void;
+  setBitCrushNoiseAmount: (v: number) => void;
   setSampleRateReductionAmount: (v: number) => void;
   setNoiseReductionAmount: (v: number) => void;
   setBassAmount: (v: number) => void;
@@ -192,6 +194,7 @@ export function RetroControlPanel({
               lofiAmount={player.lofiAmount}
               radioToneAmount={player.radioToneAmount}
               bitCrushAmount={player.bitCrushAmount}
+              bitCrushNoiseAmount={player.bitCrushNoiseAmount}
               sampleRateReductionAmount={player.sampleRateReductionAmount}
               noiseReductionAmount={player.noiseReductionAmount}
               bassAmount={player.bassAmount}
@@ -216,6 +219,7 @@ export function RetroControlPanel({
               onChangeLofiAmount={player.setLofiAmount}
               onChangeRadioToneAmount={player.setRadioToneAmount}
               onChangeBitCrushAmount={player.setBitCrushAmount}
+              onChangeBitCrushNoiseAmount={player.setBitCrushNoiseAmount}
               onChangeSampleRateReductionAmount={player.setSampleRateReductionAmount}
               onChangeNoiseReductionAmount={player.setNoiseReductionAmount}
               onChangeBassAmount={player.setBassAmount}

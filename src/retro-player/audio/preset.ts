@@ -8,6 +8,7 @@ export type RetroAudioSettings = {
   lofiAmount: number;
   radioToneAmount: number;
   bitCrushAmount: number;
+  bitCrushNoiseAmount: number;
   sampleRateReductionAmount: number;
   noiseReductionAmount: number;
   bassAmount: number;
@@ -41,6 +42,7 @@ export const DEFAULT_AUDIO_SETTINGS = {
   lofiAmount: 0.58,
   radioToneAmount: 0,
   bitCrushAmount: 0.10,
+  bitCrushNoiseAmount: 0,
   sampleRateReductionAmount: 0.10,
   noiseReductionAmount: 0,
   bassAmount: 0,
@@ -94,6 +96,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       lofiAmount: 0,
       radioToneAmount: 0,
       bitCrushAmount: 0,
+      bitCrushNoiseAmount: 0,
       sampleRateReductionAmount: 0,
       bassAmount: 0,
       midAmount: 0,
