@@ -486,6 +486,22 @@ export function useRetroPreviewMedia({
     playbackStartAttemptRef.current += 1;
   };
 
+  const settleManualStartState = () => {
+    const media = mediaRef.current;
+    if (!media) {
+      return;
+    }
+
+    cancelPendingPlaybackStart();
+    media.pause();
+    isPlayingRef.current = false;
+    setEngineIsPlaying(false);
+    setIsPlaying(false);
+    setNeedsUserPlay(false);
+    setIsBuffering(false);
+    syncVideoState();
+  };
+
   const isHlsStartupRetryableError = (
     media: HTMLMediaElement | null | undefined,
     error: unknown,
@@ -602,9 +618,8 @@ export function useRetroPreviewMedia({
 
     const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
     const duration = Number.isFinite(media.duration) ? media.duration : 0;
-    const nearStart = currentTime <= 0.08;
     const nearEnd = duration > 0 && duration - currentTime <= 0.12;
-    return nearStart || nearEnd;
+    return nearEnd;
   };
 
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
@@ -1259,7 +1274,11 @@ export function useRetroPreviewMedia({
         await connectMediaAudio(media);
         syncVideoState();
         await waitForMediaSwitchCooldown();
-        if (autoPlayRef.current) await playVideoWithAudio();
+        if (autoPlayRef.current) {
+          await playVideoWithAudio();
+        } else {
+          settleManualStartState();
+        }
         if (requestId === previewRequestIdRef.current) {
           finishLoading();
         }
@@ -1450,6 +1469,8 @@ export function useRetroPreviewMedia({
       await waitForMediaSwitchCooldown();
       if (autoPlayRef.current) {
         await playVideoWithAudio();
+      } else {
+        settleManualStartState();
       }
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -1594,6 +1615,8 @@ export function useRetroPreviewMedia({
       if ((kind === "video" || kind === "audio") && autoPlayRef.current) {
         await waitForMediaSwitchCooldown();
         await playVideoWithAudio();
+      } else if (kind === "video" || kind === "audio") {
+        settleManualStartState();
       }
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
