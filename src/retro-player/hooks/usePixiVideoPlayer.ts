@@ -682,12 +682,7 @@ export function usePixiVideoPlayer(
   const toggleMute = () => {
     if (!mediaRef.current) return;
 
-    setIsMuted((current) => {
-      const nextValue = !current;
-      isMutedRef.current = nextValue;
-      window.requestAnimationFrame(updateAudioNodes);
-      return nextValue;
-    });
+    setIsMuted((current) => !current);
   };
 
   const seekTo = (nextTime: number) => {
@@ -718,30 +713,24 @@ export function usePixiVideoPlayer(
     if (!mediaRef.current) return;
 
     mediaRef.current.playbackRate = nextRate;
-    playbackRateRef.current = nextRate;
     setPlaybackRate(nextRate);
   };
 
   const changeVolume = (nextVolume: number) => {
     if (!mediaRef.current) return;
 
-    volumeRef.current = nextVolume;
-    isMutedRef.current = nextVolume === 0;
     setVolume(nextVolume);
     setIsMuted(nextVolume === 0);
-    window.requestAnimationFrame(updateAudioNodes);
   };
 
   const toggleLoop = () => {
     if (!mediaRef.current) return;
 
     mediaRef.current.loop = !mediaRef.current.loop;
-    isLoopingRef.current = mediaRef.current.loop;
     setIsLooping(mediaRef.current.loop);
   };
 
   const setLoopingEnabled = (nextLooping: boolean) => {
-    isLoopingRef.current = nextLooping;
     setIsLooping(nextLooping);
 
     if (mediaRef.current) {
