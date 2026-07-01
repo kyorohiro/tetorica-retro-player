@@ -241,6 +241,8 @@ async fn mdrop_unshare_all(state: State<'_, MDropState>) -> Result<(), String> {
     {
         let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
         server.files.clear();
+        drop(server);
+        state.server.cleanup_hls_sessions();
         Ok(())
     }
 }
@@ -304,6 +306,7 @@ async fn mdrop_get_bonjour_status(state: State<'_, MDropState>) -> Result<Bonjou
 struct MdropConfig {
     api_key: String,
     server_url: Option<String>,
+    ffmpeg_max_concurrent_hls_sessions: usize,
 }
 
 #[tauri::command]
@@ -320,6 +323,7 @@ async fn mdrop_get_config(state: State<'_, MDropState>) -> Result<MdropConfig, S
         Ok(MdropConfig {
             api_key: ctx.get_apikey(),
             server_url: ctx.status.url.clone(),
+            ffmpeg_max_concurrent_hls_sessions: ctx.ffmpeg_max_concurrent_hls_sessions.max(1),
         })
     }
 }
@@ -339,6 +343,25 @@ async fn mdrop_set_ffmpeg_use_qsv(
     #[cfg(not(target_os = "android"))]
     {
         state.server.set_ffmpeg_use_qsv(enabled);
+        Ok(())
+    }
+}
+
+#[tauri::command]
+async fn mdrop_set_ffmpeg_max_concurrent_hls_sessions(
+    state: State<'_, MDropState>,
+    limit: usize,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        let _ = limit;
+        Err("mDrop is disabled on android".to_string())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        state.server.set_ffmpeg_max_concurrent_hls_sessions(limit);
         Ok(())
     }
 }
@@ -466,6 +489,7 @@ pub fn run() {
             mdrop_get_bonjour_status,
             mdrop_get_config,
             mdrop_set_ffmpeg_use_qsv,
+            mdrop_set_ffmpeg_max_concurrent_hls_sessions,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

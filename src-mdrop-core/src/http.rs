@@ -17,7 +17,7 @@ use std::fs;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -165,11 +165,13 @@ pub struct HttpServerContext {
     pub files: HashMap<String, PathBuf>,
     pub hls_sessions: HashMap<String, PathBuf>,
     pub hls_children: HashMap<String, tokio::process::Child>,
+    pub hls_session_order: VecDeque<String>,
     pub message_callback: Option<MessageCallback>,
     pub api_key: String,
     pub has_ffmpeg: bool,
     pub ffmpeg_path: Option<PathBuf>,
     pub ffmpeg_use_qsv: bool,
+    pub ffmpeg_max_concurrent_hls_sessions: usize,
     /// Receives `true` once the ffmpeg pre-warm finishes so HLS requests can
     /// wait for GateKeeper to clear before spawning a new ffmpeg process.
     pub ffmpeg_prewarm_rx: Option<watch::Receiver<bool>>,
@@ -207,11 +209,13 @@ impl HttpServerContext {
             files: HashMap::new(),
             hls_sessions: HashMap::new(),
             hls_children: HashMap::new(),
+            hls_session_order: VecDeque::new(),
             message_callback: None,
             api_key: create_api_key(),
             has_ffmpeg: detect_ffmpeg(),
             ffmpeg_path: None,
             ffmpeg_use_qsv: false,
+            ffmpeg_max_concurrent_hls_sessions: 2,
             ffmpeg_prewarm_rx: None,
         }
     }
@@ -379,6 +383,21 @@ impl SharedHttpServerContext {
         }
     }
 
+    pub fn set_ffmpeg_max_concurrent_hls_sessions(&self, limit: usize) {
+        let limit = limit.max(1);
+        if let Ok(mut ctx) = self.inner.lock() {
+            ctx.ffmpeg_max_concurrent_hls_sessions = limit;
+        }
+        self.enforce_hls_session_limit(limit);
+    }
+
+    pub fn get_ffmpeg_max_concurrent_hls_sessions(&self) -> usize {
+        self.inner
+            .lock()
+            .map(|ctx| ctx.ffmpeg_max_concurrent_hls_sessions.max(1))
+            .unwrap_or(2)
+    }
+
     /// Create a pre-warm channel: stores the receiver internally and returns
     /// an opaque handle. Call `FfmpegPrewarmHandle::complete()` once the
     /// macOS GateKeeper check finishes so HLS requests can proceed.
@@ -396,6 +415,69 @@ impl SharedHttpServerContext {
         }
     }
 
+    pub fn touch_hls_session(&self, session_id: &str) {
+        if let Ok(mut ctx) = self.inner.lock() {
+            if let Some(index) = ctx
+                .hls_session_order
+                .iter()
+                .position(|existing| existing == session_id)
+            {
+                ctx.hls_session_order.remove(index);
+                ctx.hls_session_order.push_back(session_id.to_string());
+            }
+        }
+    }
+
+    pub fn register_hls_session(
+        &self,
+        session_id: String,
+        session_dir: PathBuf,
+        child: tokio::process::Child,
+    ) {
+        if let Ok(mut ctx) = self.inner.lock() {
+            ctx.hls_sessions.insert(session_id.clone(), session_dir);
+            ctx.hls_children.insert(session_id.clone(), child);
+            if let Some(index) = ctx
+                .hls_session_order
+                .iter()
+                .position(|existing| existing == &session_id)
+            {
+                ctx.hls_session_order.remove(index);
+            }
+            ctx.hls_session_order.push_back(session_id);
+        }
+    }
+
+    pub fn enforce_hls_session_limit(&self, limit: usize) {
+        let mut stale_children = Vec::new();
+        let mut stale_dirs = Vec::new();
+
+        if let Ok(mut ctx) = self.inner.lock() {
+            while ctx.hls_children.len() > limit {
+                let Some(oldest_session_id) = ctx.hls_session_order.pop_front() else {
+                    break;
+                };
+                if let Some(child) = ctx.hls_children.remove(&oldest_session_id) {
+                    stale_children.push(child);
+                }
+                if let Some(dir) = ctx.hls_sessions.remove(&oldest_session_id) {
+                    stale_dirs.push(dir);
+                }
+            }
+        }
+
+        for mut child in stale_children {
+            let _ = child.start_kill();
+            tokio::spawn(async move {
+                let _ = child.wait().await;
+            });
+        }
+
+        for dir in stale_dirs {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
     pub fn cleanup_hls_sessions(&self) {
         let (children, session_dirs): (Vec<tokio::process::Child>, Vec<PathBuf>) = {
             let mut ctx = match self.inner.lock() {
@@ -404,11 +486,15 @@ impl SharedHttpServerContext {
             };
             let children = ctx.hls_children.drain().map(|(_, child)| child).collect();
             let session_dirs = ctx.hls_sessions.drain().map(|(_, dir)| dir).collect();
+            ctx.hls_session_order.clear();
             (children, session_dirs)
         };
 
         for mut child in children {
             let _ = child.start_kill();
+            tokio::spawn(async move {
+                let _ = child.wait().await;
+            });
         }
 
         for dir in session_dirs {

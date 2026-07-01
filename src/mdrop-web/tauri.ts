@@ -34,6 +34,7 @@ export interface SharedFileInfo {
 export interface MdropConfig {
   apiKey: string;
   serverUrl: string | null;
+  ffmpegMaxConcurrentHlsSessions: number;
 }
 
 export interface StartServerRequest {
@@ -94,3 +95,6 @@ export const mdropGetConfig = () =>
 
 export const mdropSetFfmpegUseQsv = (enabled: boolean) =>
   invoke<void>("mdrop_set_ffmpeg_use_qsv", { enabled });
+
+export const mdropSetFfmpegMaxConcurrentHlsSessions = (limit: number) =>
+  invoke<void>("mdrop_set_ffmpeg_max_concurrent_hls_sessions", { limit });

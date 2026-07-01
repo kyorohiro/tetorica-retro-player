@@ -194,6 +194,7 @@ export const clearPersistedRetroSettings = () => {
 
 const NATIVE_MODE_KEY = "tetorica-retro-player.nativeMode";
 const FFMPEG_USE_QSV_KEY = "tetorica-retro-player.ffmpegUseQsv";
+const FFMPEG_MAX_CONCURRENT_HLS_SESSIONS_KEY = "tetorica-retro-player.ffmpegMaxConcurrentHlsSessions";
 
 export const getNativePlaybackMode = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -232,5 +233,28 @@ export const setFfmpegUseQsv = (enabled: boolean): void => {
     } else {
       window.localStorage.removeItem(FFMPEG_USE_QSV_KEY);
     }
+  } catch {}
+};
+
+export const getFfmpegMaxConcurrentHlsSessions = (): number => {
+  if (typeof window === "undefined") return 2;
+  try {
+    const raw = window.localStorage.getItem(FFMPEG_MAX_CONCURRENT_HLS_SESSIONS_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : 2;
+    if (!Number.isFinite(parsed)) return 2;
+    return Math.min(8, Math.max(1, parsed));
+  } catch {
+    return 2;
+  }
+};
+
+export const setFfmpegMaxConcurrentHlsSessions = (limit: number): void => {
+  if (typeof window === "undefined") return;
+  try {
+    const normalized = Math.min(8, Math.max(1, Math.round(limit)));
+    window.localStorage.setItem(
+      FFMPEG_MAX_CONCURRENT_HLS_SESSIONS_KEY,
+      String(normalized),
+    );
   } catch {}
 };

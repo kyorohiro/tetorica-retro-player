@@ -70,6 +70,8 @@ export type RetroPreviewViewProps = {
   onFitWidthChange: (enabled: boolean) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
+  ffmpegMaxConcurrentHlsSessions: number;
+  onFfmpegMaxConcurrentHlsSessionsChange: (limit: number) => void;
   onError?: (error: Error) => void;
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
@@ -90,6 +92,8 @@ export function RetroPreviewView({
   onFitWidthChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
+  ffmpegMaxConcurrentHlsSessions,
+  onFfmpegMaxConcurrentHlsSessionsChange,
   onError,
   fillHeight = false,
   onIsPinnedPreviewChange,
@@ -793,6 +797,8 @@ export function RetroPreviewView({
                 onLatencyHintChange={player.setLatencyHint}
                 ffmpegUseQsv={ffmpegUseQsv}
                 onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
+                ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+                onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
               />
             </div>
           )}
@@ -861,6 +867,8 @@ export function RetroPreviewView({
               onLatencyHintChange={player.setLatencyHint}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
+              ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+              onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
             />
           </div>
         )}
@@ -928,6 +936,8 @@ export function RetroPreviewView({
               onLatencyHintChange={player.setLatencyHint}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
+              ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+              onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
             />
           </div>
         )}
@@ -994,6 +1004,8 @@ export function RetroPreviewView({
             onLatencyHintChange={player.setLatencyHint}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
+            ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+            onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
           />
         </div>
       )}
@@ -1061,6 +1073,8 @@ export function RetroPreviewView({
             onLatencyHintChange={player.setLatencyHint}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
+            ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+            onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
           />
         </div>
       )}
