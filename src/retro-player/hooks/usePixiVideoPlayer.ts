@@ -5,7 +5,10 @@ import type { RetroFilterState } from "./useRetroFilterState";
 import { useRetroAudioEngine } from "./useRetroAudioEngine";
 import { useRetroPixiStage } from "./useRetroPixiStage";
 import { useRetroPreviewMedia } from "./useRetroPreviewMedia";
-import { RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT } from "../events";
+import {
+  RETRO_PLAYER_ENSURE_AUDIO_CONTEXT_EVENT,
+  RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
+} from "../events";
 
 let retroPlayerInstanceSeed = 0;
 
@@ -78,6 +81,7 @@ export function usePixiVideoPlayer(
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingOwnedTracksRef = useRef<MediaStreamTrack[]>([]);
   const pendingDownloadUrlRef = useRef<string | null>(null);
   const pendingRecordingBlobRef = useRef<Blob | null>(null);
   const pendingRecordingFilenameRef = useRef<string | null>(null);
@@ -297,6 +301,7 @@ export function usePixiVideoPlayer(
     ensureAudioContextWithRecovery,
     updateAudioNodes,
     setEngineIsPlaying,
+    connectMediaStream,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
     rebuildAudioGraphForCurrentMedia,
@@ -516,6 +521,7 @@ export function usePixiVideoPlayer(
     updateAudioNodes,
     setEngineIsPlaying,
     setIsBuffering,
+    connectMediaStream,
     connectMediaAudio,
     rebuildAudioGraphForCurrentMedia,
     fitSprite,
@@ -707,7 +713,8 @@ export function usePixiVideoPlayer(
     }, 0);
   };
 
-  // Output format: webm (vp9+opus). VLC may play it at wrong speed due to timestamp
+  // Output format: webm (vp9/vp8 + opus for video, opus for audio-only).
+  // VLC may play some webm recordings at wrong speed due to timestamp
   // interpretation bugs — use QuickTime, browser, or mpv for correct playback.
   const saveRecording = (chunks: Blob[], mimeType: string) => {
     if (typeof window === "undefined" || chunks.length === 0) {
@@ -718,7 +725,8 @@ export function usePixiVideoPlayer(
 
     const blob = new Blob(chunks, { type: mimeType || "video/webm" });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `tetorica-retro-player-${timestamp}.webm`;
+    const isAudioOnly = (mimeType || blob.type).startsWith("audio/");
+    const filename = `tetorica-retro-player-${timestamp}.${isAudioOnly ? "weba" : "webm"}`;
     const url = window.URL.createObjectURL(blob);
 
     pendingDownloadUrlRef.current = url;
@@ -790,33 +798,67 @@ export function usePixiVideoPlayer(
     return true;
   };
 
-  const getRecordingMimeType = () => {
-    const candidates = [
-      "video/webm;codecs=vp9,opus",
-      "video/webm;codecs=vp8,opus",
-      "video/webm",
-    ];
+  const getRecordingMimeType = (hasVideoTrack: boolean) => {
+    const candidates = hasVideoTrack
+      ? [
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
+          "video/webm",
+        ]
+      : [
+          "audio/webm;codecs=opus",
+          "audio/webm",
+        ];
 
     return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
   };
 
   const startRecording = async () => {
-    const canvas = appRef.current?.canvas;
-
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      throw new Error("Preview canvas is not ready yet.");
-    }
-
     await ensureAudioContext();
 
     const recordingStream = new MediaStream();
-    const canvasStream = canvas.captureStream(30);
-    canvasStream.getVideoTracks().forEach((track) => recordingStream.addTrack(track));
-    recordingDestinationRef.current?.stream
-      .getAudioTracks()
-      .forEach((track) => recordingStream.addTrack(track.clone()));
+    const shouldRecordVideo = previewKindRef.current !== "audio";
+    const livePreviewStream = streamRef.current;
+    const ownedRecordingTracks: MediaStreamTrack[] = [];
 
-    const mimeType = getRecordingMimeType();
+    if (shouldRecordVideo) {
+      const canvas = appRef.current?.canvas;
+
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        throw new Error("Preview canvas is not ready yet.");
+      }
+
+      const canvasStream = canvas.captureStream(30);
+      canvasStream.getVideoTracks().forEach((track) => {
+        recordingStream.addTrack(track);
+        ownedRecordingTracks.push(track);
+      });
+    }
+
+    const recordingDestinationTracks =
+      recordingDestinationRef.current?.stream
+        .getAudioTracks() ?? [];
+    const liveAudioTracks =
+      livePreviewStream instanceof MediaStream
+        ? livePreviewStream.getAudioTracks()
+        : [];
+
+    if (recordingDestinationTracks.length > 0) {
+      recordingDestinationTracks.forEach((track) => {
+        const clonedTrack = track.clone();
+        recordingStream.addTrack(clonedTrack);
+        ownedRecordingTracks.push(clonedTrack);
+      });
+    } else if (liveAudioTracks.length > 0) {
+      liveAudioTracks.forEach((track) => recordingStream.addTrack(track));
+    }
+
+    if (recordingStream.getTracks().length === 0) {
+      throw new Error("Nothing is available to record yet.");
+    }
+
+    const hasVideoTrack = recordingStream.getVideoTracks().length > 0;
+    const mimeType = getRecordingMimeType(hasVideoTrack);
     const recorder = mimeType
       ? new MediaRecorder(recordingStream, { mimeType })
       : new MediaRecorder(recordingStream);
@@ -825,6 +867,7 @@ export function usePixiVideoPlayer(
     revokePendingRecording();
     setPendingRecordingFilename(null);
     recordingStreamRef.current = recordingStream;
+    recordingOwnedTracksRef.current = ownedRecordingTracks;
     mediaRecorderRef.current = recorder;
     recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size > 0) {
@@ -834,7 +877,8 @@ export function usePixiVideoPlayer(
     recorder.addEventListener("stop", () => {
       const resolvedFilename = saveRecording(recordedChunksRef.current, recorder.mimeType);
       recordedChunksRef.current = [];
-      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingOwnedTracksRef.current.forEach((track) => track.stop());
+      recordingOwnedTracksRef.current = [];
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
       isRecordingRef.current = false;
@@ -867,7 +911,8 @@ export function usePixiVideoPlayer(
         return;
       }
 
-      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingOwnedTracksRef.current.forEach((track) => track.stop());
+      recordingOwnedTracksRef.current = [];
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
       isRecordingRef.current = false;
@@ -930,6 +975,28 @@ export function usePixiVideoPlayer(
       //document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    const handleEnsureAudioContext = () => {
+      void ensureAudioContext().then((context) => {
+        logAudioRecovery("ensureAudioContext:event", {
+          audioContextState: context?.state ?? audioContextRef.current?.state ?? null,
+        });
+      });
+    };
+
+    window.addEventListener(
+      RETRO_PLAYER_ENSURE_AUDIO_CONTEXT_EVENT,
+      handleEnsureAudioContext as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        RETRO_PLAYER_ENSURE_AUDIO_CONTEXT_EVENT,
+        handleEnsureAudioContext as EventListener,
+      );
+    };
+  }, [ensureAudioContext]);
 
   useEffect(() => {
     const handlePrepareExternalNavigation = () => {

@@ -30,7 +30,10 @@ import {
   mimeFromPath,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
-import { dispatchRetroPlayerPrepareExternalNavigation } from "./retro-player/events";
+import {
+  dispatchRetroPlayerEnsureAudioContext,
+  dispatchRetroPlayerPrepareExternalNavigation,
+} from "./retro-player/events";
 import { MobileMenu } from "./MobileMenu";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { type PresetConfig, loadStartupPreset, saveStartupPreset } from "./builtin-content/preset-config";
@@ -147,7 +150,7 @@ function App() {
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = "player:root";
-  const { showConfirmDialog } = useDialog();
+  const { showConfirmDialog, showSelectDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const { showPreviewDialog } = usePreviewDialog();
@@ -727,6 +730,76 @@ function App() {
     }
   }, [locale, previewSource, showConfirmDialog]);
 
+  const handleOpenMicrophone = useCallback(async () => {
+    setIsMobileMenuOpen(false);
+    toneCleanupRef.current?.();
+    toneCleanupRef.current = null;
+    setAutoStartState('done');
+    dispatchRetroPlayerEnsureAudioContext();
+    await previewSource.startMicrophoneInput();
+  }, [previewSource]);
+
+  const handleOpenCamera = useCallback(async () => {
+    setIsMobileMenuOpen(false);
+    toneCleanupRef.current?.();
+    toneCleanupRef.current = null;
+    setAutoStartState('done');
+    dispatchRetroPlayerEnsureAudioContext();
+    await previewSource.startCameraInput();
+  }, [previewSource]);
+
+  const handleSelectMicrophoneDevice = useCallback(async () => {
+    setIsMobileMenuOpen(false);
+    const audioInputs = await previewSource.refreshAudioInputDevices();
+
+    if (audioInputs.length === 0) {
+      await showConfirmDialog({
+        title: t(locale, "selectMicrophoneTitle"),
+        body: t(locale, "microphoneUnavailable"),
+        okText: t(locale, "cancel"),
+      });
+      return;
+    }
+
+    const selectedDeviceId = await showSelectDialog({
+      title: t(locale, "selectMicrophoneTitle"),
+      message: t(locale, "selectMicrophoneMessage"),
+      options: audioInputs.map((device, index) => ({
+        value: device.deviceId,
+        label: device.label || `${t(locale, "inputMicrophone")} ${index + 1}`,
+        description:
+          device.deviceId === previewSource.preferredAudioInputDeviceId
+            ? locale === "ja" ? "現在選択中" : "Currently selected"
+            : undefined,
+      })),
+      cancelText: t(locale, "cancel"),
+    });
+
+    if (!selectedDeviceId) {
+      return;
+    }
+
+    previewSource.setPreferredAudioInputDeviceId(selectedDeviceId);
+
+    const currentLabel = previewSource.previewLabel;
+    if (currentLabel === "Microphone") {
+      toneCleanupRef.current?.();
+      toneCleanupRef.current = null;
+      setAutoStartState('done');
+      dispatchRetroPlayerEnsureAudioContext();
+      await previewSource.startMicrophoneInput(selectedDeviceId);
+      return;
+    }
+
+    if (currentLabel === "Camera") {
+      toneCleanupRef.current?.();
+      toneCleanupRef.current = null;
+      setAutoStartState('done');
+      dispatchRetroPlayerEnsureAudioContext();
+      await previewSource.startCameraInput(selectedDeviceId);
+    }
+  }, [locale, previewSource, showConfirmDialog, showSelectDialog]);
+
   const onDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
     console.log("[onDrop] React DragEvent fired (browser-context drop)");
@@ -1128,6 +1201,9 @@ function App() {
           onOpenFile={handleOpenFilePicker}
           onOpenFolder={handleOpenFolderPicker}
           onCapture={handleOpenDisplayCapture}
+          onOpenMicrophone={() => { void handleOpenMicrophone(); }}
+          onOpenCamera={() => { void handleOpenCamera(); }}
+          onSelectMicrophoneDevice={() => { void handleSelectMicrophoneDevice(); }}
           onPresetVideo={handlePresetVideo}
           onPresetImage={handlePresetImage}
           onPresetLofi={() => { void handlePresetLofi(); }}
@@ -1143,7 +1219,7 @@ function App() {
         <div className="relative flex flex-col flex-1 min-h-0 w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
           <header className="shrink-0 mb-3" />
 
-          {previewSource.previewStream && previewSource.previewKind !== "audio" && (
+          {previewSource.previewStream && (
           <div className="mb-4">
             <button
               type="button"

@@ -59,6 +59,7 @@ type UseRetroPreviewMediaParams = {
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
   setEngineIsPlaying: (nextIsPlaying: boolean) => void;
+  connectMediaStream: (stream: MediaStream, mediaTag?: string) => Promise<void>;
   connectMediaAudio: (media: HTMLMediaElement) => Promise<void>;
   rebuildAudioGraphForCurrentMedia: (reason: string) => Promise<AudioContext | null>;
   fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) =>
@@ -184,6 +185,7 @@ export function useRetroPreviewMedia({
   ensureAudioContext,
   updateAudioNodes,
   setEngineIsPlaying,
+  connectMediaStream,
   connectMediaAudio,
   rebuildAudioGraphForCurrentMedia,
   fitSprite,
@@ -800,11 +802,24 @@ export function useRetroPreviewMedia({
       return;
     }
 
+    const currentSrcObject = mediaRef.current.srcObject;
+    const liveAudioStream =
+      previewKindRef.current === "audio" && currentSrcObject instanceof MediaStream
+        ? currentSrcObject
+        : null;
+    const hasActiveLiveAudioTrack = liveAudioStream
+      ? liveAudioStream
+          .getAudioTracks()
+          .some((track: MediaStreamTrack) => track.readyState === "live" && track.enabled)
+      : false;
+
     // During a loop transition Safari may briefly fire "pause" even though the
     // video is about to restart. Treat that window as still-playing.
     const isLoopTransition = isLikelyLoopTransition(mediaRef.current);
-    const effectivelyPlaying = !mediaRef.current.paused || isLoopTransition;
+    const effectivelyPlaying =
+      hasActiveLiveAudioTrack || !mediaRef.current.paused || isLoopTransition;
     isPlayingRef.current = effectivelyPlaying;
+    setEngineIsPlaying(effectivelyPlaying);
     setIsPlaying(effectivelyPlaying);
     if (effectivelyPlaying) {
       finishLoading();
@@ -1350,7 +1365,7 @@ export function useRetroPreviewMedia({
         mediaRef.current = media;
         await attachVisualPreview(media, "capture");
         await ensureVisualStartupReady("capture");
-        await connectMediaAudio(media);
+        await connectMediaStream(stream, "VIDEO_STREAM");
       } else {
         const media = document.createElement("audio");
         media.srcObject = stream;
@@ -1371,14 +1386,18 @@ export function useRetroPreviewMedia({
         setSourceDimensions(null);
         setViewportRect(null);
         safeRender();
-        await connectMediaAudio(media);
+        await connectMediaStream(stream, "AUDIO_STREAM");
         syncVideoState();
       }
 
       if (requestId !== previewRequestIdRef.current) return;
 
       await waitForMediaSwitchCooldown();
-      if (autoPlayRef.current) await playVideoWithAudio();
+      const shouldAttemptImmediatePlay =
+        kind === "audio" || kind === "video" || autoPlayRef.current;
+      if (shouldAttemptImmediatePlay) {
+        await playVideoWithAudio();
+      }
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
       }

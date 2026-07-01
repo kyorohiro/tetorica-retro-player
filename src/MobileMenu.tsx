@@ -1,5 +1,5 @@
 import React from "react";
-import { FileUp, FolderOpen, MonitorUp } from "lucide-react";
+import { Camera, FileUp, FolderOpen, Mic, MonitorUp } from "lucide-react";
 import { t, type Locale, type LocalePreference } from "./i18n";
 import { DEMO_SONGS, type DemoSongMeta } from "./builtin-content/demo-songs";
 
@@ -10,6 +10,9 @@ interface MobileMenuProps {
   onOpenFile: () => void;
   onOpenFolder: () => void;
   onCapture: () => void;
+  onOpenMicrophone: () => void;
+  onOpenCamera: () => void;
+  onSelectMicrophoneDevice: () => void;
   onPresetVideo: () => void;
   onPresetImage: () => void;
   onPresetLofi: () => void;
@@ -24,6 +27,9 @@ export function MobileMenu({
   onOpenFile,
   onOpenFolder,
   onCapture,
+  onOpenMicrophone,
+  onOpenCamera,
+  onSelectMicrophoneDevice,
   onPresetVideo,
   onPresetImage,
   onPresetLofi,
@@ -68,6 +74,32 @@ export function MobileMenu({
             </button>
           </div>
         )}
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={onOpenMicrophone}
+            className="flex items-center gap-2 rounded-xl border border-dashed border-violet-500/40 bg-violet-500/10 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-violet-500/20"
+          >
+            <Mic className="h-4 w-4 shrink-0 text-violet-700" />
+            {t(locale, "inputMicrophone")}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenCamera}
+            className="flex items-center gap-2 rounded-xl border border-dashed border-cyan-500/40 bg-cyan-500/10 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-cyan-500/20"
+          >
+            <Camera className="h-4 w-4 shrink-0 text-cyan-700" />
+            {t(locale, "inputCamera")}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={onSelectMicrophoneDevice}
+          className="flex items-center gap-2 rounded-xl border border-dashed border-slate-400 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800 transition hover:border-violet-400 hover:bg-white"
+        >
+          <Mic className="h-4 w-4 shrink-0 text-slate-700" />
+          {t(locale, "inputMicrophoneDevice")}
+        </button>
       </div>
 
       {/* Test presets */}
