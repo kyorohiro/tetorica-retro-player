@@ -1076,7 +1076,7 @@ export function useRetroPreviewMedia({
         !isPlaybackAttemptStale() &&
         retryAttempt < HLS_STARTUP_RETRY_DELAYS_MS.length;
 
-      if (shouldRetryHlsStartup) {
+      if (shouldRetryHlsStartup && media instanceof HTMLVideoElement) {
         const retryDelayMs = HLS_STARTUP_RETRY_DELAYS_MS[retryAttempt] ?? 0;
         media.dataset[HLS_STARTUP_RETRY_DATASET_KEY] = String(retryAttempt + 1);
         debugVideo("playVideoWithAudio:hls-startup-retry", {
