@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Bell,
-  Minimize2,
 } from "lucide-react";
 import type { RetroAudioSettings } from "../audio/preset";
 import type { RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
@@ -149,6 +148,36 @@ export function RetroPreviewView({
       height: shellRect.height,
     };
   }, []);
+
+  const handlePinToggle = React.useCallback(() => {
+    if (isFitWidthEnabled) {
+      onFitWidthChange(false);
+    }
+    if (isPreviewMaximized) {
+      setIsPreviewMaximized(false);
+    }
+
+    setIsPreviewPinned((current) => {
+      const next = !current;
+      if (next) {
+        const nextMetrics = measurePinnedPreviewMetrics();
+        if (nextMetrics) {
+          setPinnedPreviewMetrics(nextMetrics);
+        }
+        return true;
+      }
+
+      setIsAutoPreviewPinned(false);
+      setAutoPinnedHiddenOffset(0);
+      setPinnedPreviewMetrics(null);
+      return false;
+    });
+  }, [
+    isFitWidthEnabled,
+    isPreviewMaximized,
+    measurePinnedPreviewMetrics,
+    onFitWidthChange,
+  ]);
 
   const {
     alarmTime,
@@ -516,34 +545,6 @@ export function RetroPreviewView({
               : undefined
         }
       >
-        {isPreviewMaximized && (
-          isFitWidthEnabled ? (
-            // Fit-width maximize: shell is a scroll container, so the exit
-            // button must be sticky so it stays reachable at all scroll depths.
-            <div className="sticky top-0 z-10 flex justify-end pb-2">
-              <button
-                type="button"
-                aria-label="Exit maximize"
-                title="Exit maximize"
-                onClick={() => { setIsPreviewMaximized(false); }}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
-              >
-                <Minimize2 size={18} />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              aria-label="Exit maximize"
-              title="Exit maximize"
-              onClick={() => { setIsPreviewMaximized(false); }}
-              className="safe-top-right-offset absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-500/60 bg-slate-900/82 text-slate-100 shadow-md backdrop-blur-sm transition hover:bg-slate-800"
-            >
-              <Minimize2 size={16} />
-            </button>
-          )
-        )}
-
         <div
           className={`relative ${
             isPreviewMaximized ? "w-full" : "max-w-full min-w-0 overflow-visible"
@@ -771,21 +772,7 @@ export function RetroPreviewView({
                   if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                   onFitWidthChange(!isFitWidthEnabled);
                 }}
-                onPinToggle={() => {
-                  if (isPreviewMaximized) return;
-                  setIsPreviewPinned((current) => {
-                    const next = !current;
-                    if (next) {
-                      const nextMetrics = measurePinnedPreviewMetrics();
-                      if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                      return true;
-                    }
-                    setIsAutoPreviewPinned(false);
-                    setAutoPinnedHiddenOffset(0);
-                    setPinnedPreviewMetrics(null);
-                    return false;
-                  });
-                }}
+                onPinToggle={handlePinToggle}
                 onMaximizeToggle={() => {
                   if (!isPreviewMaximized) onFitWidthChange(false);
                   setIsPreviewMaximized((c) => !c);
@@ -840,22 +827,7 @@ export function RetroPreviewView({
                 if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                 onFitWidthChange(!isFitWidthEnabled);
               }}
-              onPinToggle={() => {
-                if (isPreviewMaximized) return;
-                if (isFitWidthEnabled) onFitWidthChange(false);
-                setIsPreviewPinned((current) => {
-                  const next = !current;
-                  if (next) {
-                    const nextMetrics = measurePinnedPreviewMetrics();
-                    if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                    return true;
-                  }
-                  setIsAutoPreviewPinned(false);
-                  setAutoPinnedHiddenOffset(0);
-                  setPinnedPreviewMetrics(null);
-                  return false;
-                });
-              }}
+              onPinToggle={handlePinToggle}
               onMaximizeToggle={() => {
                 if (!isPreviewMaximized) onFitWidthChange(false);
                 setIsPreviewMaximized((c) => !c);
@@ -909,22 +881,7 @@ export function RetroPreviewView({
                 if (!isFitWidthEnabled) setIsPreviewMaximized(false);
                 onFitWidthChange(!isFitWidthEnabled);
               }}
-              onPinToggle={() => {
-                if (isPreviewMaximized) return;
-                if (isFitWidthEnabled) onFitWidthChange(false);
-                setIsPreviewPinned((current) => {
-                  const next = !current;
-                  if (next) {
-                    const nextMetrics = measurePinnedPreviewMetrics();
-                    if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                    return true;
-                  }
-                  setIsAutoPreviewPinned(false);
-                  setAutoPinnedHiddenOffset(0);
-                  setPinnedPreviewMetrics(null);
-                  return false;
-                });
-              }}
+              onPinToggle={handlePinToggle}
               onMaximizeToggle={() => {
                 if (!isPreviewMaximized) onFitWidthChange(false);
                 setIsPreviewMaximized((c) => !c);
@@ -978,21 +935,7 @@ export function RetroPreviewView({
               if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);
             }}
-            onPinToggle={() => {
-              if (isPreviewMaximized) return;
-              setIsPreviewPinned((current) => {
-                const next = !current;
-                if (next) {
-                  const nextMetrics = measurePinnedPreviewMetrics();
-                  if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                  return true;
-                }
-                setIsAutoPreviewPinned(false);
-                setAutoPinnedHiddenOffset(0);
-                setPinnedPreviewMetrics(null);
-                return false;
-              });
-            }}
+            onPinToggle={handlePinToggle}
             onMaximizeToggle={() => {
               if (!isPreviewMaximized) onFitWidthChange(false);
               setIsPreviewMaximized((c) => !c);
@@ -1046,22 +989,7 @@ export function RetroPreviewView({
               if (!isFitWidthEnabled) setIsPreviewMaximized(false);
               onFitWidthChange(!isFitWidthEnabled);
             }}
-            onPinToggle={() => {
-              if (isPreviewMaximized) return;
-              if (isFitWidthEnabled) onFitWidthChange(false);
-              setIsPreviewPinned((current) => {
-                const next = !current;
-                if (next) {
-                  const nextMetrics = measurePinnedPreviewMetrics();
-                  if (nextMetrics) setPinnedPreviewMetrics(nextMetrics);
-                  return true;
-                }
-                setIsAutoPreviewPinned(false);
-                setAutoPinnedHiddenOffset(0);
-                setPinnedPreviewMetrics(null);
-                return false;
-              });
-            }}
+            onPinToggle={handlePinToggle}
             onMaximizeToggle={() => {
               if (!isPreviewMaximized) onFitWidthChange(false);
               setIsPreviewMaximized((c) => !c);

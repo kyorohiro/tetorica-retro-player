@@ -650,23 +650,18 @@ export function RetroPreviewToolbar({
             onBlur={hideTooltip}
             className={[
               "inline-flex h-9 w-9 items-center justify-center rounded-none border-t border-b border-l-0 border-r-0 text-sm transition backdrop-blur-sm",
-              isPreviewMaximized
-                ? "cursor-not-allowed border-slate-700/80 bg-slate-900/55 text-slate-500"
-                : isPinnedPreview
-                  ? glowingFloatingButtonClass
-                  : idleFloatingButtonClass,
+              isPinnedPreview
+                ? glowingFloatingButtonClass
+                : idleFloatingButtonClass,
             ].join(" ")}
-            disabled={isPreviewMaximized}
           >
             <Pin size={16} />
           </button>
           {renderTooltip(
             "pin",
-            isPreviewMaximized
-              ? tooltipText.pinUnavailable
-              : isPinnedPreview
-                ? tooltipText.pinOn
-                : tooltipText.pinOff,
+            isPinnedPreview
+              ? tooltipText.pinOn
+              : tooltipText.pinOff,
           )}
         </div>
         <div className="relative">
