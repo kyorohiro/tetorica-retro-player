@@ -61,6 +61,8 @@ type RetroPreviewToolbarProps = {
   onLatencyHintChange: (hint: AudioContextLatencyCategory) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
+  ffmpegMaxConcurrentHlsSessions: number;
+  onFfmpegMaxConcurrentHlsSessionsChange: (limit: number) => void;
 };
 
 export function RetroPreviewToolbar({
@@ -95,6 +97,8 @@ export function RetroPreviewToolbar({
   onLatencyHintChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
+  ffmpegMaxConcurrentHlsSessions,
+  onFfmpegMaxConcurrentHlsSessionsChange,
 }: RetroPreviewToolbarProps) {
   const tooltipText =
     locale === "ja"
@@ -115,6 +119,8 @@ export function RetroPreviewToolbar({
           alarmArmed: "Alarm: 時刻を待っています。",
           qsv: "Use QSV when available",
           qsvDescription: "Intel Quick Sync 対応の Windows 環境のみ",
+          hlsSlots: "HLS ffmpeg slots",
+          hlsSlotsDescription: "同時実行数の上限。変更は再生切替後に安定し、再起動後も保持されます。",
           enabled: "有効",
           disabled: "無効",
         }
@@ -135,6 +141,8 @@ export function RetroPreviewToolbar({
           alarmArmed: "Alarm: armed and waiting for the selected time.",
           qsv: "Use QSV when available",
           qsvDescription: "Intel Quick Sync capable Windows environments only",
+          hlsSlots: "HLS ffmpeg slots",
+          hlsSlotsDescription: "Maximum concurrent ffmpeg HLS jobs. Persisted and safe to apply on the next playback cycle.",
           enabled: "On",
           disabled: "Off",
         };
@@ -382,6 +390,27 @@ export function RetroPreviewToolbar({
                   />
                   <span>{ffmpegUseQsv ? tooltipText.enabled : tooltipText.disabled}</span>
                 </label>
+              </div>
+            </div>
+            <div className="mb-3 border-b border-slate-700 pb-3">
+              <div className="mb-2 flex items-center justify-between gap-3 text-[11px] text-slate-400">
+                <div>
+                  <div className="text-slate-300">{tooltipText.hlsSlots}</div>
+                  <p className="mt-1 text-[10px] leading-[1.45] text-slate-500">
+                    {tooltipText.hlsSlotsDescription}
+                  </p>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  step={1}
+                  value={ffmpegMaxConcurrentHlsSessions}
+                  onChange={(event) => {
+                    onFfmpegMaxConcurrentHlsSessionsChange(Number(event.currentTarget.value));
+                  }}
+                  className="w-16 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-right text-sm text-slate-100"
+                />
               </div>
             </div>
             <div className="mb-3 border-b border-slate-700 pb-3">

@@ -6,13 +6,18 @@ import {
 } from "../hooks/useRetroFilterState";
 import {
   clearPersistedRetroSettings,
+  getFfmpegMaxConcurrentHlsSessions,
   getFfmpegUseQsv,
   getNativePlaybackMode,
   setFfmpegUseQsv,
+  setFfmpegMaxConcurrentHlsSessions,
   loadPersistedRetroSettings,
   setNativePlaybackMode,
 } from "../hooks/persistedRetroSettings";
-import { mdropSetFfmpegUseQsv } from "../../mdrop-web/tauri";
+import {
+  mdropSetFfmpegMaxConcurrentHlsSessions,
+  mdropSetFfmpegUseQsv,
+} from "../../mdrop-web/tauri";
 import { saveLocalePreference } from "../../i18n";
 import type { PresetFileData } from "../hooks/presetFile";
 import {
@@ -86,8 +91,12 @@ export function RetroPlayer({
 
   const startupNativeMode = React.useRef(getNativePlaybackMode()).current;
   const startupUseQsv = React.useRef(getFfmpegUseQsv()).current;
+  const startupMaxConcurrentHlsSessions = React.useRef(getFfmpegMaxConcurrentHlsSessions()).current;
   const [nativePlaybackMode, setNativePlaybackModeState] = React.useState(startupNativeMode);
   const [ffmpegUseQsv, setFfmpegUseQsvState] = React.useState(startupUseQsv);
+  const [ffmpegMaxConcurrentHlsSessions, setFfmpegMaxConcurrentHlsSessionsState] = React.useState(
+    startupMaxConcurrentHlsSessions,
+  );
 
   const handleToggleNativePlaybackMode = React.useCallback(() => {
     const next = !nativePlaybackMode;
@@ -104,12 +113,28 @@ export function RetroPlayer({
     }
   }, []);
 
+  const syncFfmpegMaxConcurrentHlsSessions = React.useCallback(async (limit: number) => {
+    if (!isTauriRuntime()) return;
+    try {
+      await mdropSetFfmpegMaxConcurrentHlsSessions(limit);
+    } catch (error) {
+      console.warn("[retro-player] failed to sync ffmpeg HLS session limit", error);
+    }
+  }, []);
+
   const handleToggleFfmpegUseQsv = React.useCallback(() => {
     const next = !ffmpegUseQsv;
     setFfmpegUseQsv(next);
     setFfmpegUseQsvState(next);
     void syncFfmpegUseQsv(next);
   }, [ffmpegUseQsv, syncFfmpegUseQsv]);
+
+  const handleFfmpegMaxConcurrentHlsSessionsChange = React.useCallback((limit: number) => {
+    const normalized = Math.min(8, Math.max(1, Math.round(limit)));
+    setFfmpegMaxConcurrentHlsSessions(normalized);
+    setFfmpegMaxConcurrentHlsSessionsState(normalized);
+    void syncFfmpegMaxConcurrentHlsSessions(normalized);
+  }, [syncFfmpegMaxConcurrentHlsSessions]);
 
   const [isHighResolution, setIsHighResolution] = React.useState(
     persistedUiSettings?.isHighResolution ?? false,
@@ -124,6 +149,10 @@ export function RetroPlayer({
   React.useEffect(() => {
     void syncFfmpegUseQsv(startupUseQsv);
   }, [startupUseQsv, syncFfmpegUseQsv]);
+
+  React.useEffect(() => {
+    void syncFfmpegMaxConcurrentHlsSessions(startupMaxConcurrentHlsSessions);
+  }, [startupMaxConcurrentHlsSessions, syncFfmpegMaxConcurrentHlsSessions]);
 
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
@@ -370,6 +399,8 @@ export function RetroPlayer({
             showVideoSpectrum={showVideoSpectrum}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
+            ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+            onFfmpegMaxConcurrentHlsSessionsChange={handleFfmpegMaxConcurrentHlsSessionsChange}
           />
           <RetroControlPanel
             locale={locale}
@@ -455,6 +486,8 @@ export function RetroPlayer({
               showVideoSpectrum={showVideoSpectrum}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
+              ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+              onFfmpegMaxConcurrentHlsSessionsChange={handleFfmpegMaxConcurrentHlsSessionsChange}
             />
           }
           playbackControls={

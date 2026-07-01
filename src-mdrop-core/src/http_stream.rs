@@ -25,6 +25,7 @@ pub async fn hls_playlist(
     Path(id): Path<String>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let tmp_dir = ensure_hls_session(&state, &id).await?;
+    state.touch_hls_session(&id);
     serve_playlist(&tmp_dir).await
 }
 
@@ -45,6 +46,7 @@ pub async fn hls_sub_playlist(
         ctx.hls_sessions.get(&session_id).cloned()
     };
     if let Some(dir) = existing {
+        state.touch_hls_session(&session_id);
         return serve_playlist(&dir).await;
     }
 
@@ -90,6 +92,7 @@ pub async fn hls_segment(
             .cloned()
             .ok_or((StatusCode::NOT_FOUND, "session not found".to_string()))?
     };
+    state.touch_hls_session(&session_id);
 
     let file_path = tmp_dir.join(&filename);
 
@@ -198,14 +201,17 @@ async fn start_hls_for_path(
     // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
     let base_url = format!("http://localhost:{}/hls/{}/", port, session_id);
 
-    let (ffmpeg_cmd, prewarm_rx, use_qsv) = {
+    let (ffmpeg_cmd, prewarm_rx, use_qsv, max_hls_sessions) = {
         let ctx = state.inner.lock().unwrap();
         (
             ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
             ctx.ffmpeg_prewarm_rx.clone(),
             ctx.ffmpeg_use_qsv,
+            ctx.ffmpeg_max_concurrent_hls_sessions.max(1),
         )
     };
+
+    state.enforce_hls_session_limit(max_hls_sessions.saturating_sub(1).max(1));
 
     // Wait for the pre-warm (macOS GateKeeper check) to complete before
     // spawning ffmpeg. Without this, the first HLS request races against the
@@ -383,14 +389,8 @@ async fn start_hls_for_path(
         ));
     }
 
-    {
-        let mut ctx = state
-            .inner
-            .lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        ctx.hls_sessions.insert(session_id.to_string(), tmp_dir.clone());
-        ctx.hls_children.insert(session_id.to_string(), child);
-    }
+    state.register_hls_session(session_id.to_string(), tmp_dir.clone(), child);
+    state.enforce_hls_session_limit(max_hls_sessions);
 
     println!("[HLS] session ready session={} playlist={}", session_id, playlist.display());
 
