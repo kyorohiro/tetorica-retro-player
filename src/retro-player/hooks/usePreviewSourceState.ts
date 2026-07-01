@@ -54,6 +54,24 @@ function kindFromPath(path: string): PreviewSourceKind {
   return "image";
 }
 
+const isHlsPreviewUrl = (src?: string) => Boolean(src && /\/hls(?:\/|$)|\/hls-sub\//.test(src));
+
+const fireAndForgetHlsCleanup = (src?: string) => {
+  if (!isHlsPreviewUrl(src)) {
+    return;
+  }
+
+  try {
+    const apiServer = src ? new URL(src).origin : window.__MDROP_CONFIG__?.apiServer;
+    if (!apiServer) {
+      return;
+    }
+    fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
+  } catch {
+    // ignore malformed URLs and cleanup failures
+  }
+};
+
 export function usePreviewSourceState() {
   const [preferredAudioInputDeviceId, setPreferredAudioInputDeviceIdState] = useState<string | null>(
     () => getPreferredAudioInputDeviceId(),
@@ -85,6 +103,7 @@ export function usePreviewSourceState() {
 
   const clearPreviewSrc = useCallback(() => {
     setPreviewSrc((current) => {
+      fireAndForgetHlsCleanup(current);
       revokePreviewSrc(current);
       return undefined;
     });
@@ -131,6 +150,7 @@ export function usePreviewSourceState() {
     setPreviewLabel(file.name);
     setCaptureError("");
     setPreviewSrc((current) => {
+      fireAndForgetHlsCleanup(current);
       revokePreviewSrc(current);
       return URL.createObjectURL(file);
     });
@@ -278,6 +298,9 @@ export function usePreviewSourceState() {
     setCaptureError("");
     setPreviewLabel(filePath.replace(/.*[\\/]/, ""));
     setPreviewSrc((current) => {
+      if (current !== src) {
+        fireAndForgetHlsCleanup(current);
+      }
       revokePreviewSrc(current);
       return src;
     });

@@ -352,6 +352,7 @@ pub fn run() {
     let mdrop_server = SharedHttpServerContext::new();
 
     let mdrop_server_for_start = mdrop_server.clone();
+    let mdrop_server_for_exit = mdrop_server.clone();
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -446,7 +447,7 @@ pub fn run() {
     #[cfg(feature = "ffmpeg-sidecar")]
     let builder = builder.plugin(tauri_plugin_ffmpeg::init());
 
-    builder
+    let app = builder
         .invoke_handler(tauri::generate_handler![
             greet,
             persist_recording_for_share,
@@ -466,6 +467,13 @@ pub fn run() {
             mdrop_get_config,
             mdrop_set_ffmpeg_use_qsv,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(move |_app, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            let _ = mdrop_server_for_exit.stop_server();
+            mdrop_server_for_exit.cleanup_hls_sessions();
+        }
+    });
 }

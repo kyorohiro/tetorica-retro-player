@@ -1,5 +1,5 @@
 import React from "react";
-import { usePixiVideoPlayer } from "../hooks/usePixiVideoPlayer";
+import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
 import {
   useRetroFilterState,
   type RetroFilterInitialState,
@@ -41,7 +41,8 @@ type RetroPlayerProps = {
   onError?: (error: Error) => void;
   onRetry?: () => void;
   autoPlay?: boolean;
-  onPlaybackChange?: (playing: boolean) => void;
+  onPlaybackChange?: (event: RetroPlaybackEvent) => void;
+  playbackSource?: "builtin-tone" | "media";
   initialFilterState?: RetroFilterInitialState;
   confirmDialog?: ConfirmDialogFn;
   onEnded?: () => void;
@@ -63,6 +64,7 @@ export function RetroPlayer({
   onRetry,
   autoPlay,
   onPlaybackChange,
+  playbackSource = "media",
   initialFilterState,
   confirmDialog: confirmDialogProp,
   onEnded,
@@ -144,6 +146,7 @@ export function RetroPlayer({
       onRetry,
       autoPlay,
       onPlaybackChange,
+      playbackSource,
       preferNativeVideoSurface: nativePlaybackMode,
     },
   );

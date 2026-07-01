@@ -235,6 +235,11 @@ const isRawRetroVideoFrame = (value: unknown): value is RawRetroVideoFrame =>
       "data" in value,
   );
 
+const hasRenderableVideoFrame = (video: HTMLVideoElement) =>
+  video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+  video.videoWidth > 0 &&
+  video.videoHeight > 0;
+
 export const getRetroVideoSourceSize = (source: RetroVideoSource) => ({
   width:
     isHtmlVideoElement(source)
@@ -839,6 +844,15 @@ export class TetoricaRetroVideoPipeline {
       gl.clearColor(0.01, 0.02, 0.01, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       TetoricaRetroVideoPipeline.showDebug(`EXIT out=${this.outputEnabled ? 1 : 0} src=${!!source ? 1 : 0} fs=${!!filterState ? 1 : 0}`);
+      this.renderCount++;
+      return;
+    }
+
+    if (isHtmlVideoElement(source) && !hasRenderableVideoFrame(source)) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0.01, 0.02, 0.01, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
       this.renderCount++;
       return;
     }

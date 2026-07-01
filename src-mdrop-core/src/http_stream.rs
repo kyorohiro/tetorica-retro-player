@@ -14,6 +14,11 @@ use crate::http_utils::apply_shared_security_headers;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
+const HLS_DEFAULT_SCALE_FILTER: &str = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
+const HLS_LIGHTWEIGHT_SCALE_FILTER: &str =
+    "scale=854:480:force_original_aspect_ratio=decrease:force_divisible_by=2";
+const HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES: u64 = 512 * 1024 * 1024;
+
 /// Serve HLS playlist for a directly registered file.
 pub async fn hls_playlist(
     AxumState(state): AxumState<SharedHttpServerContext>,
@@ -230,6 +235,7 @@ async fn start_hls_for_path(
         tmp_dir.display()
     );
     let should_try_copy = should_try_stream_copy(file_path);
+    let scale_filter = select_hls_scale_filter(file_path);
     if !should_try_copy {
         println!(
             "[HLS] session={} skipping copy path for extension={}",
@@ -238,6 +244,12 @@ async fn start_hls_for_path(
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .unwrap_or("(unknown)")
+        );
+    }
+    if scale_filter == HLS_LIGHTWEIGHT_SCALE_FILTER {
+        println!(
+            "[HLS] session={} using lightweight transcode profile (max 854x480) for input={}",
+            session_id, input
         );
     }
 
@@ -296,7 +308,7 @@ async fn start_hls_for_path(
             [
                 "-y", "-i", &input,
                 "-c:v", "libx264",
-                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                "-vf", scale_filter,
                 "-pix_fmt", "yuv420p",
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
@@ -353,7 +365,7 @@ async fn start_hls_for_path(
             [
                 "-y", "-i", &input,
                 "-c:v", "libx264",
-                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                "-vf", scale_filter,
                 "-pix_fmt", "yuv420p",   // force 8-bit; VP9 10-bit inputs would produce h264 high10 otherwise
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
@@ -389,27 +401,7 @@ async fn start_hls_for_path(
 pub async fn hls_cleanup_all(
     AxumState(state): AxumState<SharedHttpServerContext>,
 ) -> impl IntoResponse {
-    let (children, session_dirs): (Vec<tokio::process::Child>, Vec<PathBuf>) = {
-        let mut ctx = match state.inner.lock() {
-            Ok(c) => c,
-            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        let children = ctx.hls_children.drain().map(|(_, child)| child).collect();
-        let session_dirs = ctx.hls_sessions.drain().map(|(_, dir)| dir).collect();
-        (children, session_dirs)
-    };
-
-    for mut child in children {
-        let _ = child.start_kill();
-        tokio::spawn(async move { let _ = child.wait().await; });
-    }
-
-    for dir in session_dirs {
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    println!("[HLS] cleanup completed");
-
+    state.cleanup_hls_sessions();
     StatusCode::NO_CONTENT
 }
 
@@ -442,11 +434,18 @@ async fn segment_has_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
 /// Create a Command for ffmpeg with platform-specific flags.
 /// On Windows, CREATE_NO_WINDOW prevents ffmpeg from flashing a console window.
 fn new_ffmpeg_command(ffmpeg_cmd: &PathBuf) -> Command {
-    let mut cmd = Command::new(ffmpeg_cmd);
-    // tokio::process::Command exposes creation_flags() directly on Windows.
     #[cfg(windows)]
-    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    cmd
+    {
+        let mut cmd = Command::new(ffmpeg_cmd);
+        // tokio::process::Command exposes creation_flags() directly on Windows.
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        cmd
+    }
+
+    #[cfg(not(windows))]
+    {
+        Command::new(ffmpeg_cmd)
+    }
 }
 
 fn first_segment_from_playlist(content: &str) -> Option<String> {
@@ -463,6 +462,28 @@ fn should_try_stream_copy(path: &FsPath) -> bool {
     };
 
     !matches!(ext.to_ascii_lowercase().as_str(), "webm" | "ogv")
+}
+
+fn select_hls_scale_filter(path: &FsPath) -> &'static str {
+    if needs_lightweight_hls_transcode(path) {
+        HLS_LIGHTWEIGHT_SCALE_FILTER
+    } else {
+        HLS_DEFAULT_SCALE_FILTER
+    }
+}
+
+fn needs_lightweight_hls_transcode(path: &FsPath) -> bool {
+    let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+        return false;
+    };
+
+    if !matches!(ext.to_ascii_lowercase().as_str(), "webm" | "ogv") {
+        return false;
+    }
+
+    std::fs::metadata(path)
+        .map(|meta| meta.len() >= HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES)
+        .unwrap_or(false)
 }
 
 async fn wait_for_playlist_ready(
@@ -504,4 +525,56 @@ fn sub_session_id(folder_id: &str, subpath: &str) -> String {
         .take(64)
         .collect();
     format!("s{}-{}", folder_id, safe)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        needs_lightweight_hls_transcode, select_hls_scale_filter, HLS_DEFAULT_SCALE_FILTER,
+        HLS_LIGHTWEIGHT_SCALE_FILTER, HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES,
+    };
+    use std::{fs::File, path::Path};
+
+    fn temp_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("retro-player-http-stream-test-{name}-{}", std::process::id()))
+    }
+
+    #[test]
+    fn large_webm_uses_lightweight_hls_transcode() {
+        let path = temp_path("large.webm");
+        let file = File::create(&path).expect("create temp webm");
+        file.set_len(HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES).expect("set temp webm size");
+
+        assert!(needs_lightweight_hls_transcode(&path));
+        assert_eq!(
+            select_hls_scale_filter(&path),
+            HLS_LIGHTWEIGHT_SCALE_FILTER
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn small_webm_keeps_default_hls_scale_filter() {
+        let path = temp_path("small.webm");
+        let file = File::create(&path).expect("create temp webm");
+        file.set_len(4 * 1024 * 1024).expect("set temp webm size");
+
+        assert!(!needs_lightweight_hls_transcode(&path));
+        assert_eq!(
+            select_hls_scale_filter(&path),
+            HLS_DEFAULT_SCALE_FILTER
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn mp4_keeps_default_hls_scale_filter() {
+        assert!(!needs_lightweight_hls_transcode(Path::new("sample.mp4")));
+        assert_eq!(
+            select_hls_scale_filter(Path::new("sample.mp4")),
+            HLS_DEFAULT_SCALE_FILTER
+        );
+    }
 }

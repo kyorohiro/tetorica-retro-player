@@ -40,6 +40,7 @@ import { type PresetConfig, loadStartupPreset, saveStartupPreset } from "./built
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
+import type { RetroPlaybackEvent } from "./retro-player/hooks/usePixiVideoPlayer";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -897,8 +898,6 @@ function App() {
   }, []);
 
   const syncToneTransportPlayback = useCallback((playing: boolean) => {
-    const preset = currentPresetConfigRef.current;
-    if (preset.type !== 'lofi' && preset.type !== 'demo-song') return;
     void import('tone').then(({ getTransport }) => {
       const transport = getTransport();
       if (playing) {
@@ -908,6 +907,11 @@ function App() {
       }
     });
   }, []);
+
+  const currentPlaybackSource = React.useMemo<RetroPlaybackEvent["source"]>(
+    () => (previewSource.previewStreamSource === "audio-preview" ? "builtin-tone" : "media"),
+    [previewSource.previewStreamSource],
+  );
 
   // When a file/URL/stream is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
   React.useEffect(() => {
@@ -1274,16 +1278,23 @@ function App() {
               stream={previewSource.previewStream}
               streamName={previewSource.previewLabel}
               kind={previewSource.previewKind ?? defaultPreviewKind}
+              playbackSource={currentPlaybackSource}
               looping={!isUsingDefaultPreview && loopMode === "one"}
               autoPlay={autoStartState === 'done'}
               onEnded={handleEnded}
               onError={handlePlayerError}
               onRetry={() => { void handleRetry(); }}
-              onPlaybackChange={(playing) => {
-                if (playing) {
+              onPlaybackChange={(event) => {
+                if (event.playing) {
                   setShowPlaybackRetryHint(false);
                 }
-                syncToneTransportPlayback(playing);
+                if (event.source === "builtin-tone") {
+                  syncToneTransportPlayback(event.playing);
+                  return;
+                }
+                if (event.playing) {
+                  stopTone();
+                }
               }}
               onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
               onNextTrack={playlistLength > 1 ? nextTrack : undefined}

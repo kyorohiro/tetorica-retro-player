@@ -2,6 +2,7 @@ import React from "react";
 import { FolderOpen, Mic2, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import type { RetroFilterState } from "../hooks/useRetroFilterState";
 import type { PresetFileData } from "../hooks/presetFile";
+import type { RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
 import type { RetroPresetKey } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -20,6 +21,7 @@ export type RetroControlPlayerSlice = {
   hasImage: boolean;
   hasVideo: boolean;
   previewError: string;
+  previewStatus: RetroPreviewStatus;
   sourceDimensions: { width: number; height: number } | null;
   isAudioFxEnabled: boolean;
   isLooping: boolean;
@@ -165,19 +167,37 @@ export function RetroControlPanel({
   nativePlaybackNeedsReload,
   onToggleNativePlaybackMode,
 }: RetroControlPanelProps) {
-  const stableHasPlayableRef = React.useRef(player.hasPlayableMedia);
-  if (!player.isLoading) stableHasPlayableRef.current = player.hasPlayableMedia;
-  const effectiveIsPlaying = player.isPlaying && !player.previewError;
+  const canRetryPlayback = player.previewStatus?.kind === "retryable";
+  const stableHasPlayableRef = React.useRef(player.hasPlayableMedia || canRetryPlayback);
+  if (!player.isLoading) {
+    stableHasPlayableRef.current = player.hasPlayableMedia || canRetryPlayback;
+  }
+  const hasPlaybackControls = stableHasPlayableRef.current || canRetryPlayback || !!onNextTrack;
+  const hasVideoControls = player.hasVideo || canRetryPlayback;
+  const effectiveIsPlaying =
+    player.isPlaying && player.previewStatus?.kind !== "unsupported";
+  const statusBanner =
+    player.previewStatus?.kind === "retryable"
+      ? {
+          className: "mb-3 rounded-lg bg-amber-500/10 px-3 py-2 text-amber-700",
+          message: "Still preparing this video. Press Play to retry when it stops.",
+        }
+      : player.previewStatus?.kind === "unsupported"
+        ? {
+            className: "mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-rose-600",
+            message: player.previewStatus.message,
+          }
+        : null;
 
   return (
     <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
-      {player.previewError && (
-        <p className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-rose-600">{player.previewError}</p>
+      {statusBanner && (
+        <p className={statusBanner.className}>{statusBanner.message}</p>
       )}
       {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
-              hasPlayback={stableHasPlayableRef.current || !!onNextTrack}
+              hasPlayback={hasPlaybackControls}
               currentTime={player.currentTime}
               duration={player.duration}
               mode={
@@ -189,7 +209,7 @@ export function RetroControlPanel({
               isMuted={player.isMuted}
               isNoiseEnabled={player.isNoiseEnabled}
               isPlaying={effectiveIsPlaying}
-              hasVideo={player.hasVideo}
+              hasVideo={hasVideoControls}
               isVideoSettingsOpen={false}
               lofiAmount={player.lofiAmount}
               radioToneAmount={player.radioToneAmount}

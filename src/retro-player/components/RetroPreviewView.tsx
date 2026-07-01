@@ -4,6 +4,7 @@ import {
   Minimize2,
 } from "lucide-react";
 import type { RetroAudioSettings } from "../audio/preset";
+import type { RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import {
   loadPersistedRetroSettings,
@@ -26,6 +27,7 @@ export type RetroPreviewPlayerSlice = {
   needsUserPlay: boolean;
   hasAudioOnly: boolean;
   previewError: string;
+  previewStatus: RetroPreviewStatus;
   isRendererReady: boolean;
   sourceDimensions: { width: number; height: number } | null;
   viewportRect: { width: number; height: number; x: number; y: number } | null;
@@ -224,10 +226,13 @@ export function RetroPreviewView({
     setPinnedPreviewMetrics(null);
   }, [isFitWidthEnabled]);
 
-  // Reset isStartingPlay once the video begins playing (needsUserPlay clears).
+  // Reset the transient "starting" UI once playback either begins or falls
+  // back to a manual retry state.
   React.useEffect(() => {
-    if (!player.needsUserPlay) setIsStartingPlay(false);
-  }, [player.needsUserPlay]);
+    if (!player.needsUserPlay || (!player.isLoading && !player.isPlaying)) {
+      setIsStartingPlay(false);
+    }
+  }, [player.isLoading, player.isPlaying, player.needsUserPlay]);
 
 
   // Auto-pin when the settings panel is open and user scrolls up.
@@ -414,6 +419,12 @@ export function RetroPreviewView({
   const pinnedPreviewTop = isAutoPreviewPinned
     ? `calc(max(0.0rem, env(safe-area-inset-top)) - ${autoPinnedHiddenOffset}px)`
     : undefined;
+  const showRetryOverlay =
+    player.previewStatus?.kind === "retryable" &&
+    player.hasPlayableMedia &&
+    !player.needsUserPlay &&
+    !player.isLoading;
+  const manualRetryMessage = player.previewError || "Playback is still preparing. Press Play to retry this video.";
 
   // Notify parent when pin state changes so it can adjust the layout slot height.
   React.useEffect(() => {
@@ -637,19 +648,55 @@ export function RetroPreviewView({
                   ) : (
                     <>
                       <p className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/80">
-                        Preview Ready
+                        {player.previewError ? "Retry Playback" : "Preview Ready"}
                       </p>
                       <p className="mt-3 text-lg font-semibold text-slate-100">
-                        Press Play to start
+                        {player.previewError ? "Press Play to retry" : "Press Play to start"}
                       </p>
                       <p className="mt-2 text-sm text-slate-400">
-                        Safari may require a direct user action before video and audio can begin.
+                        {player.previewError
+                          ? manualRetryMessage
+                          : "Safari may require a direct user action before video and audio can begin."}
                       </p>
                       <button
                         type="button"
                         onClick={() => {
                           setIsStartingPlay(true);
-                          void player.playVideoWithAudio();
+                          void player.togglePlayback();
+                        }}
+                        className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
+                      >
+                        Play
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+            {showRetryOverlay && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/52">
+                <div className="w-[min(92%,30rem)] rounded-2xl border border-rose-500/25 bg-slate-900/94 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
+                  {isStartingPlay ? (
+                    <>
+                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                      <p className="text-sm text-slate-400">Retrying playback…</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-rose-300/80">
+                        Playback Paused
+                      </p>
+                      <p className="mt-3 text-sm text-slate-200">
+                        {player.previewStatus?.message ?? player.previewError}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-400">
+                        Playback may still recover. Press Play to retry this source.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsStartingPlay(true);
+                          void player.togglePlayback();
                         }}
                         className="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/12 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-emerald-500/20"
                       >
