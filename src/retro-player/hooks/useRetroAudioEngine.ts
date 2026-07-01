@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 import {
   getNativePlaybackMode,
   loadPersistedRetroSettings,
@@ -200,87 +207,87 @@ export function useRetroAudioEngine({
   const fxOutputTrimAmountRef = useRef<number>(initialAudioSettings.fxOutputTrimAmount);
   const inputTrimAmountRef = useRef<number>(initialAudioSettings.inputTrimAmount);
 
-  const [audioOptimizationMode, setAudioOptimizationMode] = useState<
+  const [audioOptimizationMode, setAudioOptimizationModeState] = useState<
     RetroAudioSettings["audioOptimizationMode"]
   >(initialAudioSettings.audioOptimizationMode);
-  const [isMuted, setIsMuted] = useState<boolean>(initialAudioSettings.isMuted);
-  const [playbackRate, setPlaybackRate] = useState<number>(
+  const [isMuted, setIsMutedState] = useState<boolean>(initialAudioSettings.isMuted);
+  const [playbackRate, setPlaybackRateState] = useState<number>(
     initialAudioSettings.playbackRate,
   );
-  const [volume, setVolume] = useState<number>(initialAudioSettings.volume);
-  const [isLooping, setIsLooping] = useState<boolean>(initialAudioSettings.isLooping);
-  const [isAudioFxEnabled, setIsAudioFxEnabled] = useState<boolean>(
+  const [volume, setVolumeState] = useState<number>(initialAudioSettings.volume);
+  const [isLooping, setIsLoopingState] = useState<boolean>(initialAudioSettings.isLooping);
+  const [isAudioFxEnabled, setIsAudioFxEnabledState] = useState<boolean>(
     initialAudioSettings.isAudioFxEnabled,
   );
-  const [lofiAmount, setLofiAmount] = useState<number>(
+  const [lofiAmount, setLofiAmountState] = useState<number>(
     initialAudioSettings.lofiAmount,
   );
-  const [radioToneAmount, setRadioToneAmount] = useState<number>(
+  const [radioToneAmount, setRadioToneAmountState] = useState<number>(
     initialAudioSettings.radioToneAmount,
   );
-  const [bitCrushAmount, setBitCrushAmount] = useState<number>(
+  const [bitCrushAmount, setBitCrushAmountState] = useState<number>(
     initialAudioSettings.bitCrushAmount,
   );
-  const [bitCrushNoiseAmount, setBitCrushNoiseAmount] = useState<number>(
+  const [bitCrushNoiseAmount, setBitCrushNoiseAmountState] = useState<number>(
     initialAudioSettings.bitCrushNoiseAmount,
   );
-  const [sampleRateReductionAmount, setSampleRateReductionAmount] = useState<number>(
+  const [sampleRateReductionAmount, setSampleRateReductionAmountState] = useState<number>(
     initialAudioSettings.sampleRateReductionAmount,
   );
-  const [noiseReductionAmount, setNoiseReductionAmount] = useState<number>(
+  const [noiseReductionAmount, setNoiseReductionAmountState] = useState<number>(
     initialAudioSettings.noiseReductionAmount,
   );
-  const [bassAmount, setBassAmount] = useState<number>(
+  const [bassAmount, setBassAmountState] = useState<number>(
     initialAudioSettings.bassAmount,
   );
-  const [midAmount, setMidAmount] = useState<number>(initialAudioSettings.midAmount);
-  const [trebleAmount, setTrebleAmount] = useState<number>(
+  const [midAmount, setMidAmountState] = useState<number>(initialAudioSettings.midAmount);
+  const [trebleAmount, setTrebleAmountState] = useState<number>(
     initialAudioSettings.trebleAmount,
   );
-  const [stereoWidthAmount, setStereoWidthAmount] = useState<number>(
+  const [stereoWidthAmount, setStereoWidthAmountState] = useState<number>(
     initialAudioSettings.stereoWidthAmount,
   );
-  const [smallSpeakerRoomAmount, setSmallSpeakerRoomAmount] = useState<number>(
+  const [smallSpeakerRoomAmount, setSmallSpeakerRoomAmountState] = useState<number>(
     initialAudioSettings.smallSpeakerRoomAmount,
   );
-  const [wowFlutterAmount, setWowFlutterAmount] = useState<number>(
+  const [wowFlutterAmount, setWowFlutterAmountState] = useState<number>(
     initialAudioSettings.wowFlutterAmount,
   );
-  const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(
+  const [isNoiseEnabled, setIsNoiseEnabledState] = useState<boolean>(
     initialAudioSettings.isNoiseEnabled,
   );
-  const [noiseLevel, setNoiseLevel] = useState<number>(initialAudioSettings.noiseLevel);
-  const [vinylDustAmount, setVinylDustAmount] = useState<number>(
+  const [noiseLevel, setNoiseLevelState] = useState<number>(initialAudioSettings.noiseLevel);
+  const [vinylDustAmount, setVinylDustAmountState] = useState<number>(
     initialAudioSettings.vinylDustAmount,
   );
-  const [noiseWarmthAmount, setNoiseWarmthAmount] = useState<number>(
+  const [noiseWarmthAmount, setNoiseWarmthAmountState] = useState<number>(
     initialAudioSettings.noiseWarmthAmount,
   );
-  const [noiseAirAmount, setNoiseAirAmount] = useState<number>(
+  const [noiseAirAmount, setNoiseAirAmountState] = useState<number>(
     initialAudioSettings.noiseAirAmount,
   );
-  const [noisePresenceAmount, setNoisePresenceAmount] = useState<number>(
+  const [noisePresenceAmount, setNoisePresenceAmountState] = useState<number>(
     initialAudioSettings.noisePresenceAmount,
   );
-  const [delayAmount, setDelayAmount] = useState<number>(
+  const [delayAmount, setDelayAmountState] = useState<number>(
     initialAudioSettings.delayAmount,
   );
-  const [reverbAmount, setReverbAmount] = useState<number>(
+  const [reverbAmount, setReverbAmountState] = useState<number>(
     initialAudioSettings.reverbAmount,
   );
-  const [chorusAmount, setChorusAmount] = useState<number>(
+  const [chorusAmount, setChorusAmountState] = useState<number>(
     initialAudioSettings.chorusAmount,
   );
-  const [tapeSaturationAmount, setTapeSaturationAmount] = useState<number>(
+  const [tapeSaturationAmount, setTapeSaturationAmountState] = useState<number>(
     initialAudioSettings.tapeSaturationAmount,
   );
-  const [compressorAmount, setCompressorAmount] = useState<number>(
+  const [compressorAmount, setCompressorAmountState] = useState<number>(
     initialAudioSettings.compressorAmount,
   );
-  const [fxOutputTrimAmount, setFxOutputTrimAmount] = useState<number>(
+  const [fxOutputTrimAmount, setFxOutputTrimAmountState] = useState<number>(
     initialAudioSettings.fxOutputTrimAmount,
   );
-  const [inputTrimAmount, setInputTrimAmount] = useState<number>(
+  const [inputTrimAmount, setInputTrimAmountState] = useState<number>(
     initialAudioSettings.inputTrimAmount,
   );
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null>(null);
@@ -429,6 +436,51 @@ export function useRetroAudioEngine({
     audioEngineRef.current?.setIsPlaying(nextIsPlaying);
   const setOutputEnabled = (isEnabled: boolean) =>
     audioEngineRef.current?.setOutputEnabled(isEnabled);
+
+  const syncCurrentMediaSettings = useCallback(() => {
+    if (!mediaRef.current) {
+      return;
+    }
+
+    if (resolveNativeAudioSuppression(audioOptimizationModeRef.current) && mediaSourceRef.current) {
+      mediaRef.current.muted = false;
+      mediaRef.current.volume = 0;
+    } else {
+      mediaRef.current.muted = isMutedRef.current;
+      mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
+    }
+    mediaRef.current.playbackRate = playbackRateRef.current;
+    mediaRef.current.loop = isLoopingRef.current;
+  }, [mediaRef]);
+
+  const createPatchedSetter = useCallback(
+    <T,>(
+      stateSetter: (value: T) => void,
+      valueRef: MutableRefObject<T>,
+      key: keyof RetroAudioSettings,
+    ) =>
+      (nextValueOrUpdater: SetStateAction<T>) => {
+        const nextValue =
+          typeof nextValueOrUpdater === "function"
+            ? (nextValueOrUpdater as (current: T) => T)(valueRef.current)
+            : nextValueOrUpdater;
+
+        valueRef.current = nextValue;
+        stateSetter(nextValue);
+        setParams({ [key]: nextValue } as Partial<RetroAudioSettings>, true);
+
+        if (
+          key === "audioOptimizationMode" ||
+          key === "isMuted" ||
+          key === "volume" ||
+          key === "playbackRate" ||
+          key === "isLooping"
+        ) {
+          syncCurrentMediaSettings();
+        }
+      },
+    [setParams, syncCurrentMediaSettings],
+  );
 
   const closeOwnedAudioContext = async (context: AudioContext) => {
     if (context.state === "closed") {
@@ -729,49 +781,39 @@ export function useRetroAudioEngine({
     fxOutputTrimAmountRef.current = nextSettings.fxOutputTrimAmount;
     inputTrimAmountRef.current = nextSettings.inputTrimAmount;
 
-    setAudioOptimizationMode(nextSettings.audioOptimizationMode);
-    setIsMuted(nextSettings.isMuted);
-    setVolume(nextSettings.volume);
-    setPlaybackRate(nextSettings.playbackRate);
-    setIsLooping(nextSettings.isLooping);
-    setIsAudioFxEnabled(nextSettings.isAudioFxEnabled);
-    setLofiAmount(nextSettings.lofiAmount);
-    setRadioToneAmount(nextSettings.radioToneAmount);
-    setBitCrushAmount(nextSettings.bitCrushAmount);
-    setBitCrushNoiseAmount(nextSettings.bitCrushNoiseAmount);
-    setSampleRateReductionAmount(nextSettings.sampleRateReductionAmount);
-    setNoiseReductionAmount(nextSettings.noiseReductionAmount);
-    setBassAmount(nextSettings.bassAmount);
-    setMidAmount(nextSettings.midAmount);
-    setTrebleAmount(nextSettings.trebleAmount);
-    setStereoWidthAmount(nextSettings.stereoWidthAmount);
-    setSmallSpeakerRoomAmount(nextSettings.smallSpeakerRoomAmount);
-    setWowFlutterAmount(nextSettings.wowFlutterAmount);
-    setIsNoiseEnabled(nextSettings.isNoiseEnabled);
-    setNoiseLevel(nextSettings.noiseLevel);
-    setVinylDustAmount(nextSettings.vinylDustAmount);
-    setNoiseWarmthAmount(nextSettings.noiseWarmthAmount);
-    setNoiseAirAmount(nextSettings.noiseAirAmount);
-    setNoisePresenceAmount(nextSettings.noisePresenceAmount);
-    setDelayAmount(nextSettings.delayAmount);
-    setReverbAmount(nextSettings.reverbAmount);
-    setChorusAmount(nextSettings.chorusAmount);
-    setTapeSaturationAmount(nextSettings.tapeSaturationAmount);
-    setCompressorAmount(nextSettings.compressorAmount);
-    setFxOutputTrimAmount(nextSettings.fxOutputTrimAmount);
-    setInputTrimAmount(nextSettings.inputTrimAmount);
+    setAudioOptimizationModeState(nextSettings.audioOptimizationMode);
+    setIsMutedState(nextSettings.isMuted);
+    setVolumeState(nextSettings.volume);
+    setPlaybackRateState(nextSettings.playbackRate);
+    setIsLoopingState(nextSettings.isLooping);
+    setIsAudioFxEnabledState(nextSettings.isAudioFxEnabled);
+    setLofiAmountState(nextSettings.lofiAmount);
+    setRadioToneAmountState(nextSettings.radioToneAmount);
+    setBitCrushAmountState(nextSettings.bitCrushAmount);
+    setBitCrushNoiseAmountState(nextSettings.bitCrushNoiseAmount);
+    setSampleRateReductionAmountState(nextSettings.sampleRateReductionAmount);
+    setNoiseReductionAmountState(nextSettings.noiseReductionAmount);
+    setBassAmountState(nextSettings.bassAmount);
+    setMidAmountState(nextSettings.midAmount);
+    setTrebleAmountState(nextSettings.trebleAmount);
+    setStereoWidthAmountState(nextSettings.stereoWidthAmount);
+    setSmallSpeakerRoomAmountState(nextSettings.smallSpeakerRoomAmount);
+    setWowFlutterAmountState(nextSettings.wowFlutterAmount);
+    setIsNoiseEnabledState(nextSettings.isNoiseEnabled);
+    setNoiseLevelState(nextSettings.noiseLevel);
+    setVinylDustAmountState(nextSettings.vinylDustAmount);
+    setNoiseWarmthAmountState(nextSettings.noiseWarmthAmount);
+    setNoiseAirAmountState(nextSettings.noiseAirAmount);
+    setNoisePresenceAmountState(nextSettings.noisePresenceAmount);
+    setDelayAmountState(nextSettings.delayAmount);
+    setReverbAmountState(nextSettings.reverbAmount);
+    setChorusAmountState(nextSettings.chorusAmount);
+    setTapeSaturationAmountState(nextSettings.tapeSaturationAmount);
+    setCompressorAmountState(nextSettings.compressorAmount);
+    setFxOutputTrimAmountState(nextSettings.fxOutputTrimAmount);
+    setInputTrimAmountState(nextSettings.inputTrimAmount);
 
-    if (mediaRef.current) {
-      if (resolveNativeAudioSuppression(nextSettings.audioOptimizationMode) && mediaSourceRef.current) {
-        mediaRef.current.muted = false;
-        mediaRef.current.volume = 0;
-      } else {
-        mediaRef.current.muted = nextSettings.isMuted;
-        mediaRef.current.volume = nextSettings.volume;
-      }
-      mediaRef.current.playbackRate = nextSettings.playbackRate;
-      mediaRef.current.loop = nextSettings.isLooping;
-    }
+    syncCurrentMediaSettings();
 
     setParams(nextSettings);
     window.requestAnimationFrame(updateAudioNodes);
@@ -779,128 +821,139 @@ export function useRetroAudioEngine({
 
   const resetAudioSettings = () => applyAudioSettings({ ...DEFAULT_AUDIO_SETTINGS });
 
-  useEffect(() => {
-    audioOptimizationModeRef.current = audioOptimizationMode;
-    isMutedRef.current = isMuted;
-    volumeRef.current = volume;
-    playbackRateRef.current = playbackRate;
-    isLoopingRef.current = isLooping;
-    isAudioFxEnabledRef.current = isAudioFxEnabled;
-    lofiAmountRef.current = lofiAmount;
-    radioToneAmountRef.current = radioToneAmount;
-    bitCrushAmountRef.current = bitCrushAmount;
-    bitCrushNoiseAmountRef.current = bitCrushNoiseAmount;
-    sampleRateReductionAmountRef.current = sampleRateReductionAmount;
-    noiseReductionAmountRef.current = noiseReductionAmount;
-    bassAmountRef.current = bassAmount;
-    midAmountRef.current = midAmount;
-    trebleAmountRef.current = trebleAmount;
-    stereoWidthAmountRef.current = stereoWidthAmount;
-    smallSpeakerRoomAmountRef.current = smallSpeakerRoomAmount;
-    wowFlutterAmountRef.current = wowFlutterAmount;
-    isNoiseEnabledRef.current = isNoiseEnabled;
-    noiseLevelRef.current = noiseLevel;
-    vinylDustAmountRef.current = vinylDustAmount;
-    noiseWarmthAmountRef.current = noiseWarmthAmount;
-    noiseAirAmountRef.current = noiseAirAmount;
-    noisePresenceAmountRef.current = noisePresenceAmount;
-    delayAmountRef.current = delayAmount;
-    reverbAmountRef.current = reverbAmount;
-    chorusAmountRef.current = chorusAmount;
-    tapeSaturationAmountRef.current = tapeSaturationAmount;
-    compressorAmountRef.current = compressorAmount;
-    fxOutputTrimAmountRef.current = fxOutputTrimAmount;
-    inputTrimAmountRef.current = inputTrimAmount;
+  const setAudioOptimizationMode = createPatchedSetter(
+    setAudioOptimizationModeState,
+    audioOptimizationModeRef,
+    "audioOptimizationMode",
+  );
+  const setIsMuted = createPatchedSetter(setIsMutedState, isMutedRef, "isMuted");
+  const setPlaybackRate = createPatchedSetter(
+    setPlaybackRateState,
+    playbackRateRef,
+    "playbackRate",
+  );
+  const setVolume = createPatchedSetter(setVolumeState, volumeRef, "volume");
+  const setIsLooping = createPatchedSetter(setIsLoopingState, isLoopingRef, "isLooping");
+  const setIsAudioFxEnabled = createPatchedSetter(
+    setIsAudioFxEnabledState,
+    isAudioFxEnabledRef,
+    "isAudioFxEnabled",
+  );
+  const setLofiAmount = createPatchedSetter(setLofiAmountState, lofiAmountRef, "lofiAmount");
+  const setRadioToneAmount = createPatchedSetter(
+    setRadioToneAmountState,
+    radioToneAmountRef,
+    "radioToneAmount",
+  );
+  const setBitCrushAmount = createPatchedSetter(
+    setBitCrushAmountState,
+    bitCrushAmountRef,
+    "bitCrushAmount",
+  );
+  const setBitCrushNoiseAmount = createPatchedSetter(
+    setBitCrushNoiseAmountState,
+    bitCrushNoiseAmountRef,
+    "bitCrushNoiseAmount",
+  );
+  const setSampleRateReductionAmount = createPatchedSetter(
+    setSampleRateReductionAmountState,
+    sampleRateReductionAmountRef,
+    "sampleRateReductionAmount",
+  );
+  const setNoiseReductionAmount = createPatchedSetter(
+    setNoiseReductionAmountState,
+    noiseReductionAmountRef,
+    "noiseReductionAmount",
+  );
+  const setBassAmount = createPatchedSetter(setBassAmountState, bassAmountRef, "bassAmount");
+  const setMidAmount = createPatchedSetter(setMidAmountState, midAmountRef, "midAmount");
+  const setTrebleAmount = createPatchedSetter(
+    setTrebleAmountState,
+    trebleAmountRef,
+    "trebleAmount",
+  );
+  const setStereoWidthAmount = createPatchedSetter(
+    setStereoWidthAmountState,
+    stereoWidthAmountRef,
+    "stereoWidthAmount",
+  );
+  const setSmallSpeakerRoomAmount = createPatchedSetter(
+    setSmallSpeakerRoomAmountState,
+    smallSpeakerRoomAmountRef,
+    "smallSpeakerRoomAmount",
+  );
+  const setWowFlutterAmount = createPatchedSetter(
+    setWowFlutterAmountState,
+    wowFlutterAmountRef,
+    "wowFlutterAmount",
+  );
+  const setIsNoiseEnabled = createPatchedSetter(
+    setIsNoiseEnabledState,
+    isNoiseEnabledRef,
+    "isNoiseEnabled",
+  );
+  const setNoiseLevel = createPatchedSetter(setNoiseLevelState, noiseLevelRef, "noiseLevel");
+  const setVinylDustAmount = createPatchedSetter(
+    setVinylDustAmountState,
+    vinylDustAmountRef,
+    "vinylDustAmount",
+  );
+  const setNoiseWarmthAmount = createPatchedSetter(
+    setNoiseWarmthAmountState,
+    noiseWarmthAmountRef,
+    "noiseWarmthAmount",
+  );
+  const setNoiseAirAmount = createPatchedSetter(
+    setNoiseAirAmountState,
+    noiseAirAmountRef,
+    "noiseAirAmount",
+  );
+  const setNoisePresenceAmount = createPatchedSetter(
+    setNoisePresenceAmountState,
+    noisePresenceAmountRef,
+    "noisePresenceAmount",
+  );
+  const setDelayAmount = createPatchedSetter(setDelayAmountState, delayAmountRef, "delayAmount");
+  const setReverbAmount = createPatchedSetter(
+    setReverbAmountState,
+    reverbAmountRef,
+    "reverbAmount",
+  );
+  const setChorusAmount = createPatchedSetter(
+    setChorusAmountState,
+    chorusAmountRef,
+    "chorusAmount",
+  );
+  const setTapeSaturationAmount = createPatchedSetter(
+    setTapeSaturationAmountState,
+    tapeSaturationAmountRef,
+    "tapeSaturationAmount",
+  );
+  const setCompressorAmount = createPatchedSetter(
+    setCompressorAmountState,
+    compressorAmountRef,
+    "compressorAmount",
+  );
+  const setFxOutputTrimAmount = createPatchedSetter(
+    setFxOutputTrimAmountState,
+    fxOutputTrimAmountRef,
+    "fxOutputTrimAmount",
+  );
+  const setInputTrimAmount = createPatchedSetter(
+    setInputTrimAmountState,
+    inputTrimAmountRef,
+    "inputTrimAmount",
+  );
 
-    setParams(
-      {
-        isMuted,
-        audioOptimizationMode,
-        volume,
-        playbackRate,
-        isLooping,
-        isAudioFxEnabled,
-        lofiAmount,
-        radioToneAmount,
-        bitCrushAmount,
-        bitCrushNoiseAmount,
-        sampleRateReductionAmount,
-        noiseReductionAmount,
-        bassAmount,
-        midAmount,
-        trebleAmount,
-        stereoWidthAmount,
-        smallSpeakerRoomAmount,
-        wowFlutterAmount,
-        isNoiseEnabled,
-        noiseLevel,
-        vinylDustAmount,
-        noiseWarmthAmount,
-        noiseAirAmount,
-        noisePresenceAmount,
-        delayAmount,
-        reverbAmount,
-        chorusAmount,
-        tapeSaturationAmount,
-        compressorAmount,
-        fxOutputTrimAmount,
-        inputTrimAmount,
-      },
-      true,
-    );
+  useEffect(() => {
     setEngineIsPlaying(isPlaying);
     setOutputEnabled(
       previewKind === "video" ||
         previewKind === "audio" ||
         previewKind === "capture",
     );
-
-    if (mediaRef.current) {
-      if (resolveNativeAudioSuppression(audioOptimizationMode) && mediaSourceRef.current) {
-        mediaRef.current.muted = false;
-        mediaRef.current.volume = 0;
-      } else {
-        mediaRef.current.muted = isMuted;
-        mediaRef.current.volume = isMuted ? 0 : volume;
-      }
-      mediaRef.current.playbackRate = playbackRate;
-      mediaRef.current.loop = isLooping;
-    }
-  }, [
-    audioOptimizationMode,
-    isMuted,
-    volume,
-    isAudioFxEnabled,
-    lofiAmount,
-    radioToneAmount,
-    bitCrushAmount,
-    bitCrushNoiseAmount,
-    sampleRateReductionAmount,
-    noiseReductionAmount,
-    bassAmount,
-    midAmount,
-    trebleAmount,
-    stereoWidthAmount,
-    smallSpeakerRoomAmount,
-    wowFlutterAmount,
-    isNoiseEnabled,
-    noiseLevel,
-    vinylDustAmount,
-    noiseWarmthAmount,
-    noiseAirAmount,
-    noisePresenceAmount,
-    delayAmount,
-    reverbAmount,
-    chorusAmount,
-    tapeSaturationAmount,
-    compressorAmount,
-    fxOutputTrimAmount,
-    inputTrimAmount,
-    isPlaying,
-    playbackRate,
-    isLooping,
-    previewKind,
-  ]);
+    syncCurrentMediaSettings();
+  }, [isPlaying, previewKind, setEngineIsPlaying, syncCurrentMediaSettings]);
 
   useEffect(() => {
     const id = setTimeout(() => {
