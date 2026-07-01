@@ -1346,7 +1346,7 @@ function App() {
             </div>
           )}
           {autoStartState === 'blocked' && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="pointer-events-none fixed inset-0 z-60 flex items-center justify-center">
               <button
                 type="button"
                 className="pointer-events-auto rounded-full border border-amber-400/40 bg-amber-500/15 px-8 py-3 text-sm text-amber-200 shadow-lg backdrop-blur-sm transition hover:bg-amber-500/25 active:scale-95"
