@@ -1219,7 +1219,7 @@ function App() {
         <div className="relative flex flex-col flex-1 min-h-0 w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
           <header className="shrink-0 mb-3" />
 
-          {previewSource.previewStream && (
+          {previewSource.previewStream && previewSource.previewStreamSource !== "audio-preview" && (
           <div className="mb-4">
             <button
               type="button"
