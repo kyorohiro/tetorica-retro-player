@@ -149,6 +149,7 @@ const resolveColorLevelsForPalette = (
   if (paletteMode === "pc98_512_sat") return 8;
   if (paletteMode === "color32") return 32;
   if (paletteMode === "color64") return 64;
+  if (paletteMode === "anime") return 16;
   return fallback;
 };
 
