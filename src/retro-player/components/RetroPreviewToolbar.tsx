@@ -19,6 +19,13 @@ import type { RetroAudioSettings } from "../audio/preset";
 import type { RetroAlarmStatus } from "../hooks/useRetroAlarm";
 import type { RetroPlayerLocale } from "../types";
 
+// Below this the compact brightness stepper doesn't fit next to
+// power/hi-res/fit-width (plus the inline record button, when shown) and
+// stays in the "More" menu instead.
+const BRIGHTNESS_INLINE_MIN_WIDTH = 480;
+const BRIGHTNESS_MIN = 0.4;
+const BRIGHTNESS_MAX = 2.0;
+
 type RetroPreviewToolbarPlayerSlice = {
   canRecord: boolean;
   isRecording: boolean;
@@ -152,6 +159,9 @@ export function RetroPreviewToolbar({
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== "undefined" && window.innerWidth < 360,
   );
+  const [isBrightnessInlineVisible, setIsBrightnessInlineVisible] = React.useState(
+    () => typeof window !== "undefined" && window.innerWidth >= BRIGHTNESS_INLINE_MIN_WIDTH,
+  );
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
   const [moreMenuStyle, setMoreMenuStyle] = React.useState<React.CSSProperties | null>(null);
   const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
@@ -187,10 +197,21 @@ export function RetroPreviewToolbar({
   }, []);
 
   React.useEffect(() => {
-    const handler = () => { setIsNarrow(window.innerWidth < 360); };
+    const handler = () => {
+      setIsNarrow(window.innerWidth < 360);
+      setIsBrightnessInlineVisible(window.innerWidth >= BRIGHTNESS_INLINE_MIN_WIDTH);
+    };
     window.addEventListener("resize", handler, { passive: true });
     return () => { window.removeEventListener("resize", handler); };
   }, []);
+
+  const adjustBrightness = React.useCallback((delta: number) => {
+    const next = Math.min(
+      BRIGHTNESS_MAX,
+      Math.max(BRIGHTNESS_MIN, Math.round((brightness + delta) * 20) / 20),
+    );
+    onBrightnessChange(next);
+  }, [brightness, onBrightnessChange]);
 
   const updateMoreMenuPosition = React.useCallback(() => {
     if (typeof window === "undefined" || !moreButtonRef.current) return;
@@ -626,6 +647,55 @@ export function RetroPreviewToolbar({
         </button>
         {renderTooltip("hi-res", tooltipText.hiRes)}
       </div>
+
+      {isBrightnessInlineVisible && (
+        <div className="relative flex items-center">
+          <button
+            type="button"
+            aria-label="Decrease brightness"
+            onClick={() => { hideTooltip(); adjustBrightness(-0.05); }}
+            onMouseEnter={() => scheduleTooltip("brightness")}
+            onMouseLeave={hideTooltip}
+            onFocus={() => scheduleTooltip("brightness")}
+            onBlur={hideTooltip}
+            disabled={brightness <= BRIGHTNESS_MIN}
+            className={[
+              "inline-flex h-9 w-7 items-center justify-center rounded-l-full border-t border-b border-l text-sm leading-none transition backdrop-blur-sm disabled:opacity-40",
+              idleFloatingButtonClass,
+            ].join(" ")}
+          >
+            <Sun size={10} className="mr-0.5 opacity-70" />
+            −
+          </button>
+          <span
+            className={[
+              "inline-flex h-9 min-w-[2.6rem] items-center justify-center border-t border-b text-[10px] tabular-nums transition backdrop-blur-sm",
+              brightness !== 1
+                ? "border-emerald-300/80 bg-emerald-400/20 text-emerald-50"
+                : "border-slate-500/70 bg-slate-900/78 text-slate-200",
+            ].join(" ")}
+          >
+            {Math.round(brightness * 100)}%
+          </span>
+          <button
+            type="button"
+            aria-label="Increase brightness"
+            onClick={() => { hideTooltip(); adjustBrightness(0.05); }}
+            onMouseEnter={() => scheduleTooltip("brightness")}
+            onMouseLeave={hideTooltip}
+            onFocus={() => scheduleTooltip("brightness")}
+            onBlur={hideTooltip}
+            disabled={brightness >= BRIGHTNESS_MAX}
+            className={[
+              "inline-flex h-9 w-7 items-center justify-center rounded-r-full border-t border-b border-r text-sm leading-none transition backdrop-blur-sm disabled:opacity-40",
+              idleFloatingButtonClass,
+            ].join(" ")}
+          >
+            +
+          </button>
+          {renderTooltip("brightness", `Brightness: ${Math.round(brightness * 100)}%`, "w-32")}
+        </div>
+      )}
 
       <div className="flex items-center">
         <div className="relative">
