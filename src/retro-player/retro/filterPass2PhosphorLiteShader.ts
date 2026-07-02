@@ -17,6 +17,7 @@ uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
 uniform float uBlackFloor;
 uniform float uFocusStrength;
+uniform vec2 uFocusSize;
 uniform float uTime;
 
 vec2 curveUv(vec2 uv, float strength)
@@ -73,8 +74,9 @@ void main(void)
   vec4 color = texture(uPass1Texture, pixelatedUv);
 
   if (uFocusStrength > 0.001) {
-    float focusDist = length(vMaskCoord - vec2(0.5)) * 2.0;
-    float blurMask = smoothstep(0.2, 0.85, focusDist);
+    vec2 focusScale = max(uFocusSize, vec2(0.001));
+    float focusDist = length((vMaskCoord - vec2(0.5)) / focusScale);
+    float blurMask = smoothstep(1.0, 2.15, focusDist);
     float blurAmt = pow(blurMask, 1.35);
     if (blurAmt > 0.001) {
       float blurRadius = (2.0 + uFocusStrength * 38.0) * blurAmt;

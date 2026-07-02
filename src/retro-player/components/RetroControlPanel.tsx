@@ -358,6 +358,8 @@ export function RetroControlPanel({
               matchTargetAspect={filterState.matchTargetAspect}
               vignetteStrength={filterState.vignetteStrength}
               focusStrength={filterState.focusStrength}
+              focusWidth={filterState.focusWidth}
+              focusHeight={filterState.focusHeight}
               onApplyPreset={onApplyPreset}
               onSetColorLevels={filterState.setColorLevels}
               onSetCurvature={filterState.setCurvature}
@@ -401,6 +403,8 @@ export function RetroControlPanel({
               onSetMatchTargetAspect={onSetMatchTargetAspect}
               onSetVignetteStrength={filterState.setVignetteStrength}
               onSetFocusStrength={filterState.setFocusStrength}
+              onSetFocusWidth={filterState.setFocusWidth}
+              onSetFocusHeight={filterState.setFocusHeight}
             />
           </React.Suspense>
         </div>

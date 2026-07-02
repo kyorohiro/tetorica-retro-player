@@ -85,6 +85,8 @@ type RetroFilterPanelProps = {
   matchTargetAspect: boolean;
   vignetteStrength: number;
   focusStrength: number;
+  focusWidth: number;
+  focusHeight: number;
   onApplyPreset: (preset: RetroPresetKey) => void;
   onSetIsFilterEnabled: (value: boolean) => void;
   onSetColorLevels: (value: number) => void;
@@ -128,6 +130,8 @@ type RetroFilterPanelProps = {
   onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
   onSetFocusStrength: (value: number) => void;
+  onSetFocusWidth: (value: number) => void;
+  onSetFocusHeight: (value: number) => void;
 };
 
 export function RetroFilterPanel({
@@ -175,6 +179,8 @@ export function RetroFilterPanel({
   targetWidth,
   matchTargetAspect,
   vignetteStrength,
+  focusWidth,
+  focusHeight,
   onApplyPreset,
   onSetIsFilterEnabled,
   onSetColorLevels,
@@ -219,6 +225,8 @@ export function RetroFilterPanel({
   onSetVignetteStrength,
   focusStrength,
   onSetFocusStrength,
+  onSetFocusWidth,
+  onSetFocusHeight,
 }: RetroFilterPanelProps) {
   const [localTargetWidth, setLocalTargetWidth] = useState(targetWidth);
   const [localTargetHeight, setLocalTargetHeight] = useState(targetHeight);
@@ -282,6 +290,10 @@ export function RetroFilterPanel({
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
           focus:
             "画面の周辺部をぼかして中央に焦点を合わせます。値を上げるほど周辺のぼけが強くなり、被写界深度のような効果が得られます。",
+          focusWidth:
+            "中央でくっきり見せる横方向の広さです。下げるほど縦長の焦点になり、上げるほど左右に広くシャープな領域が残ります。",
+          focusHeight:
+            "中央でくっきり見せる縦方向の広さです。下げるほど上下が早くぼけ、上げるほど広い帯が合焦したまま残ります。",
         }
       : {
           helpSuffix: " help",
@@ -337,6 +349,10 @@ export function RetroFilterPanel({
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
           focus:
             "Blurs the periphery of the image, keeping the center sharp. Higher values increase the defocus at the edges for a depth-of-field style effect.",
+          focusWidth:
+            "Sets how wide the sharp center stays horizontally. Lower values make the focus area narrower; higher values keep more of the left and right sides crisp.",
+          focusHeight:
+            "Sets how tall the sharp center stays vertically. Lower values make the top and bottom blur sooner; higher values preserve a taller in-focus band.",
         };
   const isPhosphorDotModeActive =
     spotMaskStrength > 0.001 &&
@@ -770,6 +786,42 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={focusStrength}
                 onChange={(ev) => onSetFocusStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Focus width: ${focusWidth.toFixed(2)}`}
+                  text={helpText.focusWidth}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.08"
+                max="0.48"
+                step="0.01"
+                value={focusWidth}
+                onChange={(ev) => onSetFocusWidth(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Focus height: ${focusHeight.toFixed(2)}`}
+                  text={helpText.focusHeight}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.08"
+                max="0.48"
+                step="0.01"
+                value={focusHeight}
+                onChange={(ev) => onSetFocusHeight(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>
