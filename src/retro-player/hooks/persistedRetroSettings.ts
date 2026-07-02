@@ -47,6 +47,9 @@ export type PersistedRetroFilterSettings = {
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
+  focusCenterX: number;
+  focusCenterY: number;
+  focusTrackCursor: boolean;
   isFilterEnabled: boolean;
 };
 

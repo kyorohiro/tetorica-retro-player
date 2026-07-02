@@ -72,6 +72,7 @@ export type RetroPreviewViewProps = {
   onToggleFfmpegUseQsv: () => void;
   ffmpegMaxConcurrentHlsSessions: number;
   onFfmpegMaxConcurrentHlsSessionsChange: (limit: number) => void;
+  onPreviewPointerMove?: (point: { x: number; y: number }) => void;
   onError?: (error: Error) => void;
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
@@ -95,6 +96,7 @@ export function RetroPreviewView({
   onToggleFfmpegUseQsv,
   ffmpegMaxConcurrentHlsSessions,
   onFfmpegMaxConcurrentHlsSessionsChange,
+  onPreviewPointerMove,
   onError,
   fillHeight = false,
   onIsPinnedPreviewChange,
@@ -133,6 +135,7 @@ export function RetroPreviewView({
   const previewAnchorRef = React.useRef<HTMLDivElement | null>(null);
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const nativeVideoHostRef = React.useRef<HTMLDivElement | null>(null);
+  const activePreviewPointerIdRef = React.useRef<number | null>(null);
 
   // --- Stable callbacks (defined before effects that use them) ---
 
@@ -526,6 +529,59 @@ export function RetroPreviewView({
     testAlarm();
   };
 
+  const updatePreviewPointer = React.useCallback((
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (!onPreviewPointerMove) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const y = 1 - Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+    onPreviewPointerMove({ x, y });
+  }, [onPreviewPointerMove]);
+
+  const handlePreviewPointerDown = React.useCallback((
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    activePreviewPointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updatePreviewPointer(event);
+  }, [updatePreviewPointer]);
+
+  const handlePreviewPointerMove = React.useCallback((
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (activePreviewPointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    if (event.buttons === 0 && event.pointerType !== "touch") {
+      activePreviewPointerIdRef.current = null;
+      return;
+    }
+
+    updatePreviewPointer(event);
+  }, [updatePreviewPointer]);
+
+  const handlePreviewPointerEnd = React.useCallback((
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (activePreviewPointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    activePreviewPointerIdRef.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
   return (
     <div ref={previewFrameRef} className={isPinnedPreview || isPreviewMaximized || !fillHeight ? "space-y-4" : "h-full flex flex-col"}>
       <div ref={previewAnchorRef} aria-hidden="true" />
@@ -606,6 +662,10 @@ export function RetroPreviewView({
               filter: brightness !== 1.0 ? `brightness(${brightness})` : undefined,
               transform: (flipH || flipV) ? `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` : undefined,
             }}
+            onPointerDown={handlePreviewPointerDown}
+            onPointerMove={handlePreviewPointerMove}
+            onPointerUp={handlePreviewPointerEnd}
+            onPointerCancel={handlePreviewPointerEnd}
           >
             <div
               ref={player.canvasHostRef}

@@ -14,6 +14,7 @@ uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uFocusStrength;
 uniform vec2 uFocusSize;
+uniform vec2 uFocusCenter;
 uniform float uTime;
 
 vec2 curveUv(vec2 uv, float strength)
@@ -57,7 +58,7 @@ void main(void)
 
   if (uFocusStrength > 0.001) {
     vec2 focusScale = max(uFocusSize, vec2(0.001));
-    float focusDist = length((vMaskCoord - vec2(0.5)) / focusScale);
+    float focusDist = length((vMaskCoord - uFocusCenter) / focusScale);
     float blurMask = smoothstep(1.0, 2.15, focusDist);
     float blurAmt = pow(blurMask, 1.35);
     if (blurAmt > 0.001) {
