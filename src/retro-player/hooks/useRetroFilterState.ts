@@ -54,6 +54,7 @@ export type RetroFilterInitialState = Partial<{
   neonBoost: number;
   neonSaturation: number;
   neonDetail: number;
+  focusStrength: number;
   isFilterEnabled: boolean;
 }>;
 
@@ -201,6 +202,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
     neonDetail: initialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
+    focusStrength: initialState.focusStrength ?? 0,
     isFilterEnabled: initialState.isFilterEnabled ?? true,
   }));
 
@@ -433,6 +435,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, neonDetail }));
   };
 
+  const setFocusStrength = (focusStrength: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, focusStrength }));
+  };
+
   const setIsFilterEnabled = (isFilterEnabled: boolean) => {
     setSettings((current) => ({ ...current, isFilterEnabled }));
   };
@@ -482,6 +489,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       neonBoost: presetSettings.neonBoost,
       neonSaturation: presetSettings.neonSaturation,
       neonDetail: presetSettings.neonDetail,
+      focusStrength: presetSettings.focusStrength ?? 0,
       isFilterEnabled: preset !== "none",
     }));
   }, []);
@@ -551,6 +559,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setNeonBoost,
     setNeonSaturation,
     setNeonDetail,
+    setFocusStrength,
     setIsFilterEnabled,
     applyAllFilterSettings,
     applyPreset,

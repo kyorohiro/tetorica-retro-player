@@ -84,6 +84,7 @@ type RetroFilterPanelProps = {
   targetWidth: number;
   matchTargetAspect: boolean;
   vignetteStrength: number;
+  focusStrength: number;
   onApplyPreset: (preset: RetroPresetKey) => void;
   onSetIsFilterEnabled: (value: boolean) => void;
   onSetColorLevels: (value: number) => void;
@@ -126,6 +127,7 @@ type RetroFilterPanelProps = {
   onSetTargetWidth: (value: number) => void;
   onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
+  onSetFocusStrength: (value: number) => void;
 };
 
 export function RetroFilterPanel({
@@ -215,6 +217,8 @@ export function RetroFilterPanel({
   onSetTargetWidth,
   onSetMatchTargetAspect,
   onSetVignetteStrength,
+  focusStrength,
+  onSetFocusStrength,
 }: RetroFilterPanelProps) {
   const [localTargetWidth, setLocalTargetWidth] = useState(targetWidth);
   const [localTargetHeight, setLocalTargetHeight] = useState(targetHeight);
@@ -276,6 +280,8 @@ export function RetroFilterPanel({
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
           closeUpNoise:
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
+          focus:
+            "画面の周辺部をぼかして中央に焦点を合わせます。値を上げるほど周辺のぼけが強くなり、被写界深度のような効果が得られます。",
         }
       : {
           helpSuffix: " help",
@@ -329,6 +335,8 @@ export function RetroFilterPanel({
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
           closeUpNoise:
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
+          focus:
+            "Blurs the periphery of the image, keeping the center sharp. Higher values increase the defocus at the edges for a depth-of-field style effect.",
         };
   const isPhosphorDotModeActive =
     spotMaskStrength > 0.001 &&
@@ -744,6 +752,24 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={vignetteStrength}
                 onChange={(ev) => onSetVignetteStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Focus blur: ${focusStrength.toFixed(2)}`}
+                  text={helpText.focus}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={focusStrength}
+                onChange={(ev) => onSetFocusStrength(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>
