@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tetorica Retro Player</title>
     <meta
       name="description"
-      content="Retro-style image, video, and screen preview powered by Pixi.js shaders."
+      content="Pixi.js シェーダーによるレトロ風の画像・動画・画面プレビュー。"
     />
     <style>
       :root {
@@ -29,7 +29,7 @@
       body {
         margin: 0;
         min-height: 100vh;
-        font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Avenir Next", Avenir, "Segoe UI", sans-serif;
         color: var(--text);
         background:
           radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 30%),
@@ -95,8 +95,8 @@
       h1 {
         margin: 18px 0 14px;
         font-size: clamp(2.4rem, 6vw, 4.5rem);
-        line-height: 0.94;
-        letter-spacing: -0.05em;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
       }
 
       .lead {
@@ -104,7 +104,7 @@
         margin: 0;
         color: var(--muted);
         font-size: 1.05rem;
-        line-height: 1.8;
+        line-height: 1.9;
       }
 
       .actions {
@@ -235,13 +235,13 @@
       .section h2 {
         margin: 0 0 12px;
         font-size: 1.35rem;
-        letter-spacing: -0.03em;
+        letter-spacing: -0.02em;
       }
 
       .section p {
         margin: 0;
         color: var(--muted);
-        line-height: 1.75;
+        line-height: 1.85;
       }
 
       .feature-list {
@@ -266,7 +266,7 @@
 
       .feature span {
         color: var(--muted);
-        line-height: 1.7;
+        line-height: 1.8;
         font-size: 0.93rem;
       }
 
@@ -302,38 +302,37 @@
   </head>
   <body>
     <main class="shell">
-      <p class="lang-switch"><a href="./index.ja.html">日本語</a></p>
+      <p class="lang-switch"><a href="./index.html">English</a></p>
       <section class="hero">
         <div class="panel hero-copy">
-          <div class="eyebrow">Pixi.js Shader Preview</div>
+          <div class="eyebrow">Pixi.js シェーダープレビュー</div>
           <h1>Tetorica Retro Player</h1>
           <p class="lead">
-            Images, videos, and screen capture are pushed through the same retro CRT/PC filter
-            pipeline, with lo-fi retro audio effects to match. Build a playlist, send files over
-            from your phone with mDrop, set an alarm, and record the filtered output — all from
-            one desktop app (macOS / Windows / Linux), an Android app, a Chrome extension, or the
-            browser demo below.
+            画像・動画・画面キャプチャを、同じレトロCRT/PC風フィルターとローファイ音声エフェクトで加工しながら再生できます。
+            複数ファイルをプレイリストにしたり、mDropでスマホからファイルを転送したり、アラームを設定したり、
+            加工後の映像をそのまま録画したりも可能。macOS / Windows / Linux 向けデスクトップアプリ、
+            Androidアプリ、Chrome拡張機能、そして下のブラウザデモから使えます。
           </p>
           <div class="actions">
-            <a class="button button-primary" href="./demo/">Open PWA Demo</a>
-            <a class="button button-secondary" href="./manual.en.html">Read the Manual</a>
+            <a class="button button-primary" href="./demo/">PWAデモを開く</a>
+            <a class="button button-secondary" href="./manual.html">取扱説明書を見る</a>
             <a
               class="button button-secondary"
               href="https://chromewebstore.google.com/detail/tetorica-retro-player/clnpmlgahomdkphcpcajbemodneoecna"
             >
-              Open Chrome Extension
+              Chrome拡張機能を開く
             </a>
             <a
               class="button button-secondary"
               href="https://github.com/kyorohiro/tetorica-retro-player"
             >
-              View Source
+              ソースコードを見る
             </a>
             <a
               class="button button-secondary"
               href="https://kyorohiro.itch.io/tetorica-retro-player"
             >
-              View Itch (Desktop, Android)
+              itch.io で見る（デスクトップ・Android）
             </a>
           </div>
         </div>
@@ -344,45 +343,44 @@
           </div>
           <div class="meta">
             <div class="chip">
-              <strong>Input</strong>
-              <span>Drag and drop image or video files, or capture a screen or window.</span>
+              <strong>入力</strong>
+              <span>画像・動画ファイルのドラッグ＆ドロップ、または画面・ウィンドウのキャプチャ。</span>
             </div>
             <div class="chip">
-              <strong>Output</strong>
-              <span>Palette quantization, monochrome tinting, dithering, scanlines, and CRT mood.</span>
+              <strong>出力</strong>
+              <span>減色、モノクロ調、ディザリング、走査線、CRT風の雰囲気。</span>
             </div>
           </div>
         </div>
       </section>
 
       <section class="panel section">
-        <h2>What You Can Try In The Demo</h2>
+        <h2>デモで試せること</h2>
         <p>
-          Start with a photo, a clip, or a captured app window, then move between PC-98 style
-          color limits, monochrome terminal looks, CRT/phosphor finishing, and lo-fi audio effects.
-          Load multiple files as a playlist, save your favorite look as a settings file, and pick up
-          the full manual for anything the demo doesn't cover.
+          写真・動画クリップ・キャプチャしたアプリウィンドウから始めて、PC-98風の色数制限、
+          モノクロ端末風の見た目、CRT/フォスファー仕上げ、ローファイ音声エフェクトを切り替えて試せます。
+          複数ファイルをプレイリストとして読み込んだり、お気に入りの設定をファイルとして保存したりも可能。
+          デモで触れていない部分は取扱説明書にまとめています。
         </p>
         <div class="feature-list">
           <article class="feature">
-            <strong>Retro Video Filters</strong>
-            <span>Palette presets, monochrome tints, dithering, CRT curvature, scanlines, phosphor dots, and more — all tunable in real time.</span>
+            <strong>レトロ映像フィルター</strong>
+            <span>パレットプリセット、モノクロ調、ディザリング、CRTの曲面・走査線・フォスファードットなどをリアルタイムに調整できます。</span>
           </article>
           <article class="feature">
-            <strong>Lo-Fi Audio Effects</strong>
-            <span>Bit crush, wow &amp; flutter, tape saturation, vinyl noise, reverb, and a 3-band EQ to match the retro look.</span>
+            <strong>ローファイ音声エフェクト</strong>
+            <span>ビットクラッシュ、ワウ・フラッター、テープサチュレーション、ヴァイナルノイズ、リバーブ、3バンドEQでレトロな見た目に音も合わせられます。</span>
           </article>
           <article class="feature">
-            <strong>mDrop &amp; Playlists</strong>
-            <span>Send files in from your phone over the local network (desktop app), or queue up several files as a looping playlist.</span>
+            <strong>mDrop ＆ プレイリスト</strong>
+            <span>同じネットワーク内のスマホからファイルを送り込んだり（デスクトップアプリ）、複数ファイルをループ再生のプレイリストにまとめたりできます。</span>
           </article>
         </div>
       </section>
 
       <p class="footer">
-        Best experienced on a desktop Chromium-based browser. Screen capture availability depends on
-        browser permissions and platform support. See the
-        <a href="./manual.en.html">manual</a> for the full feature list and platform differences.
+        デスクトップの Chromium 系ブラウザで最も快適に動作します。画面キャプチャの可否はブラウザの権限設定とプラットフォームに依存します。
+        機能の全体像やプラットフォームごとの違いは<a href="./manual.html">取扱説明書</a>を参照してください。
       </p>
     </main>
   </body>

@@ -2,8 +2,10 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-const sourcePath = path.join("docs", "manual.md");
-const outputPath = path.join("docs", "manual.html");
+const docs = [
+  { source: "manual.md", output: "manual.html", lang: "ja", title: "Tetorica Retro Player 取り扱い説明書" },
+  { source: "manual.en.md", output: "manual.en.html", lang: "en", title: "Tetorica Retro Player — User Manual" },
+];
 
 try {
   execFileSync("pandoc", ["--version"], { stdio: "ignore" });
@@ -12,16 +14,20 @@ try {
   process.exit(1);
 }
 
-const body = execFileSync("pandoc", ["-f", "gfm", "-t", "html5", sourcePath], {
-  encoding: "utf-8",
-});
+function render({ source, output, lang, title }) {
+  const sourcePath = path.join("docs", source);
+  const outputPath = path.join("docs", output);
 
-const html = `<!doctype html>
-<html lang="ja">
+  const body = execFileSync("pandoc", ["-f", "gfm", "-t", "html5", sourcePath], {
+    encoding: "utf-8",
+  });
+
+  const html = `<!doctype html>
+<html lang="${lang}">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Tetorica Retro Player 取り扱い説明書</title>
+<title>${title}</title>
 <style>
   body {
     font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
@@ -46,6 +52,12 @@ ${body}
 </html>
 `;
 
-fs.writeFileSync(outputPath, html);
-console.log(`generated ${outputPath} from ${sourcePath}`);
-console.log("Need a PDF? Open the HTML file in a browser and use Print > Save as PDF.");
+  fs.writeFileSync(outputPath, html);
+  console.log(`generated ${outputPath} from ${sourcePath}`);
+}
+
+for (const doc of docs) {
+  render(doc);
+}
+
+console.log("Need a PDF? Open an HTML file in a browser and use Print > Save as PDF.");
