@@ -38,6 +38,7 @@ uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
 uniform float uPhosphorDotNeighborBlend;
 uniform float uCloseUpNoiseStrength;
+uniform float uFocusStrength;
 uniform float uTime;
 
 vec2 curveUv(vec2 uv, float strength)
@@ -353,6 +354,25 @@ vec3 applySaturationToneCompression(vec3 color)
   return clamp(mix(color, adjustedColor, amount), 0.0, 1.0);
 }
 
+const float FOCUS_GOLDEN_ANGLE = 2.39996323;
+
+vec3 sampleFocusBlur(vec2 uv, float blurRadius)
+{
+  vec2 texel = 1.0 / vec2(textureSize(uPass1Texture, 0));
+  vec3 accum = texture(uPass1Texture, uv).rgb * 0.18;
+  float totalWeight = 0.18;
+  for (int i = 0; i < 24; i++) {
+    float t = (float(i) + 0.5) / 24.0;
+    float r = sqrt(t) * blurRadius;
+    float angle = float(i) * FOCUS_GOLDEN_ANGLE;
+    vec2 offset = vec2(cos(angle), sin(angle)) * texel * r;
+    float weight = 1.0 - t * 0.72;
+    accum += texture(uPass1Texture, clamp(uv + offset, vec2(0.0), vec2(1.0))).rgb * weight;
+    totalWeight += weight;
+  }
+  return accum / max(totalWeight, 0.0001);
+}
+
 void main(void)
 {
   vec2 warpedMask = curveUv(vMaskCoord, uCurvature);
@@ -380,6 +400,18 @@ void main(void)
   vec4 color = vec4(texture(uPass1Texture, pixelatedUv).rgb, 1.0);
   color.r = texture(uPass1Texture, redPixelatedUv).r;
   color.b = texture(uPass1Texture, bluePixelatedUv).b;
+
+  if (uFocusStrength > 0.001) {
+    float focusDist = length(vMaskCoord - vec2(0.5)) * 2.0;
+    float blurMask = smoothstep(0.2, 0.85, focusDist);
+    float blurAmt = pow(blurMask, 1.35);
+    if (blurAmt > 0.001) {
+      float blurRadius = (2.0 + uFocusStrength * 38.0) * blurAmt;
+      vec3 blurredColor = sampleFocusBlur(vTextureCoord, blurRadius);
+      float blendFactor = clamp(blurAmt * (0.6 + uFocusStrength * 0.4), 0.0, 1.0);
+      color.rgb = mix(color.rgb, blurredColor, blendFactor);
+    }
+  }
 
   if (uPhosphorDotMode > 0.5) {
     // In 2-pass mode, neighbor colors come directly from Pass 1 FBO.

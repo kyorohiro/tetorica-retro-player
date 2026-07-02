@@ -55,6 +55,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   neonBoost: DEFAULT_PRESET.neonBoost,
   neonSaturation: DEFAULT_PRESET.neonSaturation,
   neonDetail: DEFAULT_PRESET.neonDetail,
+  focusStrength: 0,
   isFilterEnabled: true,
 };
 

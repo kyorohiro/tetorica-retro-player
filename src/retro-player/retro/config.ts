@@ -63,6 +63,7 @@ export type RetroPresetDefinition = {
   neonBoost: number;
   neonSaturation: number;
   neonDetail: number;
+  focusStrength?: number;
 };
 
 export const RETRO_PRESETS = {
