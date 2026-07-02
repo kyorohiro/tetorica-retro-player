@@ -104,6 +104,7 @@ const doesPresetMatchState = (
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
+    (preset.focusStrength ?? 0) === state.focusStrength &&
     preset.monoTint === state.monoTint &&
     preset.neonBoost === state.neonBoost &&
     preset.neonSaturation === state.neonSaturation &&
