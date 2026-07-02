@@ -381,7 +381,7 @@ export function RetroFilterPanel({
           <span className="text-[#12141c]">Palette</span>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(
-              ["free", "pc98", "pc98_tile", "pc98_512", "pc98_512_sat", "pc98_4096", "color32", "color64", "mono", "neon"] as const
+              ["free", "pc98", "pc98_tile", "pc98_512", "pc98_512_sat", "pc98_4096", "color32", "color64", "mono", "neon", "anime"] as const
             ).map(
               (mode) => (
               <button
@@ -415,6 +415,8 @@ export function RetroFilterPanel({
                         ? "Color 64"
                       : mode === "neon"
                         ? "Neon"
+                      : mode === "anime"
+                        ? "Anime"
                       : "Monochrome"}
               </button>
             ),
