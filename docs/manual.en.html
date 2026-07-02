@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tetorica Retro Player — User Manual</title>
+<style>
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.7;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    color: #1c1c22;
+  }
+  h1, h2, h3 { color: #17324d; }
+  h2 { border-bottom: 2px solid #2b6cb0; padding-bottom: 4px; margin-top: 2.5em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #eaf1fb; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+  hr { border: none; border-top: 1px solid #d0d7de; margin: 2em 0; }
+</style>
+</head>
+<body>
+<h1 id="tetorica-retro-player--user-manual">Tetorica Retro Player — User Manual</h1>
+<p>A player that pushes images, videos, and screen captures through retro PC / CRT-style filters and lo-fi audio effects while it plays. This document is a user-facing manual (developer implementation notes live in <code>docs/issues/</code>).</p>
+<hr />
+<h2 id="1-supported-environments">1. Supported Environments</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Distribution</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Desktop app (Tauri)</td>
+<td>macOS / Windows / Linux. Full feature set, including mDrop and ffmpeg conversion (see below)</td>
+</tr>
+<tr class="even">
+<td>Android app (Tauri)</td>
+<td>mDrop, ffmpeg conversion, and virtual-device features are disabled. Playback, filters, and audio effects are still available</td>
+</tr>
+<tr class="odd">
+<td>Chrome extension</td>
+<td>Capture the current tab and apply the filter, or overlay the retro filter directly on videos/images on any webpage</td>
+</tr>
+<tr class="even">
+<td>Web app (browser)</td>
+<td>Play via drag-and-drop, file picker, or screen capture. mDrop is only reachable over the network from a running desktop app</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-loading-media">2. Loading Media</h2>
+<p>Press the ☰ (hamburger) button in the top-left corner to open the menu.</p>
+<ul>
+<li><strong>Open File</strong> — Load video/image/audio/zip/pdf files via a file picker</li>
+<li><strong>Open Folder</strong> (desktop only) — Load every media file in a folder as a playlist</li>
+<li><strong>Capture Screen</strong> — Pick a window or the whole screen from the OS share dialog and preview it through the filter live</li>
+<li><strong>Microphone Input / Camera Input</strong> — Capture microphone audio or camera video</li>
+<li><strong>Select Microphone Device</strong> — Pick a specific input device</li>
+<li><strong>Test presets</strong> — One-tap sample content for checking things work: color-bar video/image, a ToneJS lo-fi demo song (expand "More" for the full demo song list)</li>
+<li><strong>Language</strong> — Switch between Auto / English / Japanese</li>
+</ul>
+<p><strong>Long-press</strong> the hamburger button to hide the entire toolbar (handy when streaming or just watching without the UI in the way). While hidden, a small translucent button remains in the top-left corner to bring it back.</p>
+<p>You can also drag and drop media files anywhere on the screen to load them.</p>
+<h3 id="supported-file-formats">Supported File Formats</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Plays natively</th>
+<th>Needs ffmpeg conversion (HLS)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Video</td>
+<td>mp4, m4v, webm, ogv, mov</td>
+<td>avi, flv, mkv, wmv, ts, m2ts, mts, divx, xvid, rm, rmvb, 3gp, f4v, asf, vob, mpeg, mpg, m2v, mxf</td>
+</tr>
+<tr class="even">
+<td>Audio</td>
+<td>mp3, wav, ogg/oga, m4a, aac, flac, opus</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>Image</td>
+<td>png, jpg/jpeg, webp, gif, svg, avif, heic/heif</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>Other</td>
+<td>PDF / EPUB / ZIP(cbz) shared via mDrop can be previewed in-browser (viewing only, not playback)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Formats that need ffmpeg conversion only play when ffmpeg is enabled in the desktop app (see "mDrop" below for details).</p>
+<hr />
+<h2 id="3-screen-layout">3. Screen Layout</h2>
+<ul>
+<li><strong>Preview area</strong> — Where the filtered output is shown</li>
+<li><strong>Top-right toolbar</strong> — Power, Hi-Res, Brightness, Fit width, Pin, Maximize, Record, and the ⋯ (More) button (see <a href="#5-top-right-toolbar">Section 5</a>)</li>
+<li><strong>Top-right mDrop / ffmpeg pill buttons</strong> (desktop app only) — These buttons do different things on click vs. long-press. See <a href="#10-mdrop-transferring-files-from-another-device">Section 10, "mDrop"</a> for details</li>
+<li><strong>Bottom control panel</strong> — Playback controls, Video / Audio setting tabs, Reset, and settings save/load</li>
+</ul>
+<hr />
+<h2 id="4-basic-playback">4. Basic Playback</h2>
+<ul>
+<li><strong>Seek bar</strong> — Click or drag to jump to a position</li>
+<li><strong>Play / Pause</strong> button</li>
+<li><strong>Volume</strong> button — Short press opens/closes the volume slider; <strong>long-press</strong> toggles mute</li>
+<li><strong>Loop</strong> button — Cycles through <code>Loop One → Auto Next → Loop All → No Loop</code> on each press</li>
+<li><strong>Speed</strong> (gauge icon) — Choose from 2x / 1.5x / 1.25x / 1x / 0.75x / 0.5x</li>
+<li><strong>Skip back/forward</strong> buttons — Short press seeks ±5 seconds; <strong>long-press</strong> moves to the previous/next track (when playing a playlist)</li>
+</ul>
+<h3 id="playlist-feature">Playlist Feature</h3>
+<p>Loading multiple media files at once turns them into a playlist for continuous playback.</p>
+<p><strong>To create a playlist:</strong></p>
+<ol type="1">
+<li>First set the Loop button to <strong>"Auto Next" or "Loop All"</strong></li>
+<li>While in that mode, select <strong>multiple video/audio/image files only</strong> via the file picker, Open Folder, dragging multiple files, or sharing multiple files over mDrop</li>
+</ol>
+<p>If these conditions are met, the files load as a playlist and the skip back/forward buttons in the bottom control panel become active. (If only one file qualifies, or the conditions aren't met, only the first file is loaded.)</p>
+<p><strong>Playback behavior depends on the loop mode:</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Loop mode</th>
+<th>When a track ends</th>
+<th>Manual skip (long-press)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Auto Next</td>
+<td>Advances to the next track. Stops after the last track (does not wrap to the start)</td>
+<td>Can move to the next/previous track. Stops at the first/last track</td>
+</tr>
+<tr class="even">
+<td>Loop All</td>
+<td>Advances to the next track, and wraps back to the first track after the last one, playing indefinitely</td>
+<td>Can move to the next/previous track. Stops at the first/last track</td>
+</tr>
+<tr class="odd">
+<td>Loop One / No Loop</td>
+<td>Not a playlist — only the first of the selected files is played</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><em>Note: There is no dedicated UI showing your position in the playlist (like "track 3 of 10"). You can only track progress via the skip buttons and auto-advance behavior.</em> <em>Note: Switching the loop mode afterward doesn't change the playlist's contents — it only changes what happens the next time a track ends.</em></p>
+<h3 id="keyboard-shortcuts">Keyboard Shortcuts</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Space or K</td>
+<td>Play / Pause</td>
+</tr>
+<tr class="even">
+<td>← (Left arrow)</td>
+<td>Seek back 5 seconds</td>
+</tr>
+<tr class="odd">
+<td>→ (Right arrow)</td>
+<td>Seek forward 5 seconds</td>
+</tr>
+<tr class="even">
+<td>J</td>
+<td>Seek back 10 seconds</td>
+</tr>
+<tr class="odd">
+<td>L</td>
+<td>Seek forward 10 seconds</td>
+</tr>
+</tbody>
+</table>
+<p><em>Disabled while a text input has focus.</em></p>
+<hr />
+<h2 id="5-top-right-toolbar">5. Top-Right Toolbar</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Button</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Power</strong></td>
+<td>Toggle the retro filter on/off</td>
+</tr>
+<tr class="even">
+<td><strong>Hi-Res</strong> (aperture icon)</td>
+<td>Toggle render resolution between 1x and 2x</td>
+</tr>
+<tr class="odd">
+<td><strong>Brightness</strong> (−/%/+)</td>
+<td>Adjust from 40% to 200% in 5% steps. <strong>Only shown here when the window is at least 480px wide</strong> — below that, it's folded into the slider in the "More" menu instead</td>
+</tr>
+<tr class="even">
+<td><strong>Fit width</strong></td>
+<td>Stretch the preview to fill the available width, or undo that</td>
+</tr>
+<tr class="odd">
+<td><strong>Pin</strong></td>
+<td>Keep the preview fixed on screen while scrolling (unavailable while Maximized)</td>
+</tr>
+<tr class="even">
+<td><strong>Maximize</strong></td>
+<td>Show the preview full-screen. Press again or hit Esc to exit</td>
+</tr>
+<tr class="odd">
+<td><strong>Record</strong> (●/■ icon)</td>
+<td>Record the filtered output. Press again to stop and export (moves into the "More" menu below 360px width)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the--more-menu">The "⋯" More Menu</h3>
+<ul>
+<li><strong>Audio Optimize</strong>: auto / chrome / safari — manually pick the browser-specific audio playback strategy (auto is fine in most cases)</li>
+<li><strong>Latency</strong>: interactive / balanced / playback — WebAudio latency priority. Changes take effect after toggling Power off then on</li>
+<li><strong>Use QSV</strong> (Windows only) — Enable Intel Quick Sync–accelerated ffmpeg conversion where available</li>
+<li><strong>HLS ffmpeg slots</strong> (1–8) — Maximum number of concurrent transcode jobs</li>
+<li><strong>Alarm</strong> — Time picker (HH:MM) plus Set / Test / Clear buttons, with +1min / +5min / +10min shortcuts. Plays media or a notification tone at the chosen time. Background behavior depends on the browser, so it may not fire reliably if another window is in front</li>
+<li><strong>Flip H / Flip V</strong> — Mirror the video horizontally/vertically</li>
+<li>(On narrow screens) The brightness slider also appears here</li>
+</ul>
+<hr />
+<h2 id="6-video-settings-panel">6. Video Settings Panel</h2>
+<p>Open it via the "Video" tab at the bottom. Long-pressing this tab also toggles the retro filter on/off, same as the Power button.</p>
+<ul>
+<li><strong>Presets</strong>: Tap a tile to pick a look modeled after a retro machine — pc98_512, fm77av, pc88va, and more</li>
+<li><strong>Palette mode</strong>: The color-reduction strategy — RGB mode, grayscale, monochrome, etc.</li>
+<li><strong>Mono tint</strong> (only when the palette is monochrome): Single-color tone such as green, amber, or ice</li>
+<li><strong>Output size</strong>: Width/height sliders, plus a checkbox to lock the aspect ratio to the source</li>
+<li><strong>Color levels, dither, smoothing</strong>: Palette granularity, Bayer dithering, and pre-pixelation blur amount</li>
+<li><strong>CRT/LCD effects</strong>: Curvature, scanlines, scanline bright-fade, vignette, glow, phosphor, close-up noise</li>
+<li><strong>Tone compression</strong>: Dynamic-range compression for brightness/saturation (Amount/Low/High/Knee)</li>
+<li><strong>Phosphor dot</strong> (for compatible palettes): Dot shape, brightness, 2x internal resolution, and other fine-grained settings</li>
+<li><strong>Anime/toon</strong>: Posterize steps, edge strength, and edge-detection thresholds</li>
+</ul>
+<p>Everything here is a slider or checkbox that reflects into the preview in real time. Start from a preset, then fine-tune from there.</p>
+<hr />
+<h2 id="7-audio-settings-panel">7. Audio Settings Panel</h2>
+<p>Open it via the "Audio" tab at the bottom. Long-pressing this tab toggles all audio effects on/off.</p>
+<ul>
+<li><strong>Effects on/off</strong>: Master toggle for all audio effects (long-press also toggles the FFT spectrum display)</li>
+<li><strong>Noise on/off</strong>: Toggle the noise effect</li>
+<li><strong>Presets</strong>: Classic / Lofi / 8-bit / VHS and more — tap to apply a full configuration at once</li>
+<li><strong>Effects</strong>: Lo-Fi amount, radio tone, bit crush, sample-rate reduction, noise reduction, wow &amp; flutter, and a 3-band Bass/Mid/Treble EQ</li>
+<li><strong>Space</strong>: Delay, reverb, chorus</li>
+<li><strong>Dynamics</strong>: Tape saturation, compressor</li>
+<li><strong>Input/Output</strong>: Volume, stereo width, small-room character, output/input gain</li>
+<li><strong>Noise</strong>: Surface hiss (vinyl record hiss), vinyl dust (crackle/pops), warmth, air, presence</li>
+</ul>
+<hr />
+<h2 id="8-reset--native-playback-mode">8. Reset / Native Playback Mode</h2>
+<p>The "Reset" button at the bottom:</p>
+<ul>
+<li><strong>Short press</strong>: Resets all Video/Audio settings to their defaults</li>
+<li><strong>Long-press (0.6s)</strong>: Switches to Native Playback mode. The button label changes to "Native"</li>
+</ul>
+<p>Native Playback mode plays video through the OS's native player instead of through the retro filter pipeline. It's a fallback for environments where filtered playback is unstable (for example, HLS streaming playback on Windows).</p>
+<hr />
+<h2 id="9-saving-and-loading-settings">9. Saving and Loading Settings</h2>
+<p>Via the icons on the right side of the bottom control panel:</p>
+<ul>
+<li><strong>Save</strong> (floppy disk icon): Exports all Video/Audio/UI settings to a timestamped <code>retro-YYYYMMDD-&lt;timestamp&gt;.retro.json</code> file</li>
+<li><strong>Load</strong> (folder icon): Imports a <code>.retro.json</code> file via the file picker or drag-and-drop, and applies it immediately</li>
+</ul>
+<p>Once you've dialed in a look and sound you like, save it, and reload it later when you open a different piece of media.</p>
+<hr />
+<h2 id="10-mdrop-transferring-files-from-another-device">10. mDrop (Transferring Files From Another Device)</h2>
+<p><strong>Desktop app only</strong> (not available on Android, the Chrome extension, or the web app). Lets another device on the same network (like a phone) send files over via its browser.</p>
+<p>An "mDrop" pill button (Wifi icon) appears in the top-right corner. <strong>Click and long-press trigger two different actions.</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Action</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Click (short press)</strong></td>
+<td>Toggles the transfer server on/off (it auto-starts when the app launches). By default this is just for the app's own internal communication and isn't visible to other devices</td>
+</tr>
+<tr class="even">
+<td><strong>Long-press</strong></td>
+<td>Toggles "share mode" on/off. When on, an <code>IP:port</code> (e.g. <code>192.168.1.5:7878</code>) appears on screen, and <strong>other devices can open that URL directly in their browser</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Uploading a file from the mDrop Web UI (opened via share mode) reflects immediately in this app's preview</li>
+<li>PDF / EPUB / ZIP(cbz) files sent this way can be previewed directly in the browser</li>
+<li>If you want another device to be able to reach it, note that you need to <strong>both click to start the server and long-press to turn on share mode</strong> — one alone isn't enough</li>
+</ul>
+<p>An "ffmpeg" pill button (waves icon) may also appear next to it. Turning it on lets the app serve video formats the browser can't play directly (mkv, avi, etc.) as an HLS stream (requires ffmpeg to be installed).</p>
+<hr />
+<h2 id="11-chrome-extension">11. Chrome Extension</h2>
+<p>A lightweight version you load via <code>chrome://extensions</code> or install from the Chrome Web Store. Clicking the extension icon opens a popup.</p>
+<ul>
+<li><strong>Capture current tab</strong>: Captures the visible tab's video and runs it through the filter</li>
+<li><strong>Show viewer</strong>: Opens the captured output in a dedicated tab</li>
+<li><strong>Overlay (Experimental)</strong>: Overlays the retro filter directly on videos/images on another webpage</li>
+<li>The popup includes <strong>Video</strong> / <strong>Audio</strong> tabs like the main app, plus detailed <strong>Overlay</strong> settings and a lightweight <strong>Alarm</strong> tab</li>
+<li>Settings are stored in the Chrome extension's own storage (managed separately from the main app's <code>.retro.json</code> files)</li>
+</ul>
+<hr />
+<h2 id="12-troubleshooting">12. Troubleshooting</h2>
+<ul>
+<li><strong>No sound / stuck at "Touch &amp; Play"</strong>: Some browsers, like Safari, won't start audio playback without a direct user gesture. Press the button shown on screen to start playback</li>
+<li><strong>Stuck "loading" / shows "unsupported format"</strong>: The file may need ffmpeg conversion. Check that ffmpeg is enabled in the desktop app</li>
+<li><strong>Playback is choppy or stalls</strong>: Long-press the Reset button to switch to Native Playback mode — this sometimes helps</li>
+<li><strong>On Windows, video plays but there's no sound / effects don't apply</strong>: This is a known limitation where HLS playback bypasses Web Audio</li>
+</ul>
+
+</body>
+</html>
