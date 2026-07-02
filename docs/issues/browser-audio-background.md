@@ -206,4 +206,30 @@ if (!isHiddenWithSuspendedContext) {
 
 6. **`isSafariBrowser()` の判定**  
    `navigator.vendor === "Apple Computer, Inc."` が最も確実（Chrome DevTools の UA 偽装に引っかからない）。
-   `/safari/i` + `!/chrome|chromium/i` は次善策。Tauri on macOS は WebKit なので Safari 扱いになる。
+   `/safari/i` + `!/chrome|chromium/i` は次善策。
+
+7. **Safari 判定は「ネイティブ音声を出させるか」の分岐にも使われる**  
+   `useRetroAudioEngine.ts` の `resolveNativeAudioSuppression()` と
+   `useRetroPreviewMedia.ts` の `staticNeedsNativeAudioSuppression()` は、
+   `createMediaElementSource()` を使う Safari では `media.volume = 0` にしてネイティブ出力を殺し、
+   Web Audio（`masterGain`）だけを出力経路にする。Safari は `createMediaElementSource()` を呼んでも
+   要素のネイティブ出力を自動で止めないため、何もしないと二重に音が鳴る。
+   Chrome/Firefox は `createMediaElementSource()` 呼び出し時に自動でネイティブ出力を止めるため、
+   同じ処理をすると Web Audio の音まで消えてしまう。
+
+   ```typescript
+   // navigator.vendor === "Apple Computer, Inc." only in real Safari/WebKit.
+   if (navigator.vendor !== "Apple Computer, Inc.") return false;
+   // Exclude iOS Chrome (CriOS), Firefox for iOS (FxiOS), Opera for iOS (OPiOS)
+   // which also run on WebKit and share the same vendor string.
+   return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
+   ```
+
+   - **iOS のサードパーティブラウザは除外する**: iOS 上の Chrome/Firefox/Opera は内部的に WebKit を
+     使うため `navigator.vendor` は Safari と同じ `"Apple Computer, Inc."` になるが、
+     オーディオ・自動再生ポリシーは各ブラウザ自身の実装に従う（Safari のポリシーではない）。
+     UA に `CriOS` / `FxiOS` / `OPiOS` が含まれる場合は Safari 扱いから除外する。
+   - **Tauri は vendor チェックより前に除外する**: macOS Tauri は WKWebView（WebKit）なので
+     vendor だけ見ると Safari と誤判定してしまう。しかし Tauri の `<video>` はネイティブ音声出力を
+     アプリ側で別途制御しているため、ブラウザの Safari 分岐は適用しない
+     （`"__TAURI_INTERNALS__" in window || "__TAURI__" in window` を先にチェックして `false` を返す）。

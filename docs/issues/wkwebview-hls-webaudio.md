@@ -42,7 +42,12 @@ Web Audio の状態に関わらず常に音が出る。
 
 ## 現状の対処
 
-**現時点では未修正**。HLS 再生時はエフェクターが機能しないことを既知の制限として扱う。
+**macOS では現時点では未修正**。HLS 再生時はエフェクターが機能しないことを既知の制限として扱う。
+
+**Windows Tauri (WebView2) では同じ構造の問題が Windows Media Foundation 経由で起きるが、
+こちらは対処済み**。Web Audio 接続を諦めてネイティブ再生にフォールバックする実装が入っている。
+詳細は [`windows-tauri-hls-webaudio-bypass.md`](windows-tauri-hls-webaudio-bypass.md) 参照。
+macOS 側でも同様の bypass 方針を採用する余地がある。
 
 ## ffmpeg が必要になるフォーマット（Safari / iOS WKWebView）
 
