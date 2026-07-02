@@ -29,44 +29,6 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/x-matroska" />
-                <data android:pathPattern=".*\\.mp4" />
-                <data android:pathPattern=".*\\.m4v" />
-                <data android:pathPattern=".*\\.mov" />
-                <data android:pathPattern=".*\\.mkv" />
-                <data android:pathPattern=".*\\.avi" />
-                <data android:pathPattern=".*\\.wmv" />
-                <data android:pathPattern=".*\\.flv" />
-                <data android:pathPattern=".*\\.webm" />
-                <data android:pathPattern=".*\\.ts" />
-                <data android:pathPattern=".*\\.m2ts" />
-                <data android:pathPattern=".*\\.ogv" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/quicktime" />
-                <data android:pathPattern=".*\\.mp4" />
-                <data android:pathPattern=".*\\.m4v" />
-                <data android:pathPattern=".*\\.mov" />
-                <data android:pathPattern=".*\\.mkv" />
-                <data android:pathPattern=".*\\.avi" />
-                <data android:pathPattern=".*\\.wmv" />
-                <data android:pathPattern=".*\\.flv" />
-                <data android:pathPattern=".*\\.webm" />
-                <data android:pathPattern=".*\\.ts" />
-                <data android:pathPattern=".*\\.m2ts" />
-                <data android:pathPattern=".*\\.ogv" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="video/mp4" />
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.m4v" />
@@ -86,7 +48,45 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="video/x-matroska" />
+                <data android:pathPattern=".*\\.mp4" />
+                <data android:pathPattern=".*\\.m4v" />
+                <data android:pathPattern=".*\\.mov" />
+                <data android:pathPattern=".*\\.mkv" />
+                <data android:pathPattern=".*\\.avi" />
+                <data android:pathPattern=".*\\.wmv" />
+                <data android:pathPattern=".*\\.flv" />
+                <data android:pathPattern=".*\\.webm" />
+                <data android:pathPattern=".*\\.ts" />
+                <data android:pathPattern=".*\\.m2ts" />
+                <data android:pathPattern=".*\\.ogv" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="video/x-msvideo" />
+                <data android:pathPattern=".*\\.mp4" />
+                <data android:pathPattern=".*\\.m4v" />
+                <data android:pathPattern=".*\\.mov" />
+                <data android:pathPattern=".*\\.mkv" />
+                <data android:pathPattern=".*\\.avi" />
+                <data android:pathPattern=".*\\.wmv" />
+                <data android:pathPattern=".*\\.flv" />
+                <data android:pathPattern=".*\\.webm" />
+                <data android:pathPattern=".*\\.ts" />
+                <data android:pathPattern=".*\\.m2ts" />
+                <data android:pathPattern=".*\\.ogv" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="video/quicktime" />
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.m4v" />
                 <data android:pathPattern=".*\\.mov" />
@@ -193,7 +193,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="image/webp" />
+                <data android:mimeType="image/png" />
                 <data android:pathPattern=".*\\.png" />
                 <data android:pathPattern=".*\\.jpg" />
                 <data android:pathPattern=".*\\.jpeg" />
@@ -207,7 +207,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="image/png" />
+                <data android:mimeType="image/webp" />
                 <data android:pathPattern=".*\\.png" />
                 <data android:pathPattern=".*\\.jpg" />
                 <data android:pathPattern=".*\\.jpeg" />

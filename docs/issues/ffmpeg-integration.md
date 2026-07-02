@@ -170,20 +170,19 @@ npx tauri build --config src-tauri/tauri.ffmpeg.conf.json -- --features ffmpeg-s
 npx tauri build
 ```
 
-#### WebView2 での HLS 再生と Web Audio の動作（要確認）
+#### WebView2 での HLS 再生と Web Audio の動作（確認済み: Media Foundation 経由）
 
 Windows Tauri は WebView2（Edge/Chromium ベース）を使用する。
-Chromium は HLS をネイティブサポートしていないが、Edge は Windows Media Foundation 経由で
-HLS を再生できる可能性がある。WebView2 がこれを継承するかは **未確認**。
+実装で確認した結果、**WebView2 の HLS 再生は Windows Media Foundation にネイティブ委譲される**
+（macOS の AVFoundation と同じ構造）。`createMediaElementSource` を呼んでもオーディオが流れず、
+Web Audio エフェクターは効かない。
 
-| ケース | 状況 | Web Audio エフェクター |
-|--------|------|----------------------|
-| WebView2 が HLS を再生できない | `.m3u8` が再生不可 | — |
-| WebView2 が MSE 経由で HLS 再生 | hls.js 相当の挙動 | ✅ 効く |
-| WebView2 が Media Foundation 経由で HLS 再生 | macOS の AVFoundation と同じ構造 | ❌ 効かない可能性 |
+`useRetroPreviewMedia.ts` の `shouldBypassWebAudioForMedia` / `shouldUseNativeVideoSurfaceForMedia` で
+Windows Tauri + `.m3u8` を検出し、Web Audio 接続を諦めてネイティブ音声出力・ネイティブ `<video>` 描画に
+フォールバックする対処が入っている。
 
-Windows で ffmpeg HLS を実際に動かして検証が必要。
-→ 詳細は [`wkwebview-hls-webaudio.md`](wkwebview-hls-webaudio.md) 参照。
+→ 詳細は [`windows-tauri-hls-webaudio-bypass.md`](windows-tauri-hls-webaudio-bypass.md)、
+macOS 側の同種の問題は [`wkwebview-hls-webaudio.md`](wkwebview-hls-webaudio.md) 参照。
 
 ---
 

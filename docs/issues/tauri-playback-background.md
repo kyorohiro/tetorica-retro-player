@@ -16,7 +16,11 @@ macOS は別ウィンドウに完全に隠れると `document.hidden = true` に
 ticker が止まるとフレーム更新が止まり、再生が止まったように見える。
 
 ### 対応
-`tick()` 内で `isTauriRuntime() && document.hidden` のとき `setTimeout(tick, 16)` にフォールバック。
+`tick()` 内で `isTauriRuntime() && document.hidden` のとき `setTimeout(tick, TAURI_HIDDEN_TICK_MS)` にフォールバック。
+
+初期実装は 16ms（≒60fps を維持したまま）だったが、隠れている間は近 60fps の心拍を保つ必要がないため、
+現在は **250ms** に緩めて CPU 負荷を下げつつ再生状態の復帰だけを保証している
+（合わせて `document.hidden` 時は `renderFrameRef()` 自体もスキップし、WebGL 描画コストをゼロにする）。
 
 ```typescript
 // useRetroPixiStage.ts
@@ -24,9 +28,19 @@ const isTauriRuntime = () =>
   typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
+const TAURI_HIDDEN_TICK_MS = 250;
+
 // tick() 内
-if (isTauriRuntime() && document.hidden) {
-  animationFrameRef.current = window.setTimeout(tick, 16) as unknown as number;
+const isHidden = typeof document !== "undefined" && document.hidden;
+if (!isHidden) {
+  renderFrameRef.current(); // hidden 時は描画自体をスキップ
+}
+
+if (isRecordingRef.current) {
+  animationFrameRef.current = window.setTimeout(tick, 1000 / 30) as unknown as number; // 録画中は 30fps 固定
+} else if (isTauriRuntime() && document.hidden) {
+  // A hidden Tauri WebView does not need a near-60fps heartbeat.
+  animationFrameRef.current = window.setTimeout(tick, TAURI_HIDDEN_TICK_MS) as unknown as number;
 } else {
   animationFrameRef.current = window.requestAnimationFrame(tick);
 }
