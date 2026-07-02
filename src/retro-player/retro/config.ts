@@ -574,7 +574,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    focusStrength: 0.55,
+    focusStrength: 0.28,
     saturationAmount: 0.35,
     saturationLow: 0.0,
     saturationHigh: 0.35,
