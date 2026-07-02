@@ -51,6 +51,8 @@ export type RetroVideoFilterState = {
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
+  focusCenterX: number;
+  focusCenterY: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -118,6 +120,7 @@ type Pass2UniformLocations = {
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uFocusStrength: WebGLUniformLocation | null;
   uFocusSize: WebGLUniformLocation | null;
+  uFocusCenter: WebGLUniformLocation | null;
   uTime: WebGLUniformLocation | null;
 };
 
@@ -782,6 +785,7 @@ export class TetoricaRetroVideoPipeline {
       uCloseUpNoiseStrength: gl.getUniformLocation(program, "uCloseUpNoiseStrength"),
       uFocusStrength: gl.getUniformLocation(program, "uFocusStrength"),
       uFocusSize: gl.getUniformLocation(program, "uFocusSize"),
+      uFocusCenter: gl.getUniformLocation(program, "uFocusCenter"),
       uTime: gl.getUniformLocation(program, "uTime"),
     };
   }
@@ -1057,6 +1061,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uCloseUpNoiseStrength, filterState.closeUpNoiseStrength);
     gl.uniform1f(this.pass2Locs.uFocusStrength, filterState.focusStrength);
     gl.uniform2f(this.pass2Locs.uFocusSize, filterState.focusWidth, filterState.focusHeight);
+    gl.uniform2f(this.pass2Locs.uFocusCenter, filterState.focusCenterX, filterState.focusCenterY);
     gl.uniform1f(this.pass2Locs.uTime, (nowMs() - this.startedAt) / 1000);
   }
 }

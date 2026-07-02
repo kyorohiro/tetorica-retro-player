@@ -302,7 +302,7 @@ export function RetroControlPanel({
 
       {controlPanelMode === "video-settings" && (
         <div className="mt-4 border-t border-[#cac0b2] pt-4">
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => { onControlPanelModeChange("playback"); }}
@@ -310,6 +310,19 @@ export function RetroControlPanel({
             >
               Back to Playback
             </button>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-sm text-[#12141c]">
+              <input
+                type="checkbox"
+                checked={filterState.focusTrackCursor}
+                onChange={(event) => {
+                  filterState.setFocusTrackCursor(event.currentTarget.checked);
+                }}
+                className="h-4 w-4 rounded border-[#8a7f72] text-[#12141c]"
+              />
+              <span>
+                {locale === "ja" ? "Cursor focus" : "Track cursor"}
+              </span>
+            </label>
           </div>
           <React.Suspense fallback={controlsFallback}>
             <RetroFilterPanel

@@ -57,6 +57,9 @@ export type RetroFilterInitialState = Partial<{
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
+  focusCenterX: number;
+  focusCenterY: number;
+  focusTrackCursor: boolean;
   isFilterEnabled: boolean;
 }>;
 
@@ -210,6 +213,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     focusStrength: initialState.focusStrength ?? 0,
     focusWidth: initialState.focusWidth ?? (DEFAULT_PRESET.focusWidth ?? 0.24),
     focusHeight: initialState.focusHeight ?? (DEFAULT_PRESET.focusHeight ?? 0.16),
+    focusCenterX: initialState.focusCenterX ?? 0.5,
+    focusCenterY: initialState.focusCenterY ?? 0.5,
+    focusTrackCursor: initialState.focusTrackCursor ?? false,
     isFilterEnabled: initialState.isFilterEnabled ?? true,
   }));
 
@@ -457,6 +463,22 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, focusHeight }));
   };
 
+  const setFocusCenter = (focusCenterX: number, focusCenterY: number) => {
+    setSettings((current) => (
+      current.focusCenterX === focusCenterX && current.focusCenterY === focusCenterY
+        ? current
+        : { ...current, focusCenterX, focusCenterY }
+    ));
+  };
+
+  const setFocusTrackCursor = (focusTrackCursor: boolean) => {
+    setSettings((current) => ({
+      ...current,
+      focusTrackCursor,
+      ...(focusTrackCursor ? {} : { focusCenterX: 0.5, focusCenterY: 0.5 }),
+    }));
+  };
+
   const setIsFilterEnabled = (isFilterEnabled: boolean) => {
     setSettings((current) => ({ ...current, isFilterEnabled }));
   };
@@ -509,6 +531,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       focusStrength: presetSettings.focusStrength ?? 0,
       focusWidth: presetSettings.focusWidth ?? 0.24,
       focusHeight: presetSettings.focusHeight ?? 0.16,
+      focusCenterX: 0.5,
+      focusCenterY: 0.5,
+      focusTrackCursor: false,
       isFilterEnabled: preset !== "none",
     }));
   }, []);
@@ -581,6 +606,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setFocusStrength,
     setFocusWidth,
     setFocusHeight,
+    setFocusCenter,
+    setFocusTrackCursor,
     setIsFilterEnabled,
     applyAllFilterSettings,
     applyPreset,

@@ -58,6 +58,9 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   focusStrength: 0,
   focusWidth: DEFAULT_PRESET.focusWidth ?? 0.24,
   focusHeight: DEFAULT_PRESET.focusHeight ?? 0.16,
+  focusCenterX: 0.5,
+  focusCenterY: 0.5,
+  focusTrackCursor: false,
   isFilterEnabled: true,
 };
 

@@ -177,6 +177,13 @@ export function RetroPlayer({
   const filterState = useRetroFilterState(
     startupNativeMode ? { ...initialFilterState, isFilterEnabled: false } : initialFilterState,
   );
+  const handlePreviewPointerMove = React.useCallback((point: { x: number; y: number }) => {
+    if (!filterState.focusTrackCursor || filterState.focusStrength <= 0) {
+      return;
+    }
+
+    filterState.setFocusCenter(point.x, point.y);
+  }, [filterState]);
   const renderResolutionScale = renderResolutionPreset;
   const player = usePixiVideoPlayer(
     filterState,
@@ -507,6 +514,7 @@ export function RetroPlayer({
               onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
               onFfmpegMaxConcurrentHlsSessionsChange={handleFfmpegMaxConcurrentHlsSessionsChange}
+              onPreviewPointerMove={handlePreviewPointerMove}
             />
           }
           playbackControls={
