@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tetorica Retro Player 取り扱い説明書</title>
+<style>
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.7;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    color: #1c1c22;
+  }
+  h1, h2, h3 { color: #17324d; }
+  h2 { border-bottom: 2px solid #2b6cb0; padding-bottom: 4px; margin-top: 2.5em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #eaf1fb; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+  hr { border: none; border-top: 1px solid #d0d7de; margin: 2em 0; }
+</style>
+</head>
+<body>
+<h1 id="tetorica-retro-player-取り扱い説明書">Tetorica Retro Player 取り扱い説明書</h1>
+<p>画像・動画・画面キャプチャを、レトロPC/CRT風のフィルターとローファイ音声エフェクトで加工しながら再生するプレイヤーです。 本書はアプリの使い方をまとめたユーザー向けマニュアルです（開発者向けの実装メモは <code>docs/issues/</code> を参照してください）。</p>
+<hr />
+<h2 id="1-対応環境">1. 対応環境</h2>
+<table>
+<thead>
+<tr class="header">
+<th>配布形態</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>デスクトップアプリ（Tauri）</td>
+<td>macOS / Windows / Linux。フル機能（後述の mDrop・ffmpeg 変換を含む）が使えます</td>
+</tr>
+<tr class="even">
+<td>Android アプリ（Tauri）</td>
+<td>mDrop・ffmpeg 変換・仮想デバイス機能は無効。ファイル再生・フィルター・音声エフェクトは利用可能</td>
+</tr>
+<tr class="odd">
+<td>Chrome 拡張機能</td>
+<td>現在開いているタブをキャプチャして加工、または他のWebページの動画・画像にフィルターを重ねる「Overlay」機能</td>
+</tr>
+<tr class="even">
+<td>Web版（ブラウザ）</td>
+<td>ドラッグ＆ドロップ・ファイル選択・画面キャプチャで再生。mDrop はネットワーク越しに稼働中のデスクトップアプリへアクセスする形でのみ利用可</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-メディアを読み込む">2. メディアを読み込む</h2>
+<p>左上の ☰ (ハンバーガー) ボタンを押すとメニューが開きます。</p>
+<ul>
+<li><strong>ファイルを開く</strong> — 動画・画像・音声・zip/pdf などをファイル選択ダイアログから読み込みます</li>
+<li><strong>フォルダを開く</strong>（デスクトップのみ） — フォルダ内のメディアをプレイリストとして読み込みます</li>
+<li><strong>画面をキャプチャ</strong> — OSの画面共有ダイアログでウィンドウ／画面全体を選び、そのままフィルターを通してプレビューします</li>
+<li><strong>マイク入力 / カメラ入力</strong> — マイクの音声、またはカメラ映像を取り込みます</li>
+<li><strong>マイクデバイスを選ぶ</strong> — 使用する入力デバイスを個別に指定します</li>
+<li><strong>Test プリセット</strong> — カラーバー動画・カラーバー画像・ToneJS Lo-Fiデモ曲など、動作確認用のサンプルをワンタップで読み込めます（「More」でデモ曲一覧を展開）</li>
+<li><strong>言語</strong> — 自動 / English / 日本語 を切り替えられます</li>
+</ul>
+<p>ハンバーガーボタンを<strong>長押し</strong>すると、ツールバー全体を非表示にできます（配信・鑑賞用にUIを隠したい時向け）。非表示中は左上に小さな半透明ボタンが残るので、それを押すと元に戻ります。</p>
+<p>このほか、メディアファイルを画面にドラッグ＆ドロップして読み込むこともできます。</p>
+<h3 id="対応ファイル形式">対応ファイル形式</h3>
+<table>
+<thead>
+<tr class="header">
+<th>種別</th>
+<th>直接再生できる形式</th>
+<th>ffmpeg変換（HLS）が必要な形式</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>動画</td>
+<td>mp4, m4v, webm, ogv, mov</td>
+<td>avi, flv, mkv, wmv, ts, m2ts, mts, divx, xvid, rm, rmvb, 3gp, f4v, asf, vob, mpeg, mpg, m2v, mxf</td>
+</tr>
+<tr class="even">
+<td>音声</td>
+<td>mp3, wav, ogg/oga, m4a, aac, flac, opus</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>画像</td>
+<td>png, jpg/jpeg, webp, gif, svg, avif, heic/heif</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>その他</td>
+<td>mDrop 経由で共有された pdf / epub / zip(cbz) はブラウザ内でプレビュー可能（動画ではなく閲覧用）</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>ffmpeg変換が必要な形式は、デスクトップアプリで ffmpeg が有効な場合のみ再生できます（詳細は後述の「mDrop」参照）。</p>
+<hr />
+<h2 id="3-画面の基本構成">3. 画面の基本構成</h2>
+<ul>
+<li><strong>プレビュー枠</strong>：フィルター適用後の映像が表示される領域</li>
+<li><strong>右上のツールバー</strong>：Power・Hi-Res・明るさ・Fit width・Pin・Maximize・録画・⋯(More) ボタン（<a href="#5-右上ツールバー">5章</a>）</li>
+<li><strong>右上の mDrop / ffmpeg ピルボタン</strong>（デスクトップアプリのみ）：クリックと長押しで別の動作をする2段構えのボタンです。詳細は <a href="#10-mdrop別端末からのファイル転送">10章「mDrop」</a> を参照してください</li>
+<li><strong>下部のコントロールパネル</strong>：再生操作、Video / Audio 設定タブ、Reset、設定の保存・読み込み</li>
+</ul>
+<hr />
+<h2 id="4-再生操作の基本">4. 再生操作の基本</h2>
+<ul>
+<li><strong>シークバー</strong>：クリック／ドラッグで再生位置を移動</li>
+<li><strong>再生・一時停止</strong>ボタン</li>
+<li><strong>音量</strong>ボタン：短押しで音量スライダーを開閉、<strong>長押し</strong>でミュート切り替え</li>
+<li><strong>ループ</strong>ボタン：押すたびに <code>1曲ループ → 自動で次へ → 全曲ループ → ループなし</code> の順に切り替わります</li>
+<li><strong>速度</strong>（ゲージアイコン）：2x / 1.5x / 1.25x / 1x / 0.75x / 0.5x から選択</li>
+<li><strong>前後スキップ</strong>ボタン：短押しで前後5秒シーク、<strong>長押し</strong>で前後のトラックに移動（プレイリスト再生時）</li>
+</ul>
+<h3 id="プレイリスト機能">プレイリスト機能</h3>
+<p>複数のメディアファイルをまとめて読み込むと、連続再生用のプレイリストになります。</p>
+<p><strong>プレイリストにするには：</strong></p>
+<ol type="1">
+<li>先にループボタンを <strong>「自動で次へ」または「全曲ループ」</strong> にしておく</li>
+<li>その状態で、ファイル選択・フォルダを開く・複数ファイルのドラッグ＆ドロップ・mDropでの複数ファイル共有のいずれかで、<strong>動画/音声/画像だけを複数選択</strong>する</li>
+</ol>
+<p>この条件を満たすとプレイリストとして読み込まれ、下部コントロールパネルの前後スキップボタンが有効になります（1件しかない場合や条件を満たさない場合は先頭の1件だけが読み込まれます）。</p>
+<p><strong>再生中の挙動はループモードによって変わります：</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>ループモード</th>
+<th>曲が終わったら</th>
+<th>手動スキップ（長押し）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>自動で次へ</td>
+<td>次の曲へ進む。最後の曲まで再生したら停止（先頭には戻らない）</td>
+<td>次/前の曲へ移動可能。最後尾・先頭では止まる</td>
+</tr>
+<tr class="even">
+<td>全曲ループ</td>
+<td>次の曲へ進み、最後の曲の後は先頭へ戻って再生し続ける</td>
+<td>次/前の曲へ移動可能。最後尾・先頭では止まる</td>
+</tr>
+<tr class="odd">
+<td>1曲ループ / ループなし</td>
+<td>プレイリストにはならず、選んだ中の最初の1件だけを再生</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>※ 現在の再生位置（「何曲目/全何曲」など）を表示する専用UIはありません。前後スキップボタンと自動再生の動きだけでプレイリストの進行を確認できます。 ※ ループモードを途中で切り替えても、すでに読み込んだプレイリストの内容自体は変わりません（次に曲が終わったときの挙動が変わるだけです）。</p>
+<h3 id="キーボードショートカット">キーボードショートカット</h3>
+<table>
+<thead>
+<tr class="header">
+<th>キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Space または K</td>
+<td>再生・一時停止</td>
+</tr>
+<tr class="even">
+<td>← (左矢印)</td>
+<td>5秒戻る</td>
+</tr>
+<tr class="odd">
+<td>→ (右矢印)</td>
+<td>5秒進む</td>
+</tr>
+<tr class="even">
+<td>J</td>
+<td>10秒戻る</td>
+</tr>
+<tr class="odd">
+<td>L</td>
+<td>10秒進む</td>
+</tr>
+</tbody>
+</table>
+<p>※ 入力欄にフォーカスがある間は無効になります。</p>
+<hr />
+<h2 id="5-右上ツールバー">5. 右上ツールバー</h2>
+<table>
+<thead>
+<tr class="header">
+<th>ボタン</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Power</strong></td>
+<td>レトロフィルターのON/OFF</td>
+</tr>
+<tr class="even">
+<td><strong>Hi-Res</strong>（絞りアイコン）</td>
+<td>描画解像度を 1x / 2x で切り替え</td>
+</tr>
+<tr class="odd">
+<td><strong>明るさ</strong>（−/％/+）</td>
+<td>40%〜200%の範囲で5%刻みに調整。<strong>ウィンドウ幅が480px以上の時だけ</strong>ここに表示され、それより狭い時は「More」メニュー内のスライダーに統合されます</td>
+</tr>
+<tr class="even">
+<td><strong>Fit width</strong></td>
+<td>プレビューを横幅いっぱいに広げる／戻す</td>
+</tr>
+<tr class="odd">
+<td><strong>Pin</strong></td>
+<td>スクロールしてもプレビューを画面内に固定表示（Maximize中は使用不可）</td>
+</tr>
+<tr class="even">
+<td><strong>Maximize</strong></td>
+<td>プレビューを全画面表示。もう一度押すか Esc で解除</td>
+</tr>
+<tr class="odd">
+<td><strong>録画</strong>（●/■アイコン）</td>
+<td>フィルター適用後の映像を録画。もう一度押すと停止して書き出し（幅360px未満では「More」メニューに移動）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="more-メニュー">「⋯」More メニュー</h3>
+<ul>
+<li><strong>Audio Optimize</strong>：auto / chrome / safari — ブラウザごとの音声再生方式を手動指定（通常は auto でOK）</li>
+<li><strong>Latency</strong>：interactive / balanced / playback — WebAudioの遅延優先度。変更はPowerのOFF→ON後に反映</li>
+<li><strong>QSV を使う</strong>（Windowsのみ表示） — Intel Quick Sync対応環境でのffmpeg高速変換を有効化</li>
+<li><strong>HLS ffmpeg スロット数</strong>（1〜8） — 同時に実行できる変換ジョブ数の上限</li>
+<li><strong>アラーム</strong> — 時刻指定（HH:MM）＋ Set / Test / Clear ボタン、+1分 / +5分 / +10分のショートカット。指定時刻にメディア再生または通知音を鳴らします。バックグラウンド動作はブラウザ依存のため、他のウィンドウが前面にある場合など正常に動作しないことがあります</li>
+<li><strong>Flip H / Flip V</strong> — 映像の左右・上下反転</li>
+<li>（狭い画面の場合）明るさスライダーもここに表示されます</li>
+</ul>
+<hr />
+<h2 id="6-video-設定パネル">6. Video 設定パネル</h2>
+<p>下部の「Video」タブを押すと開きます。長押しで Power と同じフィルターON/OFFを切り替えられます。</p>
+<ul>
+<li><strong>プリセット</strong>：pc98_512 / fm77av / pc88va など、機種を模したレトロプリセットをタイルから選択</li>
+<li><strong>パレットモード</strong>：RGBモード／グレースケール／モノクロなどの減色方式</li>
+<li><strong>モノクロトーン</strong>（パレットがモノクロの時のみ）：グリーン・アンバー・アイスなどの単色調</li>
+<li><strong>出力サイズ</strong>：幅・高さのスライダー、アスペクト比を元映像に合わせるチェックボックス</li>
+<li><strong>色数・ディザ・スムーズ</strong>：減色の粒度、ベイヤーディザ、ピクセル化前のぼかし量</li>
+<li><strong>CRT/LCD効果</strong>：曲面、走査線、走査線の明部フェード、ビネット、グロー、フォスファー、近接ノイズ</li>
+<li><strong>トーン圧縮</strong>：明るさ・彩度のダイナミックレンジ圧縮（Amount/Low/High/Knee）</li>
+<li><strong>フォスファードット</strong>（対応パレット時）：ドット形状、輝度、内部解像度2倍化などの詳細設定</li>
+<li><strong>アニメ/トゥーン</strong>：ポスタライズ段数、輪郭線の強さ・検出しきい値</li>
+</ul>
+<p>各項目はスライダーやチェックボックスで、動かすとリアルタイムにプレビューへ反映されます。まずはプリセットを選んでから微調整するのがおすすめです。</p>
+<hr />
+<h2 id="7-audio-設定パネル">7. Audio 設定パネル</h2>
+<p>下部の「Audio」タブを押すと開きます。長押しで音声エフェクトのON/OFFを切り替えられます。</p>
+<ul>
+<li><strong>Effects on/off</strong>：音声エフェクト全体のON/OFF（長押しでFFTスペクトラム表示のON/OFFも可能）</li>
+<li><strong>Noise on/off</strong>：ノイズ効果のON/OFF</li>
+<li><strong>プリセット</strong>：Classic / Lofi / 8-bit / VHS などをタップで一括適用</li>
+<li><strong>エフェクト</strong>：Lo-Fi量、ラジオトーン、ビットクラッシュ、サンプルレート低下、ノイズ低減、ワウ・フラッター、Bass/Mid/Trebleの3バンドEQ</li>
+<li><strong>空間系</strong>：ディレイ、リバーブ、コーラス</li>
+<li><strong>ダイナミクス</strong>：テープサチュレーション、コンプレッサー</li>
+<li><strong>入出力</strong>：音量、ステレオ幅、スモールルーム感、出力/入力ゲイン</li>
+<li><strong>ノイズ</strong>：サーフェスヒス（レコード盤のヒスノイズ）、ヴァイナルダスト（プチノイズ）、暖かみ、エア感、プレゼンス</li>
+</ul>
+<hr />
+<h2 id="8-reset--native再生モード">8. Reset / Native再生モード</h2>
+<p>下部の「Reset」ボタン：</p>
+<ul>
+<li><strong>短押し</strong>：Video/Audioの設定をすべて初期値に戻す</li>
+<li><strong>長押し（0.6秒）</strong>：Native再生モードに切り替え。ボタン表示が「Native」に変わります</li>
+</ul>
+<p>Native再生モードは、レトロフィルターを適用せずOSネイティブの動画再生に切り替えるモードです。特定の環境（Windows上でのHLSストリーミング再生など）でフィルター経由の再生が不安定な場合の代替手段として使えます。</p>
+<hr />
+<h2 id="9-設定の保存読み込み">9. 設定の保存・読み込み</h2>
+<p>下部コントロールパネル右端のアイコンから：</p>
+<ul>
+<li><strong>保存</strong>（フロッピーアイコン）：Video/Audio/UI設定をまとめて <code>retro-YYYYMMDD-&lt;timestamp&gt;.retro.json</code> として書き出します</li>
+<li><strong>読み込み</strong>（フォルダアイコン）：<code>.retro.json</code> をファイル選択またはドラッグ＆ドロップで読み込み、即座に設定へ反映します</li>
+</ul>
+<p>お気に入りの見た目・音を作ったら保存しておき、別のメディアを開いたときに読み込んで使い回せます。</p>
+<hr />
+<h2 id="10-mdrop別端末からのファイル転送">10. mDrop（別端末からのファイル転送）</h2>
+<p><strong>デスクトップアプリのみ</strong>の機能です（Android / Chrome拡張 / Web版では使えません）。同じネットワーク内の別端末（スマホなど）からブラウザ経由でファイルを送り込めます。</p>
+<p>画面右上に「mDrop」ピルボタン（Wifiアイコン）が表示されます。<strong>クリックと長押しで別々の動作をする</strong>ボタンです。</p>
+<table>
+<thead>
+<tr class="header">
+<th>操作</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>クリック（短押し）</strong></td>
+<td>転送用サーバーのON/OFFを切り替え（アプリ起動時は自動でON）。デフォルトはアプリ自身が使う内部通信用で、他の端末からは見えません</td>
+</tr>
+<tr class="even">
+<td><strong>長押し</strong></td>
+<td>「共有モード」のON/OFF。ONにすると画面に <code>IP:ポート</code>（例: <code>192.168.1.5:7878</code>）が表示され、<strong>他の端末のブラウザから直接その URL を開けるようになります</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>共有モードで開いた mDrop Web UI からファイルをアップロードすると、即座にこのアプリのプレビューに反映されます</li>
+<li>送られてきた PDF / EPUB / ZIP(cbz) はブラウザ内でそのままプレビューできます</li>
+<li>「他の端末からアクセスしたい」場合は、クリックしてサーバーを起動した上で、さらに<strong>長押しして共有モードもONにする</strong>必要がある点に注意してください</li>
+</ul>
+<p>隣に「ffmpeg」ピルボタン（波アイコン）も表示される場合があります。ONにすると、ブラウザが直接再生できない動画形式（mkv/aviなど）をHLSストリーミングとして配信できるようになります（ffmpegがインストールされた環境が必要）。</p>
+<hr />
+<h2 id="11-chrome-拡張機能">11. Chrome 拡張機能</h2>
+<p><code>chrome://extensions</code> から読み込む、または Chrome ウェブストアからインストールして使う簡易版です。拡張機能アイコンをクリックするとポップアップが開きます。</p>
+<ul>
+<li><strong>現在のタブをキャプチャ</strong>：表示中のタブの映像をそのまま取り込んでフィルター加工</li>
+<li><strong>ビューアーを表示</strong>：専用タブでキャプチャ結果を表示</li>
+<li><strong>Overlay（実験的機能）</strong>：他のWebページ上の動画・画像に直接レトロフィルターを重ねて表示</li>
+<li>ポップアップ内には本体アプリ同様の <strong>Video</strong> / <strong>Audio</strong> タブに加え、<strong>Overlay</strong> の詳細設定、簡易版の <strong>Alarm</strong> タブがあります</li>
+<li>設定は Chrome 拡張機能のストレージに保存されます（本体アプリの <code>.retro.json</code> とは別管理）</li>
+</ul>
+<hr />
+<h2 id="12-こんな時は">12. こんな時は</h2>
+<ul>
+<li><strong>音が出ない / 「Touch &amp; Play」から進まない</strong>：Safari など一部ブラウザはユーザー操作なしに音声再生を開始できません。表示されているボタンを押して再生を開始してください</li>
+<li><strong>「読み込み中」が続く / フォーマット非対応と表示される</strong>：ffmpeg変換が必要な形式の可能性があります。デスクトップアプリで ffmpeg が有効か確認してください</li>
+<li><strong>再生がカクつく・止まる</strong>：Reset ボタンの長押しで Native再生モードに切り替えると改善することがあります</li>
+<li><strong>Windows で映像は動くのに音が出ない／エフェクトが効かない</strong>：HLS再生時にWeb Audioを経由しない既知の制限です。詳しくは <code>docs/issues/windows-tauri-hls-webaudio-bypass.md</code> を参照してください</li>
+<li>そのほかブラウザ・OS固有の既知の癖は <code>docs/issues/knowhow-os-browser-for-retroplayer.md</code> に一覧をまとめています</li>
+</ul>
+
+</body>
+</html>
