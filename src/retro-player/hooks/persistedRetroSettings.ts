@@ -45,6 +45,8 @@ export type PersistedRetroFilterSettings = {
   neonSaturation: number;
   neonDetail: number;
   focusStrength: number;
+  focusWidth: number;
+  focusHeight: number;
   isFilterEnabled: boolean;
 };
 

@@ -49,6 +49,8 @@ export type RetroVideoFilterState = {
   phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
   focusStrength: number;
+  focusWidth: number;
+  focusHeight: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -115,6 +117,7 @@ type Pass2UniformLocations = {
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uFocusStrength: WebGLUniformLocation | null;
+  uFocusSize: WebGLUniformLocation | null;
   uTime: WebGLUniformLocation | null;
 };
 
@@ -778,6 +781,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
       uCloseUpNoiseStrength: gl.getUniformLocation(program, "uCloseUpNoiseStrength"),
       uFocusStrength: gl.getUniformLocation(program, "uFocusStrength"),
+      uFocusSize: gl.getUniformLocation(program, "uFocusSize"),
       uTime: gl.getUniformLocation(program, "uTime"),
     };
   }
@@ -1052,6 +1056,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uCloseUpNoiseStrength, filterState.closeUpNoiseStrength);
     gl.uniform1f(this.pass2Locs.uFocusStrength, filterState.focusStrength);
+    gl.uniform2f(this.pass2Locs.uFocusSize, filterState.focusWidth, filterState.focusHeight);
     gl.uniform1f(this.pass2Locs.uTime, (nowMs() - this.startedAt) / 1000);
   }
 }

@@ -64,6 +64,8 @@ export type RetroPresetDefinition = {
   neonSaturation: number;
   neonDetail: number;
   focusStrength?: number;
+  focusWidth?: number;
+  focusHeight?: number;
 };
 
 export const RETRO_PRESETS = {
@@ -575,6 +577,8 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
     focusStrength: 0.28,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
     saturationAmount: 0.35,
     saturationLow: 0.0,
     saturationHigh: 0.35,

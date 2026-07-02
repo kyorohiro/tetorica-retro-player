@@ -55,6 +55,8 @@ export type RetroFilterInitialState = Partial<{
   neonSaturation: number;
   neonDetail: number;
   focusStrength: number;
+  focusWidth: number;
+  focusHeight: number;
   isFilterEnabled: boolean;
 }>;
 
@@ -105,6 +107,8 @@ const doesPresetMatchState = (
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
+    (preset.focusWidth ?? 0.24) === state.focusWidth &&
+    (preset.focusHeight ?? 0.16) === state.focusHeight &&
     preset.monoTint === state.monoTint &&
     preset.neonBoost === state.neonBoost &&
     preset.neonSaturation === state.neonSaturation &&
@@ -204,6 +208,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
     neonDetail: initialState.neonDetail ?? DEFAULT_PRESET.neonDetail,
     focusStrength: initialState.focusStrength ?? 0,
+    focusWidth: initialState.focusWidth ?? (DEFAULT_PRESET.focusWidth ?? 0.24),
+    focusHeight: initialState.focusHeight ?? (DEFAULT_PRESET.focusHeight ?? 0.16),
     isFilterEnabled: initialState.isFilterEnabled ?? true,
   }));
 
@@ -441,6 +447,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, focusStrength }));
   };
 
+  const setFocusWidth = (focusWidth: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, focusWidth }));
+  };
+
+  const setFocusHeight = (focusHeight: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, focusHeight }));
+  };
+
   const setIsFilterEnabled = (isFilterEnabled: boolean) => {
     setSettings((current) => ({ ...current, isFilterEnabled }));
   };
@@ -491,6 +507,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       neonSaturation: presetSettings.neonSaturation,
       neonDetail: presetSettings.neonDetail,
       focusStrength: presetSettings.focusStrength ?? 0,
+      focusWidth: presetSettings.focusWidth ?? 0.24,
+      focusHeight: presetSettings.focusHeight ?? 0.16,
       isFilterEnabled: preset !== "none",
     }));
   }, []);
@@ -561,6 +579,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setNeonSaturation,
     setNeonDetail,
     setFocusStrength,
+    setFocusWidth,
+    setFocusHeight,
     setIsFilterEnabled,
     applyAllFilterSettings,
     applyPreset,
