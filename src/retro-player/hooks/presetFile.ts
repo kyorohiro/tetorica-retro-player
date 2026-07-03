@@ -1,7 +1,7 @@
 import { DEFAULT_AUDIO_SETTINGS } from "../audio/preset";
 import { loadLocalePreference } from "../../i18n";
 import type { LocalePreference } from "../../i18n";
-import { RETRO_PRESETS, type RetroPresetDefinition } from "../retro/config";
+import { RETRO_PRESETS, defaultPresetId, type RetroPresetDefinition } from "../retro/config";
 import { loadPersistedRetroSettings } from "./persistedRetroSettings";
 import type {
   PersistedRetroAudioSettings,
@@ -12,7 +12,7 @@ import type {
 const FILE_TYPE = "tetorica-retro-player-settings";
 const FILE_VERSION = 1;
 
-const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.pc98_512;
+const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 
 const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   targetWidth: DEFAULT_PRESET.width,
@@ -27,9 +27,9 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   scanlineBrightnessFade: 0.6,
   vignetteStrength: DEFAULT_PRESET.vignette,
   glowStrength: DEFAULT_PRESET.glow,
-  smoothStrength: 0,
-  toonSteps: 0,
-  edgeBoost: 0,
+  smoothStrength: DEFAULT_PRESET.smoothStrength ?? 0,
+  toonSteps: DEFAULT_PRESET.toonSteps ?? 0,
+  edgeBoost: DEFAULT_PRESET.edgeBoost ?? 0,
   animeEdgeLow: 0.08,
   animeEdgeHigh: 0.55,
   phosphorStrength: DEFAULT_PRESET.phosphor,
