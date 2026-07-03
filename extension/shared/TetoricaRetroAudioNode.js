@@ -36,7 +36,7 @@ var RETRO_AUDIO_PRESET_PARTIALS = {
   none: {
     label: "None",
     settings: {
-      isAudioFxEnabled: false,
+      isAudioFxEnabled: true,
       isNoiseEnabled: false,
       //volume: 1,
       lofiAmount: 0,
