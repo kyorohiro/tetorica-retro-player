@@ -422,7 +422,8 @@ export function useRetroAudioEngine({
   });
   const debugAudio = (label: string, payload?: Record<string, unknown>) =>
     audioEngineRef.current?.debugAudio(label, payload);
-  const ensureInitialized = () => getOrCreateEngine().ensureInitialized();
+  const ensureInitialized = (options?: { requireActivation?: boolean }) =>
+    getOrCreateEngine().ensureInitialized(options);
   const ensureAudioContext = () => getOrCreateEngine().ensureInitialized();
   const updateAudioNodes = () => audioEngineRef.current?.updateAudioNodes();
   const connectSourceNode = (sourceNode: AudioNode) =>
@@ -545,7 +546,7 @@ export function useRetroAudioEngine({
   };
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
-    const context = await ensureInitialized();
+    const context = await ensureInitialized({ requireActivation: true });
     const engine = audioEngineRef.current;
     if (!context || !engine || !engine.input) {
       debugAudio("connectMediaAudio:no-context", {

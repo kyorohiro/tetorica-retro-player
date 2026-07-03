@@ -171,17 +171,19 @@ export async function getDroppedFiles(
 
     const items = Array.from(ev.dataTransfer.items ?? []);
 
-    // await 前に entry / file を確保しておく
+    // await 前に entry / file を確保しておく。
+    // Safari は FileSystemEntry.file() が NotFoundError で失敗することがある
+    // (iCloud Desktop 同期など)。その場合に備えて getAsFile() のフォールバックも保持する。
     const entriesOrFiles = items
         .map((item) => {
             const entry = (item as any).webkitGetAsEntry?.();
+            const fallbackFile = item.getAsFile?.() ?? null;
             if (entry) {
-                return { type: "entry" as const, entry };
+                return { type: "entry" as const, entry, fallbackFile };
             }
 
-            const file = item.getAsFile?.();
-            if (file) {
-                return { type: "file" as const, file };
+            if (fallbackFile) {
+                return { type: "file" as const, file: fallbackFile };
             }
 
             return null;
@@ -196,6 +198,10 @@ export async function getDroppedFiles(
                 await readEntry(item.entry, "");
             } catch (e) {
                 console.error("readEntry failed:", item.entry?.name, e);
+                if (item.fallbackFile) {
+                    console.warn("readEntry fallback: using getAsFile() instead for", item.fallbackFile.name);
+                    files.push(item.fallbackFile as FileWithRelativePath);
+                }
             }
         } else {
             files.push(item.file as FileWithRelativePath);
