@@ -535,7 +535,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       focusCenterX: 0.5,
       focusCenterY: 0.5,
       focusTrackCursor: false,
-      isFilterEnabled: preset !== "none",
+      isFilterEnabled: true,
     }));
   }, []);
 

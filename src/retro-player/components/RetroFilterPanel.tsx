@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import {
   MONO_TINTS,
+  RETRO_PRESET_CATEGORIES,
+  RETRO_PRESET_CATEGORY_LABELS,
+  RETRO_PRESET_CATEGORY_ORDER,
   RETRO_PRESETS,
   type MonoTintMode,
   type PaletteMode,
@@ -364,39 +367,75 @@ export function RetroFilterPanel({
       phosphorDotNeighborBlend
     );
 
+  const presetButtonClass = (isSelected: boolean) => [
+    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+    isSelected
+      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+      : "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20",
+  ].join(" ");
+
+  const presetsByCategory = RETRO_PRESET_CATEGORY_ORDER.map((category) => ({
+    category,
+    presets: Object.entries(RETRO_PRESETS).filter(
+      ([key]) => key !== "none" && RETRO_PRESET_CATEGORIES[key as keyof typeof RETRO_PRESET_CATEGORIES] === category,
+    ),
+  }));
+
   return (
     <>
-      <div className="grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            onSetIsFilterEnabled(!isFilterEnabled);
-          }}
-          className={[
-            "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-            isFilterEnabled
-              ? "border-emerald-400 bg-emerald-500/20"
-              : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-          ].join(" ")}
-        >
-          {isFilterEnabled ? "Filter on" : "Filter off"}
-        </button>
-        {Object.entries(RETRO_PRESETS).map(([key, preset]) => (
+      {/* "None" and the power toggle sit outside the preset category boxes. */}
+      <div className="rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/50 p-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
-            key={key}
             type="button"
             onClick={() => {
-              onApplyPreset(key as RetroPresetKey);
+              onSetIsFilterEnabled(!isFilterEnabled);
             }}
             className={[
               "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-              selectedPreset === key
-                ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                : "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20",
+              isFilterEnabled
+                ? "border-emerald-400 bg-emerald-500/20"
+                : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
             ].join(" ")}
           >
-            {preset.label}
+            {isFilterEnabled ? "Filter on" : "Filter off"}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              onApplyPreset("none");
+            }}
+            className={presetButtonClass(selectedPreset === "none")}
+          >
+            {RETRO_PRESETS.none.label}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-2 space-y-2">
+        {presetsByCategory.map(({ category, presets }) => (
+          <div
+            key={category}
+            className="rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/50 p-2"
+          >
+            <p className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7a7268]">
+              {RETRO_PRESET_CATEGORY_LABELS[category]}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {presets.map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    onApplyPreset(key as RetroPresetKey);
+                  }}
+                  className={presetButtonClass(selectedPreset === key)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 

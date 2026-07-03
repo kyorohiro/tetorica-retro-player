@@ -597,6 +597,49 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 export const defaultPresetId: RetroPresetKey = "phosphorDot";
 // デフォルト候補: "phosphorDot";//"tetorica";
 
+// Grouping used by the preset picker UI. "none" is intentionally excluded —
+// it's rendered outside the category boxes as a plain "no filter" option.
+export type RetroPresetCategory = "classic" | "lcd" | "crt" | "other";
+
+export const RETRO_PRESET_CATEGORY_LABELS: Record<RetroPresetCategory, string> = {
+  classic: "Game / Classic",
+  lcd: "LCD",
+  crt: "CRT",
+  other: "Other",
+};
+
+export const RETRO_PRESET_CATEGORY_ORDER: RetroPresetCategory[] = [
+  "classic",
+  "lcd",
+  "crt",
+  "other",
+];
+
+export const RETRO_PRESET_CATEGORIES = {
+  chunky: "classic",
+  arcade: "classic",
+  gb: "classic",
+  gba: "classic",
+  pc98_512: "classic",
+  pc98_4096: "classic",
+  pc98: "classic",
+  pc98_tile: "classic",
+  color32: "classic",
+  color64: "classic",
+  monochrome: "lcd",
+  lcdIce: "lcd",
+  greenTerminal: "crt",
+  amberCrt: "crt",
+  phosphorDot: "crt",
+  crtOnly: "crt",
+  crtEdge: "crt",
+  warmBokeh: "crt",
+  neonLine: "other",
+  animeCel: "other",
+  animeToon: "other",
+  tetorica: "other",
+} as const satisfies Record<Exclude<RetroPresetKey, "none">, RetroPresetCategory>;
+
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
   if (mode === "pc98_tile") return 2;

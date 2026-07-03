@@ -285,6 +285,13 @@ export function RetroPlayer({
   const applyPresetWithAspect = React.useCallback(
     (presetKey: RetroPresetKey) => {
       filterState.applyPreset(presetKey);
+
+      // "None" is meant to be a neutral pass-through, not a way to also
+      // silence audio effects — keep Effect on (Noise is left as-is).
+      if (presetKey === "none" && !player.isAudioFxEnabled) {
+        player.toggleAudioFx();
+      }
+
       if (presetKey !== "phosphorDot" || !player.sourceDimensions) return;
 
       const preset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
@@ -311,6 +318,8 @@ export function RetroPlayer({
       filterState.setTargetHeight,
       filterState.setTargetWidth,
       player.sourceDimensions,
+      player.isAudioFxEnabled,
+      player.toggleAudioFx,
     ],
   );
 
