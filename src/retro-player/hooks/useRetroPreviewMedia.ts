@@ -331,18 +331,34 @@ export function useRetroPreviewMedia({
         return `code-${mediaError.code}`;
       };
 
+      const describeState = (label: string) => ({
+        label,
+        src: video.currentSrc || video.src || "(empty)",
+        readyState: video.readyState,
+        networkState: video.networkState,
+        error: video.error ? describeMediaError(video.error) : null,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+      });
+
       const cleanup = () => {
-        video.removeEventListener("loadeddata", handleReady);
-        video.removeEventListener("canplay", handleReady);
+        video.removeEventListener("loadeddata", handleLoadedData);
+        video.removeEventListener("canplay", handleCanPlay);
         video.removeEventListener("error", handleError);
+        window.clearInterval(pollId);
+        window.clearTimeout(timeoutId);
       };
 
-      const handleReady = () => {
+      const handleReady = (eventName: string) => {
+        debugVideo("waitForVideoFrame:event-ready", describeState(eventName));
         cleanup();
         resolve();
       };
+      const handleLoadedData = () => { handleReady("loadeddata"); };
+      const handleCanPlay = () => { handleReady("canplay"); };
 
       const handleError = () => {
+        debugVideo("waitForVideoFrame:event-error", describeState("error"));
         cleanup();
         reject(
           new Error(
@@ -352,12 +368,37 @@ export function useRetroPreviewMedia({
       };
 
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        debugVideo("waitForVideoFrame:already-ready", describeState("sync-check"));
         resolve();
         return;
       }
 
-      video.addEventListener("loadeddata", handleReady, { once: true });
-      video.addEventListener("canplay", handleReady, { once: true });
+      // Diagnostic: some Safari builds have been observed to never fire
+      // `loadeddata`/`canplay` for certain blob-URL sources even though
+      // `readyState` does advance — log periodically so a stuck "Loading
+      // video preview..." can be diagnosed from the console.
+      const pollId = window.setInterval(() => {
+        debugVideo("waitForVideoFrame:poll", describeState("poll"));
+      }, 1000);
+
+      // Safety net: if neither a ready nor an error event ever fires, don't
+      // hang forever. Fall back to whatever readyState says after a timeout.
+      const timeoutId = window.setTimeout(() => {
+        debugVideo("waitForVideoFrame:timeout", describeState("timeout"));
+        cleanup();
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `動画の読み込みがタイムアウトしました。 src=${video.currentSrc || video.src || "(empty)"} readyState=${video.readyState}`,
+            ),
+          );
+        }
+      }, 8000);
+
+      video.addEventListener("loadeddata", handleLoadedData, { once: true });
+      video.addEventListener("canplay", handleCanPlay, { once: true });
       video.addEventListener("error", handleError, { once: true });
       video.load();
     });

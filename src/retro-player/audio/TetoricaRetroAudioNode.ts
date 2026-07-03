@@ -1081,7 +1081,7 @@ export class TetoricaRetroAudioNode {
   // Public API
   // ---------------------------------------------------------------------------
 
-  async ensureInitialized() {
+  async ensureInitialized(options?: { requireActivation?: boolean }) {
     if (this.context.state === "closed") {
       this.resetNodes();
       return null;
@@ -1096,10 +1096,57 @@ export class TetoricaRetroAudioNode {
     // resume はここで行う（利便性のため）。
     // 将来的には build と resume を分離し resumeContext() を独立させる候補。
     if (activeContext?.state === "suspended") {
+      if (options?.requireActivation) {
+        // Safari では、ここまでの await 連鎖でユーザージェスチャーの有効期限
+        // (transient activation) が既に切れていることがある。その状態のまま
+        // resume() を呼ぶと reject もせず Promise が永久に pending のままに
+        // なることがあるため、呼び出し元が要求した場合は事前に
+        // navigator.userActivation で判定し、無効なら resume() を試みず
+        // 即座に検出可能なエラーを投げて呼び出し元の autoplay-blocked 検知
+        // (isAutoplayBlockedError / recoverToManualPlayPrompt) に委ねる。
+        const userActivation = (navigator as { userActivation?: { isActive: boolean } })
+          .userActivation;
+        if (userActivation && !userActivation.isActive) {
+          this.debugAudio("ensureInitialized:resume-skip-no-activation", {
+            state: activeContext.state,
+          });
+          throw new DOMException(
+            "AudioContext.resume() requires an active user activation.",
+            "NotAllowedError",
+          );
+        }
+      }
+
+      this.debugAudio("ensureInitialized:resume-start", {
+        state: activeContext.state,
+      });
       try {
-        await activeContext.resume();
-      } catch {
-        // Resume can be blocked until the next user gesture.
+        // 一部の Safari バージョンでは、有効なユーザージェスチャーがあっても
+        // resume() が reject も resolve もせず pending のままになる既知の
+        // 不具合が報告されている。呼び出し元(alarm clock など)を無期限に
+        // ブロックしないための最終防衛線としてタイムアウトを設ける。
+        // (通常ケースの「ジェスチャー失効」自体は呼び出し元で
+        // navigator.userActivation を見て事前に弾く方針。)
+        const resumed = await Promise.race([
+          activeContext.resume().then(() => true),
+          new Promise<false>((resolve) => {
+            window.setTimeout(() => resolve(false), 3000);
+          }),
+        ]);
+        this.debugAudio(
+          resumed ? "ensureInitialized:resume-done" : "ensureInitialized:resume-timeout",
+          { state: activeContext.state },
+        );
+      } catch (error) {
+        // Resume can be blocked until the next user gesture. Callers that
+        // need to react to this (e.g. show a manual-play prompt) should
+        // check navigator.userActivation themselves before calling in;
+        // this shared engine is also used by callers (alarm clock) that
+        // intentionally tolerate a silently-still-suspended context.
+        this.debugAudio("ensureInitialized:resume-failed", {
+          state: activeContext.state,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
