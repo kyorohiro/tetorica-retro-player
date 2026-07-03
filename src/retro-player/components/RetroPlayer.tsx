@@ -162,6 +162,7 @@ export function RetroPlayer({
   >("playback");
   const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
   const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
+  const [showClockOverlay, setShowClockOverlay] = React.useState(false);
 
   React.useEffect(() => {
     void syncFfmpegUseQsv(startupUseQsv);
@@ -431,6 +432,7 @@ export function RetroPlayer({
             onError={onError}
             analyserRef={player.analyserRef}
             showVideoSpectrum={showVideoSpectrum}
+            showClockOverlay={showClockOverlay}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -488,6 +490,8 @@ export function RetroPlayer({
     onCycleLoopMode,
     showVideoSpectrum,
     onToggleVideoSpectrum: () => setShowVideoSpectrum(v => !v),
+    showClockOverlay,
+    onToggleClockOverlay: () => setShowClockOverlay(v => !v),
     isNativePlaybackMode: nativePlaybackMode,
     nativePlaybackNeedsReload: nativePlaybackMode !== startupNativeMode,
     onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
@@ -521,6 +525,7 @@ export function RetroPlayer({
               onIsPinnedPreviewChange={setIsPinnedInPreview}
               analyserRef={player.analyserRef}
               showVideoSpectrum={showVideoSpectrum}
+            showClockOverlay={showClockOverlay}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}

@@ -105,6 +105,8 @@ type VideoControlsProps = {
   onToggleVideoFx: () => void;
   showVideoSpectrum?: boolean;
   onToggleVideoSpectrum?: () => void;
+  showClockOverlay?: boolean;
+  onToggleClockOverlay?: () => void;
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
@@ -210,6 +212,8 @@ export const VideoControls = memo(function VideoControls({
   onToggleVideoFx,
   showVideoSpectrum,
   onToggleVideoSpectrum,
+  showClockOverlay,
+  onToggleClockOverlay,
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
@@ -244,10 +248,6 @@ export const VideoControls = memo(function VideoControls({
     }
   };
   const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
-  const { isHolding: isEffectsHolding, ...effectsButtonHandlers } = useLongPress(
-    useCallback(() => { onToggleVideoSpectrum?.(); }, [onToggleVideoSpectrum]),
-    onToggleAudioFx,
-  );
   const noop = useCallback(() => {}, []);
   const { isHolding: isPrevHolding, ...prevTrackHandlers } = useLongPress(
     onPrevTrack ?? noop,
@@ -264,6 +264,14 @@ export const VideoControls = memo(function VideoControls({
   const { isHolding: isResetHolding, ...resetButtonHandlers } = useLongPress(
     useCallback(() => { onToggleNativePlaybackMode?.(); }, [onToggleNativePlaybackMode]),
     onResetSettings,
+  );
+  const { isHolding: isSaveHolding, ...saveButtonHandlers } = useLongPress(
+    useCallback(() => { onToggleClockOverlay?.(); }, [onToggleClockOverlay]),
+    exportPresetFile,
+  );
+  const { isHolding: isLoadHolding, ...loadButtonHandlers } = useLongPress(
+    useCallback(() => { onToggleVideoSpectrum?.(); }, [onToggleVideoSpectrum]),
+    useCallback(() => { fileInputRef.current?.click(); }, []),
   );
 
   // Keep the restart callback in the surface area for future UI revival.
@@ -394,30 +402,16 @@ export const VideoControls = memo(function VideoControls({
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            {...effectsButtonHandlers}
+            onClick={onToggleAudioFx}
             className={[
-              "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
-              isEffectsHolding
-                ? "border-amber-500 bg-amber-500/30"
-                : isAudioFxEnabled && showVideoSpectrum
-                  ? "border-amber-500 bg-amber-400/30"
-                  : isAudioFxEnabled
-                    ? "border-amber-400 bg-amber-500/20"
-                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+              isAudioFxEnabled
+                ? "border-amber-400 bg-amber-500/20"
+                : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
             ].join(" ")}
           >
-            {isEffectsHolding && (
-              <span
-                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
-                style={{ animation: "long-press-charge 0.6s linear forwards" }}
-              />
-            )}
-            <Waves size={16} className="relative z-10" />
-            <span className="relative z-10">
-              {isAudioFxEnabled
-                ? showVideoSpectrum ? "on & FFT" : "Effects on"
-                : showVideoSpectrum ? "off & FFT" : "Effects off"}
-            </span>
+            <Waves size={16} />
+            <span>{isAudioFxEnabled ? "Effects on" : "Effects off"}</span>
           </button>
           <button
             type="button"
@@ -1277,19 +1271,41 @@ export const VideoControls = memo(function VideoControls({
         )}
         <button
           type="button"
-          onClick={exportPresetFile}
-          title="Save settings to file"
-          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]"
+          {...saveButtonHandlers}
+          title="Save settings to file (long-press for clock overlay)"
+          className={[
+            "relative select-none overflow-hidden inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
+            showClockOverlay
+              ? "border-emerald-500/50 bg-emerald-500/15"
+              : "border-[#bcb4a6] bg-[#e6e2db]",
+          ].join(" ")}
         >
-          <Save size={13} />
+          {isSaveHolding && (
+            <span
+              className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+              style={{ animation: "long-press-charge 0.6s linear forwards" }}
+            />
+          )}
+          <Save size={13} className="relative z-10" />
         </button>
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          title="Load settings from .retro.json file"
-          className="inline-flex min-h-10 w-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]"
+          {...loadButtonHandlers}
+          title="Load settings from .retro.json file (long-press for FFT overlay)"
+          className={[
+            "relative select-none overflow-hidden inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
+            showVideoSpectrum
+              ? "border-emerald-500/50 bg-emerald-500/15"
+              : "border-[#bcb4a6] bg-[#e6e2db]",
+          ].join(" ")}
         >
-          <FolderOpen size={13} />
+          {isLoadHolding && (
+            <span
+              className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+              style={{ animation: "long-press-charge 0.6s linear forwards" }}
+            />
+          )}
+          <FolderOpen size={13} className="relative z-10" />
         </button>
       </div>
       {hasPlayback && (
