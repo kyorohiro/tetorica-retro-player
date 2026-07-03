@@ -435,6 +435,8 @@ export function RetroPlayer({
             onToggleFfmpegUseQsv={handleToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
             onFfmpegMaxConcurrentHlsSessionsChange={handleFfmpegMaxConcurrentHlsSessionsChange}
+            selectedPreset={filterState.selectedPreset}
+            onApplyPreset={applyPresetWithAspect}
           />
           <RetroControlPanel
             locale={locale}
@@ -524,6 +526,8 @@ export function RetroPlayer({
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
               onFfmpegMaxConcurrentHlsSessionsChange={handleFfmpegMaxConcurrentHlsSessionsChange}
               onPreviewPointerMove={handlePreviewPointerMove}
+              selectedPreset={filterState.selectedPreset}
+              onApplyPreset={applyPresetWithAspect}
             />
           }
           playbackControls={
