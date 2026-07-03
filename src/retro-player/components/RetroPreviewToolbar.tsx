@@ -10,14 +10,25 @@ import {
   Maximize2,
   Minimize2,
   MoreHorizontal,
+  Pause,
   Pin,
+  Play,
   Power,
   Square,
   Sun,
 } from "lucide-react";
 import type { RetroAudioSettings } from "../audio/preset";
 import type { RetroAlarmStatus } from "../hooks/useRetroAlarm";
+import { useLongPress } from "../hooks/useLongPress";
 import type { RetroPlayerLocale } from "../types";
+
+const formatTime = (seconds: number) => {
+  if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainSeconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
+};
 
 // Below this the compact brightness stepper doesn't fit next to
 // power/hi-res/fit-width (plus the inline record button, when shown) and
@@ -32,6 +43,11 @@ type RetroPreviewToolbarPlayerSlice = {
   isPoweredOn: boolean;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
   latencyHint: AudioContextLatencyCategory;
+  isPlaying: boolean;
+  togglePlayback: () => Promise<void>;
+  currentTime: number;
+  duration: number;
+  seekTo: (nextTime: number) => void;
 };
 
 type RetroPreviewToolbarProps = {
@@ -156,6 +172,7 @@ export function RetroPreviewToolbar({
           disabled: "Off",
       };
   const [isMoreOpen, setIsMoreOpen] = React.useState(false);
+  const [isQuickSeekOpen, setIsQuickSeekOpen] = React.useState(false);
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== "undefined" && window.innerWidth < 360,
   );
@@ -164,8 +181,10 @@ export function RetroPreviewToolbar({
   );
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
   const [moreMenuStyle, setMoreMenuStyle] = React.useState<React.CSSProperties | null>(null);
+  const [quickSeekStyle, setQuickSeekStyle] = React.useState<React.CSSProperties | null>(null);
   const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
+  const quickSeekRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
 
   const scheduleTooltip = React.useCallback((key: string) => {
@@ -287,6 +306,76 @@ export function RetroPreviewToolbar({
     };
   }, [isMoreOpen, updateMoreMenuPosition]);
 
+  const updateQuickSeekPosition = React.useCallback(() => {
+    if (typeof window === "undefined" || !moreButtonRef.current) return;
+
+    const rect = moreButtonRef.current.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(260, window.innerWidth - margin * 2);
+    const height = 56;
+    const spaceAbove = Math.max(0, rect.top - margin);
+    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - margin);
+    const openUp = spaceAbove > spaceBelow && spaceAbove >= height;
+
+    const left = Math.min(
+      Math.max(margin, rect.left),
+      Math.max(margin, window.innerWidth - width - margin),
+    );
+    const top = openUp
+      ? Math.max(margin, rect.top - height - margin)
+      : Math.min(rect.bottom + margin, Math.max(margin, window.innerHeight - height - margin));
+
+    setQuickSeekStyle({ position: "fixed", left, top, width, zIndex: 1000 });
+  }, []);
+
+  React.useEffect(() => {
+    if (!isQuickSeekOpen) return;
+
+    updateQuickSeekPosition();
+
+    const handleWindowChange = () => {
+      updateQuickSeekPosition();
+    };
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        !quickSeekRef.current?.contains(target) &&
+        !moreButtonRef.current?.contains(target)
+      ) {
+        setIsQuickSeekOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsQuickSeekOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleWindowChange, { passive: true });
+    window.addEventListener("scroll", handleWindowChange, { passive: true });
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("resize", handleWindowChange);
+      window.removeEventListener("scroll", handleWindowChange);
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isQuickSeekOpen, updateQuickSeekPosition]);
+
+  const { isHolding: isMoreHolding, ...moreLongPressHandlers } = useLongPress(
+    React.useCallback(() => {
+      setIsMoreOpen(false);
+      setIsQuickSeekOpen(true);
+    }, []),
+    React.useCallback(() => {
+      hideTooltip();
+      setIsMoreOpen((v) => !v);
+    }, [hideTooltip]),
+  );
+
   const floatingButtonClass =
     "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition backdrop-blur-sm";
   const glowingFloatingButtonClass =
@@ -317,16 +406,56 @@ export function RetroPreviewToolbar({
           ref={moreButtonRef}
           type="button"
           aria-label="More options"
-          onClick={() => { hideTooltip(); setIsMoreOpen((v) => !v); }}
+          title="More options (long-press for quick play/seek)"
+          {...moreLongPressHandlers}
           className={[
             floatingButtonClass,
-            isMoreOpen || brightness !== 1.0 || flipH || flipV
+            "relative select-none overflow-hidden",
+            isMoreOpen || isQuickSeekOpen || isMoreHolding || brightness !== 1.0 || flipH || flipV
               ? glowingFloatingButtonClass
               : idleFloatingButtonClass,
           ].join(" ")}
         >
-          <MoreHorizontal size={16} />
+          {isMoreHolding && (
+            <span
+              className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+              style={{ animation: "long-press-charge 0.6s linear forwards" }}
+            />
+          )}
+          <MoreHorizontal size={16} className="relative z-10" />
         </button>
+        {isQuickSeekOpen && quickSeekStyle && typeof document !== "undefined" && createPortal(
+          <div
+            ref={quickSeekRef}
+            style={quickSeekStyle}
+            className="flex items-center gap-2 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
+          >
+            <button
+              type="button"
+              aria-label={player.isPlaying ? "Pause" : "Play"}
+              onClick={() => { void player.togglePlayback(); }}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-500/70 bg-slate-900/78 text-slate-100 transition hover:bg-slate-800/90"
+            >
+              {player.isPlaying ? <Pause size={14} /> : <Play size={14} />}
+            </button>
+            <span className="w-10 shrink-0 text-[10px] tabular-nums text-slate-400">
+              {formatTime(player.currentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={player.duration || 0}
+              step={0.1}
+              value={Math.min(player.currentTime, player.duration || 0)}
+              onChange={(e) => { player.seekTo(Number(e.currentTarget.value)); }}
+              className="h-1.5 min-w-0 flex-1 accent-emerald-400"
+            />
+            <span className="w-10 shrink-0 text-right text-[10px] tabular-nums text-slate-400">
+              {formatTime(player.duration)}
+            </span>
+          </div>,
+          document.body,
+        )}
         {isMoreOpen && moreMenuStyle && typeof document !== "undefined" && createPortal(
           <div
             ref={moreMenuRef}
