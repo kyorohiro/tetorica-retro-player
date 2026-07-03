@@ -1311,7 +1311,7 @@ var TetoricaRetroAudioNode = class {
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
-  async ensureInitialized() {
+  async ensureInitialized(options) {
     if (this.context.state === "closed") {
       this.resetNodes();
       return null;
@@ -1321,9 +1321,37 @@ var TetoricaRetroAudioNode = class {
     }
     const activeContext = this.nodes.audioContext;
     if (activeContext?.state === "suspended") {
+      if (options?.requireActivation) {
+        const userActivation = navigator.userActivation;
+        if (userActivation && !userActivation.isActive) {
+          this.debugAudio("ensureInitialized:resume-skip-no-activation", {
+            state: activeContext.state
+          });
+          throw new DOMException(
+            "AudioContext.resume() requires an active user activation.",
+            "NotAllowedError"
+          );
+        }
+      }
+      this.debugAudio("ensureInitialized:resume-start", {
+        state: activeContext.state
+      });
       try {
-        await activeContext.resume();
-      } catch {
+        const resumed = await Promise.race([
+          activeContext.resume().then(() => true),
+          new Promise((resolve) => {
+            window.setTimeout(() => resolve(false), 3e3);
+          })
+        ]);
+        this.debugAudio(
+          resumed ? "ensureInitialized:resume-done" : "ensureInitialized:resume-timeout",
+          { state: activeContext.state }
+        );
+      } catch (error) {
+        this.debugAudio("ensureInitialized:resume-failed", {
+          state: activeContext.state,
+          message: error instanceof Error ? error.message : String(error)
+        });
       }
     }
     this.updateAudioNodes();
