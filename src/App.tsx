@@ -36,6 +36,7 @@ import {
   dispatchRetroPlayerPrepareExternalNavigation,
 } from "./retro-player/events";
 import { MobileMenu } from "./MobileMenu";
+import { LicenseDialog } from "./LicenseDialog";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { type PresetConfig, loadStartupPreset, saveStartupPreset } from "./builtin-content/preset-config";
 import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
@@ -154,7 +155,7 @@ function App() {
   const isUsingDefaultPreview =
     !previewSource.previewSrc && !previewSource.previewStream;
   const retroPlayerKey = "player:root";
-  const { showConfirmDialog, showSelectDialog } = useDialog();
+  const { showConfirmDialog, showSelectDialog, showDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const { showPreviewDialog } = usePreviewDialog();
@@ -1105,6 +1106,13 @@ function App() {
     setLocalePreference(nextPreference);
   }, []);
 
+  const handleOpenLicenses = useCallback(() => {
+    setIsMobileMenuOpen(false);
+    void showDialog<void>(({ close }) => (
+      <LicenseDialog locale={locale} onClose={close} />
+    ));
+  }, [showDialog, locale]);
+
   return (
     <>
       {/* Fixed nav buttons: kept outside <main> so overflow-x-hidden on <main> cannot clip them in WebKit */}
@@ -1246,6 +1254,7 @@ function App() {
           onPresetLofi={() => { void handlePresetLofi(); }}
           onPresetDemoSong={(meta: DemoSongMeta) => { void handlePresetDemoSong(meta); }}
           onChangeLocale={handleChangeLocale}
+          onOpenLicenses={handleOpenLicenses}
         />
       )}
       <main

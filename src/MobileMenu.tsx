@@ -1,5 +1,5 @@
 import React from "react";
-import { Camera, FileUp, FolderOpen, Mic, MonitorUp } from "lucide-react";
+import { Camera, FileUp, FolderOpen, Mic, MonitorUp, ScrollText } from "lucide-react";
 import { t, type Locale, type LocalePreference } from "./i18n";
 import { DEMO_SONGS, type DemoSongMeta } from "./builtin-content/demo-songs";
 
@@ -18,6 +18,7 @@ interface MobileMenuProps {
   onPresetLofi: () => void;
   onPresetDemoSong: (meta: DemoSongMeta) => void;
   onChangeLocale: (pref: LocalePreference) => void;
+  onOpenLicenses: () => void;
 }
 
 export function MobileMenu({
@@ -35,6 +36,7 @@ export function MobileMenu({
   onPresetLofi,
   onPresetDemoSong,
   onChangeLocale,
+  onOpenLicenses,
 }: MobileMenuProps) {
   const [showMore, setShowMore] = React.useState(false);
 
@@ -196,6 +198,15 @@ export function MobileMenu({
           ))}
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onOpenLicenses}
+        className="mt-2 flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-white"
+      >
+        <ScrollText className="h-4 w-4 shrink-0 text-slate-500" />
+        {t(locale, "licenses")}
+      </button>
     </div>
   );
 }

@@ -39,6 +39,14 @@ const messages = {
     preparingSelectionDetail:
       "This can take a moment on phones or with large folders, but the app is still working.",
     playbackRetryHint: "Playback did not start. Press Play to retry.",
+    licenses: "Licenses",
+    licensesTitle: "Open Source Licenses",
+    licensesSearchPlaceholder: "Search by package name...",
+    licensesGroupNpm: "JavaScript / npm",
+    licensesGroupRust: "Rust / Cargo",
+    licensesGroupOther: "Other",
+    licensesNoResults: "No matching packages.",
+    close: "Close",
   },
   ja: {
     reloadApp: "再読み込み",
@@ -75,6 +83,14 @@ const messages = {
     preparingSelectionDetail:
       "スマホや大きなフォルダでは少し時間がかかりますが、アプリは動作中です。",
     playbackRetryHint: "再生の開始に失敗しました。再生ボタンを押して再試行してください。",
+    licenses: "ライセンス",
+    licensesTitle: "オープンソースライセンス",
+    licensesSearchPlaceholder: "パッケージ名で検索...",
+    licensesGroupNpm: "JavaScript / npm",
+    licensesGroupRust: "Rust / Cargo",
+    licensesGroupOther: "その他",
+    licensesNoResults: "該当するパッケージがありません。",
+    close: "閉じる",
   },
 } as const;
 
