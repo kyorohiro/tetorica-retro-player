@@ -32,6 +32,42 @@ export type RetroAudioSettings = {
   inputTrimAmount: number;
 };
 
+// The numeric "amount" knobs a preset can set, shared by anything that needs
+// to apply a full RetroAudioPresetDefinition (e.g. quick-controls steppers)
+// without depending on every individual onChangeXxx prop.
+export const RETRO_AUDIO_AMOUNT_KEYS = [
+  "lofiAmount",
+  "radioToneAmount",
+  "bitCrushAmount",
+  "bitCrushNoiseAmount",
+  "sampleRateReductionAmount",
+  "noiseReductionAmount",
+  "bassAmount",
+  "midAmount",
+  "trebleAmount",
+  "stereoWidthAmount",
+  "smallSpeakerRoomAmount",
+  "wowFlutterAmount",
+  "noiseLevel",
+  "vinylDustAmount",
+  "noiseWarmthAmount",
+  "noiseAirAmount",
+  "noisePresenceAmount",
+  "delayAmount",
+  "reverbAmount",
+  "chorusAmount",
+  "tapeSaturationAmount",
+  "compressorAmount",
+  "fxOutputTrimAmount",
+  "inputTrimAmount",
+] as const satisfies readonly (keyof RetroAudioSettings)[];
+
+export type RetroAudioAmountKey = (typeof RETRO_AUDIO_AMOUNT_KEYS)[number];
+
+export type RetroAudioAmountSetters = {
+  [K in RetroAudioAmountKey as `set${Capitalize<K>}`]: (value: number) => void;
+};
+
 export const DEFAULT_AUDIO_SETTINGS = {
   audioOptimizationMode: "auto",
   isMuted: false,

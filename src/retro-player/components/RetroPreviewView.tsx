@@ -2,8 +2,13 @@ import React from "react";
 import {
   Bell,
 } from "lucide-react";
-import type { RetroAudioSettings } from "../audio/preset";
+import {
+  RETRO_AUDIO_AMOUNT_KEYS,
+  type RetroAudioAmountSetters,
+  type RetroAudioSettings,
+} from "../audio/preset";
 import type { RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
+import type { RetroPresetKey } from "../retro/config";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import {
   loadPersistedRetroSettings,
@@ -42,6 +47,12 @@ export type RetroPreviewPlayerSlice = {
   currentTime: number;
   duration: number;
   seekTo: (nextTime: number) => void;
+  volume: number;
+  changeVolume: (nextVolume: number) => void;
+  isMuted: boolean;
+  toggleMute: () => void;
+  playbackRate: number;
+  changePlaybackRate: (nextRate: number) => void;
   setLoopingEnabled: (nextLooping: boolean) => void;
   setAudioOptimizationMode: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
   setLatencyHint: (hint: AudioContextLatencyCategory) => void;
@@ -54,7 +65,11 @@ export type RetroPreviewPlayerSlice = {
   downloadPendingRecording: () => void;
   sharePendingRecording: () => Promise<boolean>;
   refreshLayout: () => void;
-};
+  isAudioFxEnabled: boolean;
+  toggleAudioFx: () => void;
+  isNoiseEnabled: boolean;
+  toggleNoise: () => void;
+} & Pick<RetroAudioSettings, (typeof RETRO_AUDIO_AMOUNT_KEYS)[number]> & RetroAudioAmountSetters;
 
 export type RetroPreviewViewProps = {
   locale: RetroPlayerLocale;
@@ -81,6 +96,8 @@ export type RetroPreviewViewProps = {
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
   analyserRef?: React.RefObject<AnalyserNode | null>;
   showVideoSpectrum?: boolean;
+  selectedPreset: RetroPresetKey | null;
+  onApplyPreset: (preset: RetroPresetKey) => void;
 };
 
 export function RetroPreviewView({
@@ -105,6 +122,8 @@ export function RetroPreviewView({
   onIsPinnedPreviewChange,
   analyserRef,
   showVideoSpectrum,
+  selectedPreset,
+  onApplyPreset,
 }: RetroPreviewViewProps) {
   // --- Internal UI state: everything layout/pin/maximize lives here ---
 
@@ -859,6 +878,8 @@ export function RetroPreviewView({
                 onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
                 ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
                 onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
+                selectedPreset={selectedPreset}
+                onApplyPreset={onApplyPreset}
               />
             </div>
           )}
@@ -915,6 +936,8 @@ export function RetroPreviewView({
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
               onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
+              selectedPreset={selectedPreset}
+              onApplyPreset={onApplyPreset}
             />
           </div>
         )}
@@ -970,6 +993,8 @@ export function RetroPreviewView({
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
               onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
+              selectedPreset={selectedPreset}
+              onApplyPreset={onApplyPreset}
             />
           </div>
         )}
@@ -1025,6 +1050,8 @@ export function RetroPreviewView({
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
             onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
+            selectedPreset={selectedPreset}
+            onApplyPreset={onApplyPreset}
           />
         </div>
       )}
@@ -1080,6 +1107,8 @@ export function RetroPreviewView({
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
             onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
+            selectedPreset={selectedPreset}
+            onApplyPreset={onApplyPreset}
           />
         </div>
       )}

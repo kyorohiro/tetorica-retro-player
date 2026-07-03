@@ -17,10 +17,21 @@ import {
   Square,
   Sun,
 } from "lucide-react";
-import type { RetroAudioSettings } from "../audio/preset";
+import {
+  RETRO_AUDIO_AMOUNT_KEYS,
+  RETRO_AUDIO_PRESETS,
+  type RetroAudioAmountSetters,
+  type RetroAudioPresetKey,
+  type RetroAudioSettings,
+} from "../audio/preset";
+import { RETRO_PRESETS, type RetroPresetKey } from "../retro/config";
 import type { RetroAlarmStatus } from "../hooks/useRetroAlarm";
+import { useAnchoredPopover } from "../hooks/useAnchoredPopover";
 import { useLongPress } from "../hooks/useLongPress";
 import type { RetroPlayerLocale } from "../types";
+
+const AUDIO_PRESET_KEYS = Object.keys(RETRO_AUDIO_PRESETS) as RetroAudioPresetKey[];
+const VIDEO_PRESET_KEYS = Object.keys(RETRO_PRESETS) as RetroPresetKey[];
 
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
@@ -30,12 +41,59 @@ const formatTime = (seconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
 };
 
+function QuickStepperRow({
+  label,
+  valueLabel,
+  onDecrease,
+  onIncrease,
+  disabledDecrease,
+  disabledIncrease,
+}: {
+  label: string;
+  valueLabel: string;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  disabledDecrease?: boolean;
+  disabledIncrease?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="w-full truncate text-center text-[9px] text-slate-400">{label}</span>
+      <div className="flex w-full items-center justify-center gap-1">
+        <button
+          type="button"
+          aria-label={`Decrease ${label}`}
+          onClick={onDecrease}
+          disabled={disabledDecrease}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/70 text-xs leading-none text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+        >
+          −
+        </button>
+        <span className="min-w-0 flex-1 text-center text-[10px] leading-tight tabular-nums text-slate-200">
+          {valueLabel}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label}`}
+          onClick={onIncrease}
+          disabled={disabledIncrease}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/70 text-xs leading-none text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Below this the compact brightness stepper doesn't fit next to
 // power/hi-res/fit-width (plus the inline record button, when shown) and
 // stays in the "More" menu instead.
 const BRIGHTNESS_INLINE_MIN_WIDTH = 480;
 const BRIGHTNESS_MIN = 0.4;
 const BRIGHTNESS_MAX = 2.0;
+
+const QUICK_SEEK_SPEED_OPTIONS = [2, 1.5, 1.25, 1, 0.75, 0.5] as const;
 
 type RetroPreviewToolbarPlayerSlice = {
   canRecord: boolean;
@@ -48,7 +106,17 @@ type RetroPreviewToolbarPlayerSlice = {
   currentTime: number;
   duration: number;
   seekTo: (nextTime: number) => void;
-};
+  volume: number;
+  changeVolume: (nextVolume: number) => void;
+  isMuted: boolean;
+  toggleMute: () => void;
+  playbackRate: number;
+  changePlaybackRate: (nextRate: number) => void;
+  isAudioFxEnabled: boolean;
+  toggleAudioFx: () => void;
+  isNoiseEnabled: boolean;
+  toggleNoise: () => void;
+} & Pick<RetroAudioSettings, (typeof RETRO_AUDIO_AMOUNT_KEYS)[number]> & RetroAudioAmountSetters;
 
 type RetroPreviewToolbarProps = {
   locale: RetroPlayerLocale;
@@ -87,6 +155,8 @@ type RetroPreviewToolbarProps = {
   onToggleFfmpegUseQsv: () => void;
   ffmpegMaxConcurrentHlsSessions: number;
   onFfmpegMaxConcurrentHlsSessionsChange: (limit: number) => void;
+  selectedPreset: RetroPresetKey | null;
+  onApplyPreset: (preset: RetroPresetKey) => void;
 };
 
 export function RetroPreviewToolbar({
@@ -124,6 +194,8 @@ export function RetroPreviewToolbar({
   onToggleFfmpegUseQsv,
   ffmpegMaxConcurrentHlsSessions,
   onFfmpegMaxConcurrentHlsSessionsChange,
+  selectedPreset,
+  onApplyPreset,
 }: RetroPreviewToolbarProps) {
   const tooltipText =
     locale === "ja"
@@ -172,7 +244,6 @@ export function RetroPreviewToolbar({
           disabled: "Off",
       };
   const [isMoreOpen, setIsMoreOpen] = React.useState(false);
-  const [isQuickSeekOpen, setIsQuickSeekOpen] = React.useState(false);
   const [isNarrow, setIsNarrow] = React.useState(
     () => typeof window !== "undefined" && window.innerWidth < 360,
   );
@@ -181,11 +252,14 @@ export function RetroPreviewToolbar({
   );
   const [activeTooltipKey, setActiveTooltipKey] = React.useState<string | null>(null);
   const [moreMenuStyle, setMoreMenuStyle] = React.useState<React.CSSProperties | null>(null);
-  const [quickSeekStyle, setQuickSeekStyle] = React.useState<React.CSSProperties | null>(null);
   const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
-  const quickSeekRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipTimerRef = React.useRef<number | null>(null);
+
+  const quickSeekPopover = useAnchoredPopover(260, 90);
+  const presetPopover = useAnchoredPopover(260, 90);
+  const avPopover = useAnchoredPopover(360, 90);
+  const eqPopover = useAnchoredPopover(240, 140);
 
   const scheduleTooltip = React.useCallback((key: string) => {
     if (tooltipTimerRef.current !== null) {
@@ -231,6 +305,29 @@ export function RetroPreviewToolbar({
     );
     onBrightnessChange(next);
   }, [brightness, onBrightnessChange]);
+
+  // Audio presets have no single reactive "current" value (unlike video
+  // presets), so the stepper just remembers where it last left off.
+  const [audioPresetIndex, setAudioPresetIndex] = React.useState(0);
+
+  const applyAudioPresetAtIndex = React.useCallback((index: number) => {
+    const clamped = Math.min(AUDIO_PRESET_KEYS.length - 1, Math.max(0, index));
+    setAudioPresetIndex(clamped);
+    const presetSettings = RETRO_AUDIO_PRESETS[AUDIO_PRESET_KEYS[clamped]].settings;
+
+    if (presetSettings.isAudioFxEnabled !== player.isAudioFxEnabled) {
+      player.toggleAudioFx();
+    }
+    if (presetSettings.isNoiseEnabled !== player.isNoiseEnabled) {
+      player.toggleNoise();
+    }
+    for (const key of RETRO_AUDIO_AMOUNT_KEYS) {
+      const setterName = `set${key[0].toUpperCase()}${key.slice(1)}` as keyof RetroPreviewToolbarPlayerSlice;
+      (player[setterName] as (value: number) => void)(presetSettings[key]);
+    }
+  }, [player]);
+
+  const videoPresetIndex = selectedPreset ? VIDEO_PRESET_KEYS.indexOf(selectedPreset) : -1;
 
   const updateMoreMenuPosition = React.useCallback(() => {
     if (typeof window === "undefined" || !moreButtonRef.current) return;
@@ -306,74 +403,30 @@ export function RetroPreviewToolbar({
     };
   }, [isMoreOpen, updateMoreMenuPosition]);
 
-  const updateQuickSeekPosition = React.useCallback(() => {
-    if (typeof window === "undefined" || !moreButtonRef.current) return;
-
-    const rect = moreButtonRef.current.getBoundingClientRect();
-    const margin = 8;
-    const width = Math.min(260, window.innerWidth - margin * 2);
-    const height = 56;
-    const spaceAbove = Math.max(0, rect.top - margin);
-    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - margin);
-    const openUp = spaceAbove > spaceBelow && spaceAbove >= height;
-
-    const left = Math.min(
-      Math.max(margin, rect.left),
-      Math.max(margin, window.innerWidth - width - margin),
-    );
-    const top = openUp
-      ? Math.max(margin, rect.top - height - margin)
-      : Math.min(rect.bottom + margin, Math.max(margin, window.innerHeight - height - margin));
-
-    setQuickSeekStyle({ position: "fixed", left, top, width, zIndex: 1000 });
-  }, []);
-
-  React.useEffect(() => {
-    if (!isQuickSeekOpen) return;
-
-    updateQuickSeekPosition();
-
-    const handleWindowChange = () => {
-      updateQuickSeekPosition();
-    };
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (
-        target &&
-        !quickSeekRef.current?.contains(target) &&
-        !moreButtonRef.current?.contains(target)
-      ) {
-        setIsQuickSeekOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsQuickSeekOpen(false);
-      }
-    };
-
-    window.addEventListener("resize", handleWindowChange, { passive: true });
-    window.addEventListener("scroll", handleWindowChange, { passive: true });
-    document.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("resize", handleWindowChange);
-      window.removeEventListener("scroll", handleWindowChange);
-      document.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isQuickSeekOpen, updateQuickSeekPosition]);
-
   const { isHolding: isMoreHolding, ...moreLongPressHandlers } = useLongPress(
     React.useCallback(() => {
       setIsMoreOpen(false);
-      setIsQuickSeekOpen(true);
-    }, []),
+      quickSeekPopover.setIsOpen((v) => !v);
+    }, [quickSeekPopover]),
     React.useCallback(() => {
       hideTooltip();
       setIsMoreOpen((v) => !v);
     }, [hideTooltip]),
+  );
+
+  const { isHolding: isHiResHolding, ...hiResLongPressHandlers } = useLongPress(
+    React.useCallback(() => { presetPopover.setIsOpen((v) => !v); }, [presetPopover]),
+    React.useCallback(() => { hideTooltip(); onHighResolutionToggle(); }, [hideTooltip, onHighResolutionToggle]),
+  );
+
+  const { isHolding: isFitWidthHolding, ...fitWidthLongPressHandlers } = useLongPress(
+    React.useCallback(() => { avPopover.setIsOpen((v) => !v); }, [avPopover]),
+    React.useCallback(() => { hideTooltip(); onFitWidthToggle(); }, [hideTooltip, onFitWidthToggle]),
+  );
+
+  const { isHolding: isPinHolding, ...pinLongPressHandlers } = useLongPress(
+    React.useCallback(() => { eqPopover.setIsOpen((v) => !v); }, [eqPopover]),
+    React.useCallback(() => { hideTooltip(); onPinToggle(); }, [hideTooltip, onPinToggle]),
   );
 
   const floatingButtonClass =
@@ -403,15 +456,18 @@ export function RetroPreviewToolbar({
     <>
       <div className="relative">
         <button
-          ref={moreButtonRef}
+          ref={(node) => {
+            moreButtonRef.current = node;
+            quickSeekPopover.anchorRef.current = node;
+          }}
           type="button"
           aria-label="More options"
-          title="More options (long-press for quick play/seek)"
+          title="More options (long-press for play/seek)"
           {...moreLongPressHandlers}
           className={[
             floatingButtonClass,
             "relative select-none overflow-hidden",
-            isMoreOpen || isQuickSeekOpen || isMoreHolding || brightness !== 1.0 || flipH || flipV
+            isMoreOpen || quickSeekPopover.isOpen || isMoreHolding || brightness !== 1.0 || flipH || flipV
               ? glowingFloatingButtonClass
               : idleFloatingButtonClass,
           ].join(" ")}
@@ -424,35 +480,37 @@ export function RetroPreviewToolbar({
           )}
           <MoreHorizontal size={16} className="relative z-10" />
         </button>
-        {isQuickSeekOpen && quickSeekStyle && typeof document !== "undefined" && createPortal(
+        {quickSeekPopover.isOpen && quickSeekPopover.style && typeof document !== "undefined" && createPortal(
           <div
-            ref={quickSeekRef}
-            style={quickSeekStyle}
-            className="flex items-center gap-2 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
+            ref={quickSeekPopover.popoverRef}
+            style={quickSeekPopover.style}
+            className="flex flex-col gap-2.5 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
           >
-            <button
-              type="button"
-              aria-label={player.isPlaying ? "Pause" : "Play"}
-              onClick={() => { void player.togglePlayback(); }}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-500/70 bg-slate-900/78 text-slate-100 transition hover:bg-slate-800/90"
-            >
-              {player.isPlaying ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <span className="w-10 shrink-0 text-[10px] tabular-nums text-slate-400">
-              {formatTime(player.currentTime)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={player.duration || 0}
-              step={0.1}
-              value={Math.min(player.currentTime, player.duration || 0)}
-              onChange={(e) => { player.seekTo(Number(e.currentTarget.value)); }}
-              className="h-1.5 min-w-0 flex-1 accent-emerald-400"
-            />
-            <span className="w-10 shrink-0 text-right text-[10px] tabular-nums text-slate-400">
-              {formatTime(player.duration)}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label={player.isPlaying ? "Pause" : "Play"}
+                onClick={() => { void player.togglePlayback(); }}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-500/70 bg-slate-900/78 text-slate-100 transition hover:bg-slate-800/90"
+              >
+                {player.isPlaying ? <Pause size={14} /> : <Play size={14} />}
+              </button>
+              <span className="w-10 shrink-0 text-[10px] tabular-nums text-slate-400">
+                {formatTime(player.currentTime)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={player.duration || 0}
+                step={0.1}
+                value={Math.min(player.currentTime, player.duration || 0)}
+                onChange={(e) => { player.seekTo(Number(e.currentTarget.value)); }}
+                className="h-1.5 min-w-0 flex-1 accent-emerald-400"
+              />
+              <span className="w-10 shrink-0 text-right text-[10px] tabular-nums text-slate-400">
+                {formatTime(player.duration)}
+              </span>
+            </div>
           </div>,
           document.body,
         )}
@@ -754,27 +812,63 @@ export function RetroPreviewToolbar({
 
       <div className="relative">
         <button
+          ref={presetPopover.anchorRef}
           type="button"
           aria-label={
             renderResolutionPreset > 1
               ? `Disable high resolution (current ${renderResolutionPreset}x)`
               : "Enable high resolution"
           }
-          onClick={() => { hideTooltip(); onHighResolutionToggle(); }}
+          title="Hi-Res (long-press for video/audio preset)"
+          {...hiResLongPressHandlers}
           onMouseEnter={() => scheduleTooltip("hi-res")}
           onMouseLeave={hideTooltip}
           onFocus={() => scheduleTooltip("hi-res")}
           onBlur={hideTooltip}
           className={[
             floatingButtonClass,
-            isHighResolution
+            "relative select-none overflow-hidden",
+            isHighResolution || presetPopover.isOpen
               ? glowingFloatingButtonClass
               : idleFloatingButtonClass,
           ].join(" ")}
         >
-          <Aperture size={16} />
+          {isHiResHolding && (
+            <span
+              className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+              style={{ animation: "long-press-charge 0.6s linear forwards" }}
+            />
+          )}
+          <Aperture size={16} className="relative z-10" />
         </button>
         {renderTooltip("hi-res", tooltipText.hiRes)}
+        {presetPopover.isOpen && presetPopover.style && typeof document !== "undefined" && createPortal(
+          <div
+            ref={presetPopover.popoverRef}
+            style={presetPopover.style}
+            className="grid grid-cols-2 gap-x-2 gap-y-2.5 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
+          >
+            <QuickStepperRow
+              label="Video"
+              valueLabel={videoPresetIndex >= 0 ? RETRO_PRESETS[VIDEO_PRESET_KEYS[videoPresetIndex]].label : "—"}
+              onDecrease={() => {
+                const nextIndex = Math.max(0, (videoPresetIndex === -1 ? 0 : videoPresetIndex) - 1);
+                onApplyPreset(VIDEO_PRESET_KEYS[nextIndex]);
+              }}
+              onIncrease={() => {
+                const nextIndex = Math.min(VIDEO_PRESET_KEYS.length - 1, (videoPresetIndex === -1 ? 0 : videoPresetIndex) + 1);
+                onApplyPreset(VIDEO_PRESET_KEYS[nextIndex]);
+              }}
+            />
+            <QuickStepperRow
+              label="Audio"
+              valueLabel={RETRO_AUDIO_PRESETS[AUDIO_PRESET_KEYS[audioPresetIndex]].label}
+              onDecrease={() => { applyAudioPresetAtIndex(audioPresetIndex - 1); }}
+              onIncrease={() => { applyAudioPresetAtIndex(audioPresetIndex + 1); }}
+            />
+          </div>,
+          document.body,
+        )}
       </div>
 
       {isBrightnessInlineVisible && (
@@ -829,45 +923,131 @@ export function RetroPreviewToolbar({
       <div className="flex items-center">
         <div className="relative">
           <button
+            ref={avPopover.anchorRef}
             type="button"
             aria-label={isFitWidthEnabled ? "Disable fit width" : "Enable fit width"}
-            onClick={() => { hideTooltip(); onFitWidthToggle(); }}
+            title="Fit width (long-press for volume/speed/brightness)"
+            {...fitWidthLongPressHandlers}
             onMouseEnter={() => scheduleTooltip("fit-width")}
             onMouseLeave={hideTooltip}
             onFocus={() => scheduleTooltip("fit-width")}
             onBlur={hideTooltip}
             className={[
-              "inline-flex h-9 w-9 items-center justify-center rounded-l-full border-t border-b border-l border-r-0 text-sm transition backdrop-blur-sm",
-              isFitWidthEnabled ? glowingFloatingButtonClass : idleFloatingButtonClass,
+              "relative select-none overflow-hidden inline-flex h-9 w-9 items-center justify-center rounded-l-full border-t border-b border-l border-r-0 text-sm transition backdrop-blur-sm",
+              isFitWidthEnabled || avPopover.isOpen ? glowingFloatingButtonClass : idleFloatingButtonClass,
             ].join(" ")}
           >
-            <ArrowLeftRight size={16} />
+            {isFitWidthHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <ArrowLeftRight size={16} className="relative z-10" />
           </button>
           {renderTooltip("fit-width", isFitWidthEnabled ? tooltipText.fitWidthOn : tooltipText.fitWidthOff)}
+          {avPopover.isOpen && avPopover.style && typeof document !== "undefined" && createPortal(
+            <div
+              ref={avPopover.popoverRef}
+              style={avPopover.style}
+              className="grid grid-cols-3 gap-x-2 gap-y-2.5 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
+            >
+              <QuickStepperRow
+                label="Volume"
+                valueLabel={`${Math.round((player.isMuted ? 0 : player.volume) * 100)}%`}
+                onDecrease={() => { player.changeVolume(Math.max(0, (player.isMuted ? 0 : player.volume) - 0.05)); }}
+                onIncrease={() => { player.changeVolume(Math.min(1, (player.isMuted ? 0 : player.volume) + 0.05)); }}
+              />
+              <QuickStepperRow
+                label="Speed"
+                valueLabel={`${player.playbackRate}x`}
+                onDecrease={() => {
+                  const i = QUICK_SEEK_SPEED_OPTIONS.indexOf(player.playbackRate as typeof QUICK_SEEK_SPEED_OPTIONS[number]);
+                  const nextIndex = Math.min(QUICK_SEEK_SPEED_OPTIONS.length - 1, (i === -1 ? 3 : i) + 1);
+                  player.changePlaybackRate(QUICK_SEEK_SPEED_OPTIONS[nextIndex]);
+                }}
+                onIncrease={() => {
+                  const i = QUICK_SEEK_SPEED_OPTIONS.indexOf(player.playbackRate as typeof QUICK_SEEK_SPEED_OPTIONS[number]);
+                  const nextIndex = Math.max(0, (i === -1 ? 3 : i) - 1);
+                  player.changePlaybackRate(QUICK_SEEK_SPEED_OPTIONS[nextIndex]);
+                }}
+              />
+              <QuickStepperRow
+                label="Brightness"
+                valueLabel={`${Math.round(brightness * 100)}%`}
+                onDecrease={() => { adjustBrightness(-0.05); }}
+                onIncrease={() => { adjustBrightness(0.05); }}
+                disabledDecrease={brightness <= BRIGHTNESS_MIN}
+                disabledIncrease={brightness >= BRIGHTNESS_MAX}
+              />
+            </div>,
+            document.body,
+          )}
         </div>
         <div className="relative">
           <button
+            ref={eqPopover.anchorRef}
             type="button"
             aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
-            onClick={() => { hideTooltip(); onPinToggle(); }}
+            title="Pin (long-press for bass/mid/treble/noise)"
+            {...pinLongPressHandlers}
             onMouseEnter={() => scheduleTooltip("pin")}
             onMouseLeave={hideTooltip}
             onFocus={() => scheduleTooltip("pin")}
             onBlur={hideTooltip}
             className={[
-              "inline-flex h-9 w-9 items-center justify-center rounded-none border-t border-b border-l-0 border-r-0 text-sm transition backdrop-blur-sm",
-              isPinnedPreview
+              "relative select-none overflow-hidden inline-flex h-9 w-9 items-center justify-center rounded-none border-t border-b border-l-0 border-r-0 text-sm transition backdrop-blur-sm",
+              isPinnedPreview || eqPopover.isOpen
                 ? glowingFloatingButtonClass
                 : idleFloatingButtonClass,
             ].join(" ")}
           >
-            <Pin size={16} />
+            {isPinHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <Pin size={16} className="relative z-10" />
           </button>
           {renderTooltip(
             "pin",
             isPinnedPreview
               ? tooltipText.pinOn
               : tooltipText.pinOff,
+          )}
+          {eqPopover.isOpen && eqPopover.style && typeof document !== "undefined" && createPortal(
+            <div
+              ref={eqPopover.popoverRef}
+              style={eqPopover.style}
+              className="grid grid-cols-2 gap-x-2 gap-y-2.5 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
+            >
+              <QuickStepperRow
+                label="Bass"
+                valueLabel={`${player.bassAmount >= 0 ? "+" : ""}${(player.bassAmount * 15).toFixed(1)}dB`}
+                onDecrease={() => { player.setBassAmount(Math.max(-1.5, player.bassAmount - 0.1)); }}
+                onIncrease={() => { player.setBassAmount(Math.min(1.5, player.bassAmount + 0.1)); }}
+              />
+              <QuickStepperRow
+                label="Mid"
+                valueLabel={`${player.midAmount >= 0 ? "+" : ""}${(player.midAmount * 15).toFixed(1)}dB`}
+                onDecrease={() => { player.setMidAmount(Math.max(-1.5, player.midAmount - 0.1)); }}
+                onIncrease={() => { player.setMidAmount(Math.min(1.5, player.midAmount + 0.1)); }}
+              />
+              <QuickStepperRow
+                label="Treble"
+                valueLabel={`${player.trebleAmount >= 0 ? "+" : ""}${(player.trebleAmount * 15).toFixed(1)}dB`}
+                onDecrease={() => { player.setTrebleAmount(Math.max(-1.5, player.trebleAmount - 0.1)); }}
+                onIncrease={() => { player.setTrebleAmount(Math.min(1.5, player.trebleAmount + 0.1)); }}
+              />
+              <QuickStepperRow
+                label="Noise"
+                valueLabel={`${(player.noiseLevel * 100).toFixed(1)}%`}
+                onDecrease={() => { player.setNoiseLevel(Math.max(0, player.noiseLevel - 0.0025)); }}
+                onIncrease={() => { player.setNoiseLevel(Math.min(0.05, player.noiseLevel + 0.0025)); }}
+              />
+            </div>,
+            document.body,
           )}
         </div>
         <div className="relative">
