@@ -531,6 +531,12 @@ export class TetoricaRetroVideoPipeline {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
+    // Creating/configuring `tex` above left it bound on whatever texture
+    // unit was last active (unit 0, per render()'s upload step just before
+    // this call). Restore the source texture there so pass 1 doesn't end up
+    // sampling from the same texture it's about to render into.
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
     this.fbo = fbo;
     this.fboTexture = tex;
     this.fboWidth = width;
