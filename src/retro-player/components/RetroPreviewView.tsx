@@ -39,6 +39,9 @@ export type RetroPreviewPlayerSlice = {
   prefersShareExport: boolean;
   isPlaying: boolean;
   togglePlayback: () => Promise<void>;
+  currentTime: number;
+  duration: number;
+  seekTo: (nextTime: number) => void;
   setLoopingEnabled: (nextLooping: boolean) => void;
   setAudioOptimizationMode: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
   setLatencyHint: (hint: AudioContextLatencyCategory) => void;
