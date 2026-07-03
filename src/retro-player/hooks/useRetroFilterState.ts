@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   RETRO_PRESETS,
+  defaultPresetId,
   type MonoTintMode,
   type PaletteMode,
   type RetroPresetDefinition,
@@ -11,7 +12,7 @@ import {
   savePersistedRetroFilterSettings,
 } from "./persistedRetroSettings";
 
-const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS.tetorica;
+const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;

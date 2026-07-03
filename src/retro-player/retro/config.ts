@@ -591,6 +591,12 @@ export const RETRO_PRESETS = {
 
 export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 
+// Single source of truth for "which preset is the app's default".
+// Change this one line to try a different default; every consumer (initial
+// filter state, saved-settings fallback, etc.) resolves through this key.
+export const defaultPresetId: RetroPresetKey = "phosphorDot";
+// デフォルト候補: "phosphorDot";//"tetorica";
+
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
   if (mode === "pc98_tile") return 2;
