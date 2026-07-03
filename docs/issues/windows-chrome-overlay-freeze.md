@@ -145,6 +145,27 @@ Windows でも次は確認できた。
 
 ---
 
+## 2026-07-04 追記: overlayRuntime.js vs viewer.js 静的比較調査
+
+開発機がmacOSで実機Windows検証ができないため、まずは `extension/overlayRuntime.js`(不安定)と `extension/viewer.js`(安定)のWebGL実装をコードレベルで比較した。以下は実施した比較の結果で、まだ修正は入れていない。
+
+### 一致している部分(freeze原因ではなさそう)
+- shader compile: 両方とも `gl.getShaderParameter(COMPILE_STATUS)` は同期チェックだが、program の `LINK_STATUS` は `WEBGL_parallel_shader_compile` / `KHR_parallel_shader_compile` の `COMPLETION_STATUS_KHR` を rAF ポーリングで待つ非同期パターンに統一済み(`overlayRuntime.js:2434-2456`, `viewer.js:943-965`)。拡張が無ければ `setTimeout(3000)` にフォールバック
+- Windows向けの既存対策(`isWindowsChromiumAngleRisk()`)は両ファイルにあり、Windows lite shader への切り替えも共通(`overlayRuntime.js:2354-2357`, `viewer.js:885-888`)
+- pass1→FBO→pass2 の2-passピンポン構造は同一
+- `gl.readPixels`/`gl.finish`/`gl.flush` などの同期stallを起こす呼び出しはフレームループ内に存在しない(両方とも)
+
+### 差分として見つかったもの(freeze原因の候補)
+1. **WebGLコンテキスト生成オプションが違う**: overlay側は `{ alpha:false, antialias:false, depth:false, stencil:false, preserveDrawingBuffer:false }` を明示指定(`overlayRuntime.js:1764-1770`)。viewer側はオプションなし(Chromeのデフォルト = alpha:true, antialias:true, depth:true)(`viewer.js:260`)。`desynchronized`/`powerPreference` はどちらも未指定
+2. **overlayは同時に最大12面まで独立したWebGL2コンテキストを持てる**(`extension/shared/settings.js:757-760`)。各面が個別に3プログラム/5シェーダーをコンパイル・リンクし、独自の非同期完了ポーリングを走らせる(`overlayRuntime.js:904-918`)。viewer側は常に単一パイプライン。**エージェントの調査で最も大きな構造差**として指摘された点
+3. **overlayはcanvasを任意のホストページの`document.body`に直接注入**(`overlayRuntime.js:915-916`、`position:fixed`, `zIndex:2147483500-index*2`)。ホストページ自身のDOM/rAF/コンポジタと同居する点がviewer(専用の拡張ページ)と根本的に異なる
+4. **overlayは毎フレーム`performance.now()`によるアップロード時間監視**を行い、50ms超で該当videoをブラックリスト化する独自ロジックを持つ(`overlayRuntime.js:1027-1043`)。viewerにはこのオーバーヘッドが無い
+5. overlay専用の追加パス: Windows向けに `captureStream()` 経由のvideoプロキシ(`ensureProxyVideo`, `overlayRuntime.js:1863-1905`)と、フィルターを諦めるraw canvasフォールバック(`shouldUseDirectVideoFallback`→`renderRaw`, `:958-975`)がすでに存在する
+
+### 次にやるなら
+- 上記2(同時マルチサーフェス)が本丸の可能性が高いので、Windows環境で `overlayTargetCount` を1に固定した場合にfreezeが再現するかどうかの切り分けが有効そう
+- 併せてコンテキスト生成オプション(alpha/antialias/depth)をviewer側に揃えてみる実験も低コストで試せる
+
 ## Key Takeaway
 
 今回の到達点は「Windows Chrome overlay で browser freeze を避ける」こと。
