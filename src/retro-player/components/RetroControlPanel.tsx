@@ -115,6 +115,8 @@ export type RetroControlPanelProps = {
   onCycleLoopMode?: () => void;
   showVideoSpectrum?: boolean;
   onToggleVideoSpectrum?: () => void;
+  showClockOverlay?: boolean;
+  onToggleClockOverlay?: () => void;
   isNativePlaybackMode?: boolean;
   nativePlaybackNeedsReload?: boolean;
   onToggleNativePlaybackMode?: () => void;
@@ -163,6 +165,8 @@ export function RetroControlPanel({
   onCycleLoopMode,
   showVideoSpectrum,
   onToggleVideoSpectrum,
+  showClockOverlay,
+  onToggleClockOverlay,
   isNativePlaybackMode,
   nativePlaybackNeedsReload,
   onToggleNativePlaybackMode,
@@ -292,6 +296,8 @@ export function RetroControlPanel({
               onCycleLoopMode={onCycleLoopMode}
               showVideoSpectrum={showVideoSpectrum}
               onToggleVideoSpectrum={onToggleVideoSpectrum}
+              showClockOverlay={showClockOverlay}
+              onToggleClockOverlay={onToggleClockOverlay}
               analyserRef={player.analyserRef}
               isNativePlaybackMode={isNativePlaybackMode}
               nativePlaybackNeedsReload={nativePlaybackNeedsReload}

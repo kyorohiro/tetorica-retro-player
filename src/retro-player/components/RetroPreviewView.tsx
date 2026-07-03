@@ -18,6 +18,26 @@ import { useRetroAlarm } from "../hooks/useRetroAlarm";
 import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
 import { AudioSpectrum } from "./AudioSpectrum";
 
+// Casio-digital-watch style clock overlay — toggled by long-pressing the
+// playback Speed button.
+function DigitalClockOverlay() {
+  const [now, setNow] = React.useState(() => new Date());
+
+  React.useEffect(() => {
+    const id = window.setInterval(() => { setNow(new Date()); }, 1000);
+    return () => { window.clearInterval(id); };
+  }, []);
+
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+
+  return (
+    <div className="pointer-events-none absolute top-2 right-2 z-10 rounded-md border border-emerald-400/40 bg-black/75 px-2.5 py-1 font-mono text-lg tabular-nums text-emerald-300 shadow-[0_0_10px_rgba(74,222,128,0.5)]">
+      {hh}:{mm}
+    </div>
+  );
+}
+
 // Subset of the player object that RetroPreviewView needs.
 // Add new player capabilities here, not in RetroPlayer.
 export type RetroPreviewPlayerSlice = {
@@ -96,6 +116,7 @@ export type RetroPreviewViewProps = {
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
   analyserRef?: React.RefObject<AnalyserNode | null>;
   showVideoSpectrum?: boolean;
+  showClockOverlay?: boolean;
   selectedPreset: RetroPresetKey | null;
   onApplyPreset: (preset: RetroPresetKey) => void;
 };
@@ -122,6 +143,7 @@ export function RetroPreviewView({
   onIsPinnedPreviewChange,
   analyserRef,
   showVideoSpectrum,
+  showClockOverlay,
   selectedPreset,
   onApplyPreset,
 }: RetroPreviewViewProps) {
@@ -826,6 +848,7 @@ export function RetroPreviewView({
                 <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-black/50" />
               </div>
             )}
+            {showClockOverlay && <DigitalClockOverlay />}
           </div>
 
           {/* Floating buttons: maximized mode — overlaid below canvas */}
