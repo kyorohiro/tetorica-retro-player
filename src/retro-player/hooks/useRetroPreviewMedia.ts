@@ -10,11 +10,14 @@ import {
   shouldBypassWebAudio,
   shouldUseNativeVideoSurface,
 } from "../media/RetroMediaSource";
+import { resolvePreviewErrorMessage, retroT } from "../i18n";
+import type { RetroPlayerLocale } from "../types";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type CurrentRef<T> = { current: T };
 
 type UseRetroPreviewMediaParams = {
+  locale: RetroPlayerLocale;
   preferNativeVideoSurface: boolean;
   filterState: RetroFilterState;
   appRef: CurrentRef<CanvasStageApp | null>;
@@ -91,6 +94,7 @@ const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
 const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900, 1600];
 
 export function useRetroPreviewMedia({
+  locale,
   preferNativeVideoSurface,
   filterState,
   appRef,
@@ -319,7 +323,7 @@ export function useRetroPreviewMedia({
         cleanup();
         reject(
           new Error(
-            `動画の読み込みに失敗しました。 src=${video.currentSrc || video.src || "(empty)"} reason=${describeMediaError(video.error)}`,
+            `Failed to load video. src=${video.currentSrc || video.src || "(empty)"} reason=${describeMediaError(video.error)}`,
           ),
         );
       };
@@ -348,7 +352,7 @@ export function useRetroPreviewMedia({
         } else {
           reject(
             new Error(
-              `動画の読み込みがタイムアウトしました。 src=${video.currentSrc || video.src || "(empty)"} readyState=${video.readyState}`,
+              `Video load timed out. src=${video.currentSrc || video.src || "(empty)"} readyState=${video.readyState}`,
             ),
           );
         }
@@ -393,7 +397,7 @@ export function useRetroPreviewMedia({
         cleanup();
         reject(
           new Error(
-            `動画の再生開始確認に失敗しました。 src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${media.currentTime}`,
+            `Failed to confirm playback start. src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${media.currentTime}`,
           ),
         );
       };
@@ -416,7 +420,7 @@ export function useRetroPreviewMedia({
         }
         reject(
           new Error(
-            `動画の再生開始を確認できませんでした。 src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${currentTime}`,
+            `Could not confirm playback start. src=${media.currentSrc || media.src || "(empty)"} paused=${media.paused} readyState=${media.readyState} currentTime=${currentTime}`,
           ),
         );
       }, 5000);
@@ -451,7 +455,7 @@ export function useRetroPreviewMedia({
         cleanup();
         reject(
           new Error(
-            `音声の読み込みに失敗しました。 src=${audio.currentSrc || audio.src || "(empty)"} reason=${describeMediaError(audio.error)}`,
+            `Failed to load audio. src=${audio.currentSrc || audio.src || "(empty)"} reason=${describeMediaError(audio.error)}`,
           ),
         );
       };
@@ -517,7 +521,7 @@ export function useRetroPreviewMedia({
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    return /src-not-supported|network|読み込みに失敗|再生開始/i.test(message);
+    return /src-not-supported|network|failed to load|playback start/i.test(message);
   };
 
   const restartCurrentMedia = async () => {
@@ -1133,9 +1137,7 @@ export function useRetroPreviewMedia({
         setIsBuffering(false);
         syncVideoState();
         setNeedsUserPlay(true);
-        _setPreviewError(
-          "Playback is still preparing. Press Play to retry this video.",
-        );
+        _setPreviewError(retroT(locale, "hls-retry-preparing"));
         return;
       }
       if (isAutoplayBlockedError(error)) {
@@ -1147,11 +1149,7 @@ export function useRetroPreviewMedia({
 
       setNeedsUserPlay(false);
       syncVideoState();
-      _setPreviewError(
-        error instanceof Error
-          ? error.message
-          : "音声付き再生を開始できませんでした。",
-      );
+      _setPreviewError(resolvePreviewErrorMessage(error, locale, "playback-failed"));
     }
   };
 
@@ -1215,7 +1213,7 @@ export function useRetroPreviewMedia({
     const isImage = file.type.startsWith("image/");
 
     if (!isVideo && !isAudio && !isImage) {
-      _setPreviewError("動画、音声、または画像ファイルを選んでください。");
+      _setPreviewError(retroT(locale, "unsupported-file-type"));
       return;
     }
 
@@ -1313,11 +1311,7 @@ export function useRetroPreviewMedia({
 
       cleanupPreview();
       await resetAudioGraphAfterPreviewFailure("previewFile:error", error);
-      _setPreviewError(
-        error instanceof Error
-          ? error.message
-          : "動画プレビューに失敗しました。",
-      );
+      _setPreviewError(resolvePreviewErrorMessage(error, locale, "video-preview-failed"));
       setNeedsUserPlay(false);
     }
   };
@@ -1326,7 +1320,7 @@ export function useRetroPreviewMedia({
     powerOn();
 
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      _setPreviewError("このブラウザでは画面キャプチャーに対応していません。");
+      _setPreviewError(retroT(locale, "capture-unsupported"));
       return;
     }
 
@@ -1384,11 +1378,7 @@ export function useRetroPreviewMedia({
 
       cleanupPreview();
       await resetAudioGraphAfterPreviewFailure("startDisplayCapture:error", error);
-      _setPreviewError(
-        error instanceof Error
-          ? error.message
-          : "画面キャプチャーを開始できませんでした。",
-      );
+      _setPreviewError(resolvePreviewErrorMessage(error, locale, "capture-failed"));
     }
   };
 
@@ -1490,7 +1480,7 @@ export function useRetroPreviewMedia({
 
       cleanupPreview();
       await resetAudioGraphAfterPreviewFailure("previewStream:error", error);
-      _setPreviewError(error instanceof Error ? error.message : String(error));
+      _setPreviewError(resolvePreviewErrorMessage(error, locale, "playback-failed"));
     }
   };
 
@@ -1652,16 +1642,19 @@ export function useRetroPreviewMedia({
         return;
       }
 
+      const fallbackCode =
+        kind === "audio" ? "audio-load-failed" : kind === "image" ? "image-load-failed" : "video-preview-failed";
+
       if (kind === "video" && isHlsStartupRetryableError(mediaRef.current, error)) {
         finishLoading();
         setNeedsUserPlay(false);
         syncVideoState();
-        _setPreviewError(error instanceof Error ? error.message : String(error));
+        _setPreviewError(resolvePreviewErrorMessage(error, locale, fallbackCode));
         return;
       }
 
       cleanupPreview();
-      _setPreviewError(error instanceof Error ? error.message : String(error));
+      _setPreviewError(resolvePreviewErrorMessage(error, locale, fallbackCode));
       await resetAudioGraphAfterPreviewFailure("previewUrl:error", error);
     }
   };

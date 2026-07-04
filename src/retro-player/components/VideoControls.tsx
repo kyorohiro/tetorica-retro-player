@@ -30,8 +30,10 @@ import {
   type RetroAudioPresetDefinition,
   type RetroAudioPresetKey,
 } from "../audio/preset";
+import type { RetroPlayerLocale } from "../types";
 
 type VideoControlsProps = {
+  locale: RetroPlayerLocale;
   mode: "playback" | "audio-settings";
   hasPlayback: boolean;
   currentTime: number;
@@ -139,6 +141,7 @@ const formatTime = (seconds: number) => {
 };
 
 export const VideoControls = memo(function VideoControls({
+  locale,
   mode,
   hasPlayback,
   currentTime,
@@ -1179,7 +1182,7 @@ export const VideoControls = memo(function VideoControls({
 
       {nativePlaybackNeedsReload && (
         <p className="mb-1 flex items-center justify-center gap-2 rounded-lg bg-amber-500/15 px-2 py-1.5 text-[11px] text-amber-800">
-          リロードしてください
+          {locale === "ja" ? "リロードしてください" : "Please reload"}
           <button
             type="button"
             onClick={() => { window.location.reload(); }}

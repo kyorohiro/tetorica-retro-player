@@ -196,6 +196,7 @@ export function RetroPlayer({
       onPlaybackChange,
       playbackSource,
       preferNativeVideoSurface: nativePlaybackMode,
+      locale,
     },
   );
 
