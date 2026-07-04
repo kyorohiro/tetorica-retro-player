@@ -59,17 +59,17 @@ function QuickStepperRow({
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className="w-full truncate text-center text-[9px] text-slate-400">{label}</span>
-      <div className="flex w-full items-center justify-center gap-1">
+      <div className="flex w-full items-center justify-center gap-0.5">
         <button
           type="button"
           aria-label={`Decrease ${label}`}
           onClick={onDecrease}
           disabled={disabledDecrease}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/70 text-xs leading-none text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/70 text-xs leading-none text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
         >
           −
         </button>
-        <span className="min-w-0 flex-1 text-center text-[10px] leading-tight tabular-nums text-slate-200">
+        <span className="min-w-0 flex-1 text-center text-[9px] leading-tight tabular-nums text-slate-200">
           {valueLabel}
         </span>
         <button
@@ -77,7 +77,7 @@ function QuickStepperRow({
           aria-label={`Increase ${label}`}
           onClick={onIncrease}
           disabled={disabledIncrease}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/70 text-xs leading-none text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/70 text-xs leading-none text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
         >
           +
         </button>
@@ -259,7 +259,7 @@ export function RetroPreviewToolbar({
   const quickSeekPopover = useAnchoredPopover(260, 90);
   const presetPopover = useAnchoredPopover(260, 90);
   const avPopover = useAnchoredPopover(360, 90);
-  const eqPopover = useAnchoredPopover(240, 140);
+  const eqPopover = useAnchoredPopover(300, 140);
 
   const scheduleTooltip = React.useCallback((key: string) => {
     if (tooltipTimerRef.current !== null) {
@@ -989,7 +989,7 @@ export function RetroPreviewToolbar({
             ref={eqPopover.anchorRef}
             type="button"
             aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
-            title="Pin (long-press for bass/mid/treble/noise reduction)"
+            title="Pin (long-press for bass/mid/treble/denoise/comp/noise)"
             {...pinLongPressHandlers}
             onMouseEnter={() => scheduleTooltip("pin")}
             onMouseLeave={hideTooltip}
@@ -1020,7 +1020,7 @@ export function RetroPreviewToolbar({
             <div
               ref={eqPopover.popoverRef}
               style={eqPopover.style}
-              className="grid grid-cols-2 gap-x-2 gap-y-2.5 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
+              className="grid grid-cols-3 gap-x-1 gap-y-2.5 rounded-xl border border-slate-600/80 bg-slate-950/96 p-2.5 shadow-xl backdrop-blur-sm"
             >
               <QuickStepperRow
                 label="Bass"
@@ -1041,10 +1041,22 @@ export function RetroPreviewToolbar({
                 onIncrease={() => { player.setTrebleAmount(Math.min(1.5, player.trebleAmount + 0.1)); }}
               />
               <QuickStepperRow
-                label="Noise reduction"
+                label="Denoise"
                 valueLabel={`${Math.round(player.noiseReductionAmount * 100)}%`}
                 onDecrease={() => { player.setNoiseReductionAmount(Math.max(0, player.noiseReductionAmount - 0.05)); }}
                 onIncrease={() => { player.setNoiseReductionAmount(Math.min(1, player.noiseReductionAmount + 0.05)); }}
+              />
+              <QuickStepperRow
+                label="Comp"
+                valueLabel={`${Math.round(player.compressorAmount * 100)}%`}
+                onDecrease={() => { player.setCompressorAmount(Math.max(0, player.compressorAmount - 0.05)); }}
+                onIncrease={() => { player.setCompressorAmount(Math.min(1, player.compressorAmount + 0.05)); }}
+              />
+              <QuickStepperRow
+                label="Noise"
+                valueLabel={`${(player.noiseLevel * 100).toFixed(1)}%`}
+                onDecrease={() => { player.setNoiseLevel(Math.max(0, player.noiseLevel - 0.0025)); }}
+                onIncrease={() => { player.setNoiseLevel(Math.min(0.05, player.noiseLevel + 0.0025)); }}
               />
             </div>,
             document.body,
