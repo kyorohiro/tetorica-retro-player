@@ -17,6 +17,7 @@ import {
   type CurrentRef,
   type RetroAudioPreviewKind,
 } from "../audio/TetoricaRetroAudioNode";
+import { needsNativeAudioSuppression } from "../platform/runtime";
 import {
   DEFAULT_AUDIO_SETTINGS,
   type RetroAudioSettings,
@@ -51,36 +52,6 @@ type UseRetroAudioEngineParams = {
 // Chrome/Firefox suppress native output automatically, so media.volume must stay at the
 // user's value (setting it to 0 would also silence the Web Audio source).
 //
-// navigator.vendor is used as the primary discriminator because it is not affected by
-// Chrome DevTools' UA override (Chrome always reports "Google Inc." regardless of
-// the emulated UA, so spoofed iOS Safari UA strings don't trigger this path).
-function resolveNativeAudioSuppression(
-  audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"],
-): boolean {
-  if (audioOptimizationMode === "chrome") {
-    return false;
-  }
-
-  if (audioOptimizationMode === "safari") {
-    return true;
-  }
-
-  if (typeof navigator === "undefined") return false;
-  if (
-    typeof window !== "undefined" &&
-    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
-  ) {
-    return false;
-  }
-  // navigator.vendor === "Apple Computer, Inc." only in real Safari/WebKit.
-  // Chrome DevTools UA emulation does NOT change navigator.vendor.
-  if (navigator.vendor !== "Apple Computer, Inc.") return false;
-  // Exclude iOS Chrome (CriOS), Firefox for iOS (FxiOS), Opera for iOS (OPiOS)
-  // which also run on WebKit and share the same vendor string.
-  const ua = navigator.userAgent;
-  return !/CriOS|FxiOS|OPiOS/i.test(ua);
-}
-
 function createCurrentAccessor<T>(getValue: () => T): CurrentRef<T> {
   return {
     get current() {
@@ -443,7 +414,7 @@ export function useRetroAudioEngine({
       return;
     }
 
-    if (resolveNativeAudioSuppression(audioOptimizationModeRef.current) && mediaSourceRef.current) {
+    if (needsNativeAudioSuppression(audioOptimizationModeRef.current) && mediaSourceRef.current) {
       mediaRef.current.muted = false;
       mediaRef.current.volume = 0;
     } else {
@@ -592,7 +563,7 @@ export function useRetroAudioEngine({
       } else {
         mediaSource = context.createMediaElementSource(media);
         mediaSource.connect(engine.input);
-        if (resolveNativeAudioSuppression(audioOptimizationModeRef.current)) {
+        if (needsNativeAudioSuppression(audioOptimizationModeRef.current)) {
           media.muted = false;
           media.volume = 0;
         } else {

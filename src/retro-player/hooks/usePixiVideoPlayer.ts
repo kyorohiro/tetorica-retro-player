@@ -10,15 +10,9 @@ import {
   RETRO_PLAYER_PAUSE_PLAYBACK_EVENT,
   RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
 } from "../events";
+import { isAndroidRuntime, isTauriRuntime } from "../platform/runtime";
 
 let retroPlayerInstanceSeed = 0;
-
-const isTauriRuntime = () =>
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
-
-const isAndroidRuntime = () =>
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
 
 const isRetroPlayerDebugEnabled = () =>

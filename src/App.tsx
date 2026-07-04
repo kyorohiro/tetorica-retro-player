@@ -17,6 +17,11 @@ import {
   type LocalePreference,
 } from "./i18n";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
+import {
+  isAndroidRuntime,
+  isTauriRuntime,
+  isWindowsRuntime,
+} from "./retro-player/platform/runtime";
 import { useLongPress } from "./retro-player/hooks/useLongPress";
 import { DIALOG_STACK_ACTIVE_EVENT, useDialog } from "./useDialog";
 import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
@@ -55,20 +60,6 @@ const waitForExternalNavigationPause = async () => {
   await new Promise<void>((resolve) => {
     window.setTimeout(resolve, 120);
   });
-};
-
-const isTauriRuntime = () =>
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
-
-const isWindowsRuntime = () => {
-  if (typeof navigator === "undefined") return false;
-  return /Windows/i.test(navigator.userAgent || "");
-};
-
-const isAndroidRuntime = () => {
-  if (typeof navigator === "undefined") return false;
-  return /Android/i.test(navigator.userAgent || "");
 };
 
 const RetroPlayer = React.lazy(() => import("./retro-player/components/RetroPlayer"));

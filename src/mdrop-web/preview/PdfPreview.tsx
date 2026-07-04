@@ -1,6 +1,7 @@
 import React from "react";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.mjs?url";
+import { isAndroidRuntime } from "../../retro-player/platform/runtime";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -10,9 +11,6 @@ type PdfPreviewProps = {
 };
 
 type PdfStatus = "loading" | "loaded" | "error";
-
-const isAndroidRuntime = () =>
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
 const pdfAssetBase =
   typeof window !== "undefined"
