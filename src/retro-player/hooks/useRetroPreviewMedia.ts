@@ -3,6 +3,13 @@ import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
 import { isAndroidRuntime, needsNativeAudioSuppression } from "../platform/runtime";
+import {
+  createAudioMediaSource,
+  createImageMediaSource,
+  createVideoMediaSource,
+  shouldBypassWebAudio,
+  shouldUseNativeVideoSurface,
+} from "../media/RetroMediaSource";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type CurrentRef<T> = { current: T };
@@ -82,21 +89,6 @@ type UseRetroPreviewMediaParams = {
 
 const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
 const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900, 1600];
-
-const shouldUseNativeVideoSurfaceForMedia = (
-  media: HTMLMediaElement,
-  preferNativeVideoSurface: boolean,
-) => preferNativeVideoSurface && media instanceof HTMLVideoElement;
-
-// Native mode is meant to be a full passthrough regardless of what's being
-// previewed (video or audio): the Web Audio FX chain drops out the same way
-// the WebGL retro filter does. Unlike shouldUseNativeVideoSurfaceForMedia
-// (which also requires an actual HTMLVideoElement, since only video has a
-// native-tag swap to fall back to), this only checks the raw setting.
-const shouldBypassWebAudioForMedia = (
-  _media: HTMLMediaElement,
-  preferNativeVideoSurface: boolean,
-) => preferNativeVideoSurface;
 
 export function useRetroPreviewMedia({
   preferNativeVideoSurface,
@@ -587,32 +579,6 @@ export function useRetroPreviewMedia({
     return true;
   };
 
-  const waitForImageFrame = (image: HTMLImageElement) =>
-    new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        image.removeEventListener("load", handleReady);
-        image.removeEventListener("error", handleError);
-      };
-
-      const handleReady = () => {
-        cleanup();
-        resolve();
-      };
-
-      const handleError = () => {
-        cleanup();
-        reject(new Error("画像の読み込みに失敗しました。"));
-      };
-
-      if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
-        resolve();
-        return;
-      }
-
-      image.addEventListener("load", handleReady, { once: true });
-      image.addEventListener("error", handleError, { once: true });
-    });
-
   const isLikelyLoopTransition = (media: HTMLMediaElement | null) => {
     if (!media || !media.loop || !media.paused) {
       return false;
@@ -961,7 +927,7 @@ export function useRetroPreviewMedia({
 
     try {
       const media = mediaRef.current;
-      const bypassWebAudio = shouldBypassWebAudioForMedia(media, preferNativeVideoSurface);
+      const bypassWebAudio = shouldBypassWebAudio(media, preferNativeVideoSurface);
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
       const context = await ensureAudioContext();
       if (isPlaybackAttemptStale()) {
@@ -1248,16 +1214,14 @@ export function useRetroPreviewMedia({
       objectUrlRef.current = url;
 
       if (isVideo || isAudio) {
-        const media = isVideo ? document.createElement("video") : document.createElement("audio");
-        media.src = url;
-        applyMediaSettings(media);
-        attachMediaEventListeners(media);
-
-        if (media instanceof HTMLVideoElement) {
-          await waitForVideoFrame(media);
-        } else {
-          await waitForAudioReady(media);
-        }
+        const onCreated = (element: HTMLVideoElement | HTMLAudioElement) => {
+          applyMediaSettings(element);
+          attachMediaEventListeners(element);
+        };
+        const mediaSource = isVideo
+          ? await createVideoMediaSource({ url }, { onCreated })
+          : await createAudioMediaSource({ url }, { onCreated });
+        const media = mediaSource.element as HTMLVideoElement | HTMLAudioElement;
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(media, url);
@@ -1291,10 +1255,8 @@ export function useRetroPreviewMedia({
         return;
       }
 
-      const image = new Image();
-      image.src = url;
-      image.crossOrigin = "anonymous";
-      await waitForImageFrame(image);
+      const imageSource = await createImageMediaSource({ url });
+      const image = imageSource.element as HTMLImageElement;
 
       if (requestId !== previewRequestIdRef.current) {
         if (url.startsWith("blob:")) {
@@ -1363,16 +1325,20 @@ export function useRetroPreviewMedia({
         return;
       }
 
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      applyMediaSettings(video);
-      attachMediaEventListeners(video);
-
-      stream.getVideoTracks()[0]?.addEventListener("ended", () => {
-        stopDisplayCapture();
-      });
-
-      await waitForVideoFrame(video);
+      const videoSource = await createVideoMediaSource(
+        { stream },
+        {
+          onCreated: (element) => {
+            applyMediaSettings(element);
+            attachMediaEventListeners(element);
+            stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+              stopDisplayCapture();
+            });
+          },
+          onDebugEvent: debugVideo,
+        },
+      );
+      const video = videoSource.element as HTMLVideoElement;
 
       streamRef.current = stream;
       streamOwnedRef.current = true;
@@ -1429,11 +1395,17 @@ export function useRetroPreviewMedia({
       await ensureRendererReady();
 
       if (kind === "video") {
-        const media = document.createElement("video");
-        media.srcObject = stream;
-        applyMediaSettings(media);
-        attachMediaEventListeners(media);
-        await waitForVideoFrame(media);
+        const videoSource = await createVideoMediaSource(
+          { stream },
+          {
+            onCreated: (element) => {
+              applyMediaSettings(element);
+              attachMediaEventListeners(element);
+            },
+            onDebugEvent: debugVideo,
+          },
+        );
+        const media = videoSource.element as HTMLVideoElement;
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(media, undefined, false);
@@ -1447,11 +1419,16 @@ export function useRetroPreviewMedia({
         await ensureVisualStartupReady("capture");
         await connectMediaStream(stream, "VIDEO_STREAM");
       } else {
-        const media = document.createElement("audio");
-        media.srcObject = stream;
-        applyMediaSettings(media);
-        attachMediaEventListeners(media);
-        await waitForAudioReady(media);
+        const audioSource = await createAudioMediaSource(
+          { stream },
+          {
+            onCreated: (element) => {
+              applyMediaSettings(element);
+              attachMediaEventListeners(element);
+            },
+          },
+        );
+        const media = audioSource.element as HTMLAudioElement;
 
         if (requestId !== previewRequestIdRef.current) {
           releaseDetachedMedia(media, undefined, false);
@@ -1528,17 +1505,23 @@ export function useRetroPreviewMedia({
       });
 
       if (kind === "video") {
-        const media = document.createElement("video");
-        media.src = url;
-        applyMediaSettings(media);
-        attachMediaEventListeners(media);
-        previewElementRef.current = media;
-        mediaRef.current = media;
-        setPreviewKindState("video");
-        setSourceDimensions(null);
-        setViewportRect(null);
-        safeRender();
-        await waitForVideoFrame(media);
+        const videoSource = await createVideoMediaSource(
+          { url },
+          {
+            onCreated: (element) => {
+              applyMediaSettings(element);
+              attachMediaEventListeners(element);
+              previewElementRef.current = element;
+              mediaRef.current = element;
+              setPreviewKindState("video");
+              setSourceDimensions(null);
+              setViewportRect(null);
+              safeRender();
+            },
+            onDebugEvent: debugVideo,
+          },
+        );
+        const media = videoSource.element as HTMLVideoElement;
         debugVideo("startup:previewUrl:video-ready", {
           elapsedMs: elapsedMs(),
           readyState: media.readyState,
@@ -1551,13 +1534,13 @@ export function useRetroPreviewMedia({
           return;
         }
 
-        if (shouldUseNativeVideoSurfaceForMedia(media, preferNativeVideoSurface)) {
+        if (shouldUseNativeVideoSurface(media, preferNativeVideoSurface)) {
           attachNativeVideoPreview(media);
         } else {
           await attachVisualPreview(media, "video");
           await ensureVisualStartupReady("video");
         }
-        if (shouldBypassWebAudioForMedia(media, preferNativeVideoSurface)) {
+        if (shouldBypassWebAudio(media, preferNativeVideoSurface)) {
           debugAudio("connectMediaAudio:bypass-native-hls", {
             currentSrc: media.currentSrc || media.src || null,
             previewKind: "video",
@@ -1569,10 +1552,8 @@ export function useRetroPreviewMedia({
         }
         syncVideoState();
       } else if (kind === "image") {
-        const image = new Image();
-        image.src = url;
-        image.crossOrigin = "anonymous";
-        await waitForImageFrame(image);
+        const imageSource = await createImageMediaSource({ url });
+        const image = imageSource.element as HTMLImageElement;
         debugVideo("startup:previewUrl:image-ready", {
           elapsedMs: elapsedMs(),
           naturalWidth: image.naturalWidth,
@@ -1590,11 +1571,16 @@ export function useRetroPreviewMedia({
         await ensureVisualStartupReady("image");
         syncVideoState();
       } else {
-        const audio = document.createElement("audio");
-        audio.src = url;
-        applyMediaSettings(audio);
-        attachMediaEventListeners(audio);
-        await waitForAudioReady(audio);
+        const audioSource = await createAudioMediaSource(
+          { url },
+          {
+            onCreated: (element) => {
+              applyMediaSettings(element);
+              attachMediaEventListeners(element);
+            },
+          },
+        );
+        const audio = audioSource.element as HTMLAudioElement;
         debugVideo("startup:previewUrl:audio-ready", {
           elapsedMs: elapsedMs(),
           readyState: audio.readyState,

@@ -210,7 +210,17 @@ export function waitForImageReady(image: HTMLImageElement): Promise<void> {
 
 export async function createVideoMediaSource(
   options: CreateVideoSourceOptions,
-  onDebugEvent?: DebugEventCallback,
+  callbacks?: {
+    /**
+     * Called synchronously right after src/srcObject is set, before
+     * waiting for readiness begins. Existing call sites attach their own
+     * playback-event listeners and media settings (mute/volume/etc.) here —
+     * doing that AFTER waitForVideoReady would miss any of those events
+     * (loadstart, waiting, stalled, ...) that fire during the wait itself.
+     */
+    onCreated?: (video: HTMLVideoElement) => void;
+    onDebugEvent?: DebugEventCallback;
+  },
 ): Promise<RetroMediaSource> {
   const video = document.createElement("video");
   if ("stream" in options) {
@@ -218,12 +228,17 @@ export async function createVideoMediaSource(
   } else {
     video.src = options.url;
   }
-  await waitForVideoReady(video, onDebugEvent);
+  callbacks?.onCreated?.(video);
+  await waitForVideoReady(video, callbacks?.onDebugEvent);
   return { kind: "video", origin: "stream" in options ? "stream" : "url", element: video };
 }
 
 export async function createAudioMediaSource(
   options: CreateAudioSourceOptions,
+  callbacks?: {
+    /** Same rationale as createVideoMediaSource's onCreated. */
+    onCreated?: (audio: HTMLAudioElement) => void;
+  },
 ): Promise<RetroMediaSource> {
   const audio = document.createElement("audio");
   if ("stream" in options) {
@@ -231,6 +246,7 @@ export async function createAudioMediaSource(
   } else {
     audio.src = options.url;
   }
+  callbacks?.onCreated?.(audio);
   await waitForAudioReady(audio);
   return { kind: "audio", origin: "stream" in options ? "stream" : "url", element: audio };
 }
@@ -240,6 +256,9 @@ export async function createImageMediaSource(
 ): Promise<RetroMediaSource> {
   const image = new Image();
   image.src = options.url;
+  // Both existing call sites (previewFile, previewUrl) set this immediately
+  // after src, in this order — kept as-is rather than reordered.
+  image.crossOrigin = "anonymous";
   await waitForImageReady(image);
   return { kind: "image", origin: "url", element: image };
 }
