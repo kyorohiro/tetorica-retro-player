@@ -1504,7 +1504,7 @@ function createOverlay(settings) {
 
     const isVideo = isDRM || activeTarget instanceof HTMLVideoElement;
     const isNarrow = activeRect.width < 320;
-    const rectKey = `${Math.round(activeRect.right)}:${Math.round(activeRect.top)}:${Math.round(activeRect.width)}:${isDRM ? "d" : ""}:${panelOpen ? "o" : ""}`;
+    const rectKey = `${Math.round(activeRect.right)}:${Math.round(activeRect.top)}:${Math.round(activeRect.width)}:${isDRM ? "d" : ""}:${panelOpen ? "o" : ""}:${isVideo ? "v" : ""}`;
     if (rectKey === lastButtonRectKey) return;
     lastButtonRectKey = rectKey;
 
