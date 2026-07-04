@@ -10,6 +10,7 @@ import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
+import { isWindowsChromiumAngleRisk } from "../platform/runtime";
 
 export type RetroVideoFilterState = {
   targetWidth: number;
@@ -178,23 +179,6 @@ const readSearchParams = () => {
 
 const shouldForceRetroFilterCompile = () =>
   readSearchParams()?.get("forceRetroFilterCompile") === "1";
-
-const isWindowsChromiumAngleRisk = () => {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  const userAgent = navigator.userAgent ?? "";
-  const isWindows = /Windows/i.test(userAgent);
-  const userAgentDataBrands = (
-    navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }
-  ).userAgentData?.brands;
-  const isChromium =
-    /\b(?:Chrome|Chromium|Edg|OPR|Brave)\//i.test(userAgent) ||
-    (Array.isArray(userAgentDataBrands) && userAgentDataBrands.some(({ brand }) => /Chrom/i.test(brand)));
-
-  return isWindows && isChromium;
-};
 
 type WindowsLitePass1Variant = "basic" | "pc98";
 type WindowsLitePass2Variant = "basic" | "phosphor";

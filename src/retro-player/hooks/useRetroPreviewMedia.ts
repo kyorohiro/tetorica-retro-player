@@ -2,6 +2,7 @@ import { useRef } from "react";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
+import { isAndroidRuntime, needsNativeAudioSuppression } from "../platform/runtime";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type CurrentRef<T> = { current: T };
@@ -79,9 +80,6 @@ type UseRetroPreviewMediaParams = {
   autoPlayRef: CurrentRef<boolean>;
 };
 
-const isAndroidRuntime = () =>
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-
 const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
 const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900, 1600];
 
@@ -99,31 +97,6 @@ const shouldBypassWebAudioForMedia = (
   _media: HTMLMediaElement,
   preferNativeVideoSurface: boolean,
 ) => preferNativeVideoSurface;
-
-// navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
-// Chrome DevTools UA emulation does NOT change navigator.vendor, so this
-// correctly returns false even when the DevTools UA is set to iOS Safari.
-const staticNeedsNativeAudioSuppression = (
-  audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"],
-) => {
-  if (audioOptimizationMode === "chrome") {
-    return false;
-  }
-
-  if (audioOptimizationMode === "safari") {
-    return true;
-  }
-
-  if (typeof navigator === "undefined") return false;
-  if (
-    typeof window !== "undefined" &&
-    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
-  ) {
-    return false;
-  }
-  if (navigator.vendor !== "Apple Computer, Inc.") return false;
-  return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
-};
 
 export function useRetroPreviewMedia({
   preferNativeVideoSurface,
@@ -995,7 +968,7 @@ export function useRetroPreviewMedia({
         return;
       }
       if (
-        (staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
+        (needsNativeAudioSuppression(audioOptimizationModeRef.current) &&
           mediaSourceRef.current) ||
         bypassWebAudio
       ) {
@@ -1072,7 +1045,7 @@ export function useRetroPreviewMedia({
       }
       if (
         (audioContextState !== "running" &&
-          staticNeedsNativeAudioSuppression(audioOptimizationModeRef.current) &&
+          needsNativeAudioSuppression(audioOptimizationModeRef.current) &&
           mediaSourceRef.current) ||
         bypassWebAudio
       ) {

@@ -1,5 +1,6 @@
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
+import { isTauriRuntime } from "../platform/runtime";
 import {
   useRetroFilterState,
   type RetroFilterInitialState,
@@ -47,9 +48,6 @@ const resolveRenderResolutionPreset = (
   return ui?.isHighResolution ? 2 : 1;
 };
 
-const isTauriRuntime = () =>
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
 type RetroPlayerProps = {
   locale?: RetroPlayerLocale;

@@ -15,10 +15,7 @@ import {
   type RetroVideoFilterState,
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
-
-const isTauriRuntime = () =>
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+import { isTauriRuntime } from "../platform/runtime";
 
 const TAURI_HIDDEN_TICK_MS = 250;
 const getPreferredOutputScale = () => {
