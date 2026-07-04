@@ -213,12 +213,29 @@ export function usePixiVideoPlayer(
     console.info(`[retro-player audio recovery][${instanceLabelRef.current}] ${label}`, details);
   };
 
+  // The native <video> tag swap only makes sense for an actual video
+  // element (there's no "native image surface" to swap to).
+  const nativeVideoElement =
+    mediaRef.current instanceof HTMLVideoElement ? mediaRef.current : null;
+  const shouldUseNativeVideoSurface =
+    Boolean(options?.preferNativeVideoSurface) &&
+    previewKind === "video" &&
+    nativeVideoElement !== null;
+
+  // Native mode is meant as a full passthrough regardless of what's being
+  // previewed (video, image, or audio-with-cover). Gate on the raw setting
+  // here rather than shouldUseNativeVideoSurface, which is narrower (it also
+  // requires an actual native <video> element) and previously let the WebGL
+  // filter still apply to image previews while native mode was on.
+  const isNativeModePreferred = Boolean(options?.preferNativeVideoSurface);
+
   const effectiveFilterState = useMemo(
     () => ({
       ...filterState,
-      isFilterEnabled: filterState.isFilterEnabled && isVideoFxEnabled,
+      isFilterEnabled:
+        filterState.isFilterEnabled && isVideoFxEnabled && !isNativeModePreferred,
     }),
-    [filterState, isVideoFxEnabled],
+    [filterState, isVideoFxEnabled, isNativeModePreferred],
   );
 
   const stage = useRetroPixiStage({
@@ -372,14 +389,6 @@ export function usePixiVideoPlayer(
     previewKindRef.current = nextKind;
     setPreviewKind(nextKind);
   };
-
-  const nativeVideoElement =
-    mediaRef.current instanceof HTMLVideoElement ? mediaRef.current : null;
-  const shouldUseNativeVideoSurface =
-    Boolean(options?.preferNativeVideoSurface) &&
-    previewKind === "video" &&
-    nativeVideoElement !== null &&
-    nativeVideoElement.src.includes(".m3u8");
 
   const beginLoading = (label: string) => {
     setLoadingLabel(label);

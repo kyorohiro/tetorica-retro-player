@@ -82,31 +82,23 @@ type UseRetroPreviewMediaParams = {
 const isAndroidRuntime = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
-const isTauriRuntime = () =>
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
-
-const isWindowsRuntime = () =>
-  typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
-
-const shouldBypassWebAudioForMedia = (media: HTMLMediaElement) =>
-  isTauriRuntime() &&
-  isWindowsRuntime() &&
-  media instanceof HTMLVideoElement &&
-  media.src.includes(".m3u8");
-
 const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
 const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900, 1600];
 
 const shouldUseNativeVideoSurfaceForMedia = (
   media: HTMLMediaElement,
   preferNativeVideoSurface: boolean,
-) =>
-  preferNativeVideoSurface &&
-  isTauriRuntime() &&
-  isWindowsRuntime() &&
-  media instanceof HTMLVideoElement &&
-  media.src.includes(".m3u8");
+) => preferNativeVideoSurface && media instanceof HTMLVideoElement;
+
+// Native mode is meant to be a full passthrough regardless of what's being
+// previewed (video or audio): the Web Audio FX chain drops out the same way
+// the WebGL retro filter does. Unlike shouldUseNativeVideoSurfaceForMedia
+// (which also requires an actual HTMLVideoElement, since only video has a
+// native-tag swap to fall back to), this only checks the raw setting.
+const shouldBypassWebAudioForMedia = (
+  _media: HTMLMediaElement,
+  preferNativeVideoSurface: boolean,
+) => preferNativeVideoSurface;
 
 // navigator.vendor is "Apple Computer, Inc." only in real Safari/WebKit.
 // Chrome DevTools UA emulation does NOT change navigator.vendor, so this
@@ -996,7 +988,7 @@ export function useRetroPreviewMedia({
 
     try {
       const media = mediaRef.current;
-      const bypassWebAudio = shouldBypassWebAudioForMedia(media);
+      const bypassWebAudio = shouldBypassWebAudioForMedia(media, preferNativeVideoSurface);
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
       const context = await ensureAudioContext();
       if (isPlaybackAttemptStale()) {
@@ -1592,7 +1584,7 @@ export function useRetroPreviewMedia({
           await attachVisualPreview(media, "video");
           await ensureVisualStartupReady("video");
         }
-        if (shouldBypassWebAudioForMedia(media)) {
+        if (shouldBypassWebAudioForMedia(media, preferNativeVideoSurface)) {
           debugAudio("connectMediaAudio:bypass-native-hls", {
             currentSrc: media.currentSrc || media.src || null,
             previewKind: "video",
