@@ -593,6 +593,13 @@ export function RetroPreviewView({
   const handlePreviewPointerDown = React.useCallback((
     event: React.PointerEvent<HTMLDivElement>,
   ) => {
+    // Don't steal the pointer from interactive controls (e.g. the "Press
+    // Play to start" overlay button) layered on top of the preview area —
+    // capturing here can prevent the browser from routing the subsequent
+    // click to that descendant element (observed in Firefox).
+    if ((event.target as HTMLElement | null)?.closest("button, [role='button'], a, input, select, textarea")) {
+      return;
+    }
     activePreviewPointerIdRef.current = event.pointerId;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     updatePreviewPointer(event);

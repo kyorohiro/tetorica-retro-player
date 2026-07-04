@@ -641,7 +641,14 @@ export function usePixiVideoPlayer(
   }, [disposeAudioEngine]);
 
   const togglePlayback = async () => {
-    if (!mediaRef.current) return;
+    if (!mediaRef.current) {
+      debugVideo("togglePlayback:no-media", {
+        needsUserPlay,
+        isLoading,
+        previewKind,
+      });
+      return;
+    }
 
     if (mediaRef.current.paused || mediaRef.current.ended) {
       if (!isPoweredOn) {
