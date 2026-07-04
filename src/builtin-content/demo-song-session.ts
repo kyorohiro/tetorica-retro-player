@@ -34,6 +34,12 @@ export async function startDemoSongSession(meta: DemoSongMeta): Promise<DemoSong
   const mod = await meta.load();
   const disposeCreate = mod.create(() => {}, () => {});
   Tone.getTransport().loop = true;
+  // Start immediately rather than waiting for the RetroPlayer's isPlaying
+  // round-trip (App.tsx's onPlaybackChange -> syncToneTransportPlayback):
+  // that path only starts the transport after the <audio> element already
+  // reports "playing", leaving a window where playback is silent until the
+  // user manually pauses/resumes.
+  Tone.getTransport().start();
 
   return {
     stream: streamDest.stream,
