@@ -6,6 +6,7 @@ import {
   waitForImageReady,
   waitForVideoReady,
 } from "./RetroMediaSource";
+import { RetroPreviewError, retroT } from "../i18n";
 
 // jsdom does not implement the MediaStream/WebRTC API at all; stub a minimal
 // class purely so `instanceof MediaStream` checks in the source under test
@@ -58,13 +59,23 @@ describe("waitForVideoReady", () => {
     await expect(waitForVideoReady(video)).resolves.toBeUndefined();
   });
 
-  it("rejects with a Japanese error message when the error event fires", async () => {
+  it("rejects with an English technical message and a video-load-failed code when the error event fires", async () => {
     const video = document.createElement("video");
     vi.spyOn(video, "load").mockImplementation(() => {
       queueMicrotask(() => video.dispatchEvent(new Event("error")));
     });
 
-    await expect(waitForVideoReady(video)).rejects.toThrow("動画の読み込みに失敗しました。");
+    let caught: unknown;
+    try {
+      await waitForVideoReady(video);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RetroPreviewError);
+    expect((caught as Error).message).toContain("Failed to load video.");
+    expect((caught as RetroPreviewError).code).toBe("video-load-failed");
+    expect(retroT("en", "video-load-failed")).toBe("Failed to load the video.");
+    expect(retroT("ja", "video-load-failed")).toBe("動画の読み込みに失敗しました。");
   });
 
   it("times out after 8s if neither loadeddata/canplay nor error ever fire", async () => {
@@ -74,7 +85,7 @@ describe("waitForVideoReady", () => {
       vi.spyOn(video, "load").mockImplementation(() => {});
 
       const pending = waitForVideoReady(video);
-      const assertion = expect(pending).rejects.toThrow("動画の読み込みがタイムアウトしました。");
+      const assertion = expect(pending).rejects.toThrow("Video load timed out.");
       await vi.advanceTimersByTimeAsync(8000);
       await assertion;
     } finally {
@@ -133,6 +144,6 @@ describe("waitForImageReady", () => {
     const image = new Image();
     queueMicrotask(() => image.dispatchEvent(new Event("error")));
 
-    await expect(waitForImageReady(image)).rejects.toThrow("画像の読み込みに失敗しました。");
+    await expect(waitForImageReady(image)).rejects.toThrow("Failed to load image.");
   });
 });

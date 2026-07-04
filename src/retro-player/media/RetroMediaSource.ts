@@ -12,6 +12,13 @@
 //     straight into those unchanged.
 //   - teardown (releaseDetachedMedia/cleanupPreview) — stays in the hook.
 // See docs/plans (media input interface refactor) for the full rationale.
+//
+// Errors thrown here are RetroPreviewError instances: their .message is a
+// short English technical string (safe to log to the console regardless of
+// the host app's locale), and their .code is what callers use to look up a
+// localized, user-facing message via resolvePreviewErrorMessage()/retroT()
+// (see ../i18n.ts) — this module itself never picks a locale.
+import { RetroPreviewError } from "../i18n";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
 export type RetroMediaSourceKind = "video" | "audio" | "image";
@@ -88,8 +95,9 @@ export function waitForVideoReady(
       onDebugEvent?.("waitForVideoReady:event-error", describeState("error"));
       cleanup();
       reject(
-        new Error(
-          `動画の読み込みに失敗しました。 src=${video.currentSrc || video.src || "(empty)"} reason=${describeMediaError(video.error)}`,
+        new RetroPreviewError(
+          "video-load-failed",
+          `Failed to load video. src=${video.currentSrc || video.src || "(empty)"} reason=${describeMediaError(video.error)}`,
         ),
       );
     };
@@ -117,8 +125,9 @@ export function waitForVideoReady(
         resolve();
       } else {
         reject(
-          new Error(
-            `動画の読み込みがタイムアウトしました。 src=${video.currentSrc || video.src || "(empty)"} readyState=${video.readyState}`,
+          new RetroPreviewError(
+            "video-load-timeout",
+            `Video load timed out. src=${video.currentSrc || video.src || "(empty)"} readyState=${video.readyState}`,
           ),
         );
       }
@@ -153,8 +162,9 @@ export function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
     const handleError = () => {
       cleanup();
       reject(
-        new Error(
-          `音声の読み込みに失敗しました。 src=${audio.currentSrc || audio.src || "(empty)"} reason=${describeMediaError(audio.error)}`,
+        new RetroPreviewError(
+          "audio-load-failed",
+          `Failed to load audio. src=${audio.currentSrc || audio.src || "(empty)"} reason=${describeMediaError(audio.error)}`,
         ),
       );
     };
@@ -195,7 +205,7 @@ export function waitForImageReady(image: HTMLImageElement): Promise<void> {
 
     const handleError = () => {
       cleanup();
-      reject(new Error("画像の読み込みに失敗しました。"));
+      reject(new RetroPreviewError("image-load-failed", "Failed to load image."));
     };
 
     if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {

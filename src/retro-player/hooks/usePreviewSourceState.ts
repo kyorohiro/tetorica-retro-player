@@ -3,6 +3,8 @@ import {
   getPreferredAudioInputDeviceId,
   setPreferredAudioInputDeviceId,
 } from "./persistedRetroSettings";
+import { resolvePreviewErrorMessage, retroT } from "../i18n";
+import type { RetroPlayerLocale } from "../types";
 
 export type PreviewSourceKind = "video" | "image" | "audio";
 export type DisplayCaptureResult = string | null;
@@ -72,7 +74,7 @@ const fireAndForgetHlsCleanup = (src?: string) => {
   }
 };
 
-export function usePreviewSourceState() {
+export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
   const [preferredAudioInputDeviceId, setPreferredAudioInputDeviceIdState] = useState<string | null>(
     () => getPreferredAudioInputDeviceId(),
   );
@@ -159,7 +161,7 @@ export function usePreviewSourceState() {
 
   const startDisplayCapture = useCallback(async (): Promise<DisplayCaptureResult> => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      const message = "このブラウザでは画面キャプチャーに対応していません。";
+      const message = retroT(locale, "capture-unsupported");
       setCaptureError(message);
       return message;
     }
@@ -192,20 +194,17 @@ export function usePreviewSourceState() {
       });
       return null;
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "画面キャプチャーを開始できませんでした。";
+      const message = resolvePreviewErrorMessage(error, locale, "capture-failed");
       setCaptureError(message);
       return message;
     }
-  }, [clearPreviewSrc]);
+  }, [clearPreviewSrc, locale]);
 
   const startMicrophoneInput = useCallback(async (
     deviceIdOverride?: string | null,
   ): Promise<DisplayCaptureResult> => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      const message = "このブラウザではマイク入力に対応していません。";
+      const message = retroT(locale, "microphone-unsupported");
       setCaptureError(message);
       return message;
     }
@@ -237,20 +236,17 @@ export function usePreviewSourceState() {
       });
       return null;
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "マイク入力を開始できませんでした。";
+      const message = resolvePreviewErrorMessage(error, locale, "microphone-failed");
       setCaptureError(message);
       return message;
     }
-  }, [clearPreviewSrc, preferredAudioInputDeviceId, refreshAudioInputDevices]);
+  }, [clearPreviewSrc, locale, preferredAudioInputDeviceId, refreshAudioInputDevices]);
 
   const startCameraInput = useCallback(async (
     deviceIdOverride?: string | null,
   ): Promise<DisplayCaptureResult> => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      const message = "このブラウザではカメラ入力に対応していません。";
+      const message = retroT(locale, "camera-unsupported");
       setCaptureError(message);
       return message;
     }
@@ -282,14 +278,11 @@ export function usePreviewSourceState() {
       });
       return null;
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "カメラ入力を開始できませんでした。";
+      const message = resolvePreviewErrorMessage(error, locale, "camera-failed");
       setCaptureError(message);
       return message;
     }
-  }, [clearPreviewSrc, preferredAudioInputDeviceId, refreshAudioInputDevices]);
+  }, [clearPreviewSrc, locale, preferredAudioInputDeviceId, refreshAudioInputDevices]);
 
   // For Desktop: src is already a valid URL (convertFileSrc result or HTTP URL).
   // Does NOT create a blob — revokePreviewSrc only revokes blob: URLs, so cleanup is safe.

@@ -11,6 +11,7 @@ import {
   RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
 } from "../events";
 import { isAndroidRuntime, isTauriRuntime } from "../platform/runtime";
+import type { RetroPlayerLocale } from "../types";
 
 let retroPlayerInstanceSeed = 0;
 
@@ -80,6 +81,7 @@ export function usePixiVideoPlayer(
     onPlaybackChange?: (event: RetroPlaybackEvent) => void;
     playbackSource?: "builtin-tone" | "media";
     preferNativeVideoSurface?: boolean;
+    locale?: RetroPlayerLocale;
   },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
@@ -163,9 +165,12 @@ export function usePixiVideoPlayer(
     }
 
     const normalized = previewError.toLowerCase();
+    // previewError is a localized user-facing string (see ../i18n.ts), so it
+    // may be in English or Japanese depending on the app's locale — keep
+    // both sets of keywords in sync with the messages defined there.
     const isRetryable =
       needsUserPlay ||
-      /src-not-supported|network|failed to start|did not start|cannot confirm|buffer|waiting|stalled|読み込みに失敗|再生の開始|再試行|開始を確認できません/.test(
+      /src-not-supported|network|failed to start|did not start|cannot confirm|buffer|waiting|stalled|読み込みに失敗|タイムアウト|準備中|開始できません/.test(
         normalized,
       );
 
@@ -521,6 +526,7 @@ export function usePixiVideoPlayer(
     syncVideoState();
   };
   const media = useRetroPreviewMedia({
+    locale: options?.locale ?? "en",
     preferNativeVideoSurface: options?.preferNativeVideoSurface ?? false,
     filterState,
     appRef,

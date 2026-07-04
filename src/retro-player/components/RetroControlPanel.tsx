@@ -201,6 +201,7 @@ export function RetroControlPanel({
       {controlPanelMode !== "video-settings" && (
           <React.Suspense fallback={controlsFallback}>
             <VideoControls
+              locale={locale}
               hasPlayback={hasPlaybackControls}
               currentTime={player.currentTime}
               duration={player.duration}

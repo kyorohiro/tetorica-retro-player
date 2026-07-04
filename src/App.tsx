@@ -88,7 +88,6 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
-  const previewSource = usePreviewSourceState();
   const [isMDropReady, setIsMDropReady] = React.useState(false);
   const [mDropPort, setMDropPort] = React.useState<number | null>(null);
   const [mDropIp, setMDropIp] = React.useState<string | null>(null);
@@ -131,6 +130,7 @@ function App() {
     return /Android|iPhone|iPad|iPod/i.test(userAgent);
   }, []);
   const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
+  const previewSource = usePreviewSourceState(locale);
   const isAndroidTauri = React.useMemo(
     () => isTauriRuntime() && isAndroidRuntime(),
     [],
