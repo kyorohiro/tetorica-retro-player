@@ -1040,6 +1040,13 @@ function createOverlay(settings) {
         surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
         surface.gl.useProgram(surface.renderer.pass1Program);
+        // On Windows/ANGLE, UNPACK_FLIP_Y_WEBGL is not applied to ImageBitmap sources
+        // (ImageCapture.grabFrame() proxy frames). Compensate with a UV flip in pass1
+        // so the FBO receives correctly-oriented content. Pass2 reads from the FBO
+        // (written by WebGL, always correct orientation) and needs no adjustment.
+        if (isWindowsChromiumAngleRisk() && drawableSource !== targetElement) {
+          surface.gl.uniform1f(surface.renderer.pass1UniformLocations.uFlipV, flipV ? 0.0 : 1.0);
+        }
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
 
         surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, null);
