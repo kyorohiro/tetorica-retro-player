@@ -989,7 +989,7 @@ export function RetroPreviewToolbar({
             ref={eqPopover.anchorRef}
             type="button"
             aria-label={isPinnedPreview ? "Unpin preview" : "Pin preview"}
-            title="Pin (long-press for bass/mid/treble/noise)"
+            title="Pin (long-press for bass/mid/treble/noise reduction)"
             {...pinLongPressHandlers}
             onMouseEnter={() => scheduleTooltip("pin")}
             onMouseLeave={hideTooltip}
@@ -1041,10 +1041,10 @@ export function RetroPreviewToolbar({
                 onIncrease={() => { player.setTrebleAmount(Math.min(1.5, player.trebleAmount + 0.1)); }}
               />
               <QuickStepperRow
-                label="Noise"
-                valueLabel={`${(player.noiseLevel * 100).toFixed(1)}%`}
-                onDecrease={() => { player.setNoiseLevel(Math.max(0, player.noiseLevel - 0.0025)); }}
-                onIncrease={() => { player.setNoiseLevel(Math.min(0.05, player.noiseLevel + 0.0025)); }}
+                label="Noise reduction"
+                valueLabel={`${Math.round(player.noiseReductionAmount * 100)}%`}
+                onDecrease={() => { player.setNoiseReductionAmount(Math.max(0, player.noiseReductionAmount - 0.05)); }}
+                onIncrease={() => { player.setNoiseReductionAmount(Math.min(1, player.noiseReductionAmount + 0.05)); }}
               />
             </div>,
             document.body,
