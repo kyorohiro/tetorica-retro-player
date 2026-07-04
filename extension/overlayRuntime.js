@@ -907,7 +907,7 @@ function createOverlay(settings) {
         if (!renderer.uniformLocations) return;
         applySettings(surface.gl, renderer, currentSettings);
         applyFlipUniforms(surface.gl, renderer, flipH, flipV);
-      });
+      }, currentSettings);
       surface.canvas.style.opacity = String(overlayOpacity);
       const bLevel = BRIGHTNESS_PRESETS[brightnessIdx];
       surface.canvas.style.filter = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${bLevel})` : "";
@@ -956,22 +956,13 @@ function createOverlay(settings) {
     const drawableSource = surface.getDrawableSource(targetElement);
 
     if (shouldUseDirectVideoFallback(targetElement)) {
-      surface.fallbackTo2d(new Error("Direct raw overlay fallback"));
       if (!drawableSource) {
         surface.canvas.style.display = "none";
         surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
         return;
       }
-      try {
-        surface.canvas.style.display = "block";
-        surface.hideFailureOverlay();
-        surface.renderRaw(drawableSource);
-        surface.didTargetChange = false;
-      } catch (error) {
-        surface.canvas.style.display = "none";
-        surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
-      }
-      return;
+      // proxyBitmap or proxyVideo is available — safe for texImage2D on Windows.
+      // Fall through to the normal WebGL rendering path to apply the retro filter.
     }
 
     if (!drawableSource) {
@@ -1721,7 +1712,7 @@ function getFrameIntervalForPriority(priorityIndex) {
   return 4;
 }
 
-function createOverlaySurface(index, onReady) {
+function createOverlaySurface(index, onReady, initialSettings) {
   const canvas = document.createElement("canvas");
   canvas.style.position = "fixed";
   canvas.style.left = "0";
@@ -1762,17 +1753,18 @@ function createOverlaySurface(index, onReady) {
   failureOverlay.append(failureOverlayLabel);
 
   let gl = canvas.getContext("webgl2", {
-    alpha: false,
+    alpha: true,
     antialias: false,
     depth: false,
     stencil: false,
     preserveDrawingBuffer: false,
+    powerPreference: "default",
   });
   let ctx2d = gl ? null : canvas.getContext("2d");
   let renderer = null;
   if (gl) {
     try {
-      renderer = setupRenderer(gl, onReady);
+      renderer = setupRenderer(gl, onReady, initialSettings);
     } catch (error) {
       console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
       gl = null;
@@ -2330,7 +2322,7 @@ out vec4 fragColor;
 void main() { fragColor = texture(uTexture, vTextureCoord); }
 `;
 
-function setupRenderer(webgl, onReady) {
+function setupRenderer(webgl, onReady, initialSettings) {
   // --- Passthrough program (tiny; compiles instantly) ---
   // Returned immediately so the overlay shows raw video while the full filter
   // compiles in the background. After compilation, renderer.program is swapped.
@@ -2353,7 +2345,7 @@ function setupRenderer(webgl, onReady) {
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
   const shouldUseWindowsLiteMode = isWindowsChromiumAngleRisk();
   const shaderSources = shouldUseWindowsLiteMode
-    ? getWindowsLiteShaderSources(currentSettings)
+    ? getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS)
     : { pass1: FILTER_FRAGMENT_PASS1, pass2: FILTER_FRAGMENT_PASS2 };
   const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1);
   const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2);
