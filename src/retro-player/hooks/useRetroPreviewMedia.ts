@@ -996,10 +996,33 @@ export function useRetroPreviewMedia({
       setIsPlaying(true);
       _setPreviewError("");
       setNeedsUserPlay(false);
-      const audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
+      let audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
       // play() succeeded but AudioContext is still suspended (e.g. Tauri WKWebView allows
       // video autoplay but cannot resume AudioContext without a user gesture).
-      // Pause and require the user to click Play so the gesture unlocks the audio chain.
+      if (audioContextState === "suspended" && mediaSourceRef.current) {
+        // ensureAudioContext() above already attempted resume(), but it races
+        // against a timeout (see TetoricaRetroAudioNode.ensureInitialized) so
+        // it doesn't hang forever when resume() never settles without a
+        // gesture. That timeout can fire even when resume() would have
+        // succeeded moments later — this function only runs from a genuine
+        // Play click or an autoplay attempt that already reached play(), so
+        // give the in-flight resume() one more bounded chance to finish
+        // before concluding it's truly stuck and re-prompting the user.
+        const activeContext = audioContextRef.current;
+        if (activeContext) {
+          await Promise.race([
+            activeContext.resume().catch(() => {}),
+            new Promise<void>((resolve) => { window.setTimeout(resolve, 1000); }),
+          ]);
+          if (isPlaybackAttemptStale()) {
+            media.pause();
+            return;
+          }
+        }
+        audioContextState = audioContextRef.current?.state ?? context?.state ?? "none";
+      }
+      // Pause and require the user to click Play so the next gesture unlocks
+      // the audio chain, if it's still stuck after the grace period above.
       if (audioContextState === "suspended" && mediaSourceRef.current) {
         media.pause();
         isPlayingRef.current = false;
