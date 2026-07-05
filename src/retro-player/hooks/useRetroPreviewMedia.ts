@@ -4,9 +4,12 @@ import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
 import { isAndroidRuntime, needsNativeAudioSuppression } from "../platform/runtime";
 import {
+  attachHlsSource,
   createAudioMediaSource,
   createImageMediaSource,
   createVideoMediaSource,
+  destroyHlsInstance,
+  getHlsInstance,
   shouldBypassWebAudio,
   shouldUseNativeVideoSurface,
 } from "../media/RetroMediaSource";
@@ -264,6 +267,9 @@ export function useRetroPreviewMedia({
     media.muted = true;
     media.volume = 0;
     media.pause();
+    if (media instanceof HTMLVideoElement) {
+      destroyHlsInstance(media);
+    }
     if (media.srcObject instanceof MediaStream) {
       if (stopStream) {
         media.srcObject.getTracks().forEach((track) => track.stop());
@@ -512,7 +518,7 @@ export function useRetroPreviewMedia({
       return false;
     }
 
-    if (!media.src.includes(".m3u8")) {
+    if (!getHlsInstance(media)) {
       return false;
     }
 
@@ -530,7 +536,8 @@ export function useRetroPreviewMedia({
       return false;
     }
 
-    const src = media.currentSrc || media.src;
+    const existingHls = media instanceof HTMLVideoElement ? getHlsInstance(media) : undefined;
+    const src = existingHls?.url || media.currentSrc || media.src;
     if (!src) {
       return false;
     }
@@ -549,11 +556,19 @@ export function useRetroPreviewMedia({
     });
 
     media.pause();
-    media.removeAttribute("src");
-    media.load();
-    media.src = src;
-    applyMediaSettings(media);
-    media.load();
+    if (existingHls && media instanceof HTMLVideoElement) {
+      // Native src reassignment would fight hls.js's own MediaSource
+      // attachment — tear down and re-attach a fresh hls.js instance
+      // against the same (real, non-blob) manifest URL instead.
+      await attachHlsSource(media, src);
+      applyMediaSettings(media);
+    } else {
+      media.removeAttribute("src");
+      media.load();
+      media.src = src;
+      applyMediaSettings(media);
+      media.load();
+    }
 
     if (isVideo) {
       await waitForVideoFrame(media);
@@ -688,137 +703,18 @@ export function useRetroPreviewMedia({
 
     media.addEventListener("durationchange", syncIfCurrentMedia);
     media.addEventListener("seeked", syncIfCurrentMedia);
-    // WKWebView HLS VOD: 'ended' never fires; seeking/play silently fail after
-    // the stream stops. Use an interval to detect when currentTime stops
-    // advancing near the end of the stream (works even after timeupdate stops).
-    const isHlsStream = media.src.includes(".m3u8");
-    let hlsEndedFlag = false;
-    let hlsWatchInterval: ReturnType<typeof setInterval> | null = null;
-
-    const stopHlsWatch = () => {
-      if (hlsWatchInterval) { clearInterval(hlsWatchInterval); hlsWatchInterval = null; }
-    };
-
-    const handleHlsEnded = () => {
-      stopHlsWatch();
-      if (!isCurrentMedia()) return;
-      hlsEndedFlag = true;
-      syncVideoState();
-      if (media.loop) {
-        hlsEndedFlag = false;
-        media.load();
-        media.addEventListener("canplay", () => {
-          if (!isCurrentMedia()) return;
-          media.play().then(() => {
-            if (!isCurrentMedia()) return;
-            isPlayingRef.current = true;
-            setEngineIsPlaying(true);
-            setIsPlaying(true);
-          }).catch(() => {});
-        }, { once: true });
-      }
-    };
-
-    // "Stuck near duration" (below) can false-positive while an EVENT-type
-    // HLS manifest is still growing: media.duration reflects only whatever
-    // the native engine has fetched so far, which can be well short of the
-    // real length until it re-polls the manifest. Before declaring the
-    // stream actually ended, fetch the manifest ourselves and check for
-    // #EXT-X-ENDLIST — the one server-side signal that transcoding is truly
-    // done — and if it's absent, force a reload so the element re-fetches
-    // the now-longer manifest instead of looping prematurely.
-    const confirmHlsEndedOrReload = async (onConfirmedEnded?: () => void) => {
-      const src = media.currentSrc || media.src;
-      if (!src) {
-        handleHlsEnded();
-        onConfirmedEnded?.();
-        return;
-      }
-      try {
-        const res = await fetch(src, { cache: "no-store" });
-        const text = await res.text();
-        if (!isCurrentMedia()) return;
-        if (text.includes("#EXT-X-ENDLIST")) {
-          handleHlsEnded();
-          onConfirmedEnded?.();
-          return;
-        }
-        const resumeTime = media.currentTime;
-        media.load();
-        media.addEventListener("canplay", () => {
-          if (!isCurrentMedia()) return;
-          media.currentTime = resumeTime;
-          void media.play();
-        }, { once: true });
-      } catch {
-        // Manifest fetch failed — fall back to the original heuristic
-        // rather than getting stuck forever.
-        handleHlsEnded();
-        onConfirmedEnded?.();
-      }
-    };
-
+    // hls.js owns manifest polling and end-of-stream/duration detection for
+    // .m3u8 sources (see RetroMediaSource.ts's attachHlsSource) via
+    // MediaSource, so the native "ended"/"durationchange" events fire
+    // correctly and no HLS-specific handling is needed here.
     media.addEventListener("ended", () => {
       if (!isCurrentMedia()) return;
-      if (isHlsStream) {
-        // The native "ended" event fires as soon as currentTime reaches
-        // media.duration — which can itself be a short, stale estimate
-        // while an EVENT-type manifest is still growing. Route through the
-        // same ENDLIST confirmation as the stuck-detector below instead of
-        // trusting it directly.
-        void confirmHlsEndedOrReload(() => {
-          if (!media.loop) {
-            onEndedRef?.current?.();
-          }
-        });
-        return;
-      }
       syncVideoState();
       if (!media.loop) {
         onEndedRef?.current?.();
       }
     });
 
-    if (isHlsStream) {
-      // Start an interval once playback begins to watch for the stream stopping.
-      // Every 500ms, check if currentTime has advanced. If it hasn't moved for
-      // 2 seconds (4 ticks) while near the end of duration, treat as ended.
-      media.addEventListener("playing", () => {
-        if (!isCurrentMedia() || hlsWatchInterval) return;
-        let lastCt = media.currentTime;
-        let stuckTicks = 0;
-        hlsWatchInterval = setInterval(() => {
-          if (!isCurrentMedia()) { stopHlsWatch(); return; }
-          const ct = media.currentTime;
-          const dur = media.duration;
-          const remaining = Number.isFinite(dur) ? dur - ct : Infinity;
-          if (ct === lastCt && remaining < 10.0) {
-            stuckTicks++;
-            if (stuckTicks >= 4) {
-              stuckTicks = 0;
-              void confirmHlsEndedOrReload();
-            }
-          } else {
-            stuckTicks = 0;
-            lastCt = ct;
-          }
-        }, 500);
-      });
-    }
-
-    // After HLS VOD ends, seeking via scrubbar silently fails in WKWebView.
-    // Detect via hlsEndedFlag and reload to the target position.
-    media.addEventListener("seeking", () => {
-      if (!isCurrentMedia() || !isHlsStream || !hlsEndedFlag) return;
-      hlsEndedFlag = false;
-      const targetTime = media.currentTime;
-      media.load();
-      media.addEventListener("canplay", () => {
-        if (!isCurrentMedia()) return;
-        media.currentTime = targetTime;
-        media.play().catch(() => {});
-      }, { once: true });
-    });
     media.addEventListener("ratechange", syncIfCurrentMedia);
 
     // The "resize" event fires on <video> when the video's intrinsic size

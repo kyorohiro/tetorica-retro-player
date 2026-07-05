@@ -11,6 +11,7 @@ import {
   RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
 } from "../events";
 import { isAndroidRuntime, isTauriRuntime } from "../platform/runtime";
+import { getHlsInstance } from "../media/RetroMediaSource";
 import type { RetroPlayerLocale } from "../types";
 
 let retroPlayerInstanceSeed = 0;
@@ -665,7 +666,7 @@ export function usePixiVideoPlayer(
         mediaRef.current.ended ||
         (
           mediaRef.current instanceof HTMLVideoElement &&
-          mediaRef.current.src.includes(".m3u8") &&
+          Boolean(getHlsInstance(mediaRef.current)) &&
           (previewError || needsUserPlay) &&
           (mediaRef.current.currentTime ?? 0) <= 0.05
         );
