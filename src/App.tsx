@@ -1,5 +1,4 @@
 import React, { useCallback, useRef } from "react";
-import { flushSync } from "react-dom";
 import {
   Menu,
   Pin,
@@ -27,9 +26,6 @@ import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
   getDroppedFiles,
-  isAudio,
-  isImage,
-  isVideo,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import {
@@ -43,13 +39,8 @@ import { mdropUnshareAll } from "./mdrop-web/tauri";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
+import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
 import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player/components/RetroPlayerPlus";
-
-const waitForNextPaint = async () => {
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
-};
 
 const waitForExternalNavigationPause = async () => {
   dispatchRetroPlayerPrepareExternalNavigation();
@@ -60,9 +51,7 @@ const waitForExternalNavigationPause = async () => {
 
 function App() {
   const retroPlayerPlusRef = useRef<RetroPlayerPlusHandle>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
-  const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
+  const filePickerRef = useRef<FilePickerHandle>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
@@ -75,8 +64,6 @@ function App() {
   }, []);
   const [isDialogActive, setIsDialogActive] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
-  const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
-  const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
   const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
     () => loadLocalePreference(),
   );
@@ -125,12 +112,6 @@ function App() {
     };
   }, []);
 
-  const finishPreparingSelection = useCallback(() => {
-    pickerStateRef.current = "idle";
-    setIsPreparingSelection(false);
-    setIsPreparingSelectionDismissed(false);
-  }, []);
-
   React.useEffect(() => {
     saveLocalePreference(localePreference);
   }, [localePreference]);
@@ -147,97 +128,6 @@ function App() {
     retroPlayerPlusRef,
     showBrowserFileListDialog,
   });
-
-  React.useEffect(() => {
-    const clearIfPickerWasCancelled = () => {
-      if (pickerStateRef.current !== "opening") return;
-
-      window.setTimeout(() => {
-        if (pickerStateRef.current !== "opening") return;
-        finishPreparingSelection();
-      }, 0);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
-      clearIfPickerWasCancelled();
-    };
-
-    const fileInput = fileInputRef.current;
-    const folderInput = folderInputRef.current;
-
-    window.addEventListener("focus", clearIfPickerWasCancelled);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    fileInput?.addEventListener("cancel", clearIfPickerWasCancelled);
-    folderInput?.addEventListener("cancel", clearIfPickerWasCancelled);
-
-    return () => {
-      window.removeEventListener("focus", clearIfPickerWasCancelled);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      fileInput?.removeEventListener("cancel", clearIfPickerWasCancelled);
-      folderInput?.removeEventListener("cancel", clearIfPickerWasCancelled);
-    };
-  }, [finishPreparingSelection]);
-
-  const beginPreparingSelection = useCallback(() => {
-    pickerStateRef.current = "opening";
-    flushSync(() => {
-      setIsPreparingSelection(true);
-      setIsPreparingSelectionDismissed(false);
-      setIsMobileMenuOpen(false);
-    });
-  }, []);
-
-  const showPreparingSelection = useCallback(() => {
-    pickerStateRef.current = "processing";
-    flushSync(() => {
-      setIsPreparingSelection(true);
-      setIsPreparingSelectionDismissed(false);
-    });
-  }, []);
-
-  const dismissPreparingSelection = useCallback(() => {
-    flushSync(() => {
-      setIsPreparingSelectionDismissed(true);
-    });
-  }, []);
-
-  const filesToTargets = useCallback((files: FileList | File[]) => {
-    const targets: FileTargetFile[] = [];
-
-    for (let index = 0; index < files.length; index += 1) {
-      const file = files[index] as FileWithRelativePath;
-
-      targets.push({
-        id: "",
-        entry: file,
-        isDir: false,
-        isFile: true,
-        path: file.webkitRelativePath || file.name,
-        createdAt: 0,
-        modifiedAt: file.lastModified ?? 0,
-        size: file.size ?? 0,
-        isRoot: true,
-      });
-    }
-
-    return targets;
-  }, []);
-
-  const isDirectRetroFile = useCallback((file: File) => {
-    return isImage(file.name) || isVideo(file.name) || isAudio(file.name);
-  }, []);
-
-  const openPortableTargets = useCallback(async (files: FileList | File[]) => {
-    const targets = filesToTargets(files);
-    if (targets.length === 0) return;
-
-    await showBrowserFileListDialog({
-      files: targets,
-      initialPath: "/",
-      title: "",
-    });
-  }, [filesToTargets, showBrowserFileListDialog]);
 
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
     const previewFiles = Array.from(files).map((file) => ({
@@ -304,32 +194,6 @@ function App() {
       },
     });
   }, [showPreviewDialog]);
-
-  const openFiles = useCallback(async (files: FileList | File[]) => {
-    if (files.length === 0) return;
-
-    pickerStateRef.current = "processing";
-
-    try {
-      await waitForNextPaint();
-
-      if (files.length === 1 && isDirectRetroFile(files[0])) {
-        retroPlayerPlusRef.current?.loadFiles([files[0]]);
-        return;
-      }
-
-      const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
-      if ((loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaFiles.length > 1 && mediaFiles.length === files.length) {
-        retroPlayerPlusRef.current?.loadFiles(mediaFiles);
-        finishPreparingSelection();
-        return;
-      }
-
-      await openPortableTargets(files);
-    } finally {
-      finishPreparingSelection();
-    }
-  }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -440,7 +304,7 @@ function App() {
       uniqueMap.set(key, file);
     }
     const targets = Array.from(uniqueMap.values());
-    await openFiles(targets);
+    await filePickerRef.current?.openDroppedFiles(targets);
   };
   const onDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -479,9 +343,8 @@ function App() {
       return;
     }
 
-    beginPreparingSelection();
-    fileInputRef.current?.click();
-  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, isNativeMdropAvailable]);
+    filePickerRef.current?.openFileInput();
+  }, [isFfmpegEnabled, isMDropReady, isNativeMdropAvailable]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -501,9 +364,8 @@ function App() {
       return;
     }
 
-    beginPreparingSelection();
-    folderInputRef.current?.click();
-  }, [beginPreparingSelection, isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showBrowserFileListDialog]);
+    filePickerRef.current?.openFolderInput();
+  }, [isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showBrowserFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -714,35 +576,15 @@ function App() {
           <p className="mb-4 text-sm text-rose-500">{previewSource.captureError}</p>
         )}
 
-        {isPreparingSelection && !isPreparingSelectionDismissed && (
-          <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-slate-950/56 px-4">
-            <div
-              className="pointer-events-auto w-[min(92vw,28rem)] rounded-2xl border border-slate-700 bg-slate-900/94 px-4 py-4 text-slate-100 shadow-2xl backdrop-blur-sm"
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">
-                    {t(locale, "preparingSelection")}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">
-                    {t(locale, "preparingSelectionDetail")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onPointerDown={dismissPreparingSelection}
-                  onTouchStart={dismissPreparingSelection}
-                  onMouseDown={dismissPreparingSelection}
-                  onClick={dismissPreparingSelection}
-                  className="shrink-0 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-700"
-                >
-                  {t(locale, "hideLoadingOverlay")}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <FilePicker
+          ref={filePickerRef}
+          locale={locale}
+          isIosOrAndroid={isIosOrAndroid}
+          loopModeRef={loopModeRef}
+          retroPlayerPlusRef={retroPlayerPlusRef}
+          showBrowserFileListDialog={showBrowserFileListDialog}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
 
         <RetroPlayerPlus
           ref={retroPlayerPlusRef}
@@ -758,54 +600,6 @@ function App() {
           onCycleLoopMode={cycleLoopMode}
         />
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,audio/*,.zip,.cbz,.rar,.cbr,.pdf,.epub,.txt,.md"
-          multiple
-          className="hidden"
-          onChange={async (event) => {
-            const input = event.currentTarget;
-            const files = input.files;
-            if (files && files.length > 0) {
-              showPreparingSelection();
-              await waitForNextPaint();
-              await openFiles(files);
-            } else {
-              finishPreparingSelection();
-            }
-
-            input.value = "";
-          }}
-        />
-
-        {!isIosOrAndroid && (
-          <input
-            ref={folderInputRef}
-            type="file"
-            multiple
-            {...({ webkitdirectory: "true" } as any)}
-            className="hidden"
-            onChange={async (event) => {
-              const input = event.currentTarget;
-              const files = input.files;
-              if (files && files.length > 0) {
-                showPreparingSelection();
-                await waitForNextPaint();
-                try {
-                  pickerStateRef.current = "processing";
-                  await openPortableTargets(files);
-                } finally {
-                  finishPreparingSelection();
-                }
-              } else {
-                finishPreparingSelection();
-              }
-
-              input.value = "";
-            }}
-          />
-        )}
       </div>
     </main>
   </>
