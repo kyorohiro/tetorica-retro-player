@@ -50,6 +50,7 @@ type RetroPlayerPlusProps = {
   previewSource: ReturnType<typeof usePreviewSourceState>;
   isDialogActive: boolean;
   isMDropReadyRef: React.RefObject<boolean>;
+  isFfmpegEnabled: boolean;
   setIsFfmpegEnabled: (value: boolean) => void;
   shouldPreferDialogRetroPreview: boolean;
   showDialogPreviewForPath: (url: string, path: string) => Promise<void>;
@@ -65,6 +66,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       previewSource,
       isDialogActive,
       isMDropReadyRef,
+      isFfmpegEnabled,
       setIsFfmpegEnabled,
       shouldPreferDialogRetroPreview,
       showDialogPreviewForPath,
@@ -337,6 +339,29 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       }
     }, [isMDropReadyRef, setIsFfmpegEnabled, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
+    // Long-press play/pause: redo the mDrop share + (optional) ffmpeg HLS
+    // resolve for whatever's currently loaded. Recovers playback when an
+    // ffmpeg transcode session dies mid-stream — reloading the same URL
+    // (what a plain retry does) doesn't restart a dead transcode, only
+    // re-sharing does. Returns false when there's nothing mDrop-specific to
+    // redo (e.g. a local file, or mDrop not ready), so RetroPlayer falls
+    // back to its own generic "restart from 0".
+    const retryCurrentSource = useCallback(async (): Promise<boolean> => {
+      const path = currentPlayingPathRef.current;
+      if (!path || !isMDropReadyRef.current) return false;
+      setShowFfmpegRetry(false);
+      setShowPlaybackRetryHint(false);
+      try {
+        const shared = await mdropShareFile(path);
+        const url = resolvePlayableUrl(shared, isFfmpegEnabled);
+        previewSource.previewPath(url, path);
+        return true;
+      } catch (e) {
+        console.error("[retry current source] failed:", e);
+        return false;
+      }
+    }, [isFfmpegEnabled, isMDropReadyRef, previewSource]);
+
     const handlePlayerError = useCallback((_error: Error) => {
       setShowPlaybackRetryHint(true);
       if (isMDropReadyRef.current && currentPlayingPathRef.current) {
@@ -433,6 +458,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
             }}
             onPrevTrack={playlistLength > 1 ? prevTrack : undefined}
             onNextTrack={playlistLength > 1 ? nextTrack : undefined}
+            onForceReplay={retryCurrentSource}
             loopMode={loopMode}
             onCycleLoopMode={onCycleLoopMode}
           />

@@ -111,6 +111,7 @@ export type RetroControlPanelProps = {
   onImportSettings: (data: PresetFileData) => void;
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
+  onForceReplay?: () => void;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
   showVideoSpectrum?: boolean;
@@ -161,6 +162,7 @@ export function RetroControlPanel({
   onImportSettings,
   onPrevTrack,
   onNextTrack,
+  onForceReplay,
   loopMode,
   onCycleLoopMode,
   showVideoSpectrum,
@@ -280,6 +282,7 @@ export function RetroControlPanel({
               onToggleMute={player.toggleMute}
               onToggleNoise={player.toggleNoise}
               onTogglePlayback={() => { void player.togglePlayback(); }}
+              onTogglePlaybackLongPress={onForceReplay}
               onBackToPlayback={() => { onControlPanelModeChange("playback"); }}
               onResetSettings={onResetSettings}
               onImportSettings={onImportSettings}

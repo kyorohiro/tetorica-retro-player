@@ -112,6 +112,7 @@ type VideoControlsProps = {
   onToggleMute: () => void;
   onToggleNoise: () => void;
   onTogglePlayback: () => void;
+  onTogglePlaybackLongPress?: () => void;
   onBackToPlayback: () => void;
   onResetSettings: () => void;
   onToggleVideoSettings: () => void;
@@ -220,6 +221,7 @@ export const VideoControls = memo(function VideoControls({
   onToggleMute,
   onToggleNoise,
   onTogglePlayback,
+  onTogglePlaybackLongPress,
   onBackToPlayback,
   onResetSettings,
   onToggleVideoSettings,
@@ -252,6 +254,10 @@ export const VideoControls = memo(function VideoControls({
   };
   const { isHolding: isAudioHolding, ...audioButtonHandlers } = useLongPress(handleAudioFxLongPress, onToggleAudioSettings);
   const noop = useCallback(() => {}, []);
+  const { isHolding: isPlayPauseHolding, ...playPauseLongPressHandlers } = useLongPress(
+    onTogglePlaybackLongPress ?? noop,
+    onTogglePlayback,
+  );
   const { isHolding: isPrevHolding, ...prevTrackHandlers } = useLongPress(
     onPrevTrack ?? noop,
     useCallback(() => { onSeek(Math.max(currentTime - 5, 0)); }, [onSeek, currentTime]),
@@ -991,12 +997,23 @@ export const VideoControls = memo(function VideoControls({
           <div className="grid grid-cols-4 gap-2">
             <button
               type="button"
-              onClick={onTogglePlayback}
+              {...playPauseLongPressHandlers}
               aria-label={isPlaying ? "Pause" : "Play"}
               title={isPlaying ? "Pause" : "Play"}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[#12141c] hover:bg-emerald-500/20"
+              className={[
+                "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                isPlayPauseHolding
+                  ? "border-[#7fd4a8] bg-[#c9ecd7]"
+                  : "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20",
+              ].join(" ")}
             >
-              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              {isPlayPauseHolding && (
+                <span
+                  className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+              )}
+              {isPlaying ? <Pause size={16} className="relative z-10" /> : <Play size={16} className="relative z-10" />}
             </button>
             <button
               type="button"

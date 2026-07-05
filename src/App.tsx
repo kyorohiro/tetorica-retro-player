@@ -587,6 +587,7 @@ function App() {
           previewSource={previewSource}
           isDialogActive={isDialogActive}
           isMDropReadyRef={isMDropReadyRef}
+          isFfmpegEnabled={isFfmpegEnabled}
           setIsFfmpegEnabled={setIsFfmpegEnabled}
           shouldPreferDialogRetroPreview={shouldPreferDialogRetroPreview}
           showDialogPreviewForPath={showDialogPreviewForPath}
