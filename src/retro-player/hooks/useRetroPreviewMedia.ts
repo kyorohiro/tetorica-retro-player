@@ -719,6 +719,42 @@ export function useRetroPreviewMedia({
       }
     };
 
+    // "Stuck near duration" (below) can false-positive while an EVENT-type
+    // HLS manifest is still growing: media.duration reflects only whatever
+    // the native engine has fetched so far, which can be well short of the
+    // real length until it re-polls the manifest. Before declaring the
+    // stream actually ended, fetch the manifest ourselves and check for
+    // #EXT-X-ENDLIST — the one server-side signal that transcoding is truly
+    // done — and if it's absent, force a reload so the element re-fetches
+    // the now-longer manifest instead of looping prematurely.
+    const confirmHlsEndedOrReload = async () => {
+      const src = media.currentSrc || media.src;
+      if (!src) {
+        handleHlsEnded();
+        return;
+      }
+      try {
+        const res = await fetch(src, { cache: "no-store" });
+        const text = await res.text();
+        if (!isCurrentMedia()) return;
+        if (text.includes("#EXT-X-ENDLIST")) {
+          handleHlsEnded();
+          return;
+        }
+        const resumeTime = media.currentTime;
+        media.load();
+        media.addEventListener("canplay", () => {
+          if (!isCurrentMedia()) return;
+          media.currentTime = resumeTime;
+          void media.play();
+        }, { once: true });
+      } catch {
+        // Manifest fetch failed — fall back to the original heuristic
+        // rather than getting stuck forever.
+        handleHlsEnded();
+      }
+    };
+
     media.addEventListener("ended", () => {
       if (!isCurrentMedia()) return;
       if (isHlsStream) {
@@ -746,7 +782,10 @@ export function useRetroPreviewMedia({
           const remaining = Number.isFinite(dur) ? dur - ct : Infinity;
           if (ct === lastCt && remaining < 10.0) {
             stuckTicks++;
-            if (stuckTicks >= 4) handleHlsEnded();
+            if (stuckTicks >= 4) {
+              stuckTicks = 0;
+              void confirmHlsEndedOrReload();
+            }
           } else {
             stuckTicks = 0;
             lastCt = ct;
