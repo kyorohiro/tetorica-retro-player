@@ -3,6 +3,7 @@ import { isTauriRuntime } from "../retro-player/platform/runtime";
 import type { MediaPlaybackTarget } from "./mediaPlaybackTarget";
 import type { FileTargetFile } from "./api";
 import { mdropShareFile, mdropUnshareAll } from "./tauri";
+import { resolvePlayableUrl } from "./resolvePlayableSource";
 import { useMDropSharedListDialog } from "./useMDropSharedListDialog";
 import { isAudio, isImage, isVideo, isVideoExtended, mimeFromPath } from "./utils";
 import type { useBrowserFileListDialog } from "./useBrowserFileListDialog";
@@ -57,14 +58,10 @@ export function useMDropDragDrop({
             // mDrop ON: clear stale list first, then share new files
             await mdropUnshareAll().catch(() => {});
             const raw = await Promise.all(paths.map((p) => mdropShareFile(p)));
-            const sharedFiles = isFfmpegEnabledRef.current
-              ? raw.map((f) => ({
-                  ...f,
-                  url: (f.isDir || (!isVideoExtended(f.path) && !isAudio(f.path)))
-                    ? f.url
-                    : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
-                }))
-              : raw;
+            const sharedFiles = raw.map((f) => ({
+              ...f,
+              url: resolvePlayableUrl(f, isFfmpegEnabledRef.current),
+            }));
             const mediaShared = sharedFiles.filter((f) => !f.isDir && (isVideoExtended(f.path) || isAudio(f.path) || isImage(f.path)));
             const isPlaylistMode = (loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaShared.length > 1 && mediaShared.length === sharedFiles.length;
             if (sharedFiles.length === 1 && mediaShared.length === 1) {

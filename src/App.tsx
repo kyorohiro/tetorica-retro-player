@@ -35,7 +35,8 @@ import {
 import { MobileMenu } from "./MobileMenu";
 import { LicenseDialog } from "./LicenseDialog";
 import type { DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
-import { mdropUnshareAll } from "./mdrop-web/tauri";
+import { mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
+import { resolvePlayableUrl } from "./mdrop-web/resolvePlayableSource";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
@@ -326,15 +327,9 @@ function App() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
-      const { invoke } = await import("@tauri-apps/api/core");
       await mdropUnshareAll().catch(() => {});
-      const shared = await invoke<{ id: string; name: string; path: string; url: string }>(
-        "mdrop_share_file",
-        { req: { path: selected } }
-      );
-      const playUrl = isFfmpegEnabled
-        ? `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`
-        : shared.url;
+      const shared = await mdropShareFile(selected);
+      const playUrl = resolvePlayableUrl(shared, isFfmpegEnabled);
       retroPlayerPlusRef.current?.loadPaths([{ url: playUrl, path: selected }]);
       // Save restorable URLs (HTTP) as startup preset so the player retries on next launch.
       if (playUrl.startsWith('http')) {

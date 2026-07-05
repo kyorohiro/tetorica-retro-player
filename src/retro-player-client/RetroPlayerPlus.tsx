@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } 
 import { X } from "lucide-react";
 import { t } from "../i18n";
 import { mdropShareFile } from "../mdrop-web/tauri";
+import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import {
   type PresetConfig,
@@ -322,7 +323,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       setShowPlaybackRetryHint(false);
       try {
         const shared = await mdropShareFile(path);
-        const hlsUrl = `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`;
+        const hlsUrl = resolvePlayableUrl(shared, true);
         setIsFfmpegEnabled(true);
         if (shouldPreferDialogRetroPreview) {
           await showDialogPreviewForPath(hlsUrl, path);
