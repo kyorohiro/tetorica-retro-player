@@ -225,10 +225,16 @@ async fn start_hls_for_path(
     // Phase 1: stream-copy (no re-encode, near-zero CPU — works for H.264/AAC sources).
     // Phase 2: optional hardware encode on supported platforms.
     // Phase 3: libx264 software fallback.
+    // -hls_playlist_type event: without this, ffmpeg doesn't tag the manifest
+    // as VOD or EVENT while it's still being written. Native HLS clients are
+    // supposed to keep re-polling any manifest lacking #EXT-X-ENDLIST
+    // regardless, but marking it "event" makes the still-growing intent
+    // explicit and is the standard idiom for "transcode while serving".
     let hls_common_args: Vec<&str> = vec![
         "-f", "hls",
         "-hls_time", "2",
         "-hls_list_size", "0",
+        "-hls_playlist_type", "event",
         "-hls_base_url", &base_url,
         "-hls_segment_filename", segment_pattern.to_str().unwrap(),
         playlist.to_str().unwrap(),
@@ -261,13 +267,24 @@ async fn start_hls_for_path(
 
     // Helper: spawn ffmpeg with given args, poll until a .ts segment appears.
     // Returns (child, ready). Kills and cleans up playlist on failure before returning.
+    // stderr is captured to a log file in tmp_dir (not discarded) so a
+    // mid-stream ffmpeg crash — invisible in release builds with no attached
+    // console — can still be diagnosed after the fact.
     macro_rules! try_ffmpeg {
-        ($extra_args:expr, $poll_count:expr) => {{
+        ($extra_args:expr, $poll_count:expr, $log_name:expr) => {{
+            let log_path = tmp_dir.join($log_name);
+            let log_file = std::fs::File::create(&log_path).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("failed to create ffmpeg log file: {e}"),
+                )
+            })?;
+            println!("[HLS] session={} ffmpeg log={}", session_id, log_path.display());
             let mut c = new_ffmpeg_command(&ffmpeg_cmd);
             c.args($extra_args)
                 .args(&hls_common_args)
                 .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null());
+                .stderr(std::process::Stdio::from(log_file));
             let mut c = c
                 .spawn()
                 .map_err(|e| {
@@ -302,12 +319,14 @@ async fn start_hls_for_path(
     let (mut child, mut ready) = if should_try_copy {
         try_ffmpeg!(
             ["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"],
-            30
+            30,
+            "ffmpeg-copy.log"
         )
     } else if should_try_qsv {
         try_ffmpeg!(
             ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
-            50
+            50,
+            "ffmpeg-qsv.log"
         )
     } else {
         try_ffmpeg!(
@@ -320,7 +339,8 @@ async fn start_hls_for_path(
                 "-tune", "zerolatency",
                 "-c:a", "aac", "-b:a", "128k",
             ],
-            150
+            150,
+            "ffmpeg-libx264.log"
         )
     };
 
@@ -356,7 +376,8 @@ async fn start_hls_for_path(
         );
         (child, ready) = try_ffmpeg!(
             ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
-            50
+            50,
+            "ffmpeg-qsv.log"
         );
     }
 
@@ -377,7 +398,8 @@ async fn start_hls_for_path(
                 "-tune", "zerolatency",
                 "-c:a", "aac", "-b:a", "128k",
             ],
-            150
+            150,
+            "ffmpeg-libx264.log"
         );
     }
 
