@@ -727,10 +727,11 @@ export function useRetroPreviewMedia({
     // #EXT-X-ENDLIST — the one server-side signal that transcoding is truly
     // done — and if it's absent, force a reload so the element re-fetches
     // the now-longer manifest instead of looping prematurely.
-    const confirmHlsEndedOrReload = async () => {
+    const confirmHlsEndedOrReload = async (onConfirmedEnded?: () => void) => {
       const src = media.currentSrc || media.src;
       if (!src) {
         handleHlsEnded();
+        onConfirmedEnded?.();
         return;
       }
       try {
@@ -739,6 +740,7 @@ export function useRetroPreviewMedia({
         if (!isCurrentMedia()) return;
         if (text.includes("#EXT-X-ENDLIST")) {
           handleHlsEnded();
+          onConfirmedEnded?.();
           return;
         }
         const resumeTime = media.currentTime;
@@ -752,16 +754,26 @@ export function useRetroPreviewMedia({
         // Manifest fetch failed — fall back to the original heuristic
         // rather than getting stuck forever.
         handleHlsEnded();
+        onConfirmedEnded?.();
       }
     };
 
     media.addEventListener("ended", () => {
       if (!isCurrentMedia()) return;
       if (isHlsStream) {
-        handleHlsEnded();
-      } else {
-        syncVideoState();
+        // The native "ended" event fires as soon as currentTime reaches
+        // media.duration — which can itself be a short, stale estimate
+        // while an EVENT-type manifest is still growing. Route through the
+        // same ENDLIST confirmation as the stuck-detector below instead of
+        // trusting it directly.
+        void confirmHlsEndedOrReload(() => {
+          if (!media.loop) {
+            onEndedRef?.current?.();
+          }
+        });
+        return;
       }
+      syncVideoState();
       if (!media.loop) {
         onEndedRef?.current?.();
       }
