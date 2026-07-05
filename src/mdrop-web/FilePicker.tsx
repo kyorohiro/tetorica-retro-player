@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } 
 import { flushSync } from "react-dom";
 import { t } from "../i18n";
 import type { RetroPlayerLocale } from "../retro-player/types";
-import type { RetroPlayerPlusHandle } from "../retro-player-client/RetroPlayerPlus";
+import type { MediaPlaybackTarget } from "./mediaPlaybackTarget";
 import { FileTargetFile } from "./api";
 import { isAudio, isImage, isVideo, type FileWithRelativePath } from "./utils";
 import type { useBrowserFileListDialog } from "./useBrowserFileListDialog";
@@ -23,7 +23,7 @@ type FilePickerProps = {
   locale: RetroPlayerLocale;
   isIosOrAndroid: boolean;
   loopModeRef: React.RefObject<"one" | "autoplay" | "all" | "off">;
-  retroPlayerPlusRef: React.RefObject<RetroPlayerPlusHandle | null>;
+  retroPlayerPlusRef: React.RefObject<MediaPlaybackTarget | null>;
   showBrowserFileListDialog: ReturnType<typeof useBrowserFileListDialog>["showBrowserFileListDialog"];
   setIsMobileMenuOpen: (value: boolean) => void;
 };

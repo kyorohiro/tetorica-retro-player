@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { isTauriRuntime } from "../retro-player/platform/runtime";
-import type { RetroPlayerPlusHandle } from "../retro-player-client/RetroPlayerPlus";
+import type { MediaPlaybackTarget } from "./mediaPlaybackTarget";
 import type { FileTargetFile } from "./api";
 import { mdropShareFile, mdropUnshareAll } from "./tauri";
 import { useMDropSharedListDialog } from "./useMDropSharedListDialog";
@@ -11,7 +11,7 @@ type Params = {
   isMDropReadyRef: React.RefObject<boolean>;
   isFfmpegEnabledRef: React.RefObject<boolean>;
   loopModeRef: React.RefObject<"one" | "autoplay" | "all" | "off">;
-  retroPlayerPlusRef: React.RefObject<RetroPlayerPlusHandle | null>;
+  retroPlayerPlusRef: React.RefObject<MediaPlaybackTarget | null>;
   showBrowserFileListDialog: ReturnType<typeof useBrowserFileListDialog>["showBrowserFileListDialog"];
 };
 
