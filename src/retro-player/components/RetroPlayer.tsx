@@ -67,6 +67,7 @@ type RetroPlayerProps = {
   onEnded?: () => void;
   onPrevTrack?: () => void;
   onNextTrack?: () => void;
+  onForceReplay?: () => Promise<boolean> | boolean;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
 };
@@ -89,6 +90,7 @@ export function RetroPlayer({
   onEnded,
   onPrevTrack,
   onNextTrack,
+  onForceReplay,
   loopMode,
   onCycleLoopMode,
 }: RetroPlayerProps) {
@@ -219,6 +221,17 @@ export function RetroPlayer({
   const handleToggleHighResolution = React.useCallback(() => {
     setRenderResolutionPreset((current) => (current > 1 ? 1 : 2));
   }, []);
+
+  // Long-press play/pause: let the caller do a full resource reset (e.g.
+  // re-share + re-resolve a source URL) if it can. If it reports it didn't
+  // handle it (falsy/no callback), fall back to a plain restart-from-0 —
+  // the same thing the (currently unused) onRestart control does.
+  const handleForceReplay = React.useCallback(async () => {
+    const handled = await onForceReplay?.();
+    if (handled) return;
+    player.seekTo(0);
+    void player.playVideoWithAudio();
+  }, [onForceReplay, player]);
 
   const syncTargetAspect = React.useCallback(() => {
     const dims = player.sourceDimensions;
@@ -485,6 +498,7 @@ export function RetroPlayer({
     onImportSettings: handleImportSettings,
     onPrevTrack,
     onNextTrack,
+    onForceReplay: handleForceReplay,
     loopMode,
     onCycleLoopMode,
     showVideoSpectrum,

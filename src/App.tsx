@@ -1,5 +1,4 @@
 import React, { useCallback, useRef } from "react";
-import { flushSync } from "react-dom";
 import {
   Menu,
   Pin,
@@ -18,7 +17,6 @@ import {
 } from "./i18n";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import {
-  isAndroidRuntime,
   isTauriRuntime,
   isWindowsRuntime,
 } from "./retro-player/platform/runtime";
@@ -28,11 +26,6 @@ import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
   getDroppedFiles,
-  isAudio,
-  isImage,
-  isVideo,
-  isVideoExtended,
-  mimeFromPath,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import {
@@ -41,17 +34,14 @@ import {
 } from "./retro-player/events";
 import { MobileMenu } from "./MobileMenu";
 import { LicenseDialog } from "./LicenseDialog";
-import type { DemoSongMeta } from "./builtin-content/demo-songs";
-import { mdropGetConfig, mdropGetServerStatus, mdropShareFile, mdropStartServer, mdropStopServer, mdropUnshareAll } from "./mdrop-web/tauri";
-import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
+import type { DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
+import { mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
+import { resolvePlayableUrl } from "./mdrop-web/resolvePlayableSource";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
-import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player/components/RetroPlayerPlus";
-
-const waitForNextPaint = async () => {
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
-};
+import { useMDropServer } from "./mdrop-web/useMDropServer";
+import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
+import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
+import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
 
 const waitForExternalNavigationPause = async () => {
   dispatchRetroPlayerPrepareExternalNavigation();
@@ -62,16 +52,8 @@ const waitForExternalNavigationPause = async () => {
 
 function App() {
   const retroPlayerPlusRef = useRef<RetroPlayerPlusHandle>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
-  const pickerStateRef = useRef<"idle" | "opening" | "processing">("idle");
-  const [isMDropReady, setIsMDropReady] = React.useState(false);
-  const [mDropPort, setMDropPort] = React.useState<number | null>(null);
-  const [mDropIp, setMDropIp] = React.useState<string | null>(null);
+  const filePickerRef = useRef<FilePickerHandle>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
-  const [isShareMode, setIsShareMode] = React.useState(false);
-  const isShareModeRef = React.useRef(isShareMode);
-  React.useEffect(() => { isShareModeRef.current = isShareMode; }, [isShareMode]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   type LoopMode = "one" | "autoplay" | "all" | "off";
@@ -83,8 +65,6 @@ function App() {
   }, []);
   const [isDialogActive, setIsDialogActive] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
-  const [isPreparingSelection, setIsPreparingSelection] = React.useState(false);
-  const [isPreparingSelectionDismissed, setIsPreparingSelectionDismissed] = React.useState(false);
   const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
     () => loadLocalePreference(),
   );
@@ -96,22 +76,23 @@ function App() {
   }, []);
   const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
   const previewSource = usePreviewSourceState(locale);
-  const isAndroidTauri = React.useMemo(
-    () => isTauriRuntime() && isAndroidRuntime(),
-    [],
-  );
-  const isNativeMdropAvailable = React.useMemo(
-    () => isTauriRuntime() && !isAndroidTauri,
-    [isAndroidTauri],
-  );
   const shouldPreferDialogRetroPreview = React.useMemo(
     () => isTauriRuntime() && isWindowsRuntime(),
     [],
   );
   const { showConfirmDialog, showSelectDialog, showDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
-  const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const { showPreviewDialog } = usePreviewDialog();
+  const {
+    isMDropReady,
+    mDropPort,
+    mDropIp,
+    isShareMode,
+    isNativeMdropAvailable,
+    isMDropReadyRef,
+    isMDropHolding,
+    mDropLongPressHandlers,
+  } = useMDropServer();
 
   React.useEffect(() => {
     const handleDialogActive = (event: Event) => {
@@ -132,275 +113,22 @@ function App() {
     };
   }, []);
 
-  const finishPreparingSelection = useCallback(() => {
-    pickerStateRef.current = "idle";
-    setIsPreparingSelection(false);
-    setIsPreparingSelectionDismissed(false);
-  }, []);
-
   React.useEffect(() => {
     saveLocalePreference(localePreference);
   }, [localePreference]);
-
-  // Desktop: auto-start mDrop server on mount.
-  // isMDropReady drives the file picker choice (Tauri dialog vs <input>).
-  React.useEffect(() => {
-    if (!isNativeMdropAvailable) {
-      setIsMDropReady(false);
-      return;
-    }
-    mdropGetServerStatus()
-      .then((status) => { setIsMDropReady(status.running); })
-      .catch(() => { setIsMDropReady(false); });
-  }, [isNativeMdropAvailable]);
-
-  // Sync mDrop API key + actual port into window.__MDROP_CONFIG__.
-  React.useEffect(() => {
-    if (!isNativeMdropAvailable || !isMDropReady) return;
-    Promise.all([mdropGetConfig(), mdropGetServerStatus()]).then(([config, status]) => {
-      if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
-      window.__MDROP_CONFIG__.apiKey = config.apiKey;
-      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port ?? 7878}`;
-      setMDropPort(status.port);
-      setMDropIp(status.ips?.[0] ?? null);
-    }).catch(() => {});
-  }, [isMDropReady, isNativeMdropAvailable]);
-
-  // Refs to avoid stale closures in async Tauri event callbacks
-  const isMDropReadyRef = React.useRef(isMDropReady);
-  React.useEffect(() => {
-    isMDropReadyRef.current = isMDropReady;
-  }, [isMDropReady]);
 
   const isFfmpegEnabledRef = React.useRef(isFfmpegEnabled);
   React.useEffect(() => {
     isFfmpegEnabledRef.current = isFfmpegEnabled;
   }, [isFfmpegEnabled]);
 
-  const showMDropSharedListDialogRef = React.useRef(showMDropSharedListDialog);
-  React.useEffect(() => {
-    showMDropSharedListDialogRef.current = showMDropSharedListDialog;
-  }, [showMDropSharedListDialog]);
-
-  const showBrowserFileListDialogRef = React.useRef(showBrowserFileListDialog);
-  React.useEffect(() => {
-    showBrowserFileListDialogRef.current = showBrowserFileListDialog;
-  }, [showBrowserFileListDialog]);
-
-  // Tauri native OS drag-drop → mDrop HTTP URL
-  React.useEffect(() => {
-    if (!isTauriRuntime()) return;
-
-    let unlisten: (() => void) | undefined;
-
-    const setup = async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      unlisten = await getCurrentWindow().onDragDropEvent(async (event) => {
-        console.log("[mDrop] onDragDropEvent", event.payload.type, event.payload);
-        if (event.payload.type !== "drop") return;
-
-        const paths = event.payload.paths;
-        console.log("[mDrop] paths:", paths, "isMDropReady:", isMDropReadyRef.current);
-        if (paths.length === 0) return;
-
-        try {
-          if (isMDropReadyRef.current) {
-            // mDrop ON: clear stale list first, then share new files
-            await mdropUnshareAll().catch(() => {});
-            const raw = await Promise.all(paths.map((p) => mdropShareFile(p)));
-            const sharedFiles = isFfmpegEnabledRef.current
-              ? raw.map((f) => ({
-                  ...f,
-                  url: (f.isDir || (!isVideoExtended(f.path) && !isAudio(f.path)))
-                    ? f.url
-                    : `${new URL(f.url).origin}/hls/${f.id}/index.m3u8`,
-                }))
-              : raw;
-            const mediaShared = sharedFiles.filter((f) => !f.isDir && (isVideoExtended(f.path) || isAudio(f.path) || isImage(f.path)));
-            const isPlaylistMode = (loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaShared.length > 1 && mediaShared.length === sharedFiles.length;
-            if (sharedFiles.length === 1 && mediaShared.length === 1) {
-              const f = sharedFiles[0];
-              retroPlayerPlusRef.current?.loadPaths([{ url: f.url, path: f.path }]);
-            } else if (isPlaylistMode) {
-              retroPlayerPlusRef.current?.loadPaths(mediaShared.map((f) => ({ url: f.url, path: f.path })));
-            } else {
-              await showMDropSharedListDialogRef.current({
-                files: sharedFiles,
-                useHls: isFfmpegEnabledRef.current,
-                onPlay: (url, path) => {
-                  retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
-                },
-              });
-            }
-          } else {
-            // mDrop OFF: Tauri intercepts OS drag-drop; DOM events do not fire.
-            // Use asset:// protocol (assetProtocol.enable: true in tauri.conf.json).
-            const { convertFileSrc } = await import("@tauri-apps/api/core");
-
-            const isAllMedia = paths.every((p) => isVideo(p) || isAudio(p) || isImage(p));
-            const isPlaylistMode = (loopModeRef.current === "autoplay" || loopModeRef.current === "all") && paths.length > 1 && isAllMedia;
-            if (paths.length === 1 && isAllMedia) {
-              retroPlayerPlusRef.current?.loadPaths([{ url: convertFileSrc(paths[0]), path: paths[0] }]);
-            } else if (isPlaylistMode) {
-              const items = paths.map((p) => ({ url: convertFileSrc(p), path: p }));
-              retroPlayerPlusRef.current?.loadPaths(items);
-            } else {
-              // Non-media or multiple files: fetch as blobs to get real File objects for the dialog
-              const fileEntries: FileTargetFile[] = [];
-              for (const p of paths) {
-                const name = p.split("/").pop() ?? p;
-                try {
-                  const res = await fetch(convertFileSrc(p));
-                  const blob = await res.blob();
-                  const mime = mimeFromPath(p) || blob.type;
-                  fileEntries.push({
-                    id: "", entry: new File([blob], name, { type: mime }),
-                    isDir: false, isFile: true, path: name,
-                    createdAt: 0, modifiedAt: 0, size: blob.size, isRoot: true,
-                  });
-                } catch (e) {
-                  console.error("[mDrop OFF] fetch failed:", p, e);
-                }
-              }
-              if (fileEntries.length > 0) {
-                await showBrowserFileListDialogRef.current({ files: fileEntries, initialPath: "/", title: "" });
-              }
-            }
-          }
-        } catch (e) {
-          console.error("[mDrop] drag-drop share failed:", e);
-        }
-      });
-    };
-
-    setup();
-    return () => { unlisten?.(); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Tauri "Open With" / file association handler (tauri-plugin-deep-link)
-  React.useEffect(() => {
-    if (!isTauriRuntime()) return;
-
-    let unlisten: (() => void) | undefined;
-
-    const setup = async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      unlisten = await listen<string[]>("retro://open-files", async (event) => {
-        const fileUrls = event.payload;
-        if (!fileUrls || fileUrls.length === 0) return;
-
-        // file:///path/to/file → /path/to/file
-        const paths = fileUrls.map((u) => {
-          try { return decodeURIComponent(new URL(u).pathname); } catch { return u; }
-        });
-
-        const isAllMedia = paths.every((p) => isVideoExtended(p) || isAudio(p) || isImage(p));
-        if (!isAllMedia || paths.length === 0) return;
-
-        const isPlaylistMode =
-          (loopModeRef.current === "autoplay" || loopModeRef.current === "all") &&
-          paths.length > 1;
-
-        const { convertFileSrc } = await import("@tauri-apps/api/core");
-        const items = paths.map((p) => ({ url: convertFileSrc(p), path: p }));
-        retroPlayerPlusRef.current?.loadPaths(isPlaylistMode ? items : [items[0]]);
-      });
-    };
-
-    setup();
-    return () => { unlisten?.(); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  React.useEffect(() => {
-    const clearIfPickerWasCancelled = () => {
-      if (pickerStateRef.current !== "opening") return;
-
-      window.setTimeout(() => {
-        if (pickerStateRef.current !== "opening") return;
-        finishPreparingSelection();
-      }, 0);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
-      clearIfPickerWasCancelled();
-    };
-
-    const fileInput = fileInputRef.current;
-    const folderInput = folderInputRef.current;
-
-    window.addEventListener("focus", clearIfPickerWasCancelled);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    fileInput?.addEventListener("cancel", clearIfPickerWasCancelled);
-    folderInput?.addEventListener("cancel", clearIfPickerWasCancelled);
-
-    return () => {
-      window.removeEventListener("focus", clearIfPickerWasCancelled);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      fileInput?.removeEventListener("cancel", clearIfPickerWasCancelled);
-      folderInput?.removeEventListener("cancel", clearIfPickerWasCancelled);
-    };
-  }, [finishPreparingSelection]);
-
-  const beginPreparingSelection = useCallback(() => {
-    pickerStateRef.current = "opening";
-    flushSync(() => {
-      setIsPreparingSelection(true);
-      setIsPreparingSelectionDismissed(false);
-      setIsMobileMenuOpen(false);
-    });
-  }, []);
-
-  const showPreparingSelection = useCallback(() => {
-    pickerStateRef.current = "processing";
-    flushSync(() => {
-      setIsPreparingSelection(true);
-      setIsPreparingSelectionDismissed(false);
-    });
-  }, []);
-
-  const dismissPreparingSelection = useCallback(() => {
-    flushSync(() => {
-      setIsPreparingSelectionDismissed(true);
-    });
-  }, []);
-
-  const filesToTargets = useCallback((files: FileList | File[]) => {
-    const targets: FileTargetFile[] = [];
-
-    for (let index = 0; index < files.length; index += 1) {
-      const file = files[index] as FileWithRelativePath;
-
-      targets.push({
-        id: "",
-        entry: file,
-        isDir: false,
-        isFile: true,
-        path: file.webkitRelativePath || file.name,
-        createdAt: 0,
-        modifiedAt: file.lastModified ?? 0,
-        size: file.size ?? 0,
-        isRoot: true,
-      });
-    }
-
-    return targets;
-  }, []);
-
-  const isDirectRetroFile = useCallback((file: File) => {
-    return isImage(file.name) || isVideo(file.name) || isAudio(file.name);
-  }, []);
-
-  const openPortableTargets = useCallback(async (files: FileList | File[]) => {
-    const targets = filesToTargets(files);
-    if (targets.length === 0) return;
-
-    await showBrowserFileListDialog({
-      files: targets,
-      initialPath: "/",
-      title: "",
-    });
-  }, [filesToTargets, showBrowserFileListDialog]);
+  useMDropDragDrop({
+    isMDropReadyRef,
+    isFfmpegEnabledRef,
+    loopModeRef,
+    retroPlayerPlusRef,
+    showBrowserFileListDialog,
+  });
 
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
     const previewFiles = Array.from(files).map((file) => ({
@@ -467,32 +195,6 @@ function App() {
       },
     });
   }, [showPreviewDialog]);
-
-  const openFiles = useCallback(async (files: FileList | File[]) => {
-    if (files.length === 0) return;
-
-    pickerStateRef.current = "processing";
-
-    try {
-      await waitForNextPaint();
-
-      if (files.length === 1 && isDirectRetroFile(files[0])) {
-        retroPlayerPlusRef.current?.loadFiles([files[0]]);
-        return;
-      }
-
-      const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
-      if ((loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaFiles.length > 1 && mediaFiles.length === files.length) {
-        retroPlayerPlusRef.current?.loadFiles(mediaFiles);
-        finishPreparingSelection();
-        return;
-      }
-
-      await openPortableTargets(files);
-    } finally {
-      finishPreparingSelection();
-    }
-  }, [finishPreparingSelection, isDirectRetroFile, openPortableTargets]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -603,7 +305,7 @@ function App() {
       uniqueMap.set(key, file);
     }
     const targets = Array.from(uniqueMap.values());
-    await openFiles(targets);
+    await filePickerRef.current?.openDroppedFiles(targets);
   };
   const onDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -625,15 +327,9 @@ function App() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
-      const { invoke } = await import("@tauri-apps/api/core");
       await mdropUnshareAll().catch(() => {});
-      const shared = await invoke<{ id: string; name: string; path: string; url: string }>(
-        "mdrop_share_file",
-        { req: { path: selected } }
-      );
-      const playUrl = isFfmpegEnabled
-        ? `${new URL(shared.url).origin}/hls/${shared.id}/index.m3u8`
-        : shared.url;
+      const shared = await mdropShareFile(selected);
+      const playUrl = resolvePlayableUrl(shared, isFfmpegEnabled);
       retroPlayerPlusRef.current?.loadPaths([{ url: playUrl, path: selected }]);
       // Save restorable URLs (HTTP) as startup preset so the player retries on next launch.
       if (playUrl.startsWith('http')) {
@@ -642,9 +338,8 @@ function App() {
       return;
     }
 
-    beginPreparingSelection();
-    fileInputRef.current?.click();
-  }, [beginPreparingSelection, isFfmpegEnabled, isMDropReady, isNativeMdropAvailable]);
+    filePickerRef.current?.openFileInput();
+  }, [isFfmpegEnabled, isMDropReady, isNativeMdropAvailable]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -664,9 +359,8 @@ function App() {
       return;
     }
 
-    beginPreparingSelection();
-    folderInputRef.current?.click();
-  }, [beginPreparingSelection, isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showBrowserFileListDialog]);
+    filePickerRef.current?.openFolderInput();
+  }, [isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showBrowserFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -698,48 +392,6 @@ function App() {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().setAlwaysOnTop(next);
   }, [isWindowAlwaysOnTop]);
-
-  const handleMDropToggle = useCallback(async () => {
-    if (!isNativeMdropAvailable) return;
-    if (isMDropReady) {
-      await mdropStopServer().catch(() => {});
-      setIsMDropReady(false);
-      setIsShareMode(false);
-    } else {
-      const status = await mdropStartServer({ hostname: "localhost", localOnly: true }).catch(() => null);
-      setIsMDropReady(status?.running ?? false);
-      if (status?.running && status.port) {
-        if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
-        window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
-        setMDropPort(status.port);
-        setMDropIp(null);
-      }
-    }
-  }, [isMDropReady, isNativeMdropAvailable]);
-
-  const handleMDropWebToggle = useCallback(async () => {
-    if (!isNativeMdropAvailable) return;
-    const nextWeb = !isShareMode;
-    await mdropStopServer().catch(() => {});
-    const status = await mdropStartServer({
-      hostname: "localhost",
-      localOnly: true,
-      webEnabled: nextWeb,
-    }).catch(() => null);
-    setIsMDropReady(status?.running ?? false);
-    setIsShareMode(nextWeb);
-    if (status?.running && status.port) {
-      if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
-      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
-      setMDropPort(status.port);
-      setMDropIp(nextWeb ? (status.ips?.[0] ?? null) : null);
-    }
-  }, [isNativeMdropAvailable, isShareMode]);
-
-  const { isHolding: isMDropHolding, ...mDropLongPressHandlers } = useLongPress(
-    useCallback(() => { void handleMDropWebToggle(); }, [handleMDropWebToggle]),
-    useCallback(() => { void handleMDropToggle(); }, [handleMDropToggle]),
-  );
 
   const handleChangeLocale = useCallback((nextPreference: LocalePreference) => {
     setLocalePreference(nextPreference);
@@ -919,35 +571,15 @@ function App() {
           <p className="mb-4 text-sm text-rose-500">{previewSource.captureError}</p>
         )}
 
-        {isPreparingSelection && !isPreparingSelectionDismissed && (
-          <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-slate-950/56 px-4">
-            <div
-              className="pointer-events-auto w-[min(92vw,28rem)] rounded-2xl border border-slate-700 bg-slate-900/94 px-4 py-4 text-slate-100 shadow-2xl backdrop-blur-sm"
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">
-                    {t(locale, "preparingSelection")}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">
-                    {t(locale, "preparingSelectionDetail")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onPointerDown={dismissPreparingSelection}
-                  onTouchStart={dismissPreparingSelection}
-                  onMouseDown={dismissPreparingSelection}
-                  onClick={dismissPreparingSelection}
-                  className="shrink-0 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-700"
-                >
-                  {t(locale, "hideLoadingOverlay")}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <FilePicker
+          ref={filePickerRef}
+          locale={locale}
+          isIosOrAndroid={isIosOrAndroid}
+          loopModeRef={loopModeRef}
+          retroPlayerPlusRef={retroPlayerPlusRef}
+          showBrowserFileListDialog={showBrowserFileListDialog}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
 
         <RetroPlayerPlus
           ref={retroPlayerPlusRef}
@@ -955,6 +587,7 @@ function App() {
           previewSource={previewSource}
           isDialogActive={isDialogActive}
           isMDropReadyRef={isMDropReadyRef}
+          isFfmpegEnabled={isFfmpegEnabled}
           setIsFfmpegEnabled={setIsFfmpegEnabled}
           shouldPreferDialogRetroPreview={shouldPreferDialogRetroPreview}
           showDialogPreviewForPath={showDialogPreviewForPath}
@@ -963,54 +596,6 @@ function App() {
           onCycleLoopMode={cycleLoopMode}
         />
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,audio/*,.zip,.cbz,.rar,.cbr,.pdf,.epub,.txt,.md"
-          multiple
-          className="hidden"
-          onChange={async (event) => {
-            const input = event.currentTarget;
-            const files = input.files;
-            if (files && files.length > 0) {
-              showPreparingSelection();
-              await waitForNextPaint();
-              await openFiles(files);
-            } else {
-              finishPreparingSelection();
-            }
-
-            input.value = "";
-          }}
-        />
-
-        {!isIosOrAndroid && (
-          <input
-            ref={folderInputRef}
-            type="file"
-            multiple
-            {...({ webkitdirectory: "true" } as any)}
-            className="hidden"
-            onChange={async (event) => {
-              const input = event.currentTarget;
-              const files = input.files;
-              if (files && files.length > 0) {
-                showPreparingSelection();
-                await waitForNextPaint();
-                try {
-                  pickerStateRef.current = "processing";
-                  await openPortableTargets(files);
-                } finally {
-                  finishPreparingSelection();
-                }
-              } else {
-                finishPreparingSelection();
-              }
-
-              input.value = "";
-            }}
-          />
-        )}
       </div>
     </main>
   </>
