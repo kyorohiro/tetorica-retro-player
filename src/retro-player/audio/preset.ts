@@ -156,7 +156,7 @@ const RETRO_AUDIO_PRESET_PARTIALS: Record<
       isAudioFxEnabled: true,
       isNoiseEnabled: true,
       //volume: 0.92,
-      lofiAmount: 0.58,
+      lofiAmount: 0.48,
       radioToneAmount: 0.22,
       bitCrushAmount: 0.10,
       sampleRateReductionAmount: 0.10,
