@@ -25,7 +25,7 @@ export type RetroMediaSourceKind = "video" | "audio" | "image";
 // Tone.js / screen-capture audio is modeled as an "audio" kind with a
 // "stream" origin — not a separate kind. Tone.js runs on its own
 // AudioContext and is bridged out via createMediaStreamDestination() in
-// src/builtin-content/demo-song-session.ts; by the time it reaches this
+// src/retro-player-client/builtin-content/demo-song-session.ts; by the time it reaches this
 // module it's just a MediaStream like any other.
 export type RetroMediaSourceOrigin = "url" | "stream";
 

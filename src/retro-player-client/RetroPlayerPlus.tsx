@@ -1,25 +1,25 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { t } from "../../i18n";
-import { mdropShareFile } from "../../mdrop-web/tauri";
-import type { DemoSongMeta } from "../../builtin-content/demo-songs";
+import { t } from "../i18n";
+import { mdropShareFile } from "../mdrop-web/tauri";
+import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import {
   type PresetConfig,
   loadStartupPreset,
   saveStartupPreset,
-} from "../../builtin-content/preset-config";
-import { usePreviewSourceState } from "../hooks/usePreviewSourceState";
-import { dispatchRetroPlayerPausePlayback } from "../events";
-import type { RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
-import type { RetroPlayerLocale } from "../types";
+} from "./builtin-content/preset-config";
+import { usePreviewSourceState } from "../retro-player/hooks/usePreviewSourceState";
+import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
+import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
+import type { RetroPlayerLocale } from "../retro-player/types";
 
-const RetroPlayer = React.lazy(() => import("./RetroPlayer"));
+const RetroPlayer = React.lazy(() => import("../retro-player/components/RetroPlayer"));
 
 const preloadToneBuiltins = () => {
   void import("tone");
-  void import("../../builtin-content/lofi-engine");
-  void import("../../builtin-content/demo-song-session");
-  void import("../../builtin-content/demo-songs");
+  void import("./builtin-content/lofi-engine");
+  void import("./builtin-content/demo-song-session");
+  void import("./builtin-content/demo-songs");
 };
 
 type PlaylistItem =
@@ -207,7 +207,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       savePreset({ type: 'lofi' });
       stopTone();
       const [{ startLofiSession }, Tone] = await Promise.all([
-        import('../../builtin-content/lofi-engine'),
+        import('./builtin-content/lofi-engine'),
         import('tone'),
       ]);
       await Tone.start().catch(() => {});
@@ -219,7 +219,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
     const playPresetDemoSong = useCallback(async (meta: DemoSongMeta) => {
       savePreset({ type: 'demo-song', songId: meta.id });
       stopTone();
-      const { startDemoSongSession } = await import('../../builtin-content/demo-song-session');
+      const { startDemoSongSession } = await import('./builtin-content/demo-song-session');
       const session = await startDemoSongSession(meta);
       toneCleanupRef.current = session.dispose;
       previewSource.previewAudioStream(session.stream, meta.name);
@@ -233,7 +233,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       stopTone();
       if (preset.type === 'lofi') {
         const [{ startLofiSession }, Tone] = await Promise.all([
-          import('../../builtin-content/lofi-engine'),
+          import('./builtin-content/lofi-engine'),
           import('tone'),
         ]);
         await Tone.start().catch(() => {});
@@ -242,8 +242,8 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
         previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
       } else if (preset.type === 'demo-song') {
         const [{ DEMO_SONGS }, { startDemoSongSession }] = await Promise.all([
-          import('../../builtin-content/demo-songs'),
-          import('../../builtin-content/demo-song-session'),
+          import('./builtin-content/demo-songs'),
+          import('./builtin-content/demo-song-session'),
         ]);
         const meta = DEMO_SONGS.find(s => s.id === preset.songId);
         if (meta) {

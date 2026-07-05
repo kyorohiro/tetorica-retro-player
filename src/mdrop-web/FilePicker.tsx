@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } 
 import { flushSync } from "react-dom";
 import { t } from "../i18n";
 import type { RetroPlayerLocale } from "../retro-player/types";
-import type { RetroPlayerPlusHandle } from "../retro-player/components/RetroPlayerPlus";
+import type { RetroPlayerPlusHandle } from "../retro-player-client/RetroPlayerPlus";
 import { FileTargetFile } from "./api";
 import { isAudio, isImage, isVideo, type FileWithRelativePath } from "./utils";
 import type { useBrowserFileListDialog } from "./useBrowserFileListDialog";

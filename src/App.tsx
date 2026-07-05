@@ -34,13 +34,13 @@ import {
 } from "./retro-player/events";
 import { MobileMenu } from "./MobileMenu";
 import { LicenseDialog } from "./LicenseDialog";
-import type { DemoSongMeta } from "./builtin-content/demo-songs";
+import type { DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
 import { mdropUnshareAll } from "./mdrop-web/tauri";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
-import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player/components/RetroPlayerPlus";
+import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
 
 const waitForExternalNavigationPause = async () => {
   dispatchRetroPlayerPrepareExternalNavigation();

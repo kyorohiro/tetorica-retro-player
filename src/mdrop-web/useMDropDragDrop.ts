@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { isTauriRuntime } from "../retro-player/platform/runtime";
-import type { RetroPlayerPlusHandle } from "../retro-player/components/RetroPlayerPlus";
+import type { RetroPlayerPlusHandle } from "../retro-player-client/RetroPlayerPlus";
 import type { FileTargetFile } from "./api";
 import { mdropShareFile, mdropUnshareAll } from "./tauri";
 import { useMDropSharedListDialog } from "./useMDropSharedListDialog";
