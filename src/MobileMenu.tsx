@@ -1,7 +1,7 @@
 import React from "react";
 import { Camera, FileUp, FolderOpen, Mic, MonitorUp, ScrollText } from "lucide-react";
 import { t, type Locale, type LocalePreference } from "./i18n";
-import { DEMO_SONGS, type DemoSongMeta } from "./builtin-content/demo-songs";
+import { DEMO_SONGS, type DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
 
 interface MobileMenuProps {
   locale: Locale;
