@@ -30,6 +30,7 @@ uniform float uSaturationLow;
 uniform float uSaturationHigh;
 uniform float uSaturationKnee;
 uniform float uPhosphorDotLightBalance;
+uniform float uOutputBrightness;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotInternalScale;
@@ -525,7 +526,7 @@ void main(void)
     color.rgb = clamp(phosphorColor, 0.0, 1.0);
     color.rgb = applyLumaToneCompression(color.rgb);
     color.rgb = applySaturationToneCompression(color.rgb);
-    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    color.rgb = clamp(color.rgb * uOutputBrightness, 0.0, 1.0);
     finalColor = color;
     return;
   }
@@ -573,7 +574,7 @@ void main(void)
 
   color.rgb = applyLumaToneCompression(color.rgb);
   color.rgb = applySaturationToneCompression(color.rgb);
-  color.rgb = clamp(color.rgb, 0.0, 1.0);
+  color.rgb = clamp(color.rgb * uOutputBrightness, 0.0, 1.0);
 
   finalColor = color;
 }

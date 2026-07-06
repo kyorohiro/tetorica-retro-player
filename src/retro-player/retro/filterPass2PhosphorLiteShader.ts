@@ -22,6 +22,7 @@ uniform vec2 uFocusCenter;
 uniform float uGlowStrength;
 uniform float uTime;
 uniform float uPhosphorDotLightBalance;
+uniform float uOutputBrightness;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotInternalScale;
@@ -260,7 +261,7 @@ void main(void)
     float vignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
 
-    finalColor = vec4(clamp(phosphorColor, 0.0, 1.0), 1.0);
+    finalColor = vec4(clamp(phosphorColor * uOutputBrightness, 0.0, 1.0), 1.0);
     return;
   }
 
@@ -293,6 +294,6 @@ void main(void)
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
 
-  finalColor = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
+  finalColor = vec4(clamp(color.rgb * uOutputBrightness, 0.0, 1.0), 1.0);
 }
 `;

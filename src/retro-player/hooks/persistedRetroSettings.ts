@@ -33,6 +33,7 @@ export type PersistedRetroFilterSettings = {
   saturationLow: number;
   saturationHigh: number;
   saturationKnee: number;
+  outputBrightness: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;

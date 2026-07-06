@@ -68,6 +68,7 @@ type RetroFilterPanelProps = {
   saturationLow: number;
   saturationHigh: number;
   saturationKnee: number;
+  outputBrightness: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -115,6 +116,7 @@ type RetroFilterPanelProps = {
   onSetSaturationLow: (value: number) => void;
   onSetSaturationHigh: (value: number) => void;
   onSetSaturationKnee: (value: number) => void;
+  onSetOutputBrightness: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotInternalScale: (value: boolean) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
@@ -163,6 +165,7 @@ export function RetroFilterPanel({
   saturationLow,
   saturationHigh,
   saturationKnee,
+  outputBrightness,
   phosphorDotLightBalance,
   phosphorDotInternalScale,
   phosphorDotBrightCore,
@@ -209,6 +212,7 @@ export function RetroFilterPanel({
   onSetSaturationLow,
   onSetSaturationHigh,
   onSetSaturationKnee,
+  onSetOutputBrightness,
   onSetPhosphorDotLightBalance,
   onSetPhosphorDotInternalScale,
   onSetPhosphorDotBrightCore,
@@ -289,6 +293,8 @@ export function RetroFilterPanel({
             "Saturation Low / High の閾値外で圧縮できる余裕幅です。上げると閾値を超えた先まで緩やかに追従し、下げるとタイトに切れます。",
           lightLevel:
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
+          outputBrightness:
+            "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           closeUpNoise:
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
           focus:
@@ -348,6 +354,8 @@ export function RetroFilterPanel({
             "Sets the headroom beyond the Low and High thresholds before the compressor clips. Higher values allow more range; lower values are tighter.",
           lightLevel:
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
+          outputBrightness:
+            "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
           closeUpNoise:
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
           focus:
@@ -807,6 +815,24 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={vignetteStrength}
                 onChange={(ev) => onSetVignetteStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Output brightness: ${outputBrightness.toFixed(2)}`}
+                  text={helpText.outputBrightness}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.4"
+                max="2.5"
+                step="0.01"
+                value={outputBrightness}
+                onChange={(ev) => onSetOutputBrightness(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

@@ -44,6 +44,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   saturationLow: DEFAULT_PRESET.saturationLow ?? 0,
   saturationHigh: DEFAULT_PRESET.saturationHigh ?? 1,
   saturationKnee: DEFAULT_PRESET.saturationKnee ?? 0.2,
+  outputBrightness: 1,
   phosphorDotLightBalance: 1,
   phosphorDotInternalScale: false,
   phosphorDotBrightCore: false,
