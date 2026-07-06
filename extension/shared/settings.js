@@ -1139,6 +1139,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.saturationKnee === "number"
         ? preset.saturationKnee
         : DEFAULT_SETTINGS.saturationKnee,
+    outputBrightness:
+      typeof preset.outputBrightness === "number"
+        ? preset.outputBrightness
+        : DEFAULT_SETTINGS.outputBrightness,
     phosphorDotLightBalance:
       typeof preset.phosphorDotLightBalance === "number"
         ? preset.phosphorDotLightBalance
