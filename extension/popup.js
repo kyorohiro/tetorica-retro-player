@@ -75,6 +75,8 @@ const saturationHighInput = document.getElementById("saturationHigh");
 const saturationHighValue = document.getElementById("saturationHighValue");
 const saturationKneeInput = document.getElementById("saturationKnee");
 const saturationKneeValue = document.getElementById("saturationKneeValue");
+const outputBrightnessInput = document.getElementById("outputBrightness");
+const outputBrightnessValue = document.getElementById("outputBrightnessValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const smoothStrengthInput = document.getElementById("smoothStrength");
@@ -860,6 +862,13 @@ saturationKneeInput.addEventListener("input", () => {
   });
 });
 
+outputBrightnessInput.addEventListener("input", () => {
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    outputBrightness: Number(outputBrightnessInput.value),
+  });
+});
+
 closeUpNoiseStrengthInput.addEventListener("input", () => {
   const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
   closeUpNoiseStrengthValue.textContent = closeUpNoiseStrength.toFixed(2);
@@ -1154,6 +1163,8 @@ function renderSettings(settings) {
   saturationHighValue.textContent = (settings.saturationHigh ?? 1).toFixed(2);
   saturationKneeInput.value = String(settings.saturationKnee ?? 0.2);
   saturationKneeValue.textContent = (settings.saturationKnee ?? 0.2).toFixed(2);
+  outputBrightnessInput.value = String(settings.outputBrightness ?? 1);
+  outputBrightnessValue.textContent = (settings.outputBrightness ?? 1).toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   smoothStrengthInput.value = String(settings.smoothStrength ?? 0);
