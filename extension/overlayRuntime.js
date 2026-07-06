@@ -2227,11 +2227,31 @@ function getRecordingMimeType() {
   return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
+function getPhosphorDotLimitedTargetSize(gl, settings) {
+  if (!settings.phosphorDotMode) {
+    return { w: settings.targetWidth, h: settings.targetHeight };
+  }
+  const bulbRadius = settings.bulbRadius ?? 0.22;
+  const baseMinCellPixels = Math.max(1.1, 2.15 + bulbRadius * 1.15);
+  const maxWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / baseMinCellPixels));
+  const maxHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / baseMinCellPixels));
+  const scale = Math.min(
+    1,
+    maxWidth / Math.max(settings.targetWidth, 1),
+    maxHeight / Math.max(settings.targetHeight, 1),
+  );
+  return {
+    w: Math.max(1, Math.round(settings.targetWidth * scale)),
+    h: Math.max(1, Math.round(settings.targetHeight * scale)),
+  };
+}
+
 function applySettings(gl, renderer, settings) {
   if (!renderer) return;
+  const limitedSize = getPhosphorDotLimitedTargetSize(gl, settings);
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
-    gl.uniform2f(renderer.pass1UniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
+    gl.uniform2f(renderer.pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
     gl.uniform1f(renderer.pass1UniformLocations.uColorLevels, settings.colorLevels);
     gl.uniform1f(renderer.pass1UniformLocations.uDitherStrength, settings.ditherStrength);
     gl.uniform1f(renderer.pass1UniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
@@ -2250,7 +2270,7 @@ function applySettings(gl, renderer, settings) {
   if (!renderer.program || !renderer.uniformLocations) return;
   const uniformLocations = renderer.uniformLocations;
   gl.useProgram(renderer.program);
-  gl.uniform2f(uniformLocations.uTargetSize, settings.targetWidth, settings.targetHeight);
+  gl.uniform2f(uniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
   gl.uniform1f(uniformLocations.uCurvature, settings.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, settings.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, settings.scanline2Strength);
