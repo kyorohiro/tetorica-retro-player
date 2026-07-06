@@ -1,6 +1,7 @@
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
 import { isTauriRuntime } from "../platform/runtime";
+import { isHlsUrl } from "../media/RetroMediaSource";
 import {
   useRetroFilterState,
   type RetroFilterInitialState,
@@ -97,6 +98,11 @@ export function RetroPlayer({
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
     ((opts) => showConfirmDialog({ ...opts, title: opts.title ?? "", body: opts.body ?? "" }).then((v) => v ?? false));
+
+  // HLS (ffmpeg) streaming bypasses the Web Audio graph on Tauri's native
+  // webviews (WKWebView/WebView2) — see docs/issues/wkwebview-hls-webaudio.md.
+  // Browser builds decode HLS via Chromium MSE and are unaffected.
+  const isAudioFxUnavailable = isTauriRuntime() && typeof src === "string" && isHlsUrl(src);
 
   // isHighResolution and isFitWidthEnabled live here because they are args to
   // usePixiVideoPlayer. Their toggle buttons are in RetroPreviewView.
@@ -467,6 +473,7 @@ export function RetroPlayer({
             isNativePlaybackMode={nativePlaybackMode}
             nativePlaybackNeedsReload={nativePlaybackMode !== startupNativeMode}
             onToggleNativePlaybackMode={handleToggleNativePlaybackMode}
+            isAudioFxUnavailable={isAudioFxUnavailable}
           />
         </div>
       </section>
@@ -508,6 +515,7 @@ export function RetroPlayer({
     isNativePlaybackMode: nativePlaybackMode,
     nativePlaybackNeedsReload: nativePlaybackMode !== startupNativeMode,
     onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
+    isAudioFxUnavailable,
   } as const;
 
   return (

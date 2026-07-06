@@ -121,6 +121,7 @@ export type RetroControlPanelProps = {
   isNativePlaybackMode?: boolean;
   nativePlaybackNeedsReload?: boolean;
   onToggleNativePlaybackMode?: () => void;
+  isAudioFxUnavailable?: boolean;
 };
 
 const controlsFallback = (
@@ -172,6 +173,7 @@ export function RetroControlPanel({
   isNativePlaybackMode,
   nativePlaybackNeedsReload,
   onToggleNativePlaybackMode,
+  isAudioFxUnavailable,
 }: RetroControlPanelProps) {
   const canRetryPlayback = player.previewStatus?.kind === "retryable";
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia || canRetryPlayback);
@@ -306,6 +308,7 @@ export function RetroControlPanel({
               isNativePlaybackMode={isNativePlaybackMode}
               nativePlaybackNeedsReload={nativePlaybackNeedsReload}
               onToggleNativePlaybackMode={onToggleNativePlaybackMode}
+              isAudioFxUnavailable={isAudioFxUnavailable}
             />
           </React.Suspense>
         )}
