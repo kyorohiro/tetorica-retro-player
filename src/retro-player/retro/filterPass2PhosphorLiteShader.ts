@@ -19,6 +19,7 @@ uniform float uBlackFloor;
 uniform float uFocusStrength;
 uniform vec2 uFocusSize;
 uniform vec2 uFocusCenter;
+uniform float uGlowStrength;
 uniform float uTime;
 uniform float uPhosphorDotLightBalance;
 uniform float uPixelAspect;
@@ -229,6 +230,11 @@ void main(void)
     vec3 fourWayMix = mixedSourceColor * 0.34 + (rightColor + leftColor + upColor + downColor) * 0.165;
     float fourWayAmount = neighborBlendMix * (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08);
     phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount);
+
+    if (uGlowStrength > 0.001) {
+      vec3 glowLift = max(centerColor - mixedSourceColor, vec3(0.0));
+      phosphorColor += glowLift * (0.3 + bleedMask * 0.25 + phosphorBrightness * 0.15);
+    }
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
     float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
