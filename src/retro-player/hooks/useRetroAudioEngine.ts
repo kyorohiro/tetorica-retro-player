@@ -18,6 +18,7 @@ import {
   type RetroAudioPreviewKind,
 } from "../audio/TetoricaRetroAudioNode";
 import { needsNativeAudioSuppression } from "../platform/runtime";
+import { getHlsInstance } from "../media/RetroMediaSource";
 import {
   DEFAULT_AUDIO_SETTINGS,
   type RetroAudioSettings,
@@ -561,15 +562,44 @@ export function useRetroAudioEngine({
         media.muted = true;
         media.volume = 0;
       } else {
-        mediaSource = context.createMediaElementSource(media);
-        mediaSource.connect(engine.input);
-        if (needsNativeAudioSuppression(audioOptimizationModeRef.current)) {
-          media.muted = false;
+        // MediaSource-backed (hls.js) <video> was confirmed NOT to have its
+        // native audio output redirected by createMediaElementSource() on
+        // Tauri's WKWebView — raw, un-effected audio keeps playing through
+        // speakers regardless of .muted/.volume (both verified to have no
+        // effect). captureStream() + createMediaStreamSource() goes through
+        // the same mechanism already proven to work for MediaStream
+        // srcObject sources (Tone.js, see the branch above) — try that
+        // first for hls.js-managed elements, falling back to the plain
+        // element tap if captureStream() isn't available or has no audio.
+        const isHlsManaged = media instanceof HTMLVideoElement && Boolean(getHlsInstance(media));
+        const capturedStream = isHlsManaged
+          ? (media as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream?.()
+          : undefined;
+        const capturedAudioTracks = capturedStream?.getAudioTracks() ?? [];
+
+        if (capturedStream && capturedAudioTracks.length > 0) {
+          mediaSource = context.createMediaStreamSource(capturedStream);
+          mediaSource.connect(engine.input);
+          media.muted = true;
           media.volume = 0;
         } else {
-          media.muted = isMutedRef.current;
-          media.volume = isMutedRef.current ? 0 : volumeRef.current;
+          mediaSource = context.createMediaElementSource(media);
+          mediaSource.connect(engine.input);
+          if (isHlsManaged || needsNativeAudioSuppression(audioOptimizationModeRef.current)) {
+            media.muted = true;
+            media.volume = 0;
+          } else {
+            media.muted = isMutedRef.current;
+            media.volume = isMutedRef.current ? 0 : volumeRef.current;
+          }
         }
+        debugAudio("connectMediaAudio:native-suppression", {
+          isHlsManaged,
+          usedCaptureStream: Boolean(capturedStream && capturedAudioTracks.length > 0),
+          capturedAudioTrackCount: capturedAudioTracks.length,
+          mediaMuted: media.muted,
+          mediaVolume: media.volume,
+        });
       }
       mediaSourceRef.current = mediaSource;
 

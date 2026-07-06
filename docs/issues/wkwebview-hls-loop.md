@@ -1,6 +1,31 @@
 # WKWebView HLS Loop — 終端検出と再生復帰
 
-## 症状
+## 解決済み (追記 2026-07-06): hls.js 導入で本ドキュメントの workaround は不要に
+
+以下に書かれている「① ライブ扱い問題」「B. 終端スタック検出」「C. リロードによる
+VOD 正常化」は、`.m3u8` 再生をネイティブ `<video src>` から
+[hls.js](https://github.com/video-dev/hls.js) (MSE 経由) に切り替えたことで
+根本的に解消した。hls.js 自身がマニフェストのポーリング・セグメント管理・
+終端 (`#EXT-X-ENDLIST`) 検出を行うため、`useRetroPreviewMedia.ts` にあった
+`isHlsStream` 判定・`hlsWatchInterval`・`handleHlsEnded`・`confirmHlsEndedOrReload`
+等の自前 workaround（下記 B 節のコード）は全て削除済み。
+
+あわせて `src-mdrop-core/src/http_stream.rs` の HLS 共通引数に
+`-hls_playlist_type event` を追加し、ffmpeg が入力ファイルを最後まで読み切って
+プロセスが正常終了した際に `#EXT-X-ENDLIST` が確実に付くようにした
+(GateKeeper pre-warm を扱う下記「A」節の対処は今も有効・変更なし)。
+
+`getHlsInstance()` (`src/retro-player/media/RetroMediaSource.ts`) で
+「この `<video>` 要素は hls.js 管理下か」を判定できるようにしたので、
+`isHlsStartupRetryableError` 等の `.m3u8` 文字列判定もそちらに置き換えている。
+
+**なお、hls.js 導入は本ページの終端検出問題は解決したが、
+[`wkwebview-hls-webaudio.md`](wkwebview-hls-webaudio.md) の
+Web Audio エフェクトが効かない問題は別件で未解決のまま。**
+
+---
+
+## 症状 (旧: ネイティブ `<video src>` 再生時代の記録)
 
 - HLS (`index.m3u8`) 動画が終端手前（残り数秒）で止まる
 - `ended` イベントが発火しない
