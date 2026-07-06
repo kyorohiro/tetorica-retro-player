@@ -961,10 +961,19 @@ function createOverlay(settings) {
 
     if (shouldUseDirectVideoFallback(targetElement)) {
       if (!drawableSource) {
+        if (!surface._proxyStuckSince) {
+          surface._proxyStuckSince = performance.now();
+        } else if (performance.now() - surface._proxyStuckSince > 1500) {
+          // Proxy has been unable to deliver a frame for >1.5s — reset and retry.
+          surface.disposeProxyVideo();
+          surface.ensureProxyVideo(targetElement);
+          surface._proxyStuckSince = 0;
+        }
         surface.canvas.style.display = "none";
         surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
         return;
       }
+      surface._proxyStuckSince = 0;
       // proxyBitmap or proxyVideo is available — safe for texImage2D on Windows.
       // Fall through to the normal WebGL rendering path to apply the retro filter.
     }
@@ -1799,6 +1808,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
     proxyBitmap: null,
     proxyFramePending: false,
     proxyReady: false,
+    _proxyStuckSince: 0,
     startedAt: performance.now(),
     lastRectKey: "",
     didTargetChange: true,
@@ -1914,7 +1924,14 @@ function createOverlaySurface(index, onReady, initialSettings) {
         return;
       }
       this.proxyFramePending = true;
-      void this.proxyImageCapture.grabFrame()
+      let grabPromise;
+      try {
+        grabPromise = this.proxyImageCapture.grabFrame();
+      } catch {
+        this.proxyFramePending = false;
+        return;
+      }
+      void grabPromise
         .then((bitmap) => {
           if (this.proxyBitmap && this.proxyBitmap !== bitmap) {
             try {
@@ -1953,6 +1970,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
       this.proxyBitmap = null;
       this.proxyFramePending = false;
       this.proxyReady = false;
+      this._proxyStuckSince = 0;
     },
     getDrawableSource(targetElement) {
       if (
