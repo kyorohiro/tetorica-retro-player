@@ -469,6 +469,13 @@ var TetoricaRetroAudioNode = class {
   autoConnections = /* @__PURE__ */ new Set();
   // Destinations added by explicit connect() calls (caller-managed, cleared by disconnect()).
   externalConnections = /* @__PURE__ */ new Set();
+  // Tracks whether each Convolver is currently wired into the graph.
+  // Convolvers process audio even when wet gain is 0, so we disconnect them when unused.
+  _roomConvolverConnected = true;
+  _hallReverbConvolverConnected = true;
+  // Cache last WaveShaper curve amounts to avoid recreating 4096-sample Float32Arrays every update.
+  _driveCurveAmount = -1;
+  _tapeSatCurveAmount = -1;
   nodes = {
     audioContext: null,
     masterGain: null,
@@ -801,9 +808,14 @@ var TetoricaRetroAudioNode = class {
       lowpass.frequency.value = 16e3 - amount * 14200;
       lowpass.Q.value = 0.3 + amount * 1.8;
       highshelf.gain.value = -amount * 18;
-      try {
-        drive.curve = createDriveCurve(amount * 0.6);
-      } catch {
+      drive.oversample = amount > 1e-3 ? "4x" : "none";
+      const driveAmount = amount * 0.6;
+      if (Math.abs(driveAmount - this._driveCurveAmount) > 2e-3) {
+        try {
+          drive.curve = createDriveCurve(driveAmount);
+          this._driveCurveAmount = driveAmount;
+        } catch {
+        }
       }
     }
     if (bitcrusher) {
@@ -872,6 +884,27 @@ var TetoricaRetroAudioNode = class {
       const amount = settings.isAudioFxEnabled ? settings.smallSpeakerRoomAmount : 0;
       roomDryGain.gain.value = Math.max(0.52, 1 - amount * 0.42);
       roomWetGain.gain.value = amount * 0.95;
+      const roomConvolver = this.nodes.roomConvolver;
+      if (roomConvolver) {
+        const shouldConnect = amount > 1e-3;
+        if (shouldConnect && !this._roomConvolverConnected) {
+          const upstream = stereoWidth ?? this.nodes.tapeSaturator;
+          upstream?.connect(roomConvolver);
+          roomConvolver.connect(roomWetGain);
+          this._roomConvolverConnected = true;
+        } else if (!shouldConnect && this._roomConvolverConnected) {
+          const upstream = stereoWidth ?? this.nodes.tapeSaturator;
+          try {
+            upstream?.disconnect(roomConvolver);
+          } catch {
+          }
+          try {
+            roomConvolver.disconnect(roomWetGain);
+          } catch {
+          }
+          this._roomConvolverConnected = false;
+        }
+      }
     }
     if (wowFlutterDelay && wowLfo && wowLfoGain && flutterLfo && flutterLfoGain) {
       const amount = settings.isAudioFxEnabled ? settings.wowFlutterAmount : 0;
@@ -926,6 +959,25 @@ var TetoricaRetroAudioNode = class {
     if (hallReverbWetGain) {
       const amount = settings.isAudioFxEnabled ? settings.reverbAmount : 0;
       hallReverbWetGain.gain.value = amount * 2;
+      const hallReverbConvolver = this.nodes.hallReverbConvolver;
+      if (hallReverbConvolver && masterGain) {
+        const shouldConnect = amount > 1e-3;
+        if (shouldConnect && !this._hallReverbConvolverConnected) {
+          masterGain.connect(hallReverbConvolver);
+          hallReverbConvolver.connect(hallReverbWetGain);
+          this._hallReverbConvolverConnected = true;
+        } else if (!shouldConnect && this._hallReverbConvolverConnected) {
+          try {
+            masterGain.disconnect(hallReverbConvolver);
+          } catch {
+          }
+          try {
+            hallReverbConvolver.disconnect(hallReverbWetGain);
+          } catch {
+          }
+          this._hallReverbConvolverConnected = false;
+        }
+      }
     }
     const chorusLfoGain1 = this.nodes.chorusLfoGain1;
     const chorusLfoGain2 = this.nodes.chorusLfoGain2;
@@ -938,11 +990,14 @@ var TetoricaRetroAudioNode = class {
     }
     const tapeSaturator = this.nodes.tapeSaturator;
     if (tapeSaturator) {
-      try {
-        tapeSaturator.curve = createTapeSaturationCurve(
-          settings.isAudioFxEnabled ? settings.tapeSaturationAmount : 0
-        );
-      } catch {
+      const tapeSatAmount = settings.isAudioFxEnabled ? settings.tapeSaturationAmount : 0;
+      tapeSaturator.oversample = tapeSatAmount > 1e-3 ? "4x" : "none";
+      if (Math.abs(tapeSatAmount - this._tapeSatCurveAmount) > 2e-3) {
+        try {
+          tapeSaturator.curve = createTapeSaturationCurve(tapeSatAmount);
+          this._tapeSatCurveAmount = tapeSatAmount;
+        } catch {
+        }
       }
     }
     const busCompressor = this.nodes.busCompressor;
@@ -1306,6 +1361,10 @@ var TetoricaRetroAudioNode = class {
     const worklets = await this.loadWorklets(context);
     const built = this.buildAndWireNodes(context, worklets);
     Object.assign(this.nodes, { audioContext: context, ...built });
+    this._roomConvolverConnected = true;
+    this._hallReverbConvolverConnected = true;
+    this._driveCurveAmount = -1;
+    this._tapeSatCurveAmount = -1;
     this.startSources();
     this.applyAutoConnect();
   }
