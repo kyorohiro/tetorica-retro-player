@@ -2311,6 +2311,7 @@ function applySettings(gl, renderer, settings) {
   gl.uniform1f(uniformLocations.uSaturationLow, settings.saturationLow ?? 0);
   gl.uniform1f(uniformLocations.uSaturationHigh, settings.saturationHigh ?? 1);
   gl.uniform1f(uniformLocations.uSaturationKnee, settings.saturationKnee ?? 0.2);
+  gl.uniform1f(uniformLocations.uOutputBrightness, settings.outputBrightness ?? 1);
   gl.uniform1f(uniformLocations.uPhosphorDotLightBalance, settings.phosphorDotLightBalance ?? 1);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
@@ -2570,6 +2571,7 @@ function setupRenderer(webgl, onReady, initialSettings) {
       uSaturationLow: webgl.getUniformLocation(prog2, "uSaturationLow"),
       uSaturationHigh: webgl.getUniformLocation(prog2, "uSaturationHigh"),
       uSaturationKnee: webgl.getUniformLocation(prog2, "uSaturationKnee"),
+      uOutputBrightness: webgl.getUniformLocation(prog2, "uOutputBrightness"),
       uPhosphorDotLightBalance: webgl.getUniformLocation(prog2, "uPhosphorDotLightBalance"),
       uPixelAspect: webgl.getUniformLocation(prog2, "uPixelAspect"),
       uPhosphorDotMode: webgl.getUniformLocation(prog2, "uPhosphorDotMode"),

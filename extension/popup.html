@@ -263,6 +263,15 @@
               <input id="saturationKnee" type="range" min="0.02" max="1" step="0.01" />
               <output id="saturationKneeValue"></output>
             </label>
+
+            <label class="control">
+              <span class="label-with-tip">
+                <span>Output brightness</span>
+                <span class="info-tip" tabindex="0" data-tip="Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. Same kind of last-stage adjustment as CSS brightness, so it won't change dot shapes or introduce moire.">?</span>
+              </span>
+              <input id="outputBrightness" type="range" min="0.4" max="2.5" step="0.01" />
+              <output id="outputBrightnessValue"></output>
+            </label>
           </section>
 
           <section class="subsection phosphor-dot-section" aria-labelledby="phosphorDotTitle">

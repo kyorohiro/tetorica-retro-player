@@ -38,6 +38,7 @@ const FIELD_MAP = {
   saturationLow: "saturationLow",
   saturationHigh: "saturationHigh",
   saturationKnee: "saturationKnee",
+  outputBrightness: "outputBrightness",
   phosphorDotLightBalance: "phosphorDotLightBalance",
   phosphorDotInternalScale: "phosphorDotInternalScale",
   phosphorDotBrightCore: "phosphorDotBrightCore",

@@ -470,6 +470,7 @@ export const PRESETS = {
     spotMaskStrength: 1,
     bulbRadius: 0.5,
     blackFloor: 0.001,
+    outputBrightness: 1.8,
     phosphorDotLightBalance: 0.22,
     phosphorDotInternalScale: true,
     phosphorDotBrightCore: false,
@@ -706,6 +707,7 @@ export const DEFAULT_SETTINGS = {
   saturationLow: 0.0,
   saturationHigh: 1.0,
   saturationKnee: 0.2,
+  outputBrightness: 1.0,
   phosphorDotLightBalance: 1.0,
   phosphorDotInternalScale: false,
   phosphorDotBrightCore: false,
@@ -886,6 +888,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.saturationKnee === "number"
         ? clamp(candidate.saturationKnee, 0.02, 1)
         : basePresetSettings.saturationKnee ?? DEFAULT_SETTINGS.saturationKnee,
+    outputBrightness:
+      typeof candidate?.outputBrightness === "number"
+        ? clamp(candidate.outputBrightness, 0.4, 2.5)
+        : basePresetSettings.outputBrightness ?? DEFAULT_SETTINGS.outputBrightness,
     phosphorDotLightBalance:
       typeof candidate?.phosphorDotLightBalance === "number"
         ? clamp(candidate.phosphorDotLightBalance, 0, 2)

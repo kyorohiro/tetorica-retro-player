@@ -688,6 +688,7 @@ function applyPass2Settings() {
   gl.uniform1f(uniformLocations.uSaturationLow, currentSettings.saturationLow ?? 0);
   gl.uniform1f(uniformLocations.uSaturationHigh, currentSettings.saturationHigh ?? 1);
   gl.uniform1f(uniformLocations.uSaturationKnee, currentSettings.saturationKnee ?? 0.2);
+  gl.uniform1f(uniformLocations.uOutputBrightness, currentSettings.outputBrightness ?? 1);
   gl.uniform1f(uniformLocations.uPhosphorDotLightBalance, currentSettings.phosphorDotLightBalance ?? 1);
   gl.uniform1f(
     uniformLocations.uPixelAspect,
@@ -1017,6 +1018,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
     uSaturationLow: webgl.getUniformLocation(prog2, "uSaturationLow"),
     uSaturationHigh: webgl.getUniformLocation(prog2, "uSaturationHigh"),
     uSaturationKnee: webgl.getUniformLocation(prog2, "uSaturationKnee"),
+    uOutputBrightness: webgl.getUniformLocation(prog2, "uOutputBrightness"),
     uPhosphorDotLightBalance: webgl.getUniformLocation(prog2, "uPhosphorDotLightBalance"),
     uPixelAspect: webgl.getUniformLocation(prog2, "uPixelAspect"),
     uPhosphorDotMode: webgl.getUniformLocation(prog2, "uPhosphorDotMode"),
