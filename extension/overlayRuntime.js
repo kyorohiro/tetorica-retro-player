@@ -419,6 +419,8 @@ function createOverlay(settings) {
   let overlayAudioEngine = null;
   let overlayAudioHookedEl = null;
   let _hookSeq = 0;
+  let _audioHookInFlight = false;
+  let _audioHookFailedEl = null;
   const rejectedElements = new WeakSet();
   let mediaRecorder = null;
   let recordedChunks = [];
@@ -785,10 +787,12 @@ function createOverlay(settings) {
 
     updateOpacityButton();
     updateSpeedButtonLabel();
-    if (audioFxEnabled) {
+    if (audioFxEnabled && !_audioHookInFlight) {
       const activeVideo = getActiveVideoForSpeed();
-      if (activeVideo && (activeVideo !== overlayAudioHookedEl || !overlayAudioEngine)) {
-        hookOverlayAudio(activeVideo);
+      if (activeVideo && activeVideo !== _audioHookFailedEl &&
+          (activeVideo !== overlayAudioHookedEl || !overlayAudioEngine)) {
+        _audioHookInFlight = true;
+        hookOverlayAudio(activeVideo).finally(() => { _audioHookInFlight = false; });
       }
     }
     rafId = requestAnimationFrame(draw);
@@ -1378,6 +1382,7 @@ function createOverlay(settings) {
           { error: err instanceof Error ? err.message : String(err), reason },
           "warn",
         );
+        _audioHookFailedEl = videoElement;
         overlayAudioHookedEl = null;
         releaseOverlayAudio();
       }
@@ -1392,6 +1397,7 @@ function createOverlay(settings) {
     }
     if (overlayAudioEngine) { overlayAudioEngine.dispose().catch(() => {}); overlayAudioEngine = null; }
     overlayAudioHookedEl = null;
+    _audioHookFailedEl = null;
     audioFxEnabled = false;
     _sharedAudioFxEnabled = false;
   }
