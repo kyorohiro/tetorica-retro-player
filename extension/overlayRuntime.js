@@ -2251,16 +2251,20 @@ function getPhosphorDotLimitedTargetSize(gl, settings) {
   }
   const bulbRadius = settings.bulbRadius ?? 0.22;
   const baseMinCellPixels = Math.max(1.1, 2.15 + bulbRadius * 1.15);
-  const maxWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / baseMinCellPixels));
-  const maxHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / baseMinCellPixels));
+  const internalScale = settings.phosphorDotInternalScale ? 2 : 1;
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / internalScale);
+  const scaledW = settings.targetWidth * internalScale;
+  const scaledH = settings.targetHeight * internalScale;
+  const maxWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / minCellPixels));
+  const maxHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / minCellPixels));
   const scale = Math.min(
     1,
-    maxWidth / Math.max(settings.targetWidth, 1),
-    maxHeight / Math.max(settings.targetHeight, 1),
+    maxWidth / Math.max(scaledW, 1),
+    maxHeight / Math.max(scaledH, 1),
   );
   return {
-    w: Math.max(1, Math.round(settings.targetWidth * scale)),
-    h: Math.max(1, Math.round(settings.targetHeight * scale)),
+    w: Math.max(1, Math.round(scaledW * scale)),
+    h: Math.max(1, Math.round(scaledH * scale)),
   };
 }
 

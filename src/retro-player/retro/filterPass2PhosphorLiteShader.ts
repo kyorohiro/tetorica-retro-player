@@ -24,6 +24,7 @@ uniform float uTime;
 uniform float uPhosphorDotLightBalance;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
+uniform float uPhosphorDotInternalScale;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
@@ -228,7 +229,8 @@ void main(void)
     phosphorColor += bleedColor * bleedMask * uSpotMaskStrength * (0.06 + phosphorBrightness * 0.1);
 
     vec3 fourWayMix = mixedSourceColor * 0.34 + (rightColor + leftColor + upColor + downColor) * 0.165;
-    float fourWayAmount = neighborBlendMix * (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08);
+    float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
+    float fourWayAmount = neighborBlendMix * (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08 + internalScaleMix * 0.06);
     phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount);
 
     if (uGlowStrength > 0.001) {
