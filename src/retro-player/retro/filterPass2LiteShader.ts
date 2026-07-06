@@ -12,6 +12,7 @@ uniform float uScanlineStrength;
 uniform float uScanline2Strength;
 uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
+uniform float uOutputBrightness;
 uniform float uFocusStrength;
 uniform vec2 uFocusSize;
 uniform vec2 uFocusCenter;
@@ -83,6 +84,6 @@ void main(void)
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
 
-  finalColor = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
+  finalColor = vec4(clamp(color.rgb * uOutputBrightness, 0.0, 1.0), 1.0);
 }
 `;

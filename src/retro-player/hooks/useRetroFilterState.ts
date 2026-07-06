@@ -44,6 +44,7 @@ export type RetroFilterInitialState = Partial<{
   saturationLow: number;
   saturationHigh: number;
   saturationKnee: number;
+  outputBrightness: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -104,6 +105,7 @@ const doesPresetMatchState = (
     (preset.saturationLow ?? 0) === state.saturationLow &&
     (preset.saturationHigh ?? 1) === state.saturationHigh &&
     (preset.saturationKnee ?? 0.2) === state.saturationKnee &&
+    (preset.outputBrightness ?? 1) === state.outputBrightness &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
@@ -194,6 +196,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     saturationLow: initialState.saturationLow ?? (DEFAULT_PRESET.saturationLow ?? 0),
     saturationHigh: initialState.saturationHigh ?? (DEFAULT_PRESET.saturationHigh ?? 1),
     saturationKnee: initialState.saturationKnee ?? (DEFAULT_PRESET.saturationKnee ?? 0.2),
+    outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
     phosphorDotLightBalance:
       initialState.phosphorDotLightBalance ?? (DEFAULT_PRESET.phosphorDotLightBalance ?? 1),
     phosphorDotInternalScale:
@@ -394,6 +397,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => ({ ...current, saturationKnee }));
   };
 
+  const setOutputBrightness = (outputBrightness: number) => {
+    setSelectedPreset(null);
+    setSettings((current) => ({ ...current, outputBrightness }));
+  };
+
   const setPhosphorDotLightBalance = (phosphorDotLightBalance: number) => {
     setSelectedPreset(null);
     setSettings((current) => ({ ...current, phosphorDotLightBalance }));
@@ -517,6 +525,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       saturationLow: presetSettings.saturationLow ?? 0,
       saturationHigh: presetSettings.saturationHigh ?? 1,
       saturationKnee: presetSettings.saturationKnee ?? 0.2,
+      outputBrightness: presetSettings.outputBrightness ?? 1,
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? false,
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
@@ -593,6 +602,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSaturationLow,
     setSaturationHigh,
     setSaturationKnee,
+    setOutputBrightness,
     setPhosphorDotLightBalance,
     setPhosphorDotInternalScale,
     setPhosphorDotBrightCore,

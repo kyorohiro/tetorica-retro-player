@@ -42,6 +42,7 @@ export type RetroVideoFilterState = {
   saturationLow: number;
   saturationHigh: number;
   saturationKnee: number;
+  outputBrightness: number;
   phosphorDotLightBalance: number;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
@@ -110,6 +111,7 @@ type Pass2UniformLocations = {
   uSaturationLow: WebGLUniformLocation | null;
   uSaturationHigh: WebGLUniformLocation | null;
   uSaturationKnee: WebGLUniformLocation | null;
+  uOutputBrightness: WebGLUniformLocation | null;
   uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
@@ -764,6 +766,7 @@ export class TetoricaRetroVideoPipeline {
       uSaturationLow: gl.getUniformLocation(program, "uSaturationLow"),
       uSaturationHigh: gl.getUniformLocation(program, "uSaturationHigh"),
       uSaturationKnee: gl.getUniformLocation(program, "uSaturationKnee"),
+      uOutputBrightness: gl.getUniformLocation(program, "uOutputBrightness"),
       uPhosphorDotLightBalance: gl.getUniformLocation(program, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(program, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
@@ -1036,6 +1039,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uSaturationLow, filterState.saturationLow);
     gl.uniform1f(this.pass2Locs.uSaturationHigh, filterState.saturationHigh);
     gl.uniform1f(this.pass2Locs.uSaturationKnee, filterState.saturationKnee);
+    gl.uniform1f(this.pass2Locs.uOutputBrightness, filterState.outputBrightness);
     gl.uniform1f(this.pass2Locs.uPhosphorDotLightBalance, filterState.phosphorDotLightBalance);
     gl.uniform1f(
       this.pass2Locs.uPixelAspect,

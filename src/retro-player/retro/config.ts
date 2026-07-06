@@ -51,6 +51,7 @@ export type RetroPresetDefinition = {
   saturationLow?: number;
   saturationHigh?: number;
   saturationKnee?: number;
+  outputBrightness?: number;
   phosphorDotLightBalance?: number;
   phosphorDotInternalScale?: boolean;
   phosphorDotBrightCore?: boolean;
@@ -431,6 +432,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
+    outputBrightness: 1.8,
   },
   crtOnly: {
     label: "CRT Only",
