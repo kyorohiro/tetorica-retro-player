@@ -18,7 +18,6 @@ import {
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import {
   isTauriRuntime,
-  isWindowsRuntime,
 } from "./retro-player/platform/runtime";
 import { useLongPress } from "./retro-player/hooks/useLongPress";
 import { DIALOG_STACK_ACTIVE_EVENT, useDialog } from "./useDialog";
@@ -77,7 +76,7 @@ function App() {
   const locale = React.useMemo(() => resolveLocale(localePreference), [localePreference]);
   const previewSource = usePreviewSourceState(locale);
   const shouldPreferDialogRetroPreview = React.useMemo(
-    () => isTauriRuntime() && isWindowsRuntime(),
+    () => false,
     [],
   );
   const { showConfirmDialog, showSelectDialog, showDialog } = useDialog();

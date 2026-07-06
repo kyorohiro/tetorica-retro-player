@@ -18,6 +18,11 @@
 // the host app's locale), and their .code is what callers use to look up a
 // localized, user-facing message via resolvePreviewErrorMessage()/retroT()
 // (see ../i18n.ts) — this module itself never picks a locale.
+// Type-only: the actual hls.js module is dynamically imported inside
+// attachHlsSource, so builds/platforms that never touch an .m3u8 source
+// (e.g. the plain web build, which has no mDrop/ffmpeg HLS server to talk
+// to) never pay for it in their bundle.
+import type Hls from "hls.js";
 import { RetroPreviewError } from "../i18n";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
@@ -41,6 +46,75 @@ export type CreateAudioSourceOptions = { url: string } | { stream: MediaStream }
 export type CreateImageSourceOptions = { url: string };
 
 type DebugEventCallback = (label: string, payload: Record<string, unknown>) => void;
+
+// .m3u8 sources always go through hls.js rather than native <video src>
+// playback. The native engine was found to under-prioritize manifest
+// re-polling/duration updates for a <video> element that's never attached
+// to the DOM (this app's default rendering path — PixiJS reads frames into
+// a WebGL canvas for the retro-filter effect instead), which caused
+// still-transcoding (EVENT-type, no #EXT-X-ENDLIST yet) streams to appear
+// to end early. hls.js implements manifest polling and end-of-stream
+// detection itself via MediaSource, independent of that native behavior.
+const hlsInstances = new WeakMap<HTMLVideoElement, Hls>();
+
+export const isHlsUrl = (url: string): boolean => url.includes(".m3u8");
+
+export const getHlsInstance = (video: HTMLVideoElement): Hls | undefined =>
+  hlsInstances.get(video);
+
+export const destroyHlsInstance = (video: HTMLVideoElement): void => {
+  const hls = hlsInstances.get(video);
+  if (!hls) return;
+  hls.destroy();
+  hlsInstances.delete(video);
+};
+
+/**
+ * Attach hls.js to `video` for `url`. hls.js's own network/media errors
+ * don't set the native video.error or fire the native "error" event, so
+ * existing error handling (waitForVideoReady's error listener,
+ * RetroPlayerPlus's onError) would never see them. Follow hls.js's
+ * documented recovery pattern for fatal errors, capped at 3 attempts each,
+ * and only once truly unrecoverable, dispatch a synthetic native "error"
+ * event to reuse all the existing native-error plumbing unchanged.
+ */
+export const attachHlsSource = async (video: HTMLVideoElement, url: string): Promise<Hls> => {
+  destroyHlsInstance(video);
+
+  const { default: HlsCtor } = await import("hls.js");
+  const hls = new HlsCtor();
+  let networkRetries = 0;
+  let mediaRetries = 0;
+
+  hls.on(HlsCtor.Events.ERROR, (_event, data) => {
+    if (!data.fatal) return;
+    switch (data.type) {
+      case HlsCtor.ErrorTypes.NETWORK_ERROR:
+        if (networkRetries < 3) {
+          networkRetries += 1;
+          hls.startLoad();
+          return;
+        }
+        break;
+      case HlsCtor.ErrorTypes.MEDIA_ERROR:
+        if (mediaRetries < 3) {
+          mediaRetries += 1;
+          hls.recoverMediaError();
+          return;
+        }
+        break;
+      default:
+        break;
+    }
+    destroyHlsInstance(video);
+    video.dispatchEvent(new Event("error"));
+  });
+
+  hlsInstances.set(video, hls);
+  hls.loadSource(url);
+  hls.attachMedia(video);
+  return hls;
+};
 
 const describeMediaError = (mediaError: MediaError | null) => {
   if (!mediaError) return "unknown";
@@ -136,7 +210,13 @@ export function waitForVideoReady(
     video.addEventListener("loadeddata", handleLoadedData, { once: true });
     video.addEventListener("canplay", handleCanPlay, { once: true });
     video.addEventListener("error", handleError, { once: true });
-    video.load();
+    // hls.js already triggers loading via attachMedia()/loadSource() —
+    // calling video.load() ourselves here would reset its MediaSource
+    // attachment mid-setup. The listeners above still fire normally once
+    // hls.js starts feeding the MediaSource.
+    if (!getHlsInstance(video)) {
+      video.load();
+    }
   });
 }
 
@@ -235,6 +315,8 @@ export async function createVideoMediaSource(
   const video = document.createElement("video");
   if ("stream" in options) {
     video.srcObject = options.stream;
+  } else if (isHlsUrl(options.url)) {
+    await attachHlsSource(video, options.url);
   } else {
     video.src = options.url;
   }
