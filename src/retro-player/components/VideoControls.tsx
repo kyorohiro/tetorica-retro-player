@@ -125,6 +125,7 @@ type VideoControlsProps = {
   isNativePlaybackMode?: boolean;
   nativePlaybackNeedsReload?: boolean;
   onToggleNativePlaybackMode?: () => void;
+  isAudioFxUnavailable?: boolean;
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -234,6 +235,7 @@ export const VideoControls = memo(function VideoControls({
   isNativePlaybackMode = false,
   nativePlaybackNeedsReload = false,
   onToggleNativePlaybackMode,
+  isAudioFxUnavailable = false,
 }: VideoControlsProps) {
   const [isSpeedOpen, setIsSpeedOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
@@ -1233,16 +1235,26 @@ export const VideoControls = memo(function VideoControls({
           </button>
           <button
             type="button"
-            {...audioButtonHandlers}
+            disabled={isAudioFxUnavailable}
+            {...(isAudioFxUnavailable ? {} : audioButtonHandlers)}
+            title={
+              isAudioFxUnavailable
+                ? locale === "ja"
+                  ? "HLS(ffmpeg)ストリーミング中はAudio設定が効きません"
+                  : "Audio settings have no effect while streaming via HLS (ffmpeg)"
+                : undefined
+            }
             className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
-              isAudioHolding
-                ? "border-sky-400/70 bg-[#111a24] text-sky-200"
-                : isAudioFxEnabled
-                  ? "border-sky-500/60 bg-sky-500/15 text-black shadow-[0_0_8px_rgba(14,165,233,0.5)]"
-                  : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
+              isAudioFxUnavailable
+                ? "cursor-not-allowed border-[#111014]/20 bg-[#111014]/30 text-white/40"
+                : isAudioHolding
+                  ? "border-sky-400/70 bg-[#111a24] text-sky-200"
+                  : isAudioFxEnabled
+                    ? "border-sky-500/60 bg-sky-500/15 text-black shadow-[0_0_8px_rgba(14,165,233,0.5)]"
+                    : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
             }`}
           >
-            {isAudioHolding && (
+            {isAudioHolding && !isAudioFxUnavailable && (
               <span
                 className="pointer-events-none absolute inset-0 origin-left bg-sky-400/20"
                 style={{ animation: "long-press-charge 0.6s linear forwards" }}
@@ -1250,6 +1262,13 @@ export const VideoControls = memo(function VideoControls({
             )}
             <Mic2 size={16} className="relative z-10" />
             <span className="relative z-10">Audio</span>
+            {isAudioFxUnavailable && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-0 top-1/2 h-px w-full bg-current opacity-70"
+                style={{ transform: "rotate(-14deg)" }}
+              />
+            )}
           </button>
           {/* Short press: reset settings. Long press: toggle native playback mode. */}
           <button
