@@ -7,6 +7,7 @@ import {
   RETRO_PRESETS,
   type MonoTintMode,
   type PaletteMode,
+  type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
@@ -375,11 +376,16 @@ export function RetroFilterPanel({
       phosphorDotNeighborBlend
     );
 
-  const presetButtonClass = (isSelected: boolean) => [
+  const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
     "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
     isSelected
       ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
       : "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20",
+      isFeatured
+        ? isSelected
+          ? " font-bold bg-[repeating-linear-gradient(20deg,#0596694d,#0596694d_1px,transparent_1px,transparent_30px)] "
+          : " font-bold bg-[repeating-linear-gradient(20deg,#f59e0b4d,#f59e0b4d_1px,transparent_1px,transparent_30px)] "
+        : "",
   ].join(" ");
 
   const presetsByCategory = RETRO_PRESET_CATEGORY_ORDER.map((category) => ({
@@ -437,7 +443,10 @@ export function RetroFilterPanel({
                   onClick={() => {
                     onApplyPreset(key as RetroPresetKey);
                   }}
-                  className={presetButtonClass(selectedPreset === key)}
+                  className={presetButtonClass(
+                    selectedPreset === key,
+                    (preset as RetroPresetDefinition).featured,
+                  )}
                 >
                   {preset.label}
                 </button>

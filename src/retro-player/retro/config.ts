@@ -67,6 +67,7 @@ export type RetroPresetDefinition = {
   focusStrength?: number;
   focusWidth?: number;
   focusHeight?: number;
+  featured?: boolean;
 };
 
 export const RETRO_PRESETS = {
@@ -93,6 +94,7 @@ export const RETRO_PRESETS = {
   },
   chunky: {
     label: "Chunky",
+    featured: true,
     width: 256,
     height: 192,
     colors: 8,
@@ -114,6 +116,7 @@ export const RETRO_PRESETS = {
   },
   arcade: {
     label: "Arcade",
+    featured: true,
     width: 320,
     height: 224,
     colors: 12,
@@ -135,6 +138,7 @@ export const RETRO_PRESETS = {
   },
   gb: {
     label: "GB",
+    featured: true,
     width: 200, //GB is 160, // 160 or 144
     height: 180,// GB is 144,
     colors: 4,
@@ -156,6 +160,7 @@ export const RETRO_PRESETS = {
   },
   gba: {
     label: "GBA",
+    featured: true,
     width: 320, // GBA is 240,GBA's internal resolution is 240x160, but we scale it to 320x200 for better visibility
     height: 200,// GBA is 160,
     colors: 48,
@@ -308,12 +313,12 @@ export const RETRO_PRESETS = {
     colors: 16,
     dither: 0.18,
     palette: "mono",
-    curvature: 0.05,
-    scanline: 0.10,
+    curvature: 0.0,
+    scanline: 0.0,
     scanline2: 0.0,
-    vignette: 0.08,
-    glow: 0.07,
-    phosphor: 0.02,
+    vignette: 0.015,
+    glow: 0.0,
+    phosphor: 0.0,
     spotMask: 0.0,
     bulbRadius: 0.3,
     blackFloor: 0.008,
@@ -345,6 +350,7 @@ export const RETRO_PRESETS = {
   },
   amberCrt: {
     label: "Amber CRT",
+    featured: true,
     width: 960,
     height: 600,
     colors: 32,
@@ -387,6 +393,7 @@ export const RETRO_PRESETS = {
   },
   lcdIce: {
     label: "LCD Ice",
+    featured: true,
     width: 480,
     height: 300,
     colors: 16,
@@ -408,6 +415,7 @@ export const RETRO_PRESETS = {
   },
   phosphorDot: {
     label: "Phosphor Dot",
+    featured: true,
     width: 320,
     height: 180,
     colors: 32,
@@ -457,6 +465,7 @@ export const RETRO_PRESETS = {
   },
   crtEdge: {
     label: "CRT Edge",
+    featured: true,
     width: 1280,
     height: 800,
     colors: 256,
@@ -507,6 +516,7 @@ export const RETRO_PRESETS = {
   },
   tetorica: {
     label: "Tetorica",
+    featured: true,
     width: 1280,
     height: 800,
     colors: 256,
