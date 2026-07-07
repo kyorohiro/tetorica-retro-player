@@ -1,6 +1,8 @@
 import {
   DEFAULT_AUDIO_SETTINGS,
+  DEFAULT_AUDIO_PRESET_SETTINGS,
   RETRO_AUDIO_PRESET_SETTINGS,
+  defaultAudioPresetId,
   type RetroAudioPresetKey,
   type RetroAudioSettings,
 } from "./preset.ts";
@@ -82,7 +84,7 @@ function resolveRetroAudioSettings({
 }): RetroAudioSettings {
   return {
     ...DEFAULT_AUDIO_SETTINGS,
-    ...(preset ? RETRO_AUDIO_PRESET_SETTINGS[preset] : null),
+    ...RETRO_AUDIO_PRESET_SETTINGS[preset ?? defaultAudioPresetId],
     ...params,
   };
 }
@@ -347,7 +349,7 @@ export class TetoricaRetroAudioNode {
   setParams(nextParams: Partial<RetroAudioSettings>, isPartialUpdate = true) {
     const nextSettings = isPartialUpdate
       ? { ...this.currentSettings, ...nextParams }
-      : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
+      : { ...DEFAULT_AUDIO_PRESET_SETTINGS, ...nextParams };
 
     Object.assign(this.currentSettings, nextSettings);
     this.updateAudioNodes();

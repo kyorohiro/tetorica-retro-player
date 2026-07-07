@@ -75,30 +75,30 @@ export const DEFAULT_AUDIO_SETTINGS = {
   playbackRate: 1,
   isLooping: true,
   isAudioFxEnabled: true,
-  lofiAmount: 0.58,
+  lofiAmount: 0,
   radioToneAmount: 0,
-  bitCrushAmount: 0.10,
+  bitCrushAmount: 0,
   bitCrushNoiseAmount: 0,
-  sampleRateReductionAmount: 0.10,
+  sampleRateReductionAmount: 0,
   noiseReductionAmount: 0,
   bassAmount: 0,
-  midAmount: -0.25,
+  midAmount: 0,
   trebleAmount: 0,
   stereoWidthAmount: 0,
   smallSpeakerRoomAmount: 0,
   wowFlutterAmount: 0,
-  isNoiseEnabled: true,
-  noiseLevel: 0.0010,
+  isNoiseEnabled: false,
+  noiseLevel: 0,
   vinylDustAmount: 0,
-  noiseWarmthAmount: 0.33,
-  noiseAirAmount: 0.55,
-  noisePresenceAmount: 0.5,
+  noiseWarmthAmount: 0,
+  noiseAirAmount: 0,
+  noisePresenceAmount: 0,
   delayAmount: 0,
   reverbAmount: 0,
   chorusAmount: 0,
   tapeSaturationAmount: 0,
   compressorAmount: 0,
-  fxOutputTrimAmount: 0.66,
+  fxOutputTrimAmount: 1.0,
   inputTrimAmount: 1.0,
 } as const satisfies RetroAudioSettings;
 
@@ -113,6 +113,8 @@ export type RetroAudioPresetKey =
   | "lofiTape"
   | "boombox"
   | "club";
+
+export const defaultAudioPresetId: RetroAudioPresetKey = "lofi";
 
 export type RetroAudioPresetDefinition = {
   label: string;
@@ -406,3 +408,6 @@ export const RETRO_AUDIO_PRESET_SETTINGS: Record<
 > = Object.fromEntries(
   Object.entries(RETRO_AUDIO_PRESETS).map(([key, preset]) => [key, preset.settings]),
 ) as Record<RetroAudioPresetKey, RetroAudioSettings>;
+
+export const DEFAULT_AUDIO_PRESET_SETTINGS: RetroAudioSettings =
+  RETRO_AUDIO_PRESET_SETTINGS[defaultAudioPresetId];

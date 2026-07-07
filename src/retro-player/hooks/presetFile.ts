@@ -1,4 +1,4 @@
-import { DEFAULT_AUDIO_SETTINGS } from "../audio/preset";
+import { DEFAULT_AUDIO_PRESET_SETTINGS } from "../audio/preset";
 import { loadLocalePreference } from "../../i18n";
 import type { LocalePreference } from "../../i18n";
 import { RETRO_PRESETS, defaultPresetId, type RetroPresetDefinition } from "../retro/config";
@@ -96,7 +96,7 @@ const applyFilterDefaults = (
 
 const applyAudioDefaults = (
   raw: Partial<PersistedRetroAudioSettings>,
-): PersistedRetroAudioSettings => ({ ...DEFAULT_AUDIO_SETTINGS, ...raw });
+): PersistedRetroAudioSettings => ({ ...DEFAULT_AUDIO_PRESET_SETTINGS, ...raw });
 
 const applyUiDefaults = (
   raw: Partial<PersistedRetroUiSettings>,
