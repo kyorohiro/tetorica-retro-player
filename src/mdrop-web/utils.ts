@@ -10,6 +10,8 @@ export const supportedExtensions = [
 
     // Videos
     "mp4", "m4v", "webm", "ogv", "mov",
+    "avi", "mkv", "wmv", "flv", "ts", "m2ts", "mts",
+    "mpeg", "mpg", "m2v", "vob", "asf", "3gp", "f4v", "mxf",
 
     // Audio
     "mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus",
@@ -38,10 +40,18 @@ export const mimeFromPath = (path: string): string => {
     if (/\.(heic)$/i.test(lower)) return "image/heic";
     if (/\.(heif)$/i.test(lower)) return "image/heif";
 
-    if (/\.(mp4|m4v)$/i.test(lower)) return "video/mp4";
+    if (/\.(mp4|m4v|f4v)$/i.test(lower)) return "video/mp4";
     if (/\.(webm)$/i.test(lower)) return "video/webm";
     if (/\.(ogv)$/i.test(lower)) return "video/ogg";
     if (/\.(mov)$/i.test(lower)) return "video/quicktime";
+    if (/\.(avi|divx|xvid)$/i.test(lower)) return "video/x-msvideo";
+    if (/\.(mkv)$/i.test(lower)) return "video/x-matroska";
+    if (/\.(wmv|asf)$/i.test(lower)) return "video/x-ms-wmv";
+    if (/\.(flv)$/i.test(lower)) return "video/x-flv";
+    if (/\.(ts|m2ts|mts)$/i.test(lower)) return "video/mp2t";
+    if (/\.(mpeg|mpg|m2v|vob)$/i.test(lower)) return "video/mpeg";
+    if (/\.(3gp)$/i.test(lower)) return "video/3gpp";
+    if (/\.(mxf)$/i.test(lower)) return "application/mxf";
 
     if (/\.(mp3)$/i.test(lower)) return "audio/mpeg";
     if (/\.(wav)$/i.test(lower)) return "audio/wav";
