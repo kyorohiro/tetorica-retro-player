@@ -123,7 +123,10 @@ export const attachHlsSource = async (video: HTMLVideoElement, url: string): Pro
   hls.on(HlsCtor.Events.MANIFEST_PARSED, (_event, data) => {
     logHls("manifest-parsed", {
       audioTracks: data.audioTracks?.length ?? 0,
-      firstLevelBitrate: data.firstLevel?.bitrate ?? null,
+      firstLevelBitrate:
+        typeof data.firstLevel === "number"
+          ? data.levels?.[data.firstLevel]?.bitrate ?? null
+          : null,
       levels: data.levels?.length ?? 0,
     });
   });
