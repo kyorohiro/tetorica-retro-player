@@ -4,7 +4,7 @@ import { t } from "../i18n";
 import type { RetroPlayerLocale } from "../retro-player/types";
 import type { MediaPlaybackTarget } from "./mediaPlaybackTarget";
 import { FileTargetFile } from "./api";
-import { isAudio, isImage, isVideo, type FileWithRelativePath } from "./utils";
+import { isAudio, isBrowserPlayableVideo, isImage, type FileWithRelativePath } from "./utils";
 import type { useBrowserFileListDialog } from "./useBrowserFileListDialog";
 
 const waitForNextPaint = async () => {
@@ -124,7 +124,7 @@ export const FilePicker = React.forwardRef<FilePickerHandle, FilePickerProps>(
     }, []);
 
     const isDirectRetroFile = useCallback((file: File) => {
-      return isImage(file.name) || isVideo(file.name) || isAudio(file.name);
+      return isImage(file.name) || isBrowserPlayableVideo(file.name) || isAudio(file.name);
     }, []);
 
     const openPortableTargets = useCallback(async (files: FileList | File[]) => {

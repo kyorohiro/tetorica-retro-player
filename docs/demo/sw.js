@@ -1,4 +1,4 @@
-const APP_VERSION = "0.35.9-mrao8cot";
+const APP_VERSION = "0.35.10-mrapjwqy";
 const CACHE_PREFIX = "tetorica-retro-player-";
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 

@@ -5,7 +5,7 @@ import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
-import { isAudio, isVideo, isVideoExtended } from "./utils";
+import { isAudio, isBrowserPlayableVideo, isVideoExtended } from "./utils";
 
 type Options = {
   files: SharedFileInfo[];
@@ -73,7 +73,7 @@ function MDropSharedListDialog({
       return;
     }
 
-    const canPlayDirect = isVideo(file.path) || isAudio(file.path);
+    const canPlayDirect = isBrowserPlayableVideo(file.path) || isAudio(file.path);
     const canPlayWithFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
     const options: { value: string; label: string; description: string }[] = [];
 

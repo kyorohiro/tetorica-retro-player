@@ -3,7 +3,7 @@ import { File, Folder, Loader, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, FileTargetFile } from "./api";
 import { usePreviewDialog } from "./usePreviewDialog";
-import { isAudio, isEpub, isImage, isPdf, isText, isVideo } from "./utils";
+import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
 type SortMode = "name" | "modifiedAt" | "comic";
@@ -205,7 +205,7 @@ function BrowserFileListDialog({
           target.isFile &&
           (
             isImage(target.path) ||
-            isVideo(target.path) ||
+            isBrowserPlayableVideo(target.path) ||
             isText(target.path) ||
             isAudio(target.path) ||
             isPdf(target.path) ||
@@ -236,7 +236,7 @@ function BrowserFileListDialog({
     async (file: TargetFile, filename: string) => {
       const isPreviewable =
         isImage(file.path) ||
-        isVideo(file.path) ||
+        isBrowserPlayableVideo(file.path) ||
         isText(file.path) ||
         isAudio(file.path) ||
         isPdf(file.path) ||

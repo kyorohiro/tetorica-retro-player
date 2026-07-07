@@ -92,6 +92,11 @@ export function isHeic(path: string, type?: string) {
 export const isVideo = (path: string) =>
     mimeFromPath(path).startsWith("video/");
 
+// Video formats we expect the browser/webview to handle directly without
+// routing through ffmpeg/HLS first.
+export const isBrowserPlayableVideo = (path: string) =>
+    /\.(mp4|m4v|mov|webm|ogv)$/i.test(path);
+
 // Formats that ffmpeg can transcode to HLS but browsers can't play natively
 export const isVideoExtended = (path: string) =>
     isVideo(path) ||
