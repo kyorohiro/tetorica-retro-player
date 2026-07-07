@@ -120,6 +120,7 @@ function BrowserFileListDialog({
   const [loading, setLoading] = useState(true);
 
   const { showPreviewDialog } = usePreviewDialog();
+  const { showSelectDialog } = useDialog();
   const { showZipFileListDialog } = useZipFileListDialog();
 
   const load = React.useCallback(
@@ -197,6 +198,142 @@ function BrowserFileListDialog({
     }
   };
 
+  const previewableFiles = React.useMemo(
+    () =>
+      sortedFiles.filter(
+        (target) =>
+          target.isFile &&
+          (
+            isImage(target.path) ||
+            isVideo(target.path) ||
+            isText(target.path) ||
+            isAudio(target.path) ||
+            isPdf(target.path) ||
+            isEpub(target.path)
+          ),
+      ),
+    [sortedFiles],
+  );
+
+  const openPreview = React.useCallback(
+    async (file: TargetFile) => {
+      const index = previewableFiles.findIndex((target) => target.path === file.path);
+      if (index < 0) return;
+
+      await showPreviewDialog({
+        files: previewableFiles,
+        initialIndex: index,
+        isRetro: true,
+        apiServer: ".",
+        getObjectUrl,
+        download,
+      });
+    },
+    [download, getObjectUrl, previewableFiles, showPreviewDialog],
+  );
+
+  const handleFileClick = React.useCallback(
+    async (file: TargetFile, filename: string) => {
+      const isPreviewable =
+        isImage(file.path) ||
+        isVideo(file.path) ||
+        isText(file.path) ||
+        isAudio(file.path) ||
+        isPdf(file.path) ||
+        isEpub(file.path);
+
+      if (
+        file.path.endsWith(".zip") ||
+        file.path.endsWith(".cbz") ||
+        file.path.endsWith(".rar") ||
+        file.path.endsWith(".cbr")
+      ) {
+        const action = await showSelectDialog({
+          title: filename,
+          message: "How would you like to open this file?",
+          options: [
+            {
+              value: "open-archive",
+              label: "Open archive",
+              description: "Browse files inside this archive.",
+            },
+            {
+              value: "download",
+              label: "Download",
+              description: "Save the original file.",
+            },
+          ],
+          cancelText: "Cancel",
+        });
+
+        if (action === "open-archive") {
+          await showZipFileListDialog({
+            title: filename,
+            source: {
+              type: "blob",
+              blob: (file as FileTargetFile).entry!,
+            } as any,
+            initialPath: "/",
+          });
+          return;
+        }
+
+        if (action === "download") {
+          await download(file);
+        }
+        return;
+      }
+
+      if (isPreviewable) {
+        const action = await showSelectDialog({
+          title: filename,
+          message: "Choose an action for this file.",
+          options: [
+            {
+              value: "play",
+              label: "Play",
+              description: "Open it in PreviewDialog.",
+            },
+            {
+              value: "download",
+              label: "Download",
+              description: "Save the original file.",
+            },
+          ],
+          cancelText: "Cancel",
+        });
+
+        if (action === "play") {
+          await openPreview(file);
+          return;
+        }
+
+        if (action === "download") {
+          await download(file);
+        }
+        return;
+      }
+
+      const action = await showSelectDialog({
+        title: filename,
+        message: "Preview is not available for this file type.",
+        options: [
+          {
+            value: "download",
+            label: "Download",
+            description: "Save the original file.",
+          },
+        ],
+        cancelText: "Cancel",
+      });
+
+      if (action === "download") {
+        await download(file);
+      }
+    },
+    [download, openPreview, showSelectDialog, showZipFileListDialog],
+  );
+
   return (
     <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
       <button
@@ -260,47 +397,7 @@ function BrowserFileListDialog({
                     type="button"
                     className="w-full text-left"
                     onClick={async () => {
-                      if (
-                        isImage(file.path) ||
-                        isVideo(file.path) ||
-                        isText(file.path) ||
-                        isAudio(file.path) ||
-                        isPdf(file.path) ||
-                        isEpub(file.path)
-                      ) {
-                        const index = sortedFiles.findIndex((f) => f.path === file.path);
-
-                        await showPreviewDialog({
-                          files: sortedFiles,
-                          initialIndex: index,
-                          isRetro: true,
-                          apiServer: ".",
-                          getObjectUrl,
-                          download,
-                        });
-
-                        return;
-                      }
-
-                      if (
-                        file.path.endsWith(".zip") ||
-                        file.path.endsWith(".cbz") ||
-                        file.path.endsWith(".rar") ||
-                        file.path.endsWith(".cbr")
-                      ) {
-                        await showZipFileListDialog({
-                          title: filename,
-                          source: {
-                            type: "blob",
-                            blob: (file as FileTargetFile).entry!,
-                          } as any,
-                          initialPath: "/",
-                        });
-
-                        return;
-                      }
-
-                      await download(file);
+                      await handleFileClick(file, filename);
                     }}
                   >
                     <div className="flex items-start gap-2 font-medium text-slate-100">

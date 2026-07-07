@@ -80,6 +80,7 @@ function FileListDialog({
     const [loading, setLoading] = useState(false);
 
     const { showPreviewDialog } = usePreviewDialog();
+    const { showSelectDialog } = useDialog();
     const { showZipFileListDialog } = useZipFileListDialog();
 
 
@@ -176,6 +177,140 @@ function FileListDialog({
         }
     }, [files, sort, path]);
 
+    const previewableFiles = React.useMemo(
+        () =>
+            sortedFiles.filter((target) => {
+                if (!target.isFile) return false;
+                const isVideoHere = useHls ? isVideoExtended(target.path) : isVideo(target.path);
+                return (
+                    isImage(target.path) ||
+                    isVideoHere ||
+                    isText(target.path) ||
+                    isAudio(target.path) ||
+                    isPdf(target.path) ||
+                    isEpub(target.path)
+                );
+            }),
+        [sortedFiles, useHls]
+    );
+
+    const openPreview = React.useCallback(
+        async (file: TargetFile, forceFfmpeg: boolean) => {
+            const index = previewableFiles.findIndex((target) => target.path === file.path);
+            if (index < 0) return;
+
+            const canUseFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
+            const getObjectUrl = forceFfmpeg && canUseFfmpeg
+                ? async (target: TargetFile) => hlsSubUrl(apiServer, targetId, target)
+                : undefined;
+
+            await showPreviewDialog({
+                files: previewableFiles,
+                initialIndex: index,
+                isRetro: true,
+                useHls: forceFfmpeg && canUseFfmpeg,
+                apiServer,
+                ...(getObjectUrl ? { getObjectUrl } : {}),
+            });
+        },
+        [apiServer, previewableFiles, showPreviewDialog, targetId, useHls]
+    );
+
+    const downloadFile = React.useCallback((file: TargetFile) => {
+        const a = document.createElement("a");
+        a.href = downloadUrl(apiServer, file);
+        a.target = "_blank";
+        a.download = file.path.replace(/.*\//, "");
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }, [apiServer]);
+
+    const handleFileClick = React.useCallback(
+        async (file: TargetFile, filename: string) => {
+            const canPlayDirect =
+                isImage(file.path) ||
+                isVideo(file.path) ||
+                isText(file.path) ||
+                isAudio(file.path) ||
+                isPdf(file.path) ||
+                isEpub(file.path);
+            const canPlayWithFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
+            const isArchive =
+                file.path.endsWith(".zip") ||
+                file.path.endsWith(".cbz") ||
+                file.path.endsWith(".rar") ||
+                file.path.endsWith(".cbr");
+
+            const options: { value: string; label: string; description: string }[] = [];
+
+            if (canPlayDirect) {
+                options.push({
+                    value: "play",
+                    label: "Play",
+                    description: "Try direct preview first.",
+                });
+            }
+
+            if (canPlayWithFfmpeg) {
+                options.push({
+                    value: "ffmpeg",
+                    label: "ffmpeg",
+                    description: "Open through ffmpeg HLS playback.",
+                });
+            }
+
+            if (isArchive) {
+                options.push({
+                    value: "open-archive",
+                    label: "Open archive",
+                    description: "Browse files inside this archive.",
+                });
+            }
+
+            options.push({
+                value: "download",
+                label: "Download",
+                description: "Save the original file.",
+            });
+
+            const action = await showSelectDialog({
+                title: filename,
+                message: "Choose an action for this file.",
+                options,
+                cancelText: "Cancel",
+            });
+
+            if (action === "play") {
+                await openPreview(file, false);
+                return;
+            }
+
+            if (action === "ffmpeg") {
+                await openPreview(file, true);
+                return;
+            }
+
+            if (action === "open-archive") {
+                await showZipFileListDialog({
+                    title: filename,
+                    source: {
+                        type: "url",
+                        url: downloadUrl(apiServer, file),
+                    },
+                    initialPath: "/",
+
+                });
+                return;
+            }
+
+            if (action === "download") {
+                downloadFile(file);
+            }
+        },
+        [apiServer, downloadFile, openPreview, showSelectDialog, showZipFileListDialog, useHls]
+    );
+
     return (
         <div className="safe-dialog-card flex w-[min(96vw,900px)] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 shadow-xl">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
@@ -233,48 +368,7 @@ function FileListDialog({
                                         className="w-full text-left"
 
                                         onClick={async () => {
-                                            const isVideoHere = useHls ? isVideoExtended(file.path) : isVideo(file.path);
-                                            if (isImage(file.path) || isVideoHere || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path)) {
-                                                const index = sortedFiles.findIndex((f) => f.path === file.path);
-                                                const getObjectUrl = (useHls && (isVideoHere || isAudio(file.path)))
-                                                    ? async (f: TargetFile) => hlsSubUrl(apiServer, targetId, f)
-                                                    : undefined;
-
-                                                await showPreviewDialog({
-                                                    files: sortedFiles,
-                                                    initialIndex: index,
-                                                    isRetro: true,
-                                                    useHls,
-                                                    apiServer,
-                                                    ...(getObjectUrl ? { getObjectUrl } : {}),
-                                                });
-                                            } else {
-                                                // showZipFileListDialog
-                                                if (file.path.endsWith(".zip") || file.path.endsWith(".cbz")|| file.path.endsWith(".rar") || file.path.endsWith(".cbr")) {
-                                                    await showZipFileListDialog({
-                                                        title: filename,
-                                                        source: {
-                                                            type: "url",
-                                                            url: downloadUrl(apiServer, file),
-                                                        },
-                                                        initialPath: "/",
-
-                                                    });
-
-                                                    return;
-
-                                                } else {
-                                                    //window.location.href = downloadUrl(apiServer, file);
-                                                    const a = document.createElement("a");
-                                                    a.href = downloadUrl(apiServer, file);
-                                                    a.target = "_blank";
-                                                    a.download = file.path.replace(/.*\//, "");
-                                                    document.body.appendChild(a);
-                                                    a.click();
-                                                    document.body.removeChild(a);
-                                                }
-
-                                            }
+                                            await handleFileClick(file, filename);
                                         }}
 
                                     >

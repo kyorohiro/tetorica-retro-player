@@ -9,6 +9,7 @@ import {
   createImageMediaSource,
   createVideoMediaSource,
   destroyHlsInstance,
+  getHlsSourceUrl,
   getHlsInstance,
   shouldBypassWebAudio,
   shouldUseNativeVideoSurface,
@@ -350,6 +351,7 @@ export function useRetroPreviewMedia({
 
       // Safety net: if neither a ready nor an error event ever fires, don't
       // hang forever. Fall back to whatever readyState says after a timeout.
+      const timeoutMs = getHlsInstance(video) ? 20000 : 8000;
       const timeoutId = window.setTimeout(() => {
         debugVideo("waitForVideoFrame:timeout", describeState("timeout"));
         cleanup();
@@ -362,7 +364,7 @@ export function useRetroPreviewMedia({
             ),
           );
         }
-      }, 8000);
+      }, timeoutMs);
 
       video.addEventListener("loadeddata", handleLoadedData, { once: true });
       video.addEventListener("canplay", handleCanPlay, { once: true });
@@ -537,7 +539,9 @@ export function useRetroPreviewMedia({
     }
 
     const existingHls = media instanceof HTMLVideoElement ? getHlsInstance(media) : undefined;
-    const src = existingHls?.url || media.currentSrc || media.src;
+    const src = media instanceof HTMLVideoElement
+      ? getHlsSourceUrl(media) || media.currentSrc || media.src
+      : media.currentSrc || media.src;
     if (!src) {
       return false;
     }

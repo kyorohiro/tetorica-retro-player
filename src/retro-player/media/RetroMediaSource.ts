@@ -56,18 +56,29 @@ type DebugEventCallback = (label: string, payload: Record<string, unknown>) => v
 // to end early. hls.js implements manifest polling and end-of-stream
 // detection itself via MediaSource, independent of that native behavior.
 const hlsInstances = new WeakMap<HTMLVideoElement, Hls>();
+const hlsSourceUrls = new WeakMap<HTMLVideoElement, string>();
 
 export const isHlsUrl = (url: string): boolean => url.includes(".m3u8");
 
 export const getHlsInstance = (video: HTMLVideoElement): Hls | undefined =>
   hlsInstances.get(video);
 
+export const getHlsSourceUrl = (video: HTMLVideoElement): string | undefined =>
+  hlsSourceUrls.get(video);
+
 export const destroyHlsInstance = (video: HTMLVideoElement): void => {
   const hls = hlsInstances.get(video);
+  hlsSourceUrls.delete(video);
   if (!hls) return;
   hls.destroy();
   hlsInstances.delete(video);
 };
+
+const canUseNativeHls = (video: HTMLVideoElement): boolean =>
+  Boolean(
+    video.canPlayType("application/vnd.apple.mpegurl") ||
+    video.canPlayType("application/x-mpegURL"),
+  );
 
 /**
  * Attach hls.js to `video` for `url`. hls.js's own network/media errors
@@ -82,11 +93,66 @@ export const attachHlsSource = async (video: HTMLVideoElement, url: string): Pro
   destroyHlsInstance(video);
 
   const { default: HlsCtor } = await import("hls.js");
-  const hls = new HlsCtor();
+  const hls = new HlsCtor({
+    autoStartLoad: true,
+    startPosition: 0,
+  });
   let networkRetries = 0;
   let mediaRetries = 0;
+  let sourceLoaded = false;
+
+  const logHls = (label: string, payload?: Record<string, unknown>) => {
+    console.log("[retro-player hls]", label, {
+      url,
+      currentSrc: video.currentSrc || video.src || null,
+      readyState: video.readyState,
+      networkState: video.networkState,
+      ...payload,
+    });
+  };
+
+  hls.on(HlsCtor.Events.MEDIA_ATTACHED, () => {
+    logHls("media-attached");
+    if (sourceLoaded) {
+      return;
+    }
+    sourceLoaded = true;
+    hls.loadSource(url);
+  });
+
+  hls.on(HlsCtor.Events.MANIFEST_PARSED, (_event, data) => {
+    logHls("manifest-parsed", {
+      audioTracks: data.audioTracks?.length ?? 0,
+      firstLevelBitrate: data.firstLevel?.bitrate ?? null,
+      levels: data.levels?.length ?? 0,
+    });
+  });
+
+  hls.on(HlsCtor.Events.LEVEL_LOADED, (_event, data) => {
+    logHls("level-loaded", {
+      endCC: data.details.endCC,
+      fragments: data.details.fragments.length,
+      live: data.details.live,
+      targetduration: data.details.targetduration,
+      totalduration: data.details.totalduration,
+    });
+  });
+
+  hls.on(HlsCtor.Events.FRAG_LOADED, (_event, data) => {
+    logHls("frag-loaded", {
+      sn: data.frag.sn,
+      type: data.frag.type,
+      duration: data.frag.duration,
+    });
+  });
 
   hls.on(HlsCtor.Events.ERROR, (_event, data) => {
+    logHls("error", {
+      details: data.details,
+      fatal: data.fatal,
+      responseCode: data.response?.code ?? null,
+      type: data.type,
+    });
     if (!data.fatal) return;
     switch (data.type) {
       case HlsCtor.ErrorTypes.NETWORK_ERROR:
@@ -111,7 +177,7 @@ export const attachHlsSource = async (video: HTMLVideoElement, url: string): Pro
   });
 
   hlsInstances.set(video, hls);
-  hls.loadSource(url);
+  hlsSourceUrls.set(video, url);
   hls.attachMedia(video);
   return hls;
 };
@@ -139,6 +205,7 @@ export function waitForVideoReady(
   onDebugEvent?: DebugEventCallback,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    const timeoutMs = getHlsInstance(video) ? 20000 : 8000;
     const describeState = (label: string) => ({
       label,
       src: video.currentSrc || video.src || "(empty)",
@@ -205,7 +272,7 @@ export function waitForVideoReady(
           ),
         );
       }
-    }, 8000);
+    }, timeoutMs);
 
     video.addEventListener("loadeddata", handleLoadedData, { once: true });
     video.addEventListener("canplay", handleCanPlay, { once: true });
@@ -316,12 +383,38 @@ export async function createVideoMediaSource(
   if ("stream" in options) {
     video.srcObject = options.stream;
   } else if (isHlsUrl(options.url)) {
-    await attachHlsSource(video, options.url);
+    try {
+      await attachHlsSource(video, options.url);
+    } catch (error) {
+      if (!canUseNativeHls(video)) {
+        throw error;
+      }
+      console.warn("[retro-player hls] falling back to native playback after attach failure", {
+        url: options.url,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      destroyHlsInstance(video);
+      video.src = options.url;
+    }
   } else {
     video.src = options.url;
   }
   callbacks?.onCreated?.(video);
-  await waitForVideoReady(video, callbacks?.onDebugEvent);
+  try {
+    await waitForVideoReady(video, callbacks?.onDebugEvent);
+  } catch (error) {
+    if (!("url" in options) || !isHlsUrl(options.url) || !canUseNativeHls(video) || !getHlsInstance(video)) {
+      throw error;
+    }
+    console.warn("[retro-player hls] falling back to native playback after readiness failure", {
+      url: options.url,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    destroyHlsInstance(video);
+    video.src = options.url;
+    callbacks?.onCreated?.(video);
+    await waitForVideoReady(video, callbacks?.onDebugEvent);
+  }
   return { kind: "video", origin: "stream" in options ? "stream" : "url", element: video };
 }
 

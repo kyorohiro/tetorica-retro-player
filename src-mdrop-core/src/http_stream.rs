@@ -37,15 +37,7 @@ pub async fn hls_sub_playlist(
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let session_id = sub_session_id(&folder_id, &subpath);
 
-    // Return existing session if already started
-    let existing = {
-        let ctx = state
-            .inner
-            .lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        ctx.hls_sessions.get(&session_id).cloned()
-    };
-    if let Some(dir) = existing {
+    if let Some(dir) = wait_for_existing_or_starting_session(&state, &session_id).await? {
         state.touch_hls_session(&session_id);
         return serve_playlist(&dir).await;
     }
@@ -144,14 +136,7 @@ async fn ensure_hls_session(
     state: &SharedHttpServerContext,
     id: &str,
 ) -> Result<PathBuf, (StatusCode, String)> {
-    let existing = {
-        let ctx = state
-            .inner
-            .lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        ctx.hls_sessions.get(id).cloned()
-    };
-    if let Some(dir) = existing {
+    if let Some(dir) = wait_for_existing_or_starting_session(state, id).await? {
         return Ok(dir);
     }
 
@@ -179,6 +164,12 @@ async fn start_hls_for_path(
     file_path: &PathBuf,
     port: u16,
 ) -> Result<PathBuf, (StatusCode, String)> {
+    if !state.begin_hls_session_start(session_id) {
+        if let Some(dir) = wait_for_existing_or_starting_session(state, session_id).await? {
+            return Ok(dir);
+        }
+    }
+
     let input = file_path
         .to_str()
         .ok_or((StatusCode::BAD_REQUEST, "invalid file path".to_string()))?
@@ -197,19 +188,23 @@ async fn start_hls_for_path(
 
     let playlist = tmp_dir.join("index.m3u8");
     let segment_pattern = tmp_dir.join("seg%03d.ts");
-    // Absolute base URL so WKWebView fetches segments from our server regardless of
-    // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
-    let base_url = format!("http://localhost:{}/hls/{}/", port, session_id);
 
-    let (ffmpeg_cmd, prewarm_rx, use_qsv, max_hls_sessions) = {
+    let start_result: Result<PathBuf, (StatusCode, String)> = async {
+    let (ffmpeg_cmd, prewarm_rx, use_qsv, max_hls_sessions, is_https) = {
         let ctx = state.inner.lock().unwrap();
         (
             ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
             ctx.ffmpeg_prewarm_rx.clone(),
             ctx.ffmpeg_use_qsv,
             ctx.ffmpeg_max_concurrent_hls_sessions.max(1),
+            ctx.status.is_https == Some(true),
         )
     };
+
+    // Absolute base URL so WKWebView fetches segments from our server regardless of
+    // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
+    let scheme = if is_https { "https" } else { "http" };
+    let base_url = format!("{scheme}://localhost:{}/hls/{}/", port, session_id);
 
     state.enforce_hls_session_limit(max_hls_sessions.saturating_sub(1).max(1));
 
@@ -235,6 +230,9 @@ async fn start_hls_for_path(
         "-hls_time", "2",
         "-hls_list_size", "0",
         "-hls_playlist_type", "event",
+        "-hls_flags", "independent_segments",
+        "-muxpreload", "0",
+        "-muxdelay", "0",
         "-hls_base_url", &base_url,
         "-hls_segment_filename", segment_pattern.to_str().unwrap(),
         playlist.to_str().unwrap(),
@@ -324,19 +322,36 @@ async fn start_hls_for_path(
         )
     } else if should_try_qsv {
         try_ffmpeg!(
-            ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
+            [
+                "-y",
+                "-fflags", "+genpts+discardcorrupt",
+                "-avoid_negative_ts", "make_zero",
+                "-i", &input,
+                "-c:v", "h264_qsv",
+                "-g", "60",
+                "-keyint_min", "60",
+                "-force_key_frames", "expr:gte(t,n_forced*2)",
+                "-c:a", "aac", "-b:a", "128k",
+            ],
             50,
             "ffmpeg-qsv.log"
         )
     } else {
         try_ffmpeg!(
             [
-                "-y", "-i", &input,
+                "-y",
+                "-fflags", "+genpts+discardcorrupt",
+                "-avoid_negative_ts", "make_zero",
+                "-i", &input,
                 "-c:v", "libx264",
                 "-vf", scale_filter,
                 "-pix_fmt", "yuv420p",
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
+                "-g", "60",
+                "-keyint_min", "60",
+                "-sc_threshold", "0",
+                "-force_key_frames", "expr:gte(t,n_forced*2)",
                 "-c:a", "aac", "-b:a", "128k",
             ],
             150,
@@ -344,9 +359,11 @@ async fn start_hls_for_path(
         )
     };
 
-    // Guard: VP8/VP9/AV1 inputs can make ffmpeg silently produce audio-only TS
-    // (codec not supported in container, video stream dropped without error).
-    // If the first segment has no video stream, treat copy as failed and re-encode.
+    // Guard: a copy-path segment can still be unusable for browser HLS even
+    // when it technically contains a video stream (e.g. AVI / MPEG sources
+    // copied through as MPEG-4 Part 2 / MPEG-2 instead of H.264). Treat any
+    // first segment whose video codec is not H.264 as copy-path failure and
+    // retry with a real transcode.
     if ready {
         let seg_path = std::fs::read_to_string(&playlist)
             .ok()
@@ -354,8 +371,10 @@ async fn start_hls_for_path(
                 tmp_dir.join(n.rsplit('/').next().unwrap_or(&n).to_owned())
             }));
         if let Some(seg) = seg_path {
-            if !segment_has_video_stream(&ffmpeg_cmd, &seg).await {
-                println!("[HLS] Phase 1 copy: no video stream in segment for session={session_id}, falling back to re-encode");
+            if !segment_has_browser_compatible_video_stream(&ffmpeg_cmd, &seg).await {
+                println!(
+                    "[HLS] Phase 1 copy: first segment is not browser-compatible video for session={session_id}, falling back to re-encode"
+                );
                 ready = false;
                 let _ = child.start_kill();
                 let _ = child.wait().await;
@@ -375,7 +394,17 @@ async fn start_hls_for_path(
             session_id
         );
         (child, ready) = try_ffmpeg!(
-            ["-y", "-i", &input, "-c:v", "h264_qsv", "-c:a", "aac", "-b:a", "128k"],
+            [
+                "-y",
+                "-fflags", "+genpts+discardcorrupt",
+                "-avoid_negative_ts", "make_zero",
+                "-i", &input,
+                "-c:v", "h264_qsv",
+                "-g", "60",
+                "-keyint_min", "60",
+                "-force_key_frames", "expr:gte(t,n_forced*2)",
+                "-c:a", "aac", "-b:a", "128k",
+            ],
             50,
             "ffmpeg-qsv.log"
         );
@@ -390,12 +419,19 @@ async fn start_hls_for_path(
         );
         (child, ready) = try_ffmpeg!(
             [
-                "-y", "-i", &input,
+                "-y",
+                "-fflags", "+genpts+discardcorrupt",
+                "-avoid_negative_ts", "make_zero",
+                "-i", &input,
                 "-c:v", "libx264",
                 "-vf", scale_filter,
                 "-pix_fmt", "yuv420p",   // force 8-bit; VP9 10-bit inputs would produce h264 high10 otherwise
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
+                "-g", "60",
+                "-keyint_min", "60",
+                "-sc_threshold", "0",
+                "-force_key_frames", "expr:gte(t,n_forced*2)",
                 "-c:a", "aac", "-b:a", "128k",
             ],
             150,
@@ -417,6 +453,13 @@ async fn start_hls_for_path(
     println!("[HLS] session ready session={} playlist={}", session_id, playlist.display());
 
     Ok(tmp_dir)
+    }.await;
+
+    if start_result.is_err() {
+        state.finish_hls_session_start(session_id);
+    }
+
+    start_result
 }
 
 /// Kill all active HLS ffmpeg processes.
@@ -433,11 +476,13 @@ fn is_segment_ready(path: &FsPath) -> bool {
         .unwrap_or(false)
 }
 
-/// Run `ffmpeg -i <segment>` and check stderr for "Video:" to detect video streams.
-/// Returns true when a video stream is found, or when the probe itself fails (safe default).
+/// Run `ffmpeg -i <segment>` and verify the first video stream is H.264, which is the
+/// copy-path codec this browser-HLS flow can reliably consume.
+/// Returns true when an H.264 video stream is found, or when the probe itself fails
+/// (safe default).
 /// Note: ffmpeg -i always exits with error code 1 when no output is specified;
 /// we only care about the stderr content, not the exit code.
-async fn segment_has_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
+async fn segment_has_browser_compatible_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
     let Some(path_str) = path.to_str() else {
         return true;
     };
@@ -448,9 +493,7 @@ async fn segment_has_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
     let Ok(out) = cmd.output().await else {
         return true;
     };
-    // Stream info ("Video: h264 ...") is printed at INFO level (default).
-    // An audio-only segment will have no "Video:" line.
-    String::from_utf8_lossy(&out.stderr).contains("Video:")
+    segment_stderr_has_h264_video(&String::from_utf8_lossy(&out.stderr))
 }
 
 /// Create a Command for ffmpeg with platform-specific flags.
@@ -483,7 +526,32 @@ fn should_try_stream_copy(path: &FsPath) -> bool {
         return true;
     };
 
-    !matches!(ext.to_ascii_lowercase().as_str(), "webm" | "ogv")
+    !matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "avi"
+            | "asf"
+            | "divx"
+            | "f4v"
+            | "flv"
+            | "m2v"
+            | "mpeg"
+            | "mpg"
+            | "mxf"
+            | "ogv"
+            | "rm"
+            | "rmvb"
+            | "vob"
+            | "webm"
+            | "wmv"
+            | "xvid"
+    )
+}
+
+fn segment_stderr_has_h264_video(stderr: &str) -> bool {
+    stderr.lines().any(|line| {
+        let lower = line.to_ascii_lowercase();
+        lower.contains("video:") && lower.contains("h264")
+    })
 }
 
 fn select_hls_scale_filter(path: &FsPath) -> &'static str {
@@ -549,16 +617,57 @@ fn sub_session_id(folder_id: &str, subpath: &str) -> String {
     format!("s{}-{}", folder_id, safe)
 }
 
+async fn wait_for_existing_or_starting_session(
+    state: &SharedHttpServerContext,
+    session_id: &str,
+) -> Result<Option<PathBuf>, (StatusCode, String)> {
+    for _ in 0..75 {
+        let existing = {
+            let ctx = state
+                .inner
+                .lock()
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            ctx.hls_sessions.get(session_id).cloned()
+        };
+        if existing.is_some() {
+            return Ok(existing);
+        }
+        if !state.is_hls_session_starting(session_id) {
+            return Ok(None);
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    Err((
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("timed out waiting for HLS session startup: {session_id}"),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        needs_lightweight_hls_transcode, select_hls_scale_filter, HLS_DEFAULT_SCALE_FILTER,
-        HLS_LIGHTWEIGHT_SCALE_FILTER, HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES,
+        needs_lightweight_hls_transcode, segment_stderr_has_h264_video, select_hls_scale_filter,
+        should_try_stream_copy, HLS_DEFAULT_SCALE_FILTER, HLS_LIGHTWEIGHT_SCALE_FILTER,
+        HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES,
     };
     use std::{fs::File, path::Path};
 
     fn temp_path(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("retro-player-http-stream-test-{name}-{}", std::process::id()))
+        let stem = Path::new(name)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or(name);
+        let ext = Path::new(name)
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
+        let filename = if ext.is_empty() {
+            format!("retro-player-http-stream-test-{stem}-{}", std::process::id())
+        } else {
+            format!("retro-player-http-stream-test-{stem}-{}.{}", std::process::id(), ext)
+        };
+        std::env::temp_dir().join(filename)
     }
 
     #[test]
@@ -598,5 +707,32 @@ mod tests {
             select_hls_scale_filter(Path::new("sample.mp4")),
             HLS_DEFAULT_SCALE_FILTER
         );
+    }
+
+    #[test]
+    fn h264_segment_probe_accepts_h264_video() {
+        assert!(segment_stderr_has_h264_video(
+            "Stream #0:0: Video: h264 (High), yuv420p(progressive), 1280x720"
+        ));
+    }
+
+    #[test]
+    fn h264_segment_probe_rejects_audio_only_and_other_video_codecs() {
+        assert!(!segment_stderr_has_h264_video(
+            "Stream #0:0: Audio: aac (LC), 48000 Hz, stereo, fltp"
+        ));
+        assert!(!segment_stderr_has_h264_video(
+            "Stream #0:0: Video: mpeg2video (Main), yuv420p(tv), 720x480"
+        ));
+        assert!(!segment_stderr_has_h264_video(
+            "Stream #0:0: Video: mpeg4 (Simple Profile), yuv420p, 640x480"
+        ));
+    }
+
+    #[test]
+    fn avi_and_mpg_skip_stream_copy() {
+        assert!(!should_try_stream_copy(Path::new("sample.avi")));
+        assert!(!should_try_stream_copy(Path::new("sample.mpg")));
+        assert!(should_try_stream_copy(Path::new("sample.mp4")));
     }
 }
