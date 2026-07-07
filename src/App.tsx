@@ -41,6 +41,7 @@ import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
 import { useMDropFileListDialog } from "./mdrop-web/useMDropFileListDialog";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
+import { setFfmpegStreamingEnabled } from "./mdrop-web/ffmpegPreference";
 import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
 
 const waitForExternalNavigationPause = async () => {
@@ -121,6 +122,7 @@ function App() {
   const isFfmpegEnabledRef = React.useRef(isFfmpegEnabled);
   React.useEffect(() => {
     isFfmpegEnabledRef.current = isFfmpegEnabled;
+    setFfmpegStreamingEnabled(isFfmpegEnabled);
   }, [isFfmpegEnabled]);
 
   useMDropDragDrop({

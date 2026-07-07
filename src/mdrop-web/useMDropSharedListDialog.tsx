@@ -5,6 +5,7 @@ import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
+import { getFfmpegStreamingEnabled, listenFfmpegStreamingEnabled } from "./ffmpegPreference";
 import { isAudio, isBrowserPlayableVideo, isVideoExtended } from "./utils";
 
 type Options = {
@@ -51,9 +52,18 @@ function MDropSharedListDialog({
   useHls: boolean;
   onClose: () => void;
 }) {
+  const [currentUseHls, setCurrentUseHls] = React.useState(
+    () => useHls || getFfmpegStreamingEnabled()
+  );
   const { showPreviewDialog } = usePreviewDialog();
   const { showMDropFileListDialog } = useMDropFileListDialog();
   const { showSelectDialog } = useDialog();
+
+  React.useEffect(() => {
+    setCurrentUseHls(useHls || getFfmpegStreamingEnabled());
+  }, [useHls]);
+
+  React.useEffect(() => listenFfmpegStreamingEnabled(setCurrentUseHls), []);
 
   const targetFiles: TargetFile[] = files.filter((f) => !f.isDir).map(sharedToTargetFile);
   const urlMap = Object.fromEntries(files.map((f) => [f.id, f.url]));
@@ -68,13 +78,13 @@ function MDropSharedListDialog({
         targetId: file.id,
         initialPath: "/",
         title: file.name,
-        useHls,
+        useHls: currentUseHls,
       });
       return;
     }
 
     const canPlayDirect = isBrowserPlayableVideo(file.path) || isAudio(file.path);
-    const canPlayWithFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
+    const canPlayWithFfmpeg = currentUseHls && (isVideoExtended(file.path) || isAudio(file.path));
     const options: { value: string; label: string; description: string }[] = [];
 
     if (canPlayDirect) {
@@ -131,7 +141,7 @@ function MDropSharedListDialog({
     <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
       <button
         type="button"
-        onClick={() => { if (useHls) cleanupHls(apiServer); onClose(); }}
+        onClick={() => { if (currentUseHls) cleanupHls(apiServer); onClose(); }}
         aria-label="Close"
         className="safe-top-offset-right fixed right-2 z-9998 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-700 hover:text-slate-200"
       >
