@@ -473,10 +473,10 @@ export const RETRO_PRESETS = {
     palette: "free",
     curvature: 0.03,
     scanline: 0.00,
-    scanline2: 0.12,
+    scanline2: 0.06,
     vignette: 0.48,
     glow: 0.28,
-    edgeBoost: 1.5,
+    edgeBoost: 0.68,
     phosphor: 0.48,
     spotMask: 0.0,
     bulbRadius: 0.3,
@@ -485,8 +485,8 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    closeUpNoiseStrength: 1.8,
-    scanlineBrightnessFade: 0.92
+    closeUpNoiseStrength: 1.2,
+    scanlineBrightnessFade: 0.98
   },
   animeCel: {
     label: "Anime Cel",
