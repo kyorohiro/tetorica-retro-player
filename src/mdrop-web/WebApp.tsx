@@ -4,7 +4,7 @@ import { Loader } from "lucide-react";
 import { FileTargetFile, getDownloadList, getMeta, Target, TargetFile } from "./api";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import { usePreviewDialog } from "./usePreviewDialog";
-import { sleep, isAudio, isEpub, isImage, isPdf, isText, isVideo, isArchive } from "./utils";
+import { sleep, isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isArchive } from "./utils";
 
 
 function WebApp({ active }: { active?: boolean }) {
@@ -152,7 +152,7 @@ function WebApp({ active }: { active?: boolean }) {
 
                                                     //href={`${apiServer}/download/${file.id}`}
                                                     onClick={async () => {
-                                                        if (isImage(file.path) || isVideo(file.path) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path) || isArchive(file.path)) {
+                                                        if (isImage(file.path) || isBrowserPlayableVideo(file.path) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path) || isArchive(file.path)) {
                                                             //const index = sortedFiles.findIndex((f) => f.path === file.path);
 
                                                             await showPreviewDialog({
