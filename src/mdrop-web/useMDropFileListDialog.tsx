@@ -3,6 +3,7 @@ import { File, Folder, Loader, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, getFiles } from "./api";
 import { downloadUrl, usePreviewDialog } from "./usePreviewDialog";
+import { getFfmpegStreamingEnabled, listenFfmpegStreamingEnabled } from "./ffmpegPreference";
 import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
@@ -74,6 +75,9 @@ function FileListDialog({
     useHls = false,
     onClose,
 }: FileListDialogOptions & { onClose: () => void }) {
+    const [currentUseHls, setCurrentUseHls] = useState(
+        () => useHls || getFfmpegStreamingEnabled()
+    );
     const [path, setPath] = useState(initialPath);
     const [files, setFiles] = useState<TargetFile[]>([]);
     const [sort, setSort] = useState<SortMode>("comic");
@@ -82,6 +86,12 @@ function FileListDialog({
     const { showPreviewDialog } = usePreviewDialog();
     const { showSelectDialog } = useDialog();
     const { showZipFileListDialog } = useZipFileListDialog();
+
+    React.useEffect(() => {
+        setCurrentUseHls(useHls || getFfmpegStreamingEnabled());
+    }, [useHls]);
+
+    React.useEffect(() => listenFfmpegStreamingEnabled(setCurrentUseHls), []);
 
 
     const load = React.useCallback(
@@ -181,7 +191,7 @@ function FileListDialog({
         () =>
             sortedFiles.filter((target) => {
                 if (!target.isFile) return false;
-                const isVideoHere = useHls ? isVideoExtended(target.path) : isBrowserPlayableVideo(target.path);
+                const isVideoHere = currentUseHls ? isVideoExtended(target.path) : isBrowserPlayableVideo(target.path);
                 return (
                     isImage(target.path) ||
                     isVideoHere ||
@@ -191,7 +201,7 @@ function FileListDialog({
                     isEpub(target.path)
                 );
             }),
-        [sortedFiles, useHls]
+        [currentUseHls, sortedFiles]
     );
 
     const openPreview = React.useCallback(
@@ -199,7 +209,7 @@ function FileListDialog({
             const index = previewableFiles.findIndex((target) => target.path === file.path);
             if (index < 0) return;
 
-            const canUseFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
+            const canUseFfmpeg = currentUseHls && (isVideoExtended(file.path) || isAudio(file.path));
             const getObjectUrl = forceFfmpeg && canUseFfmpeg
                 ? async (target: TargetFile) => hlsSubUrl(apiServer, targetId, target)
                 : undefined;
@@ -213,7 +223,7 @@ function FileListDialog({
                 ...(getObjectUrl ? { getObjectUrl } : {}),
             });
         },
-        [apiServer, previewableFiles, showPreviewDialog, targetId, useHls]
+        [apiServer, currentUseHls, previewableFiles, showPreviewDialog, targetId]
     );
 
     const downloadFile = React.useCallback((file: TargetFile) => {
@@ -235,7 +245,7 @@ function FileListDialog({
                 isAudio(file.path) ||
                 isPdf(file.path) ||
                 isEpub(file.path);
-            const canPlayWithFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
+            const canPlayWithFfmpeg = currentUseHls && (isVideoExtended(file.path) || isAudio(file.path));
             const isArchive =
                 file.path.endsWith(".zip") ||
                 file.path.endsWith(".cbz") ||
@@ -308,7 +318,7 @@ function FileListDialog({
                 downloadFile(file);
             }
         },
-        [apiServer, downloadFile, openPreview, showSelectDialog, showZipFileListDialog, useHls]
+        [apiServer, currentUseHls, downloadFile, openPreview, showSelectDialog, showZipFileListDialog]
     );
 
     return (
@@ -322,7 +332,7 @@ function FileListDialog({
                 <button
                     type="button"
                     onClick={() => {
-                        if (useHls) fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
+                        if (currentUseHls) fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
                         onClose();
                     }}
                     aria-label="Close"
