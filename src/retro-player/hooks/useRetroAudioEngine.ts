@@ -20,7 +20,7 @@ import {
 import { needsNativeAudioSuppression } from "../platform/runtime";
 import { getHlsInstance } from "../media/RetroMediaSource";
 import {
-  DEFAULT_AUDIO_SETTINGS,
+  DEFAULT_AUDIO_PRESET_SETTINGS,
   type RetroAudioSettings,
 } from "../audio/preset";
 
@@ -82,63 +82,11 @@ export function useRetroAudioEngine({
     const isNativeMode = getNativePlaybackMode();
 
     return {
-      audioOptimizationMode:
-        persisted?.audioOptimizationMode ?? DEFAULT_AUDIO_SETTINGS.audioOptimizationMode,
-      isMuted: persisted?.isMuted ?? DEFAULT_AUDIO_SETTINGS.isMuted,
-      volume: persisted?.volume ?? DEFAULT_AUDIO_SETTINGS.volume,
-      playbackRate: persisted?.playbackRate ?? DEFAULT_AUDIO_SETTINGS.playbackRate,
-      isLooping: persisted?.isLooping ?? DEFAULT_AUDIO_SETTINGS.isLooping,
+      ...DEFAULT_AUDIO_PRESET_SETTINGS,
+      ...persisted,
       isAudioFxEnabled: isNativeMode
         ? false
-        : (persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_SETTINGS.isAudioFxEnabled),
-      lofiAmount: persisted?.lofiAmount ?? DEFAULT_AUDIO_SETTINGS.lofiAmount,
-      radioToneAmount:
-        persisted?.radioToneAmount ?? DEFAULT_AUDIO_SETTINGS.radioToneAmount,
-      bitCrushAmount:
-        persisted?.bitCrushAmount ?? DEFAULT_AUDIO_SETTINGS.bitCrushAmount,
-      bitCrushNoiseAmount:
-        persisted?.bitCrushNoiseAmount ?? DEFAULT_AUDIO_SETTINGS.bitCrushNoiseAmount,
-      sampleRateReductionAmount:
-        persisted?.sampleRateReductionAmount ??
-        DEFAULT_AUDIO_SETTINGS.sampleRateReductionAmount,
-      noiseReductionAmount:
-        persisted?.noiseReductionAmount ??
-        DEFAULT_AUDIO_SETTINGS.noiseReductionAmount,
-      bassAmount: persisted?.bassAmount ?? DEFAULT_AUDIO_SETTINGS.bassAmount,
-      midAmount: persisted?.midAmount ?? DEFAULT_AUDIO_SETTINGS.midAmount,
-      trebleAmount: persisted?.trebleAmount ?? DEFAULT_AUDIO_SETTINGS.trebleAmount,
-      stereoWidthAmount:
-        persisted?.stereoWidthAmount ?? DEFAULT_AUDIO_SETTINGS.stereoWidthAmount,
-      smallSpeakerRoomAmount:
-        persisted?.smallSpeakerRoomAmount ??
-        DEFAULT_AUDIO_SETTINGS.smallSpeakerRoomAmount,
-      wowFlutterAmount:
-        persisted?.wowFlutterAmount ?? DEFAULT_AUDIO_SETTINGS.wowFlutterAmount,
-      isNoiseEnabled:
-        persisted?.isNoiseEnabled ?? DEFAULT_AUDIO_SETTINGS.isNoiseEnabled,
-      noiseLevel: persisted?.noiseLevel ?? DEFAULT_AUDIO_SETTINGS.noiseLevel,
-      vinylDustAmount:
-        persisted?.vinylDustAmount ?? DEFAULT_AUDIO_SETTINGS.vinylDustAmount,
-      noiseWarmthAmount:
-        persisted?.noiseWarmthAmount ?? DEFAULT_AUDIO_SETTINGS.noiseWarmthAmount,
-      noiseAirAmount:
-        persisted?.noiseAirAmount ?? DEFAULT_AUDIO_SETTINGS.noiseAirAmount,
-      noisePresenceAmount:
-        persisted?.noisePresenceAmount ?? DEFAULT_AUDIO_SETTINGS.noisePresenceAmount,
-      delayAmount:
-        persisted?.delayAmount ?? DEFAULT_AUDIO_SETTINGS.delayAmount,
-      reverbAmount:
-        persisted?.reverbAmount ?? DEFAULT_AUDIO_SETTINGS.reverbAmount,
-      chorusAmount:
-        persisted?.chorusAmount ?? DEFAULT_AUDIO_SETTINGS.chorusAmount,
-      tapeSaturationAmount:
-        persisted?.tapeSaturationAmount ?? DEFAULT_AUDIO_SETTINGS.tapeSaturationAmount,
-      compressorAmount:
-        persisted?.compressorAmount ?? DEFAULT_AUDIO_SETTINGS.compressorAmount,
-      fxOutputTrimAmount:
-        persisted?.fxOutputTrimAmount ?? DEFAULT_AUDIO_SETTINGS.fxOutputTrimAmount,
-      inputTrimAmount:
-        persisted?.inputTrimAmount ?? DEFAULT_AUDIO_SETTINGS.inputTrimAmount,
+        : (persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_PRESET_SETTINGS.isAudioFxEnabled),
     } satisfies RetroAudioSettings;
   });
   const audioOptimizationModeRef = useRef<RetroAudioSettings["audioOptimizationMode"]>(
@@ -821,7 +769,7 @@ export function useRetroAudioEngine({
     window.requestAnimationFrame(updateAudioNodes);
   };
 
-  const resetAudioSettings = () => applyAudioSettings({ ...DEFAULT_AUDIO_SETTINGS });
+  const resetAudioSettings = () => applyAudioSettings({ ...DEFAULT_AUDIO_PRESET_SETTINGS });
 
   const setAudioOptimizationMode = createPatchedSetter(
     setAudioOptimizationModeState,
