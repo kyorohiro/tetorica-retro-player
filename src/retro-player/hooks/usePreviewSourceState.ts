@@ -51,7 +51,7 @@ const requestUserAudioStream = async (
 
 function kindFromPath(path: string): PreviewSourceKind {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  if (/^(m3u8|mp4|m4v|mov|mkv|avi|wmv|flv|webm|ts|m2ts|mts|ogv|mpg|mpeg|m2v|vob)$/.test(ext)) return "video";
+  if (/^(m3u8|mp4|m4v|mov|mkv|avi|wmv|flv|webm|ts|m2ts|mts|ogv|mpg|mpeg|m2v|vob|asf|divx|xvid|3gp|f4v|mxf|rm|rmvb)$/.test(ext)) return "video";
   if (/^(mp3|wav|ogg|oga|m4a|aac|flac|opus|wma|weba)$/.test(ext)) return "audio";
   return "image";
 }

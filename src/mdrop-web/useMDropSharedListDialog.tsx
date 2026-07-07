@@ -5,6 +5,7 @@ import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
+import { isAudio, isVideo, isVideoExtended } from "./utils";
 
 type Options = {
   files: SharedFileInfo[];
@@ -52,6 +53,7 @@ function MDropSharedListDialog({
 }) {
   const { showPreviewDialog } = usePreviewDialog();
   const { showMDropFileListDialog } = useMDropFileListDialog();
+  const { showSelectDialog } = useDialog();
 
   const targetFiles: TargetFile[] = files.filter((f) => !f.isDir).map(sharedToTargetFile);
   const urlMap = Object.fromEntries(files.map((f) => [f.id, f.url]));
@@ -70,12 +72,58 @@ function MDropSharedListDialog({
       });
       return;
     }
+
+    const canPlayDirect = isVideo(file.path) || isAudio(file.path);
+    const canPlayWithFfmpeg = useHls && (isVideoExtended(file.path) || isAudio(file.path));
+    const options: { value: string; label: string; description: string }[] = [];
+
+    if (canPlayDirect) {
+      options.push({
+        value: "play",
+        label: "Play",
+        description: "Try direct preview first.",
+      });
+    }
+
+    if (canPlayWithFfmpeg) {
+      options.push({
+        value: "ffmpeg",
+        label: "ffmpeg",
+        description: "Open through ffmpeg HLS playback.",
+      });
+    }
+
+    options.push({
+      value: "download",
+      label: "Download",
+      description: "Save the original file.",
+    });
+
+    const action = await showSelectDialog({
+      title: file.name,
+      message: "Choose an action for this file.",
+      options,
+      cancelText: "Cancel",
+    });
+
+    if (action === "download") {
+      const link = document.createElement("a");
+      link.href = file.url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    const forceFfmpeg = action === "ffmpeg";
     await showPreviewDialog({
       files: targetFiles,
       initialIndex: fileIndex,
       isRetro: true,
-      useHls,
-      getObjectUrl,
+      useHls: forceFfmpeg,
+      getObjectUrl: async (target) =>
+        forceFfmpeg ? `${apiServer}/hls/${target.id}/index.m3u8` : getObjectUrl(target),
     });
   };
 

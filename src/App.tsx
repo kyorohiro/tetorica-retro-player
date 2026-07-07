@@ -322,7 +322,7 @@ function App() {
       const selected = await open({
         multiple: false,
         filters: [
-          { name: "Video", extensions: ["mp4", "m4v", "mov", "mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "mts", "ogv"] },
+          { name: "Video", extensions: ["mp4", "m4v", "mov", "mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "mts", "ogv", "mpeg", "mpg", "m2v", "vob", "asf", "3gp", "f4v", "mxf", "divx", "xvid", "rm", "rmvb"] },
           { name: "Audio", extensions: ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "wma"] },
           { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif", "heic", "heif", "bmp"] },
         ],
