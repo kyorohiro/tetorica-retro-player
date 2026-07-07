@@ -26,6 +26,7 @@ export function useMDropDragDrop({
   showBrowserFileListDialog,
 }: Params) {
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
+  const lastDragLogRef = useRef<{ type: string; at: number } | null>(null);
 
   const showMDropSharedListDialogRef = useRef(showMDropSharedListDialog);
   useEffect(() => {
@@ -46,7 +47,17 @@ export function useMDropDragDrop({
     const setup = async () => {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       unlisten = await getCurrentWindow().onDragDropEvent(async (event) => {
-        console.log("[mDrop] onDragDropEvent", event.payload.type, event.payload);
+        const now = Date.now();
+        const payloadType = event.payload.type;
+        const shouldLog =
+          payloadType !== "over" ||
+          !lastDragLogRef.current ||
+          lastDragLogRef.current.type !== "over" ||
+          now - lastDragLogRef.current.at >= 1000;
+        if (shouldLog) {
+          console.log("[mDrop] onDragDropEvent", payloadType, event.payload);
+          lastDragLogRef.current = { type: payloadType, at: now };
+        }
         if (event.payload.type !== "drop") return;
 
         const paths = event.payload.paths;

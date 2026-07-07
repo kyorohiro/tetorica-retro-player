@@ -17,7 +17,7 @@ use std::fs;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -164,6 +164,7 @@ pub struct HttpServerContext {
     pub web_enabled: bool,
     pub files: HashMap<String, PathBuf>,
     pub hls_sessions: HashMap<String, PathBuf>,
+    pub hls_starting_sessions: HashSet<String>,
     pub hls_children: HashMap<String, tokio::process::Child>,
     pub hls_session_order: VecDeque<String>,
     pub message_callback: Option<MessageCallback>,
@@ -208,6 +209,7 @@ impl HttpServerContext {
             web_enabled: false,
             files: HashMap::new(),
             hls_sessions: HashMap::new(),
+            hls_starting_sessions: HashSet::new(),
             hls_children: HashMap::new(),
             hls_session_order: VecDeque::new(),
             message_callback: None,
@@ -435,6 +437,7 @@ impl SharedHttpServerContext {
         child: tokio::process::Child,
     ) {
         if let Ok(mut ctx) = self.inner.lock() {
+            ctx.hls_starting_sessions.remove(&session_id);
             ctx.hls_sessions.insert(session_id.clone(), session_dir);
             ctx.hls_children.insert(session_id.clone(), child);
             if let Some(index) = ctx
@@ -463,6 +466,7 @@ impl SharedHttpServerContext {
                 if let Some(dir) = ctx.hls_sessions.remove(&oldest_session_id) {
                     stale_dirs.push(dir);
                 }
+                ctx.hls_starting_sessions.remove(&oldest_session_id);
             }
         }
 
@@ -486,6 +490,7 @@ impl SharedHttpServerContext {
             };
             let children = ctx.hls_children.drain().map(|(_, child)| child).collect();
             let session_dirs = ctx.hls_sessions.drain().map(|(_, dir)| dir).collect();
+            ctx.hls_starting_sessions.clear();
             ctx.hls_session_order.clear();
             (children, session_dirs)
         };
@@ -502,6 +507,30 @@ impl SharedHttpServerContext {
         }
 
         println!("[HLS] cleanup completed");
+    }
+
+    pub fn begin_hls_session_start(&self, session_id: &str) -> bool {
+        if let Ok(mut ctx) = self.inner.lock() {
+            if ctx.hls_sessions.contains_key(session_id) || ctx.hls_starting_sessions.contains(session_id) {
+                return false;
+            }
+            ctx.hls_starting_sessions.insert(session_id.to_string());
+            return true;
+        }
+        false
+    }
+
+    pub fn finish_hls_session_start(&self, session_id: &str) {
+        if let Ok(mut ctx) = self.inner.lock() {
+            ctx.hls_starting_sessions.remove(session_id);
+        }
+    }
+
+    pub fn is_hls_session_starting(&self, session_id: &str) -> bool {
+        self.inner
+            .lock()
+            .map(|ctx| ctx.hls_starting_sessions.contains(session_id))
+            .unwrap_or(false)
     }
 
     fn build_router(self) -> Router {

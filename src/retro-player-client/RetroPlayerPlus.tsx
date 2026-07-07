@@ -8,6 +8,7 @@ import {
   type PresetConfig,
   loadStartupPreset,
   saveStartupPreset,
+  shouldPersistStartupPresetUrl,
 } from "./builtin-content/preset-config";
 import { usePreviewSourceState } from "../retro-player/hooks/usePreviewSourceState";
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
@@ -275,6 +276,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
         previewSource.previewFile(item.file);
       } else {
         currentPlayingPathRef.current = item.path;
+        currentPresetConfigRef.current = { type: "url", url: item.url, label: item.path };
         if (shouldPreferDialogRetroPreview) {
           void showDialogPreviewForPath(item.url, item.path);
           return;
@@ -333,7 +335,9 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
         }
         previewSourceRef.current.previewPath(hlsUrl, path);
         currentPresetConfigRef.current = { type: 'url', url: hlsUrl, label: path };
-        saveStartupPreset(currentPresetConfigRef.current);
+        if (shouldPersistStartupPresetUrl(hlsUrl)) {
+          saveStartupPreset(currentPresetConfigRef.current);
+        }
       } catch (e) {
         console.error("[ffmpeg retry] failed:", e);
       }
@@ -380,6 +384,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       setPlaylistLength(items.length);
       setPlaylistIndex(startIndex);
       currentPlayingPathRef.current = target.path;
+      currentPresetConfigRef.current = { type: "url", url: target.url, label: target.path };
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
     }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
@@ -401,7 +406,9 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };
-      saveStartupPreset(currentPresetConfigRef.current);
+      if (shouldPersistStartupPresetUrl(url)) {
+        saveStartupPreset(currentPresetConfigRef.current);
+      }
     }, []);
 
     useImperativeHandle(ref, () => ({
@@ -439,7 +446,13 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
             autoPlay={autoStartState === 'done'}
             onEnded={handleEnded}
             onError={handlePlayerError}
-            onRetry={() => { void handleRetry(); }}
+            onRetry={() => {
+              void retryCurrentSource().then((handled) => {
+                if (!handled) {
+                  void handleRetry();
+                }
+              });
+            }}
             onPlaybackChange={(event) => {
               if (event.playing) {
                 setShowPlaybackRetryHint(false);

@@ -51,12 +51,17 @@ const requestUserAudioStream = async (
 
 function kindFromPath(path: string): PreviewSourceKind {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  if (/^(mp4|m4v|mov|mkv|avi|wmv|flv|webm|ts|m2ts|mts|ogv)$/.test(ext)) return "video";
+  if (/^(m3u8|mp4|m4v|mov|mkv|avi|wmv|flv|webm|ts|m2ts|mts|ogv|mpg|mpeg|m2v|vob)$/.test(ext)) return "video";
   if (/^(mp3|wav|ogg|oga|m4a|aac|flac|opus|wma|weba)$/.test(ext)) return "audio";
   return "image";
 }
 
 const isHlsPreviewUrl = (src?: string) => Boolean(src && /\/hls(?:\/|$)|\/hls-sub\//.test(src));
+
+const resolvePreviewKind = (src: string, filePath: string): PreviewSourceKind =>
+  isHlsPreviewUrl(src) || src.toLowerCase().includes(".m3u8")
+    ? "video"
+    : kindFromPath(filePath);
 
 const fireAndForgetHlsCleanup = (src?: string) => {
   if (!isHlsPreviewUrl(src)) {
@@ -297,7 +302,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
       revokePreviewSrc(current);
       return src;
     });
-    setPreviewKind(kindFromPath(filePath));
+    setPreviewKind(resolvePreviewKind(src, filePath));
   }, [revokePreviewSrc, stopPreviewStream]);
 
   const previewAudioStream = useCallback((stream: MediaStream, label: string) => {

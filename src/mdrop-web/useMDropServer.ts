@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { isAndroidRuntime, isTauriRuntime } from "../retro-player/platform/runtime";
 import { useLongPress } from "../retro-player/hooks/useLongPress";
-import { mdropGetConfig, mdropGetServerStatus, mdropStartServer, mdropStopServer } from "./tauri";
+import { mdropGetConfig, mdropGetServerStatus, mdropStartServer, mdropStopServer, type ServerStatus } from "./tauri";
+
+const localApiServerFromStatus = (status: Pick<ServerStatus, "port" | "isHttps">) => {
+  const scheme = status.isHttps ? "https" : "http";
+  return `${scheme}://localhost:${status.port ?? 7878}`;
+};
 
 export function useMDropServer() {
   const [isMDropReady, setIsMDropReady] = useState(false);
@@ -33,7 +38,7 @@ export function useMDropServer() {
     Promise.all([mdropGetConfig(), mdropGetServerStatus()]).then(([config, status]) => {
       if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
       window.__MDROP_CONFIG__.apiKey = config.apiKey;
-      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port ?? 7878}`;
+      window.__MDROP_CONFIG__.apiServer = localApiServerFromStatus(status);
       setMDropPort(status.port);
       setMDropIp(status.ips?.[0] ?? null);
     }).catch(() => {});
@@ -56,7 +61,7 @@ export function useMDropServer() {
       setIsMDropReady(status?.running ?? false);
       if (status?.running && status.port) {
         if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
-        window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
+        window.__MDROP_CONFIG__.apiServer = localApiServerFromStatus(status);
         setMDropPort(status.port);
         setMDropIp(null);
       }
@@ -76,7 +81,7 @@ export function useMDropServer() {
     setIsShareMode(nextWeb);
     if (status?.running && status.port) {
       if (!window.__MDROP_CONFIG__) window.__MDROP_CONFIG__ = {};
-      window.__MDROP_CONFIG__.apiServer = `http://localhost:${status.port}`;
+      window.__MDROP_CONFIG__.apiServer = localApiServerFromStatus(status);
       setMDropPort(status.port);
       setMDropIp(nextWeb ? (status.ips?.[0] ?? null) : null);
     }

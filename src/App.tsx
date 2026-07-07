@@ -39,6 +39,7 @@ import { resolvePlayableUrl } from "./mdrop-web/resolvePlayableSource";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
+import { useMDropFileListDialog } from "./mdrop-web/useMDropFileListDialog";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
 import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
 
@@ -82,6 +83,7 @@ function App() {
   const { showConfirmDialog, showSelectDialog, showDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showPreviewDialog } = usePreviewDialog();
+  const { showMDropFileListDialog } = useMDropFileListDialog();
   const {
     isMDropReady,
     mDropPort,
@@ -349,17 +351,21 @@ function App() {
       setIsMobileMenuOpen(false);
       const selected = await open({ directory: true, multiple: false });
       if (!selected || Array.isArray(selected)) return;
-      // フォルダーは従来通り FileList ダイアログで展開
-      const { getFiles } = await import("./mdrop-web/api");
-      const files = await getFiles("", selected as string).catch(() => []);
-      if (files.length > 0) {
-        await showBrowserFileListDialog({ files, initialPath: "/", title: "" });
-      }
+      await mdropUnshareAll().catch(() => {});
+      const shared = await mdropShareFile(selected as string);
+      if (!shared.isDir) return;
+      await showMDropFileListDialog({
+        title: shared.name,
+        apiServer: new URL(shared.url).origin,
+        targetId: shared.id,
+        initialPath: "/",
+        useHls: isFfmpegEnabled,
+      });
       return;
     }
 
     filePickerRef.current?.openFolderInput();
-  }, [isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showBrowserFileListDialog]);
+  }, [isFfmpegEnabled, isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showMDropFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
