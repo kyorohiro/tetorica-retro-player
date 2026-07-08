@@ -57,6 +57,27 @@ type DebugEventCallback = (label: string, payload: Record<string, unknown>) => v
 // detection itself via MediaSource, independent of that native behavior.
 const hlsInstances = new WeakMap<HTMLMediaElement, Hls>();
 const hlsSourceUrls = new WeakMap<HTMLMediaElement, string>();
+const HLS_STARTUP_MIN_BUFFER_SECONDS = 12;
+const HLS_STARTUP_READY_TIMEOUT_MS = 60000;
+
+const getBufferedEnd = (media: HTMLMediaElement): number => {
+  const ranges = media.buffered;
+  if (!ranges || ranges.length === 0) return 0;
+  try {
+    return ranges.end(ranges.length - 1);
+  } catch {
+    return 0;
+  }
+};
+
+const hasEnoughHlsStartupBuffer = (media: HTMLMediaElement): boolean => {
+  if (!getHlsInstance(media)) {
+    return true;
+  }
+  const duration = Number.isFinite(media.duration) ? media.duration : 0;
+  const bufferedEnd = getBufferedEnd(media);
+  return Math.max(duration, bufferedEnd) >= HLS_STARTUP_MIN_BUFFER_SECONDS;
+};
 
 export const isHlsUrl = (url: string): boolean => url.includes(".m3u8");
 
@@ -95,6 +116,10 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
   const { default: HlsCtor } = await import("hls.js");
   const hls = new HlsCtor({
     autoStartLoad: true,
+    backBufferLength: 0,
+    liveDurationInfinity: true,
+    maxBufferLength: 120,
+    maxMaxBufferLength: 180,
     startPosition: 0,
   });
   let networkRetries = 0;
@@ -133,9 +158,13 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
 
   hls.on(HlsCtor.Events.LEVEL_LOADED, (_event, data) => {
     logHls("level-loaded", {
+      bufferedEnd: getBufferedEnd(media),
+      currentTime: media.currentTime,
       endCC: data.details.endCC,
+      enoughStartupBuffer: hasEnoughHlsStartupBuffer(media),
       fragments: data.details.fragments.length,
       live: data.details.live,
+      mediaDuration: Number.isFinite(media.duration) ? media.duration : null,
       targetduration: data.details.targetduration,
       totalduration: data.details.totalduration,
     });
@@ -143,16 +172,21 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
 
   hls.on(HlsCtor.Events.FRAG_LOADED, (_event, data) => {
     logHls("frag-loaded", {
+      duration: data.frag.duration,
+      bufferedEnd: getBufferedEnd(media),
+      currentTime: media.currentTime,
       sn: data.frag.sn,
       type: data.frag.type,
-      duration: data.frag.duration,
     });
   });
 
   hls.on(HlsCtor.Events.ERROR, (_event, data) => {
     logHls("error", {
+      bufferedEnd: getBufferedEnd(media),
+      currentTime: media.currentTime,
       details: data.details,
       fatal: data.fatal,
+      mediaDuration: Number.isFinite(media.duration) ? media.duration : null,
       responseCode: data.response?.code ?? null,
       type: data.type,
     });
@@ -208,10 +242,14 @@ export function waitForVideoReady(
   onDebugEvent?: DebugEventCallback,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const timeoutMs = getHlsInstance(video) ? 20000 : 8000;
+    const timeoutMs = getHlsInstance(video) ? HLS_STARTUP_READY_TIMEOUT_MS : 8000;
     const describeState = (label: string) => ({
+      bufferedEnd: getBufferedEnd(video),
       label,
       src: video.currentSrc || video.src || "(empty)",
+      duration: Number.isFinite(video.duration) ? video.duration : 0,
+      hasEnoughHlsStartupBuffer: hasEnoughHlsStartupBuffer(video),
+      hasHls: Boolean(getHlsInstance(video)),
       readyState: video.readyState,
       networkState: video.networkState,
       error: video.error ? describeMediaError(video.error) : null,
@@ -228,6 +266,10 @@ export function waitForVideoReady(
     };
 
     const handleReady = (eventName: string) => {
+      if (getHlsInstance(video) && !hasEnoughHlsStartupBuffer(video)) {
+        onDebugEvent?.("waitForVideoReady:hls-startup-buffering", describeState(eventName));
+        return;
+      }
       onDebugEvent?.("waitForVideoReady:event-ready", describeState(eventName));
       cleanup();
       resolve();
@@ -258,6 +300,12 @@ export function waitForVideoReady(
     // video preview..." can be diagnosed from the console.
     const pollId = window.setInterval(() => {
       onDebugEvent?.("waitForVideoReady:poll", describeState("poll"));
+      if (
+        video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+        hasEnoughHlsStartupBuffer(video)
+      ) {
+        handleReady("poll-ready");
+      }
     }, 1000);
 
     // Safety net: if neither a ready nor an error event ever fires, don't
