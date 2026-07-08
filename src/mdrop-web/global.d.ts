@@ -4,6 +4,7 @@ declare global {
       apiKey?: string;
       apiServer?: string;
       ffmpegStreamingEnabled?: boolean;
+      ffmpegStreamingMode?: "video" | "audio";
       initData?: string;
       coverSrc?: string;
       coverData?: string;

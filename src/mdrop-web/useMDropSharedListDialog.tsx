@@ -5,7 +5,12 @@ import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
-import { getFfmpegStreamingEnabled, listenFfmpegStreamingEnabled } from "./ffmpegPreference";
+import {
+  getFfmpegStreamingEnabled,
+  getFfmpegStreamingMode,
+  listenFfmpegStreamingEnabled,
+  listenFfmpegStreamingMode,
+} from "./ffmpegPreference";
 import { isAudio, isBrowserPlayableVideo, isVideo, isVideoExtended } from "./utils";
 
 type Options = {
@@ -58,6 +63,7 @@ function MDropSharedListDialog({
   const [currentUseHls, setCurrentUseHls] = React.useState(
     () => useHls || getFfmpegStreamingEnabled()
   );
+  const [currentFfmpegMode, setCurrentFfmpegMode] = React.useState(() => getFfmpegStreamingMode());
   const { showPreviewDialog } = usePreviewDialog();
   const { showMDropFileListDialog } = useMDropFileListDialog();
   const { showSelectDialog } = useDialog();
@@ -67,6 +73,7 @@ function MDropSharedListDialog({
   }, [useHls]);
 
   React.useEffect(() => listenFfmpegStreamingEnabled(setCurrentUseHls), []);
+  React.useEffect(() => listenFfmpegStreamingMode(setCurrentFfmpegMode), []);
 
   const targetFiles: TargetFile[] = files.filter((f) => !f.isDir).map(sharedToTargetFile);
   const urlMap = Object.fromEntries(files.map((f) => [f.id, f.url]));
@@ -92,8 +99,6 @@ function MDropSharedListDialog({
       value: string;
       label: string;
       description: string;
-      longPressValue?: string;
-      longPressDescription?: string;
     }[] = [];
 
     if (canPlayDirect) {
@@ -108,9 +113,9 @@ function MDropSharedListDialog({
       options.push({
         value: "ffmpeg",
         label: "ffmpeg",
-        description: "Open through ffmpeg HLS playback.",
-        longPressValue: "ffmpeg-audio",
-        longPressDescription: "Long press: audio-only AAC stream.",
+        description: currentFfmpegMode === "audio"
+          ? "Open through ffmpeg audio-only HLS playback."
+          : "Open through ffmpeg HLS playback.",
       });
     }
 
@@ -138,7 +143,7 @@ function MDropSharedListDialog({
     }
 
     const forceFfmpeg = action === "ffmpeg";
-    const forceFfmpegAudio = action === "ffmpeg-audio";
+    const forceFfmpegAudio = action === "ffmpeg" && currentFfmpegMode === "audio";
     const playableFiles = forceFfmpegAudio
       ? targetFiles.filter((target) => isVideo(target.path) || isVideoExtended(target.path) || isAudio(target.path))
       : targetFiles;
