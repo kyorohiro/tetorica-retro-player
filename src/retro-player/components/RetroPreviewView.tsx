@@ -323,14 +323,19 @@ export function RetroPreviewView({
   // Persist UI settings. isHighResolution is owned by RetroPlayer but
   // persisted here since we know both values.
   React.useEffect(() => {
-    savePersistedRetroUiSettings({
-      isPreviewMaximized,
-      isHighResolution,
-      renderResolutionPreset,
-      brightness,
-      flipH,
-      flipV,
-    });
+    const id = window.setTimeout(() => {
+      savePersistedRetroUiSettings({
+        isPreviewMaximized,
+        isHighResolution,
+        renderResolutionPreset,
+        brightness,
+        flipH,
+        flipV,
+      });
+    }, 180);
+    return () => {
+      window.clearTimeout(id);
+    };
   }, [isHighResolution, isPreviewMaximized, renderResolutionPreset, brightness, flipH, flipV]);
 
   React.useEffect(() => {

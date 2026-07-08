@@ -27,6 +27,47 @@ const ReactReader = React.lazy(loadReactReader);
 const PdfPreview = React.lazy(loadPdfPreview);
 
 type PreviewPageStatus = "none" | "loading" | "loaded" | "error";
+type PreviewCacheEntry =
+    | { kind: "src"; src: string; revokeOnEvict: boolean }
+    | { kind: "text"; src: string; text: string; revokeOnEvict: boolean };
+
+const PREVIEW_CACHE_LIMIT = 6;
+const previewCache = new Map<string, PreviewCacheEntry>();
+
+const getPreviewCacheKey = (
+    file: TargetFile,
+    apiServer: string,
+    useHls: boolean,
+    forcedKind?: "audio" | "video" | "image",
+) => `${apiServer}|${useHls ? "hls" : "direct"}|${forcedKind ?? "auto"}|${file.id}|${file.path}`;
+
+const getCachedPreview = (key: string): PreviewCacheEntry | undefined => {
+    const cached = previewCache.get(key);
+    if (!cached) return undefined;
+    previewCache.delete(key);
+    previewCache.set(key, cached);
+    return cached;
+};
+
+const setCachedPreview = (key: string, entry: PreviewCacheEntry) => {
+    if (previewCache.has(key)) {
+        const current = previewCache.get(key);
+        if (current?.revokeOnEvict && current.src !== entry.src) {
+            URL.revokeObjectURL(current.src);
+        }
+        previewCache.delete(key);
+    }
+    previewCache.set(key, entry);
+    while (previewCache.size > PREVIEW_CACHE_LIMIT) {
+        const oldestKey = previewCache.keys().next().value;
+        if (!oldestKey) break;
+        const oldest = previewCache.get(oldestKey);
+        if (oldest?.revokeOnEvict) {
+            URL.revokeObjectURL(oldest.src);
+        }
+        previewCache.delete(oldestKey);
+    }
+};
 
 export type PreviewPageProps = {
     file: TargetFile;
@@ -77,6 +118,10 @@ export function PreviewPage({
     const [error, setError] = React.useState("");
     const [epubLocation, setEpubLocation] = React.useState<string | number>(0);
     const renditionRef = React.useRef<any>(null);
+    const cacheKey = React.useMemo(
+        () => getPreviewCacheKey(file, apiServer, useHls, forcedKind),
+        [apiServer, file, forcedKind, useHls],
+    );
 
     const { showZipFileListDialog } = useZipFileListDialog();
 
@@ -108,6 +153,16 @@ export function PreviewPage({
             setError("");
             onLoadingMessage?.("");
 
+            const cached = getCachedPreview(cacheKey);
+            if (cached) {
+                setSrc(cached.src);
+                if (cached.kind === "text") {
+                    setText(cached.text);
+                }
+                setStatus("loaded");
+                return;
+            }
+
             if (isPdf(file.path)) {
                 void loadPdfPreview();
             }
@@ -135,6 +190,12 @@ export function PreviewPage({
                 if (!alive) return;
 
                 setText(nextText);
+                setCachedPreview(cacheKey, {
+                    kind: "text",
+                    src: nextSrc,
+                    text: nextText,
+                    revokeOnEvict: nextSrc.startsWith("blob:"),
+                });
                 setStatus("loaded");
                 return;
             }
@@ -154,12 +215,22 @@ export function PreviewPage({
                 if (!alive) return;
 
                 setSrc(convertedUrl);
+                setCachedPreview(cacheKey, {
+                    kind: "src",
+                    src: convertedUrl,
+                    revokeOnEvict: true,
+                });
                 setStatus("loaded");
                 onLoadingMessage?.("");
                 return;
             }
 
             setSrc(nextSrc);
+            setCachedPreview(cacheKey, {
+                kind: "src",
+                src: nextSrc,
+                revokeOnEvict: nextSrc.startsWith("blob:"),
+            });
             setStatus("loaded");
         };
 
@@ -175,10 +246,13 @@ export function PreviewPage({
         return () => {
             alive = false;
             for (const url of objectUrls) {
+                if (previewCache.get(cacheKey)?.src === url) {
+                    continue;
+                }
                 URL.revokeObjectURL(url);
             }
         };
-    }, [file, getUrlFromTargetFile, onLoadingMessage]);
+    }, [cacheKey, file, getUrlFromTargetFile, isRetro, isVideoHere, onLoadingMessage]);
 
     if (status === "none" || status === "loading") {
         return <div className="text-sm text-slate-400">Loading...</div>;

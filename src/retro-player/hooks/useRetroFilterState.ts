@@ -233,48 +233,51 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [selectedPreset, setSelectedPreset] = useState<RetroPresetKey | null>(
     resolvePresetKeyFromState(resolvedInitialState),
   );
+  const markPresetAsCustom = useCallback(() => {
+    setSelectedPreset((current) => (current === null ? current : null));
+  }, []);
 
   const setTargetWidth = useCallback((targetWidth: number) => {
     if (!Number.isFinite(targetWidth) || targetWidth < 1) return;
-    setSelectedPreset(null);
+    markPresetAsCustom();
     setSettings((current) => (
       current.targetWidth === targetWidth
         ? current
         : { ...current, targetWidth }
     ));
-  }, []);
+  }, [markPresetAsCustom]);
 
   const setTargetHeight = useCallback((targetHeight: number) => {
     if (!Number.isFinite(targetHeight) || targetHeight < 1) return;
-    setSelectedPreset(null);
+    markPresetAsCustom();
     setSettings((current) => (
       current.targetHeight === targetHeight
         ? current
         : { ...current, targetHeight }
     ));
-  }, []);
+  }, [markPresetAsCustom]);
 
   const setMatchTargetAspect = useCallback((matchTargetAspect: boolean) => {
-    setSelectedPreset(null);
+    markPresetAsCustom();
     setSettings((current) => (
       current.matchTargetAspect === matchTargetAspect
         ? current
         : { ...current, matchTargetAspect }
     ));
-  }, []);
+  }, [markPresetAsCustom]);
 
   const setColorLevels = (colorLevels: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, colorLevels }));
+    markPresetAsCustom();
+    setSettings((current) => (current.colorLevels === colorLevels ? current : { ...current, colorLevels }));
   };
 
   const setDitherStrength = (ditherStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, ditherStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.ditherStrength === ditherStrength ? current : { ...current, ditherStrength }));
   };
 
   const setPaletteMode = (paletteMode: PaletteMode) => {
-    setSelectedPreset(null);
+    markPresetAsCustom();
     setSettings((current) => ({
       ...current,
       paletteMode,
@@ -283,193 +286,205 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   };
 
   const setCurvature = (curvature: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, curvature }));
+    markPresetAsCustom();
+    setSettings((current) => (current.curvature === curvature ? current : { ...current, curvature }));
   };
 
   const setScanlineStrength = (scanlineStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, scanlineStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.scanlineStrength === scanlineStrength ? current : { ...current, scanlineStrength }));
   };
 
   const setScanline2Strength = (scanline2Strength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, scanline2Strength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.scanline2Strength === scanline2Strength ? current : { ...current, scanline2Strength }));
   };
 
   const setScanlineBrightnessFade = (scanlineBrightnessFade: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, scanlineBrightnessFade }));
+    markPresetAsCustom();
+    setSettings((current) => (current.scanlineBrightnessFade === scanlineBrightnessFade ? current : { ...current, scanlineBrightnessFade }));
   };
 
   const setVignetteStrength = (vignetteStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, vignetteStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.vignetteStrength === vignetteStrength ? current : { ...current, vignetteStrength }));
   };
 
   const setGlowStrength = (glowStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, glowStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.glowStrength === glowStrength ? current : { ...current, glowStrength }));
   };
 
   const setSmoothStrength = (smoothStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, smoothStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.smoothStrength === smoothStrength ? current : { ...current, smoothStrength }));
   };
 
   const setToonSteps = (toonSteps: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, toonSteps }));
+    markPresetAsCustom();
+    setSettings((current) => (current.toonSteps === toonSteps ? current : { ...current, toonSteps }));
   };
 
   const setEdgeBoost = (edgeBoost: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, edgeBoost }));
+    markPresetAsCustom();
+    setSettings((current) => (current.edgeBoost === edgeBoost ? current : { ...current, edgeBoost }));
   };
 
   const setAnimeEdgeLow = (animeEdgeLow: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, animeEdgeLow }));
+    markPresetAsCustom();
+    setSettings((current) => (current.animeEdgeLow === animeEdgeLow ? current : { ...current, animeEdgeLow }));
   };
 
   const setAnimeEdgeHigh = (animeEdgeHigh: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, animeEdgeHigh }));
+    markPresetAsCustom();
+    setSettings((current) => (current.animeEdgeHigh === animeEdgeHigh ? current : { ...current, animeEdgeHigh }));
   };
 
   const setPhosphorStrength = (phosphorStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.phosphorStrength === phosphorStrength ? current : { ...current, phosphorStrength }));
   };
 
   const setSpotMaskStrength = (spotMaskStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, spotMaskStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.spotMaskStrength === spotMaskStrength ? current : { ...current, spotMaskStrength }));
   };
 
   const setBulbRadius = (bulbRadius: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, bulbRadius }));
+    markPresetAsCustom();
+    setSettings((current) => (current.bulbRadius === bulbRadius ? current : { ...current, bulbRadius }));
   };
 
   const setBlackFloor = (blackFloor: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, blackFloor }));
+    markPresetAsCustom();
+    setSettings((current) => (current.blackFloor === blackFloor ? current : { ...current, blackFloor }));
   };
 
   const setLumaAmount = (lumaAmount: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, lumaAmount }));
+    markPresetAsCustom();
+    setSettings((current) => (current.lumaAmount === lumaAmount ? current : { ...current, lumaAmount }));
   };
 
   const setLumaLow = (lumaLow: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, lumaLow }));
+    markPresetAsCustom();
+    setSettings((current) => (current.lumaLow === lumaLow ? current : { ...current, lumaLow }));
   };
 
   const setLumaHigh = (lumaHigh: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, lumaHigh }));
+    markPresetAsCustom();
+    setSettings((current) => (current.lumaHigh === lumaHigh ? current : { ...current, lumaHigh }));
   };
 
   const setLumaKnee = (lumaKnee: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, lumaKnee }));
+    markPresetAsCustom();
+    setSettings((current) => (current.lumaKnee === lumaKnee ? current : { ...current, lumaKnee }));
   };
 
   const setSaturationAmount = (saturationAmount: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, saturationAmount }));
+    markPresetAsCustom();
+    setSettings((current) => (current.saturationAmount === saturationAmount ? current : { ...current, saturationAmount }));
   };
 
   const setSaturationLow = (saturationLow: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, saturationLow }));
+    markPresetAsCustom();
+    setSettings((current) => (current.saturationLow === saturationLow ? current : { ...current, saturationLow }));
   };
 
   const setSaturationHigh = (saturationHigh: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, saturationHigh }));
+    markPresetAsCustom();
+    setSettings((current) => (current.saturationHigh === saturationHigh ? current : { ...current, saturationHigh }));
   };
 
   const setSaturationKnee = (saturationKnee: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, saturationKnee }));
+    markPresetAsCustom();
+    setSettings((current) => (current.saturationKnee === saturationKnee ? current : { ...current, saturationKnee }));
   };
 
   const setOutputBrightness = (outputBrightness: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, outputBrightness }));
+    markPresetAsCustom();
+    setSettings((current) => (current.outputBrightness === outputBrightness ? current : { ...current, outputBrightness }));
   };
 
   const setPhosphorDotLightBalance = (phosphorDotLightBalance: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorDotLightBalance }));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotLightBalance === phosphorDotLightBalance ? current : { ...current, phosphorDotLightBalance }
+    ));
   };
 
   const setPhosphorDotInternalScale = (phosphorDotInternalScale: boolean) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorDotInternalScale }));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotInternalScale === phosphorDotInternalScale ? current : { ...current, phosphorDotInternalScale }
+    ));
   };
 
   const setPhosphorDotBrightCore = (phosphorDotBrightCore: boolean) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorDotBrightCore }));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotBrightCore === phosphorDotBrightCore ? current : { ...current, phosphorDotBrightCore }
+    ));
   };
 
   const setPhosphorDotCellFill = (phosphorDotCellFill: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorDotCellFill }));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotCellFill === phosphorDotCellFill ? current : { ...current, phosphorDotCellFill }
+    ));
   };
 
   const setPhosphorDotFlatDisc = (phosphorDotFlatDisc: boolean) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorDotFlatDisc }));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotFlatDisc === phosphorDotFlatDisc ? current : { ...current, phosphorDotFlatDisc }
+    ));
   };
 
   const setPhosphorDotNeighborBlend = (phosphorDotNeighborBlend: boolean) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, phosphorDotNeighborBlend }));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotNeighborBlend === phosphorDotNeighborBlend ? current : { ...current, phosphorDotNeighborBlend }
+    ));
   };
 
   const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, closeUpNoiseStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.closeUpNoiseStrength === closeUpNoiseStrength ? current : { ...current, closeUpNoiseStrength }));
   };
 
   const setMonoTint = (monoTint: MonoTintMode) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, monoTint }));
+    markPresetAsCustom();
+    setSettings((current) => (current.monoTint === monoTint ? current : { ...current, monoTint }));
   };
 
   const setNeonBoost = (neonBoost: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, neonBoost }));
+    markPresetAsCustom();
+    setSettings((current) => (current.neonBoost === neonBoost ? current : { ...current, neonBoost }));
   };
 
   const setNeonSaturation = (neonSaturation: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, neonSaturation }));
+    markPresetAsCustom();
+    setSettings((current) => (current.neonSaturation === neonSaturation ? current : { ...current, neonSaturation }));
   };
 
   const setNeonDetail = (neonDetail: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, neonDetail }));
+    markPresetAsCustom();
+    setSettings((current) => (current.neonDetail === neonDetail ? current : { ...current, neonDetail }));
   };
 
   const setFocusStrength = (focusStrength: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, focusStrength }));
+    markPresetAsCustom();
+    setSettings((current) => (current.focusStrength === focusStrength ? current : { ...current, focusStrength }));
   };
 
   const setFocusWidth = (focusWidth: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, focusWidth }));
+    markPresetAsCustom();
+    setSettings((current) => (current.focusWidth === focusWidth ? current : { ...current, focusWidth }));
   };
 
   const setFocusHeight = (focusHeight: number) => {
-    setSelectedPreset(null);
-    setSettings((current) => ({ ...current, focusHeight }));
+    markPresetAsCustom();
+    setSettings((current) => (current.focusHeight === focusHeight ? current : { ...current, focusHeight }));
   };
 
   const setFocusCenter = (focusCenterX: number, focusCenterY: number) => {
@@ -481,15 +496,27 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   };
 
   const setFocusTrackCursor = (focusTrackCursor: boolean) => {
-    setSettings((current) => ({
-      ...current,
-      focusTrackCursor,
-      ...(focusTrackCursor ? {} : { focusCenterX: 0.5, focusCenterY: 0.5 }),
-    }));
+    setSettings((current) => {
+      const nextFocusCenterX = focusTrackCursor ? current.focusCenterX : 0.5;
+      const nextFocusCenterY = focusTrackCursor ? current.focusCenterY : 0.5;
+      if (
+        current.focusTrackCursor === focusTrackCursor
+        && current.focusCenterX === nextFocusCenterX
+        && current.focusCenterY === nextFocusCenterY
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        focusTrackCursor,
+        focusCenterX: nextFocusCenterX,
+        focusCenterY: nextFocusCenterY,
+      };
+    });
   };
 
   const setIsFilterEnabled = (isFilterEnabled: boolean) => {
-    setSettings((current) => ({ ...current, isFilterEnabled }));
+    setSettings((current) => (current.isFilterEnabled === isFilterEnabled ? current : { ...current, isFilterEnabled }));
   };
 
   const applyPreset = useCallback((preset: RetroPresetKey) => {
@@ -561,13 +588,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   useEffect(() => {
     const id = setTimeout(() => {
       savePersistedRetroFilterSettings(settings);
-    }, 300);
+    }, 220);
     return () => clearTimeout(id);
   }, [settings]);
 
   useEffect(() => {
-    const resolvedPreset = resolvePresetKeyFromState(settings);
-    setSelectedPreset((current) => (current === resolvedPreset ? current : resolvedPreset));
+    const id = setTimeout(() => {
+      const resolvedPreset = resolvePresetKeyFromState(settings);
+      setSelectedPreset((current) => (current === resolvedPreset ? current : resolvedPreset));
+    }, 120);
+    return () => clearTimeout(id);
   }, [settings]);
 
   return {
