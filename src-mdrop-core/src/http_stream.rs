@@ -16,10 +16,10 @@ use crate::http_utils::apply_shared_security_headers;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
-const HLS_DEFAULT_SCALE_FILTER: &str = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
-const HLS_LIGHTWEIGHT_SCALE_FILTER: &str =
-    "scale=854:480:force_original_aspect_ratio=decrease:force_divisible_by=2";
-const HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES: u64 = 512 * 1024 * 1024;
+const HLS_TRANSCODE_SCALE_FILTER: &str =
+    "scale=640:360:force_original_aspect_ratio=decrease:force_divisible_by=2";
+const HLS_TRANSCODE_FPS: &str = "15";
+const HLS_SEGMENT_DURATION_SECONDS: &str = "4";
 
 /// Serve HLS playlist for a directly registered file.
 pub async fn hls_playlist(
@@ -432,7 +432,7 @@ async fn start_hls_for_path(
     // explicit and is the standard idiom for "transcode while serving".
     let hls_common_args: Vec<&str> = vec![
         "-f", "hls",
-        "-hls_time", "2",
+        "-hls_time", HLS_SEGMENT_DURATION_SECONDS,
         "-hls_list_size", "0",
         "-hls_playlist_type", "event",
         "-hls_flags", "independent_segments",
@@ -449,24 +449,11 @@ async fn start_hls_for_path(
         input,
         tmp_dir.display()
     );
-    let should_try_copy = should_try_stream_copy(file_path);
-    let scale_filter = select_hls_scale_filter(file_path);
-    if !should_try_copy {
-        println!(
-            "[HLS] session={} skipping copy path for extension={}",
-            session_id,
-            file_path
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .unwrap_or("(unknown)")
-        );
-    }
-    if scale_filter == HLS_LIGHTWEIGHT_SCALE_FILTER {
-        println!(
-            "[HLS] session={} using lightweight transcode profile (max 854x480) for input={}",
-            session_id, input
-        );
-    }
+    let scale_filter = HLS_TRANSCODE_SCALE_FILTER;
+    println!(
+        "[HLS] session={} using ffmpeg transcode profile (max 640x360, {} fps, {}s segments) for input={}",
+        session_id, HLS_TRANSCODE_FPS, HLS_SEGMENT_DURATION_SECONDS, input
+    );
 
     // Helper: spawn ffmpeg with given args, poll until a .ts segment appears.
     // Returns (child, ready). Kills and cleans up playlist on failure before returning.
@@ -516,16 +503,11 @@ async fn start_hls_for_path(
 
     let should_try_qsv = cfg!(target_os = "windows") && use_qsv;
 
-    // Phase 1: copy (6 s timeout) or direct software fallback for formats that
-    // always need re-encode on non-Windows platforms (e.g. webm on macOS).
-    let started_with_hw = !should_try_copy && should_try_qsv;
-    let (mut child, mut ready) = if should_try_copy {
-        try_ffmpeg!(
-            ["-y", "-i", &input, "-c:v", "copy", "-c:a", "aac", "-b:a", "128k"],
-            30,
-            "ffmpeg-copy.log"
-        )
-    } else if should_try_qsv {
+    // ffmpeg mode prefers a consistent low-resolution transcode profile over
+    // stream-copy so older machines do not end up uploading full-resolution
+    // frames back into WebGL after HLS playback starts.
+    let started_with_hw = should_try_qsv;
+    let (mut child, mut ready) = if should_try_qsv {
         try_ffmpeg!(
             [
                 "-y",
@@ -533,6 +515,7 @@ async fn start_hls_for_path(
                 "-avoid_negative_ts", "make_zero",
                 "-i", &input,
                 "-c:v", "h264_qsv",
+                "-vf", &format!("fps={},{}", HLS_TRANSCODE_FPS, scale_filter),
                 "-g", "60",
                 "-keyint_min", "60",
                 "-force_key_frames", "expr:gte(t,n_forced*2)",
@@ -549,7 +532,7 @@ async fn start_hls_for_path(
                 "-avoid_negative_ts", "make_zero",
                 "-i", &input,
                 "-c:v", "libx264",
-                "-vf", scale_filter,
+                "-vf", &format!("fps={},{}", HLS_TRANSCODE_FPS, scale_filter),
                 "-pix_fmt", "yuv420p",
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
@@ -564,62 +547,11 @@ async fn start_hls_for_path(
         )
     };
 
-    // Guard: a copy-path segment can still be unusable for browser HLS even
-    // when it technically contains a video stream (e.g. AVI / MPEG sources
-    // copied through as MPEG-4 Part 2 / MPEG-2 instead of H.264). Treat any
-    // first segment whose video codec is not H.264 as copy-path failure and
-    // retry with a real transcode.
-    if ready {
-        let seg_path = std::fs::read_to_string(&playlist)
-            .ok()
-            .and_then(|c| first_segment_from_playlist(&c).map(|n| {
-                tmp_dir.join(n.rsplit('/').next().unwrap_or(&n).to_owned())
-            }));
-        if let Some(seg) = seg_path {
-            if !segment_has_browser_compatible_video_stream(&ffmpeg_cmd, &seg).await {
-                println!(
-                    "[HLS] Phase 1 copy: first segment is not browser-compatible video for session={session_id}, falling back to re-encode"
-                );
-                ready = false;
-                let _ = child.start_kill();
-                let _ = child.wait().await;
-                let _ = std::fs::remove_dir_all(&tmp_dir);
-                std::fs::create_dir_all(&tmp_dir).map_err(|e| (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("failed to recreate temp dir: {e}"),
-                ))?;
-            }
-        }
-    }
-
-    // Phase 2: h264_qsv hardware encode (10 s — Windows only, fails fast if unavailable)
-    if !ready && should_try_copy && should_try_qsv {
-        println!(
-            "[HLS] copy path not ready for session={}, retrying with h264_qsv",
-            session_id
-        );
-        (child, ready) = try_ffmpeg!(
-            [
-                "-y",
-                "-fflags", "+genpts+discardcorrupt",
-                "-avoid_negative_ts", "make_zero",
-                "-i", &input,
-                "-c:v", "h264_qsv",
-                "-g", "60",
-                "-keyint_min", "60",
-                "-force_key_frames", "expr:gte(t,n_forced*2)",
-                "-c:a", "aac", "-b:a", "128k",
-            ],
-            50,
-            "ffmpeg-qsv.log"
-        );
-    }
-
-    // Phase 3: libx264 software fallback (30 s)
+    // Phase 2: libx264 software fallback.
     if !ready {
         println!(
             "[HLS] {} not ready for session={}, retrying with libx264",
-            if started_with_hw { "initial hardware path" } else { "copy/hardware path" },
+            if started_with_hw { "initial hardware path" } else { "initial transcode path" },
             session_id,
         );
         (child, ready) = try_ffmpeg!(
@@ -629,7 +561,7 @@ async fn start_hls_for_path(
                 "-avoid_negative_ts", "make_zero",
                 "-i", &input,
                 "-c:v", "libx264",
-                "-vf", scale_filter,
+                "-vf", &format!("fps={},{}", HLS_TRANSCODE_FPS, scale_filter),
                 "-pix_fmt", "yuv420p",   // force 8-bit; VP9 10-bit inputs would produce h264 high10 otherwise
                 "-preset", "ultrafast",
                 "-tune", "zerolatency",
@@ -722,7 +654,7 @@ async fn start_audio_hls_for_path(
 
         let hls_common_args: Vec<&str> = vec![
             "-f", "hls",
-            "-hls_time", "2",
+            "-hls_time", HLS_SEGMENT_DURATION_SECONDS,
             "-hls_list_size", "0",
             "-hls_playlist_type", "event",
             "-hls_flags", "independent_segments",
@@ -804,26 +736,6 @@ fn is_segment_ready(path: &FsPath) -> bool {
         .unwrap_or(false)
 }
 
-/// Run `ffmpeg -i <segment>` and verify the first video stream is H.264, which is the
-/// copy-path codec this browser-HLS flow can reliably consume.
-/// Returns true when an H.264 video stream is found, or when the probe itself fails
-/// (safe default).
-/// Note: ffmpeg -i always exits with error code 1 when no output is specified;
-/// we only care about the stderr content, not the exit code.
-async fn segment_has_browser_compatible_video_stream(ffmpeg_cmd: &PathBuf, path: &FsPath) -> bool {
-    let Some(path_str) = path.to_str() else {
-        return true;
-    };
-    let mut cmd = new_ffmpeg_command(ffmpeg_cmd);
-    cmd.args(["-hide_banner", "-i", path_str])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped());
-    let Ok(out) = cmd.output().await else {
-        return true;
-    };
-    segment_stderr_has_h264_video(&String::from_utf8_lossy(&out.stderr))
-}
-
 /// Create a Command for ffmpeg with platform-specific flags.
 /// On Windows, CREATE_NO_WINDOW prevents ffmpeg from flashing a console window.
 fn new_ffmpeg_command(ffmpeg_cmd: &PathBuf) -> Command {
@@ -847,61 +759,6 @@ fn first_segment_from_playlist(content: &str) -> Option<String> {
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with('#') && line.ends_with(".ts"))
         .map(ToOwned::to_owned)
-}
-
-fn should_try_stream_copy(path: &FsPath) -> bool {
-    let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
-        return true;
-    };
-
-    !matches!(
-        ext.to_ascii_lowercase().as_str(),
-        "avi"
-            | "asf"
-            | "divx"
-            | "f4v"
-            | "flv"
-            | "m2v"
-            | "mpeg"
-            | "mpg"
-            | "mxf"
-            | "ogv"
-            | "rm"
-            | "rmvb"
-            | "vob"
-            | "webm"
-            | "wmv"
-            | "xvid"
-    )
-}
-
-fn segment_stderr_has_h264_video(stderr: &str) -> bool {
-    stderr.lines().any(|line| {
-        let lower = line.to_ascii_lowercase();
-        lower.contains("video:") && lower.contains("h264")
-    })
-}
-
-fn select_hls_scale_filter(path: &FsPath) -> &'static str {
-    if needs_lightweight_hls_transcode(path) {
-        HLS_LIGHTWEIGHT_SCALE_FILTER
-    } else {
-        HLS_DEFAULT_SCALE_FILTER
-    }
-}
-
-fn needs_lightweight_hls_transcode(path: &FsPath) -> bool {
-    let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
-        return false;
-    };
-
-    if !matches!(ext.to_ascii_lowercase().as_str(), "webm" | "ogv") {
-        return false;
-    }
-
-    std::fs::metadata(path)
-        .map(|meta| meta.len() >= HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES)
-        .unwrap_or(false)
 }
 
 async fn wait_for_playlist_ready(
@@ -974,93 +831,19 @@ async fn wait_for_existing_or_starting_session(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        needs_lightweight_hls_transcode, segment_stderr_has_h264_video, select_hls_scale_filter,
-        should_try_stream_copy, HLS_DEFAULT_SCALE_FILTER, HLS_LIGHTWEIGHT_SCALE_FILTER,
-        HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES,
-    };
-    use std::{fs::File, path::Path};
-
-    fn temp_path(name: &str) -> std::path::PathBuf {
-        let stem = Path::new(name)
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or(name);
-        let ext = Path::new(name)
-            .extension()
-            .and_then(|value| value.to_str())
-            .unwrap_or("");
-        let filename = if ext.is_empty() {
-            format!("retro-player-http-stream-test-{stem}-{}", std::process::id())
-        } else {
-            format!("retro-player-http-stream-test-{stem}-{}.{}", std::process::id(), ext)
-        };
-        std::env::temp_dir().join(filename)
-    }
+    use super::{HLS_SEGMENT_DURATION_SECONDS, HLS_TRANSCODE_FPS, HLS_TRANSCODE_SCALE_FILTER};
 
     #[test]
-    fn large_webm_uses_lightweight_hls_transcode() {
-        let path = temp_path("large.webm");
-        let file = File::create(&path).expect("create temp webm");
-        file.set_len(HLS_LIGHTWEIGHT_TRANSCODE_SIZE_THRESHOLD_BYTES).expect("set temp webm size");
-
-        assert!(needs_lightweight_hls_transcode(&path));
+    fn transcode_scale_filter_is_fixed_to_640x360() {
         assert_eq!(
-            select_hls_scale_filter(&path),
-            HLS_LIGHTWEIGHT_SCALE_FILTER
-        );
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn small_webm_keeps_default_hls_scale_filter() {
-        let path = temp_path("small.webm");
-        let file = File::create(&path).expect("create temp webm");
-        file.set_len(4 * 1024 * 1024).expect("set temp webm size");
-
-        assert!(!needs_lightweight_hls_transcode(&path));
-        assert_eq!(
-            select_hls_scale_filter(&path),
-            HLS_DEFAULT_SCALE_FILTER
-        );
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn mp4_keeps_default_hls_scale_filter() {
-        assert!(!needs_lightweight_hls_transcode(Path::new("sample.mp4")));
-        assert_eq!(
-            select_hls_scale_filter(Path::new("sample.mp4")),
-            HLS_DEFAULT_SCALE_FILTER
+            HLS_TRANSCODE_SCALE_FILTER,
+            "scale=640:360:force_original_aspect_ratio=decrease:force_divisible_by=2"
         );
     }
 
     #[test]
-    fn h264_segment_probe_accepts_h264_video() {
-        assert!(segment_stderr_has_h264_video(
-            "Stream #0:0: Video: h264 (High), yuv420p(progressive), 1280x720"
-        ));
-    }
-
-    #[test]
-    fn h264_segment_probe_rejects_audio_only_and_other_video_codecs() {
-        assert!(!segment_stderr_has_h264_video(
-            "Stream #0:0: Audio: aac (LC), 48000 Hz, stereo, fltp"
-        ));
-        assert!(!segment_stderr_has_h264_video(
-            "Stream #0:0: Video: mpeg2video (Main), yuv420p(tv), 720x480"
-        ));
-        assert!(!segment_stderr_has_h264_video(
-            "Stream #0:0: Video: mpeg4 (Simple Profile), yuv420p, 640x480"
-        ));
-    }
-
-    #[test]
-    fn avi_and_mpg_skip_stream_copy() {
-        assert!(!should_try_stream_copy(Path::new("sample.avi")));
-        assert!(!should_try_stream_copy(Path::new("sample.mpg")));
-        assert!(should_try_stream_copy(Path::new("sample.mp4")));
+    fn transcode_profile_keeps_expected_fps_and_segment_duration() {
+        assert_eq!(HLS_TRANSCODE_FPS, "15");
+        assert_eq!(HLS_SEGMENT_DURATION_SECONDS, "4");
     }
 }
