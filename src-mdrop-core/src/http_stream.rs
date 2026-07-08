@@ -503,11 +503,13 @@ async fn start_hls_for_path(
     }
 
     let should_try_qsv = cfg!(target_os = "windows") && use_qsv;
+    let should_try_videotoolbox = cfg!(target_os = "macos") && use_qsv;
+    let should_try_hardware_encode = should_try_qsv || should_try_videotoolbox;
 
     // ffmpeg mode prefers a consistent low-resolution transcode profile over
     // stream-copy so older machines do not end up uploading full-resolution
     // frames back into WebGL after HLS playback starts.
-    let started_with_hw = should_try_qsv;
+    let started_with_hw = should_try_hardware_encode;
     let (mut child, mut ready) = if should_try_qsv {
         try_ffmpeg!(
             [
@@ -524,6 +526,23 @@ async fn start_hls_for_path(
             ],
             50,
             "ffmpeg-qsv.log"
+        )
+    } else if should_try_videotoolbox {
+        try_ffmpeg!(
+            [
+                "-y",
+                "-fflags", "+genpts+discardcorrupt",
+                "-avoid_negative_ts", "make_zero",
+                "-i", &input,
+                "-c:v", "h264_videotoolbox",
+                "-vf", &format!("fps={},{}", HLS_TRANSCODE_FPS, scale_filter),
+                "-g", "60",
+                "-keyint_min", "60",
+                "-force_key_frames", "expr:gte(t,n_forced*2)",
+                "-c:a", "aac", "-b:a", HLS_VIDEO_AUDIO_BITRATE,
+            ],
+            50,
+            "ffmpeg-videotoolbox.log"
         )
     } else {
         try_ffmpeg!(
