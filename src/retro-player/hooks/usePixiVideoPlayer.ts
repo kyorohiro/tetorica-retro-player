@@ -1126,7 +1126,6 @@ export function usePixiVideoPlayer(
     applyFilterState();
     syncSpriteFilter();
     syncTexturePresentation();
-    refreshLayout();
   }, [
     filterState.colorLevels,
     filterState.curvature,
@@ -1150,7 +1149,6 @@ export function usePixiVideoPlayer(
     filterState.targetWidth,
     filterState.vignetteStrength,
     filterState.glowStrength,
-    refreshLayout,
   ]);
 
   useEffect(() => {

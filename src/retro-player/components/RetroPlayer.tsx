@@ -176,6 +176,7 @@ export function RetroPlayer({
   const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
   const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
   const [showClockOverlay, setShowClockOverlay] = React.useState(false);
+  const refreshLayoutFrameRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     void syncFfmpegUseQsv(startupUseQsv);
@@ -187,13 +188,17 @@ export function RetroPlayer({
 
   React.useEffect(() => {
     if (typeof previewLayoutState?.isFitWidthEnabled === "boolean") {
-      setIsFitWidthEnabled(previewLayoutState.isFitWidthEnabled);
+      setIsFitWidthEnabled((current) => (
+        current === previewLayoutState.isFitWidthEnabled ? current : previewLayoutState.isFitWidthEnabled
+      ));
     }
   }, [previewLayoutState?.isFitWidthEnabled]);
 
   React.useEffect(() => {
     if (typeof previewLayoutState?.isPreviewPinned === "boolean") {
-      setIsPinnedInPreview(previewLayoutState.isPreviewPinned);
+      setIsPinnedInPreview((current) => (
+        current === previewLayoutState.isPreviewPinned ? current : previewLayoutState.isPreviewPinned
+      ));
     }
   }, [previewLayoutState?.isPreviewPinned]);
 
@@ -257,6 +262,14 @@ export function RetroPlayer({
     player.seekTo(0);
     void player.playVideoWithAudio();
   }, [onForceReplay, player]);
+
+  const scheduleRefreshLayout = React.useCallback(() => {
+    if (refreshLayoutFrameRef.current !== null) return;
+    refreshLayoutFrameRef.current = window.requestAnimationFrame(() => {
+      refreshLayoutFrameRef.current = null;
+      player.refreshLayout();
+    });
+  }, [player]);
 
   const syncTargetAspect = React.useCallback(() => {
     const dims = player.sourceDimensions;
@@ -412,19 +425,28 @@ export function RetroPlayer({
 
   // Layout refresh when fit-mode changes (pin/maximize handled in RetroPreviewView).
   React.useEffect(() => {
-    player.refreshLayout();
-  }, [isFitWidthEnabled, player.refreshLayout]);
+    scheduleRefreshLayout();
+  }, [isFitWidthEnabled, scheduleRefreshLayout]);
 
   // Layout refresh when filter resolution or target size changes.
   React.useEffect(() => {
-    player.refreshLayout();
+    scheduleRefreshLayout();
   }, [
     filterState.targetWidth,
     filterState.targetHeight,
     filterState.isFilterEnabled,
     renderResolutionScale,
-    player.refreshLayout,
+    scheduleRefreshLayout,
   ]);
+
+  React.useEffect(() => {
+    return () => {
+      if (refreshLayoutFrameRef.current !== null) {
+        window.cancelAnimationFrame(refreshLayoutFrameRef.current);
+        refreshLayoutFrameRef.current = null;
+      }
+    };
+  }, []);
 
   // Propagate looping prop to the player.
   React.useEffect(() => {

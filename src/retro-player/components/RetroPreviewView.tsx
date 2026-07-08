@@ -16,6 +16,7 @@ import {
 } from "../hooks/persistedRetroSettings";
 import { useRetroAlarm } from "../hooks/useRetroAlarm";
 import {
+  areRetroPreviewLayoutStatesEqual,
   normalizeRetroPreviewLayoutState,
   type RetroPreviewLayoutState,
 } from "../previewLayoutState";
@@ -190,6 +191,42 @@ export function RetroPreviewView({
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const nativeVideoHostRef = React.useRef<HTMLDivElement | null>(null);
   const activePreviewPointerIdRef = React.useRef<number | null>(null);
+  const autoPinFrameRef = React.useRef<number | null>(null);
+  const pinnedMetricsFrameRef = React.useRef<number | null>(null);
+  const emittedPreviewLayoutStateRef = React.useRef<RetroPreviewLayoutState | undefined>(undefined);
+  const refreshLayoutFrameRef = React.useRef<number | null>(null);
+
+  const setPinnedPreviewMetricsIfChanged = React.useCallback((
+    nextMetrics: {
+      left: number;
+      width: number;
+      height: number;
+    } | null,
+  ) => {
+    setPinnedPreviewMetrics((current) => {
+      if (
+        current === nextMetrics
+        || (
+          current
+          && nextMetrics
+          && current.left === nextMetrics.left
+          && current.width === nextMetrics.width
+          && current.height === nextMetrics.height
+        )
+      ) {
+        return current;
+      }
+      return nextMetrics;
+    });
+  }, []);
+
+  const scheduleRefreshLayout = React.useCallback(() => {
+    if (refreshLayoutFrameRef.current !== null) return;
+    refreshLayoutFrameRef.current = window.requestAnimationFrame(() => {
+      refreshLayoutFrameRef.current = null;
+      player.refreshLayout();
+    });
+  }, [player]);
 
   // --- Stable callbacks (defined before effects that use them) ---
 
@@ -219,19 +256,20 @@ export function RetroPreviewView({
       if (next) {
         const nextMetrics = measurePinnedPreviewMetrics();
         if (nextMetrics) {
-          setPinnedPreviewMetrics(nextMetrics);
+          setPinnedPreviewMetricsIfChanged(nextMetrics);
         }
         return true;
       }
 
       setIsAutoPreviewPinned(false);
       setAutoPinnedHiddenOffset(0);
-      setPinnedPreviewMetrics(null);
+      setPinnedPreviewMetricsIfChanged(null);
       return false;
     });
   }, [
     measurePinnedPreviewMetrics,
     onFitWidthChange,
+    setPinnedPreviewMetricsIfChanged,
   ]);
 
   const handleFitWidthToggle = React.useCallback(() => {
@@ -240,19 +278,19 @@ export function RetroPreviewView({
     setIsPreviewPinned(false);
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
-    setPinnedPreviewMetrics(null);
+    setPinnedPreviewMetricsIfChanged(null);
     onFitWidthChange(next);
-  }, [isFitWidthEnabled, onFitWidthChange]);
+  }, [isFitWidthEnabled, onFitWidthChange, setPinnedPreviewMetricsIfChanged]);
 
   const handleMaximizeToggle = React.useCallback(() => {
     const next = !isPreviewMaximized;
     setIsPreviewPinned(false);
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
-    setPinnedPreviewMetrics(null);
+    setPinnedPreviewMetricsIfChanged(null);
     onFitWidthChange(false);
     setIsPreviewMaximized(next);
-  }, [isPreviewMaximized, onFitWidthChange]);
+  }, [isPreviewMaximized, onFitWidthChange, setPinnedPreviewMetricsIfChanged]);
 
   const {
     alarmTime,
@@ -298,20 +336,23 @@ export function RetroPreviewView({
   React.useEffect(() => {
     if (!previewLayoutState) return;
     const normalized = normalizeRetroPreviewLayoutState(previewLayoutState);
-    onFitWidthChange(normalized.isFitWidthEnabled);
-    setIsPreviewMaximized(normalized.isPreviewMaximized);
-    setIsPreviewPinned(normalized.isPreviewPinned);
-    setIsAutoPreviewPinned(false);
-    setAutoPinnedHiddenOffset(0);
+    setIsPreviewMaximized((current) => (
+      current === normalized.isPreviewMaximized ? current : normalized.isPreviewMaximized
+    ));
+    setIsPreviewPinned((current) => (
+      current === normalized.isPreviewPinned ? current : normalized.isPreviewPinned
+    ));
+    setIsAutoPreviewPinned((current) => (current ? false : current));
+    setAutoPinnedHiddenOffset((current) => (current === 0 ? current : 0));
     if (!normalized.isPreviewPinned) {
-      setPinnedPreviewMetrics(null);
+      setPinnedPreviewMetricsIfChanged(null);
     }
   }, [
-    onFitWidthChange,
     previewLayoutState,
     previewLayoutState?.isPreviewMaximized,
     previewLayoutState?.isPreviewPinned,
     previewLayoutState?.isFitWidthEnabled,
+    setPinnedPreviewMetricsIfChanged,
   ]);
 
   // Tooltip timer cleanup on unmount.
@@ -347,8 +388,8 @@ export function RetroPreviewView({
     setIsPreviewPinned(false);
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
-    setPinnedPreviewMetrics(null);
-  }, [isPreviewMaximized]);
+    setPinnedPreviewMetricsIfChanged(null);
+  }, [isPreviewMaximized, setPinnedPreviewMetricsIfChanged]);
 
   // Fit Width ON: reset pin state (after render so layout has settled).
   React.useEffect(() => {
@@ -357,8 +398,8 @@ export function RetroPreviewView({
     setIsPreviewPinned(false);
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
-    setPinnedPreviewMetrics(null);
-  }, [isFitWidthEnabled]);
+    setPinnedPreviewMetricsIfChanged(null);
+  }, [isFitWidthEnabled, setPinnedPreviewMetricsIfChanged]);
 
   // Reset the transient "starting" UI once playback either begins or falls
   // back to a manual retry state.
@@ -377,7 +418,7 @@ export function RetroPreviewView({
       return;
     }
 
-    const updateAutoPin = () => {
+    const updateAutoPinNow = () => {
       const anchor = previewAnchorRef.current;
       const shell = previewShellRef.current;
       if (!anchor || !shell) return;
@@ -394,7 +435,7 @@ export function RetroPreviewView({
           setAutoPinnedHiddenOffset(Math.max(120, maxHiddenHeight));
           const nextMetrics = measurePinnedPreviewMetrics();
           if (nextMetrics) {
-            setPinnedPreviewMetrics(nextMetrics);
+            setPinnedPreviewMetricsIfChanged(nextMetrics);
           }
           return true;
         }
@@ -412,15 +453,34 @@ export function RetroPreviewView({
       });
     };
 
-    updateAutoPin();
-    window.addEventListener("scroll", updateAutoPin, { passive: true });
-    window.addEventListener("resize", updateAutoPin);
+    const scheduleUpdateAutoPin = () => {
+      if (autoPinFrameRef.current !== null) return;
+      autoPinFrameRef.current = window.requestAnimationFrame(() => {
+        autoPinFrameRef.current = null;
+        updateAutoPinNow();
+      });
+    };
+
+    updateAutoPinNow();
+    window.addEventListener("scroll", scheduleUpdateAutoPin, { passive: true });
+    window.addEventListener("resize", scheduleUpdateAutoPin);
 
     return () => {
-      window.removeEventListener("scroll", updateAutoPin);
-      window.removeEventListener("resize", updateAutoPin);
+      if (autoPinFrameRef.current !== null) {
+        window.cancelAnimationFrame(autoPinFrameRef.current);
+        autoPinFrameRef.current = null;
+      }
+      window.removeEventListener("scroll", scheduleUpdateAutoPin);
+      window.removeEventListener("resize", scheduleUpdateAutoPin);
     };
-  }, [controlPanelMode, isFitWidthEnabled, isPreviewMaximized, isPreviewPinned, measurePinnedPreviewMetrics]);
+  }, [
+    controlPanelMode,
+    isFitWidthEnabled,
+    isPreviewMaximized,
+    isPreviewPinned,
+    measurePinnedPreviewMetrics,
+    setPinnedPreviewMetricsIfChanged,
+  ]);
 
   // Keep pinned shell metrics in sync with layout changes.
   React.useEffect(() => {
@@ -428,23 +488,35 @@ export function RetroPreviewView({
       (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
 
     if (!shouldPinPreview) {
-      setPinnedPreviewMetrics(null);
+      setPinnedPreviewMetricsIfChanged(null);
       return;
     }
 
-    const updatePinnedMetrics = () => {
+    const updatePinnedMetricsNow = () => {
       const nextMetrics = measurePinnedPreviewMetrics();
       if (!nextMetrics) return;
-      setPinnedPreviewMetrics(nextMetrics);
+      setPinnedPreviewMetricsIfChanged(nextMetrics);
     };
 
-    updatePinnedMetrics();
-    window.addEventListener("resize", updatePinnedMetrics);
-    window.addEventListener("scroll", updatePinnedMetrics, { passive: true });
+    const schedulePinnedMetricsUpdate = () => {
+      if (pinnedMetricsFrameRef.current !== null) return;
+      pinnedMetricsFrameRef.current = window.requestAnimationFrame(() => {
+        pinnedMetricsFrameRef.current = null;
+        updatePinnedMetricsNow();
+      });
+    };
+
+    updatePinnedMetricsNow();
+    window.addEventListener("resize", schedulePinnedMetricsUpdate);
+    window.addEventListener("scroll", schedulePinnedMetricsUpdate, { passive: true });
 
     return () => {
-      window.removeEventListener("resize", updatePinnedMetrics);
-      window.removeEventListener("scroll", updatePinnedMetrics);
+      if (pinnedMetricsFrameRef.current !== null) {
+        window.cancelAnimationFrame(pinnedMetricsFrameRef.current);
+        pinnedMetricsFrameRef.current = null;
+      }
+      window.removeEventListener("resize", schedulePinnedMetricsUpdate);
+      window.removeEventListener("scroll", schedulePinnedMetricsUpdate);
     };
   }, [
     controlPanelMode,
@@ -454,18 +526,28 @@ export function RetroPreviewView({
     isFitWidthEnabled,
     measurePinnedPreviewMetrics,
     player.sourceDimensions,
+    setPinnedPreviewMetricsIfChanged,
   ]);
 
   // Refresh canvas layout when pin/maximize state changes.
   React.useEffect(() => {
-    player.refreshLayout();
+    scheduleRefreshLayout();
   }, [
     isPreviewPinned,
     isPreviewMaximized,
-    player.refreshLayout,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
+    scheduleRefreshLayout,
   ]);
+
+  React.useEffect(() => {
+    return () => {
+      if (refreshLayoutFrameRef.current !== null) {
+        window.cancelAnimationFrame(refreshLayoutFrameRef.current);
+        refreshLayoutFrameRef.current = null;
+      }
+    };
+  }, []);
 
   // --- Computed values ---
 
@@ -566,11 +648,16 @@ export function RetroPreviewView({
   }, [isPinnedPreview, onIsPinnedPreviewChange]);
 
   React.useEffect(() => {
-    onPreviewLayoutStateChange?.(normalizeRetroPreviewLayoutState({
+    const nextState = normalizeRetroPreviewLayoutState({
       isFitWidthEnabled,
       isPreviewMaximized,
       isPreviewPinned: isPinnedPreview,
-    }));
+    });
+    if (areRetroPreviewLayoutStatesEqual(emittedPreviewLayoutStateRef.current, nextState)) {
+      return;
+    }
+    emittedPreviewLayoutStateRef.current = nextState;
+    onPreviewLayoutStateChange?.(nextState);
   }, [
     isFitWidthEnabled,
     isPinnedPreview,
