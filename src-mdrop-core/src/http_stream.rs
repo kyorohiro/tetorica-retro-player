@@ -20,6 +20,7 @@ const HLS_TRANSCODE_SCALE_FILTER: &str =
     "scale=640:360:force_original_aspect_ratio=decrease:force_divisible_by=2";
 const HLS_TRANSCODE_FPS: &str = "15";
 const HLS_SEGMENT_DURATION_SECONDS: &str = "4";
+const HLS_VIDEO_AUDIO_BITRATE: &str = "96k";
 
 /// Serve HLS playlist for a directly registered file.
 pub async fn hls_playlist(
@@ -519,7 +520,7 @@ async fn start_hls_for_path(
                 "-g", "60",
                 "-keyint_min", "60",
                 "-force_key_frames", "expr:gte(t,n_forced*2)",
-                "-c:a", "aac", "-b:a", "128k",
+                "-c:a", "aac", "-b:a", HLS_VIDEO_AUDIO_BITRATE,
             ],
             50,
             "ffmpeg-qsv.log"
@@ -540,7 +541,7 @@ async fn start_hls_for_path(
                 "-keyint_min", "60",
                 "-sc_threshold", "0",
                 "-force_key_frames", "expr:gte(t,n_forced*2)",
-                "-c:a", "aac", "-b:a", "128k",
+                "-c:a", "aac", "-b:a", HLS_VIDEO_AUDIO_BITRATE,
             ],
             150,
             "ffmpeg-libx264.log"
@@ -569,7 +570,7 @@ async fn start_hls_for_path(
                 "-keyint_min", "60",
                 "-sc_threshold", "0",
                 "-force_key_frames", "expr:gte(t,n_forced*2)",
-                "-c:a", "aac", "-b:a", "128k",
+                "-c:a", "aac", "-b:a", HLS_VIDEO_AUDIO_BITRATE,
             ],
             150,
             "ffmpeg-libx264.log"
@@ -831,7 +832,10 @@ async fn wait_for_existing_or_starting_session(
 
 #[cfg(test)]
 mod tests {
-    use super::{HLS_SEGMENT_DURATION_SECONDS, HLS_TRANSCODE_FPS, HLS_TRANSCODE_SCALE_FILTER};
+    use super::{
+        HLS_SEGMENT_DURATION_SECONDS, HLS_TRANSCODE_FPS, HLS_TRANSCODE_SCALE_FILTER,
+        HLS_VIDEO_AUDIO_BITRATE,
+    };
 
     #[test]
     fn transcode_scale_filter_is_fixed_to_640x360() {
@@ -845,5 +849,6 @@ mod tests {
     fn transcode_profile_keeps_expected_fps_and_segment_duration() {
         assert_eq!(HLS_TRANSCODE_FPS, "15");
         assert_eq!(HLS_SEGMENT_DURATION_SECONDS, "4");
+        assert_eq!(HLS_VIDEO_AUDIO_BITRATE, "96k");
     }
 }
