@@ -6,7 +6,7 @@ import { usePreviewDialog } from "./usePreviewDialog";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
 import { getFfmpegStreamingEnabled, listenFfmpegStreamingEnabled } from "./ffmpegPreference";
-import { isAudio, isBrowserPlayableVideo, isVideoExtended } from "./utils";
+import { isAudio, isBrowserPlayableVideo, isVideo, isVideoExtended } from "./utils";
 
 type Options = {
   files: SharedFileInfo[];
@@ -23,6 +23,9 @@ function sharedToTargetFile(f: SharedFileInfo): TargetFile {
     size: 0,
   };
 }
+
+const audioStreamUrl = (apiServer: string, file: TargetFile) =>
+  `${apiServer}/audio-hls/${encodeURIComponent(file.id)}/index.m3u8`;
 
 export function useMDropSharedListDialog() {
   const { showDialog } = useDialog();
@@ -85,7 +88,13 @@ function MDropSharedListDialog({
 
     const canPlayDirect = isBrowserPlayableVideo(file.path) || isAudio(file.path);
     const canPlayWithFfmpeg = currentUseHls && (isVideoExtended(file.path) || isAudio(file.path));
-    const options: { value: string; label: string; description: string }[] = [];
+    const options: {
+      value: string;
+      label: string;
+      description: string;
+      longPressValue?: string;
+      longPressDescription?: string;
+    }[] = [];
 
     if (canPlayDirect) {
       options.push({
@@ -100,6 +109,8 @@ function MDropSharedListDialog({
         value: "ffmpeg",
         label: "ffmpeg",
         description: "Open through ffmpeg HLS playback.",
+        longPressValue: "ffmpeg-audio",
+        longPressDescription: "Long press: audio-only AAC stream.",
       });
     }
 
@@ -127,13 +138,23 @@ function MDropSharedListDialog({
     }
 
     const forceFfmpeg = action === "ffmpeg";
+    const forceFfmpegAudio = action === "ffmpeg-audio";
+    const playableFiles = forceFfmpegAudio
+      ? targetFiles.filter((target) => isVideo(target.path) || isVideoExtended(target.path) || isAudio(target.path))
+      : targetFiles;
+    const initialPlayableIndex = playableFiles.findIndex((target) => target.id === file.id);
     await showPreviewDialog({
-      files: targetFiles,
-      initialIndex: fileIndex,
+      files: playableFiles,
+      initialIndex: initialPlayableIndex >= 0 ? initialPlayableIndex : fileIndex,
       isRetro: true,
-      useHls: forceFfmpeg,
+      useHls: forceFfmpeg || forceFfmpegAudio,
+      forcedKind: forceFfmpegAudio ? "audio" : undefined,
       getObjectUrl: async (target) =>
-        forceFfmpeg ? `${apiServer}/hls/${target.id}/index.m3u8` : getObjectUrl(target),
+        forceFfmpeg
+          ? `${apiServer}/hls/${target.id}/index.m3u8`
+          : forceFfmpegAudio
+            ? audioStreamUrl(apiServer, target)
+            : getObjectUrl(target),
     });
   };
 

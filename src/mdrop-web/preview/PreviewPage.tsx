@@ -31,6 +31,7 @@ export type PreviewPageProps = {
     file: TargetFile;
     isRetro?: boolean;
     useHls?: boolean;
+    forcedKind?: "audio" | "video" | "image";
     apiServer?: string;
     coverSrc?: string;
     getObjectUrl?: (
@@ -44,12 +45,27 @@ export function PreviewPage({
     file,
     isRetro = false,
     useHls = false,
+    forcedKind,
     apiServer = "",
     getObjectUrl,
     onLoadingMessage,
     coverSrc,
 }: PreviewPageProps) {
-    const isVideoHere = useHls ? isVideoExtended(file.path) : isVideo(file.path);
+    const isVideoHere =
+        forcedKind === "video"
+            ? (useHls ? isVideoExtended(file.path) : isVideo(file.path))
+            : forcedKind === "audio"
+                ? false
+                : useHls
+                    ? isVideoExtended(file.path)
+                    : isVideo(file.path);
+    const resolvedKind =
+        forcedKind ??
+        (isVideoHere
+            ? "video"
+            : isAudio(file.path)
+                ? "audio"
+                : "image");
     const [status, setStatus] = React.useState<PreviewPageStatus>("none");
     const [src, setSrc] = React.useState("");
     const [text, setText] = React.useState("");
@@ -174,7 +190,7 @@ export function PreviewPage({
         );
     }
 
-    if (isRetro && (isVideoHere || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+    if (isRetro && (resolvedKind === "video" || resolvedKind === "audio" || isImage(file.path) || isHeic(file.path))) {
         return (
             <div className="mx-auto w-full max-w-6xl touch-manipulation">
                 <React.Suspense
@@ -189,13 +205,8 @@ export function PreviewPage({
                 >
                     <RetroPlayer
                         src={src}
-                        kind={
-                            isVideoHere
-                                ? "video"
-                                : isAudio(file.path)
-                                    ? "audio"
-                                : "image"
-                        }
+                        kind={resolvedKind}
+                        looping={forcedKind === "audio" ? false : undefined}
                         autoPlay={false}
                         className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
                     />
@@ -204,7 +215,7 @@ export function PreviewPage({
         );
     }
 
-    if (isVideoHere) {
+    if (resolvedKind === "video") {
         return (
             <video
                 src={src}
@@ -215,7 +226,7 @@ export function PreviewPage({
         );
     }
 
-    if (isAudio(file.path)) {
+    if (resolvedKind === "audio") {
         return (
             <div className="w-full max-w-2xl px-6 text-center">
                 <div className="mb-4 break-all text-sm text-slate-300">

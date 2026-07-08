@@ -575,12 +575,32 @@ impl SharedHttpServerContext {
                 get(http_stream::hls_playlist),
             )
             .route(
+                "/audio-hls/{id}/index.m3u8",
+                get(http_stream::audio_hls_playlist),
+            )
+            .route(
                 "/hls/{id}/{filename}",
                 get(http_stream::hls_segment),
             )
             .route(
+                "/audio/{id}/stream.m4a",
+                get(http_stream::audio_stream),
+            )
+            .route(
                 "/hls-sub/{folder_id}/{*subpath}",
                 get(http_stream::hls_sub_playlist),
+            )
+            .route(
+                "/audio-hls-sub/{folder_id}/{*subpath}",
+                get(http_stream::audio_hls_sub_playlist),
+            )
+            .route(
+                "/audio-sub/{folder_id}/{*subpath}",
+                get(http_stream::audio_sub_stream),
+            )
+            .route(
+                "/audio-sub-m4a/{folder_id}/{filename}",
+                get(http_stream::audio_sub_stream_m4a),
             )
             .route(
                 "/hls/cleanup",

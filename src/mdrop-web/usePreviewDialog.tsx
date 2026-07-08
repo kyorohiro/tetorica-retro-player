@@ -12,6 +12,7 @@ type PreviewDialogOptions = {
     initialIndex: number;
     isRetro?: boolean;
     useHls?: boolean;
+    forcedKind?: "audio" | "video" | "image";
     apiServer?: string;
     coverSrc?: string;
     getObjectUrl?: (
@@ -64,6 +65,7 @@ function PreviewDialog({
     initialIndex,
     isRetro = false,
     useHls = false,
+    forcedKind,
     apiServer = "",
     coverSrc,
     getObjectUrl,
@@ -208,6 +210,7 @@ function PreviewDialog({
                     file={file}
                     isRetro={isRetro}
                     useHls={useHls}
+                    forcedKind={forcedKind}
                     apiServer={apiServer}
                     getObjectUrl={getObjectUrl}
                     onLoadingMessage={setLoadingMessage}
