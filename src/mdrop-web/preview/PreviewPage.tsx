@@ -1,4 +1,5 @@
 import React from "react";
+import type { RetroPreviewLayoutState } from "../../retro-player/previewLayoutState";
 import type { TargetFile } from "../api";
 import {
     heicToObjectUrl,
@@ -39,6 +40,8 @@ export type PreviewPageProps = {
         onProgress?: (loaded: number, total: number) => void
     ) => Promise<string>;
     onLoadingMessage?: (message: string) => void;
+    previewLayoutState?: RetroPreviewLayoutState;
+    onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
 };
 
 export function PreviewPage({
@@ -50,6 +53,8 @@ export function PreviewPage({
     getObjectUrl,
     onLoadingMessage,
     coverSrc,
+    previewLayoutState,
+    onPreviewLayoutStateChange,
 }: PreviewPageProps) {
     const isVideoHere =
         forcedKind === "video"
@@ -208,6 +213,8 @@ export function PreviewPage({
                         kind={resolvedKind}
                         looping={forcedKind === "audio" ? false : undefined}
                         autoPlay={false}
+                        previewLayoutState={previewLayoutState}
+                        onPreviewLayoutStateChange={onPreviewLayoutStateChange}
                         className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
                     />
                 </React.Suspense>

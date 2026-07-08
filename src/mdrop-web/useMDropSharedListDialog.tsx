@@ -5,13 +5,24 @@ import { SharedFileInfo } from "./tauri";
 import { usePreviewDialog } from "./usePreviewDialog";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import type { TargetFile } from "./api";
+import { useZipFileListDialog } from "./useZipFileListDialog";
 import {
   getFfmpegStreamingEnabled,
   getFfmpegStreamingMode,
   listenFfmpegStreamingEnabled,
   listenFfmpegStreamingMode,
 } from "./ffmpegPreference";
-import { isAudio, isBrowserPlayableVideo, isVideo, isVideoExtended } from "./utils";
+import {
+  isArchive,
+  isAudio,
+  isBrowserPlayableVideo,
+  isEpub,
+  isImage,
+  isPdf,
+  isText,
+  isVideo,
+  isVideoExtended,
+} from "./utils";
 
 type Options = {
   files: SharedFileInfo[];
@@ -66,6 +77,7 @@ function MDropSharedListDialog({
   const [currentFfmpegMode, setCurrentFfmpegMode] = React.useState(() => getFfmpegStreamingMode());
   const { showPreviewDialog } = usePreviewDialog();
   const { showMDropFileListDialog } = useMDropFileListDialog();
+  const { showZipFileListDialog } = useZipFileListDialog();
   const { showSelectDialog } = useDialog();
 
   React.useEffect(() => {
@@ -78,6 +90,14 @@ function MDropSharedListDialog({
   const targetFiles: TargetFile[] = files.filter((f) => !f.isDir).map(sharedToTargetFile);
   const urlMap = Object.fromEntries(files.map((f) => [f.id, f.url]));
   const getObjectUrl = async (file: TargetFile) => urlMap[file.id] ?? "";
+  const previewableFiles = targetFiles.filter((target) => (
+    isImage(target.path) ||
+    isBrowserPlayableVideo(target.path) ||
+    isText(target.path) ||
+    isAudio(target.path) ||
+    isPdf(target.path) ||
+    isEpub(target.path)
+  ));
 
   const apiServer = files.length > 0 ? new URL(files[0].url).origin : "http://localhost:7878";
 
@@ -93,15 +113,22 @@ function MDropSharedListDialog({
       return;
     }
 
-    const canPlayDirect = isBrowserPlayableVideo(file.path) || isAudio(file.path);
+    const canPreviewDirect =
+      isImage(file.path) ||
+      isBrowserPlayableVideo(file.path) ||
+      isText(file.path) ||
+      isAudio(file.path) ||
+      isPdf(file.path) ||
+      isEpub(file.path);
     const canPlayWithFfmpeg = currentUseHls && (isVideoExtended(file.path) || isAudio(file.path));
+    const canOpenArchive = isArchive(file.path);
     const options: {
       value: string;
       label: string;
       description: string;
     }[] = [];
 
-    if (canPlayDirect) {
+    if (canPreviewDirect) {
       options.push({
         value: "play",
         label: "Play",
@@ -116,6 +143,14 @@ function MDropSharedListDialog({
         description: currentFfmpegMode === "audio"
           ? "Open through ffmpeg audio-only HLS playback."
           : "Open through ffmpeg HLS playback.",
+      });
+    }
+
+    if (canOpenArchive) {
+      options.push({
+        value: "open-archive",
+        label: "Open archive",
+        description: "Browse files inside this archive.",
       });
     }
 
@@ -139,6 +174,31 @@ function MDropSharedListDialog({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      return;
+    }
+
+    if (action === "play") {
+      const initialIndex = previewableFiles.findIndex((target) => target.id === file.id);
+      if (initialIndex >= 0) {
+        await showPreviewDialog({
+          files: previewableFiles,
+          initialIndex,
+          isRetro: true,
+          getObjectUrl,
+        });
+      }
+      return;
+    }
+
+    if (action === "open-archive") {
+      await showZipFileListDialog({
+        title: file.name,
+        source: {
+          type: "url",
+          url: file.url,
+        },
+        initialPath: "/",
+      });
       return;
     }
 

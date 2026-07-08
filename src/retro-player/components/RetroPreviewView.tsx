@@ -15,6 +15,10 @@ import {
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
 import { useRetroAlarm } from "../hooks/useRetroAlarm";
+import {
+  normalizeRetroPreviewLayoutState,
+  type RetroPreviewLayoutState,
+} from "../previewLayoutState";
 import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
 import { AudioSpectrum } from "./AudioSpectrum";
 
@@ -114,6 +118,8 @@ export type RetroPreviewViewProps = {
   onError?: (error: Error) => void;
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
+  previewLayoutState?: RetroPreviewLayoutState;
+  onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
   analyserRef?: React.RefObject<AnalyserNode | null>;
   showVideoSpectrum?: boolean;
   showClockOverlay?: boolean;
@@ -141,6 +147,8 @@ export function RetroPreviewView({
   onError,
   fillHeight = false,
   onIsPinnedPreviewChange,
+  previewLayoutState,
+  onPreviewLayoutStateChange,
   analyserRef,
   showVideoSpectrum,
   showClockOverlay,
@@ -154,9 +162,11 @@ export function RetroPreviewView({
     [],
   );
   const [isPreviewMaximized, setIsPreviewMaximized] = React.useState(
-    persistedUiSettings?.isPreviewMaximized ?? false,
+    previewLayoutState?.isPreviewMaximized ?? persistedUiSettings?.isPreviewMaximized ?? false,
   );
-  const [isPreviewPinned, setIsPreviewPinned] = React.useState(false);
+  const [isPreviewPinned, setIsPreviewPinned] = React.useState(
+    previewLayoutState?.isPreviewPinned ?? false,
+  );
   const [isAutoPreviewPinned, setIsAutoPreviewPinned] = React.useState(false);
   const [autoPinnedHiddenOffset, setAutoPinnedHiddenOffset] = React.useState(0);
   const [brightness, setBrightness] = React.useState<number>(
@@ -199,12 +209,10 @@ export function RetroPreviewView({
   }, []);
 
   const handlePinToggle = React.useCallback(() => {
-    if (isFitWidthEnabled) {
-      onFitWidthChange(false);
-    }
-    if (isPreviewMaximized) {
-      setIsPreviewMaximized(false);
-    }
+    onFitWidthChange(false);
+    setIsPreviewMaximized(false);
+    setIsAutoPreviewPinned(false);
+    setAutoPinnedHiddenOffset(0);
 
     setIsPreviewPinned((current) => {
       const next = !current;
@@ -222,11 +230,29 @@ export function RetroPreviewView({
       return false;
     });
   }, [
-    isFitWidthEnabled,
-    isPreviewMaximized,
     measurePinnedPreviewMetrics,
     onFitWidthChange,
   ]);
+
+  const handleFitWidthToggle = React.useCallback(() => {
+    const next = !isFitWidthEnabled;
+    setIsPreviewMaximized(false);
+    setIsPreviewPinned(false);
+    setIsAutoPreviewPinned(false);
+    setAutoPinnedHiddenOffset(0);
+    setPinnedPreviewMetrics(null);
+    onFitWidthChange(next);
+  }, [isFitWidthEnabled, onFitWidthChange]);
+
+  const handleMaximizeToggle = React.useCallback(() => {
+    const next = !isPreviewMaximized;
+    setIsPreviewPinned(false);
+    setIsAutoPreviewPinned(false);
+    setAutoPinnedHiddenOffset(0);
+    setPinnedPreviewMetrics(null);
+    onFitWidthChange(false);
+    setIsPreviewMaximized(next);
+  }, [isPreviewMaximized, onFitWidthChange]);
 
   const {
     alarmTime,
@@ -268,6 +294,25 @@ export function RetroPreviewView({
       flipV,
     });
   }, [isHighResolution, isPreviewMaximized, renderResolutionPreset, brightness, flipH, flipV]);
+
+  React.useEffect(() => {
+    if (!previewLayoutState) return;
+    const normalized = normalizeRetroPreviewLayoutState(previewLayoutState);
+    onFitWidthChange(normalized.isFitWidthEnabled);
+    setIsPreviewMaximized(normalized.isPreviewMaximized);
+    setIsPreviewPinned(normalized.isPreviewPinned);
+    setIsAutoPreviewPinned(false);
+    setAutoPinnedHiddenOffset(0);
+    if (!normalized.isPreviewPinned) {
+      setPinnedPreviewMetrics(null);
+    }
+  }, [
+    onFitWidthChange,
+    previewLayoutState,
+    previewLayoutState?.isPreviewMaximized,
+    previewLayoutState?.isPreviewPinned,
+    previewLayoutState?.isFitWidthEnabled,
+  ]);
 
   // Tooltip timer cleanup on unmount.
   React.useEffect(() => {
@@ -519,6 +564,19 @@ export function RetroPreviewView({
   React.useEffect(() => {
     onIsPinnedPreviewChange?.(isPinnedPreview);
   }, [isPinnedPreview, onIsPinnedPreviewChange]);
+
+  React.useEffect(() => {
+    onPreviewLayoutStateChange?.(normalizeRetroPreviewLayoutState({
+      isFitWidthEnabled,
+      isPreviewMaximized,
+      isPreviewPinned: isPinnedPreview,
+    }));
+  }, [
+    isFitWidthEnabled,
+    isPinnedPreview,
+    isPreviewMaximized,
+    onPreviewLayoutStateChange,
+  ]);
 
   // --- Render ---
 
@@ -890,15 +948,9 @@ export function RetroPreviewView({
                   player.powerOn();
                 }}
                 onHighResolutionToggle={onHighResolutionToggle}
-                onFitWidthToggle={() => {
-                  if (!isFitWidthEnabled) setIsPreviewMaximized(false);
-                  onFitWidthChange(!isFitWidthEnabled);
-                }}
+                onFitWidthToggle={handleFitWidthToggle}
                 onPinToggle={handlePinToggle}
-                onMaximizeToggle={() => {
-                  if (!isPreviewMaximized) onFitWidthChange(false);
-                  setIsPreviewMaximized((c) => !c);
-                }}
+                onMaximizeToggle={handleMaximizeToggle}
                 onBrightnessChange={setBrightness}
                 onFlipHToggle={() => { setFlipH((v) => !v); }}
                 onFlipVToggle={() => { setFlipV((v) => !v); }}
@@ -948,15 +1000,9 @@ export function RetroPreviewView({
                 player.powerOn();
               }}
               onHighResolutionToggle={onHighResolutionToggle}
-              onFitWidthToggle={() => {
-                if (!isFitWidthEnabled) setIsPreviewMaximized(false);
-                onFitWidthChange(!isFitWidthEnabled);
-              }}
+              onFitWidthToggle={handleFitWidthToggle}
               onPinToggle={handlePinToggle}
-              onMaximizeToggle={() => {
-                if (!isPreviewMaximized) onFitWidthChange(false);
-                setIsPreviewMaximized((c) => !c);
-              }}
+              onMaximizeToggle={handleMaximizeToggle}
               onBrightnessChange={setBrightness}
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
@@ -1005,15 +1051,9 @@ export function RetroPreviewView({
                 player.powerOn();
               }}
               onHighResolutionToggle={onHighResolutionToggle}
-              onFitWidthToggle={() => {
-                if (!isFitWidthEnabled) setIsPreviewMaximized(false);
-                onFitWidthChange(!isFitWidthEnabled);
-              }}
+              onFitWidthToggle={handleFitWidthToggle}
               onPinToggle={handlePinToggle}
-              onMaximizeToggle={() => {
-                if (!isPreviewMaximized) onFitWidthChange(false);
-                setIsPreviewMaximized((c) => !c);
-              }}
+              onMaximizeToggle={handleMaximizeToggle}
               onBrightnessChange={setBrightness}
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
@@ -1062,15 +1102,9 @@ export function RetroPreviewView({
               player.powerOn();
             }}
             onHighResolutionToggle={onHighResolutionToggle}
-            onFitWidthToggle={() => {
-              if (!isFitWidthEnabled) setIsPreviewMaximized(false);
-              onFitWidthChange(!isFitWidthEnabled);
-            }}
+            onFitWidthToggle={handleFitWidthToggle}
             onPinToggle={handlePinToggle}
-            onMaximizeToggle={() => {
-              if (!isPreviewMaximized) onFitWidthChange(false);
-              setIsPreviewMaximized((c) => !c);
-            }}
+            onMaximizeToggle={handleMaximizeToggle}
             onBrightnessChange={setBrightness}
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
@@ -1119,15 +1153,9 @@ export function RetroPreviewView({
               player.powerOn();
             }}
             onHighResolutionToggle={onHighResolutionToggle}
-            onFitWidthToggle={() => {
-              if (!isFitWidthEnabled) setIsPreviewMaximized(false);
-              onFitWidthChange(!isFitWidthEnabled);
-            }}
+            onFitWidthToggle={handleFitWidthToggle}
             onPinToggle={handlePinToggle}
-            onMaximizeToggle={() => {
-              if (!isPreviewMaximized) onFitWidthChange(false);
-              setIsPreviewMaximized((c) => !c);
-            }}
+            onMaximizeToggle={handleMaximizeToggle}
             onBrightnessChange={setBrightness}
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
