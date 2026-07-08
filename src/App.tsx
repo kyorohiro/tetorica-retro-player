@@ -41,7 +41,12 @@ import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
 import { useMDropFileListDialog } from "./mdrop-web/useMDropFileListDialog";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
-import { setFfmpegStreamingEnabled } from "./mdrop-web/ffmpegPreference";
+import {
+  getFfmpegStreamingMode,
+  setFfmpegStreamingEnabled,
+  setFfmpegStreamingMode,
+  type FfmpegStreamingMode,
+} from "./mdrop-web/ffmpegPreference";
 import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
 
 const waitForExternalNavigationPause = async () => {
@@ -55,6 +60,9 @@ function App() {
   const retroPlayerPlusRef = useRef<RetroPlayerPlusHandle>(null);
   const filePickerRef = useRef<FilePickerHandle>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
+  const [ffmpegStreamingMode, setFfmpegStreamingModeState] = React.useState<FfmpegStreamingMode>(
+    () => getFfmpegStreamingMode(),
+  );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   type LoopMode = "one" | "autoplay" | "all" | "off";
@@ -120,14 +128,33 @@ function App() {
   }, [localePreference]);
 
   const isFfmpegEnabledRef = React.useRef(isFfmpegEnabled);
+  const ffmpegStreamingModeRef = React.useRef<FfmpegStreamingMode>(ffmpegStreamingMode);
   React.useEffect(() => {
     isFfmpegEnabledRef.current = isFfmpegEnabled;
     setFfmpegStreamingEnabled(isFfmpegEnabled);
   }, [isFfmpegEnabled]);
+  React.useEffect(() => {
+    ffmpegStreamingModeRef.current = ffmpegStreamingMode;
+    setFfmpegStreamingMode(ffmpegStreamingMode);
+  }, [ffmpegStreamingMode]);
+
+  const {
+    isHolding: isFfmpegHolding,
+    ...ffmpegLongPressHandlers
+  } = useLongPress(
+    () => {
+      setIsFfmpegEnabled(true);
+      setFfmpegStreamingModeState((current) => current === "audio" ? "video" : "audio");
+    },
+    () => {
+      setIsFfmpegEnabled((current) => !current);
+    },
+  );
 
   useMDropDragDrop({
     isMDropReadyRef,
     isFfmpegEnabledRef,
+    ffmpegStreamingModeRef,
     loopModeRef,
     retroPlayerPlusRef,
     showBrowserFileListDialog,
@@ -512,20 +539,38 @@ function App() {
             {isMDropReady && (
               <button
                 type="button"
-                aria-label={isFfmpegEnabled ? "ffmpeg: ON" : "ffmpeg: OFF"}
+                aria-label={
+                  isFfmpegEnabled
+                    ? ffmpegStreamingMode === "audio"
+                      ? "ffmpeg audio: ON"
+                      : "ffmpeg: ON"
+                    : "ffmpeg: OFF"
+                }
                 title={locale === "ja"
-                  ? isFfmpegEnabled ? "ffmpeg ストリーミング: ON (クリックで OFF)" : "ffmpeg ストリーミング: OFF (クリックで ON)"
-                  : isFfmpegEnabled ? "ffmpeg streaming: ON (click to disable)" : "ffmpeg streaming: OFF (click to enable)"}
-                onClick={() => setIsFfmpegEnabled((v) => !v)}
+                  ? isFfmpegEnabled
+                    ? ffmpegStreamingMode === "audio"
+                      ? "ffmpeg 音声モード: ON (クリックで OFF / 長押しで通常 ffmpeg)"
+                      : "ffmpeg ストリーミング: ON (クリックで OFF / 長押しで音声モード)"
+                    : "ffmpeg ストリーミング: OFF (クリックで ON / 長押しで音声モード ON)"
+                  : isFfmpegEnabled
+                    ? ffmpegStreamingMode === "audio"
+                      ? "ffmpeg audio mode: ON (click to disable / long press for normal ffmpeg)"
+                      : "ffmpeg streaming: ON (click to disable / long press for audio mode)"
+                    : "ffmpeg streaming: OFF (click to enable / long press for audio mode)"}
+                {...ffmpegLongPressHandlers}
                 className={[
                   "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-md backdrop-blur-sm transition",
-                  isFfmpegEnabled
+                  isFfmpegHolding
+                    ? "border-fuchsia-400/80 bg-fuchsia-500/30 text-fuchsia-700"
+                    : isFfmpegEnabled && ffmpegStreamingMode === "audio"
+                    ? "border-fuchsia-400/80 bg-fuchsia-500/20 text-fuchsia-700 hover:bg-fuchsia-500/30"
+                    : isFfmpegEnabled
                     ? "border-violet-400/80 bg-violet-500/20 text-violet-700 hover:bg-violet-500/30"
                     : "border-slate-300/80 bg-white/88 text-slate-500 hover:bg-white",
                 ].join(" ")}
               >
                 <Waves size={13} />
-                <span>ffmpeg</span>
+                <span>{ffmpegStreamingMode === "audio" ? "ffmpeg audio" : "ffmpeg"}</span>
               </button>
             )}
           </div>

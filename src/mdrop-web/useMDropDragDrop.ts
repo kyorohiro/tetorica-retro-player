@@ -7,10 +7,12 @@ import { resolvePlayableUrl } from "./resolvePlayableSource";
 import { useMDropSharedListDialog } from "./useMDropSharedListDialog";
 import { isAudio, isImage, isVideo, isVideoExtended, mimeFromPath } from "./utils";
 import type { useBrowserFileListDialog } from "./useBrowserFileListDialog";
+import type { FfmpegStreamingMode } from "./ffmpegPreference";
 
 type Params = {
   isMDropReadyRef: React.RefObject<boolean>;
   isFfmpegEnabledRef: React.RefObject<boolean>;
+  ffmpegStreamingModeRef: React.RefObject<FfmpegStreamingMode>;
   loopModeRef: React.RefObject<"one" | "autoplay" | "all" | "off">;
   retroPlayerPlusRef: React.RefObject<MediaPlaybackTarget | null>;
   showBrowserFileListDialog: ReturnType<typeof useBrowserFileListDialog>["showBrowserFileListDialog"];
@@ -21,6 +23,7 @@ type Params = {
 export function useMDropDragDrop({
   isMDropReadyRef,
   isFfmpegEnabledRef,
+  ffmpegStreamingModeRef,
   loopModeRef,
   retroPlayerPlusRef,
   showBrowserFileListDialog,
@@ -71,7 +74,11 @@ export function useMDropDragDrop({
             const raw = await Promise.all(paths.map((p) => mdropShareFile(p)));
             const sharedFiles = raw.map((f) => ({
               ...f,
-              url: resolvePlayableUrl(f, isFfmpegEnabledRef.current),
+              url: resolvePlayableUrl(
+                f,
+                isFfmpegEnabledRef.current,
+                ffmpegStreamingModeRef.current,
+              ),
             }));
             const mediaShared = sharedFiles.filter((f) => !f.isDir && (isVideoExtended(f.path) || isAudio(f.path) || isImage(f.path)));
             const isPlaylistMode = (loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaShared.length > 1 && mediaShared.length === sharedFiles.length;

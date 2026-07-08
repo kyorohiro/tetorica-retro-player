@@ -3,7 +3,12 @@ import { File, Folder, Loader, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, getFiles } from "./api";
 import { downloadUrl, usePreviewDialog } from "./usePreviewDialog";
-import { getFfmpegStreamingEnabled, listenFfmpegStreamingEnabled } from "./ffmpegPreference";
+import {
+    getFfmpegStreamingEnabled,
+    getFfmpegStreamingMode,
+    listenFfmpegStreamingEnabled,
+    listenFfmpegStreamingMode,
+} from "./ffmpegPreference";
 import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideo, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
@@ -84,6 +89,7 @@ function FileListDialog({
     const [currentUseHls, setCurrentUseHls] = useState(
         () => useHls || getFfmpegStreamingEnabled()
     );
+    const [currentFfmpegMode, setCurrentFfmpegMode] = useState(() => getFfmpegStreamingMode());
     const [path, setPath] = useState(initialPath);
     const [files, setFiles] = useState<TargetFile[]>([]);
     const [sort, setSort] = useState<SortMode>("comic");
@@ -98,6 +104,7 @@ function FileListDialog({
     }, [useHls]);
 
     React.useEffect(() => listenFfmpegStreamingEnabled(setCurrentUseHls), []);
+    React.useEffect(() => listenFfmpegStreamingMode(setCurrentFfmpegMode), []);
 
 
     const load = React.useCallback(
@@ -270,8 +277,6 @@ function FileListDialog({
                 value: string;
                 label: string;
                 description: string;
-                longPressValue?: string;
-                longPressDescription?: string;
             }[] = [];
 
             if (canPlayDirect) {
@@ -286,9 +291,9 @@ function FileListDialog({
                 options.push({
                     value: "ffmpeg",
                     label: "ffmpeg",
-                    description: "Open through ffmpeg HLS playback.",
-                    longPressValue: "ffmpeg-audio",
-                    longPressDescription: "Long press: audio-only AAC stream.",
+                    description: currentFfmpegMode === "audio"
+                        ? "Open through ffmpeg audio-only HLS playback."
+                        : "Open through ffmpeg HLS playback.",
                 });
             }
 
@@ -319,12 +324,7 @@ function FileListDialog({
             }
 
             if (action === "ffmpeg") {
-                await openPreview(file, "ffmpeg");
-                return;
-            }
-
-            if (action === "ffmpeg-audio") {
-                await openPreview(file, "ffmpeg-audio");
+                await openPreview(file, currentFfmpegMode === "audio" ? "ffmpeg-audio" : "ffmpeg");
                 return;
             }
 
@@ -345,7 +345,7 @@ function FileListDialog({
                 downloadFile(file);
             }
         },
-        [apiServer, currentUseHls, downloadFile, openPreview, showSelectDialog, showZipFileListDialog]
+        [apiServer, currentFfmpegMode, currentUseHls, downloadFile, openPreview, showSelectDialog, showZipFileListDialog]
     );
 
     return (
