@@ -6,32 +6,33 @@ var DEFAULT_AUDIO_SETTINGS = {
   playbackRate: 1,
   isLooping: true,
   isAudioFxEnabled: true,
-  lofiAmount: 0.58,
+  lofiAmount: 0,
   radioToneAmount: 0,
-  bitCrushAmount: 0.1,
+  bitCrushAmount: 0,
   bitCrushNoiseAmount: 0,
-  sampleRateReductionAmount: 0.1,
+  sampleRateReductionAmount: 0,
   noiseReductionAmount: 0,
   bassAmount: 0,
-  midAmount: -0.25,
+  midAmount: 0,
   trebleAmount: 0,
   stereoWidthAmount: 0,
   smallSpeakerRoomAmount: 0,
   wowFlutterAmount: 0,
-  isNoiseEnabled: true,
-  noiseLevel: 1e-3,
+  isNoiseEnabled: false,
+  noiseLevel: 0,
   vinylDustAmount: 0,
-  noiseWarmthAmount: 0.33,
-  noiseAirAmount: 0.55,
-  noisePresenceAmount: 0.5,
+  noiseWarmthAmount: 0,
+  noiseAirAmount: 0,
+  noisePresenceAmount: 0,
   delayAmount: 0,
   reverbAmount: 0,
   chorusAmount: 0,
   tapeSaturationAmount: 0,
   compressorAmount: 0,
-  fxOutputTrimAmount: 0.66,
+  fxOutputTrimAmount: 1,
   inputTrimAmount: 1
 };
+var defaultAudioPresetId = "lofi";
 var RETRO_AUDIO_PRESET_PARTIALS = {
   none: {
     label: "None",
@@ -308,6 +309,7 @@ var RETRO_AUDIO_PRESETS = Object.fromEntries(
 var RETRO_AUDIO_PRESET_SETTINGS = Object.fromEntries(
   Object.entries(RETRO_AUDIO_PRESETS).map(([key, preset]) => [key, preset.settings])
 );
+var DEFAULT_AUDIO_PRESET_SETTINGS = RETRO_AUDIO_PRESET_SETTINGS[defaultAudioPresetId];
 
 // src/retro-player/audio/audioChainEngine.ts
 function createDriveCurve(amount) {
@@ -452,7 +454,7 @@ function resolveRetroAudioSettings({
 }) {
   return {
     ...DEFAULT_AUDIO_SETTINGS,
-    ...preset ? RETRO_AUDIO_PRESET_SETTINGS[preset] : null,
+    ...RETRO_AUDIO_PRESET_SETTINGS[preset ?? defaultAudioPresetId],
     ...params
   };
 }
@@ -673,7 +675,7 @@ var TetoricaRetroAudioNode = class {
     return { ...this.currentSettings };
   }
   setParams(nextParams, isPartialUpdate = true) {
-    const nextSettings = isPartialUpdate ? { ...this.currentSettings, ...nextParams } : { ...DEFAULT_AUDIO_SETTINGS, ...nextParams };
+    const nextSettings = isPartialUpdate ? { ...this.currentSettings, ...nextParams } : { ...DEFAULT_AUDIO_PRESET_SETTINGS, ...nextParams };
     Object.assign(this.currentSettings, nextSettings);
     this.updateAudioNodes();
   }
