@@ -48,6 +48,7 @@ import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
 import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
 import { useMDropFileListDialog } from "./mdrop-web/useMDropFileListDialog";
+import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
 import {
   getFfmpegStreamingMode,
@@ -71,6 +72,12 @@ const basenameOfPath = (value: string) => value.split(/[\\/]/).pop() || value;
 
 const recentPlaylistLabel = (paths: string[]) => {
   if (paths.length === 0) return "Playlist";
+  if (paths.length === 1) return basenameOfPath(paths[0]);
+  return `${basenameOfPath(paths[0])} +${paths.length - 1}`;
+};
+
+const recentFileListLabel = (paths: string[]) => {
+  if (paths.length === 0) return "File list";
   if (paths.length === 1) return basenameOfPath(paths[0]);
   return `${basenameOfPath(paths[0])} +${paths.length - 1}`;
 };
@@ -114,6 +121,7 @@ function App() {
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showPreviewDialog } = usePreviewDialog();
   const { showMDropFileListDialog } = useMDropFileListDialog();
+  const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const {
     isMDropReady,
     mDropPort,
@@ -183,6 +191,18 @@ function App() {
     refreshRecentLaunch();
   }, [isNativeMdropAvailable, refreshRecentLaunch]);
 
+  const rememberRecentFileList = React.useCallback((paths: string[]) => {
+    if (!isNativeMdropAvailable || paths.length === 0) return;
+    upsertPersistedRecentLaunchItem({
+      id: recentLaunchId("file-list", paths),
+      type: "file-list",
+      label: recentFileListLabel(paths),
+      paths,
+      pinned: false,
+    });
+    refreshRecentLaunch();
+  }, [isNativeMdropAvailable, refreshRecentLaunch]);
+
   const openRecentLaunchItem = React.useCallback(async (item: PersistedRecentLaunchItem) => {
     if (!isNativeMdropAvailable || !isMDropReadyRef.current) return;
     if (item.type === "folder") {
@@ -201,6 +221,26 @@ function App() {
       return;
     }
 
+    if (item.type === "file-list") {
+      if (item.paths.length === 0) return;
+      await mdropUnshareAll().catch(() => {});
+      const sharedFiles = await Promise.all(item.paths.map(async (path) => {
+        const shared = await mdropShareFile(path);
+        return {
+          ...shared,
+          url: resolvePlayableUrl(shared, isFfmpegEnabledRef.current),
+        };
+      }));
+      await showMDropSharedListDialog({
+        files: sharedFiles,
+        useHls: isFfmpegEnabledRef.current,
+        onPlay: (url, path) => {
+          retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
+        },
+      });
+      return;
+    }
+
     if (item.paths.length === 0) return;
     await mdropUnshareAll().catch(() => {});
     const sharedItems = await Promise.all(item.paths.map(async (path) => {
@@ -214,7 +254,7 @@ function App() {
       sharedItems.map((entry) => ({ url: entry.url, path: entry.path })),
       item.startIndex ?? 0,
     );
-  }, [isMDropReadyRef, isNativeMdropAvailable, isFfmpegEnabledRef, showMDropFileListDialog]);
+  }, [isMDropReadyRef, isNativeMdropAvailable, isFfmpegEnabledRef, showMDropFileListDialog, showMDropSharedListDialog]);
 
   const handleOpenRecentLaunchItem = React.useCallback(async (item: PersistedRecentLaunchItem) => {
     setIsMobileMenuOpen(false);
@@ -282,6 +322,7 @@ function App() {
     retroPlayerPlusRef,
     showBrowserFileListDialog,
     onRememberFolderPath: rememberRecentFolder,
+    onRememberFileListPaths: rememberRecentFileList,
   });
 
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
