@@ -15,6 +15,14 @@ import {
   t,
   type LocalePreference,
 } from "./i18n";
+import {
+  loadPersistedRecentLaunchSettings,
+  removePersistedRecentLaunchItem,
+  setPersistedRecentLaunchBootItem,
+  setPersistedRecentLaunchPinned,
+  upsertPersistedRecentLaunchItem,
+  type PersistedRecentLaunchItem,
+} from "./retro-player/hooks/persistedRetroSettings";
 import { usePreviewSourceState } from "./retro-player/hooks/usePreviewSourceState";
 import {
   isTauriRuntime,
@@ -56,6 +64,17 @@ const waitForExternalNavigationPause = async () => {
   });
 };
 
+const recentLaunchId = (type: PersistedRecentLaunchItem["type"], paths: string[]) =>
+  `${type}:${paths.join("\n")}`;
+
+const basenameOfPath = (value: string) => value.split(/[\\/]/).pop() || value;
+
+const recentPlaylistLabel = (paths: string[]) => {
+  if (paths.length === 0) return "Playlist";
+  if (paths.length === 1) return basenameOfPath(paths[0]);
+  return `${basenameOfPath(paths[0])} +${paths.length - 1}`;
+};
+
 function App() {
   const retroPlayerPlusRef = useRef<RetroPlayerPlusHandle>(null);
   const filePickerRef = useRef<FilePickerHandle>(null);
@@ -74,9 +93,11 @@ function App() {
   }, []);
   const [isDialogActive, setIsDialogActive] = React.useState(false);
   const [isWindowAlwaysOnTop, setIsWindowAlwaysOnTop] = React.useState(false);
+  const [recentLaunch, setRecentLaunch] = React.useState(() => loadPersistedRecentLaunchSettings());
   const [localePreference, setLocalePreference] = React.useState<LocalePreference>(
     () => loadLocalePreference(),
   );
+  const bootLaunchAttemptedRef = React.useRef<string | null>(null);
   const isIosOrAndroid = React.useMemo(() => {
     if (typeof navigator === "undefined") return false;
 
@@ -129,6 +150,92 @@ function App() {
 
   const isFfmpegEnabledRef = React.useRef(isFfmpegEnabled);
   const ffmpegStreamingModeRef = React.useRef<FfmpegStreamingMode>(ffmpegStreamingMode);
+
+  const refreshRecentLaunch = React.useCallback(() => {
+    setRecentLaunch(loadPersistedRecentLaunchSettings());
+  }, []);
+
+  const rememberRecentPlaylist = React.useCallback((
+    paths: string[],
+    startIndex = 0,
+  ) => {
+    if (!isNativeMdropAvailable || paths.length === 0) return;
+    upsertPersistedRecentLaunchItem({
+      id: recentLaunchId("playlist", paths),
+      type: "playlist",
+      label: recentPlaylistLabel(paths),
+      paths,
+      startIndex,
+      pinned: false,
+    });
+    refreshRecentLaunch();
+  }, [isNativeMdropAvailable, refreshRecentLaunch]);
+
+  const rememberRecentFolder = React.useCallback((path: string) => {
+    if (!isNativeMdropAvailable || !path) return;
+    upsertPersistedRecentLaunchItem({
+      id: recentLaunchId("folder", [path]),
+      type: "folder",
+      label: basenameOfPath(path),
+      paths: [path],
+      pinned: false,
+    });
+    refreshRecentLaunch();
+  }, [isNativeMdropAvailable, refreshRecentLaunch]);
+
+  const openRecentLaunchItem = React.useCallback(async (item: PersistedRecentLaunchItem) => {
+    if (!isNativeMdropAvailable || !isMDropReadyRef.current) return;
+    if (item.type === "folder") {
+      const path = item.paths[0];
+      if (!path) return;
+      await mdropUnshareAll().catch(() => {});
+      const shared = await mdropShareFile(path);
+      if (!shared.isDir) return;
+      await showMDropFileListDialog({
+        title: shared.name,
+        apiServer: new URL(shared.url).origin,
+        targetId: shared.id,
+        initialPath: "/",
+        useHls: isFfmpegEnabledRef.current,
+      });
+      return;
+    }
+
+    if (item.paths.length === 0) return;
+    await mdropUnshareAll().catch(() => {});
+    const sharedItems = await Promise.all(item.paths.map(async (path) => {
+      const shared = await mdropShareFile(path);
+      return {
+        path,
+        url: resolvePlayableUrl(shared, isFfmpegEnabledRef.current),
+      };
+    }));
+    retroPlayerPlusRef.current?.loadPaths(
+      sharedItems.map((entry) => ({ url: entry.url, path: entry.path })),
+      item.startIndex ?? 0,
+    );
+  }, [isMDropReadyRef, isNativeMdropAvailable, isFfmpegEnabledRef, showMDropFileListDialog]);
+
+  const handleOpenRecentLaunchItem = React.useCallback(async (item: PersistedRecentLaunchItem) => {
+    setIsMobileMenuOpen(false);
+    await waitForExternalNavigationPause();
+    await openRecentLaunchItem(item);
+  }, [openRecentLaunchItem]);
+
+  const handleRemoveRecentLaunchItem = React.useCallback((id: string) => {
+    removePersistedRecentLaunchItem(id);
+    refreshRecentLaunch();
+  }, [refreshRecentLaunch]);
+
+  const handleToggleRecentLaunchPinned = React.useCallback((id: string, pinned: boolean) => {
+    setPersistedRecentLaunchPinned(id, pinned);
+    refreshRecentLaunch();
+  }, [refreshRecentLaunch]);
+
+  const handleToggleRecentLaunchBoot = React.useCallback((id: string, enabled: boolean) => {
+    setPersistedRecentLaunchBootItem(enabled ? id : null);
+    refreshRecentLaunch();
+  }, [refreshRecentLaunch]);
   React.useEffect(() => {
     isFfmpegEnabledRef.current = isFfmpegEnabled;
     setFfmpegStreamingEnabled(isFfmpegEnabled);
@@ -137,6 +244,22 @@ function App() {
     ffmpegStreamingModeRef.current = ffmpegStreamingMode;
     setFfmpegStreamingMode(ffmpegStreamingMode);
   }, [ffmpegStreamingMode]);
+
+  React.useEffect(() => {
+    const bootItemId = recentLaunch.bootItemId ?? null;
+    if (!bootItemId) {
+      bootLaunchAttemptedRef.current = null;
+      return;
+    }
+    if (!isNativeMdropAvailable || !isMDropReady) return;
+    if (bootLaunchAttemptedRef.current === bootItemId) return;
+    const item = recentLaunch.items.find((entry) => entry.id === bootItemId);
+    if (!item) return;
+    bootLaunchAttemptedRef.current = bootItemId;
+    void openRecentLaunchItem(item).catch((error) => {
+      console.error("[recent boot] failed:", error);
+    });
+  }, [isMDropReady, isNativeMdropAvailable, openRecentLaunchItem, recentLaunch]);
 
   const {
     isHolding: isFfmpegHolding,
@@ -158,6 +281,7 @@ function App() {
     loopModeRef,
     retroPlayerPlusRef,
     showBrowserFileListDialog,
+    onRememberFolderPath: rememberRecentFolder,
   });
 
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
@@ -380,6 +504,7 @@ function App() {
       setIsMobileMenuOpen(false);
       const selected = await open({ directory: true, multiple: false });
       if (!selected || Array.isArray(selected)) return;
+      rememberRecentFolder(selected as string);
       await mdropUnshareAll().catch(() => {});
       const shared = await mdropShareFile(selected as string);
       if (!shared.isDir) return;
@@ -394,7 +519,7 @@ function App() {
     }
 
     filePickerRef.current?.openFolderInput();
-  }, [isFfmpegEnabled, isIosOrAndroid, isMDropReady, isNativeMdropAvailable, showMDropFileListDialog]);
+  }, [isFfmpegEnabled, isIosOrAndroid, isMDropReady, isNativeMdropAvailable, rememberRecentFolder, showMDropFileListDialog]);
 
   const handleOpenDisplayCapture = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -586,6 +711,9 @@ function App() {
           locale={locale}
           localePreference={localePreference}
           isIosOrAndroid={isIosOrAndroid}
+          recentItems={recentLaunch.items}
+          bootItemId={recentLaunch.bootItemId ?? null}
+          showRecentSection={isNativeMdropAvailable}
           onOpenFile={handleOpenFilePicker}
           onOpenFolder={handleOpenFolderPicker}
           onCapture={handleOpenDisplayCapture}
@@ -596,6 +724,10 @@ function App() {
           onPresetImage={() => { setIsMobileMenuOpen(false); retroPlayerPlusRef.current?.playPresetImage(); }}
           onPresetLofi={() => { setIsMobileMenuOpen(false); void retroPlayerPlusRef.current?.playPresetLofi(); }}
           onPresetDemoSong={(meta: DemoSongMeta) => { setIsMobileMenuOpen(false); void retroPlayerPlusRef.current?.playPresetDemoSong(meta); }}
+          onOpenRecentItem={(item) => { void handleOpenRecentLaunchItem(item); }}
+          onRemoveRecentItem={handleRemoveRecentLaunchItem}
+          onToggleRecentItemPinned={handleToggleRecentLaunchPinned}
+          onToggleRecentItemBoot={handleToggleRecentLaunchBoot}
           onChangeLocale={handleChangeLocale}
           onOpenLicenses={handleOpenLicenses}
         />
@@ -646,6 +778,9 @@ function App() {
           showDialogPreviewForBrowserFiles={showDialogPreviewForBrowserFiles}
           loopMode={loopMode}
           onCycleLoopMode={cycleLoopMode}
+          onPathPlaylistLoaded={(items, startIndex) => {
+            rememberRecentPlaylist(items.map((item) => item.path), startIndex);
+          }}
         />
 
       </div>

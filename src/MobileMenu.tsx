@@ -1,12 +1,16 @@
 import React from "react";
-import { Camera, FileUp, FolderOpen, Mic, MonitorUp, ScrollText } from "lucide-react";
+import { Camera, FileUp, FolderOpen, Mic, MonitorUp, Pin, Play, Power, ScrollText, X } from "lucide-react";
 import { t, type Locale, type LocalePreference } from "./i18n";
+import type { PersistedRecentLaunchItem } from "./retro-player/hooks/persistedRetroSettings";
 import { DEMO_SONGS, type DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
 
 interface MobileMenuProps {
   locale: Locale;
   localePreference: LocalePreference;
   isIosOrAndroid: boolean;
+  recentItems: PersistedRecentLaunchItem[];
+  bootItemId: string | null;
+  showRecentSection: boolean;
   onOpenFile: () => void;
   onOpenFolder: () => void;
   onCapture: () => void;
@@ -17,6 +21,10 @@ interface MobileMenuProps {
   onPresetImage: () => void;
   onPresetLofi: () => void;
   onPresetDemoSong: (meta: DemoSongMeta) => void;
+  onOpenRecentItem: (item: PersistedRecentLaunchItem) => void;
+  onRemoveRecentItem: (id: string) => void;
+  onToggleRecentItemPinned: (id: string, pinned: boolean) => void;
+  onToggleRecentItemBoot: (id: string, enabled: boolean) => void;
   onChangeLocale: (pref: LocalePreference) => void;
   onOpenLicenses: () => void;
 }
@@ -25,6 +33,9 @@ export function MobileMenu({
   locale,
   localePreference,
   isIosOrAndroid,
+  recentItems,
+  bootItemId,
+  showRecentSection,
   onOpenFile,
   onOpenFolder,
   onCapture,
@@ -35,6 +46,10 @@ export function MobileMenu({
   onPresetImage,
   onPresetLofi,
   onPresetDemoSong,
+  onOpenRecentItem,
+  onRemoveRecentItem,
+  onToggleRecentItemPinned,
+  onToggleRecentItemBoot,
   onChangeLocale,
   onOpenLicenses,
 }: MobileMenuProps) {
@@ -103,6 +118,91 @@ export function MobileMenu({
           {t(locale, "inputMicrophoneDevice")}
         </button>
       </div>
+
+      {showRecentSection && (
+        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2">
+          <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            {t(locale, "recent")}
+          </p>
+          {recentItems.length === 0 ? (
+            <p className="px-1 py-1 text-xs text-slate-400">
+              {t(locale, "recentEmpty")}
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {recentItems.map((item) => {
+                const isBoot = bootItemId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-slate-200 bg-white p-2"
+                  >
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onOpenRecentItem(item)}
+                        className="min-w-0 flex-1 rounded-lg px-1 py-0.5 text-left transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-2">
+                          {item.type === "folder" ? (
+                            <FolderOpen className="h-4 w-4 shrink-0 text-amber-600" />
+                          ) : (
+                            <Play className="h-4 w-4 shrink-0 text-sky-600" />
+                          )}
+                          <span className="min-w-0 truncate text-sm font-medium text-slate-800">
+                            {item.label}
+                          </span>
+                        </div>
+                        <div className="mt-1 pl-6 text-[11px] text-slate-400">
+                          {item.type === "folder"
+                            ? t(locale, "recentFolder")
+                            : `${t(locale, "recentPlaylist")}${item.paths.length > 1 ? ` · ${item.paths.length} ${t(locale, "recentItemsSuffix")}` : ""}`}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveRecentItem(item.id)}
+                        className="rounded-lg p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        aria-label={t(locale, "removeRecentItem")}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5 pl-1">
+                      <button
+                        type="button"
+                        onClick={() => onToggleRecentItemPinned(item.id, !item.pinned)}
+                        className={[
+                          "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition",
+                          item.pinned
+                            ? "border-amber-400 bg-amber-50 text-amber-700"
+                            : "border-slate-300 bg-white text-slate-500 hover:border-slate-400",
+                        ].join(" ")}
+                      >
+                        <Pin className={`h-3.5 w-3.5 ${item.pinned ? "fill-amber-500" : ""}`} />
+                        {t(locale, "pinItem")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onToggleRecentItemBoot(item.id, !isBoot)}
+                        className={[
+                          "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition",
+                          isBoot
+                            ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                            : "border-slate-300 bg-white text-slate-500 hover:border-slate-400",
+                        ].join(" ")}
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                        {t(locale, "bootItem")}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Test presets */}
       <div className="mt-2">

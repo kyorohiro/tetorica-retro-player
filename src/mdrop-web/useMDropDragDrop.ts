@@ -16,6 +16,7 @@ type Params = {
   loopModeRef: React.RefObject<"one" | "autoplay" | "all" | "off">;
   retroPlayerPlusRef: React.RefObject<MediaPlaybackTarget | null>;
   showBrowserFileListDialog: ReturnType<typeof useBrowserFileListDialog>["showBrowserFileListDialog"];
+  onRememberFolderPath?: (path: string) => void;
 };
 
 // Wires up the two Tauri-only ways media can arrive from outside the app
@@ -27,6 +28,7 @@ export function useMDropDragDrop({
   loopModeRef,
   retroPlayerPlusRef,
   showBrowserFileListDialog,
+  onRememberFolderPath,
 }: Params) {
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const lastDragLogRef = useRef<{ type: string; at: number } | null>(null);
@@ -85,6 +87,15 @@ export function useMDropDragDrop({
             if (sharedFiles.length === 1 && mediaShared.length === 1) {
               const f = sharedFiles[0];
               retroPlayerPlusRef.current?.loadPaths([{ url: f.url, path: f.path }]);
+            } else if (sharedFiles.length === 1 && sharedFiles[0].isDir) {
+              onRememberFolderPath?.(paths[0]);
+              await showMDropSharedListDialogRef.current({
+                files: sharedFiles,
+                useHls: isFfmpegEnabledRef.current,
+                onPlay: (url, path) => {
+                  retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
+                },
+              });
             } else if (isPlaylistMode) {
               retroPlayerPlusRef.current?.loadPaths(mediaShared.map((f) => ({ url: f.url, path: f.path })));
             } else {

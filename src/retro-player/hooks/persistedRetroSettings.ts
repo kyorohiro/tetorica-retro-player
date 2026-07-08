@@ -97,13 +97,31 @@ export type PersistedRetroUiSettings = {
   flipV: boolean;
 };
 
+export type PersistedRecentLaunchItem = {
+  id: string;
+  type: "playlist" | "folder";
+  label: string;
+  paths: string[];
+  startIndex?: number;
+  pinned: boolean;
+  updatedAt: number;
+};
+
+export type PersistedRecentLaunchSettings = {
+  items: PersistedRecentLaunchItem[];
+  bootItemId?: string | null;
+};
+
 type PersistedRetroSettings = {
   version: number;
   filter?: PersistedRetroFilterSettings;
   audio?: PersistedRetroAudioSettings;
   ui?: PersistedRetroUiSettings;
   preferredAudioInputDeviceId?: string;
+  recentLaunch?: PersistedRecentLaunchSettings;
 };
+
+const MAX_RECENT_LAUNCH_ITEMS = 3;
 
 const readSettings = (): PersistedRetroSettings | null => {
   if (typeof window === "undefined") return null;
@@ -136,6 +154,134 @@ export const loadPersistedRetroSettings = () => readSettings();
 export const getPreferredAudioInputDeviceId = (): string | null =>
   readSettings()?.preferredAudioInputDeviceId ?? null;
 
+const normalizeRecentLaunchSettings = (
+  recent: PersistedRecentLaunchSettings | undefined,
+): PersistedRecentLaunchSettings => {
+  const items = Array.isArray(recent?.items)
+    ? recent.items.filter((item): item is PersistedRecentLaunchItem => {
+      if (!item || typeof item !== "object") return false;
+      if (item.type !== "playlist" && item.type !== "folder") return false;
+      if (typeof item.id !== "string" || item.id.length === 0) return false;
+      if (typeof item.label !== "string") return false;
+      if (!Array.isArray(item.paths) || item.paths.some((path) => typeof path !== "string")) return false;
+      return true;
+    })
+    : [];
+
+  const nextItems = items
+    .map((item) => ({
+      ...item,
+      pinned: Boolean(item.pinned),
+      updatedAt: Number.isFinite(item.updatedAt) ? item.updatedAt : 0,
+    }))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_RECENT_LAUNCH_ITEMS);
+
+  const bootItemId = typeof recent?.bootItemId === "string"
+    && nextItems.some((item) => item.id === recent.bootItemId)
+    ? recent.bootItemId
+    : null;
+
+  return {
+    items: nextItems,
+    bootItemId,
+  };
+};
+
+const writeRecentLaunchSettings = (recentLaunch: PersistedRecentLaunchSettings) => {
+  const current = readSettings();
+
+  writeSettings({
+    version: STORAGE_VERSION,
+    audio: current?.audio,
+    filter: current?.filter,
+    ui: current?.ui,
+    preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
+    recentLaunch,
+  });
+};
+
+const trimRecentLaunchItems = (
+  items: PersistedRecentLaunchItem[],
+): PersistedRecentLaunchItem[] => {
+  const nextItems = [...items].sort((a, b) => b.updatedAt - a.updatedAt);
+  while (nextItems.length > MAX_RECENT_LAUNCH_ITEMS) {
+    let removableIndex = -1;
+    for (let index = nextItems.length - 1; index >= 0; index -= 1) {
+      if (!nextItems[index].pinned) {
+        removableIndex = index;
+        break;
+      }
+    }
+    if (removableIndex < 0) {
+      nextItems.pop();
+      continue;
+    }
+    nextItems.splice(removableIndex, 1);
+  }
+  return nextItems;
+};
+
+export const loadPersistedRecentLaunchSettings = (): PersistedRecentLaunchSettings =>
+  normalizeRecentLaunchSettings(readSettings()?.recentLaunch);
+
+export const savePersistedRecentLaunchSettings = (
+  recentLaunch: PersistedRecentLaunchSettings,
+) => {
+  writeRecentLaunchSettings(normalizeRecentLaunchSettings(recentLaunch));
+};
+
+export const upsertPersistedRecentLaunchItem = (
+  item: Omit<PersistedRecentLaunchItem, "updatedAt"> & { updatedAt?: number },
+) => {
+  const current = loadPersistedRecentLaunchSettings();
+  const updatedAt = item.updatedAt ?? Date.now();
+  const existing = current.items.find((entry) => entry.id === item.id);
+  const nextItems = trimRecentLaunchItems([
+    {
+      ...item,
+      pinned: existing?.pinned ?? item.pinned,
+      updatedAt,
+    },
+    ...current.items.filter((entry) => entry.id !== item.id),
+  ]);
+
+  writeRecentLaunchSettings({
+    items: nextItems,
+    bootItemId: nextItems.some((entry) => entry.id === current.bootItemId)
+      ? current.bootItemId
+      : null,
+  });
+};
+
+export const removePersistedRecentLaunchItem = (id: string) => {
+  const current = loadPersistedRecentLaunchSettings();
+  const nextItems = current.items.filter((item) => item.id !== id);
+  writeRecentLaunchSettings({
+    items: nextItems,
+    bootItemId: current.bootItemId === id ? null : current.bootItemId,
+  });
+};
+
+export const setPersistedRecentLaunchPinned = (id: string, pinned: boolean) => {
+  const current = loadPersistedRecentLaunchSettings();
+  const nextItems = current.items.map((item) => (
+    item.id === id ? { ...item, pinned } : item
+  ));
+  writeRecentLaunchSettings({
+    items: trimRecentLaunchItems(nextItems),
+    bootItemId: current.bootItemId,
+  });
+};
+
+export const setPersistedRecentLaunchBootItem = (id: string | null) => {
+  const current = loadPersistedRecentLaunchSettings();
+  writeRecentLaunchSettings({
+    items: current.items,
+    bootItemId: id && current.items.some((item) => item.id === id) ? id : null,
+  });
+};
+
 export const savePersistedRetroFilterSettings = (
   filter: PersistedRetroFilterSettings,
 ) => {
@@ -147,6 +293,7 @@ export const savePersistedRetroFilterSettings = (
     filter,
     ui: current?.ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
+    recentLaunch: current?.recentLaunch,
   });
 };
 
@@ -161,6 +308,7 @@ export const savePersistedRetroAudioSettings = (
     filter: current?.filter,
     ui: current?.ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
+    recentLaunch: current?.recentLaunch,
   });
 };
 
@@ -175,6 +323,7 @@ export const savePersistedRetroUiSettings = (
     filter: current?.filter,
     ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
+    recentLaunch: current?.recentLaunch,
   });
 };
 
@@ -187,6 +336,7 @@ export const setPreferredAudioInputDeviceId = (deviceId: string | null) => {
     filter: current?.filter,
     ui: current?.ui,
     preferredAudioInputDeviceId: deviceId ?? undefined,
+    recentLaunch: current?.recentLaunch,
   });
 };
 

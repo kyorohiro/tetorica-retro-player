@@ -58,6 +58,7 @@ type RetroPlayerPlusProps = {
   showDialogPreviewForBrowserFiles: (files: FileList | File[]) => Promise<void>;
   loopMode: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode: () => void;
+  onPathPlaylistLoaded?: (items: { url: string; path: string }[], startIndex: number) => void;
 };
 
 export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlayerPlusProps>(
@@ -74,6 +75,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       showDialogPreviewForBrowserFiles,
       loopMode,
       onCycleLoopMode,
+      onPathPlaylistLoaded,
     },
     ref,
   ) {
@@ -377,6 +379,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       if (items.length === 0) return;
       if (items.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForPath(items[0].url, items[0].path);
+        onPathPlaylistLoaded?.(items, startIndex);
         return;
       }
       const target = items[startIndex] ?? items[0];
@@ -387,7 +390,8 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       currentPresetConfigRef.current = { type: "url", url: target.url, label: target.path };
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
-    }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
+      onPathPlaylistLoaded?.(items, startIndex);
+    }, [onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
     const loadFiles = useCallback((files: File[], startIndex = 0) => {
       if (files.length === 0) return;
