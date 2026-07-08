@@ -104,22 +104,22 @@ input[type="range"] {
   }
 
   .safe-top-offset {
-    top: 0.75rem;
+    top: max(0.0rem, env(safe-area-inset-top));
     left: calc(env(safe-area-inset-left) + 0.75rem);
   }
 
   .safe-top-menu {
-    top: 0.75rem;
+    top: max(0.0rem, env(safe-area-inset-top));
     left: calc(env(safe-area-inset-left) + 3.75rem);
   }
 
   .safe-top-right-offset {
-    top: 0.75rem;
+    top: max(0.0rem, env(safe-area-inset-top));
     right: calc(env(safe-area-inset-right) + 0.75rem);
   }
 
   .safe-top-offset-right {
-    top: 0.75rem;
+    top: max(0.0rem, env(safe-area-inset-top));
   }
 
   .safe-sticky-top {
