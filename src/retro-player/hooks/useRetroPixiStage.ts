@@ -76,6 +76,7 @@ export function useRetroPixiStage({
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutTimeoutRef = useRef<number | null>(null);
+  const observedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
   const filterReadyPromiseRef = useRef<Promise<void> | null>(null);
   const resolveFilterReadyRef = useRef<(() => void) | null>(null);
   const viewportRectRef = useRef<{
@@ -86,12 +87,7 @@ export function useRetroPixiStage({
   } | null>(null);
   const [isRendererReady, setIsRendererReady] = useState(false);
   const [isFilterReady, setIsFilterReady] = useState(false);
-  const [viewportRect, setViewportRect] = useState<{
-    width: number;
-    height: number;
-    x: number;
-    y: number;
-  } | null>(null);
+  const viewportRect = viewportRectRef.current;
 
   filterStateRef.current = filterState;
   isPoweredOnRef.current = isPoweredOn;
@@ -104,14 +100,22 @@ export function useRetroPixiStage({
       y: number;
     } | null>,
   ) => {
-    setViewportRect((current) => {
-      const resolved =
-        typeof nextValue === "function"
-          ? nextValue(current)
-          : nextValue;
-      viewportRectRef.current = resolved;
-      return resolved;
-    });
+    const current = viewportRectRef.current;
+    const resolved =
+      typeof nextValue === "function"
+        ? nextValue(current)
+        : nextValue;
+    if (
+      current
+      && resolved
+      && current.width === resolved.width
+      && current.height === resolved.height
+      && current.x === resolved.x
+      && current.y === resolved.y
+    ) {
+      return;
+    }
+    viewportRectRef.current = resolved;
   }, []);
 
   const renderFrame = useCallback(() => {
@@ -254,10 +258,10 @@ export function useRetroPixiStage({
         : Math.min(screenWidth / sourceWidth, screenHeight / sourceHeight);
     const appliedScale = scale;
 
-    const nextWidth = sourceWidth * appliedScale;
-    const nextHeight = sourceHeight * appliedScale;
-    const nextX = (screenWidth - nextWidth) / 2;
-    const nextY = (screenHeight - nextHeight) / 2;
+    const nextWidth = Math.max(1, Math.round(sourceWidth * appliedScale));
+    const nextHeight = Math.max(1, Math.round(sourceHeight * appliedScale));
+    const nextX = Math.round((screenWidth - nextWidth) / 2);
+    const nextY = Math.round((screenHeight - nextHeight) / 2);
 
     const next = {
       width: nextWidth,
@@ -558,8 +562,31 @@ export function useRetroPixiStage({
     const host = canvasHostRef.current;
     if (!host) return;
 
+    const readHostSize = () => ({
+      width: Math.round(host.clientWidth),
+      height: Math.round(host.clientHeight),
+    });
+
+    const shouldRefreshForHostSize = (next: { width: number; height: number }) => {
+      const current = observedHostSizeRef.current;
+      if (current && current.width === next.width && current.height === next.height) {
+        return false;
+      }
+      observedHostSizeRef.current = next;
+      return true;
+    };
+
+    observedHostSizeRef.current = readHostSize();
+
     if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const next = {
+          width: Math.round(entry.contentRect.width),
+          height: Math.round(entry.contentRect.height),
+        };
+        if (!shouldRefreshForHostSize(next)) return;
         scheduleRefreshLayout();
       });
       observer.observe(host);
@@ -569,6 +596,7 @@ export function useRetroPixiStage({
     }
 
     const handleResize = () => {
+      if (!shouldRefreshForHostSize(readHostSize())) return;
       scheduleRefreshLayout();
     };
 
