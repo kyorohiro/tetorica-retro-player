@@ -55,29 +55,29 @@ type DebugEventCallback = (label: string, payload: Record<string, unknown>) => v
 // still-transcoding (EVENT-type, no #EXT-X-ENDLIST yet) streams to appear
 // to end early. hls.js implements manifest polling and end-of-stream
 // detection itself via MediaSource, independent of that native behavior.
-const hlsInstances = new WeakMap<HTMLVideoElement, Hls>();
-const hlsSourceUrls = new WeakMap<HTMLVideoElement, string>();
+const hlsInstances = new WeakMap<HTMLMediaElement, Hls>();
+const hlsSourceUrls = new WeakMap<HTMLMediaElement, string>();
 
 export const isHlsUrl = (url: string): boolean => url.includes(".m3u8");
 
-export const getHlsInstance = (video: HTMLVideoElement): Hls | undefined =>
-  hlsInstances.get(video);
+export const getHlsInstance = (media: HTMLMediaElement): Hls | undefined =>
+  hlsInstances.get(media);
 
-export const getHlsSourceUrl = (video: HTMLVideoElement): string | undefined =>
-  hlsSourceUrls.get(video);
+export const getHlsSourceUrl = (media: HTMLMediaElement): string | undefined =>
+  hlsSourceUrls.get(media);
 
-export const destroyHlsInstance = (video: HTMLVideoElement): void => {
-  const hls = hlsInstances.get(video);
-  hlsSourceUrls.delete(video);
+export const destroyHlsInstance = (media: HTMLMediaElement): void => {
+  const hls = hlsInstances.get(media);
+  hlsSourceUrls.delete(media);
   if (!hls) return;
   hls.destroy();
-  hlsInstances.delete(video);
+  hlsInstances.delete(media);
 };
 
-const canUseNativeHls = (video: HTMLVideoElement): boolean =>
+const canUseNativeHls = (media: HTMLMediaElement): boolean =>
   Boolean(
-    video.canPlayType("application/vnd.apple.mpegurl") ||
-    video.canPlayType("application/x-mpegURL"),
+    media.canPlayType("application/vnd.apple.mpegurl") ||
+    media.canPlayType("application/x-mpegURL"),
   );
 
 /**
@@ -89,8 +89,8 @@ const canUseNativeHls = (video: HTMLVideoElement): boolean =>
  * and only once truly unrecoverable, dispatch a synthetic native "error"
  * event to reuse all the existing native-error plumbing unchanged.
  */
-export const attachHlsSource = async (video: HTMLVideoElement, url: string): Promise<Hls> => {
-  destroyHlsInstance(video);
+export const attachHlsSource = async (media: HTMLMediaElement, url: string): Promise<Hls> => {
+  destroyHlsInstance(media);
 
   const { default: HlsCtor } = await import("hls.js");
   const hls = new HlsCtor({
@@ -104,9 +104,9 @@ export const attachHlsSource = async (video: HTMLVideoElement, url: string): Pro
   const logHls = (label: string, payload?: Record<string, unknown>) => {
     console.log("[retro-player hls]", label, {
       url,
-      currentSrc: video.currentSrc || video.src || null,
-      readyState: video.readyState,
-      networkState: video.networkState,
+      currentSrc: media.currentSrc || media.src || null,
+      readyState: media.readyState,
+      networkState: media.networkState,
       ...payload,
     });
   };
@@ -175,13 +175,13 @@ export const attachHlsSource = async (video: HTMLVideoElement, url: string): Pro
       default:
         break;
     }
-    destroyHlsInstance(video);
-    video.dispatchEvent(new Event("error"));
+    destroyHlsInstance(media);
+    media.dispatchEvent(new Event("error"));
   });
 
-  hlsInstances.set(video, hls);
-  hlsSourceUrls.set(video, url);
-  hls.attachMedia(video);
+  hlsInstances.set(media, hls);
+  hlsSourceUrls.set(media, url);
+  hls.attachMedia(media);
   return hls;
 };
 
@@ -336,7 +336,9 @@ export function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
     audio.addEventListener("loadedmetadata", handleReady, { once: true });
     audio.addEventListener("canplay", handleReady, { once: true });
     audio.addEventListener("error", handleError, { once: true });
-    audio.load();
+    if (!getHlsInstance(audio)) {
+      audio.load();
+    }
   });
 }
 
@@ -431,6 +433,12 @@ export async function createAudioMediaSource(
   const audio = document.createElement("audio");
   if ("stream" in options) {
     audio.srcObject = options.stream;
+  } else if (isHlsUrl(options.url)) {
+    if (canUseNativeHls(audio)) {
+      audio.src = options.url;
+    } else {
+      await attachHlsSource(audio, options.url);
+    }
   } else {
     audio.src = options.url;
   }

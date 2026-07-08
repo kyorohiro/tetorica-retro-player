@@ -1,12 +1,14 @@
 use axum::{
     body::Body,
-    extract::{Path, State as AxumState},
+    extract::{Path, Query, State as AxumState},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
 };
+use serde::Deserialize;
 use std::path::{Path as FsPath, PathBuf};
 use tokio::process::Command;
 use tokio::time::{sleep, Duration};
+use tokio_util::io::ReaderStream;
 
 use crate::http::SharedHttpServerContext;
 use crate::http_utils::apply_shared_security_headers;
@@ -62,6 +64,111 @@ pub async fn hls_sub_playlist(
 
     let tmp_dir = start_hls_for_path(&state, &session_id, &file_path, port).await?;
     serve_playlist(&tmp_dir).await
+}
+
+/// Serve audio-only HLS playlist for a directly registered file.
+pub async fn audio_hls_playlist(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path(id): Path<String>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let session_id = format!("audio-{id}");
+    let src_path = {
+        let ctx = state
+            .inner
+            .lock()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        ctx.files
+            .get(&id)
+            .cloned()
+            .ok_or((StatusCode::NOT_FOUND, "file not registered".to_string()))?
+    };
+    let port = {
+        let ctx = state
+            .inner
+            .lock()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        ctx.status.port.unwrap_or(7878)
+    };
+
+    if let Some(dir) = wait_for_existing_or_starting_session(&state, &session_id).await? {
+        state.touch_hls_session(&session_id);
+        return serve_playlist(&dir).await;
+    }
+
+    let tmp_dir = start_audio_hls_for_path(&state, &session_id, &src_path, port).await?;
+    state.touch_hls_session(&session_id);
+    serve_playlist(&tmp_dir).await
+}
+
+/// Serve audio-only HLS playlist for a file inside a registered folder.
+pub async fn audio_hls_sub_playlist(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path((folder_id, subpath)): Path<(String, String)>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let session_id = format!("audio-{}", sub_session_id(&folder_id, &subpath));
+
+    if let Some(dir) = wait_for_existing_or_starting_session(&state, &session_id).await? {
+        state.touch_hls_session(&session_id);
+        return serve_playlist(&dir).await;
+    }
+
+    let file_path = resolve_folder_subpath(&state, &folder_id, &subpath)?;
+    let port = {
+        let ctx = state
+            .inner
+            .lock()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        ctx.status.port.unwrap_or(7878)
+    };
+
+    let tmp_dir = start_audio_hls_for_path(&state, &session_id, &file_path, port).await?;
+    state.touch_hls_session(&session_id);
+    serve_playlist(&tmp_dir).await
+}
+
+/// Stream AAC-in-MP4 audio for a directly registered file id.
+pub async fn audio_stream(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path(id): Path<String>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let src_path = {
+        let ctx = state
+            .inner
+            .lock()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        ctx.files
+            .get(&id)
+            .cloned()
+            .ok_or((StatusCode::NOT_FOUND, "file not registered".to_string()))?
+    };
+
+    stream_audio_for_path(&state, &src_path).await
+}
+
+/// Stream AAC-in-MP4 audio for a file inside a registered folder.
+pub async fn audio_sub_stream(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path((folder_id, subpath)): Path<(String, String)>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let file_path = resolve_folder_subpath(&state, &folder_id, &subpath)?;
+    stream_audio_for_path(&state, &file_path).await
+}
+
+#[derive(Deserialize)]
+pub struct AudioSubStreamM4aQuery {
+    subpath: String,
+}
+
+/// Stream AAC-in-MP4 audio for a file inside a registered folder with an
+/// explicit .m4a suffix in the URL so Safari/WebKit recognizes it as an MP4
+/// audio resource instead of keying off the original source extension.
+pub async fn audio_sub_stream_m4a(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path((folder_id, _filename)): Path<(String, String)>,
+    Query(query): Query<AudioSubStreamM4aQuery>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let file_path = resolve_folder_subpath(&state, &folder_id, &query.subpath)?;
+    stream_audio_for_path(&state, &file_path).await
 }
 
 /// Serve an individual HLS segment (.ts).
@@ -129,6 +236,104 @@ async fn serve_playlist(tmp_dir: &PathBuf) -> Result<Response<Body>, (StatusCode
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     apply_shared_security_headers(&mut res);
     Ok(res)
+}
+
+async fn stream_audio_for_path(
+    state: &SharedHttpServerContext,
+    file_path: &PathBuf,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let input = file_path
+        .to_str()
+        .ok_or((StatusCode::BAD_REQUEST, "invalid file path".to_string()))?
+        .to_string();
+
+    let (ffmpeg_cmd, prewarm_rx) = {
+        let ctx = state.inner.lock().unwrap();
+        (
+            ctx.ffmpeg_path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("ffmpeg")),
+            ctx.ffmpeg_prewarm_rx.clone(),
+        )
+    };
+
+    if let Some(mut rx) = prewarm_rx {
+        if !*rx.borrow() {
+            let _ = tokio::time::timeout(Duration::from_secs(90), rx.changed()).await;
+        }
+    }
+
+    let mut cmd = new_ffmpeg_command(&ffmpeg_cmd);
+    cmd.args([
+        "-nostdin",
+        "-fflags",
+        "+genpts+discardcorrupt",
+        "-avoid_negative_ts",
+        "make_zero",
+        "-i",
+        &input,
+        "-vn",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+frag_keyframe+empty_moov+default_base_moof",
+        "-frag_duration",
+        "1000000",
+        "-f",
+        "mp4",
+        "pipe:1",
+    ])
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::null());
+
+    let mut child = cmd.spawn().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("ffmpeg launch failed: {e}"),
+        )
+    })?;
+
+    let stdout = child.stdout.take().ok_or((
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "ffmpeg stdout was not piped".to_string(),
+    ))?;
+
+    tokio::spawn(async move {
+        let _ = child.wait().await;
+    });
+
+    let stream = ReaderStream::new(stdout);
+    let body = Body::from_stream(stream);
+    let mut res = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "audio/mp4")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .body(body)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    apply_shared_security_headers(&mut res);
+    Ok(res)
+}
+
+fn resolve_folder_subpath(
+    state: &SharedHttpServerContext,
+    folder_id: &str,
+    subpath: &str,
+) -> Result<PathBuf, (StatusCode, String)> {
+    let folder_path = {
+        let ctx = state
+            .inner
+            .lock()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        ctx.files
+            .get(folder_id)
+            .cloned()
+            .ok_or((StatusCode::NOT_FOUND, "folder not registered".to_string()))?
+    };
+
+    let clean = subpath.trim_start_matches('/');
+    Ok(folder_path.join(clean))
 }
 
 /// Ensure an HLS session exists for a directly registered file id.
@@ -454,6 +659,129 @@ async fn start_hls_for_path(
 
     Ok(tmp_dir)
     }.await;
+
+    if start_result.is_err() {
+        state.finish_hls_session_start(session_id);
+    }
+
+    start_result
+}
+
+async fn start_audio_hls_for_path(
+    state: &SharedHttpServerContext,
+    session_id: &str,
+    file_path: &PathBuf,
+    port: u16,
+) -> Result<PathBuf, (StatusCode, String)> {
+    if !state.begin_hls_session_start(session_id) {
+        if let Some(dir) = wait_for_existing_or_starting_session(state, session_id).await? {
+            return Ok(dir);
+        }
+    }
+
+    let input = file_path
+        .to_str()
+        .ok_or((StatusCode::BAD_REQUEST, "invalid file path".to_string()))?
+        .to_string();
+
+    let tmp_dir = std::env::temp_dir().join(format!("retro-hls-{}", session_id));
+    if tmp_dir.exists() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+    std::fs::create_dir_all(&tmp_dir).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to create temp dir: {e}"),
+        )
+    })?;
+
+    let playlist = tmp_dir.join("index.m3u8");
+    let segment_pattern = tmp_dir.join("seg%03d.ts");
+
+    let start_result: Result<PathBuf, (StatusCode, String)> = async {
+        let (ffmpeg_cmd, prewarm_rx, max_hls_sessions, is_https) = {
+            let ctx = state.inner.lock().unwrap();
+            (
+                ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
+                ctx.ffmpeg_prewarm_rx.clone(),
+                ctx.ffmpeg_max_concurrent_hls_sessions.max(1),
+                ctx.status.is_https == Some(true),
+            )
+        };
+
+        let scheme = if is_https { "https" } else { "http" };
+        let base_url = format!("{scheme}://localhost:{}/hls/{}/", port, session_id);
+
+        state.enforce_hls_session_limit(max_hls_sessions.saturating_sub(1).max(1));
+
+        if let Some(mut rx) = prewarm_rx {
+            if !*rx.borrow() {
+                let _ = tokio::time::timeout(Duration::from_secs(90), rx.changed()).await;
+            }
+        }
+
+        let hls_common_args: Vec<&str> = vec![
+            "-f", "hls",
+            "-hls_time", "2",
+            "-hls_list_size", "0",
+            "-hls_playlist_type", "event",
+            "-hls_flags", "independent_segments",
+            "-muxpreload", "0",
+            "-muxdelay", "0",
+            "-hls_base_url", &base_url,
+            "-hls_segment_filename", segment_pattern.to_str().unwrap(),
+            playlist.to_str().unwrap(),
+        ];
+
+        let log_path = tmp_dir.join("ffmpeg-audio-hls.log");
+        let log_file = std::fs::File::create(&log_path).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to create ffmpeg log file: {e}"),
+            )
+        })?;
+        println!("[HLS audio] session={} ffmpeg log={}", session_id, log_path.display());
+
+        let mut cmd = new_ffmpeg_command(&ffmpeg_cmd);
+        cmd.args([
+            "-y",
+            "-fflags", "+genpts+discardcorrupt",
+            "-avoid_negative_ts", "make_zero",
+            "-i", &input,
+            "-vn",
+            "-c:a", "aac",
+            "-b:a", "128k",
+        ])
+        .args(&hls_common_args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::from(log_file));
+
+        let child = cmd.spawn().map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("ffmpeg launch failed: {e}"),
+            )
+        })?;
+
+        if wait_for_playlist_ready(&playlist, 80, Duration::from_millis(200)).await.is_err() {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "ffmpeg did not produce audio HLS output in time".to_string(),
+            ));
+        }
+
+        state.register_hls_session(session_id.to_string(), tmp_dir.clone(), child);
+        state.enforce_hls_session_limit(max_hls_sessions);
+
+        println!(
+            "[HLS audio] session ready session={} playlist={}",
+            session_id,
+            playlist.display()
+        );
+
+        Ok(tmp_dir)
+    }
+    .await;
 
     if start_result.is_err() {
         state.finish_hls_session_start(session_id);

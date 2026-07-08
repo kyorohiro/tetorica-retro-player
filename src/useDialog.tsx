@@ -7,6 +7,7 @@ import React, {
     useState,
     type ReactNode,
 } from "react";
+import { useLongPress } from "./retro-player/hooks/useLongPress";
 
 export const DIALOG_STACK_ACTIVE_EVENT = "tetorica-dialog-stack-active";
 
@@ -236,6 +237,8 @@ type SelectOption = {
     value: string;
     label: string;
     description?: React.ReactNode;
+    longPressValue?: string;
+    longPressDescription?: React.ReactNode;
     disabled?: boolean;
 };
 
@@ -265,28 +268,11 @@ const SelectDialog: React.FC<{
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
                 {options.options.map((opt) => (
-                    <button
+                    <SelectDialogOptionButton
                         key={opt.value}
-                        type="button"
-                        disabled={opt.disabled}
-                        onClick={() => !opt.disabled && onSelect(opt.value)}
-                        className={`
-                            w-full text-left px-3 py-2 rounded-xl border text-xs
-                            ${opt.disabled
-                                ? "border-slate-700 text-slate-500 cursor-not-allowed"
-                                : "border-slate-600 hover:bg-slate-800 cursor-pointer"
-                            }
-                        `}
-                    >
-                        <div className="font-medium text-slate-100">
-                            {opt.label}
-                        </div>
-                        {opt.description && (
-                            <div className="text-[11px] text-slate-400 mt-0.5">
-                                {opt.description}
-                            </div>
-                        )}
-                    </button>
+                        option={opt}
+                        onSelect={onSelect}
+                    />
                 ))}
             </div>
 
@@ -300,6 +286,75 @@ const SelectDialog: React.FC<{
                 </button>
             </div>
         </div>
+    );
+};
+
+const SelectDialogOptionButton: React.FC<{
+    option: SelectOption;
+    onSelect: (value: string) => void;
+}> = ({ option, onSelect }) => {
+    const longPressEnabled = Boolean(option.longPressValue) && !option.disabled;
+    const {
+        isHolding,
+        onPointerDown,
+        onPointerUp,
+        onPointerLeave,
+        onPointerCancel,
+        onClick,
+        onContextMenu,
+    } = useLongPress(
+        () => {
+            if (option.longPressValue) {
+                onSelect(option.longPressValue);
+            }
+        },
+        () => {
+            onSelect(option.value);
+        },
+    );
+
+    return (
+        <button
+            type="button"
+            disabled={option.disabled}
+            {...(longPressEnabled
+                ? {
+                    onPointerDown,
+                    onPointerUp,
+                    onPointerLeave,
+                    onPointerCancel,
+                    onClick,
+                    onContextMenu,
+                }
+                : { onClick: () => !option.disabled && onSelect(option.value) })}
+            className={`
+                relative w-full text-left px-3 py-2 rounded-xl border text-xs
+                ${option.disabled
+                    ? "border-slate-700 text-slate-500 cursor-not-allowed"
+                    : "border-slate-600 hover:bg-slate-800 cursor-pointer"
+                }
+            `}
+        >
+            {longPressEnabled && isHolding && (
+                <span
+                    className="pointer-events-none absolute inset-0 origin-left rounded-xl bg-cyan-400/10"
+                    style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+            )}
+            <div className="relative z-10 font-medium text-slate-100">
+                {option.label}
+            </div>
+            {option.description && (
+                <div className="relative z-10 text-[11px] text-slate-400 mt-0.5">
+                    {option.description}
+                </div>
+            )}
+            {option.longPressDescription && (
+                <div className="relative z-10 mt-1 text-[10px] text-cyan-300/80">
+                    {option.longPressDescription}
+                </div>
+            )}
+        </button>
     );
 };
 

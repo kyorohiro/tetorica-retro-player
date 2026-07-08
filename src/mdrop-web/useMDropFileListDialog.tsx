@@ -4,7 +4,7 @@ import { useDialog } from "../useDialog";
 import { TargetFile, getFiles } from "./api";
 import { downloadUrl, usePreviewDialog } from "./usePreviewDialog";
 import { getFfmpegStreamingEnabled, listenFfmpegStreamingEnabled } from "./ffmpegPreference";
-import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideoExtended } from "./utils";
+import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideo, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
 type SortMode = "name" | "modifiedAt" | "comic";
@@ -65,6 +65,12 @@ const hlsSubUrl = (apiServer: string, folderId: string, file: TargetFile): strin
     const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
     const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
     return `${apiServer}/hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
+};
+
+const audioSubUrl = (apiServer: string, folderId: string, file: TargetFile): string => {
+    const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
+    const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
+    return `${apiServer}/audio-hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
 };
 
 function FileListDialog({
@@ -205,20 +211,28 @@ function FileListDialog({
     );
 
     const openPreview = React.useCallback(
-        async (file: TargetFile, forceFfmpeg: boolean) => {
-            const index = previewableFiles.findIndex((target) => target.path === file.path);
+        async (file: TargetFile, mode: "direct" | "ffmpeg" | "ffmpeg-audio") => {
+            const forceFfmpeg = mode === "ffmpeg";
+            const forceFfmpegAudio = mode === "ffmpeg-audio";
+            const sourceFiles = forceFfmpegAudio
+                ? previewableFiles.filter((target) => isVideo(target.path) || isVideoExtended(target.path) || isAudio(target.path))
+                : previewableFiles;
+            const index = sourceFiles.findIndex((target) => target.path === file.path);
             if (index < 0) return;
 
             const canUseFfmpeg = currentUseHls && (isVideoExtended(file.path) || isAudio(file.path));
             const getObjectUrl = forceFfmpeg && canUseFfmpeg
                 ? async (target: TargetFile) => hlsSubUrl(apiServer, targetId, target)
+                : forceFfmpegAudio && canUseFfmpeg
+                    ? async (target: TargetFile) => audioSubUrl(apiServer, targetId, target)
                 : undefined;
 
             await showPreviewDialog({
-                files: previewableFiles,
+                files: sourceFiles,
                 initialIndex: index,
                 isRetro: true,
-                useHls: forceFfmpeg && canUseFfmpeg,
+                useHls: (forceFfmpeg || forceFfmpegAudio) && canUseFfmpeg,
+                forcedKind: forceFfmpegAudio ? "audio" : undefined,
                 apiServer,
                 ...(getObjectUrl ? { getObjectUrl } : {}),
             });
@@ -252,7 +266,13 @@ function FileListDialog({
                 file.path.endsWith(".rar") ||
                 file.path.endsWith(".cbr");
 
-            const options: { value: string; label: string; description: string }[] = [];
+            const options: {
+                value: string;
+                label: string;
+                description: string;
+                longPressValue?: string;
+                longPressDescription?: string;
+            }[] = [];
 
             if (canPlayDirect) {
                 options.push({
@@ -267,6 +287,8 @@ function FileListDialog({
                     value: "ffmpeg",
                     label: "ffmpeg",
                     description: "Open through ffmpeg HLS playback.",
+                    longPressValue: "ffmpeg-audio",
+                    longPressDescription: "Long press: audio-only AAC stream.",
                 });
             }
 
@@ -292,12 +314,17 @@ function FileListDialog({
             });
 
             if (action === "play") {
-                await openPreview(file, false);
+                await openPreview(file, "direct");
                 return;
             }
 
             if (action === "ffmpeg") {
-                await openPreview(file, true);
+                await openPreview(file, "ffmpeg");
+                return;
+            }
+
+            if (action === "ffmpeg-audio") {
+                await openPreview(file, "ffmpeg-audio");
                 return;
             }
 
