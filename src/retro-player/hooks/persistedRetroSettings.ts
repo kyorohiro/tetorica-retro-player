@@ -99,7 +99,7 @@ export type PersistedRetroUiSettings = {
 
 export type PersistedRecentLaunchItem = {
   id: string;
-  type: "playlist" | "folder";
+  type: "playlist" | "folder" | "file-list";
   label: string;
   paths: string[];
   startIndex?: number;
@@ -160,7 +160,7 @@ const normalizeRecentLaunchSettings = (
   const items = Array.isArray(recent?.items)
     ? recent.items.filter((item): item is PersistedRecentLaunchItem => {
       if (!item || typeof item !== "object") return false;
-      if (item.type !== "playlist" && item.type !== "folder") return false;
+      if (item.type !== "playlist" && item.type !== "folder" && item.type !== "file-list") return false;
       if (typeof item.id !== "string" || item.id.length === 0) return false;
       if (typeof item.label !== "string") return false;
       if (!Array.isArray(item.paths) || item.paths.some((path) => typeof path !== "string")) return false;

@@ -17,6 +17,7 @@ type Params = {
   retroPlayerPlusRef: React.RefObject<MediaPlaybackTarget | null>;
   showBrowserFileListDialog: ReturnType<typeof useBrowserFileListDialog>["showBrowserFileListDialog"];
   onRememberFolderPath?: (path: string) => void;
+  onRememberFileListPaths?: (paths: string[]) => void;
 };
 
 // Wires up the two Tauri-only ways media can arrive from outside the app
@@ -29,6 +30,7 @@ export function useMDropDragDrop({
   retroPlayerPlusRef,
   showBrowserFileListDialog,
   onRememberFolderPath,
+  onRememberFileListPaths,
 }: Params) {
   const { showMDropSharedListDialog } = useMDropSharedListDialog();
   const lastDragLogRef = useRef<{ type: string; at: number } | null>(null);
@@ -99,6 +101,10 @@ export function useMDropDragDrop({
             } else if (isPlaylistMode) {
               retroPlayerPlusRef.current?.loadPaths(mediaShared.map((f) => ({ url: f.url, path: f.path })));
             } else {
+              const fileListPaths = sharedFiles.filter((file) => !file.isDir).map((file) => file.path);
+              if (fileListPaths.length > 1) {
+                onRememberFileListPaths?.(fileListPaths);
+              }
               await showMDropSharedListDialogRef.current({
                 files: sharedFiles,
                 useHls: isFfmpegEnabledRef.current,
@@ -120,6 +126,9 @@ export function useMDropDragDrop({
               const items = paths.map((p) => ({ url: convertFileSrc(p), path: p }));
               retroPlayerPlusRef.current?.loadPaths(items);
             } else {
+              if (paths.length > 1) {
+                onRememberFileListPaths?.(paths);
+              }
               // Non-media or multiple files: fetch as blobs to get real File objects for the dialog
               const fileEntries: FileTargetFile[] = [];
               for (const p of paths) {
@@ -179,6 +188,9 @@ export function useMDropDragDrop({
         const { convertFileSrc } = await import("@tauri-apps/api/core");
         const items = paths.map((p) => ({ url: convertFileSrc(p), path: p }));
         retroPlayerPlusRef.current?.loadPaths(isPlaylistMode ? items : [items[0]]);
+        if (!isPlaylistMode && paths.length > 1) {
+          onRememberFileListPaths?.(paths);
+        }
       });
     };
 

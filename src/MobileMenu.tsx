@@ -56,7 +56,7 @@ export function MobileMenu({
   const [showMore, setShowMore] = React.useState(false);
 
   return (
-    <div className="safe-top-menu fixed left-3 z-9999 w-[min(85vw,20rem)] rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
+    <div className="safe-top-menu fixed left-3 z-9999 max-h-[calc(100dvh-1rem)] w-[min(85vw,20rem)] overflow-y-auto rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
       {/* File picker */}
       <div className="grid grid-cols-1 gap-1.5">
         <button
@@ -156,7 +156,7 @@ export function MobileMenu({
                         <div className="mt-1 pl-6 text-[11px] text-slate-400">
                           {item.type === "folder"
                             ? t(locale, "recentFolder")
-                            : `${t(locale, "recentPlaylist")}${item.paths.length > 1 ? ` · ${item.paths.length} ${t(locale, "recentItemsSuffix")}` : ""}`}
+                            : `${item.type === "file-list" ? t(locale, "recentFileList") : t(locale, "recentPlaylist")}${item.paths.length > 1 ? ` · ${item.paths.length} ${t(locale, "recentItemsSuffix")}` : ""}`}
                         </div>
                       </button>
                       <button
