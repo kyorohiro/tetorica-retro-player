@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { useDialog } from "../useDialog";
+import {
+    areRetroPreviewLayoutStatesEqual,
+    normalizeRetroPreviewLayoutState,
+    type RetroPreviewLayoutState,
+} from "../retro-player/previewLayoutState";
 import type { TargetFile } from "./api";
 import { PreviewPage } from "./preview/PreviewPage";
 import { preivewGlobalSetting } from "./preview/preivewSetting";
@@ -75,6 +80,15 @@ function PreviewDialog({
     console.log(">> coverSrc", !!coverSrc);
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
+    const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
+        undefined,
+    );
+    const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
+        const normalized = normalizeRetroPreviewLayoutState(state);
+        setPreviewLayoutState((current) =>
+            areRetroPreviewLayoutStatesEqual(current, normalized) ? current : normalized
+        );
+    }, []);
 
     const file = files[index];
 
@@ -215,6 +229,8 @@ function PreviewDialog({
                     getObjectUrl={getObjectUrl}
                     onLoadingMessage={setLoadingMessage}
                     coverSrc={coverSrc}
+                    previewLayoutState={previewLayoutState}
+                    onPreviewLayoutStateChange={handlePreviewLayoutStateChange}
                 />
             </div>
 

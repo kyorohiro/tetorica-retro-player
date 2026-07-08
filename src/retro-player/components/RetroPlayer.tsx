@@ -28,6 +28,7 @@ import {
   type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
+import type { RetroPreviewLayoutState } from "../previewLayoutState";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import { RetroPreviewView } from "./RetroPreviewView";
 import { RetroControlPanel } from "./RetroControlPanel";
@@ -71,6 +72,8 @@ type RetroPlayerProps = {
   onForceReplay?: () => Promise<boolean> | boolean;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
+  previewLayoutState?: RetroPreviewLayoutState;
+  onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
 };
 
 export function RetroPlayer({
@@ -94,6 +97,8 @@ export function RetroPlayer({
   onForceReplay,
   loopMode,
   onCycleLoopMode,
+  previewLayoutState,
+  onPreviewLayoutStateChange,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
@@ -162,7 +167,9 @@ export function RetroPlayer({
     resolveRenderResolutionPreset(persistedUiSettings),
   );
   const isHighResolution = renderResolutionPreset > 1;
-  const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(false);
+  const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(
+    () => previewLayoutState?.isFitWidthEnabled ?? false,
+  );
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
   >("playback");
@@ -177,6 +184,18 @@ export function RetroPlayer({
   React.useEffect(() => {
     void syncFfmpegMaxConcurrentHlsSessions(startupMaxConcurrentHlsSessions);
   }, [startupMaxConcurrentHlsSessions, syncFfmpegMaxConcurrentHlsSessions]);
+
+  React.useEffect(() => {
+    if (typeof previewLayoutState?.isFitWidthEnabled === "boolean") {
+      setIsFitWidthEnabled(previewLayoutState.isFitWidthEnabled);
+    }
+  }, [previewLayoutState?.isFitWidthEnabled]);
+
+  React.useEffect(() => {
+    if (typeof previewLayoutState?.isPreviewPinned === "boolean") {
+      setIsPinnedInPreview(previewLayoutState.isPreviewPinned);
+    }
+  }, [previewLayoutState?.isPreviewPinned]);
 
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
@@ -448,6 +467,9 @@ export function RetroPlayer({
             onHighResolutionToggle={handleToggleHighResolution}
             onFitWidthChange={setIsFitWidthEnabled}
             onError={onError}
+            onIsPinnedPreviewChange={setIsPinnedInPreview}
+            previewLayoutState={previewLayoutState}
+            onPreviewLayoutStateChange={onPreviewLayoutStateChange}
             analyserRef={player.analyserRef}
             showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}
@@ -544,6 +566,8 @@ export function RetroPlayer({
               onFitWidthChange={setIsFitWidthEnabled}
               onError={onError}
               onIsPinnedPreviewChange={setIsPinnedInPreview}
+              previewLayoutState={previewLayoutState}
+              onPreviewLayoutStateChange={onPreviewLayoutStateChange}
               analyserRef={player.analyserRef}
               showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}
