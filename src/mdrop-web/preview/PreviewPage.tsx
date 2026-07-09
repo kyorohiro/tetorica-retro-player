@@ -118,10 +118,15 @@ export function PreviewPage({
     const [error, setError] = React.useState("");
     const [epubLocation, setEpubLocation] = React.useState<string | number>(0);
     const renditionRef = React.useRef<any>(null);
+    const statusRef = React.useRef<PreviewPageStatus>("none");
     const cacheKey = React.useMemo(
         () => getPreviewCacheKey(file, apiServer, useHls, forcedKind),
         [apiServer, file, forcedKind, useHls],
     );
+
+    React.useEffect(() => {
+        statusRef.current = status;
+    }, [status]);
 
     const { showZipFileListDialog } = useZipFileListDialog();
 
@@ -139,6 +144,7 @@ export function PreviewPage({
     React.useEffect(() => {
         let alive = true;
         const objectUrls: string[] = [];
+        const keepCurrentPreviewVisible = statusRef.current === "loaded";
 
         const addObjectUrl = (url: string) => {
             if (url.startsWith("blob:")) {
@@ -147,9 +153,11 @@ export function PreviewPage({
         };
 
         const run = async () => {
-            setStatus("loading");
-            setSrc("");
-            setText("");
+            if (!keepCurrentPreviewVisible) {
+                setStatus("loading");
+                setSrc("");
+                setText("");
+            }
             setError("");
             onLoadingMessage?.("");
 
@@ -158,6 +166,8 @@ export function PreviewPage({
                 setSrc(cached.src);
                 if (cached.kind === "text") {
                     setText(cached.text);
+                } else {
+                    setText("");
                 }
                 setStatus("loaded");
                 return;
@@ -215,6 +225,7 @@ export function PreviewPage({
                 if (!alive) return;
 
                 setSrc(convertedUrl);
+                setText("");
                 setCachedPreview(cacheKey, {
                     kind: "src",
                     src: convertedUrl,
@@ -226,6 +237,7 @@ export function PreviewPage({
             }
 
             setSrc(nextSrc);
+            setText("");
             setCachedPreview(cacheKey, {
                 kind: "src",
                 src: nextSrc,
