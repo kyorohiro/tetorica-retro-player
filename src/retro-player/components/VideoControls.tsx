@@ -300,6 +300,10 @@ export const VideoControls = memo(function VideoControls({
     : loopMode === "autoplay" ? "Auto Next"
     : loopMode === "all" ? "Loop All"
     : "No loop";
+  const loopShortLabel = loopMode === "one" ? "1"
+    : loopMode === "autoplay" ? "Next"
+    : loopMode === "all" ? "All"
+    : "Off";
   const loopActive = loopMode === "one" || loopMode === "autoplay" || loopMode === "all";
   const currentVolume = isMuted ? 0 : volume;
   const speedBarIndex = (() => {
@@ -1091,13 +1095,16 @@ export const VideoControls = memo(function VideoControls({
               aria-label={loopLabel}
               title={loopLabel}
               className={[
-                "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                "inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 text-[#12141c]",
                 loopActive
                   ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
               {loopIcon}
+              <span className="text-[9px] font-semibold uppercase leading-none tracking-[0.08em]">
+                {loopShortLabel}
+              </span>
             </button>
             <div className="relative">
               <button
@@ -1303,13 +1310,16 @@ export const VideoControls = memo(function VideoControls({
             aria-label={loopLabel}
             title={loopLabel}
             className={[
-              "inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#12141c]",
+              "inline-flex min-h-10 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 text-[#12141c]",
               loopActive
                 ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                 : "border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
             ].join(" ")}
           >
             {loopIconSm}
+            <span className="text-[8px] font-semibold uppercase leading-none tracking-[0.06em]">
+              {loopShortLabel}
+            </span>
           </button>
         )}
         <button
