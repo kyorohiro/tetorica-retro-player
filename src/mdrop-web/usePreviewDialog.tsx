@@ -220,7 +220,6 @@ function PreviewDialog({
                 onTouchEnd={handleTouchEnd}
             >
                 <PreviewPage
-                    key={`${file.id}:${file.path}`}
                     file={file}
                     isRetro={isRetro}
                     useHls={useHls}
