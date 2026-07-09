@@ -1,6 +1,7 @@
 import type { MonoTintMode, PaletteMode } from "../retro/config";
 
 const STORAGE_KEY = "tetorica-retro-player.settings";
+const RECENT_LAUNCH_STORAGE_KEY = "tetorica-retro-player.recentLaunch";
 const STORAGE_VERSION = 1;
 
 export type PersistedRetroFilterSettings = {
@@ -149,6 +150,39 @@ const writeSettings = (settings: PersistedRetroSettings) => {
   }
 };
 
+const readRecentLaunchSettings = (): PersistedRecentLaunchSettings | undefined => {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const raw = window.localStorage.getItem(RECENT_LAUNCH_STORAGE_KEY);
+    if (!raw) {
+      const legacyRecentLaunch = readSettings()?.recentLaunch;
+      if (legacyRecentLaunch) {
+        writeRecentLaunchStorage(normalizeRecentLaunchSettings(legacyRecentLaunch));
+      }
+      return legacyRecentLaunch;
+    }
+
+    return JSON.parse(raw) as PersistedRecentLaunchSettings;
+  } catch {
+    const legacyRecentLaunch = readSettings()?.recentLaunch;
+    if (legacyRecentLaunch) {
+      writeRecentLaunchStorage(normalizeRecentLaunchSettings(legacyRecentLaunch));
+    }
+    return legacyRecentLaunch;
+  }
+};
+
+const writeRecentLaunchStorage = (recentLaunch: PersistedRecentLaunchSettings) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(RECENT_LAUNCH_STORAGE_KEY, JSON.stringify(recentLaunch));
+  } catch {
+    // Ignore storage errors and keep runtime behavior.
+  }
+};
+
 export const loadPersistedRetroSettings = () => readSettings();
 
 export const getPreferredAudioInputDeviceId = (): string | null =>
@@ -189,16 +223,7 @@ const normalizeRecentLaunchSettings = (
 };
 
 const writeRecentLaunchSettings = (recentLaunch: PersistedRecentLaunchSettings) => {
-  const current = readSettings();
-
-  writeSettings({
-    version: STORAGE_VERSION,
-    audio: current?.audio,
-    filter: current?.filter,
-    ui: current?.ui,
-    preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
-    recentLaunch,
-  });
+  writeRecentLaunchStorage(recentLaunch);
 };
 
 const trimRecentLaunchItems = (
@@ -223,7 +248,7 @@ const trimRecentLaunchItems = (
 };
 
 export const loadPersistedRecentLaunchSettings = (): PersistedRecentLaunchSettings =>
-  normalizeRecentLaunchSettings(readSettings()?.recentLaunch);
+  normalizeRecentLaunchSettings(readRecentLaunchSettings());
 
 export const savePersistedRecentLaunchSettings = (
   recentLaunch: PersistedRecentLaunchSettings,
@@ -293,7 +318,6 @@ export const savePersistedRetroFilterSettings = (
     filter,
     ui: current?.ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
-    recentLaunch: current?.recentLaunch,
   });
 };
 
@@ -308,7 +332,6 @@ export const savePersistedRetroAudioSettings = (
     filter: current?.filter,
     ui: current?.ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
-    recentLaunch: current?.recentLaunch,
   });
 };
 
@@ -323,7 +346,6 @@ export const savePersistedRetroUiSettings = (
     filter: current?.filter,
     ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
-    recentLaunch: current?.recentLaunch,
   });
 };
 
@@ -336,7 +358,6 @@ export const setPreferredAudioInputDeviceId = (deviceId: string | null) => {
     filter: current?.filter,
     ui: current?.ui,
     preferredAudioInputDeviceId: deviceId ?? undefined,
-    recentLaunch: current?.recentLaunch,
   });
 };
 
