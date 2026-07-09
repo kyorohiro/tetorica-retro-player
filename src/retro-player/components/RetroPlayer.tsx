@@ -228,6 +228,8 @@ export function RetroPlayer({
       onRetry,
       autoPlay,
       onPlaybackChange,
+      onPrevTrack,
+      onNextTrack,
       playbackSource,
       preferNativeVideoSurface: nativePlaybackMode,
       locale,
