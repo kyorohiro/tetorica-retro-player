@@ -16,6 +16,7 @@ import {
   type LocalePreference,
 } from "./i18n";
 import {
+  getNativePlaybackMode,
   loadPersistedRecentLaunchSettings,
   removePersistedRecentLaunchItem,
   setPersistedRecentLaunchBootItem,
@@ -115,6 +116,10 @@ function App() {
   const previewSource = usePreviewSourceState(locale);
   const shouldPreferDialogRetroPreview = React.useMemo(
     () => false,
+    [],
+  );
+  const shouldUseDialogRetroPreview = React.useMemo(
+    () => !getNativePlaybackMode(),
     [],
   );
   const { showConfirmDialog, showSelectDialog, showDialog } = useDialog();
@@ -341,7 +346,7 @@ function App() {
     await showPreviewDialog({
       files: previewFiles,
       initialIndex: 0,
-      isRetro: true,
+      isRetro: shouldUseDialogRetroPreview,
       apiServer: ".",
       getObjectUrl: async (file: TargetFile) =>
         URL.createObjectURL((file as FileTargetFile).entry!),
@@ -361,7 +366,7 @@ function App() {
         }
       },
     });
-  }, [showPreviewDialog]);
+  }, [shouldUseDialogRetroPreview, showPreviewDialog]);
 
   const showDialogPreviewForPath = useCallback(async (url: string, path: string) => {
     const previewFile: TargetFile = {
@@ -377,7 +382,7 @@ function App() {
     await showPreviewDialog({
       files: [previewFile],
       initialIndex: 0,
-      isRetro: true,
+      isRetro: shouldUseDialogRetroPreview,
       getObjectUrl: async () => url,
       download: async () => {
         const a = document.createElement("a");
@@ -389,7 +394,7 @@ function App() {
         document.body.removeChild(a);
       },
     });
-  }, [showPreviewDialog]);
+  }, [shouldUseDialogRetroPreview, showPreviewDialog]);
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
