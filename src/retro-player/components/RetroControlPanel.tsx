@@ -114,6 +114,7 @@ export type RetroControlPanelProps = {
   onForceReplay?: () => void;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
+  onLoopLongPress?: () => void;
   showVideoSpectrum?: boolean;
   onToggleVideoSpectrum?: () => void;
   showClockOverlay?: boolean;
@@ -166,6 +167,7 @@ export function RetroControlPanel({
   onForceReplay,
   loopMode,
   onCycleLoopMode,
+  onLoopLongPress,
   showVideoSpectrum,
   onToggleVideoSpectrum,
   showClockOverlay,
@@ -218,6 +220,7 @@ export function RetroControlPanel({
               isMuted={player.isMuted}
               isNoiseEnabled={player.isNoiseEnabled}
               isPlaying={effectiveIsPlaying}
+              hasImage={player.hasImage}
               hasVideo={hasVideoControls}
               isVideoSettingsOpen={false}
               lofiAmount={player.lofiAmount}
@@ -300,6 +303,7 @@ export function RetroControlPanel({
               onNextTrack={onNextTrack}
               loopMode={loopMode}
               onCycleLoopMode={onCycleLoopMode}
+              onLoopLongPress={onLoopLongPress}
               showVideoSpectrum={showVideoSpectrum}
               onToggleVideoSpectrum={onToggleVideoSpectrum}
               showClockOverlay={showClockOverlay}
