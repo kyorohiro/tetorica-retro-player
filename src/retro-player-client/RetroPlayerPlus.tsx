@@ -421,7 +421,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       onPathPlaylistLoaded?.(sortedItems, sortedStartIndex);
     }, [onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
-    const loadFiles = useCallback((files: File[], startIndex = 0) => {
+    const loadFiles = useCallback((files: File[], _startIndex = 0) => {
       if (files.length === 0) return;
       if (files.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForBrowserFiles(files);
