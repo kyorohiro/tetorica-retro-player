@@ -93,7 +93,7 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
   type LoopMode = "one" | "autoplay" | "all" | "off";
-  const [loopMode, setLoopMode] = React.useState<LoopMode>("one");
+  const [loopMode, setLoopMode] = React.useState<LoopMode>("all");
   const loopModeRef = React.useRef<LoopMode>(loopMode);
   React.useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
   const cycleLoopMode = React.useCallback(() => {

@@ -28,6 +28,10 @@ type PlaylistItem =
   | { kind: "file"; file: File }
   | { kind: "path"; url: string; path: string };
 
+const getPlaylistItemLabel = (item: PlaylistItem) => (
+  item.kind === "file" ? item.file.name : item.path
+);
+
 // 'pending' = loading (dark overlay covers colorbars flash)
 // 'blocked' = AudioContext suspended (Safari) → shows Touch & Play button
 // 'done'    = playing or user chose something else
@@ -102,7 +106,8 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
 
     const playlistRef = useRef<PlaylistItem[]>([]);
     const [playlistLength, setPlaylistLength] = useState(0);
-    const [, setPlaylistIndex] = useState(0);
+    const [playlistIndex, setPlaylistIndex] = useState(0);
+    const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
 
     const currentPlayingPathRef = useRef<string | null>(null);
     const [showFfmpegRetry, setShowFfmpegRetry] = useState(false);
@@ -317,10 +322,24 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       });
     }, [previewItem]);
 
+    const jumpToPlaylistIndex = useCallback((targetIndex: number) => {
+      const list = playlistRef.current;
+      const item = list[targetIndex];
+      if (!item) return;
+      previewItem(item);
+      setPlaylistIndex(targetIndex);
+      setIsPlaylistOpen(false);
+    }, [previewItem]);
+
     const handleEnded = useCallback(() => {
       if (loopMode === "autoplay") nextTrack();
       else if (loopMode === "all") nextTrackAll();
     }, [loopMode, nextTrack, nextTrackAll]);
+
+    const handleLoopLongPress = useCallback(() => {
+      if (playlistRef.current.length <= 1) return;
+      setIsPlaylistOpen((current) => !current);
+    }, []);
 
     const handleFfmpegRetry = useCallback(async () => {
       const path = currentPlayingPathRef.current;
@@ -386,6 +405,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       playlistRef.current = items.map((item) => ({ kind: "path" as const, url: item.url, path: item.path }));
       setPlaylistLength(items.length);
       setPlaylistIndex(startIndex);
+      setIsPlaylistOpen(false);
       currentPlayingPathRef.current = target.path;
       currentPresetConfigRef.current = { type: "url", url: target.url, label: target.path };
       setShowFfmpegRetry(false);
@@ -403,6 +423,7 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
       playlistRef.current = files.map((file) => ({ kind: "file" as const, file }));
       setPlaylistLength(files.length);
       setPlaylistIndex(startIndex);
+      setIsPlaylistOpen(false);
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       previewSource.previewFile(target);
@@ -478,8 +499,58 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
             onForceReplay={retryCurrentSource}
             loopMode={loopMode}
             onCycleLoopMode={onCycleLoopMode}
+            onLoopLongPress={playlistLength > 1 ? handleLoopLongPress : undefined}
           />
         </React.Suspense>
+        {isPlaylistOpen && playlistLength > 1 && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">
+            <div className="pointer-events-auto flex w-full max-w-lg flex-col rounded-2xl border border-slate-600/80 bg-slate-950/92 p-3 shadow-xl backdrop-blur-sm">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                    {locale === "ja" ? "Playlist" : "Playlist"}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {locale === "ja"
+                      ? `${playlistIndex + 1} / ${playlistLength} を再生中`
+                      : `Playing ${playlistIndex + 1} / ${playlistLength}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPlaylistOpen(false)}
+                  aria-label={locale === "ja" ? "プレイリストを閉じる" : "Close playlist"}
+                  className="shrink-0 rounded-full border border-slate-600 px-2 py-1 text-xs text-slate-300 transition hover:bg-slate-800"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+                {playlistRef.current.map((item, index) => {
+                  const isActive = index === playlistIndex;
+                  return (
+                    <button
+                      key={`${index}:${getPlaylistItemLabel(item)}`}
+                      type="button"
+                      onClick={() => jumpToPlaylistIndex(index)}
+                      className={[
+                        "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition",
+                        isActive
+                          ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-50"
+                          : "border-slate-700 bg-slate-900/70 text-slate-200 hover:bg-slate-800",
+                      ].join(" ")}
+                    >
+                      <span className="w-5 shrink-0 text-xs tabular-nums text-slate-400">
+                        {isActive ? "▶" : index + 1}
+                      </span>
+                      <span className="truncate">{getPlaylistItemLabel(item)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
         {shouldShowFfmpegRetry && showFfmpegRetry && (
           <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-4">
             <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-400/60 bg-slate-900/80 px-4 py-2 text-sm shadow-lg backdrop-blur-sm">

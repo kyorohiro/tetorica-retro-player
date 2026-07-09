@@ -72,6 +72,7 @@ type RetroPlayerProps = {
   onForceReplay?: () => Promise<boolean> | boolean;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
+  onLoopLongPress?: () => void;
   previewLayoutState?: RetroPreviewLayoutState;
   onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
 };
@@ -97,6 +98,7 @@ export function RetroPlayer({
   onForceReplay,
   loopMode,
   onCycleLoopMode,
+  onLoopLongPress,
   previewLayoutState,
   onPreviewLayoutStateChange,
 }: RetroPlayerProps) {
@@ -552,6 +554,7 @@ export function RetroPlayer({
     onForceReplay: handleForceReplay,
     loopMode,
     onCycleLoopMode,
+    onLoopLongPress,
     showVideoSpectrum,
     onToggleVideoSpectrum: () => setShowVideoSpectrum(v => !v),
     showClockOverlay,

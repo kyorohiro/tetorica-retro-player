@@ -44,6 +44,7 @@ type VideoControlsProps = {
   isAudioFxEnabled: boolean;
   isVideoFxEnabled: boolean;
   isNoiseEnabled: boolean;
+  hasImage: boolean;
   hasVideo: boolean;
   analyserRef?: React.RefObject<AnalyserNode | null>;
   isVideoSettingsOpen: boolean;
@@ -122,6 +123,7 @@ type VideoControlsProps = {
   onNextTrack?: () => void;
   loopMode?: "one" | "autoplay" | "all" | "off";
   onCycleLoopMode?: () => void;
+  onLoopLongPress?: () => void;
   isNativePlaybackMode?: boolean;
   nativePlaybackNeedsReload?: boolean;
   onToggleNativePlaybackMode?: () => void;
@@ -155,6 +157,7 @@ export const VideoControls = memo(function VideoControls({
   isAudioFxEnabled,
   isVideoFxEnabled,
   isNoiseEnabled,
+  hasImage,
   hasVideo,
   analyserRef: _analyserRef,
   isVideoSettingsOpen,
@@ -233,6 +236,7 @@ export const VideoControls = memo(function VideoControls({
   onNextTrack,
   loopMode,
   onCycleLoopMode,
+  onLoopLongPress,
   isNativePlaybackMode = false,
   nativePlaybackNeedsReload = false,
   onToggleNativePlaybackMode,
@@ -260,13 +264,31 @@ export const VideoControls = memo(function VideoControls({
     onTogglePlaybackLongPress ?? noop,
     onTogglePlayback,
   );
+  const handlePrevShortPress = useCallback(() => {
+    if (hasImage && onPrevTrack) {
+      onPrevTrack();
+      return;
+    }
+    onSeek(Math.max(currentTime - 5, 0));
+  }, [currentTime, hasImage, onPrevTrack, onSeek]);
   const { isHolding: isPrevHolding, ...prevTrackHandlers } = useLongPress(
     onPrevTrack ?? noop,
-    useCallback(() => { onSeek(Math.max(currentTime - 5, 0)); }, [onSeek, currentTime]),
+    handlePrevShortPress,
   );
+  const handleNextShortPress = useCallback(() => {
+    if (hasImage && onNextTrack) {
+      onNextTrack();
+      return;
+    }
+    onSeek(Math.min(currentTime + 5, duration || currentTime + 5));
+  }, [currentTime, duration, hasImage, onNextTrack, onSeek]);
   const { isHolding: isNextHolding, ...nextTrackHandlers } = useLongPress(
     onNextTrack ?? noop,
-    useCallback(() => { onSeek(Math.min(currentTime + 5, duration || currentTime + 5)); }, [onSeek, currentTime, duration]),
+    handleNextShortPress,
+  );
+  const { isHolding: isLoopHolding, ...loopButtonHandlers } = useLongPress(
+    onLoopLongPress ?? noop,
+    onCycleLoopMode ?? onToggleLoop,
   );
   const { isHolding: isVolumeHolding, ...volumeLongPressHandlers } = useLongPress(
     onToggleMute,
@@ -306,6 +328,8 @@ export const VideoControls = memo(function VideoControls({
     : "Off";
   const loopActive = loopMode === "one" || loopMode === "autoplay" || loopMode === "all";
   const currentVolume = isMuted ? 0 : volume;
+  const prevTrackLabel = hasImage ? "Prev" : "-5s";
+  const nextTrackLabel = hasImage ? "Next" : "+5s";
   const speedBarIndex = (() => {
     const exactIndex = SPEED_BAR_OPTIONS.indexOf(playbackRate as typeof SPEED_BAR_OPTIONS[number]);
     if (exactIndex !== -1) return exactIndex;
@@ -1091,18 +1115,24 @@ export const VideoControls = memo(function VideoControls({
             </button>
             <button
               type="button"
-              onClick={onCycleLoopMode ?? onToggleLoop}
+              {...loopButtonHandlers}
               aria-label={loopLabel}
               title={loopLabel}
               className={[
-                "inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 text-[#12141c]",
-                loopActive
+                "relative select-none overflow-hidden inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 text-[#12141c]",
+                isLoopHolding || loopActive
                   ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
+              {isLoopHolding && (
+                <span
+                  className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+              )}
               {loopIcon}
-              <span className="text-[9px] font-semibold uppercase leading-none tracking-[0.08em]">
+              <span className="relative z-10 text-[9px] font-semibold uppercase leading-none tracking-[0.08em]">
                 {loopShortLabel}
               </span>
             </button>
@@ -1149,7 +1179,7 @@ export const VideoControls = memo(function VideoControls({
                       style={{ animation: "long-press-charge 0.6s linear forwards" }} />
                   )}
                   <SkipBack size={16} className="relative z-10" />
-                  <span className="relative z-10">-5s</span>
+                  <span className="relative z-10">{prevTrackLabel}</span>
                 </button>
                 <button
                   type="button"
@@ -1162,7 +1192,7 @@ export const VideoControls = memo(function VideoControls({
                       style={{ animation: "long-press-charge 0.6s linear forwards" }} />
                   )}
                   <SkipForward size={16} className="relative z-10" />
-                  <span className="relative z-10">+5s</span>
+                  <span className="relative z-10">{nextTrackLabel}</span>
                 </button>
                 <button
                   type="button"
@@ -1189,7 +1219,7 @@ export const VideoControls = memo(function VideoControls({
                       style={{ animation: "long-press-charge 0.6s linear forwards" }} />
                   )}
                   <SkipBack size={16} className="relative z-10" />
-                  <span className="relative z-10">-5s</span>
+                  <span className="relative z-10">{prevTrackLabel}</span>
                 </button>
                 <button
                   type="button"
@@ -1202,7 +1232,7 @@ export const VideoControls = memo(function VideoControls({
                       style={{ animation: "long-press-charge 0.6s linear forwards" }} />
                   )}
                   <SkipForward size={16} className="relative z-10" />
-                  <span className="relative z-10">+5s</span>
+                  <span className="relative z-10">{nextTrackLabel}</span>
                 </button>
               </>
             )}
@@ -1306,18 +1336,24 @@ export const VideoControls = memo(function VideoControls({
         {!hasPlayback && (
           <button
             type="button"
-            onClick={onCycleLoopMode ?? onToggleLoop}
+            {...loopButtonHandlers}
             aria-label={loopLabel}
             title={loopLabel}
             className={[
-              "inline-flex min-h-10 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 text-[#12141c]",
-              loopActive
+              "relative select-none overflow-hidden inline-flex min-h-10 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 text-[#12141c]",
+              isLoopHolding || loopActive
                 ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                 : "border-[#bcb4a6] bg-[#e6e2db] text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
             ].join(" ")}
           >
-            {loopIconSm}
-            <span className="text-[8px] font-semibold uppercase leading-none tracking-[0.06em]">
+            {isLoopHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <span className="relative z-10">{loopIconSm}</span>
+            <span className="relative z-10 text-[8px] font-semibold uppercase leading-none tracking-[0.06em]">
               {loopShortLabel}
             </span>
           </button>
