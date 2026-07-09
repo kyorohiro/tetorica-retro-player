@@ -129,6 +129,7 @@ type VideoControlsProps = {
 };
 
 const isNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+const SPEED_BAR_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds < 0) {
@@ -237,8 +238,7 @@ export const VideoControls = memo(function VideoControls({
   onToggleNativePlaybackMode,
   isAudioFxUnavailable = false,
 }: VideoControlsProps) {
-  const [isSpeedOpen, setIsSpeedOpen] = useState(false);
-  const [isVolumeOpen, setIsVolumeOpen] = useState(false);
+  const [activeTransportBar, setActiveTransportBar] = useState<"seek" | "volume" | "speed">("seek");
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevNoiseEnabledRef = useRef(false);
@@ -270,7 +270,7 @@ export const VideoControls = memo(function VideoControls({
   );
   const { isHolding: isVolumeHolding, ...volumeLongPressHandlers } = useLongPress(
     onToggleMute,
-    () => setIsVolumeOpen((v) => !v),
+    () => setActiveTransportBar((current) => (current === "volume" ? "seek" : "volume")),
   );
   const { isHolding: isResetHolding, ...resetButtonHandlers } = useLongPress(
     useCallback(() => { onToggleNativePlaybackMode?.(); }, [onToggleNativePlaybackMode]),
@@ -301,6 +301,54 @@ export const VideoControls = memo(function VideoControls({
     : loopMode === "all" ? "Loop All"
     : "No loop";
   const loopActive = loopMode === "one" || loopMode === "autoplay" || loopMode === "all";
+  const currentVolume = isMuted ? 0 : volume;
+  const speedBarIndex = (() => {
+    const exactIndex = SPEED_BAR_OPTIONS.indexOf(playbackRate as typeof SPEED_BAR_OPTIONS[number]);
+    if (exactIndex !== -1) return exactIndex;
+
+    return SPEED_BAR_OPTIONS.reduce((bestIndex, rate, index) => (
+      Math.abs(rate - playbackRate) < Math.abs(SPEED_BAR_OPTIONS[bestIndex] - playbackRate)
+        ? index
+        : bestIndex
+    ), 0);
+  })();
+  const transportBarMeta = activeTransportBar === "volume"
+    ? {
+        leftLabel: "Volume",
+        rightLabel: `${Math.round(currentVolume * 100)}%`,
+        min: 0,
+        max: 1,
+        step: 0.01,
+        value: currentVolume,
+        onChange: (rawValue: number) => {
+          if (isMuted && rawValue > 0) onToggleMute();
+          onChangeVolume(rawValue);
+        },
+      }
+    : activeTransportBar === "speed"
+      ? {
+          leftLabel: "Speed",
+          rightLabel: `${playbackRate}x`,
+          min: 0,
+          max: SPEED_BAR_OPTIONS.length - 1,
+          step: 1,
+          value: speedBarIndex,
+          onChange: (rawValue: number) => {
+            const nextRate = SPEED_BAR_OPTIONS[Math.round(rawValue)] ?? 1;
+            onChangePlaybackRate(nextRate);
+          },
+        }
+      : {
+          leftLabel: formatTime(currentTime),
+          rightLabel: formatTime(duration),
+          min: 0,
+          max: Math.max(duration, 0),
+          step: 0.01,
+          value: Math.min(currentTime, duration || 0),
+          onChange: (rawValue: number) => {
+            onSeek(rawValue);
+          },
+        };
 
   const handleSettingsFile = async (file: File) => {
     if (!file.name.endsWith(".retro.json")) return;
@@ -980,17 +1028,17 @@ export const VideoControls = memo(function VideoControls({
         <>
           <div>
             <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+              <span>{transportBarMeta.leftLabel}</span>
+              <span>{transportBarMeta.rightLabel}</span>
             </div>
             <input
               type="range"
-              min="0"
-              max={Math.max(duration, 0)}
-              step="0.01"
-              value={Math.min(currentTime, duration || 0)}
+              min={transportBarMeta.min}
+              max={transportBarMeta.max}
+              step={transportBarMeta.step}
+              value={transportBarMeta.value}
               onChange={(ev) => {
-                onSeek(Number(ev.currentTarget.value));
+                transportBarMeta.onChange(Number(ev.currentTarget.value));
               }}
               className="w-full"
             />
@@ -1024,7 +1072,7 @@ export const VideoControls = memo(function VideoControls({
               title="Volume"
               className={[
                 "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                isVolumeHolding
+                isVolumeHolding || activeTransportBar === "volume"
                   ? "border-[#bcb4a6] bg-[#e2ddd5]"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
@@ -1055,34 +1103,19 @@ export const VideoControls = memo(function VideoControls({
               <button
                 type="button"
                 onClick={() => {
-                  setIsSpeedOpen((current) => !current);
+                  setActiveTransportBar((current) => (current === "speed" ? "seek" : "speed"));
                 }}
                 aria-label={`Speed ${playbackRate}x`}
                 title={`Speed ${playbackRate}x`}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                className={[
+                  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                  activeTransportBar === "speed"
+                    ? "border-[#bcb4a6] bg-[#e2ddd5]"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
               >
                 <Gauge size={14} />
               </button>
-              {isSpeedOpen && (
-                <div className="absolute bottom-full left-0 z-200 mb-1 flex min-w-full flex-col gap-1 rounded-lg border border-[#cac0b2] bg-[#eae6df] p-2 shadow-lg">
-                  {[2, 1.5, 1.25, 1, 0.75, 0.5].map((rate) => (
-                    <button
-                      key={rate}
-                      type="button"
-                      onClick={() => {
-                        onChangePlaybackRate(rate);
-                        setIsSpeedOpen(false);
-                      }}
-                      className={[
-                        "rounded-md px-3 py-2 text-left text-[#12141c] hover:bg-[#e2ddd5]",
-                        playbackRate === rate ? "bg-[#111014]/20 text-[#000000] font-bold" : "",
-                      ].join(" ")}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             {true ? (
@@ -1167,35 +1200,6 @@ export const VideoControls = memo(function VideoControls({
               </>
             )}
           </div>
-          {isVolumeOpen && (
-            <div className="flex items-center gap-2 rounded-lg border border-[#cac0b2] bg-[#f5f1ea] px-3 py-2">
-              <button
-                type="button"
-                onClick={onToggleMute}
-                aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"}
-                title={isMuted || volume === 0 ? "Unmute" : "Mute"}
-                className="shrink-0 text-[#7a7268] hover:text-[#12141c]"
-              >
-                {isMuted || volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={isMuted ? 0 : volume}
-                onChange={(ev) => {
-                  const v = Number(ev.currentTarget.value);
-                  if (isMuted && v > 0) onToggleMute();
-                  onChangeVolume(v);
-                }}
-                className="w-full cursor-pointer"
-              />
-              <span className="w-8 shrink-0 text-right text-[11px] text-[#7a7268]">
-                {Math.round((isMuted ? 0 : volume) * 100)}%
-              </span>
-            </div>
-          )}
         </>
       )}
 
