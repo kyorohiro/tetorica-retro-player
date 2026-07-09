@@ -1442,16 +1442,35 @@ export function useRetroPreviewMedia({
       Math.round(
         ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
       ) / 10;
+    const canReuseImagePreview =
+      kind === "image" &&
+      previewKindRef.current === "image" &&
+      appRef.current !== null &&
+      previewElementRef.current instanceof HTMLImageElement &&
+      mediaRef.current === null;
 
     try {
       debugVideo("startup:previewUrl:start", {
         url,
         kind,
+        canReuseImagePreview,
       });
       powerOn();
-      cleanupPreview();
-      resetFilterInstance();
-      requestId = previewRequestIdRef.current;
+      if (canReuseImagePreview) {
+        previewRequestIdRef.current += 1;
+        requestId = previewRequestIdRef.current;
+        finishLoading();
+        setNeedsUserPlay(false);
+        setIsBuffering(false);
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(0);
+      } else {
+        cleanupPreview();
+        resetFilterInstance();
+        requestId = previewRequestIdRef.current;
+      }
 
       _setPreviewError("");
       setPreviewName(url);
