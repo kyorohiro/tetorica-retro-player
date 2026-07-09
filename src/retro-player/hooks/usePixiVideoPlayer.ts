@@ -80,6 +80,8 @@ export function usePixiVideoPlayer(
     onRetry?: () => void;
     autoPlay?: boolean;
     onPlaybackChange?: (event: RetroPlaybackEvent) => void;
+    onPrevTrack?: () => void;
+    onNextTrack?: () => void;
     playbackSource?: "builtin-tone" | "media";
     preferNativeVideoSurface?: boolean;
     locale?: RetroPlayerLocale;
@@ -107,6 +109,8 @@ export function usePixiVideoPlayer(
   const onRetryRef = useRef<(() => void) | undefined>(options?.onRetry);
   const autoPlayRef = useRef<boolean>(options?.autoPlay ?? true);
   const onPlaybackChangeRef = useRef<((event: RetroPlaybackEvent) => void) | undefined>(options?.onPlaybackChange);
+  const onPrevTrackRef = useRef<(() => void) | undefined>(options?.onPrevTrack);
+  const onNextTrackRef = useRef<(() => void) | undefined>(options?.onNextTrack);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -630,6 +634,14 @@ export function usePixiVideoPlayer(
   useEffect(() => {
     onPlaybackChangeRef.current = options?.onPlaybackChange;
   }, [options?.onPlaybackChange]);
+
+  useEffect(() => {
+    onPrevTrackRef.current = options?.onPrevTrack;
+  }, [options?.onPrevTrack]);
+
+  useEffect(() => {
+    onNextTrackRef.current = options?.onNextTrack;
+  }, [options?.onNextTrack]);
 
   useEffect(() => {
     onPlaybackChangeRef.current?.({
@@ -1210,8 +1222,6 @@ export function usePixiVideoPlayer(
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!mediaRef.current) return;
-
       const target = event.target as HTMLElement | null;
       const isTypingTarget =
         target instanceof HTMLInputElement ||
@@ -1219,6 +1229,20 @@ export function usePixiVideoPlayer(
         target?.isContentEditable;
 
       if (isTypingTarget) return;
+
+      if (event.code === "ArrowLeft" && previewKindRef.current === "image" && onPrevTrackRef.current) {
+        event.preventDefault();
+        onPrevTrackRef.current();
+        return;
+      }
+
+      if (event.code === "ArrowRight" && previewKindRef.current === "image" && onNextTrackRef.current) {
+        event.preventDefault();
+        onNextTrackRef.current();
+        return;
+      }
+
+      if (!mediaRef.current) return;
 
       if (event.code === "Space" || event.code === "KeyK") {
         event.preventDefault();

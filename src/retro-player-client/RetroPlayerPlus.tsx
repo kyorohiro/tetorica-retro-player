@@ -32,6 +32,12 @@ const getPlaylistItemLabel = (item: PlaylistItem) => (
   item.kind === "file" ? item.file.name : item.path
 );
 
+const compareComicOrder = (a: string, b: string) =>
+  a.localeCompare(b, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+
 // 'pending' = loading (dark overlay covers colorbars flash)
 // 'blocked' = AudioContext suspended (Safari) → shows Touch & Play button
 // 'done'    = playing or user chose something else
@@ -401,16 +407,18 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
         onPathPlaylistLoaded?.(items, startIndex);
         return;
       }
-      const target = items[startIndex] ?? items[0];
-      playlistRef.current = items.map((item) => ({ kind: "path" as const, url: item.url, path: item.path }));
-      setPlaylistLength(items.length);
-      setPlaylistIndex(startIndex);
+      const sortedItems = [...items].sort((a, b) => compareComicOrder(a.path, b.path));
+      const sortedStartIndex = 0;
+      const target = sortedItems[sortedStartIndex] ?? sortedItems[0];
+      playlistRef.current = sortedItems.map((item) => ({ kind: "path" as const, url: item.url, path: item.path }));
+      setPlaylistLength(sortedItems.length);
+      setPlaylistIndex(sortedStartIndex);
       setIsPlaylistOpen(false);
       currentPlayingPathRef.current = target.path;
       currentPresetConfigRef.current = { type: "url", url: target.url, label: target.path };
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
-      onPathPlaylistLoaded?.(items, startIndex);
+      onPathPlaylistLoaded?.(sortedItems, sortedStartIndex);
     }, [onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
     const loadFiles = useCallback((files: File[], startIndex = 0) => {
@@ -419,10 +427,12 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
         void showDialogPreviewForBrowserFiles(files);
         return;
       }
-      const target = files[startIndex] ?? files[0];
-      playlistRef.current = files.map((file) => ({ kind: "file" as const, file }));
-      setPlaylistLength(files.length);
-      setPlaylistIndex(startIndex);
+      const sortedFiles = [...files].sort((a, b) => compareComicOrder(a.name, b.name));
+      const sortedStartIndex = 0;
+      const target = sortedFiles[sortedStartIndex] ?? sortedFiles[0];
+      playlistRef.current = sortedFiles.map((file) => ({ kind: "file" as const, file }));
+      setPlaylistLength(sortedFiles.length);
+      setPlaylistIndex(sortedStartIndex);
       setIsPlaylistOpen(false);
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
