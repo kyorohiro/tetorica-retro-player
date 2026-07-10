@@ -45,7 +45,7 @@ type AutoStartState = 'pending' | 'blocked' | 'done';
 
 const retroPlayerKey = "player:root";
 
-export type RetroPlayerPlusHandle = {
+export type RetroPlayerClientHandle = {
   loadPaths: (items: { url: string; path: string }[], startIndex?: number) => void;
   loadFiles: (files: File[], startIndex?: number) => void;
   rememberUrlPreset: (url: string, label: string) => void;
@@ -56,7 +56,7 @@ export type RetroPlayerPlusHandle = {
   playPresetDemoSong: (meta: DemoSongMeta) => Promise<void>;
 };
 
-type RetroPlayerPlusProps = {
+type RetroPlayerClientProps = {
   locale: RetroPlayerLocale;
   previewSource: ReturnType<typeof usePreviewSourceState>;
   isDialogActive: boolean;
@@ -71,8 +71,8 @@ type RetroPlayerPlusProps = {
   onPathPlaylistLoaded?: (items: { url: string; path: string }[], startIndex: number) => void;
 };
 
-export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlayerPlusProps>(
-  function RetroPlayerPlus(
+export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, RetroPlayerClientProps>(
+  function RetroPlayerClient(
     {
       locale,
       previewSource,
@@ -619,4 +619,4 @@ export const RetroPlayerPlus = React.forwardRef<RetroPlayerPlusHandle, RetroPlay
   },
 );
 
-export default RetroPlayerPlus;
+export default RetroPlayerClient;

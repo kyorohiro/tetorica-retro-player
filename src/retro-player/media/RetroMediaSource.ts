@@ -105,7 +105,7 @@ const canUseNativeHls = (media: HTMLMediaElement): boolean =>
  * Attach hls.js to `video` for `url`. hls.js's own network/media errors
  * don't set the native video.error or fire the native "error" event, so
  * existing error handling (waitForVideoReady's error listener,
- * RetroPlayerPlus's onError) would never see them. Follow hls.js's
+ * RetroPlayerClient's onError) would never see them. Follow hls.js's
  * documented recovery pattern for fatal errors, capped at 3 attempts each,
  * and only once truly unrecoverable, dispatch a synthetic native "error"
  * event to reuse all the existing native-error plumbing unchanged.

@@ -69,7 +69,7 @@ import {
   setFfmpegStreamingMode,
   type FfmpegStreamingMode,
 } from "./mdrop-web/ffmpegPreference";
-import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
+import { RetroPlayerClient, type RetroPlayerClientHandle } from "./retro-player-client/RetroPlayerClient";
 
 const waitForExternalNavigationPause = async () => {
   dispatchRetroPlayerPrepareExternalNavigation();
@@ -96,7 +96,7 @@ const recentFileListLabel = (paths: string[]) => {
 };
 
 function App() {
-  const retroPlayerPlusRef = useRef<RetroPlayerPlusHandle>(null);
+  const retroPlayerClientRef = useRef<RetroPlayerClientHandle>(null);
   const filePickerRef = useRef<FilePickerHandle>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [ffmpegStreamingMode, setFfmpegStreamingModeState] = React.useState<FfmpegStreamingMode>(
@@ -251,7 +251,7 @@ function App() {
         files: sharedFiles,
         useHls: isFfmpegEnabledRef.current,
         onPlay: (url, path) => {
-          retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
+          retroPlayerClientRef.current?.loadPaths([{ url, path }]);
         },
       });
       return;
@@ -266,7 +266,7 @@ function App() {
         url: resolvePlayableUrl(shared, isFfmpegEnabledRef.current),
       };
     }));
-    retroPlayerPlusRef.current?.loadPaths(
+    retroPlayerClientRef.current?.loadPaths(
       sharedItems.map((entry) => ({ url: entry.url, path: entry.path })),
       item.startIndex ?? 0,
     );
@@ -408,7 +408,7 @@ function App() {
   const onInputFiles = useCallback(async (files: File[]) => {
     const decision = decideBrowserFileSelection(files, loopModeRef.current);
     if (decision.kind === "play-files") {
-      retroPlayerPlusRef.current?.loadFiles(decision.files);
+      retroPlayerClientRef.current?.loadFiles(decision.files);
       return;
     }
 
@@ -445,7 +445,7 @@ function App() {
         ffmpegMode: ffmpegStreamingModeRef.current,
       });
       if (sharedFolderPlaylistItems && sharedFolderPlaylistItems.length > 0) {
-        retroPlayerPlusRef.current?.loadPaths(sharedFolderPlaylistItems);
+        retroPlayerClientRef.current?.loadPaths(sharedFolderPlaylistItems);
         return;
       }
       const decision = decideSharedDropSelection(
@@ -458,9 +458,9 @@ function App() {
       );
 
       if (decision.kind === "play-paths") {
-        retroPlayerPlusRef.current?.loadPaths(decision.items);
+        retroPlayerClientRef.current?.loadPaths(decision.items);
         if (decision.items.length === 1 && decision.items[0].url.startsWith("http")) {
-          retroPlayerPlusRef.current?.rememberUrlPreset(decision.items[0].url, decision.items[0].path);
+          retroPlayerClientRef.current?.rememberUrlPreset(decision.items[0].url, decision.items[0].path);
         }
         return;
       }
@@ -476,7 +476,7 @@ function App() {
           files: sharedFiles,
           useHls: isFfmpegEnabledRef.current,
           onPlay: (url, path) => {
-            retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
+            retroPlayerClientRef.current?.loadPaths([{ url, path }]);
           },
         });
       }
@@ -493,7 +493,7 @@ function App() {
     );
 
     if (decision.kind === "play-paths") {
-      retroPlayerPlusRef.current?.loadPaths(
+      retroPlayerClientRef.current?.loadPaths(
         decision.paths.map((path) => ({ url: convertFileSrc(path), path })),
       );
       return;
@@ -517,7 +517,7 @@ function App() {
         nativeEntries.length > 0 && mediaNativeEntries.length === nativeEntries.length;
       if (hasOnlyMediaFiles) {
         if (mediaNativeEntries.length === 1 || loopModeRef.current === "autoplay" || loopModeRef.current === "all") {
-          retroPlayerPlusRef.current?.loadPaths(
+          retroPlayerClientRef.current?.loadPaths(
             mediaNativeEntries.map((entry) => ({
               url: convertFileSrc(entry.sourcePath),
               path: entry.sourcePath,
@@ -611,14 +611,14 @@ function App() {
 
   const handleOpenMicrophone = useCallback(async () => {
     setIsMobileMenuOpen(false);
-    retroPlayerPlusRef.current?.stopBuiltinPlayback();
+    retroPlayerClientRef.current?.stopBuiltinPlayback();
     dispatchRetroPlayerEnsureAudioContext();
     await previewSource.startMicrophoneInput();
   }, [previewSource]);
 
   const handleOpenCamera = useCallback(async () => {
     setIsMobileMenuOpen(false);
-    retroPlayerPlusRef.current?.stopBuiltinPlayback();
+    retroPlayerClientRef.current?.stopBuiltinPlayback();
     dispatchRetroPlayerEnsureAudioContext();
     await previewSource.startCameraInput();
   }, [previewSource]);
@@ -658,14 +658,14 @@ function App() {
 
     const currentLabel = previewSource.previewLabel;
     if (currentLabel === "Microphone") {
-      retroPlayerPlusRef.current?.stopBuiltinPlayback();
+      retroPlayerClientRef.current?.stopBuiltinPlayback();
       dispatchRetroPlayerEnsureAudioContext();
       await previewSource.startMicrophoneInput(selectedDeviceId);
       return;
     }
 
     if (currentLabel === "Camera") {
-      retroPlayerPlusRef.current?.stopBuiltinPlayback();
+      retroPlayerClientRef.current?.stopBuiltinPlayback();
       dispatchRetroPlayerEnsureAudioContext();
       await previewSource.startCameraInput(selectedDeviceId);
     }
@@ -937,10 +937,10 @@ function App() {
           onOpenMicrophone={() => { void handleOpenMicrophone(); }}
           onOpenCamera={() => { void handleOpenCamera(); }}
           onSelectMicrophoneDevice={() => { void handleSelectMicrophoneDevice(); }}
-          onPresetVideo={() => { setIsMobileMenuOpen(false); retroPlayerPlusRef.current?.playPresetVideo(); }}
-          onPresetImage={() => { setIsMobileMenuOpen(false); retroPlayerPlusRef.current?.playPresetImage(); }}
-          onPresetLofi={() => { setIsMobileMenuOpen(false); void retroPlayerPlusRef.current?.playPresetLofi(); }}
-          onPresetDemoSong={(meta: DemoSongMeta) => { setIsMobileMenuOpen(false); void retroPlayerPlusRef.current?.playPresetDemoSong(meta); }}
+          onPresetVideo={() => { setIsMobileMenuOpen(false); retroPlayerClientRef.current?.playPresetVideo(); }}
+          onPresetImage={() => { setIsMobileMenuOpen(false); retroPlayerClientRef.current?.playPresetImage(); }}
+          onPresetLofi={() => { setIsMobileMenuOpen(false); void retroPlayerClientRef.current?.playPresetLofi(); }}
+          onPresetDemoSong={(meta: DemoSongMeta) => { setIsMobileMenuOpen(false); void retroPlayerClientRef.current?.playPresetDemoSong(meta); }}
           onOpenRecentItem={(item) => { void handleOpenRecentLaunchItem(item); }}
           onRemoveRecentItem={handleRemoveRecentLaunchItem}
           onToggleRecentItemPinned={handleToggleRecentLaunchPinned}
@@ -980,8 +980,8 @@ function App() {
           setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
-        <RetroPlayerPlus
-          ref={retroPlayerPlusRef}
+        <RetroPlayerClient
+          ref={retroPlayerClientRef}
           locale={locale}
           previewSource={previewSource}
           isDialogActive={isDialogActive}
