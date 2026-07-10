@@ -47,8 +47,8 @@ function DigitalClockOverlay() {
 // Add new player capabilities here, not in RetroPlayer.
 export type RetroPreviewPlayerSlice = {
   canvasHostRef: React.RefObject<HTMLDivElement | null>;
-  nativeVideoElement: HTMLVideoElement | null;
-  shouldUseNativeVideoSurface: boolean;
+  nativeVisualElement: HTMLVideoElement | HTMLImageElement | null;
+  shouldUseNativeVisualSurface: boolean;
   isPoweredOn: boolean;
   isLoading: boolean;
   isBuffering: boolean;
@@ -579,32 +579,34 @@ export function RetroPreviewView({
 
   React.useEffect(() => {
     const host = nativeVideoHostRef.current;
-    const video = player.nativeVideoElement;
+    const visual = player.nativeVisualElement;
 
-    if (!host || !player.shouldUseNativeVideoSurface || !video) {
+    if (!host || !player.shouldUseNativeVisualSurface || !visual) {
       return;
     }
 
-    video.controls = false;
-    video.playsInline = true;
-    video.style.width = "100%";
-    video.style.height = "100%";
-    video.style.display = "block";
-    video.style.objectFit = "contain";
-    video.style.backgroundColor = "black";
+    if (visual instanceof HTMLVideoElement) {
+      visual.controls = false;
+      visual.playsInline = true;
+    }
+    visual.style.width = "100%";
+    visual.style.height = "100%";
+    visual.style.display = "block";
+    visual.style.objectFit = "contain";
+    visual.style.backgroundColor = "black";
 
-    if (video.parentElement !== host) {
-      host.replaceChildren(video);
+    if (visual.parentElement !== host) {
+      host.replaceChildren(visual);
     }
 
     return () => {
-      if (video.parentElement === host) {
+      if (visual.parentElement === host) {
         host.replaceChildren();
       }
     };
   }, [
-    player.nativeVideoElement,
-    player.shouldUseNativeVideoSurface,
+    player.nativeVisualElement,
+    player.shouldUseNativeVisualSurface,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
   ]);
@@ -873,7 +875,7 @@ export function RetroPreviewView({
               className="pointer-events-none relative h-full w-full touch-manipulation"
               style={{
                 opacity:
-                  player.shouldUseNativeVideoSurface
+                  player.shouldUseNativeVisualSurface
                     ? 0
                     : isCanvasVisible
                       ? 1
@@ -881,7 +883,7 @@ export function RetroPreviewView({
                 transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease`,
               }}
             />
-            {player.shouldUseNativeVideoSurface && (
+            {player.shouldUseNativeVisualSurface && (
               <div
                 ref={nativeVideoHostRef}
                 className="absolute inset-0 overflow-hidden rounded-xl bg-black"

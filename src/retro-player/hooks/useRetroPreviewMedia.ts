@@ -1158,6 +1158,17 @@ export function useRetroPreviewMedia({
     appRef.current?.ticker.stop();
   };
 
+  const attachNativeImagePreview = (image: HTMLImageElement) => {
+    previewElementRef.current = image;
+    setPreviewKindState("image");
+    setSourceDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+    setViewportRect(null);
+    safeRender();
+    refreshLayout();
+    scheduleRefreshLayout();
+    appRef.current?.ticker.stop();
+  };
+
   const previewFile = async (file: File) => {
     const isVideo = file.type.startsWith("video/");
     const isAudio = file.type.startsWith("audio/");
@@ -1181,7 +1192,6 @@ export function useRetroPreviewMedia({
     let url: string | null = null;
 
     try {
-      await ensureRendererReady();
       url = URL.createObjectURL(file);
       objectUrlRef.current = url;
 
@@ -1203,8 +1213,12 @@ export function useRetroPreviewMedia({
         mediaRef.current = media;
 
         if (media instanceof HTMLVideoElement) {
-          await attachVisualPreview(media, "video");
-          await ensureVisualStartupReady("video");
+          if (shouldUseNativeVideoSurface(media, preferNativeVideoSurface)) {
+            attachNativeVideoPreview(media);
+          } else {
+            await attachVisualPreview(media, "video");
+            await ensureVisualStartupReady("video");
+          }
         } else {
           previewElementRef.current = null;
           setPreviewKindState("audio");
@@ -1240,8 +1254,13 @@ export function useRetroPreviewMedia({
       mediaRef.current = null;
       muteNoiseImmediately();
       updateAudioNodes();
-      await attachVisualPreview(image, "image");
-      await ensureVisualStartupReady("image");
+      if (preferNativeVideoSurface) {
+        attachNativeImagePreview(image);
+      } else {
+        await ensureRendererReady();
+        await attachVisualPreview(image, "image");
+        await ensureVisualStartupReady("image");
+      }
       syncVideoState();
       if (requestId === previewRequestIdRef.current) {
         finishLoading();
@@ -1481,7 +1500,6 @@ export function useRetroPreviewMedia({
             ? "Loading image preview..."
             : "Loading audio preview...",
       );
-      await ensureRendererReady();
       debugVideo("startup:previewUrl:renderer-ready", {
         kind,
         elapsedMs: elapsedMs(),
@@ -1520,6 +1538,7 @@ export function useRetroPreviewMedia({
         if (shouldUseNativeVideoSurface(media, preferNativeVideoSurface)) {
           attachNativeVideoPreview(media);
         } else {
+          await ensureRendererReady();
           await attachVisualPreview(media, "video");
           await ensureVisualStartupReady("video");
         }
@@ -1550,8 +1569,13 @@ export function useRetroPreviewMedia({
         mediaRef.current = null;
         muteNoiseImmediately();
         updateAudioNodes();
-        await attachVisualPreview(image, "image");
-        await ensureVisualStartupReady("image");
+        if (preferNativeVideoSurface) {
+          attachNativeImagePreview(image);
+        } else {
+          await ensureRendererReady();
+          await attachVisualPreview(image, "image");
+          await ensureVisualStartupReady("image");
+        }
         syncVideoState();
       } else {
         const audioSource = await createAudioMediaSource(
@@ -1581,6 +1605,7 @@ export function useRetroPreviewMedia({
         setViewportRect(null);
         mediaRef.current = audio;
         safeRender();
+        await ensureRendererReady();
         await connectMediaAudio(audio);
         syncVideoState();
       }

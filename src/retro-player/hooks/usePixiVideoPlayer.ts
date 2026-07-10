@@ -219,13 +219,6 @@ export function usePixiVideoPlayer(
 
   // The native <video> tag swap only makes sense for an actual video
   // element (there's no "native image surface" to swap to).
-  const nativeVideoElement =
-    mediaRef.current instanceof HTMLVideoElement ? mediaRef.current : null;
-  const shouldUseNativeVideoSurface =
-    Boolean(options?.preferNativeVideoSurface) &&
-    previewKind === "video" &&
-    nativeVideoElement !== null;
-
   // Native mode is meant as a full passthrough regardless of what's being
   // previewed (video, image, or audio-with-cover). Gate on the raw setting
   // here rather than shouldUseNativeVideoSurface, which is narrower (it also
@@ -282,6 +275,20 @@ export function usePixiVideoPlayer(
   const initialRenderResolutionScaleRef = useRef(renderResolutionScale);
   const cleanupPreviewRef = useRef<() => void>(() => {});
   const disposeAudioEngineRef = useRef<() => Promise<void> | void>(() => {});
+
+  const nativeVideoElement =
+    mediaRef.current instanceof HTMLVideoElement ? mediaRef.current : null;
+  const nativeImageElement =
+    previewElementRef.current instanceof HTMLImageElement ? previewElementRef.current : null;
+  const nativeVisualElement =
+    previewKind === "video"
+      ? nativeVideoElement
+      : previewKind === "image"
+        ? nativeImageElement
+        : null;
+  const shouldUseNativeVisualSurface =
+    Boolean(options?.preferNativeVideoSurface) &&
+    nativeVisualElement !== null;
 
   const audio = useRetroAudioEngine({
     instanceLabel: instanceLabelRef.current,
@@ -1293,8 +1300,8 @@ export function usePixiVideoPlayer(
 
   return {
     canvasHostRef,
-    nativeVideoElement,
-    shouldUseNativeVideoSurface,
+    nativeVisualElement,
+    shouldUseNativeVisualSurface,
     previewName,
     previewError,
     isRendererReady,
