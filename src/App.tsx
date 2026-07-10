@@ -62,6 +62,7 @@ import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
 import { useMDropFileListDialog } from "./mdrop-web/useMDropFileListDialog";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
+import { resolveSharedFolderPlaylistItems } from "./mdrop-web/mdropFolderPlaylist";
 import {
   getFfmpegStreamingMode,
   setFfmpegStreamingEnabled,
@@ -433,6 +434,20 @@ function App() {
           ffmpegStreamingModeRef.current,
         ),
       }));
+      const sharedFolderPlaylistItems = await resolveSharedFolderPlaylistItems({
+        entries: sharedFiles.map((file) => ({
+          id: file.id,
+          path: file.path,
+          url: file.url,
+          isDir: file.isDir,
+        })),
+        useFfmpeg: isFfmpegEnabledRef.current,
+        ffmpegMode: ffmpegStreamingModeRef.current,
+      });
+      if (sharedFolderPlaylistItems && sharedFolderPlaylistItems.length > 0) {
+        retroPlayerPlusRef.current?.loadPaths(sharedFolderPlaylistItems);
+        return;
+      }
       const decision = decideSharedDropSelection(
         sharedFiles.map((file) => ({
           url: file.url,
