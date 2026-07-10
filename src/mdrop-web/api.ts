@@ -19,6 +19,7 @@ type TargetFile = {
 
 type FileTargetFile = TargetFile & {
     entry?: File;
+    resolveEntry?: () => Promise<File>;
 };
 
 const getMeta = async (): Promise<{ apiServer: string; hasFfmpeg: boolean }> => {

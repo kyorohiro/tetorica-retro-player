@@ -144,6 +144,20 @@ struct ShareFileRequest {
     path: String,
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativePathListRequest {
+    paths: Vec<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativePathEntry {
+    source_path: String,
+    path: String,
+    is_dir: bool,
+}
+
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SharedFileInfo {
@@ -202,6 +216,73 @@ async fn mdrop_share_file(
             url: format!("http://{hostname}:{port}/download/{id}"),
         })
     }
+}
+
+fn collect_native_path_entries(
+    real_path: &PathBuf,
+    display_path: String,
+    entries: &mut Vec<NativePathEntry>,
+) -> Result<(), String> {
+    let is_dir = real_path.is_dir();
+
+    if !is_dir {
+        entries.push(NativePathEntry {
+            source_path: real_path.to_string_lossy().to_string(),
+            path: display_path,
+            is_dir: false,
+        });
+        return Ok(());
+    }
+
+    let read_dir = fs::read_dir(real_path).map_err(|error| error.to_string())?;
+    let mut children: Vec<PathBuf> = read_dir
+        .filter_map(|entry| entry.ok().map(|item| item.path()))
+        .collect();
+    children.sort();
+
+    if children.is_empty() {
+        entries.push(NativePathEntry {
+            source_path: real_path.to_string_lossy().to_string(),
+            path: display_path,
+            is_dir: true,
+        });
+        return Ok(());
+    }
+
+    for child in children {
+        let name = child
+            .file_name()
+            .ok_or("invalid file name")?
+            .to_string_lossy()
+            .to_string();
+        let child_display_path = if display_path.is_empty() {
+            name
+        } else {
+            format!("{display_path}/{name}")
+        };
+        collect_native_path_entries(&child, child_display_path, entries)?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn list_native_path_entries(
+    req: NativePathListRequest,
+) -> Result<Vec<NativePathEntry>, String> {
+    let mut entries = Vec::new();
+
+    for path in req.paths {
+        let real_path = PathBuf::from(&path);
+        let name = real_path
+            .file_name()
+            .ok_or("invalid file name")?
+            .to_string_lossy()
+            .to_string();
+        collect_native_path_entries(&real_path, name, &mut entries)?;
+    }
+
+    Ok(entries)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -482,6 +563,7 @@ pub fn run() {
             mdrop_stop_server,
             mdrop_get_server_status,
             mdrop_share_file,
+            list_native_path_entries,
             mdrop_unshare_file,
             mdrop_unshare_all,
             mdrop_start_bonjour,
