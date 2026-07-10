@@ -54,7 +54,7 @@ import {
 import { MobileMenu } from "./MobileMenu";
 import { LicenseDialog } from "./LicenseDialog";
 import type { DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
-import { mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
+import { listNativePathEntries, mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
 import { resolvePlayableUrl } from "./mdrop-web/resolvePlayableSource";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
@@ -503,27 +503,60 @@ function App() {
       if (decision.rememberFileListPaths) {
         rememberRecentFileList(decision.rememberFileListPaths);
       }
+      const nativeEntries = await listNativePathEntries(paths);
+      const mediaNativeEntries = nativeEntries.filter(
+        (entry) =>
+          !entry.isDir &&
+          (
+            options?.useExtendedMedia
+              ? isVideoExtended(entry.sourcePath) || isAudio(entry.sourcePath) || isImage(entry.sourcePath)
+              : isVideo(entry.sourcePath) || isAudio(entry.sourcePath) || isImage(entry.sourcePath)
+          ),
+      );
+      const hasOnlyMediaFiles =
+        nativeEntries.length > 0 && mediaNativeEntries.length === nativeEntries.length;
+      if (hasOnlyMediaFiles) {
+        if (mediaNativeEntries.length === 1 || loopModeRef.current === "autoplay" || loopModeRef.current === "all") {
+          retroPlayerPlusRef.current?.loadPaths(
+            mediaNativeEntries.map((entry) => ({
+              url: convertFileSrc(entry.sourcePath),
+              path: entry.sourcePath,
+            })),
+          );
+          return;
+        }
+      }
       const fileEntries: FileTargetFile[] = [];
-      for (const path of paths) {
-        const name = path.split("/").pop() ?? path;
-        try {
-          const res = await fetch(convertFileSrc(path));
-          const blob = await res.blob();
-          const mime = mimeFromPath(path) || blob.type;
+      for (const nativeEntry of nativeEntries) {
+        if (nativeEntry.isDir) {
           fileEntries.push({
-            id: "",
-            entry: new File([blob], name, { type: mime }),
-            isDir: false,
-            isFile: true,
-            path: name,
+            id: `dir:${nativeEntry.path}`,
+            isDir: true,
+            isFile: false,
+            path: nativeEntry.path,
             createdAt: 0,
             modifiedAt: 0,
-            size: blob.size,
+            size: 0,
             isRoot: true,
           });
-        } catch (error) {
-          console.error("[App] path fetch failed:", path, error);
+          continue;
         }
+        fileEntries.push({
+          id: "",
+          isDir: false,
+          isFile: true,
+          path: nativeEntry.path,
+          createdAt: 0,
+          modifiedAt: 0,
+          size: 0,
+          isRoot: true,
+          resolveEntry: async () => {
+            const res = await fetch(convertFileSrc(nativeEntry.sourcePath));
+            const blob = await res.blob();
+            const mime = mimeFromPath(nativeEntry.sourcePath) || blob.type;
+            return new File([blob], nativeEntry.path.replace(/.*\//, ""), { type: mime });
+          },
+        });
       }
       await openBrowserDialogTargets(fileEntries);
     }

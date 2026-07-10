@@ -51,7 +51,7 @@ export function useMDropDragDrop({
 
     setup();
     return () => { unlisten?.(); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onInputPaths]);
 
   // Tauri "Open With" / file association handler (tauri-plugin-deep-link)
   useEffect(() => {
