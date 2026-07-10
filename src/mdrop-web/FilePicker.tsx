@@ -2,10 +2,6 @@ import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } 
 import { flushSync } from "react-dom";
 import { t } from "../i18n";
 import type { RetroPlayerLocale } from "../retro-player/types";
-import type { MediaPlaybackTarget } from "./mediaPlaybackTarget";
-import { FileTargetFile } from "./api";
-import { isAudio, isBrowserPlayableVideo, isImage, type FileWithRelativePath } from "./utils";
-import type { useBrowserFileListDialog } from "./useBrowserFileListDialog";
 
 const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
@@ -22,15 +18,13 @@ export type FilePickerHandle = {
 type FilePickerProps = {
   locale: RetroPlayerLocale;
   isIosOrAndroid: boolean;
-  loopModeRef: React.RefObject<"one" | "autoplay" | "all" | "off">;
-  retroPlayerPlusRef: React.RefObject<MediaPlaybackTarget | null>;
-  showBrowserFileListDialog: ReturnType<typeof useBrowserFileListDialog>["showBrowserFileListDialog"];
+  onInputFiles: (files: File[]) => Promise<void>;
   setIsMobileMenuOpen: (value: boolean) => void;
 };
 
 export const FilePicker = React.forwardRef<FilePickerHandle, FilePickerProps>(
   function FilePicker(
-    { locale, isIosOrAndroid, loopModeRef, retroPlayerPlusRef, showBrowserFileListDialog, setIsMobileMenuOpen },
+    { locale, isIosOrAndroid, onInputFiles, setIsMobileMenuOpen },
     ref,
   ) {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,43 +95,6 @@ export const FilePicker = React.forwardRef<FilePickerHandle, FilePickerProps>(
       });
     }, []);
 
-    const filesToTargets = useCallback((files: FileList | File[]) => {
-      const targets: FileTargetFile[] = [];
-
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index] as FileWithRelativePath;
-
-        targets.push({
-          id: "",
-          entry: file,
-          isDir: false,
-          isFile: true,
-          path: file.webkitRelativePath || file.name,
-          createdAt: 0,
-          modifiedAt: file.lastModified ?? 0,
-          size: file.size ?? 0,
-          isRoot: true,
-        });
-      }
-
-      return targets;
-    }, []);
-
-    const isDirectRetroFile = useCallback((file: File) => {
-      return isImage(file.name) || isBrowserPlayableVideo(file.name) || isAudio(file.name);
-    }, []);
-
-    const openPortableTargets = useCallback(async (files: FileList | File[]) => {
-      const targets = filesToTargets(files);
-      if (targets.length === 0) return;
-
-      await showBrowserFileListDialog({
-        files: targets,
-        initialPath: "/",
-        title: "",
-      });
-    }, [filesToTargets, showBrowserFileListDialog]);
-
     const openFiles = useCallback(async (files: FileList | File[]) => {
       if (files.length === 0) return;
 
@@ -145,24 +102,11 @@ export const FilePicker = React.forwardRef<FilePickerHandle, FilePickerProps>(
 
       try {
         await waitForNextPaint();
-
-        if (files.length === 1 && isDirectRetroFile(files[0])) {
-          retroPlayerPlusRef.current?.loadFiles([files[0]]);
-          return;
-        }
-
-        const mediaFiles = Array.from(files).filter((f) => isDirectRetroFile(f));
-        if ((loopModeRef.current === "autoplay" || loopModeRef.current === "all") && mediaFiles.length > 1 && mediaFiles.length === files.length) {
-          retroPlayerPlusRef.current?.loadFiles(mediaFiles);
-          finishPreparingSelection();
-          return;
-        }
-
-        await openPortableTargets(files);
+        await onInputFiles(Array.from(files));
       } finally {
         finishPreparingSelection();
       }
-    }, [finishPreparingSelection, isDirectRetroFile, loopModeRef, openPortableTargets, retroPlayerPlusRef]);
+    }, [finishPreparingSelection, onInputFiles]);
 
     const openFileInput = useCallback(() => {
       beginPreparingSelection();
@@ -248,7 +192,7 @@ export const FilePicker = React.forwardRef<FilePickerHandle, FilePickerProps>(
                 await waitForNextPaint();
                 try {
                   pickerStateRef.current = "processing";
-                  await openPortableTargets(files);
+                  await onInputFiles(Array.from(files));
                 } finally {
                   finishPreparingSelection();
                 }

@@ -31,9 +31,20 @@ import {
 import { useLongPress } from "./retro-player/hooks/useLongPress";
 import { DIALOG_STACK_ACTIVE_EVENT, useDialog } from "./useDialog";
 import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
+import {
+  decideBrowserFileSelection,
+  decidePathDropSelection,
+  decideSharedDropSelection,
+  type LoopMode,
+} from "./mdrop-web/incomingSelection";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
   getDroppedFiles,
+  isAudio,
+  isImage,
+  isVideo,
+  isVideoExtended,
+  mimeFromPath,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import {
@@ -92,7 +103,6 @@ function App() {
   );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
-  type LoopMode = "one" | "autoplay" | "all" | "off";
   const [loopMode, setLoopMode] = React.useState<LoopMode>("all");
   const loopModeRef = React.useRef<LoopMode>(loopMode);
   React.useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
@@ -319,17 +329,6 @@ function App() {
     },
   );
 
-  useMDropDragDrop({
-    isMDropReadyRef,
-    isFfmpegEnabledRef,
-    ffmpegStreamingModeRef,
-    loopModeRef,
-    retroPlayerPlusRef,
-    showBrowserFileListDialog,
-    onRememberFolderPath: rememberRecentFolder,
-    onRememberFileListPaths: rememberRecentFileList,
-  });
-
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
     const previewFiles = Array.from(files).map((file) => ({
       id: "",
@@ -395,6 +394,137 @@ function App() {
       },
     });
   }, [shouldUseDialogRetroPreview, showPreviewDialog]);
+
+  const openBrowserDialogTargets = useCallback(async (targets: FileTargetFile[]) => {
+    if (targets.length === 0) return;
+    await showBrowserFileListDialog({
+      files: targets,
+      initialPath: "/",
+      title: "",
+    });
+  }, [showBrowserFileListDialog]);
+
+  const onInputFiles = useCallback(async (files: File[]) => {
+    const decision = decideBrowserFileSelection(files, loopModeRef.current);
+    if (decision.kind === "play-files") {
+      retroPlayerPlusRef.current?.loadFiles(decision.files);
+      return;
+    }
+
+    if (decision.kind === "open-browser-dialog") {
+      await openBrowserDialogTargets(decision.targets);
+    }
+  }, [openBrowserDialogTargets]);
+
+  const onInputPaths = useCallback(async (
+    paths: string[],
+    options?: { useExtendedMedia?: boolean },
+  ) => {
+    if (paths.length === 0) return;
+
+    if (isMDropReadyRef.current) {
+      await mdropUnshareAll().catch(() => {});
+      const raw = await Promise.all(paths.map((path) => mdropShareFile(path)));
+      const sharedFiles = raw.map((file) => ({
+        ...file,
+        url: resolvePlayableUrl(
+          file,
+          isFfmpegEnabledRef.current,
+          ffmpegStreamingModeRef.current,
+        ),
+      }));
+      const decision = decideSharedDropSelection(
+        sharedFiles.map((file) => ({
+          url: file.url,
+          path: file.path,
+          isDir: file.isDir,
+        })),
+        loopModeRef.current,
+      );
+
+      if (decision.kind === "play-paths") {
+        retroPlayerPlusRef.current?.loadPaths(decision.items);
+        if (decision.items.length === 1 && decision.items[0].url.startsWith("http")) {
+          retroPlayerPlusRef.current?.rememberUrlPreset(decision.items[0].url, decision.items[0].path);
+        }
+        return;
+      }
+
+      if (decision.kind === "open-shared-dialog") {
+        if (decision.rememberFolderPath) {
+          rememberRecentFolder(decision.rememberFolderPath);
+        }
+        if (decision.rememberFileListPaths) {
+          rememberRecentFileList(decision.rememberFileListPaths);
+        }
+        await showMDropSharedListDialog({
+          files: sharedFiles,
+          useHls: isFfmpegEnabledRef.current,
+          onPlay: (url, path) => {
+            retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
+          },
+        });
+      }
+      return;
+    }
+
+    const { convertFileSrc } = await import("@tauri-apps/api/core");
+    const decision = decidePathDropSelection(
+      paths,
+      loopModeRef.current,
+      options?.useExtendedMedia
+        ? (path) => isVideoExtended(path) || isAudio(path) || isImage(path)
+        : (path) => isVideo(path) || isAudio(path) || isImage(path),
+    );
+
+    if (decision.kind === "play-paths") {
+      retroPlayerPlusRef.current?.loadPaths(
+        decision.paths.map((path) => ({ url: convertFileSrc(path), path })),
+      );
+      return;
+    }
+
+    if (decision.kind === "open-browser-dialog") {
+      if (decision.rememberFileListPaths) {
+        rememberRecentFileList(decision.rememberFileListPaths);
+      }
+      const fileEntries: FileTargetFile[] = [];
+      for (const path of paths) {
+        const name = path.split("/").pop() ?? path;
+        try {
+          const res = await fetch(convertFileSrc(path));
+          const blob = await res.blob();
+          const mime = mimeFromPath(path) || blob.type;
+          fileEntries.push({
+            id: "",
+            entry: new File([blob], name, { type: mime }),
+            isDir: false,
+            isFile: true,
+            path: name,
+            createdAt: 0,
+            modifiedAt: 0,
+            size: blob.size,
+            isRoot: true,
+          });
+        } catch (error) {
+          console.error("[App] path fetch failed:", path, error);
+        }
+      }
+      await openBrowserDialogTargets(fileEntries);
+    }
+  }, [
+    ffmpegStreamingModeRef,
+    isFfmpegEnabledRef,
+    isMDropReadyRef,
+    openBrowserDialogTargets,
+    rememberRecentFileList,
+    rememberRecentFolder,
+    showMDropSharedListDialog,
+  ]);
+
+  useMDropDragDrop({
+    onInputPaths,
+  });
 
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
@@ -505,7 +635,7 @@ function App() {
       uniqueMap.set(key, file);
     }
     const targets = Array.from(uniqueMap.values());
-    await filePickerRef.current?.openDroppedFiles(targets);
+    await onInputFiles(targets);
   };
   const onDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -527,19 +657,12 @@ function App() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
-      await mdropUnshareAll().catch(() => {});
-      const shared = await mdropShareFile(selected);
-      const playUrl = resolvePlayableUrl(shared, isFfmpegEnabled);
-      retroPlayerPlusRef.current?.loadPaths([{ url: playUrl, path: selected }]);
-      // Save restorable URLs (HTTP) as startup preset so the player retries on next launch.
-      if (playUrl.startsWith('http')) {
-        retroPlayerPlusRef.current?.rememberUrlPreset(playUrl, selected);
-      }
+      await onInputPaths([selected], { useExtendedMedia: true });
       return;
     }
 
     filePickerRef.current?.openFileInput();
-  }, [isFfmpegEnabled, isMDropReady, isNativeMdropAvailable]);
+  }, [isMDropReady, isNativeMdropAvailable, onInputPaths]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -805,9 +928,7 @@ function App() {
           ref={filePickerRef}
           locale={locale}
           isIosOrAndroid={isIosOrAndroid}
-          loopModeRef={loopModeRef}
-          retroPlayerPlusRef={retroPlayerPlusRef}
-          showBrowserFileListDialog={showBrowserFileListDialog}
+          onInputFiles={onInputFiles}
           setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
