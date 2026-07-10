@@ -31,9 +31,20 @@ import {
 import { useLongPress } from "./retro-player/hooks/useLongPress";
 import { DIALOG_STACK_ACTIVE_EVENT, useDialog } from "./useDialog";
 import { FileTargetFile, type TargetFile } from "./mdrop-web/api";
+import {
+  decideBrowserFileSelection,
+  decidePathDropSelection,
+  decideSharedDropSelection,
+  type LoopMode,
+} from "./mdrop-web/incomingSelection";
 import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
   getDroppedFiles,
+  isAudio,
+  isImage,
+  isVideo,
+  isVideoExtended,
+  mimeFromPath,
   type FileWithRelativePath,
 } from "./mdrop-web/utils";
 import {
@@ -43,7 +54,7 @@ import {
 import { MobileMenu } from "./MobileMenu";
 import { LicenseDialog } from "./LicenseDialog";
 import type { DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
-import { mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
+import { listNativePathEntries, mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
 import { resolvePlayableUrl } from "./mdrop-web/resolvePlayableSource";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
 import { useMDropServer } from "./mdrop-web/useMDropServer";
@@ -51,13 +62,14 @@ import { useMDropDragDrop } from "./mdrop-web/useMDropDragDrop";
 import { useMDropFileListDialog } from "./mdrop-web/useMDropFileListDialog";
 import { useMDropSharedListDialog } from "./mdrop-web/useMDropSharedListDialog";
 import { FilePicker, type FilePickerHandle } from "./mdrop-web/FilePicker";
+import { resolveSharedFolderPlaylistItems } from "./mdrop-web/mdropFolderPlaylist";
 import {
   getFfmpegStreamingMode,
   setFfmpegStreamingEnabled,
   setFfmpegStreamingMode,
   type FfmpegStreamingMode,
 } from "./mdrop-web/ffmpegPreference";
-import { RetroPlayerPlus, type RetroPlayerPlusHandle } from "./retro-player-client/RetroPlayerPlus";
+import { RetroPlayerClient, type RetroPlayerClientHandle } from "./retro-player-client/RetroPlayerClient";
 
 const waitForExternalNavigationPause = async () => {
   dispatchRetroPlayerPrepareExternalNavigation();
@@ -84,7 +96,7 @@ const recentFileListLabel = (paths: string[]) => {
 };
 
 function App() {
-  const retroPlayerPlusRef = useRef<RetroPlayerPlusHandle>(null);
+  const retroPlayerClientRef = useRef<RetroPlayerClientHandle>(null);
   const filePickerRef = useRef<FilePickerHandle>(null);
   const [isFfmpegEnabled, setIsFfmpegEnabled] = React.useState(false);
   const [ffmpegStreamingMode, setFfmpegStreamingModeState] = React.useState<FfmpegStreamingMode>(
@@ -92,7 +104,6 @@ function App() {
   );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = React.useState(false);
-  type LoopMode = "one" | "autoplay" | "all" | "off";
   const [loopMode, setLoopMode] = React.useState<LoopMode>("all");
   const loopModeRef = React.useRef<LoopMode>(loopMode);
   React.useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
@@ -240,7 +251,7 @@ function App() {
         files: sharedFiles,
         useHls: isFfmpegEnabledRef.current,
         onPlay: (url, path) => {
-          retroPlayerPlusRef.current?.loadPaths([{ url, path }]);
+          retroPlayerClientRef.current?.loadPaths([{ url, path }]);
         },
       });
       return;
@@ -255,7 +266,7 @@ function App() {
         url: resolvePlayableUrl(shared, isFfmpegEnabledRef.current),
       };
     }));
-    retroPlayerPlusRef.current?.loadPaths(
+    retroPlayerClientRef.current?.loadPaths(
       sharedItems.map((entry) => ({ url: entry.url, path: entry.path })),
       item.startIndex ?? 0,
     );
@@ -318,17 +329,6 @@ function App() {
       setIsFfmpegEnabled((current) => !current);
     },
   );
-
-  useMDropDragDrop({
-    isMDropReadyRef,
-    isFfmpegEnabledRef,
-    ffmpegStreamingModeRef,
-    loopModeRef,
-    retroPlayerPlusRef,
-    showBrowserFileListDialog,
-    onRememberFolderPath: rememberRecentFolder,
-    onRememberFileListPaths: rememberRecentFileList,
-  });
 
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
     const previewFiles = Array.from(files).map((file) => ({
@@ -396,6 +396,184 @@ function App() {
     });
   }, [shouldUseDialogRetroPreview, showPreviewDialog]);
 
+  const openBrowserDialogTargets = useCallback(async (targets: FileTargetFile[]) => {
+    if (targets.length === 0) return;
+    await showBrowserFileListDialog({
+      files: targets,
+      initialPath: "/",
+      title: "",
+    });
+  }, [showBrowserFileListDialog]);
+
+  const onInputFiles = useCallback(async (files: File[]) => {
+    const decision = decideBrowserFileSelection(files, loopModeRef.current);
+    if (decision.kind === "play-files") {
+      retroPlayerClientRef.current?.loadFiles(decision.files);
+      return;
+    }
+
+    if (decision.kind === "open-browser-dialog") {
+      await openBrowserDialogTargets(decision.targets);
+    }
+  }, [openBrowserDialogTargets]);
+
+  const onInputPaths = useCallback(async (
+    paths: string[],
+    options?: { useExtendedMedia?: boolean },
+  ) => {
+    if (paths.length === 0) return;
+
+    if (isMDropReadyRef.current) {
+      await mdropUnshareAll().catch(() => {});
+      const raw = await Promise.all(paths.map((path) => mdropShareFile(path)));
+      const sharedFiles = raw.map((file) => ({
+        ...file,
+        url: resolvePlayableUrl(
+          file,
+          isFfmpegEnabledRef.current,
+          ffmpegStreamingModeRef.current,
+        ),
+      }));
+      const sharedFolderPlaylistItems = await resolveSharedFolderPlaylistItems({
+        entries: sharedFiles.map((file) => ({
+          id: file.id,
+          path: file.path,
+          url: file.url,
+          isDir: file.isDir,
+        })),
+        useFfmpeg: isFfmpegEnabledRef.current,
+        ffmpegMode: ffmpegStreamingModeRef.current,
+      });
+      if (sharedFolderPlaylistItems && sharedFolderPlaylistItems.length > 0) {
+        retroPlayerClientRef.current?.loadPaths(sharedFolderPlaylistItems);
+        return;
+      }
+      const decision = decideSharedDropSelection(
+        sharedFiles.map((file) => ({
+          url: file.url,
+          path: file.path,
+          isDir: file.isDir,
+        })),
+        loopModeRef.current,
+      );
+
+      if (decision.kind === "play-paths") {
+        retroPlayerClientRef.current?.loadPaths(decision.items);
+        if (decision.items.length === 1 && decision.items[0].url.startsWith("http")) {
+          retroPlayerClientRef.current?.rememberUrlPreset(decision.items[0].url, decision.items[0].path);
+        }
+        return;
+      }
+
+      if (decision.kind === "open-shared-dialog") {
+        if (decision.rememberFolderPath) {
+          rememberRecentFolder(decision.rememberFolderPath);
+        }
+        if (decision.rememberFileListPaths) {
+          rememberRecentFileList(decision.rememberFileListPaths);
+        }
+        await showMDropSharedListDialog({
+          files: sharedFiles,
+          useHls: isFfmpegEnabledRef.current,
+          onPlay: (url, path) => {
+            retroPlayerClientRef.current?.loadPaths([{ url, path }]);
+          },
+        });
+      }
+      return;
+    }
+
+    const { convertFileSrc } = await import("@tauri-apps/api/core");
+    const decision = decidePathDropSelection(
+      paths,
+      loopModeRef.current,
+      options?.useExtendedMedia
+        ? (path) => isVideoExtended(path) || isAudio(path) || isImage(path)
+        : (path) => isVideo(path) || isAudio(path) || isImage(path),
+    );
+
+    if (decision.kind === "play-paths") {
+      retroPlayerClientRef.current?.loadPaths(
+        decision.paths.map((path) => ({ url: convertFileSrc(path), path })),
+      );
+      return;
+    }
+
+    if (decision.kind === "open-browser-dialog") {
+      if (decision.rememberFileListPaths) {
+        rememberRecentFileList(decision.rememberFileListPaths);
+      }
+      const nativeEntries = await listNativePathEntries(paths);
+      const mediaNativeEntries = nativeEntries.filter(
+        (entry) =>
+          !entry.isDir &&
+          (
+            options?.useExtendedMedia
+              ? isVideoExtended(entry.sourcePath) || isAudio(entry.sourcePath) || isImage(entry.sourcePath)
+              : isVideo(entry.sourcePath) || isAudio(entry.sourcePath) || isImage(entry.sourcePath)
+          ),
+      );
+      const hasOnlyMediaFiles =
+        nativeEntries.length > 0 && mediaNativeEntries.length === nativeEntries.length;
+      if (hasOnlyMediaFiles) {
+        if (mediaNativeEntries.length === 1 || loopModeRef.current === "autoplay" || loopModeRef.current === "all") {
+          retroPlayerClientRef.current?.loadPaths(
+            mediaNativeEntries.map((entry) => ({
+              url: convertFileSrc(entry.sourcePath),
+              path: entry.sourcePath,
+            })),
+          );
+          return;
+        }
+      }
+      const fileEntries: FileTargetFile[] = [];
+      for (const nativeEntry of nativeEntries) {
+        if (nativeEntry.isDir) {
+          fileEntries.push({
+            id: `dir:${nativeEntry.path}`,
+            isDir: true,
+            isFile: false,
+            path: nativeEntry.path,
+            createdAt: 0,
+            modifiedAt: 0,
+            size: 0,
+            isRoot: true,
+          });
+          continue;
+        }
+        fileEntries.push({
+          id: "",
+          isDir: false,
+          isFile: true,
+          path: nativeEntry.path,
+          createdAt: 0,
+          modifiedAt: 0,
+          size: 0,
+          isRoot: true,
+          resolveEntry: async () => {
+            const res = await fetch(convertFileSrc(nativeEntry.sourcePath));
+            const blob = await res.blob();
+            const mime = mimeFromPath(nativeEntry.sourcePath) || blob.type;
+            return new File([blob], nativeEntry.path.replace(/.*\//, ""), { type: mime });
+          },
+        });
+      }
+      await openBrowserDialogTargets(fileEntries);
+    }
+  }, [
+    ffmpegStreamingModeRef,
+    isFfmpegEnabledRef,
+    isMDropReadyRef,
+    openBrowserDialogTargets,
+    rememberRecentFileList,
+    rememberRecentFolder,
+    showMDropSharedListDialog,
+  ]);
+
+  useMDropDragDrop({
+    onInputPaths,
+  });
+
   const handleDisplayCapture = useCallback(async () => {
     const errorMessage = await previewSource.startDisplayCapture();
     const isItchDisplayCaptureError =
@@ -433,14 +611,14 @@ function App() {
 
   const handleOpenMicrophone = useCallback(async () => {
     setIsMobileMenuOpen(false);
-    retroPlayerPlusRef.current?.stopBuiltinPlayback();
+    retroPlayerClientRef.current?.stopBuiltinPlayback();
     dispatchRetroPlayerEnsureAudioContext();
     await previewSource.startMicrophoneInput();
   }, [previewSource]);
 
   const handleOpenCamera = useCallback(async () => {
     setIsMobileMenuOpen(false);
-    retroPlayerPlusRef.current?.stopBuiltinPlayback();
+    retroPlayerClientRef.current?.stopBuiltinPlayback();
     dispatchRetroPlayerEnsureAudioContext();
     await previewSource.startCameraInput();
   }, [previewSource]);
@@ -480,14 +658,14 @@ function App() {
 
     const currentLabel = previewSource.previewLabel;
     if (currentLabel === "Microphone") {
-      retroPlayerPlusRef.current?.stopBuiltinPlayback();
+      retroPlayerClientRef.current?.stopBuiltinPlayback();
       dispatchRetroPlayerEnsureAudioContext();
       await previewSource.startMicrophoneInput(selectedDeviceId);
       return;
     }
 
     if (currentLabel === "Camera") {
-      retroPlayerPlusRef.current?.stopBuiltinPlayback();
+      retroPlayerClientRef.current?.stopBuiltinPlayback();
       dispatchRetroPlayerEnsureAudioContext();
       await previewSource.startCameraInput(selectedDeviceId);
     }
@@ -505,7 +683,7 @@ function App() {
       uniqueMap.set(key, file);
     }
     const targets = Array.from(uniqueMap.values());
-    await filePickerRef.current?.openDroppedFiles(targets);
+    await onInputFiles(targets);
   };
   const onDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -527,19 +705,12 @@ function App() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
-      await mdropUnshareAll().catch(() => {});
-      const shared = await mdropShareFile(selected);
-      const playUrl = resolvePlayableUrl(shared, isFfmpegEnabled);
-      retroPlayerPlusRef.current?.loadPaths([{ url: playUrl, path: selected }]);
-      // Save restorable URLs (HTTP) as startup preset so the player retries on next launch.
-      if (playUrl.startsWith('http')) {
-        retroPlayerPlusRef.current?.rememberUrlPreset(playUrl, selected);
-      }
+      await onInputPaths([selected], { useExtendedMedia: true });
       return;
     }
 
     filePickerRef.current?.openFileInput();
-  }, [isFfmpegEnabled, isMDropReady, isNativeMdropAvailable]);
+  }, [isMDropReady, isNativeMdropAvailable, onInputPaths]);
 
   const handleOpenFolderPicker = useCallback(async () => {
     if (isIosOrAndroid) return;
@@ -766,10 +937,10 @@ function App() {
           onOpenMicrophone={() => { void handleOpenMicrophone(); }}
           onOpenCamera={() => { void handleOpenCamera(); }}
           onSelectMicrophoneDevice={() => { void handleSelectMicrophoneDevice(); }}
-          onPresetVideo={() => { setIsMobileMenuOpen(false); retroPlayerPlusRef.current?.playPresetVideo(); }}
-          onPresetImage={() => { setIsMobileMenuOpen(false); retroPlayerPlusRef.current?.playPresetImage(); }}
-          onPresetLofi={() => { setIsMobileMenuOpen(false); void retroPlayerPlusRef.current?.playPresetLofi(); }}
-          onPresetDemoSong={(meta: DemoSongMeta) => { setIsMobileMenuOpen(false); void retroPlayerPlusRef.current?.playPresetDemoSong(meta); }}
+          onPresetVideo={() => { setIsMobileMenuOpen(false); retroPlayerClientRef.current?.playPresetVideo(); }}
+          onPresetImage={() => { setIsMobileMenuOpen(false); retroPlayerClientRef.current?.playPresetImage(); }}
+          onPresetLofi={() => { setIsMobileMenuOpen(false); void retroPlayerClientRef.current?.playPresetLofi(); }}
+          onPresetDemoSong={(meta: DemoSongMeta) => { setIsMobileMenuOpen(false); void retroPlayerClientRef.current?.playPresetDemoSong(meta); }}
           onOpenRecentItem={(item) => { void handleOpenRecentLaunchItem(item); }}
           onRemoveRecentItem={handleRemoveRecentLaunchItem}
           onToggleRecentItemPinned={handleToggleRecentLaunchPinned}
@@ -805,14 +976,12 @@ function App() {
           ref={filePickerRef}
           locale={locale}
           isIosOrAndroid={isIosOrAndroid}
-          loopModeRef={loopModeRef}
-          retroPlayerPlusRef={retroPlayerPlusRef}
-          showBrowserFileListDialog={showBrowserFileListDialog}
+          onInputFiles={onInputFiles}
           setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
-        <RetroPlayerPlus
-          ref={retroPlayerPlusRef}
+        <RetroPlayerClient
+          ref={retroPlayerClientRef}
           locale={locale}
           previewSource={previewSource}
           isDialogActive={isDialogActive}

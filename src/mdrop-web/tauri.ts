@@ -31,6 +31,12 @@ export interface SharedFileInfo {
   isDir: boolean;
 }
 
+export interface NativePathEntry {
+  sourcePath: string;
+  path: string;
+  isDir: boolean;
+}
+
 export interface MdropConfig {
   apiKey: string;
   serverUrl: string | null;
@@ -66,6 +72,9 @@ export const mdropGetServerStatus = () =>
 
 export const mdropShareFile = (path: string) =>
   invoke<SharedFileInfo>("mdrop_share_file", { req: { path } });
+
+export const listNativePathEntries = (paths: string[]) =>
+  invoke<NativePathEntry[]>("list_native_path_entries", { req: { paths } });
 
 export const mdropUnshareFile = (id: string) =>
   invoke<void>("mdrop_unshare_file", { req: { id } });

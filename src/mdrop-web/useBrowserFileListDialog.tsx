@@ -142,6 +142,19 @@ function BrowserFileListDialog({
     load(initialPath);
   }, [initialPath]);
 
+  const ensureFileEntry = React.useCallback(async (file: TargetFile): Promise<File> => {
+    const target = file as FileTargetFile;
+    if (target.entry) {
+      return target.entry;
+    }
+    if (!target.resolveEntry) {
+      throw new Error(`Missing file entry resolver for ${file.path}`);
+    }
+    const entry = await target.resolveEntry();
+    target.entry = entry;
+    return entry;
+  }, []);
+
   const sortedFiles = useMemo<TargetFile[]>((() => {
     const next = [...files];
 
@@ -178,11 +191,11 @@ function BrowserFileListDialog({
   }) as () => TargetFile[], [files, sort, path]);
 
   const getObjectUrl = async (file: TargetFile): Promise<string> => {
-    return URL.createObjectURL((file as FileTargetFile).entry!);
+    return URL.createObjectURL(await ensureFileEntry(file));
   };
 
   const download = async (file: TargetFile): Promise<void> => {
-    const entry = (file as FileTargetFile).entry!;
+    const entry = await ensureFileEntry(file);
     const url = URL.createObjectURL(entry);
 
     try {
@@ -271,7 +284,7 @@ function BrowserFileListDialog({
             title: filename,
             source: {
               type: "blob",
-              blob: (file as FileTargetFile).entry!,
+              blob: await ensureFileEntry(file),
             } as any,
             initialPath: "/",
           });
@@ -331,7 +344,7 @@ function BrowserFileListDialog({
         await download(file);
       }
     },
-    [download, openPreview, showSelectDialog, showZipFileListDialog],
+    [download, ensureFileEntry, openPreview, showSelectDialog, showZipFileListDialog],
   );
 
   return (
