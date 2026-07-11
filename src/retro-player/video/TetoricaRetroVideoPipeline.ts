@@ -494,6 +494,11 @@ export class TetoricaRetroVideoPipeline {
   private windowsLitePendingVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLiteCompilePromise: Promise<void> | null = null;
 
+  // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
+  // Video frames always upload (content changes each frame). Raw frames (HEIC)
+  // are never equal by reference, so they always upload too.
+  private lastUploadedImageSource: HTMLImageElement | null = null;
+
   // Ensure the FBO matches the current drawing buffer size.
   private ensureFbo(width: number, height: number) {
     if (this.fboWidth === width && this.fboHeight === height && this.fbo) return;
@@ -867,20 +872,25 @@ export class TetoricaRetroVideoPipeline {
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     const textureFilter = gl.NEAREST;
     this.syncTextureSamplingFilter(textureFilter);
-    if (isRawRetroVideoFrame(uploadSource)) {
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        uploadSource.width,
-        uploadSource.height,
-        0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        uploadSource.data,
-      );
-    } else {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+    const isImageSource = isHtmlImageElement(uploadSource);
+    const skipUpload = isImageSource && uploadSource === this.lastUploadedImageSource;
+    if (!skipUpload) {
+      if (isRawRetroVideoFrame(uploadSource)) {
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          uploadSource.width,
+          uploadSource.height,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          uploadSource.data,
+        );
+      } else {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+      }
+      this.lastUploadedImageSource = isImageSource ? (uploadSource as HTMLImageElement) : null;
     }
 
     const usingFilter = filterState.isFilterEnabled && this.filterPass1Program && this.filterPass2Program;
@@ -948,6 +958,7 @@ export class TetoricaRetroVideoPipeline {
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
     this.currentSource = null;
     this.currentFilterState = null;
+    this.lastUploadedImageSource = null;
   }
 
   private getUploadSource(
