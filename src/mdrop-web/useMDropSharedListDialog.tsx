@@ -12,6 +12,7 @@ import {
   listenFfmpegStreamingEnabled,
   listenFfmpegStreamingMode,
 } from "./ffmpegPreference";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import {
   isArchive,
   isAudio,
@@ -183,7 +184,7 @@ function MDropSharedListDialog({
         await showPreviewDialog({
           files: previewableFiles,
           initialIndex,
-          isRetro: true,
+          isRetro: !getNativePlaybackMode(),
           getObjectUrl,
         });
       }
@@ -211,7 +212,7 @@ function MDropSharedListDialog({
     await showPreviewDialog({
       files: playableFiles,
       initialIndex: initialPlayableIndex >= 0 ? initialPlayableIndex : fileIndex,
-      isRetro: true,
+      isRetro: !getNativePlaybackMode(),
       useHls: forceFfmpeg || forceFfmpegAudio,
       forcedKind: forceFfmpegAudio ? "audio" : undefined,
       getObjectUrl: async (target) =>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { useDialog } from "../useDialog";
+import { primeImageElementCache } from "../retro-player/media/RetroMediaSource";
 import {
     areRetroPreviewLayoutStatesEqual,
     normalizeRetroPreviewLayoutState,
@@ -8,9 +9,45 @@ import {
 } from "../retro-player/previewLayoutState";
 import type { TargetFile } from "./api";
 import { PreviewPage } from "./preview/PreviewPage";
+import {
+    getPreviewDialogCacheKey,
+    PreviewDialogCache,
+    shouldWarmPreviewDialogFile,
+} from "./preview/previewDialogCache";
 import { preivewGlobalSetting } from "./preview/preivewSetting";
+import { isHeic, isImage } from "./utils";
 
 const RETRO_PREVIEW_DIALOG_EVENT = "tetorica-retro-preview-dialog-active";
+const PREVIEW_DIALOG_PAGE_INDICATOR_DELAY_MS = 300;
+const PREVIEW_DIALOG_PAGE_INDICATOR_HOLD_MS = 220;
+
+const primeBrowserImageCache = async (url: string): Promise<void> => {
+    if (typeof Image === "undefined") {
+        return;
+    }
+
+    const image = new Image();
+    image.decoding = "async";
+    image.src = url;
+
+    if (image.complete && image.naturalWidth > 0) {
+        return;
+    }
+
+    if (typeof image.decode === "function") {
+        try {
+            await image.decode();
+            return;
+        } catch {
+            // Fall through to onload because some browsers reject decode for blob timing.
+        }
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error(`Failed to preload image: ${url}`));
+    });
+};
 
 type PreviewDialogOptions = {
     files: TargetFile[];
@@ -47,6 +84,9 @@ export const downloadUrl = (apiServer: string, file: TargetFile): string => {
     )}`;
 };
 
+const formatPreviewDialogPageLabel = (pageNumber: number, totalPages: number) =>
+    `${pageNumber} / ${totalPages}`;
+
 export function usePreviewDialog() {
     const { showDialog } = useDialog();
 
@@ -77,24 +117,22 @@ function PreviewDialog({
     download,
     onClose,
 }: PreviewDialogOptions & { onClose?: () => void }) {
-    const inferPageLabel = React.useCallback((path: string) => {
-        const basename = path.split(/[\\/]/).pop() ?? path;
-        return basename.replace(/\.[^.]+$/, "") || basename;
-    }, []);
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
-    const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
-    const [pageTurnDirection, setPageTurnDirection] = React.useState<"next" | "prev" | null>(null);
+    const [neighborImageUrls, setNeighborImageUrls] = React.useState<string[]>([]);
+    const [showPageIndicator, setShowPageIndicator] = React.useState(false);
+    const [indicatorPageNumber, setIndicatorPageNumber] = React.useState<number | null>(null);
     const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
         undefined,
     );
-    const pageTurnResetTimerRef = React.useRef<number | null>(null);
-    const loadingOverlayTimerRef = React.useRef<number | null>(null);
-    const loadingOverlayHoldTimerRef = React.useRef<number | null>(null);
-    const displayedRequestSequenceRef = React.useRef(0);
-    const immediateOverlayRequestSequenceRef = React.useRef<number | null>(null);
-    const delayedOverlayPendingRef = React.useRef(false);
+    const pageIndicatorTimerRef = React.useRef<number | null>(null);
+    const pageIndicatorHoldTimerRef = React.useRef<number | null>(null);
+    const requestedPageSequenceRef = React.useRef(1);
+    const displayedPageSequenceRef = React.useRef(1);
+    const delayedPageIndicatorPendingRef = React.useRef(false);
+    const requestSequenceRef = React.useRef(1);
+    const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
         setPreviewLayoutState((current) =>
@@ -103,34 +141,156 @@ function PreviewDialog({
     }, []);
 
     const file = files[index];
+    if (!previewCacheRef.current) {
+        previewCacheRef.current = new PreviewDialogCache(Math.max(files.length, 1));
+    }
+    const previewCache = previewCacheRef.current;
+
+    const resolveObjectUrl = React.useCallback(
+        async (
+            target: TargetFile,
+            onProgress?: (loaded: number, total: number) => void
+        ) => {
+            const key = getPreviewDialogCacheKey(target);
+            const loadUrl = async () =>
+                getObjectUrl
+                    ? await getObjectUrl(target, onProgress)
+                    : downloadUrl(apiServer, target);
+            return await previewCache.loadNow(key, loadUrl);
+        },
+        [apiServer, getObjectUrl, previewCache]
+    );
+    const releaseObjectUrl = React.useCallback((url: string) => {
+        previewCache.releaseObjectUrl(url);
+    }, [previewCache]);
+
+    const clearPageIndicator = React.useCallback(() => {
+        if (pageIndicatorTimerRef.current !== null) {
+            window.clearTimeout(pageIndicatorTimerRef.current);
+            pageIndicatorTimerRef.current = null;
+        }
+        if (pageIndicatorHoldTimerRef.current !== null) {
+            window.clearTimeout(pageIndicatorHoldTimerRef.current);
+            pageIndicatorHoldTimerRef.current = null;
+        }
+        setShowPageIndicator(false);
+    }, []);
+
+    const showPageIndicatorWithHold = React.useCallback(() => {
+        delayedPageIndicatorPendingRef.current = false;
+        setShowPageIndicator(true);
+        pageIndicatorHoldTimerRef.current = window.setTimeout(() => {
+            setShowPageIndicator(false);
+            pageIndicatorHoldTimerRef.current = null;
+        }, PREVIEW_DIALOG_PAGE_INDICATOR_HOLD_MS);
+    }, []);
 
     const move = React.useCallback(
         (delta: number) => {
-            const nextDirection = delta > 0 ? "next" : "prev";
             const nextIndex = Math.max(0, Math.min(index + delta, files.length - 1));
             if (nextIndex === index) {
                 return;
             }
-            const nextRequestSequence = requestSequence + 1;
+
+            const previousRequestedSequence = requestedPageSequenceRef.current;
             const hasPendingUndisplayedPage =
-                displayedRequestSequenceRef.current < requestSequence;
-            immediateOverlayRequestSequenceRef.current = hasPendingUndisplayedPage
-                || delayedOverlayPendingRef.current
-                ? nextRequestSequence
-                : null;
-            setPageTurnDirection(nextDirection);
-            if (pageTurnResetTimerRef.current !== null) {
-                window.clearTimeout(pageTurnResetTimerRef.current);
+                displayedPageSequenceRef.current < previousRequestedSequence;
+            const shouldShowPageIndicatorImmediately =
+                hasPendingUndisplayedPage || delayedPageIndicatorPendingRef.current;
+            const nextRequestSequence = requestSequenceRef.current + 1;
+
+            clearPageIndicator();
+            setIndicatorPageNumber(nextIndex + 1);
+            requestedPageSequenceRef.current = nextRequestSequence;
+            requestSequenceRef.current = nextRequestSequence;
+            if (shouldShowPageIndicatorImmediately) {
+                showPageIndicatorWithHold();
+            } else {
+                delayedPageIndicatorPendingRef.current = true;
+                pageIndicatorTimerRef.current = window.setTimeout(() => {
+                    pageIndicatorTimerRef.current = null;
+                    showPageIndicatorWithHold();
+                }, PREVIEW_DIALOG_PAGE_INDICATOR_DELAY_MS);
             }
-            pageTurnResetTimerRef.current = window.setTimeout(() => {
-                setPageTurnDirection(null);
-                pageTurnResetTimerRef.current = null;
-            }, 220);
             setRequestSequence(nextRequestSequence);
             setIndex(nextIndex);
         },
-        [files.length, index, requestSequence]
+        [clearPageIndicator, files.length, index, showPageIndicatorWithHold]
     );
+
+    React.useEffect(() => {
+        const candidates = [files[index + 1]].filter(
+            (candidate): candidate is TargetFile => Boolean(candidate)
+        );
+        for (const candidate of candidates) {
+            if (!shouldWarmPreviewDialogFile(candidate)) {
+                continue;
+            }
+            previewCache.schedule(
+                getPreviewDialogCacheKey(candidate),
+                async () => {
+                    const url = getObjectUrl
+                        ? await getObjectUrl(candidate)
+                        : downloadUrl(apiServer, candidate);
+                    if (isImage(candidate.path) || isHeic(candidate.path)) {
+                        if (isRetro) {
+                            await primeImageElementCache(url);
+                        } else {
+                            await primeBrowserImageCache(url);
+                        }
+                    }
+                    return url;
+                },
+                20,
+            );
+        }
+    }, [apiServer, files, getObjectUrl, index, isRetro, previewCache]);
+
+    React.useEffect(() => {
+        let alive = true;
+
+        if (!file || isRetro || !(isImage(file.path) || isHeic(file.path))) {
+            setNeighborImageUrls([]);
+            return () => {
+                alive = false;
+            };
+        }
+
+        const candidate = files[index + 1];
+        if (!candidate || !(isImage(candidate.path) || isHeic(candidate.path))) {
+            setNeighborImageUrls([]);
+            return () => {
+                alive = false;
+            };
+        }
+
+        const loadNeighbor = async () => {
+            const key = getPreviewDialogCacheKey(candidate);
+            const url = await previewCache.getOrStart(
+                key,
+                async () =>
+                    getObjectUrl
+                        ? await getObjectUrl(candidate)
+                        : downloadUrl(apiServer, candidate),
+                30,
+            );
+            if (!alive) {
+                return;
+            }
+            setNeighborImageUrls([url]);
+        };
+
+        loadNeighbor().catch(() => {
+            if (!alive) {
+                return;
+            }
+            setNeighborImageUrls([]);
+        });
+
+        return () => {
+            alive = false;
+        };
+    }, [apiServer, file, files, getObjectUrl, index, isRetro, previewCache]);
 
     const touchRef = React.useRef<{
         startX: number;
@@ -203,70 +363,25 @@ function PreviewDialog({
     }, []);
 
     React.useEffect(() => {
-        if (loadingOverlayTimerRef.current !== null) {
-            window.clearTimeout(loadingOverlayTimerRef.current);
-            loadingOverlayTimerRef.current = null;
-        }
-        if (loadingOverlayHoldTimerRef.current !== null) {
-            window.clearTimeout(loadingOverlayHoldTimerRef.current);
-            loadingOverlayHoldTimerRef.current = null;
-        }
-
-        if (!loadingMessage) {
-            delayedOverlayPendingRef.current = false;
-            setShowLoadingOverlay(false);
-            return;
-        }
-
-        const showAndHoldOverlay = () => {
-            delayedOverlayPendingRef.current = false;
-            setShowLoadingOverlay(true);
-            loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
-                setShowLoadingOverlay(false);
-                loadingOverlayHoldTimerRef.current = null;
-            }, 220);
-        };
-
-        if (immediateOverlayRequestSequenceRef.current === requestSequence) {
-            showAndHoldOverlay();
-        } else {
-            delayedOverlayPendingRef.current = true;
-            setShowLoadingOverlay(false);
-            loadingOverlayTimerRef.current = window.setTimeout(() => {
-                setShowLoadingOverlay(true);
-                delayedOverlayPendingRef.current = false;
-                loadingOverlayTimerRef.current = null;
-                loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
-                    setShowLoadingOverlay(false);
-                    loadingOverlayHoldTimerRef.current = null;
-                }, 220);
-            }, 300);
-        }
-    }, [loadingMessage, requestSequence]);
-
-    const handleDisplayReady = React.useCallback((displayedSequence: number) => {
-        if (displayedSequence < requestSequence) {
-            return;
-        }
-        displayedRequestSequenceRef.current = displayedSequence;
-        immediateOverlayRequestSequenceRef.current = null;
-        delayedOverlayPendingRef.current = false;
-        setShowLoadingOverlay(false);
-    }, [requestSequence]);
-
-    React.useEffect(() => {
         return () => {
-            if (pageTurnResetTimerRef.current !== null) {
-                window.clearTimeout(pageTurnResetTimerRef.current);
-            }
-            if (loadingOverlayTimerRef.current !== null) {
-                window.clearTimeout(loadingOverlayTimerRef.current);
-            }
-            if (loadingOverlayHoldTimerRef.current !== null) {
-                window.clearTimeout(loadingOverlayHoldTimerRef.current);
-            }
+            clearPageIndicator();
+            previewCache.dispose();
         };
-    }, []);
+    }, [clearPageIndicator, previewCache]);
+
+    const handleDisplayReady = React.useCallback((displayedRequestSequence: number) => {
+        if (displayedRequestSequence < requestedPageSequenceRef.current) {
+            displayedPageSequenceRef.current = Math.max(
+                displayedPageSequenceRef.current,
+                displayedRequestSequence,
+            );
+            return;
+        }
+        displayedPageSequenceRef.current = displayedRequestSequence;
+        requestedPageSequenceRef.current = displayedRequestSequence;
+        delayedPageIndicatorPendingRef.current = false;
+        clearPageIndicator();
+    }, [clearPageIndicator]);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -291,8 +406,10 @@ function PreviewDialog({
         <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
             <div className="border-b border-slate-800 px-4 py-2 text-slate-100">
                 <div className="min-w-0 truncate text-sm">
-                    {index + 1} / {files.length} {file.path}
-                    {loadingMessage ? ` : ${loadingMessage}` : ""}
+                    {file.path}
+                    {loadingMessage ? (
+                        <span className="sr-only">{loadingMessage}</span>
+                    ) : null}
                 </div>
             </div>
             {onClose && (
@@ -316,25 +433,32 @@ function PreviewDialog({
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
-                {showLoadingOverlay && loadingMessage && (
-                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/42">
-                        <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
-                            <p className="break-words text-[min(3.4vw,0.95rem)] font-medium leading-snug text-slate-200">
-                                {inferPageLabel(file.path)}
+                {neighborImageUrls.length > 0 && (
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+                    >
+                        {neighborImageUrls.map((url) => (
+                            <img
+                                key={url}
+                                src={url}
+                                alt=""
+                                decoding="async"
+                                loading="eager"
+                            />
+                        ))}
+                    </div>
+                )}
+                {showPageIndicator && indicatorPageNumber !== null && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                        <div className="w-[min(84%,18rem)] rounded-2xl border border-slate-700 bg-slate-950 px-5 py-4 text-center text-slate-100">
+                            <p className="text-[min(3.8vw,0.95rem)] font-medium tabular-nums text-slate-200">
+                                {formatPreviewDialogPageLabel(indicatorPageNumber, files.length)}
                             </p>
-                            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-800/90">
+                            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800/90">
                                 <div
                                     className="h-full rounded-full bg-gradient-to-r from-sky-400/40 via-sky-100 to-sky-400/40"
-                                    style={{
-                                        width: "42%",
-                                        transform:
-                                            pageTurnDirection === "next"
-                                                ? "translateX(130%)"
-                                                : pageTurnDirection === "prev"
-                                                    ? "translateX(-30%)"
-                                                    : "translateX(40%)",
-                                        transition: "transform 0.22s ease",
-                                    }}
+                                    style={{ width: "42%", transform: "translateX(40%)" }}
                                 />
                             </div>
                         </div>
@@ -347,7 +471,8 @@ function PreviewDialog({
                     useHls={useHls}
                     forcedKind={forcedKind}
                     apiServer={apiServer}
-                    getObjectUrl={getObjectUrl}
+                    getObjectUrl={resolveObjectUrl}
+                    releaseObjectUrl={releaseObjectUrl}
                     onLoadingMessage={setLoadingMessage}
                     onDisplayReady={handleDisplayReady}
                     coverSrc={coverSrc}

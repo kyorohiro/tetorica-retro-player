@@ -19,6 +19,7 @@ type UnrarExtractor = Extractor<Uint8Array>;
 export class RarExtractor implements ArchiveExtractor {
   private dataPromise?: Promise<Uint8Array>;
   private password: string | undefined;
+  private readChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly source: ZipSource) {}
 
@@ -65,41 +66,50 @@ export class RarExtractor implements ArchiveExtractor {
     path: string,
     onProgress?: (loaded: number, total: number) => void
   ): Promise<Blob> {
-    const extractor = await this.createExtractor();
-    const targetPath = RarExtractor.normalizeRarPath(path);
+    const runRead = async (): Promise<Blob> => {
+      const extractor = await this.createExtractor();
+      const targetPath = RarExtractor.normalizeRarPath(path);
 
-    const extracted = extractor.extract({
-      files: [targetPath],
-    } as any);
+      const extracted = extractor.extract({
+        files: [targetPath],
+      } as any);
 
-    const files = [...extracted.files] as any[];
+      const files = [...extracted.files] as any[];
 
-    const file = files.find(
-      (f) =>
-        RarExtractor.normalizeRarPath(f.fileHeader?.name ?? "") === targetPath
-    );
-
-    if (!file) {
-      console.log("targetPath", targetPath);
-      console.log(
-        "extracted files",
-        files.map((f) => f.fileHeader?.name)
+      const file = files.find(
+        (f) =>
+          RarExtractor.normalizeRarPath(f.fileHeader?.name ?? "") === targetPath
       );
 
-      throw new Error(`rar entry not found: ${path}`);
-    }
+      if (!file) {
+        console.log("targetPath", targetPath);
+        console.log(
+          "extracted files",
+          files.map((f) => f.fileHeader?.name)
+        );
 
-    const data = file.extraction;
+        throw new Error(`rar entry not found: ${path}`);
+      }
 
-    if (!data) {
-      throw new Error(`rar entry extraction failed: ${path}`);
-    }
+      const data = file.extraction;
 
-    onProgress?.(data.length, data.length);
+      if (!data) {
+        throw new Error(`rar entry extraction failed: ${path}`);
+      }
 
-    return new Blob([data], {
-      type: mimeFromPath(path),
-    });
+      onProgress?.(data.length, data.length);
+
+      return new Blob([data], {
+        type: mimeFromPath(path),
+      });
+    };
+
+    const nextRead = this.readChain.then(runRead, runRead);
+    this.readChain = nextRead.then(
+      () => undefined,
+      () => undefined
+    );
+    return await nextRead;
   }
 
   static normalizeRarPath = (path: string) =>

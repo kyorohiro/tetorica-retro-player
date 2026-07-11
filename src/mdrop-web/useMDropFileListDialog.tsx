@@ -9,6 +9,7 @@ import {
     listenFfmpegStreamingEnabled,
     listenFfmpegStreamingMode,
 } from "./ffmpegPreference";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideo, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
@@ -237,7 +238,7 @@ function FileListDialog({
             await showPreviewDialog({
                 files: sourceFiles,
                 initialIndex: index,
-                isRetro: true,
+                isRetro: !getNativePlaybackMode(),
                 useHls: (forceFfmpeg || forceFfmpegAudio) && canUseFfmpeg,
                 forcedKind: forceFfmpegAudio ? "audio" : undefined,
                 apiServer,

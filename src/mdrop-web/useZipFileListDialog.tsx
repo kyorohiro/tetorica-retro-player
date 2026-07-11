@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { File, Folder, Loader, Archive, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { usePreviewDialog } from "./usePreviewDialog";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import {
     isAudio,
     isEpub,
@@ -354,10 +355,12 @@ function ZipFileListDialog({
                                                     const previewIndex = previewFiles.findIndex(
                                                         (f) => f.path === file.path
                                                     );
+                                                    const shouldUseRetroPreview =
+                                                        !getNativePlaybackMode();
                                                     await showPreviewDialog({
                                                         files: previewFiles,
                                                         initialIndex: previewIndex,
-                                                        isRetro: true,
+                                                        isRetro: shouldUseRetroPreview,
                                                         apiServer: "",
                                                         getObjectUrl: async (target, onProgress) => {
                                                             const entryBlob = await readArchiveFile(

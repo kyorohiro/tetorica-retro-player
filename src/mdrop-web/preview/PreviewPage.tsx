@@ -40,6 +40,7 @@ export type PreviewPageProps = {
         file: TargetFile,
         onProgress?: (loaded: number, total: number) => void
     ) => Promise<string>;
+    releaseObjectUrl?: (url: string) => void;
     onLoadingMessage?: (message: string) => void;
     onDisplayReady?: (requestSequence: number) => void;
     previewLayoutState?: RetroPreviewLayoutState;
@@ -54,12 +55,20 @@ export function PreviewPage({
     forcedKind,
     apiServer = "",
     getObjectUrl,
+    releaseObjectUrl,
     onLoadingMessage,
     onDisplayReady,
     coverSrc,
     previewLayoutState,
     onPreviewLayoutStateChange,
 }: PreviewPageProps) {
+    const debugPreview = React.useCallback((label: string, payload?: Record<string, unknown>) => {
+        console.log("[preview-page]", label, {
+            path: file.path,
+            requestSequence,
+            ...payload,
+        });
+    }, [file.path, requestSequence]);
     const isVideoHere =
         forcedKind === "video"
             ? (useHls ? isVideoExtended(file.path) : isVideo(file.path))
@@ -80,6 +89,7 @@ export function PreviewPage({
     const [text, setText] = React.useState("");
     const [error, setError] = React.useState("");
     const [epubLocation, setEpubLocation] = React.useState<string | number>(0);
+    const imageStartedAtRef = React.useRef<number | null>(null);
     const renditionRef = React.useRef<any>(null);
     const statusRef = React.useRef<PreviewPageStatus>("none");
 
@@ -104,6 +114,11 @@ export function PreviewPage({
         let alive = true;
         const objectUrls: string[] = [];
         const keepCurrentPreviewVisible = statusRef.current === "loaded";
+        const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const elapsedMs = () =>
+            Math.round(
+                ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
+            ) / 10;
 
         const addObjectUrl = (url: string) => {
             if (url.startsWith("blob:")) {
@@ -112,6 +127,9 @@ export function PreviewPage({
         };
 
         const run = async () => {
+            debugPreview("load:start", {
+                keepCurrentPreviewVisible,
+            });
             if (!keepCurrentPreviewVisible) {
                 setStatus("loading");
                 setSrc("");
@@ -133,6 +151,10 @@ export function PreviewPage({
             }
 
             const nextSrc = await getUrlFromTargetFile(file);
+            debugPreview("load:url-ready", {
+                elapsedMs: elapsedMs(),
+                isBlob: nextSrc.startsWith("blob:"),
+            });
             addObjectUrl(nextSrc);
 
             if (!alive) return;
@@ -148,12 +170,19 @@ export function PreviewPage({
 
                 setText(nextText);
                 setStatus("loaded");
+                debugPreview("load:text-ready", {
+                    elapsedMs: elapsedMs(),
+                    textLength: nextText.length,
+                });
                 onDisplayReady?.(requestSequence);
                 return;
             }
 
             if (isHeic(file.path)) {
                 onLoadingMessage?.("Converting HEIC...");
+                debugPreview("load:heic-fetch-start", {
+                    elapsedMs: elapsedMs(),
+                });
 
                 const resp = await fetch(nextSrc);
                 if (!resp.ok) {
@@ -161,7 +190,15 @@ export function PreviewPage({
                 }
 
                 const heicBlob = await resp.blob();
+                debugPreview("load:heic-blob-ready", {
+                    elapsedMs: elapsedMs(),
+                    size: heicBlob.size,
+                });
                 const convertedUrl = await heicToObjectUrl(heicBlob);
+                debugPreview("load:heic-converted", {
+                    elapsedMs: elapsedMs(),
+                    isBlob: convertedUrl.startsWith("blob:"),
+                });
                 addObjectUrl(convertedUrl);
 
                 if (!alive) return;
@@ -170,14 +207,24 @@ export function PreviewPage({
                 setText("");
                 setStatus("loaded");
                 onLoadingMessage?.("");
-                onDisplayReady?.(requestSequence);
+                imageStartedAtRef.current =
+                    typeof performance !== "undefined" ? performance.now() : Date.now();
+                debugPreview("load:img-src-set", {
+                    elapsedMs: elapsedMs(),
+                    kind: "heic",
+                });
                 return;
             }
 
             setSrc(nextSrc);
             setText("");
             setStatus("loaded");
-            onDisplayReady?.(requestSequence);
+            imageStartedAtRef.current =
+                typeof performance !== "undefined" ? performance.now() : Date.now();
+            debugPreview("load:img-src-set", {
+                elapsedMs: elapsedMs(),
+                kind: isImage(file.path) ? "image" : resolvedKind,
+            });
         };
 
         run().catch((err) => {
@@ -187,15 +234,27 @@ export function PreviewPage({
             setError(err instanceof Error ? err.message : String(err));
             setStatus("error");
             onLoadingMessage?.("Failed to load preview");
+            debugPreview("load:error", {
+                elapsedMs: elapsedMs(),
+                error: err instanceof Error ? err.message : String(err),
+            });
         });
 
         return () => {
             alive = false;
+            debugPreview("load:cleanup", {
+                elapsedMs: elapsedMs(),
+                objectUrlCount: objectUrls.length,
+            });
             for (const url of objectUrls) {
-                URL.revokeObjectURL(url);
+                if (releaseObjectUrl) {
+                    releaseObjectUrl(url);
+                } else {
+                    URL.revokeObjectURL(url);
+                }
             }
         };
-    }, [file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, requestSequence]);
+    }, [debugPreview, file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, releaseObjectUrl, requestSequence, resolvedKind]);
 
     if (status === "none" || status === "loading") {
         return <div className="text-sm text-slate-400">Loading...</div>;
@@ -246,7 +305,7 @@ export function PreviewPage({
                 src={src}
                 controls
                 autoPlay
-                className="max-h-full max-w-full"
+                className="block h-full w-full object-contain"
             />
         );
     }
@@ -267,7 +326,25 @@ export function PreviewPage({
             <img
                 src={src}
                 alt={file.path}
-                className="max-h-full max-w-full object-contain"
+                onLoad={(event) => {
+                    const startedAt = imageStartedAtRef.current;
+                    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+                    const image = event.currentTarget;
+                    debugPreview("img:onload", {
+                        elapsedMs:
+                            startedAt === null
+                                ? null
+                                : Math.round((now - startedAt) * 10) / 10,
+                        complete: image.complete,
+                        naturalWidth: image.naturalWidth,
+                        naturalHeight: image.naturalHeight,
+                    });
+                    onDisplayReady?.(requestSequence);
+                }}
+                onError={() => {
+                    debugPreview("img:onerror");
+                }}
+                className="block h-full w-full object-contain"
             />
         );
     }
@@ -348,7 +425,11 @@ export function PreviewPage({
                             });
                         } finally {
                             if (f.startsWith("blob:")) {
-                                URL.revokeObjectURL(f);
+                                if (releaseObjectUrl) {
+                                    releaseObjectUrl(f);
+                                } else {
+                                    URL.revokeObjectURL(f);
+                                }
                             }
                         }
                     }}
