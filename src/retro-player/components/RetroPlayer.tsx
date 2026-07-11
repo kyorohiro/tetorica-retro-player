@@ -211,9 +211,7 @@ export function RetroPlayer({
   const lastPreviewRequestRef = React.useRef<string>("");
   const lastLoopingPresetRef = React.useRef<string>("");
 
-  const filterState = useRetroFilterState(
-    startupNativeMode ? { ...initialFilterState, isFilterEnabled: false } : initialFilterState,
-  );
+  const filterState = useRetroFilterState(initialFilterState);
   const handlePreviewPointerMove = React.useCallback((point: { x: number; y: number }) => {
     if (!filterState.focusTrackCursor || filterState.focusStrength <= 0) {
       return;

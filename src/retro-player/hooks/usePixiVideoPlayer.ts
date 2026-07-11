@@ -139,6 +139,10 @@ export function usePixiVideoPlayer(
     width: number;
     height: number;
   } | null>(null);
+  const sourceDimensionsRef = useRef<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
   const [pendingRecordingFilename, setPendingRecordingFilename] = useState<string | null>(null);
@@ -306,6 +310,7 @@ export function usePixiVideoPlayer(
     mediaRef,
     isPlaying,
     isPlayingRef,
+    nativePlaybackMode: isNativeModePreferred,
   });
 
   const {
@@ -406,8 +411,33 @@ export function usePixiVideoPlayer(
   const setPreviewKindState = (
     nextKind: "video" | "audio" | "image" | "capture" | null,
   ) => {
+    if (previewKindRef.current === nextKind) {
+      return;
+    }
     previewKindRef.current = nextKind;
     setPreviewKind(nextKind);
+  };
+
+  const setSourceDimensionsState = (
+    nextDimensions: {
+      width: number;
+      height: number;
+    } | null,
+  ) => {
+    const current = sourceDimensionsRef.current;
+    const isUnchanged =
+      current === nextDimensions ||
+      (
+        current !== null &&
+        nextDimensions !== null &&
+        current.width === nextDimensions.width &&
+        current.height === nextDimensions.height
+      );
+    if (isUnchanged) {
+      return;
+    }
+    sourceDimensionsRef.current = nextDimensions;
+    setSourceDimensions(nextDimensions);
   };
 
   const beginLoading = (label: string) => {
@@ -591,7 +621,7 @@ export function usePixiVideoPlayer(
     setDuration,
     setPlaybackRate,
     setIsLooping,
-    setSourceDimensions,
+    setSourceDimensions: setSourceDimensionsState,
     setViewportRect,
     setPreviewKindState,
     setIsPoweredOn,

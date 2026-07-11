@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useLongPress } from "../hooks/useLongPress";
 import {
   ChevronsRight,
@@ -244,8 +244,97 @@ export const VideoControls = memo(function VideoControls({
 }: VideoControlsProps) {
   const [activeTransportBar, setActiveTransportBar] = useState<"seek" | "volume" | "speed">("seek");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [activeTooltipKey, setActiveTooltipKey] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevNoiseEnabledRef = useRef(false);
+  const tooltipTimerRef = useRef<number | null>(null);
+  const isVideoFxUnavailable = isNativePlaybackMode;
+  const effectiveAudioFxUnavailable = isAudioFxUnavailable || isNativePlaybackMode;
+
+  const tooltipText =
+    locale === "ja"
+      ? {
+          video: isVideoFxUnavailable
+            ? "Video: Native mode では使えません。低性能PCではこの方が快適なことがあります。Native ボタン長押しで Retro ON に戻せます。"
+            : isVideoFxEnabled
+              ? "Video: エフェクトが有効です。長押しで ON/OFF、通常押しで設定を開きます。"
+              : "Video: 映像エフェクトはオフです。通常押しで設定を開きます。",
+          audio: isNativePlaybackMode
+            ? "Audio: Native mode では使えません。低性能PCではこの方が快適なことがあります。Native ボタン長押しで Retro ON に戻せます。"
+            : isAudioFxUnavailable
+              ? "Audio: HLS(ffmpeg) ストリーミング中は設定が効きません。"
+              : isAudioFxEnabled
+              ? "Audio: エフェクトが有効です。長押しで ON/OFF、通常押しで設定を開きます。"
+              : "Audio: 音声エフェクトはオフです。通常押しで設定を開きます。",
+          reset: isNativePlaybackMode
+            ? "Retro OFF: Native mode です。長押しで Retro に戻し、通常押しで設定を初期化します。"
+            : "Reset: 通常押しで設定を初期化します。長押しで Native mode に切り替えます。",
+          save: showClockOverlay
+            ? "Save: 設定を書き出します。長押しで時計表示を切り替えます。"
+            : "Save: 設定を書き出します。長押しで時計表示を切り替えます。",
+          load: showVideoSpectrum
+            ? "Load: 設定を読み込みます。長押しでスペクトラム表示を切り替えます。"
+            : "Load: 設定を読み込みます。長押しでスペクトラム表示を切り替えます。",
+        }
+      : {
+          video: isVideoFxUnavailable
+            ? "Video: unavailable in native mode. This is often faster on low-end PCs. Long press the Native button to turn Retro ON."
+            : isVideoFxEnabled
+              ? "Video: effects are enabled. Long press toggles them, tap opens settings."
+              : "Video: effects are off. Tap opens video settings.",
+          audio: isNativePlaybackMode
+            ? "Audio: unavailable in native mode. This is often faster on low-end PCs. Long press the Native button to turn Retro ON."
+            : isAudioFxUnavailable
+              ? "Audio: settings have no effect while streaming via HLS (ffmpeg)."
+              : isAudioFxEnabled
+              ? "Audio: effects are enabled. Long press toggles them, tap opens settings."
+              : "Audio: effects are off. Tap opens audio settings.",
+          reset: isNativePlaybackMode
+            ? "Retro OFF: native mode is active. Long press returns to Retro, tap resets settings."
+            : "Reset: tap resets settings. Long press switches to native mode.",
+          save: "Save: export the current settings. Long press toggles the clock overlay.",
+          load: "Load: import settings. Long press toggles the spectrum overlay.",
+        };
+
+  const scheduleTooltip = useCallback((key: string) => {
+    if (tooltipTimerRef.current !== null) {
+      window.clearTimeout(tooltipTimerRef.current);
+    }
+
+    tooltipTimerRef.current = window.setTimeout(() => {
+      setActiveTooltipKey(key);
+      tooltipTimerRef.current = null;
+    }, 120);
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipTimerRef.current !== null) {
+      window.clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+    }
+    setActiveTooltipKey(null);
+  }, []);
+
+  const tooltipHandlers = useCallback((key: string) => ({
+    onMouseEnter: () => scheduleTooltip(key),
+    onMouseLeave: hideTooltip,
+    onFocus: () => scheduleTooltip(key),
+    onBlur: hideTooltip,
+  }), [hideTooltip, scheduleTooltip]);
+
+  const renderTooltip = (key: string, text: string, widthClass = "w-48") => (
+    <div
+      role="tooltip"
+      aria-hidden={activeTooltipKey !== key}
+      className={[
+        "pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 rounded-lg border border-slate-600/80 bg-slate-950/95 px-3 py-2 text-[11px] leading-4 text-slate-100 shadow-lg transition",
+        widthClass,
+        activeTooltipKey === key ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+      ].join(" ")}
+    >
+      {text}
+    </div>
+  );
 
   const { isHolding: isVideoHolding, ...videoButtonHandlers } = useLongPress(onToggleVideoFx, onToggleVideoSettings);
   const handleAudioFxLongPress = () => {
@@ -306,6 +395,14 @@ export const VideoControls = memo(function VideoControls({
     useCallback(() => { onToggleVideoSpectrum?.(); }, [onToggleVideoSpectrum]),
     useCallback(() => { fileInputRef.current?.click(); }, []),
   );
+
+  useEffect(() => {
+    return () => {
+      if (tooltipTimerRef.current !== null) {
+        window.clearTimeout(tooltipTimerRef.current);
+      }
+    };
+  }, []);
 
   // Keep the restart callback in the surface area for future UI revival.
   void _onRestart;
@@ -1254,84 +1351,108 @@ export const VideoControls = memo(function VideoControls({
       )}
       <div className="flex gap-2">
         <div className="grid flex-1 grid-cols-3 gap-2">
-          <button
-            type="button"
-            {...videoButtonHandlers}
-            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
-              isVideoHolding
-                ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
-                : isVideoFxEnabled
-                  ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                  : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
-            }`}
-          >
-            {isVideoHolding && (
-              <span
-                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
-                style={{ animation: "long-press-charge 0.6s linear forwards" }}
-              />
-            )}
-            <SlidersHorizontal size={16} className="relative z-10" />
-            <span className="relative z-10">{isVideoSettingsOpen ? "Close Video" : "Video"}</span>
-          </button>
-          <button
-            type="button"
-            disabled={isAudioFxUnavailable}
-            {...(isAudioFxUnavailable ? {} : audioButtonHandlers)}
-            title={
-              isAudioFxUnavailable
-                ? locale === "ja"
-                  ? "HLS(ffmpeg)ストリーミング中はAudio設定が効きません"
-                  : "Audio settings have no effect while streaming via HLS (ffmpeg)"
-                : undefined
-            }
-            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
-              isAudioFxUnavailable
-                ? "cursor-not-allowed border-[#111014]/20 bg-[#111014]/30 text-white/40"
-                : isAudioHolding
-                  ? "border-sky-400/70 bg-[#111a24] text-sky-200"
-                  : isAudioFxEnabled
-                    ? "border-sky-500/60 bg-sky-500/15 text-black shadow-[0_0_8px_rgba(14,165,233,0.5)]"
+          <div className="relative min-w-0" {...tooltipHandlers("video")}>
+            <button
+              type="button"
+              disabled={isVideoFxUnavailable}
+              {...(isVideoFxUnavailable ? {} : videoButtonHandlers)}
+              className={`relative flex w-full select-none overflow-hidden min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+                isVideoFxUnavailable
+                  ? "cursor-not-allowed border-[#111014]/20 bg-[#111014]/30 text-white/40"
+                  : isVideoHolding
+                  ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
+                  : isVideoFxEnabled
+                    ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
                     : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
-            }`}
-          >
-            {isAudioHolding && !isAudioFxUnavailable && (
-              <span
-                className="pointer-events-none absolute inset-0 origin-left bg-sky-400/20"
-                style={{ animation: "long-press-charge 0.6s linear forwards" }}
-              />
-            )}
-            <Mic2 size={16} className="relative z-10" />
-            <span className="relative z-10">Audio</span>
-            {isAudioFxUnavailable && (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute left-0 top-1/2 h-px w-full bg-current opacity-70"
-                style={{ transform: "rotate(-14deg)" }}
-              />
-            )}
-          </button>
+              }`}
+            >
+              {isVideoHolding && (
+                <span
+                  className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
+                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+              )}
+              <SlidersHorizontal size={16} className="relative z-10" />
+              <span className="relative z-10">{isVideoSettingsOpen ? "Close Video" : "Video"}</span>
+              {isVideoFxUnavailable && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-1/2 h-px w-full bg-current opacity-70"
+                  style={{ transform: "rotate(-14deg)" }}
+                />
+              )}
+            </button>
+            {renderTooltip("video", tooltipText.video)}
+          </div>
+          <div className="relative min-w-0" {...tooltipHandlers("audio")}>
+            <button
+              type="button"
+              disabled={effectiveAudioFxUnavailable}
+              {...(effectiveAudioFxUnavailable ? {} : audioButtonHandlers)}
+              title={
+                effectiveAudioFxUnavailable
+                  ? locale === "ja"
+                    ? isNativePlaybackMode
+                      ? "Native mode では Audio 設定は使えません"
+                      : "HLS(ffmpeg)ストリーミング中はAudio設定が効きません"
+                    : isNativePlaybackMode
+                      ? "Audio settings are unavailable in native mode"
+                      : "Audio settings have no effect while streaming via HLS (ffmpeg)"
+                : undefined
+              }
+              className={`relative flex w-full select-none overflow-hidden min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+                effectiveAudioFxUnavailable
+                  ? "cursor-not-allowed border-[#111014]/20 bg-[#111014]/30 text-white/40"
+                  : isAudioHolding
+                    ? "border-sky-400/70 bg-[#111a24] text-sky-200"
+                    : isAudioFxEnabled
+                      ? "border-sky-500/60 bg-sky-500/15 text-black shadow-[0_0_8px_rgba(14,165,233,0.5)]"
+                      : "border-[#111014]/30 bg-[#111014] text-white hover:bg-[#2a2a32]"
+              }`}
+            >
+              {isAudioHolding && !effectiveAudioFxUnavailable && (
+                <span
+                  className="pointer-events-none absolute inset-0 origin-left bg-sky-400/20"
+                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+              )}
+              <Mic2 size={16} className="relative z-10" />
+              <span className="relative z-10">Audio</span>
+              {effectiveAudioFxUnavailable && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-1/2 h-px w-full bg-current opacity-70"
+                  style={{ transform: "rotate(-14deg)" }}
+                />
+              )}
+            </button>
+            {renderTooltip("audio", tooltipText.audio)}
+          </div>
           {/* Short press: reset settings. Long press: toggle native playback mode. */}
-          <button
-            type="button"
-            {...resetButtonHandlers}
-            className={`relative select-none overflow-hidden inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
-              isResetHolding
-                ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
-                : isNativePlaybackMode
-                  ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                  : "border-rose-500/40 bg-rose-500/10 text-[#12141c] hover:bg-rose-500/20"
-            }`}
-          >
-            {isResetHolding && (
-              <span
-                className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
-                style={{ animation: "long-press-charge 0.6s linear forwards" }}
-              />
-            )}
-            <RotateCcw size={15} className="relative z-10" />
-            <span className="relative z-10">{isNativePlaybackMode ? "Native" : "Reset"}</span>
-          </button>
+          <div className="relative min-w-0">
+            <button
+              type="button"
+              {...resetButtonHandlers}
+              {...tooltipHandlers("reset")}
+              className={`relative flex w-full select-none overflow-hidden min-h-10 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors duration-150 ${
+                isResetHolding
+                  ? "border-amber-400/70 bg-[#2a2316] text-amber-200"
+                  : isNativePlaybackMode
+                    ? "border-amber-500/60 bg-amber-500/15 text-black shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                    : "border-rose-500/40 bg-rose-500/10 text-[#12141c] hover:bg-rose-500/20"
+              }`}
+            >
+              {isResetHolding && (
+                <span
+                  className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
+                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                />
+              )}
+              <RotateCcw size={15} className="relative z-10" />
+              <span className="relative z-10">{isNativePlaybackMode ? "Native" : "Reset"}</span>
+            </button>
+            {renderTooltip("reset", tooltipText.reset)}
+          </div>
         </div>
         {!hasPlayback && (
           <button
@@ -1358,44 +1479,52 @@ export const VideoControls = memo(function VideoControls({
             </span>
           </button>
         )}
-        <button
-          type="button"
-          {...saveButtonHandlers}
-          title="Save settings to file (long-press for clock overlay)"
-          className={[
-            "relative select-none overflow-hidden inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
-            showClockOverlay
-              ? "border-emerald-500/50 bg-emerald-500/15"
-              : "border-[#bcb4a6] bg-[#e6e2db]",
-          ].join(" ")}
-        >
-          {isSaveHolding && (
-            <span
-              className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
-              style={{ animation: "long-press-charge 0.6s linear forwards" }}
-            />
-          )}
-          <Save size={13} className="relative z-10" />
-        </button>
-        <button
-          type="button"
-          {...loadButtonHandlers}
-          title="Load settings from .retro.json file (long-press for FFT overlay)"
-          className={[
-            "relative select-none overflow-hidden inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
-            showVideoSpectrum
-              ? "border-emerald-500/50 bg-emerald-500/15"
-              : "border-[#bcb4a6] bg-[#e6e2db]",
-          ].join(" ")}
-        >
-          {isLoadHolding && (
-            <span
-              className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
-              style={{ animation: "long-press-charge 0.6s linear forwards" }}
-            />
-          )}
-          <FolderOpen size={13} className="relative z-10" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            {...saveButtonHandlers}
+            {...tooltipHandlers("save")}
+            title="Save settings to file (long-press for clock overlay)"
+            className={[
+              "relative select-none overflow-hidden inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
+              showClockOverlay
+                ? "border-emerald-500/50 bg-emerald-500/15"
+                : "border-[#bcb4a6] bg-[#e6e2db]",
+            ].join(" ")}
+          >
+            {isSaveHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <Save size={13} className="relative z-10" />
+          </button>
+          {renderTooltip("save", tooltipText.save, "w-44")}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            {...loadButtonHandlers}
+            {...tooltipHandlers("load")}
+            title="Load settings from .retro.json file (long-press for FFT overlay)"
+            className={[
+              "relative select-none overflow-hidden inline-flex min-h-10 w-8 items-center justify-center rounded-lg border text-[#7a7268] hover:bg-[#d4ccc0] hover:text-[#12141c]",
+              showVideoSpectrum
+                ? "border-emerald-500/50 bg-emerald-500/15"
+                : "border-[#bcb4a6] bg-[#e6e2db]",
+            ].join(" ")}
+          >
+            {isLoadHolding && (
+              <span
+                className="pointer-events-none absolute inset-0 origin-left bg-emerald-400/20"
+                style={{ animation: "long-press-charge 0.6s linear forwards" }}
+              />
+            )}
+            <FolderOpen size={13} className="relative z-10" />
+          </button>
+          {renderTooltip("load", tooltipText.load, "w-44")}
+        </div>
       </div>
       {hasPlayback && (
         <p className="hidden text-[11px] text-[#9a948c]">
