@@ -10,7 +10,11 @@ import {
   saveStartupPreset,
   shouldPersistStartupPresetUrl,
 } from "./builtin-content/preset-config";
-import { usePreviewSourceState } from "../retro-player/hooks/usePreviewSourceState";
+import {
+  releasePreviewBlobSrc,
+  retainPreviewBlobSrc,
+  usePreviewSourceState,
+} from "../retro-player/hooks/usePreviewSourceState";
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
 import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
 import type { RetroPlayerLocale } from "../retro-player/types";
@@ -114,13 +118,18 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
 
     const playlistRef = useRef<PlaylistItem[]>([]);
     const filePlaylistBlobUrlsRef = useRef<string[]>([]);
+    const clearFilePlaylistBlobUrls = useCallback(() => {
+      for (const url of filePlaylistBlobUrlsRef.current) {
+        releasePreviewBlobSrc(url);
+        try { URL.revokeObjectURL(url); } catch {}
+      }
+      filePlaylistBlobUrlsRef.current = [];
+    }, []);
     useEffect(() => {
       return () => {
-        for (const url of filePlaylistBlobUrlsRef.current) {
-          try { URL.revokeObjectURL(url); } catch {}
-        }
+        clearFilePlaylistBlobUrls();
       };
-    }, []);
+    }, [clearFilePlaylistBlobUrls]);
     const [playlistLength, setPlaylistLength] = useState(0);
     const [playlistIndex, setPlaylistIndex] = useState(0);
     const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
@@ -440,10 +449,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, [isMDropReadyRef]);
 
     const loadPaths = useCallback((items: { url: string; path: string }[], startIndex = 0) => {
-      for (const url of filePlaylistBlobUrlsRef.current) {
-        try { URL.revokeObjectURL(url); } catch {}
-      }
-      filePlaylistBlobUrlsRef.current = [];
+      clearFilePlaylistBlobUrls();
       if (items.length === 0) return;
       if (items.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForPath(items[0].url, items[0].path);
@@ -462,14 +468,11 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
       onPathPlaylistLoaded?.(sortedItems, sortedStartIndex);
-    }, [onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
+    }, [clearFilePlaylistBlobUrls, onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
     const loadFiles = useCallback((files: File[], _startIndex = 0) => {
       // Revoke blob URLs from previous file playlist before creating new ones.
-      for (const url of filePlaylistBlobUrlsRef.current) {
-        try { URL.revokeObjectURL(url); } catch {}
-      }
-      filePlaylistBlobUrlsRef.current = [];
+      clearFilePlaylistBlobUrls();
 
       if (files.length === 0) return;
       if (files.length === 1 && shouldPreferDialogRetroPreview) {
@@ -480,6 +483,9 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       // Pre-create stable blob URLs for all files so primeImageElementCache can
       // prefetch adjacent images by URL before the user navigates to them.
       const blobUrls = sortedFiles.map((file) => URL.createObjectURL(file));
+      for (const url of blobUrls) {
+        retainPreviewBlobSrc(url);
+      }
       filePlaylistBlobUrlsRef.current = blobUrls;
       const sortedStartIndex = 0;
       playlistRef.current = sortedFiles.map((file, index) => ({
@@ -493,7 +499,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       previewSource.previewPath(blobUrls[0], sortedFiles[0].name);
-    }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
+    }, [clearFilePlaylistBlobUrls, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };
