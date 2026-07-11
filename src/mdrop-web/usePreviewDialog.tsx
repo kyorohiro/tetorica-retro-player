@@ -122,6 +122,7 @@ function PreviewDialog({
         undefined,
     );
     const pageIndicatorTimerRef = React.useRef<number | null>(null);
+    const pageIndicatorHoldTimerRef = React.useRef<number | null>(null);
     const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
@@ -159,6 +160,10 @@ function PreviewDialog({
             window.clearTimeout(pageIndicatorTimerRef.current);
             pageIndicatorTimerRef.current = null;
         }
+        if (pageIndicatorHoldTimerRef.current !== null) {
+            window.clearTimeout(pageIndicatorHoldTimerRef.current);
+            pageIndicatorHoldTimerRef.current = null;
+        }
         setShowPageIndicator(false);
     }, []);
 
@@ -173,6 +178,10 @@ function PreviewDialog({
             pageIndicatorTimerRef.current = window.setTimeout(() => {
                 setShowPageIndicator(true);
                 pageIndicatorTimerRef.current = null;
+                pageIndicatorHoldTimerRef.current = window.setTimeout(() => {
+                    setShowPageIndicator(false);
+                    pageIndicatorHoldTimerRef.current = null;
+                }, 500);
             }, 180);
             setRequestSequence((current) => current + 1);
             setIndex(nextIndex);
@@ -359,7 +368,9 @@ function PreviewDialog({
             <div className="border-b border-slate-800 px-4 py-2 text-slate-100">
                 <div className="min-w-0 truncate text-sm">
                     {index + 1} / {files.length} {file.path}
-                    {loadingMessage ? ` : ${loadingMessage}` : ""}
+                    {loadingMessage ? (
+                        <span className="sr-only">{loadingMessage}</span>
+                    ) : null}
                 </div>
             </div>
             {onClose && (
