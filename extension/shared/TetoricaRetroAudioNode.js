@@ -475,6 +475,7 @@ var TetoricaRetroAudioNode = class {
   // Convolvers process audio even when wet gain is 0, so we disconnect them when unused.
   _roomConvolverConnected = true;
   _hallReverbConvolverConnected = true;
+  _destinationConnected = false;
   // Cache last WaveShaper curve amounts to avoid recreating 4096-sample Float32Arrays every update.
   _driveCurveAmount = -1;
   _tapeSatCurveAmount = -1;
@@ -694,6 +695,33 @@ var TetoricaRetroAudioNode = class {
   setOutputEnabled(isEnabled) {
     this.runtimeState.isOutputEnabled = isEnabled;
     this.updateAudioNodes();
+  }
+  setDestinationOutputEnabled(isEnabled) {
+    const outputNode = this.output;
+    const destination = this.context.destination;
+    if (!outputNode || !destination) {
+      this._destinationConnected = false;
+      return;
+    }
+    if (isEnabled) {
+      if (this._destinationConnected) {
+        return;
+      }
+      try {
+        outputNode.connect(destination);
+        this._destinationConnected = true;
+      } catch {
+      }
+      return;
+    }
+    if (!this._destinationConnected) {
+      return;
+    }
+    try {
+      outputNode.disconnect(destination);
+    } catch {
+    }
+    this._destinationConnected = false;
   }
   resetNodes() {
     Object.assign(this.nodes, {
@@ -1351,6 +1379,7 @@ var TetoricaRetroAudioNode = class {
     if (this.connectOutputToDestination) {
       fxOutputGain.connect(this.context.destination);
       this.autoConnections.add(this.context.destination);
+      this._destinationConnected = true;
     }
     const recordingDestination = this.nodes.recordingDestination;
     if (recordingDestination && this.connectOutputToRecordingDestination) {
@@ -1365,6 +1394,7 @@ var TetoricaRetroAudioNode = class {
     Object.assign(this.nodes, { audioContext: context, ...built });
     this._roomConvolverConnected = true;
     this._hallReverbConvolverConnected = true;
+    this._destinationConnected = false;
     this._driveCurveAmount = -1;
     this._tapeSatCurveAmount = -1;
     this.startSources();
@@ -1457,7 +1487,7 @@ var TetoricaRetroAudioNode = class {
       this.externalConnections.add(destinationNode);
       return;
     }
-    if (this.connectOutputToDestination && destinationNode === context.destination) {
+    if (destinationNode === context.destination && this._destinationConnected) {
       this.debugAudio("connect:skipped-double-destination");
       return;
     }
