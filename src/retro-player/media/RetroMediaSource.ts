@@ -393,22 +393,54 @@ export function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
 /** Mirrors useRetroPreviewMedia.ts's waitForImageFrame exactly. */
 export function waitForImageReady(image: HTMLImageElement): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const elapsedMs = () =>
+      Math.round(
+        ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
+      ) / 10;
+    const imageSrc = image.currentSrc || image.src || "(empty)";
+    console.log("[retro-player image]", "waitForImageReady:start", {
+      src: imageSrc,
+      complete: image.complete,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+    });
     const cleanup = () => {
       image.removeEventListener("load", handleReady);
       image.removeEventListener("error", handleError);
     };
 
     const handleReady = () => {
+      console.log("[retro-player image]", "waitForImageReady:ready", {
+        src: image.currentSrc || image.src || imageSrc,
+        elapsedMs: elapsedMs(),
+        complete: image.complete,
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+      });
       cleanup();
       resolve();
     };
 
     const handleError = () => {
+      console.log("[retro-player image]", "waitForImageReady:error", {
+        src: image.currentSrc || image.src || imageSrc,
+        elapsedMs: elapsedMs(),
+        complete: image.complete,
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+      });
       cleanup();
       reject(new RetroPreviewError("image-load-failed", "Failed to load image."));
     };
 
     if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      console.log("[retro-player image]", "waitForImageReady:already-ready", {
+        src: image.currentSrc || image.src || imageSrc,
+        elapsedMs: elapsedMs(),
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+      });
       resolve();
       return;
     }
@@ -502,13 +534,31 @@ export async function createImageMediaSource(
     onCreated?: (image: HTMLImageElement) => void;
   },
 ): Promise<RetroMediaSource> {
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const elapsedMs = () =>
+    Math.round(
+      ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
+    ) / 10;
+  console.log("[retro-player image]", "createImageMediaSource:start", {
+    url: options.url,
+  });
   const image = new Image();
   image.src = options.url;
   // Both existing call sites (previewFile, previewUrl) set this immediately
   // after src, in this order — kept as-is rather than reordered.
   image.crossOrigin = "anonymous";
+  console.log("[retro-player image]", "createImageMediaSource:created", {
+    url: options.url,
+    elapsedMs: elapsedMs(),
+  });
   callbacks?.onCreated?.(image);
   await waitForImageReady(image);
+  console.log("[retro-player image]", "createImageMediaSource:ready", {
+    url: options.url,
+    elapsedMs: elapsedMs(),
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+  });
   return { kind: "image", origin: "url", element: image };
 }
 
