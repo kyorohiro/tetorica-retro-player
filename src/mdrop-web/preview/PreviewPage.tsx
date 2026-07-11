@@ -62,6 +62,13 @@ export function PreviewPage({
     previewLayoutState,
     onPreviewLayoutStateChange,
 }: PreviewPageProps) {
+    const debugPreview = React.useCallback((label: string, payload?: Record<string, unknown>) => {
+        console.log("[preview-page]", label, {
+            path: file.path,
+            requestSequence,
+            ...payload,
+        });
+    }, [file.path, requestSequence]);
     const isVideoHere =
         forcedKind === "video"
             ? (useHls ? isVideoExtended(file.path) : isVideo(file.path))
@@ -106,6 +113,11 @@ export function PreviewPage({
         let alive = true;
         const objectUrls: string[] = [];
         const keepCurrentPreviewVisible = statusRef.current === "loaded";
+        const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const elapsedMs = () =>
+            Math.round(
+                ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) * 10,
+            ) / 10;
 
         const addObjectUrl = (url: string) => {
             if (url.startsWith("blob:")) {
@@ -114,6 +126,9 @@ export function PreviewPage({
         };
 
         const run = async () => {
+            debugPreview("load:start", {
+                keepCurrentPreviewVisible,
+            });
             if (!keepCurrentPreviewVisible) {
                 setStatus("loading");
                 setSrc("");
@@ -135,6 +150,10 @@ export function PreviewPage({
             }
 
             const nextSrc = await getUrlFromTargetFile(file);
+            debugPreview("load:url-ready", {
+                elapsedMs: elapsedMs(),
+                isBlob: nextSrc.startsWith("blob:"),
+            });
             addObjectUrl(nextSrc);
 
             if (!alive) return;
@@ -150,12 +169,19 @@ export function PreviewPage({
 
                 setText(nextText);
                 setStatus("loaded");
+                debugPreview("load:text-ready", {
+                    elapsedMs: elapsedMs(),
+                    textLength: nextText.length,
+                });
                 onDisplayReady?.(requestSequence);
                 return;
             }
 
             if (isHeic(file.path)) {
                 onLoadingMessage?.("Converting HEIC...");
+                debugPreview("load:heic-fetch-start", {
+                    elapsedMs: elapsedMs(),
+                });
 
                 const resp = await fetch(nextSrc);
                 if (!resp.ok) {
@@ -163,7 +189,15 @@ export function PreviewPage({
                 }
 
                 const heicBlob = await resp.blob();
+                debugPreview("load:heic-blob-ready", {
+                    elapsedMs: elapsedMs(),
+                    size: heicBlob.size,
+                });
                 const convertedUrl = await heicToObjectUrl(heicBlob);
+                debugPreview("load:heic-converted", {
+                    elapsedMs: elapsedMs(),
+                    isBlob: convertedUrl.startsWith("blob:"),
+                });
                 addObjectUrl(convertedUrl);
 
                 if (!alive) return;
@@ -172,6 +206,10 @@ export function PreviewPage({
                 setText("");
                 setStatus("loaded");
                 onLoadingMessage?.("");
+                debugPreview("load:display-ready", {
+                    elapsedMs: elapsedMs(),
+                    kind: "heic",
+                });
                 onDisplayReady?.(requestSequence);
                 return;
             }
@@ -179,6 +217,10 @@ export function PreviewPage({
             setSrc(nextSrc);
             setText("");
             setStatus("loaded");
+            debugPreview("load:display-ready", {
+                elapsedMs: elapsedMs(),
+                kind: isImage(file.path) ? "image" : resolvedKind,
+            });
             onDisplayReady?.(requestSequence);
         };
 
@@ -189,10 +231,18 @@ export function PreviewPage({
             setError(err instanceof Error ? err.message : String(err));
             setStatus("error");
             onLoadingMessage?.("Failed to load preview");
+            debugPreview("load:error", {
+                elapsedMs: elapsedMs(),
+                error: err instanceof Error ? err.message : String(err),
+            });
         });
 
         return () => {
             alive = false;
+            debugPreview("load:cleanup", {
+                elapsedMs: elapsedMs(),
+                objectUrlCount: objectUrls.length,
+            });
             for (const url of objectUrls) {
                 if (releaseObjectUrl) {
                     releaseObjectUrl(url);
@@ -201,7 +251,7 @@ export function PreviewPage({
                 }
             }
         };
-    }, [file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, releaseObjectUrl, requestSequence]);
+    }, [debugPreview, file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, releaseObjectUrl, requestSequence, resolvedKind]);
 
     if (status === "none" || status === "loading") {
         return <div className="text-sm text-slate-400">Loading...</div>;
