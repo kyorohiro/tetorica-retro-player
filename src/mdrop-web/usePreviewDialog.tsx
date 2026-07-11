@@ -66,12 +66,6 @@ type PreviewDialogOptions = {
     isClose?: boolean;
 };
 
-type NeighborSlotState = {
-    file: TargetFile | null;
-    url: string | null;
-    status: "idle" | "loading" | "ready" | "error";
-};
-
 export const downloadUrl = (apiServer: string, file: TargetFile): string => {
     const encodePath = (path: string) =>
         path
@@ -118,31 +112,13 @@ function PreviewDialog({
     download,
     onClose,
 }: PreviewDialogOptions & { onClose?: () => void }) {
-    const inferPageLabel = React.useCallback((path: string) => {
-        const basename = path.split(/[\\/]/).pop() ?? path;
-        return basename.replace(/\.[^.]+$/, "") || basename;
-    }, []);
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
-    const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
     const [neighborImageUrls, setNeighborImageUrls] = React.useState<string[]>([]);
-    const [neighborSlots, setNeighborSlots] = React.useState<{
-        prev: NeighborSlotState;
-        next: NeighborSlotState;
-    }>({
-        prev: { file: null, url: null, status: "idle" },
-        next: { file: null, url: null, status: "idle" },
-    });
-    const [pageTurnDirection, setPageTurnDirection] = React.useState<"next" | "prev" | null>(null);
     const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
         undefined,
     );
-    const pageTurnResetTimerRef = React.useRef<number | null>(null);
-    const loadingOverlayTimerRef = React.useRef<number | null>(null);
-    const loadingOverlayHoldTimerRef = React.useRef<number | null>(null);
-    const activeRequestSequenceRef = React.useRef(1);
-    const completedRequestSequencesRef = React.useRef<Set<number>>(new Set());
     const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
@@ -152,9 +128,6 @@ function PreviewDialog({
     }, []);
 
     const file = files[index];
-    const isNativeComicMode = Boolean(
-        file && !isRetro && (isImage(file.path) || isHeic(file.path))
-    );
     if (!previewCacheRef.current) {
         previewCacheRef.current = new PreviewDialogCache(Math.max(files.length, 1));
     }
@@ -178,60 +151,16 @@ function PreviewDialog({
         previewCache.releaseObjectUrl(url);
     }, [previewCache]);
 
-    const clearOverlayTimers = React.useCallback(() => {
-        if (loadingOverlayTimerRef.current !== null) {
-            window.clearTimeout(loadingOverlayTimerRef.current);
-            loadingOverlayTimerRef.current = null;
-        }
-        if (loadingOverlayHoldTimerRef.current !== null) {
-            window.clearTimeout(loadingOverlayHoldTimerRef.current);
-            loadingOverlayHoldTimerRef.current = null;
-        }
-    }, []);
-
-    const scheduleOverlayForRequest = React.useCallback((sequence: number) => {
-        clearOverlayTimers();
-        setShowLoadingOverlay(false);
-        loadingOverlayTimerRef.current = window.setTimeout(() => {
-            loadingOverlayTimerRef.current = null;
-            if (activeRequestSequenceRef.current !== sequence) {
-                return;
-            }
-            if (completedRequestSequencesRef.current.has(sequence)) {
-                return;
-            }
-            setShowLoadingOverlay(true);
-            loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
-                if (activeRequestSequenceRef.current === sequence) {
-                    setShowLoadingOverlay(false);
-                }
-                loadingOverlayHoldTimerRef.current = null;
-            }, 220);
-        }, 300);
-    }, [clearOverlayTimers]);
-
     const move = React.useCallback(
         (delta: number) => {
-            const nextDirection = delta > 0 ? "next" : "prev";
             const nextIndex = Math.max(0, Math.min(index + delta, files.length - 1));
             if (nextIndex === index) {
                 return;
             }
-            const nextRequestSequence = requestSequence + 1;
-            setPageTurnDirection(nextDirection);
-            if (pageTurnResetTimerRef.current !== null) {
-                window.clearTimeout(pageTurnResetTimerRef.current);
-            }
-            pageTurnResetTimerRef.current = window.setTimeout(() => {
-                setPageTurnDirection(null);
-                pageTurnResetTimerRef.current = null;
-            }, 220);
-            activeRequestSequenceRef.current = nextRequestSequence;
-            scheduleOverlayForRequest(nextRequestSequence);
-            setRequestSequence(nextRequestSequence);
+            setRequestSequence((current) => current + 1);
             setIndex(nextIndex);
         },
-        [files.length, index, requestSequence, scheduleOverlayForRequest]
+        [files.length, index]
     );
 
     React.useEffect(() => {
@@ -308,89 +237,6 @@ function PreviewDialog({
         };
     }, [apiServer, file, files, getObjectUrl, index, isRetro, previewCache]);
 
-    React.useEffect(() => {
-        let alive = true;
-
-        if (!isNativeComicMode) {
-            setNeighborSlots({
-                prev: { file: null, url: null, status: "idle" },
-                next: { file: null, url: null, status: "idle" },
-            });
-            return () => {
-                alive = false;
-            };
-        }
-
-        const prevFile = index > 0 ? files[index - 1] : null;
-        const nextFile = index + 1 < files.length ? files[index + 1] : null;
-        const canPreviewSlot = (target: TargetFile | null) =>
-            Boolean(target && (isImage(target.path) || isHeic(target.path)));
-
-        setNeighborSlots({
-            prev: canPreviewSlot(prevFile)
-                ? {
-                    file: prevFile,
-                    url: prevFile ? previewCache.get(getPreviewDialogCacheKey(prevFile)) ?? null : null,
-                    status: prevFile && previewCache.get(getPreviewDialogCacheKey(prevFile)) ? "ready" : "loading",
-                }
-                : { file: prevFile, url: null, status: "idle" },
-            next: canPreviewSlot(nextFile)
-                ? {
-                    file: nextFile,
-                    url: nextFile ? previewCache.get(getPreviewDialogCacheKey(nextFile)) ?? null : null,
-                    status: nextFile && previewCache.get(getPreviewDialogCacheKey(nextFile)) ? "ready" : "loading",
-                }
-                : { file: nextFile, url: null, status: "idle" },
-        });
-
-        const loadSlot = async (slot: "prev" | "next", target: TargetFile | null, priority: number) => {
-            if (!target || !(isImage(target.path) || isHeic(target.path))) {
-                return;
-            }
-            try {
-                const key = getPreviewDialogCacheKey(target);
-                const url = await previewCache.getOrStart(
-                    key,
-                    async () =>
-                        getObjectUrl
-                            ? await getObjectUrl(target)
-                            : downloadUrl(apiServer, target),
-                    priority,
-                );
-                if (!alive) {
-                    return;
-                }
-                setNeighborSlots((current) => ({
-                    ...current,
-                    [slot]: {
-                        file: target,
-                        url,
-                        status: "ready",
-                    },
-                }));
-            } catch {
-                if (!alive) {
-                    return;
-                }
-                setNeighborSlots((current) => ({
-                    ...current,
-                    [slot]: {
-                        file: target,
-                        url: null,
-                        status: "error",
-                    },
-                }));
-            }
-        };
-
-        void loadSlot("prev", prevFile, 15);
-        void loadSlot("next", nextFile, 25);
-
-        return () => {
-            alive = false;
-        };
-    }, [apiServer, files, getObjectUrl, index, isNativeComicMode, previewCache]);
-
     const touchRef = React.useRef<{
         startX: number;
         startY: number;
@@ -461,24 +307,11 @@ function PreviewDialog({
         };
     }, []);
 
-    const handleDisplayReady = React.useCallback((displayedSequence: number) => {
-        completedRequestSequencesRef.current.add(displayedSequence);
-        if (displayedSequence !== activeRequestSequenceRef.current) {
-            return;
-        }
-        clearOverlayTimers();
-        setShowLoadingOverlay(false);
-    }, [clearOverlayTimers]);
-
     React.useEffect(() => {
         return () => {
             previewCache.dispose();
-            if (pageTurnResetTimerRef.current !== null) {
-                window.clearTimeout(pageTurnResetTimerRef.current);
-            }
-            clearOverlayTimers();
         };
-    }, [clearOverlayTimers, previewCache]);
+    }, [previewCache]);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -498,49 +331,6 @@ function PreviewDialog({
     }, [move, onClose]);
 
     if (!file) return null;
-
-    const renderNeighborSlot = (
-        slot: NeighborSlotState,
-        label: "Prev" | "Next",
-        align: "left" | "right",
-    ) => {
-        const fileLabel = slot.file ? inferPageLabel(slot.file.path) : label;
-        return (
-            <div
-                className={[
-                    "hidden w-28 shrink-0 md:flex md:flex-col md:items-center md:gap-3",
-                    align === "left" ? "md:text-left" : "md:text-right",
-                ].join(" ")}
-            >
-                <div className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-3 text-slate-200">
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                        {label}
-                    </div>
-                    <div className="mt-2 break-words text-xs leading-snug">
-                        {fileLabel}
-                    </div>
-                    <div className="mt-3 flex h-36 items-center justify-center overflow-hidden rounded-xl bg-slate-950">
-                        {slot.status === "ready" && slot.url ? (
-                            <img
-                                src={slot.url}
-                                alt={slot.file?.path ?? label}
-                                className="max-h-full max-w-full object-contain opacity-80"
-                            />
-                        ) : slot.status === "loading" ? (
-                            <div className="flex flex-col items-center gap-2 text-[11px] text-slate-400">
-                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-slate-300" />
-                                <span>Loading</span>
-                            </div>
-                        ) : slot.status === "error" ? (
-                            <div className="text-[11px] text-red-300">Failed</div>
-                        ) : (
-                            <div className="text-[11px] text-slate-500">Empty</div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
@@ -587,69 +377,20 @@ function PreviewDialog({
                         ))}
                     </div>
                 )}
-                {showLoadingOverlay && !isNativeComicMode && (
-                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/42">
-                        <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
-                            <p className="break-words text-[min(3.4vw,0.95rem)] font-medium leading-snug text-slate-200">
-                                {inferPageLabel(file.path)}
-                            </p>
-                            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-800/90">
-                                <div
-                                    className="h-full rounded-full bg-gradient-to-r from-sky-400/40 via-sky-100 to-sky-400/40"
-                                    style={{
-                                        width: "42%",
-                                        transform:
-                                            pageTurnDirection === "next"
-                                                ? "translateX(130%)"
-                                                : pageTurnDirection === "prev"
-                                                    ? "translateX(-30%)"
-                                                    : "translateX(40%)",
-                                        transition: "transform 0.22s ease",
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {isNativeComicMode ? (
-                    <div className="flex h-full w-full items-center justify-center gap-4 px-4 py-4">
-                        {renderNeighborSlot(neighborSlots.prev, "Prev", "left")}
-                        <div className="min-w-0 flex-1">
-                            <PreviewPage
-                                file={file}
-                                requestSequence={requestSequence}
-                                isRetro={isRetro}
-                                useHls={useHls}
-                                forcedKind={forcedKind}
-                                apiServer={apiServer}
-                                getObjectUrl={resolveObjectUrl}
-                                releaseObjectUrl={releaseObjectUrl}
-                                onLoadingMessage={setLoadingMessage}
-                                onDisplayReady={handleDisplayReady}
-                                coverSrc={coverSrc}
-                                previewLayoutState={previewLayoutState}
-                                onPreviewLayoutStateChange={handlePreviewLayoutStateChange}
-                            />
-                        </div>
-                        {renderNeighborSlot(neighborSlots.next, "Next", "right")}
-                    </div>
-                ) : (
-                    <PreviewPage
-                        file={file}
-                        requestSequence={requestSequence}
-                        isRetro={isRetro}
-                        useHls={useHls}
-                        forcedKind={forcedKind}
-                        apiServer={apiServer}
-                        getObjectUrl={resolveObjectUrl}
-                        releaseObjectUrl={releaseObjectUrl}
-                        onLoadingMessage={setLoadingMessage}
-                        onDisplayReady={handleDisplayReady}
-                        coverSrc={coverSrc}
-                        previewLayoutState={previewLayoutState}
-                        onPreviewLayoutStateChange={handlePreviewLayoutStateChange}
-                    />
-                )}
+                <PreviewPage
+                    file={file}
+                    requestSequence={requestSequence}
+                    isRetro={isRetro}
+                    useHls={useHls}
+                    forcedKind={forcedKind}
+                    apiServer={apiServer}
+                    getObjectUrl={resolveObjectUrl}
+                    releaseObjectUrl={releaseObjectUrl}
+                    onLoadingMessage={setLoadingMessage}
+                    coverSrc={coverSrc}
+                    previewLayoutState={previewLayoutState}
+                    onPreviewLayoutStateChange={handlePreviewLayoutStateChange}
+                />
             </div>
 
             <div className="flex flex-wrap justify-center gap-2 border-t border-slate-800 px-4 py-3">

@@ -3,6 +3,7 @@ import { File, Folder, Loader, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { TargetFile, FileTargetFile } from "./api";
 import { usePreviewDialog } from "./usePreviewDialog";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
@@ -236,7 +237,7 @@ function BrowserFileListDialog({
       await showPreviewDialog({
         files: previewableFiles,
         initialIndex: index,
-        isRetro: true,
+        isRetro: !getNativePlaybackMode(),
         apiServer: ".",
         getObjectUrl,
         download,

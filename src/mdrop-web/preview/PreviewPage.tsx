@@ -305,7 +305,7 @@ export function PreviewPage({
                 src={src}
                 controls
                 autoPlay
-                className="max-h-full max-w-full"
+                className="block h-full w-full object-contain"
             />
         );
     }
@@ -344,7 +344,7 @@ export function PreviewPage({
                 onError={() => {
                     debugPreview("img:onerror");
                 }}
-                className="max-h-full max-w-full object-contain"
+                className="block h-full w-full object-contain"
             />
         );
     }
