@@ -30,7 +30,8 @@ const createDeferred = <T>() => {
 
 export const getPreviewDialogCacheKey = (file: TargetFile) => `${file.id}|${file.path}`;
 
-export const shouldWarmPreviewDialogFile = (_file: TargetFile) => true;
+export const shouldWarmPreviewDialogFile = (file: TargetFile) =>
+    file.id !== "rar";
 
 export class PreviewDialogCache {
     private readonly cacheNum: number;
