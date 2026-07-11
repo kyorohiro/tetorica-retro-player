@@ -354,10 +354,12 @@ function ZipFileListDialog({
                                                     const previewIndex = previewFiles.findIndex(
                                                         (f) => f.path === file.path
                                                     );
+                                                    const shouldUseRetroPreview =
+                                                        isVideo(file.path) || isAudio(file.path);
                                                     await showPreviewDialog({
                                                         files: previewFiles,
                                                         initialIndex: previewIndex,
-                                                        isRetro: true,
+                                                        isRetro: shouldUseRetroPreview,
                                                         apiServer: "",
                                                         getObjectUrl: async (target, onProgress) => {
                                                             const entryBlob = await readArchiveFile(
