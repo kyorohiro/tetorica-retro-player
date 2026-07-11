@@ -18,6 +18,8 @@ import { preivewGlobalSetting } from "./preview/preivewSetting";
 import { isHeic, isImage } from "./utils";
 
 const RETRO_PREVIEW_DIALOG_EVENT = "tetorica-retro-preview-dialog-active";
+const PREVIEW_DIALOG_PAGE_INDICATOR_DELAY_MS = 300;
+const PREVIEW_DIALOG_PAGE_INDICATOR_HOLD_MS = 220;
 
 const primeBrowserImageCache = async (url: string): Promise<void> => {
     if (typeof Image === "undefined") {
@@ -82,6 +84,9 @@ export const downloadUrl = (apiServer: string, file: TargetFile): string => {
     )}`;
 };
 
+const formatPreviewDialogPageLabel = (pageNumber: number, totalPages: number) =>
+    `${pageNumber} / ${totalPages}`;
+
 export function usePreviewDialog() {
     const { showDialog } = useDialog();
 
@@ -123,6 +128,10 @@ function PreviewDialog({
     );
     const pageIndicatorTimerRef = React.useRef<number | null>(null);
     const pageIndicatorHoldTimerRef = React.useRef<number | null>(null);
+    const requestedPageSequenceRef = React.useRef(1);
+    const displayedPageSequenceRef = React.useRef(1);
+    const delayedPageIndicatorPendingRef = React.useRef(false);
+    const requestSequenceRef = React.useRef(1);
     const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
@@ -167,26 +176,46 @@ function PreviewDialog({
         setShowPageIndicator(false);
     }, []);
 
+    const showPageIndicatorWithHold = React.useCallback(() => {
+        delayedPageIndicatorPendingRef.current = false;
+        setShowPageIndicator(true);
+        pageIndicatorHoldTimerRef.current = window.setTimeout(() => {
+            setShowPageIndicator(false);
+            pageIndicatorHoldTimerRef.current = null;
+        }, PREVIEW_DIALOG_PAGE_INDICATOR_HOLD_MS);
+    }, []);
+
     const move = React.useCallback(
         (delta: number) => {
             const nextIndex = Math.max(0, Math.min(index + delta, files.length - 1));
             if (nextIndex === index) {
                 return;
             }
+
+            const previousRequestedSequence = requestedPageSequenceRef.current;
+            const hasPendingUndisplayedPage =
+                displayedPageSequenceRef.current < previousRequestedSequence;
+            const shouldShowPageIndicatorImmediately =
+                hasPendingUndisplayedPage || delayedPageIndicatorPendingRef.current;
+            const nextRequestSequence = requestSequenceRef.current + 1;
+
             clearPageIndicator();
             setIndicatorPageNumber(nextIndex + 1);
-            pageIndicatorTimerRef.current = window.setTimeout(() => {
-                setShowPageIndicator(true);
-                pageIndicatorTimerRef.current = null;
-                pageIndicatorHoldTimerRef.current = window.setTimeout(() => {
-                    setShowPageIndicator(false);
-                    pageIndicatorHoldTimerRef.current = null;
-                }, 500);
-            }, 180);
-            setRequestSequence((current) => current + 1);
+            requestedPageSequenceRef.current = nextRequestSequence;
+            requestSequenceRef.current = nextRequestSequence;
+            if (shouldShowPageIndicatorImmediately) {
+                showPageIndicatorWithHold();
+            } else {
+                delayedPageIndicatorPendingRef.current = true;
+                pageIndicatorTimerRef.current = window.setTimeout(() => {
+                    pageIndicatorTimerRef.current = null;
+                    showPageIndicatorWithHold();
+                }, PREVIEW_DIALOG_PAGE_INDICATOR_DELAY_MS);
+            }
+            setRequestSequence(nextRequestSequence);
             setIndex(nextIndex);
         },
-        [clearPageIndicator, files.length, index]
+        [clearPageIndicator, files.length, index, showPageIndicatorWithHold]
     );
 
     React.useEffect(() => {
@@ -340,7 +369,17 @@ function PreviewDialog({
         };
     }, [clearPageIndicator, previewCache]);
 
-    const handleDisplayReady = React.useCallback(() => {
+    const handleDisplayReady = React.useCallback((displayedRequestSequence: number) => {
+        if (displayedRequestSequence < requestedPageSequenceRef.current) {
+            displayedPageSequenceRef.current = Math.max(
+                displayedPageSequenceRef.current,
+                displayedRequestSequence,
+            );
+            return;
+        }
+        displayedPageSequenceRef.current = displayedRequestSequence;
+        requestedPageSequenceRef.current = displayedRequestSequence;
+        delayedPageIndicatorPendingRef.current = false;
         clearPageIndicator();
     }, [clearPageIndicator]);
 
@@ -367,7 +406,7 @@ function PreviewDialog({
         <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
             <div className="border-b border-slate-800 px-4 py-2 text-slate-100">
                 <div className="min-w-0 truncate text-sm">
-                    {index + 1} / {files.length} {file.path}
+                    {file.path}
                     {loadingMessage ? (
                         <span className="sr-only">{loadingMessage}</span>
                     ) : null}
@@ -412,8 +451,16 @@ function PreviewDialog({
                 )}
                 {showPageIndicator && indicatorPageNumber !== null && (
                     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                        <div className="rounded-full border border-slate-700/90 bg-slate-950/92 px-4 py-2 text-sm text-slate-100 shadow-lg">
-                            {indicatorPageNumber} / {files.length}
+                        <div className="w-[min(84%,18rem)] rounded-2xl border border-slate-700 bg-slate-950 px-5 py-4 text-center text-slate-100">
+                            <p className="text-[min(3.8vw,0.95rem)] font-medium tabular-nums text-slate-200">
+                                {formatPreviewDialogPageLabel(indicatorPageNumber, files.length)}
+                            </p>
+                            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800/90">
+                                <div
+                                    className="h-full rounded-full bg-gradient-to-r from-sky-400/40 via-sky-100 to-sky-400/40"
+                                    style={{ width: "42%", transform: "translateX(40%)" }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
