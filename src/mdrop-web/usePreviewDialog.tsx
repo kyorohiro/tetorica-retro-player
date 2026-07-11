@@ -119,6 +119,7 @@ function PreviewDialog({
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
+    const [isDisplayPending, setIsDisplayPending] = React.useState(true);
     const [pageTurnDirection, setPageTurnDirection] = React.useState<"next" | "prev" | null>(null);
     const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
@@ -176,6 +177,7 @@ function PreviewDialog({
                 || delayedOverlayPendingRef.current
                 ? nextRequestSequence
                 : null;
+            setIsDisplayPending(true);
             setPageTurnDirection(nextDirection);
             if (pageTurnResetTimerRef.current !== null) {
                 window.clearTimeout(pageTurnResetTimerRef.current);
@@ -298,7 +300,7 @@ function PreviewDialog({
             loadingOverlayHoldTimerRef.current = null;
         }
 
-        if (!loadingMessage) {
+        if (!isDisplayPending) {
             delayedOverlayPendingRef.current = false;
             setShowLoadingOverlay(false);
             return;
@@ -328,7 +330,7 @@ function PreviewDialog({
                 }, 220);
             }, 300);
         }
-    }, [loadingMessage, requestSequence]);
+    }, [isDisplayPending, requestSequence]);
 
     const handleDisplayReady = React.useCallback((displayedSequence: number) => {
         if (displayedSequence < requestSequence) {
@@ -337,6 +339,7 @@ function PreviewDialog({
         displayedRequestSequenceRef.current = displayedSequence;
         immediateOverlayRequestSequenceRef.current = null;
         delayedOverlayPendingRef.current = false;
+        setIsDisplayPending(false);
         setShowLoadingOverlay(false);
     }, [requestSequence]);
 
@@ -403,7 +406,7 @@ function PreviewDialog({
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
-                {showLoadingOverlay && loadingMessage && (
+                {showLoadingOverlay && (
                     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/42">
                         <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
                             <p className="break-words text-[min(3.4vw,0.95rem)] font-medium leading-snug text-slate-200">
