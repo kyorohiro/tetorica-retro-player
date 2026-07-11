@@ -110,7 +110,7 @@ function PreviewDialog({
 
     const file = files[index];
     if (!previewCacheRef.current) {
-        previewCacheRef.current = new PreviewDialogCache(3);
+        previewCacheRef.current = new PreviewDialogCache(Math.max(files.length, 1));
     }
     const previewCache = previewCacheRef.current;
 
@@ -164,21 +164,22 @@ function PreviewDialog({
     );
 
     React.useEffect(() => {
-        const currentIndex = index;
-        const candidates = [files[currentIndex + 1], files[currentIndex - 1]].filter(
-            (candidate): candidate is TargetFile => Boolean(candidate)
-        );
-        for (const candidate of candidates) {
-            if (!shouldWarmPreviewDialogFile(candidate)) {
+        for (let candidateIndex = 0; candidateIndex < files.length; candidateIndex += 1) {
+            const candidate = files[candidateIndex];
+            if (!candidate || !shouldWarmPreviewDialogFile(candidate)) {
                 continue;
             }
+            const distance = Math.abs(candidateIndex - index);
+            const priority = candidateIndex === index
+                ? 200
+                : Math.max(1, 100 - distance);
             previewCache.schedule(
                 getPreviewDialogCacheKey(candidate),
                 async () =>
                     getObjectUrl
                         ? await getObjectUrl(candidate)
                         : downloadUrl(apiServer, candidate),
-                candidate === files[currentIndex + 1] ? 20 : 10,
+                priority,
             );
         }
     }, [apiServer, files, getObjectUrl, index, previewCache]);

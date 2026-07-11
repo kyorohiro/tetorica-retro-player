@@ -1,5 +1,4 @@
 import type { TargetFile } from "../api";
-import { isHeic, isImage, isText } from "../utils";
 
 type CacheEntry = {
     key: string;
@@ -31,8 +30,7 @@ const createDeferred = <T>() => {
 
 export const getPreviewDialogCacheKey = (file: TargetFile) => `${file.id}|${file.path}`;
 
-export const shouldWarmPreviewDialogFile = (file: TargetFile) =>
-    isImage(file.path) || isHeic(file.path) || isText(file.path);
+export const shouldWarmPreviewDialogFile = (_file: TargetFile) => true;
 
 export class PreviewDialogCache {
     private readonly cacheNum: number;
