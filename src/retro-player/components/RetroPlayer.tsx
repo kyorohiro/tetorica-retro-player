@@ -54,6 +54,8 @@ const resolveRenderResolutionPreset = (
 type RetroPlayerProps = {
   locale?: RetroPlayerLocale;
   src?: string;
+  displayName?: string;
+  displayIndex?: number | null;
   stream?: MediaStream | null;
   streamName?: string;
   kind?: "video" | "image" | "audio";
@@ -80,6 +82,8 @@ type RetroPlayerProps = {
 export function RetroPlayer({
   locale = "en",
   src,
+  displayName,
+  displayIndex,
   stream,
   streamName,
   kind = "video",
@@ -233,6 +237,8 @@ export function RetroPlayer({
       playbackSource,
       preferNativeVideoSurface: nativePlaybackMode,
       locale,
+      requestedKind: kind,
+      requestedIndex: displayIndex,
     },
   );
 
@@ -419,13 +425,13 @@ export function RetroPlayer({
     lastPreviewRequestRef.current = srcKey;
 
     void (async () => {
-      try {
-        await player.previewUrl(src, kind);
-      } catch (error) {
-        onError?.(error instanceof Error ? error : new Error(String(error)));
-      }
-    })();
-  }, [src, stream, streamName, kind, onError, player]);
+        try {
+          await player.previewUrl(src, kind, displayName);
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+      })();
+  }, [displayName, src, stream, streamName, kind, onError, player]);
 
   // Layout refresh when fit-mode changes (pin/maximize handled in RetroPreviewView).
   React.useEffect(() => {
