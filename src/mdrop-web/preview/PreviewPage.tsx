@@ -40,6 +40,7 @@ export type PreviewPageProps = {
         file: TargetFile,
         onProgress?: (loaded: number, total: number) => void
     ) => Promise<string>;
+    releaseObjectUrl?: (url: string) => void;
     onLoadingMessage?: (message: string) => void;
     onDisplayReady?: (requestSequence: number) => void;
     previewLayoutState?: RetroPreviewLayoutState;
@@ -54,6 +55,7 @@ export function PreviewPage({
     forcedKind,
     apiServer = "",
     getObjectUrl,
+    releaseObjectUrl,
     onLoadingMessage,
     onDisplayReady,
     coverSrc,
@@ -192,10 +194,14 @@ export function PreviewPage({
         return () => {
             alive = false;
             for (const url of objectUrls) {
-                URL.revokeObjectURL(url);
+                if (releaseObjectUrl) {
+                    releaseObjectUrl(url);
+                } else {
+                    URL.revokeObjectURL(url);
+                }
             }
         };
-    }, [file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, requestSequence]);
+    }, [file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, releaseObjectUrl, requestSequence]);
 
     if (status === "none" || status === "loading") {
         return <div className="text-sm text-slate-400">Loading...</div>;
@@ -348,7 +354,11 @@ export function PreviewPage({
                             });
                         } finally {
                             if (f.startsWith("blob:")) {
-                                URL.revokeObjectURL(f);
+                                if (releaseObjectUrl) {
+                                    releaseObjectUrl(f);
+                                } else {
+                                    URL.revokeObjectURL(f);
+                                }
                             }
                         }
                     }}

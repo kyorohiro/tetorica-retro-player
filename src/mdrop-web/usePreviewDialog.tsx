@@ -8,6 +8,11 @@ import {
 } from "../retro-player/previewLayoutState";
 import type { TargetFile } from "./api";
 import { PreviewPage } from "./preview/PreviewPage";
+import {
+    getPreviewDialogCacheKey,
+    PreviewDialogCache,
+    shouldWarmPreviewDialogFile,
+} from "./preview/previewDialogCache";
 import { preivewGlobalSetting } from "./preview/preivewSetting";
 
 const RETRO_PREVIEW_DIALOG_EVENT = "tetorica-retro-preview-dialog-active";
@@ -95,6 +100,7 @@ function PreviewDialog({
     const displayedRequestSequenceRef = React.useRef(0);
     const immediateOverlayRequestSequenceRef = React.useRef<number | null>(null);
     const delayedOverlayPendingRef = React.useRef(false);
+    const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
         setPreviewLayoutState((current) =>
@@ -103,6 +109,31 @@ function PreviewDialog({
     }, []);
 
     const file = files[index];
+    if (!previewCacheRef.current) {
+        previewCacheRef.current = new PreviewDialogCache(3);
+    }
+    const previewCache = previewCacheRef.current;
+
+    const resolveObjectUrl = React.useCallback(
+        async (
+            target: TargetFile,
+            onProgress?: (loaded: number, total: number) => void
+        ) => {
+            const loadUrl = async () =>
+                getObjectUrl
+                    ? await getObjectUrl(target, onProgress)
+                    : downloadUrl(apiServer, target);
+            return await previewCache.getOrStart(
+                getPreviewDialogCacheKey(target),
+                loadUrl,
+                100,
+            );
+        },
+        [apiServer, getObjectUrl, previewCache]
+    );
+    const releaseObjectUrl = React.useCallback((url: string) => {
+        previewCache.releaseObjectUrl(url);
+    }, [previewCache]);
 
     const move = React.useCallback(
         (delta: number) => {
@@ -131,6 +162,26 @@ function PreviewDialog({
         },
         [files.length, index, requestSequence]
     );
+
+    React.useEffect(() => {
+        const currentIndex = index;
+        const candidates = [files[currentIndex + 1], files[currentIndex - 1]].filter(
+            (candidate): candidate is TargetFile => Boolean(candidate)
+        );
+        for (const candidate of candidates) {
+            if (!shouldWarmPreviewDialogFile(candidate)) {
+                continue;
+            }
+            previewCache.schedule(
+                getPreviewDialogCacheKey(candidate),
+                async () =>
+                    getObjectUrl
+                        ? await getObjectUrl(candidate)
+                        : downloadUrl(apiServer, candidate),
+                candidate === files[currentIndex + 1] ? 20 : 10,
+            );
+        }
+    }, [apiServer, files, getObjectUrl, index, previewCache]);
 
     const touchRef = React.useRef<{
         startX: number;
@@ -256,6 +307,7 @@ function PreviewDialog({
 
     React.useEffect(() => {
         return () => {
+            previewCache.dispose();
             if (pageTurnResetTimerRef.current !== null) {
                 window.clearTimeout(pageTurnResetTimerRef.current);
             }
@@ -266,7 +318,7 @@ function PreviewDialog({
                 window.clearTimeout(loadingOverlayHoldTimerRef.current);
             }
         };
-    }, []);
+    }, [previewCache]);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -347,7 +399,8 @@ function PreviewDialog({
                     useHls={useHls}
                     forcedKind={forcedKind}
                     apiServer={apiServer}
-                    getObjectUrl={getObjectUrl}
+                    getObjectUrl={resolveObjectUrl}
+                    releaseObjectUrl={releaseObjectUrl}
                     onLoadingMessage={setLoadingMessage}
                     onDisplayReady={handleDisplayReady}
                     coverSrc={coverSrc}
