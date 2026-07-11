@@ -19,6 +19,34 @@ import { isHeic, isImage } from "./utils";
 
 const RETRO_PREVIEW_DIALOG_EVENT = "tetorica-retro-preview-dialog-active";
 
+const primeBrowserImageCache = async (url: string): Promise<void> => {
+    if (typeof Image === "undefined") {
+        return;
+    }
+
+    const image = new Image();
+    image.decoding = "async";
+    image.src = url;
+
+    if (image.complete && image.naturalWidth > 0) {
+        return;
+    }
+
+    if (typeof image.decode === "function") {
+        try {
+            await image.decode();
+            return;
+        } catch {
+            // Fall through to onload because some browsers reject decode for blob timing.
+        }
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error(`Failed to preload image: ${url}`));
+    });
+};
+
 type PreviewDialogOptions = {
     files: TargetFile[];
     initialIndex: number;
@@ -121,15 +149,12 @@ function PreviewDialog({
             target: TargetFile,
             onProgress?: (loaded: number, total: number) => void
         ) => {
+            const key = getPreviewDialogCacheKey(target);
             const loadUrl = async () =>
                 getObjectUrl
                     ? await getObjectUrl(target, onProgress)
                     : downloadUrl(apiServer, target);
-            return await previewCache.getOrStart(
-                getPreviewDialogCacheKey(target),
-                loadUrl,
-                100,
-            );
+            return await previewCache.loadNow(key, loadUrl);
         },
         [apiServer, getObjectUrl, previewCache]
     );
@@ -166,14 +191,13 @@ function PreviewDialog({
     );
 
     React.useEffect(() => {
-        const candidates = [files[index + 1], files[index - 1]].filter(
+        const candidates = [files[index + 1]].filter(
             (candidate): candidate is TargetFile => Boolean(candidate)
         );
         for (const candidate of candidates) {
             if (!shouldWarmPreviewDialogFile(candidate)) {
                 continue;
             }
-            const priority = candidate === files[index + 1] ? 20 : 10;
             previewCache.schedule(
                 getPreviewDialogCacheKey(candidate),
                 async () => {
@@ -181,14 +205,18 @@ function PreviewDialog({
                         ? await getObjectUrl(candidate)
                         : downloadUrl(apiServer, candidate);
                     if (isImage(candidate.path) || isHeic(candidate.path)) {
-                        await primeImageElementCache(url);
+                        if (isRetro) {
+                            await primeImageElementCache(url);
+                        } else {
+                            await primeBrowserImageCache(url);
+                        }
                     }
                     return url;
                 },
-                priority,
+                20,
             );
         }
-    }, [apiServer, files, getObjectUrl, index, previewCache]);
+    }, [apiServer, files, getObjectUrl, index, isRetro, previewCache]);
 
     const touchRef = React.useRef<{
         startX: number;

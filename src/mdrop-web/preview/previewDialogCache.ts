@@ -36,6 +36,7 @@ export class PreviewDialogCache {
     private readonly cacheNum: number;
     private readonly entries = new Map<string, CacheEntry>();
     private readonly queue = new Map<string, QueueItem>();
+    private readonly immediateLoads = new Map<string, Promise<string>>();
     private inFlightKey: string | null = null;
 
     constructor(cacheNum = 3) {
@@ -49,6 +50,102 @@ export class PreviewDialogCache {
         }
         this.touch(entry);
         return entry.value;
+    }
+
+    getPendingPromise(key: string): Promise<string> | undefined {
+        const entry = this.entries.get(key);
+        if (!entry || entry.status !== "pending") {
+            return undefined;
+        }
+        this.touch(entry);
+        return entry.promise;
+    }
+
+    setResolved(key: string, value: string): string {
+        const existing = this.entries.get(key);
+        if (existing?.status === "ready" && existing.value === value) {
+            this.touch(existing);
+            return value;
+        }
+
+        const deferred = createDeferred<string>();
+        deferred.resolve(value);
+        const entry: CacheEntry = existing ?? {
+            key,
+            lastAccessedAt: Date.now(),
+            promise: deferred.promise,
+            reject: deferred.reject,
+            resolve: deferred.resolve,
+            revokeOnDispose: false,
+            status: "ready",
+        };
+        if (existing?.status === "pending") {
+            existing.resolve(value);
+        } else {
+            entry.promise = Promise.resolve(value);
+        }
+        entry.value = value;
+        entry.status = "ready";
+        entry.revokeOnDispose = value.startsWith("blob:");
+        this.entries.set(key, entry);
+        this.touch(entry);
+        this.trimOverflow();
+        return value;
+    }
+
+    loadNow(key: string, loader: () => Promise<string>): Promise<string> {
+        const ready = this.get(key);
+        if (ready) {
+            return Promise.resolve(ready);
+        }
+
+        const existingImmediate = this.immediateLoads.get(key);
+        if (existingImmediate) {
+            return existingImmediate;
+        }
+
+        const existing = this.entries.get(key);
+        if (existing && this.inFlightKey === key) {
+            this.touch(existing);
+            return existing.promise;
+        }
+
+        const entry = existing ?? (() => {
+            const deferred = createDeferred<string>();
+            const created: CacheEntry = {
+                key,
+                lastAccessedAt: Date.now(),
+                promise: deferred.promise,
+                reject: deferred.reject,
+                resolve: deferred.resolve,
+                revokeOnDispose: false,
+                status: "pending",
+            };
+            this.entries.set(key, created);
+            return created;
+        })();
+
+        entry.status = "pending";
+        this.touch(entry);
+        this.queue.delete(key);
+
+        const loadPromise = (async () => {
+            try {
+                const value = await loader();
+                this.setResolved(key, value);
+                return value;
+            } catch (error) {
+                this.entries.delete(key);
+                entry.status = "error";
+                entry.reject(error);
+                throw error;
+            } finally {
+                this.immediateLoads.delete(key);
+            }
+        })();
+
+        this.immediateLoads.set(key, loadPromise);
+        return loadPromise;
     }
 
     getOrStart(key: string, loader: () => Promise<string>, priority = 100): Promise<string> {
@@ -138,6 +235,7 @@ export class PreviewDialogCache {
 
     dispose(): void {
         this.queue.clear();
+        this.immediateLoads.clear();
         for (const entry of this.entries.values()) {
             if (entry.revokeOnDispose && entry.value) {
                 URL.revokeObjectURL(entry.value);
