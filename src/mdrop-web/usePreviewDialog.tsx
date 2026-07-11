@@ -119,7 +119,6 @@ function PreviewDialog({
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
-    const [isDisplayPending, setIsDisplayPending] = React.useState(true);
     const [pageTurnDirection, setPageTurnDirection] = React.useState<"next" | "prev" | null>(null);
     const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
@@ -128,9 +127,8 @@ function PreviewDialog({
     const pageTurnResetTimerRef = React.useRef<number | null>(null);
     const loadingOverlayTimerRef = React.useRef<number | null>(null);
     const loadingOverlayHoldTimerRef = React.useRef<number | null>(null);
+    const activeRequestSequenceRef = React.useRef(1);
     const displayedRequestSequenceRef = React.useRef(0);
-    const immediateOverlayRequestSequenceRef = React.useRef<number | null>(null);
-    const delayedOverlayPendingRef = React.useRef(false);
     const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
@@ -163,6 +161,38 @@ function PreviewDialog({
         previewCache.releaseObjectUrl(url);
     }, [previewCache]);
 
+    const clearOverlayTimers = React.useCallback(() => {
+        if (loadingOverlayTimerRef.current !== null) {
+            window.clearTimeout(loadingOverlayTimerRef.current);
+            loadingOverlayTimerRef.current = null;
+        }
+        if (loadingOverlayHoldTimerRef.current !== null) {
+            window.clearTimeout(loadingOverlayHoldTimerRef.current);
+            loadingOverlayHoldTimerRef.current = null;
+        }
+    }, []);
+
+    const scheduleOverlayForRequest = React.useCallback((sequence: number) => {
+        clearOverlayTimers();
+        setShowLoadingOverlay(false);
+        loadingOverlayTimerRef.current = window.setTimeout(() => {
+            loadingOverlayTimerRef.current = null;
+            if (activeRequestSequenceRef.current !== sequence) {
+                return;
+            }
+            if (displayedRequestSequenceRef.current >= sequence) {
+                return;
+            }
+            setShowLoadingOverlay(true);
+            loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
+                if (activeRequestSequenceRef.current === sequence) {
+                    setShowLoadingOverlay(false);
+                }
+                loadingOverlayHoldTimerRef.current = null;
+            }, 220);
+        }, 300);
+    }, [clearOverlayTimers]);
+
     const move = React.useCallback(
         (delta: number) => {
             const nextDirection = delta > 0 ? "next" : "prev";
@@ -171,13 +201,6 @@ function PreviewDialog({
                 return;
             }
             const nextRequestSequence = requestSequence + 1;
-            const hasPendingUndisplayedPage =
-                displayedRequestSequenceRef.current < requestSequence;
-            immediateOverlayRequestSequenceRef.current = hasPendingUndisplayedPage
-                || delayedOverlayPendingRef.current
-                ? nextRequestSequence
-                : null;
-            setIsDisplayPending(true);
             setPageTurnDirection(nextDirection);
             if (pageTurnResetTimerRef.current !== null) {
                 window.clearTimeout(pageTurnResetTimerRef.current);
@@ -186,10 +209,12 @@ function PreviewDialog({
                 setPageTurnDirection(null);
                 pageTurnResetTimerRef.current = null;
             }, 220);
+            activeRequestSequenceRef.current = nextRequestSequence;
+            scheduleOverlayForRequest(nextRequestSequence);
             setRequestSequence(nextRequestSequence);
             setIndex(nextIndex);
         },
-        [files.length, index, requestSequence]
+        [files.length, index, requestSequence, scheduleOverlayForRequest]
     );
 
     React.useEffect(() => {
@@ -291,57 +316,17 @@ function PreviewDialog({
     }, []);
 
     React.useEffect(() => {
-        if (loadingOverlayTimerRef.current !== null) {
-            window.clearTimeout(loadingOverlayTimerRef.current);
-            loadingOverlayTimerRef.current = null;
-        }
-        if (loadingOverlayHoldTimerRef.current !== null) {
-            window.clearTimeout(loadingOverlayHoldTimerRef.current);
-            loadingOverlayHoldTimerRef.current = null;
-        }
-
-        if (!isDisplayPending) {
-            delayedOverlayPendingRef.current = false;
-            setShowLoadingOverlay(false);
-            return;
-        }
-
-        const showAndHoldOverlay = () => {
-            delayedOverlayPendingRef.current = false;
-            setShowLoadingOverlay(true);
-            loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
-                setShowLoadingOverlay(false);
-                loadingOverlayHoldTimerRef.current = null;
-            }, 220);
-        };
-
-        if (immediateOverlayRequestSequenceRef.current === requestSequence) {
-            showAndHoldOverlay();
-        } else {
-            delayedOverlayPendingRef.current = true;
-            setShowLoadingOverlay(false);
-            loadingOverlayTimerRef.current = window.setTimeout(() => {
-                setShowLoadingOverlay(true);
-                delayedOverlayPendingRef.current = false;
-                loadingOverlayTimerRef.current = null;
-                loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
-                    setShowLoadingOverlay(false);
-                    loadingOverlayHoldTimerRef.current = null;
-                }, 220);
-            }, 300);
-        }
-    }, [isDisplayPending, requestSequence]);
+        activeRequestSequenceRef.current = requestSequence;
+    }, [requestSequence]);
 
     const handleDisplayReady = React.useCallback((displayedSequence: number) => {
         if (displayedSequence < requestSequence) {
             return;
         }
         displayedRequestSequenceRef.current = displayedSequence;
-        immediateOverlayRequestSequenceRef.current = null;
-        delayedOverlayPendingRef.current = false;
-        setIsDisplayPending(false);
+        clearOverlayTimers();
         setShowLoadingOverlay(false);
-    }, [requestSequence]);
+    }, [clearOverlayTimers, requestSequence]);
 
     React.useEffect(() => {
         return () => {
@@ -349,14 +334,9 @@ function PreviewDialog({
             if (pageTurnResetTimerRef.current !== null) {
                 window.clearTimeout(pageTurnResetTimerRef.current);
             }
-            if (loadingOverlayTimerRef.current !== null) {
-                window.clearTimeout(loadingOverlayTimerRef.current);
-            }
-            if (loadingOverlayHoldTimerRef.current !== null) {
-                window.clearTimeout(loadingOverlayHoldTimerRef.current);
-            }
+            clearOverlayTimers();
         };
-    }, [previewCache]);
+    }, [clearOverlayTimers, previewCache]);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
