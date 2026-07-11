@@ -170,6 +170,16 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       setAutoStartState('done');
     }, [stopTone]);
 
+    const clearPlaylistSession = useCallback(() => {
+      playlistRef.current = [];
+      setPlaylistLength(0);
+      setPlaylistIndex(0);
+      setIsPlaylistOpen(false);
+      currentPlayingPathRef.current = null;
+      setShowFfmpegRetry(false);
+      setShowPlaybackRetryHint(false);
+    }, []);
+
     const syncToneTransportPlayback = useCallback((playing: boolean) => {
       void import('tone').then(({ getTransport }) => {
         const transport = getTransport();
@@ -209,18 +219,21 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, []);
 
     const playPresetVideo = useCallback(() => {
+      clearPlaylistSession();
       savePreset({ type: 'colorbars-video' });
       stopTone();
       previewSource.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
-    }, [previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
 
     const playPresetImage = useCallback(() => {
+      clearPlaylistSession();
       savePreset({ type: 'colorbars-image' });
       stopTone();
       previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
-    }, [previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
 
     const playPresetLofi = useCallback(async () => {
+      clearPlaylistSession();
       savePreset({ type: 'lofi' });
       stopTone();
       const [{ startLofiSession }, Tone] = await Promise.all([
@@ -231,16 +244,17 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       const session = await startLofiSession();
       toneCleanupRef.current = session.dispose;
       previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
-    }, [previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
 
     const playPresetDemoSong = useCallback(async (meta: DemoSongMeta) => {
+      clearPlaylistSession();
       savePreset({ type: 'demo-song', songId: meta.id });
       stopTone();
       const { startDemoSongSession } = await import('./builtin-content/demo-song-session');
       const session = await startDemoSongSession(meta);
       toneCleanupRef.current = session.dispose;
       previewSource.previewAudioStream(session.stream, meta.name);
-    }, [previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
 
     // Restart the currently saved preset. Called from RetroPlayer's onRetry
     // (play button pressed while media is in error/ended state).

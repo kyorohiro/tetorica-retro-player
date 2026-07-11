@@ -310,6 +310,7 @@ export function usePixiVideoPlayer(
     mediaRef,
     isPlaying,
     isPlayingRef,
+    nativePlaybackMode: isNativeModePreferred,
   });
 
   const {

@@ -7,7 +7,6 @@ import {
   type SetStateAction,
 } from "react";
 import {
-  getNativePlaybackMode,
   loadPersistedRetroSettings,
   savePersistedRetroAudioSettings,
 } from "./persistedRetroSettings";
@@ -45,6 +44,7 @@ type UseRetroAudioEngineParams = {
   mediaRef: MutableRefObject<HTMLMediaElement | null>;
   isPlaying: boolean;
   isPlayingRef: MutableRefObject<boolean>;
+  nativePlaybackMode: boolean;
 };
 
 // Safari's createMediaElementSource() does not suppress the element's native audio output,
@@ -68,6 +68,7 @@ export function useRetroAudioEngine({
   mediaRef,
   isPlaying,
   isPlayingRef,
+  nativePlaybackMode,
 }: UseRetroAudioEngineParams) {
   const [latencyHint, setLatencyHintState] = useState<AudioContextLatencyCategory>(loadLatencyHint);
   const latencyHintRef = useRef<AudioContextLatencyCategory>(latencyHint);
@@ -79,14 +80,10 @@ export function useRetroAudioEngine({
   }, []);
   const [initialAudioSettings] = useState(() => {
     const persisted = loadPersistedRetroSettings()?.audio;
-    const isNativeMode = getNativePlaybackMode();
 
     return {
       ...DEFAULT_AUDIO_PRESET_SETTINGS,
       ...persisted,
-      isAudioFxEnabled: isNativeMode
-        ? false
-        : (persisted?.isAudioFxEnabled ?? DEFAULT_AUDIO_PRESET_SETTINGS.isAudioFxEnabled),
     } satisfies RetroAudioSettings;
   });
   const audioOptimizationModeRef = useRef<RetroAudioSettings["audioOptimizationMode"]>(
@@ -357,6 +354,8 @@ export function useRetroAudioEngine({
     audioEngineRef.current?.setIsPlaying(nextIsPlaying);
   const setOutputEnabled = (isEnabled: boolean) =>
     audioEngineRef.current?.setOutputEnabled(isEnabled);
+  const setDestinationOutputEnabled = (isEnabled: boolean) =>
+    audioEngineRef.current?.setDestinationOutputEnabled(isEnabled);
 
   const syncCurrentMediaSettings = useCallback(() => {
     if (!mediaRef.current) {
@@ -455,6 +454,7 @@ export function useRetroAudioEngine({
         previewKindRef.current === "audio" ||
         previewKindRef.current === "capture",
     );
+    nextEngine.setDestinationOutputEnabled(!nativePlaybackMode);
 
     debugAudio("recreateAudioEngine:ready", {
       audioContextState: initializedContext?.state ?? nextContext.state,
@@ -902,8 +902,9 @@ export function useRetroAudioEngine({
         previewKind === "audio" ||
         previewKind === "capture",
     );
+    setDestinationOutputEnabled(!nativePlaybackMode);
     syncCurrentMediaSettings();
-  }, [isPlaying, previewKind, setEngineIsPlaying, syncCurrentMediaSettings]);
+  }, [isPlaying, nativePlaybackMode, previewKind, setDestinationOutputEnabled, setEngineIsPlaying, syncCurrentMediaSettings]);
 
   useEffect(() => {
     const id = setTimeout(() => {

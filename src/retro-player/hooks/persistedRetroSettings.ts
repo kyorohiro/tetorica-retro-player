@@ -374,24 +374,27 @@ export const clearPersistedRetroSettings = () => {
 const NATIVE_MODE_KEY = "tetorica-retro-player.nativeMode";
 const FFMPEG_USE_QSV_KEY = "tetorica-retro-player.ffmpegUseQsv";
 const FFMPEG_MAX_CONCURRENT_HLS_SESSIONS_KEY = "tetorica-retro-player.ffmpegMaxConcurrentHlsSessions";
+export const DEFAULT_RETRO_PLAYBACK = {
+  mode: "native" as "retro" | "native",
+};
 
 export const getNativePlaybackMode = (): boolean => {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return DEFAULT_RETRO_PLAYBACK.mode === "native";
   try {
-    return window.localStorage.getItem(NATIVE_MODE_KEY) === "true";
+    const stored = window.localStorage.getItem(NATIVE_MODE_KEY);
+    if (stored === null) {
+      return DEFAULT_RETRO_PLAYBACK.mode === "native";
+    }
+    return stored === "true";
   } catch {
-    return false;
+    return DEFAULT_RETRO_PLAYBACK.mode === "native";
   }
 };
 
 export const setNativePlaybackMode = (enabled: boolean): void => {
   if (typeof window === "undefined") return;
   try {
-    if (enabled) {
-      window.localStorage.setItem(NATIVE_MODE_KEY, "true");
-    } else {
-      window.localStorage.removeItem(NATIVE_MODE_KEY);
-    }
+    window.localStorage.setItem(NATIVE_MODE_KEY, enabled ? "true" : "false");
   } catch {}
 };
 
