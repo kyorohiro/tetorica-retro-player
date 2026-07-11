@@ -589,8 +589,7 @@ export function RetroPreviewView({
   const displayedImagePageTurnTokenRef = React.useRef(player.pageTurnToken);
   const delayedImageOverlayPendingRef = React.useRef(false);
   const isImagePreviewRequested = player.requestedKind === "image" || player.hasImage;
-  const shouldKeepNativeVisualVisible =
-    player.shouldUseNativeVisualSurface || (isImagePreviewRequested && player.isLoading);
+  const shouldKeepNativeVisualVisible = player.shouldUseNativeVisualSurface;
   const loadingPageLabel = resolveOverlayPrimaryLabel(
     player.previewName || "",
     player.requestedIndex,

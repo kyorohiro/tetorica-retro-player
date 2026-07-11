@@ -14,6 +14,7 @@ import { usePreviewSourceState } from "../retro-player/hooks/usePreviewSourceSta
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
 import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
 import type { RetroPlayerLocale } from "../retro-player/types";
+import { isHeic, isImage } from "../mdrop-web/utils";
 
 const RetroPlayer = React.lazy(() => import("../retro-player/components/RetroPlayer"));
 
@@ -341,6 +342,22 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         return prev;
       });
     }, [previewItem]);
+
+    // Prefetch adjacent images into browser cache so createImageMediaSource finds them ready
+    useEffect(() => {
+      if (playlistLength <= 1) return;
+      const timer = window.setTimeout(() => {
+        const list = playlistRef.current;
+        for (const delta of [-1, 1]) {
+          const item = list[playlistIndex + delta];
+          if (!item || item.kind !== "path") continue;
+          if (!isImage(item.path) && !isHeic(item.path)) continue;
+          const img = new window.Image();
+          img.src = item.url;
+        }
+      }, 150);
+      return () => window.clearTimeout(timer);
+    }, [playlistIndex, playlistLength]);
 
     const jumpToPlaylistIndex = useCallback((targetIndex: number) => {
       const list = playlistRef.current;
