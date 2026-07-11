@@ -119,6 +119,7 @@ function PreviewDialog({
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
+    const [neighborImageUrls, setNeighborImageUrls] = React.useState<string[]>([]);
     const [pageTurnDirection, setPageTurnDirection] = React.useState<"next" | "prev" | null>(null);
     const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
@@ -244,6 +245,52 @@ function PreviewDialog({
             );
         }
     }, [apiServer, files, getObjectUrl, index, isRetro, previewCache]);
+
+    React.useEffect(() => {
+        let alive = true;
+
+        if (!file || isRetro || !(isImage(file.path) || isHeic(file.path))) {
+            setNeighborImageUrls([]);
+            return () => {
+                alive = false;
+            };
+        }
+
+        const candidate = files[index + 1];
+        if (!candidate || !(isImage(candidate.path) || isHeic(candidate.path))) {
+            setNeighborImageUrls([]);
+            return () => {
+                alive = false;
+            };
+        }
+
+        const loadNeighbor = async () => {
+            const key = getPreviewDialogCacheKey(candidate);
+            const url = await previewCache.getOrStart(
+                key,
+                async () =>
+                    getObjectUrl
+                        ? await getObjectUrl(candidate)
+                        : downloadUrl(apiServer, candidate),
+                30,
+            );
+            if (!alive) {
+                return;
+            }
+            setNeighborImageUrls([url]);
+        };
+
+        loadNeighbor().catch(() => {
+            if (!alive) {
+                return;
+            }
+            setNeighborImageUrls([]);
+        });
+
+        return () => {
+            alive = false;
+        };
+    }, [apiServer, file, files, getObjectUrl, index, isRetro, previewCache]);
 
     const touchRef = React.useRef<{
         startX: number;
@@ -386,6 +433,22 @@ function PreviewDialog({
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
+                {neighborImageUrls.length > 0 && (
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+                    >
+                        {neighborImageUrls.map((url) => (
+                            <img
+                                key={url}
+                                src={url}
+                                alt=""
+                                decoding="async"
+                                loading="eager"
+                            />
+                        ))}
+                    </div>
+                )}
                 {showLoadingOverlay && (
                     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/42">
                         <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
