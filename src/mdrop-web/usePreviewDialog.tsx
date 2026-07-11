@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { useDialog } from "../useDialog";
+import { primeImageElementCache } from "../retro-player/media/RetroMediaSource";
 import {
     areRetroPreviewLayoutStatesEqual,
     normalizeRetroPreviewLayoutState,
@@ -14,6 +15,7 @@ import {
     shouldWarmPreviewDialogFile,
 } from "./preview/previewDialogCache";
 import { preivewGlobalSetting } from "./preview/preivewSetting";
+import { isHeic, isImage } from "./utils";
 
 const RETRO_PREVIEW_DIALOG_EVENT = "tetorica-retro-preview-dialog-active";
 
@@ -164,21 +166,25 @@ function PreviewDialog({
     );
 
     React.useEffect(() => {
-        for (let candidateIndex = 0; candidateIndex < files.length; candidateIndex += 1) {
-            const candidate = files[candidateIndex];
-            if (!candidate || !shouldWarmPreviewDialogFile(candidate)) {
+        const candidates = [files[index + 1], files[index - 1]].filter(
+            (candidate): candidate is TargetFile => Boolean(candidate)
+        );
+        for (const candidate of candidates) {
+            if (!shouldWarmPreviewDialogFile(candidate)) {
                 continue;
             }
-            const distance = Math.abs(candidateIndex - index);
-            const priority = candidateIndex === index
-                ? 200
-                : Math.max(1, 100 - distance);
+            const priority = candidate === files[index + 1] ? 20 : 10;
             previewCache.schedule(
                 getPreviewDialogCacheKey(candidate),
-                async () =>
-                    getObjectUrl
+                async () => {
+                    const url = getObjectUrl
                         ? await getObjectUrl(candidate)
-                        : downloadUrl(apiServer, candidate),
+                        : downloadUrl(apiServer, candidate);
+                    if (isImage(candidate.path) || isHeic(candidate.path)) {
+                        await primeImageElementCache(url);
+                    }
+                    return url;
+                },
                 priority,
             );
         }

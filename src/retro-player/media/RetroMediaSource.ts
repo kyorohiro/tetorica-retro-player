@@ -46,6 +46,10 @@ export type CreateAudioSourceOptions = { url: string } | { stream: MediaStream }
 export type CreateImageSourceOptions = { url: string };
 
 type DebugEventCallback = (label: string, payload: Record<string, unknown>) => void;
+type CachedImageEntry = {
+  image: HTMLImageElement;
+  lastAccessedAt: number;
+};
 
 // .m3u8 sources always go through hls.js rather than native <video src>
 // playback. The native engine was found to under-prioritize manifest
@@ -59,6 +63,34 @@ const hlsInstances = new WeakMap<HTMLMediaElement, Hls>();
 const hlsSourceUrls = new WeakMap<HTMLMediaElement, string>();
 const HLS_STARTUP_MIN_BUFFER_SECONDS = 12;
 const HLS_STARTUP_READY_TIMEOUT_MS = 60000;
+const IMAGE_ELEMENT_CACHE_LIMIT = 6;
+const cachedImages = new Map<string, CachedImageEntry>();
+const pendingImageElements = new Map<string, Promise<HTMLImageElement>>();
+
+const touchCachedImage = (url: string, image: HTMLImageElement) => {
+  cachedImages.delete(url);
+  cachedImages.set(url, {
+    image,
+    lastAccessedAt: Date.now(),
+  });
+  while (cachedImages.size > IMAGE_ELEMENT_CACHE_LIMIT) {
+    const oldest = [...cachedImages.entries()]
+      .sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt)[0];
+    if (!oldest) {
+      break;
+    }
+    cachedImages.delete(oldest[0]);
+  }
+};
+
+export const getCachedImageElement = (url: string): HTMLImageElement | null => {
+  const cached = cachedImages.get(url);
+  if (!cached) {
+    return null;
+  }
+  touchCachedImage(url, cached.image);
+  return cached.image;
+};
 
 const getBufferedEnd = (media: HTMLMediaElement): number => {
   const ranges = media.buffered;
@@ -450,6 +482,35 @@ export function waitForImageReady(image: HTMLImageElement): Promise<void> {
   });
 }
 
+export async function primeImageElementCache(url: string): Promise<void> {
+  if (!url || getCachedImageElement(url) || pendingImageElements.has(url)) {
+    return;
+  }
+
+  const loadPromise = (async () => {
+    const image = new Image();
+    image.src = url;
+    image.crossOrigin = "anonymous";
+    await waitForImageReady(image);
+    if (typeof image.decode === "function") {
+      try {
+        await image.decode();
+      } catch {
+        // Some browsers reject decode() for already-usable images.
+      }
+    }
+    touchCachedImage(url, image);
+    return image;
+  })();
+
+  pendingImageElements.set(url, loadPromise);
+  try {
+    await loadPromise;
+  } finally {
+    pendingImageElements.delete(url);
+  }
+}
+
 export async function createVideoMediaSource(
   options: CreateVideoSourceOptions,
   callbacks?: {
@@ -542,22 +603,28 @@ export async function createImageMediaSource(
   console.log("[retro-player image]", "createImageMediaSource:start", {
     url: options.url,
   });
-  const image = new Image();
-  image.src = options.url;
-  // Both existing call sites (previewFile, previewUrl) set this immediately
-  // after src, in this order — kept as-is rather than reordered.
-  image.crossOrigin = "anonymous";
+  const cached = getCachedImageElement(options.url);
+  const image = cached ?? new Image();
+  if (!cached) {
+    image.src = options.url;
+    // Both existing call sites (previewFile, previewUrl) set this immediately
+    // after src, in this order — kept as-is rather than reordered.
+    image.crossOrigin = "anonymous";
+  }
   console.log("[retro-player image]", "createImageMediaSource:created", {
     url: options.url,
     elapsedMs: elapsedMs(),
+    cached: Boolean(cached),
   });
   callbacks?.onCreated?.(image);
   await waitForImageReady(image);
+  touchCachedImage(options.url, image);
   console.log("[retro-player image]", "createImageMediaSource:ready", {
     url: options.url,
     elapsedMs: elapsedMs(),
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
+    cached: Boolean(cached),
   });
   return { kind: "image", origin: "url", element: image };
 }
