@@ -218,14 +218,16 @@ export function useRetroAudioEngine({
     if (!audioEngineRef.current) {
       const context = new AudioContext({ latencyHint: latencyHintRef.current });
       audioContextOwnedRef.current = context;
-      audioEngineRef.current = createRetroAudioEngine({
+      const engine = createRetroAudioEngine({
         context,
         instanceLabel,
         params: initialAudioSettings,
         isPlaying: isPlayingRef.current,
-        connectOutputToDestination: true,
+        connectOutputToDestination: false,
         connectOutputToRecordingDestination: true,
       });
+      engine.setDestinationOutputEnabled(!nativePlaybackMode);
+      audioEngineRef.current = engine;
     }
     return audioEngineRef.current;
   };
@@ -439,7 +441,7 @@ export function useRetroAudioEngine({
       instanceLabel,
       params: nextSettings,
       isPlaying: isPlayingRef.current,
-      connectOutputToDestination: true,
+      connectOutputToDestination: false,
       connectOutputToRecordingDestination: true,
     });
 

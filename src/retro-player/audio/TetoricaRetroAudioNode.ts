@@ -1287,8 +1287,9 @@ export class TetoricaRetroAudioNode {
       return;
     }
 
-    // connectOutputToDestination: true のとき context.destination には既に接続済みなので二重接続しない
-    if (this.connectOutputToDestination && destinationNode === context.destination) {
+    // Avoid double-connecting the speaker output when destination routing is
+    // already managed explicitly via setDestinationOutputEnabled().
+    if (destinationNode === context.destination && this._destinationConnected) {
       this.debugAudio("connect:skipped-double-destination");
       return;
     }
