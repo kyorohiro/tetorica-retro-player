@@ -311,6 +311,7 @@ export function usePixiVideoPlayer(
     isPlaying,
     isPlayingRef,
     nativePlaybackMode: isNativeModePreferred,
+    playbackSource: options?.playbackSource ?? "media",
   });
 
   const {
