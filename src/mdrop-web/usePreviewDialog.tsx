@@ -115,10 +115,13 @@ function PreviewDialog({
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [neighborImageUrls, setNeighborImageUrls] = React.useState<string[]>([]);
+    const [showPageIndicator, setShowPageIndicator] = React.useState(false);
+    const [indicatorPageNumber, setIndicatorPageNumber] = React.useState<number | null>(null);
     const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
         undefined,
     );
+    const pageIndicatorTimerRef = React.useRef<number | null>(null);
     const previewCacheRef = React.useRef<PreviewDialogCache | null>(null);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
@@ -151,16 +154,30 @@ function PreviewDialog({
         previewCache.releaseObjectUrl(url);
     }, [previewCache]);
 
+    const clearPageIndicator = React.useCallback(() => {
+        if (pageIndicatorTimerRef.current !== null) {
+            window.clearTimeout(pageIndicatorTimerRef.current);
+            pageIndicatorTimerRef.current = null;
+        }
+        setShowPageIndicator(false);
+    }, []);
+
     const move = React.useCallback(
         (delta: number) => {
             const nextIndex = Math.max(0, Math.min(index + delta, files.length - 1));
             if (nextIndex === index) {
                 return;
             }
+            clearPageIndicator();
+            setIndicatorPageNumber(nextIndex + 1);
+            pageIndicatorTimerRef.current = window.setTimeout(() => {
+                setShowPageIndicator(true);
+                pageIndicatorTimerRef.current = null;
+            }, 180);
             setRequestSequence((current) => current + 1);
             setIndex(nextIndex);
         },
-        [files.length, index]
+        [clearPageIndicator, files.length, index]
     );
 
     React.useEffect(() => {
@@ -309,9 +326,14 @@ function PreviewDialog({
 
     React.useEffect(() => {
         return () => {
+            clearPageIndicator();
             previewCache.dispose();
         };
-    }, [previewCache]);
+    }, [clearPageIndicator, previewCache]);
+
+    const handleDisplayReady = React.useCallback(() => {
+        clearPageIndicator();
+    }, [clearPageIndicator]);
 
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -377,6 +399,13 @@ function PreviewDialog({
                         ))}
                     </div>
                 )}
+                {showPageIndicator && indicatorPageNumber !== null && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                        <div className="rounded-full border border-slate-700/90 bg-slate-950/92 px-4 py-2 text-sm text-slate-100 shadow-lg">
+                            {indicatorPageNumber} / {files.length}
+                        </div>
+                    </div>
+                )}
                 <PreviewPage
                     file={file}
                     requestSequence={requestSequence}
@@ -387,6 +416,7 @@ function PreviewDialog({
                     getObjectUrl={resolveObjectUrl}
                     releaseObjectUrl={releaseObjectUrl}
                     onLoadingMessage={setLoadingMessage}
+                    onDisplayReady={handleDisplayReady}
                     coverSrc={coverSrc}
                     previewLayoutState={previewLayoutState}
                     onPreviewLayoutStateChange={handlePreviewLayoutStateChange}
