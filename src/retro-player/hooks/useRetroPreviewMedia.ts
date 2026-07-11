@@ -1454,7 +1454,11 @@ export function useRetroPreviewMedia({
     }
   };
 
-  const previewUrl = async (url: string, kind: "video" | "image" | "audio" = "video") => {
+  const previewUrl = async (
+    url: string,
+    kind: "video" | "image" | "audio" = "video",
+    displayName?: string,
+  ) => {
     let requestId = 0;
     const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     const elapsedMs = () =>
@@ -1492,7 +1496,7 @@ export function useRetroPreviewMedia({
       }
 
       _setPreviewError("");
-      setPreviewName(url);
+      setPreviewName(displayName || url);
       beginLoading(
         kind === "video"
           ? "Loading video preview..."

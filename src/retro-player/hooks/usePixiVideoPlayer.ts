@@ -63,6 +63,8 @@ export type RetroPlaybackEvent = {
   source: "builtin-tone" | "media";
 };
 
+export type RetroPageTurnDirection = "next" | "prev" | null;
+
 export type RetroPreviewStatus =
   | {
       kind: "loading" | "buffering" | "retryable" | "unsupported";
@@ -85,6 +87,8 @@ export function usePixiVideoPlayer(
     playbackSource?: "builtin-tone" | "media";
     preferNativeVideoSurface?: boolean;
     locale?: RetroPlayerLocale;
+    requestedKind?: "video" | "audio" | "image";
+    requestedIndex?: number | null;
   },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
@@ -111,6 +115,8 @@ export function usePixiVideoPlayer(
   const onPlaybackChangeRef = useRef<((event: RetroPlaybackEvent) => void) | undefined>(options?.onPlaybackChange);
   const onPrevTrackRef = useRef<(() => void) | undefined>(options?.onPrevTrack);
   const onNextTrackRef = useRef<(() => void) | undefined>(options?.onNextTrack);
+  const requestedKindRef = useRef<"video" | "audio" | "image">(options?.requestedKind ?? "video");
+  const requestedIndexRef = useRef<number | null>(options?.requestedIndex ?? null);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -137,6 +143,9 @@ export function usePixiVideoPlayer(
   const isRecordingRef = useRef(false);
   const [pendingRecordingFilename, setPendingRecordingFilename] = useState<string | null>(null);
   const [isVideoFxEnabled, setIsVideoFxEnabled] = useState(true);
+  const [pageTurnDirection, setPageTurnDirection] = useState<RetroPageTurnDirection>(null);
+  const [pageTurnToken, setPageTurnToken] = useState(0);
+  const pageTurnResetTimerRef = useRef<number | null>(null);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -649,6 +658,22 @@ export function usePixiVideoPlayer(
   useEffect(() => {
     onNextTrackRef.current = options?.onNextTrack;
   }, [options?.onNextTrack]);
+
+  useEffect(() => {
+    requestedKindRef.current = options?.requestedKind ?? "video";
+  }, [options?.requestedKind]);
+
+  useEffect(() => {
+    requestedIndexRef.current = options?.requestedIndex ?? null;
+  }, [options?.requestedIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (pageTurnResetTimerRef.current !== null) {
+        window.clearTimeout(pageTurnResetTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     onPlaybackChangeRef.current?.({
@@ -1172,6 +1197,8 @@ export function usePixiVideoPlayer(
 
   useEffect(() => {
     const visualShaderPending =
+      !shouldUseNativeVisualSurface &&
+      effectiveFilterState.isFilterEnabled &&
       (previewKind === "video" || previewKind === "capture" || previewKind === "image") &&
       !isFilterReady;
 
@@ -1192,7 +1219,15 @@ export function usePixiVideoPlayer(
     if (isPlaying) {
       finishLoading();
     }
-  }, [previewError, needsUserPlay, previewKind, isPlaying, isFilterReady]);
+  }, [
+    effectiveFilterState.isFilterEnabled,
+    isFilterReady,
+    isPlaying,
+    needsUserPlay,
+    previewError,
+    previewKind,
+    shouldUseNativeVisualSurface,
+  ]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -1237,14 +1272,31 @@ export function usePixiVideoPlayer(
 
       if (isTypingTarget) return;
 
-      if (event.code === "ArrowLeft" && previewKindRef.current === "image" && onPrevTrackRef.current) {
+      const isImageNavigationActive =
+        previewKindRef.current === "image" ||
+        requestedKindRef.current === "image";
+      const triggerPageTurnMotion = (direction: Exclude<RetroPageTurnDirection, null>) => {
+        setPageTurnDirection(direction);
+        setPageTurnToken((current) => current + 1);
+        if (pageTurnResetTimerRef.current !== null) {
+          window.clearTimeout(pageTurnResetTimerRef.current);
+        }
+        pageTurnResetTimerRef.current = window.setTimeout(() => {
+          setPageTurnDirection(null);
+          pageTurnResetTimerRef.current = null;
+        }, 220);
+      };
+
+      if (event.code === "ArrowLeft" && isImageNavigationActive && onPrevTrackRef.current) {
         event.preventDefault();
+        triggerPageTurnMotion("prev");
         onPrevTrackRef.current();
         return;
       }
 
-      if (event.code === "ArrowRight" && previewKindRef.current === "image" && onNextTrackRef.current) {
+      if (event.code === "ArrowRight" && isImageNavigationActive && onNextTrackRef.current) {
         event.preventDefault();
+        triggerPageTurnMotion("next");
         onNextTrackRef.current();
         return;
       }
@@ -1354,7 +1406,11 @@ export function usePixiVideoPlayer(
     hasAudibleMedia,
     hasVideo: previewKind === "video" || previewKind === "capture",
     hasAudioOnly: previewKind === "audio",
-    hasImage: previewKind === "image",
+    hasImage: previewKind === "image" || options?.requestedKind === "image",
+    requestedKind: options?.requestedKind ?? "video",
+    requestedIndex: options?.requestedIndex ?? null,
+    pageTurnDirection,
+    pageTurnToken,
     previewStatus,
     isRecording,
     pendingRecordingFilename,

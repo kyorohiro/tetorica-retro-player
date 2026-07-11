@@ -7,7 +7,7 @@ import {
   type RetroAudioAmountSetters,
   type RetroAudioSettings,
 } from "../audio/preset";
-import type { RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
+import type { RetroPageTurnDirection, RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
 import type { RetroPresetKey } from "../retro/config";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import {
@@ -43,12 +43,31 @@ function DigitalClockOverlay() {
   );
 }
 
+const inferPageLabel = (name: string) => {
+  const normalized = name.split(/[\\/]/).pop() ?? name;
+  return normalized.replace(/\.[^.]+$/, "") || normalized;
+};
+
+const resolveOverlayPrimaryLabel = (name: string, fallbackIndex?: number | null) => {
+  const label = inferPageLabel(name).trim();
+  if (label) {
+    return label;
+  }
+  if (typeof fallbackIndex === "number" && Number.isFinite(fallbackIndex)) {
+    return String(fallbackIndex);
+  }
+  return "";
+};
+
 // Subset of the player object that RetroPreviewView needs.
 // Add new player capabilities here, not in RetroPlayer.
 export type RetroPreviewPlayerSlice = {
   canvasHostRef: React.RefObject<HTMLDivElement | null>;
   nativeVisualElement: HTMLVideoElement | HTMLImageElement | null;
   shouldUseNativeVisualSurface: boolean;
+  previewName: string;
+  requestedKind: "video" | "audio" | "image";
+  requestedIndex: number | null;
   isPoweredOn: boolean;
   isLoading: boolean;
   isBuffering: boolean;
@@ -64,6 +83,9 @@ export type RetroPreviewPlayerSlice = {
   latencyHint: AudioContextLatencyCategory;
   hasPlayableMedia: boolean;
   hasAudibleMedia: boolean;
+  hasImage: boolean;
+  pageTurnDirection: RetroPageTurnDirection;
+  pageTurnToken: number;
   canRecord: boolean;
   isRecording: boolean;
   prefersShareExport: boolean;
@@ -558,24 +580,121 @@ export function RetroPreviewView({
 
   const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
   const [isCanvasVisible, setIsCanvasVisible] = React.useState(false);
+  const [turnOverlayDirection, setTurnOverlayDirection] = React.useState<RetroPageTurnDirection>(null);
   const hasShownOnceRef = React.useRef(false);
+  const turnOverlayTimerRef = React.useRef<number | null>(null);
+  const loadingOverlayTimerRef = React.useRef<number | null>(null);
+  const loadingOverlayHoldTimerRef = React.useRef<number | null>(null);
+  const requestedImagePageTurnTokenRef = React.useRef(player.pageTurnToken);
+  const displayedImagePageTurnTokenRef = React.useRef(player.pageTurnToken);
+  const delayedImageOverlayPendingRef = React.useRef(false);
+  const isImagePreviewRequested = player.requestedKind === "image" || player.hasImage;
+  const shouldKeepNativeVisualVisible =
+    player.shouldUseNativeVisualSurface || (isImagePreviewRequested && player.isLoading);
+  const loadingPageLabel = resolveOverlayPrimaryLabel(
+    player.previewName || "",
+    player.requestedIndex,
+  );
+  const shouldShowImagePageOverlay =
+    isImagePreviewRequested &&
+    !player.needsUserPlay &&
+    !player.previewError &&
+    showLoadingOverlay;
 
   React.useEffect(() => {
-    if (!player.isLoading) {
+    if (!isImagePreviewRequested) {
+      requestedImagePageTurnTokenRef.current = player.pageTurnToken;
+      displayedImagePageTurnTokenRef.current = player.pageTurnToken;
+      delayedImageOverlayPendingRef.current = false;
+      if (!player.isLoading) {
+        setShowLoadingOverlay(false);
+        return;
+      }
       setShowLoadingOverlay(false);
-      return;
+      const timer = window.setTimeout(() => setShowLoadingOverlay(true), 350);
+      return () => window.clearTimeout(timer);
     }
-    const timer = window.setTimeout(() => setShowLoadingOverlay(true), 350);
-    return () => window.clearTimeout(timer);
-  }, [player.isLoading]);
+
+    const previousRequestedToken = requestedImagePageTurnTokenRef.current;
+    const hasNewPageTurnRequest = previousRequestedToken !== player.pageTurnToken;
+    const hasPendingUndisplayedPage =
+      displayedImagePageTurnTokenRef.current < previousRequestedToken;
+    const shouldShowOverlayImmediately =
+      hasNewPageTurnRequest && (hasPendingUndisplayedPage || delayedImageOverlayPendingRef.current);
+    requestedImagePageTurnTokenRef.current = player.pageTurnToken;
+
+    if (loadingOverlayTimerRef.current !== null) {
+      window.clearTimeout(loadingOverlayTimerRef.current);
+      loadingOverlayTimerRef.current = null;
+    }
+    if (loadingOverlayHoldTimerRef.current !== null) {
+      window.clearTimeout(loadingOverlayHoldTimerRef.current);
+      loadingOverlayHoldTimerRef.current = null;
+    }
+
+    if (player.isLoading) {
+      const showAndHoldOverlay = () => {
+        delayedImageOverlayPendingRef.current = false;
+        setShowLoadingOverlay(true);
+        loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
+          setShowLoadingOverlay(false);
+          loadingOverlayHoldTimerRef.current = null;
+        }, 220);
+      };
+
+      if (shouldShowOverlayImmediately) {
+        showAndHoldOverlay();
+      } else {
+        delayedImageOverlayPendingRef.current = true;
+        setShowLoadingOverlay(false);
+        loadingOverlayTimerRef.current = window.setTimeout(() => {
+          loadingOverlayTimerRef.current = null;
+          showAndHoldOverlay();
+        }, 300);
+      }
+      return () => {
+        if (loadingOverlayTimerRef.current !== null) {
+          window.clearTimeout(loadingOverlayTimerRef.current);
+          loadingOverlayTimerRef.current = null;
+        }
+        if (loadingOverlayHoldTimerRef.current !== null) {
+          window.clearTimeout(loadingOverlayHoldTimerRef.current);
+          loadingOverlayHoldTimerRef.current = null;
+        }
+      };
+    }
+
+    displayedImagePageTurnTokenRef.current = player.pageTurnToken;
+    requestedImagePageTurnTokenRef.current = player.pageTurnToken;
+    delayedImageOverlayPendingRef.current = false;
+    setShowLoadingOverlay(false);
+  }, [
+    isImagePreviewRequested,
+    player.isLoading,
+    player.pageTurnToken,
+  ]);
 
   React.useEffect(() => {
-    if (player.isRendererReady && !player.isLoading) {
+    if (player.isRendererReady) {
       setIsCanvasVisible(true);
     } else {
       setIsCanvasVisible(false);
     }
-  }, [player.isRendererReady, player.isLoading]);
+  }, [player.isRendererReady]);
+
+  React.useEffect(() => {
+    if (!player.pageTurnDirection) {
+      return;
+    }
+    setTurnOverlayDirection(player.pageTurnDirection);
+    if (turnOverlayTimerRef.current !== null) {
+      window.clearTimeout(turnOverlayTimerRef.current);
+    }
+    turnOverlayTimerRef.current = window.setTimeout(() => {
+      setTurnOverlayDirection(null);
+      turnOverlayTimerRef.current = null;
+    }, 220);
+  }, [player.pageTurnDirection, player.pageTurnToken]);
 
   React.useEffect(() => {
     const host = nativeVideoHostRef.current;
@@ -599,17 +718,27 @@ export function RetroPreviewView({
       host.replaceChildren(visual);
     }
 
-    return () => {
-      if (visual.parentElement === host) {
-        host.replaceChildren();
-      }
-    };
   }, [
     player.nativeVisualElement,
     player.shouldUseNativeVisualSurface,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
   ]);
+
+  React.useEffect(() => {
+    return () => {
+      if (turnOverlayTimerRef.current !== null) {
+        window.clearTimeout(turnOverlayTimerRef.current);
+      }
+      if (loadingOverlayTimerRef.current !== null) {
+        window.clearTimeout(loadingOverlayTimerRef.current);
+      }
+      if (loadingOverlayHoldTimerRef.current !== null) {
+        window.clearTimeout(loadingOverlayHoldTimerRef.current);
+      }
+      nativeVideoHostRef.current?.replaceChildren();
+    };
+  }, []);
 
   // 一度表示されたら次回以降は短いフェードにする
   React.useEffect(() => {
@@ -869,7 +998,7 @@ export function RetroPreviewView({
             onPointerMove={handlePreviewPointerMove}
             onPointerUp={handlePreviewPointerEnd}
             onPointerCancel={handlePreviewPointerEnd}
-          >
+            >
             <div
               ref={player.canvasHostRef}
               className="pointer-events-none relative h-full w-full touch-manipulation"
@@ -883,10 +1012,14 @@ export function RetroPreviewView({
                 transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease`,
               }}
             />
-            {player.shouldUseNativeVisualSurface && (
+            {shouldKeepNativeVisualVisible && (
               <div
                 ref={nativeVideoHostRef}
                 className="absolute inset-0 overflow-hidden rounded-xl bg-black"
+                style={{
+                  opacity: shouldKeepNativeVisualVisible ? 1 : 0,
+                  transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease`,
+                }}
               />
             )}
             {!player.isPoweredOn && (
@@ -899,7 +1032,31 @@ export function RetroPreviewView({
                 </div>
               </div>
             )}
-            {showLoadingOverlay && !player.needsUserPlay && !player.previewError && (
+            {shouldShowImagePageOverlay && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/46">
+                <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
+                  <p className="break-words text-[min(3.4vw,0.95rem)] font-medium leading-snug text-slate-200">
+                    {loadingPageLabel}
+                  </p>
+                  <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-800/90">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-400/40 via-sky-100 to-sky-400/40"
+                      style={{
+                        width: "42%",
+                        transform:
+                          turnOverlayDirection === "next"
+                            ? "translateX(130%)"
+                            : turnOverlayDirection === "prev"
+                              ? "translateX(-30%)"
+                              : "translateX(40%)",
+                        transition: "transform 0.22s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            {showLoadingOverlay && !player.needsUserPlay && !player.previewError && !isImagePreviewRequested && (
               <div
                 className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72"
               >

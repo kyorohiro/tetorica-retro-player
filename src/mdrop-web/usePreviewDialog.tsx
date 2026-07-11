@@ -77,12 +77,24 @@ function PreviewDialog({
     download,
     onClose,
 }: PreviewDialogOptions & { onClose?: () => void }) {
-    console.log(">> coverSrc", !!coverSrc);
+    const inferPageLabel = React.useCallback((path: string) => {
+        const basename = path.split(/[\\/]/).pop() ?? path;
+        return basename.replace(/\.[^.]+$/, "") || basename;
+    }, []);
     const [index, setIndex] = React.useState(initialIndex);
     const [loadingMessage, setLoadingMessage] = useState("");
+    const [showLoadingOverlay, setShowLoadingOverlay] = React.useState(false);
+    const [pageTurnDirection, setPageTurnDirection] = React.useState<"next" | "prev" | null>(null);
+    const [requestSequence, setRequestSequence] = React.useState(1);
     const [previewLayoutState, setPreviewLayoutState] = React.useState<RetroPreviewLayoutState | undefined>(
         undefined,
     );
+    const pageTurnResetTimerRef = React.useRef<number | null>(null);
+    const loadingOverlayTimerRef = React.useRef<number | null>(null);
+    const loadingOverlayHoldTimerRef = React.useRef<number | null>(null);
+    const displayedRequestSequenceRef = React.useRef(0);
+    const immediateOverlayRequestSequenceRef = React.useRef<number | null>(null);
+    const delayedOverlayPendingRef = React.useRef(false);
     const handlePreviewLayoutStateChange = React.useCallback((state: RetroPreviewLayoutState) => {
         const normalized = normalizeRetroPreviewLayoutState(state);
         setPreviewLayoutState((current) =>
@@ -94,11 +106,30 @@ function PreviewDialog({
 
     const move = React.useCallback(
         (delta: number) => {
-            setIndex((current) =>
-                Math.max(0, Math.min(current + delta, files.length - 1))
-            );
+            const nextDirection = delta > 0 ? "next" : "prev";
+            const nextIndex = Math.max(0, Math.min(index + delta, files.length - 1));
+            if (nextIndex === index) {
+                return;
+            }
+            const nextRequestSequence = requestSequence + 1;
+            const hasPendingUndisplayedPage =
+                displayedRequestSequenceRef.current < requestSequence;
+            immediateOverlayRequestSequenceRef.current = hasPendingUndisplayedPage
+                || delayedOverlayPendingRef.current
+                ? nextRequestSequence
+                : null;
+            setPageTurnDirection(nextDirection);
+            if (pageTurnResetTimerRef.current !== null) {
+                window.clearTimeout(pageTurnResetTimerRef.current);
+            }
+            pageTurnResetTimerRef.current = window.setTimeout(() => {
+                setPageTurnDirection(null);
+                pageTurnResetTimerRef.current = null;
+            }, 220);
+            setRequestSequence(nextRequestSequence);
+            setIndex(nextIndex);
         },
-        [files.length]
+        [files.length, index, requestSequence]
     );
 
     const touchRef = React.useRef<{
@@ -172,6 +203,72 @@ function PreviewDialog({
     }, []);
 
     React.useEffect(() => {
+        if (loadingOverlayTimerRef.current !== null) {
+            window.clearTimeout(loadingOverlayTimerRef.current);
+            loadingOverlayTimerRef.current = null;
+        }
+        if (loadingOverlayHoldTimerRef.current !== null) {
+            window.clearTimeout(loadingOverlayHoldTimerRef.current);
+            loadingOverlayHoldTimerRef.current = null;
+        }
+
+        if (!loadingMessage) {
+            delayedOverlayPendingRef.current = false;
+            setShowLoadingOverlay(false);
+            return;
+        }
+
+        const showAndHoldOverlay = () => {
+            delayedOverlayPendingRef.current = false;
+            setShowLoadingOverlay(true);
+            loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
+                setShowLoadingOverlay(false);
+                loadingOverlayHoldTimerRef.current = null;
+            }, 220);
+        };
+
+        if (immediateOverlayRequestSequenceRef.current === requestSequence) {
+            showAndHoldOverlay();
+        } else {
+            delayedOverlayPendingRef.current = true;
+            setShowLoadingOverlay(false);
+            loadingOverlayTimerRef.current = window.setTimeout(() => {
+                setShowLoadingOverlay(true);
+                delayedOverlayPendingRef.current = false;
+                loadingOverlayTimerRef.current = null;
+                loadingOverlayHoldTimerRef.current = window.setTimeout(() => {
+                    setShowLoadingOverlay(false);
+                    loadingOverlayHoldTimerRef.current = null;
+                }, 220);
+            }, 300);
+        }
+    }, [loadingMessage, requestSequence]);
+
+    const handleDisplayReady = React.useCallback((displayedSequence: number) => {
+        if (displayedSequence < requestSequence) {
+            return;
+        }
+        displayedRequestSequenceRef.current = displayedSequence;
+        immediateOverlayRequestSequenceRef.current = null;
+        delayedOverlayPendingRef.current = false;
+        setShowLoadingOverlay(false);
+    }, [requestSequence]);
+
+    React.useEffect(() => {
+        return () => {
+            if (pageTurnResetTimerRef.current !== null) {
+                window.clearTimeout(pageTurnResetTimerRef.current);
+            }
+            if (loadingOverlayTimerRef.current !== null) {
+                window.clearTimeout(loadingOverlayTimerRef.current);
+            }
+            if (loadingOverlayHoldTimerRef.current !== null) {
+                window.clearTimeout(loadingOverlayHoldTimerRef.current);
+            }
+        };
+    }, []);
+
+    React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
                 onClose?.();
@@ -211,7 +308,7 @@ function PreviewDialog({
 
             <div
                 className={[
-                    "min-h-0 flex-1 touch-manipulation bg-black",
+                    "relative min-h-0 flex-1 touch-manipulation bg-black",
                     isRetro
                         ? "overflow-y-auto p-4"
                         : "flex items-center justify-center",
@@ -219,14 +316,40 @@ function PreviewDialog({
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
+                {showLoadingOverlay && loadingMessage && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/42">
+                        <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
+                            <p className="break-words text-[min(3.4vw,0.95rem)] font-medium leading-snug text-slate-200">
+                                {inferPageLabel(file.path)}
+                            </p>
+                            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-800/90">
+                                <div
+                                    className="h-full rounded-full bg-gradient-to-r from-sky-400/40 via-sky-100 to-sky-400/40"
+                                    style={{
+                                        width: "42%",
+                                        transform:
+                                            pageTurnDirection === "next"
+                                                ? "translateX(130%)"
+                                                : pageTurnDirection === "prev"
+                                                    ? "translateX(-30%)"
+                                                    : "translateX(40%)",
+                                        transition: "transform 0.22s ease",
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <PreviewPage
                     file={file}
+                    requestSequence={requestSequence}
                     isRetro={isRetro}
                     useHls={useHls}
                     forcedKind={forcedKind}
                     apiServer={apiServer}
                     getObjectUrl={getObjectUrl}
                     onLoadingMessage={setLoadingMessage}
+                    onDisplayReady={handleDisplayReady}
                     coverSrc={coverSrc}
                     previewLayoutState={previewLayoutState}
                     onPreviewLayoutStateChange={handlePreviewLayoutStateChange}

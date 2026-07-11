@@ -497,12 +497,17 @@ export async function createAudioMediaSource(
 
 export async function createImageMediaSource(
   options: CreateImageSourceOptions,
+  callbacks?: {
+    /** Called synchronously right after the Image object is created/configured. */
+    onCreated?: (image: HTMLImageElement) => void;
+  },
 ): Promise<RetroMediaSource> {
   const image = new Image();
   image.src = options.url;
   // Both existing call sites (previewFile, previewUrl) set this immediately
   // after src, in this order — kept as-is rather than reordered.
   image.crossOrigin = "anonymous";
+  callbacks?.onCreated?.(image);
   await waitForImageReady(image);
   return { kind: "image", origin: "url", element: image };
 }
