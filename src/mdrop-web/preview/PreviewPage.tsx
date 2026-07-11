@@ -89,6 +89,7 @@ export function PreviewPage({
     const [text, setText] = React.useState("");
     const [error, setError] = React.useState("");
     const [epubLocation, setEpubLocation] = React.useState<string | number>(0);
+    const imageStartedAtRef = React.useRef<number | null>(null);
     const renditionRef = React.useRef<any>(null);
     const statusRef = React.useRef<PreviewPageStatus>("none");
 
@@ -206,22 +207,24 @@ export function PreviewPage({
                 setText("");
                 setStatus("loaded");
                 onLoadingMessage?.("");
-                debugPreview("load:display-ready", {
+                imageStartedAtRef.current =
+                    typeof performance !== "undefined" ? performance.now() : Date.now();
+                debugPreview("load:img-src-set", {
                     elapsedMs: elapsedMs(),
                     kind: "heic",
                 });
-                onDisplayReady?.(requestSequence);
                 return;
             }
 
             setSrc(nextSrc);
             setText("");
             setStatus("loaded");
-            debugPreview("load:display-ready", {
+            imageStartedAtRef.current =
+                typeof performance !== "undefined" ? performance.now() : Date.now();
+            debugPreview("load:img-src-set", {
                 elapsedMs: elapsedMs(),
                 kind: isImage(file.path) ? "image" : resolvedKind,
             });
-            onDisplayReady?.(requestSequence);
         };
 
         run().catch((err) => {
@@ -323,6 +326,24 @@ export function PreviewPage({
             <img
                 src={src}
                 alt={file.path}
+                onLoad={(event) => {
+                    const startedAt = imageStartedAtRef.current;
+                    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+                    const image = event.currentTarget;
+                    debugPreview("img:onload", {
+                        elapsedMs:
+                            startedAt === null
+                                ? null
+                                : Math.round((now - startedAt) * 10) / 10,
+                        complete: image.complete,
+                        naturalWidth: image.naturalWidth,
+                        naturalHeight: image.naturalHeight,
+                    });
+                    onDisplayReady?.(requestSequence);
+                }}
+                onError={() => {
+                    debugPreview("img:onerror");
+                }}
                 className="max-h-full max-w-full object-contain"
             />
         );
