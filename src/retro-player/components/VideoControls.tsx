@@ -1138,6 +1138,12 @@ export const VideoControls = memo(function VideoControls({
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
     >
+      <style>{`
+        @keyframes long-press-native-hint {
+          0%, 100% { opacity: 0.20; }
+          50% { opacity: 0.80; }
+        }
+      `}</style>
       <input
         ref={fileInputRef}
         type="file"
@@ -1442,6 +1448,12 @@ export const VideoControls = memo(function VideoControls({
                     : "border-rose-500/40 bg-rose-500/10 text-[#12141c] hover:bg-rose-500/20"
               }`}
             >
+              {isNativePlaybackMode && !isResetHolding && (
+                <span
+                  className="pointer-events-none absolute inset-0 rounded-lg bg-amber-400/20"
+                  style={{ animation: "long-press-native-hint 1.8s ease-in-out infinite" }}
+                />
+              )}
               {isResetHolding && (
                 <span
                   className="pointer-events-none absolute inset-0 origin-left bg-amber-400/20"
