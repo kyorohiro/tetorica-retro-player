@@ -253,21 +253,21 @@ export const VideoControls = memo(function VideoControls({
 
   const tooltipText =
     locale === "ja"
-      ? {
-          video: isVideoFxUnavailable
-            ? "Video: Native mode では使えません。低性能PCではこの方が快適なことがあります。Native ボタン長押しで Retro ON に戻せます。"
+          ? {
+              video: isVideoFxUnavailable
+            ? "Video: Native mode では使えません。低性能PCではこの方が快適なことがあります。"
             : isVideoFxEnabled
               ? "Video: エフェクトが有効です。長押しで ON/OFF、通常押しで設定を開きます。"
               : "Video: 映像エフェクトはオフです。通常押しで設定を開きます。",
           audio: isNativePlaybackMode
-            ? "Audio: Native mode では使えません。低性能PCではこの方が快適なことがあります。Native ボタン長押しで Retro ON に戻せます。"
+            ? "Audio: Native mode では使えません。Native ボタン長押しで Retro ON になります。"
             : isAudioFxUnavailable
               ? "Audio: HLS(ffmpeg) ストリーミング中は設定が効きません。"
               : isAudioFxEnabled
               ? "Audio: エフェクトが有効です。長押しで ON/OFF、通常押しで設定を開きます。"
               : "Audio: 音声エフェクトはオフです。通常押しで設定を開きます。",
           reset: isNativePlaybackMode
-            ? "Retro OFF: Native mode です。長押しで Retro に戻し、通常押しで設定を初期化します。"
+                ? "Retro OFF: Native mode です。長押しで Retro モード が解放されます。"
             : "Reset: 通常押しで設定を初期化します。長押しで Native mode に切り替えます。",
           save: showClockOverlay
             ? "Save: 設定を書き出します。長押しで時計表示を切り替えます。"
@@ -278,19 +278,19 @@ export const VideoControls = memo(function VideoControls({
         }
       : {
           video: isVideoFxUnavailable
-            ? "Video: unavailable in native mode. This is often faster on low-end PCs. Long press the Native button to turn Retro ON."
+            ? "Video: unavailable in native mode. This is often faster on low-end PCs."
             : isVideoFxEnabled
               ? "Video: effects are enabled. Long press toggles them, tap opens settings."
               : "Video: effects are off. Tap opens video settings.",
           audio: isNativePlaybackMode
-            ? "Audio: unavailable in native mode. This is often faster on low-end PCs. Long press the Native button to turn Retro ON."
+            ? "Audio: unavailable in native mode. Long press the Native button to turn Retro ON."
             : isAudioFxUnavailable
               ? "Audio: settings have no effect while streaming via HLS (ffmpeg)."
               : isAudioFxEnabled
               ? "Audio: effects are enabled. Long press toggles them, tap opens settings."
               : "Audio: effects are off. Tap opens audio settings.",
           reset: isNativePlaybackMode
-            ? "Retro OFF: native mode is active. Long press returns to Retro, tap resets settings."
+            ? "Retro OFF: native mode is active. Long press unlocks Retro mode."
             : "Reset: tap resets settings. Long press switches to native mode.",
           save: "Save: export the current settings. Long press toggles the clock overlay.",
           load: "Load: import settings. Long press toggles the spectrum overlay.",
