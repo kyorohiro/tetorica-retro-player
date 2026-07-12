@@ -111,7 +111,10 @@ const hasEnoughHlsStartupBuffer = (media: HTMLMediaElement): boolean => {
   return Math.max(duration, bufferedEnd) >= HLS_STARTUP_MIN_BUFFER_SECONDS;
 };
 
-export const isHlsUrl = (url: string): boolean => url.includes(".m3u8");
+export const isHlsUrl = (url: string): boolean =>
+  url.includes(".m3u8") ||
+  /\/hls-sub\/|\/audio-hls-sub\/|\/audio-hls\/.+\/index\.m3u8(?:$|\?)/.test(url) ||
+  /\/hls\/.+\/index\.m3u8(?:$|\?)/.test(url);
 
 export const getHlsInstance = (media: HTMLMediaElement): Hls | undefined =>
   hlsInstances.get(media);
