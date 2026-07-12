@@ -267,7 +267,7 @@ export const VideoControls = memo(function VideoControls({
               ? "Audio: エフェクトが有効です。長押しで ON/OFF、通常押しで設定を開きます。"
               : "Audio: 音声エフェクトはオフです。通常押しで設定を開きます。",
           reset: isNativePlaybackMode
-                ? "Retro OFF: Native mode です。長押しで Retro モード が解放されます。"
+                ? "Retro OFF: 長押しで Retro モード が解放されます。"
             : "Reset: 通常押しで設定を初期化します。長押しで Native mode に切り替えます。",
           save: showClockOverlay
             ? "Save: 設定を書き出します。長押しで時計表示を切り替えます。"
@@ -290,7 +290,7 @@ export const VideoControls = memo(function VideoControls({
               ? "Audio: effects are enabled. Long press toggles them, tap opens settings."
               : "Audio: effects are off. Tap opens audio settings.",
           reset: isNativePlaybackMode
-            ? "Retro OFF: native mode is active. Long press unlocks Retro mode."
+            ? "Retro OFF: long press unlocks Retro mode."
             : "Reset: tap resets settings. Long press switches to native mode.",
           save: "Save: export the current settings. Long press toggles the clock overlay.",
           load: "Load: import settings. Long press toggles the spectrum overlay.",
@@ -385,7 +385,12 @@ export const VideoControls = memo(function VideoControls({
   );
   const { isHolding: isResetHolding, ...resetButtonHandlers } = useLongPress(
     useCallback(() => { onToggleNativePlaybackMode?.(); }, [onToggleNativePlaybackMode]),
-    onResetSettings,
+    useCallback(() => {
+      if (isNativePlaybackMode) {
+        return;
+      }
+      onResetSettings();
+    }, [isNativePlaybackMode, onResetSettings]),
   );
   const { isHolding: isSaveHolding, ...saveButtonHandlers } = useLongPress(
     useCallback(() => { onToggleClockOverlay?.(); }, [onToggleClockOverlay]),
