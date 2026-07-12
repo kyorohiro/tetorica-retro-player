@@ -541,7 +541,10 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             streamName={previewSource.previewLabel}
             kind={previewSource.previewKind ?? defaultPreviewKind}
             playbackSource={currentPlaybackSource}
-            looping={!isUsingDefaultPreview && loopMode === "one"}
+            looping={
+              !isUsingDefaultPreview &&
+              (loopMode === "one" || (loopMode === "all" && playlistLength === 1))
+            }
             autoPlay={autoStartState === 'done'}
             onEnded={handleEnded}
             onError={handlePlayerError}
