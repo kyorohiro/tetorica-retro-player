@@ -63,7 +63,7 @@ const hlsInstances = new WeakMap<HTMLMediaElement, Hls>();
 const hlsSourceUrls = new WeakMap<HTMLMediaElement, string>();
 const HLS_STARTUP_MIN_BUFFER_SECONDS = 12;
 const HLS_STARTUP_READY_TIMEOUT_MS = 60000;
-const IMAGE_ELEMENT_CACHE_LIMIT = 6;
+const IMAGE_ELEMENT_CACHE_LIMIT = 12;
 const cachedImages = new Map<string, CachedImageEntry>();
 const pendingImageElements = new Map<string, Promise<HTMLImageElement>>();
 
@@ -604,17 +604,56 @@ export async function createImageMediaSource(
     url: options.url,
   });
   const cached = getCachedImageElement(options.url);
-  const image = cached ?? new Image();
-  if (!cached) {
-    image.src = options.url;
-    // Both existing call sites (previewFile, previewUrl) set this immediately
-    // after src, in this order — kept as-is rather than reordered.
-    image.crossOrigin = "anonymous";
+  if (cached) {
+    console.log("[retro-player image]", "createImageMediaSource:created", {
+      url: options.url,
+      elapsedMs: elapsedMs(),
+      cached: true,
+    });
+    callbacks?.onCreated?.(cached);
+    await waitForImageReady(cached);
+    touchCachedImage(options.url, cached);
+    console.log("[retro-player image]", "createImageMediaSource:ready", {
+      url: options.url,
+      elapsedMs: elapsedMs(),
+      naturalWidth: cached.naturalWidth,
+      naturalHeight: cached.naturalHeight,
+      cached: true,
+    });
+    return { kind: "image", origin: "url", element: cached };
   }
+
+  // If a prefetch is already in flight, piggyback on it instead of decoding twice.
+  const pending = pendingImageElements.get(options.url);
+  if (pending) {
+    console.log("[retro-player image]", "createImageMediaSource:created", {
+      url: options.url,
+      elapsedMs: elapsedMs(),
+      cached: false,
+      pending: true,
+    });
+    const image = await pending;
+    callbacks?.onCreated?.(image);
+    console.log("[retro-player image]", "createImageMediaSource:ready", {
+      url: options.url,
+      elapsedMs: elapsedMs(),
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      cached: false,
+      pending: true,
+    });
+    return { kind: "image", origin: "url", element: image };
+  }
+
+  const image = new Image();
+  image.src = options.url;
+  // Both existing call sites (previewFile, previewUrl) set this immediately
+  // after src, in this order — kept as-is rather than reordered.
+  image.crossOrigin = "anonymous";
   console.log("[retro-player image]", "createImageMediaSource:created", {
     url: options.url,
     elapsedMs: elapsedMs(),
-    cached: Boolean(cached),
+    cached: false,
   });
   callbacks?.onCreated?.(image);
   await waitForImageReady(image);
@@ -624,7 +663,7 @@ export async function createImageMediaSource(
     elapsedMs: elapsedMs(),
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
-    cached: Boolean(cached),
+    cached: false,
   });
   return { kind: "image", origin: "url", element: image };
 }

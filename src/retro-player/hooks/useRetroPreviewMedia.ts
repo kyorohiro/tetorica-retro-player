@@ -1130,6 +1130,7 @@ export function useRetroPreviewMedia({
   const attachVisualPreview = async (
     source: HTMLVideoElement | HTMLImageElement,
     kind: "video" | "image" | "capture",
+    skipLayoutRefresh = false,
   ) => {
     const app = await ensureRendererReady();
     previewElementRef.current = source;
@@ -1140,8 +1141,13 @@ export function useRetroPreviewMedia({
         ? { width: source.videoWidth, height: source.videoHeight }
         : { width: source.naturalWidth, height: source.naturalHeight },
     );
-    safeRender();
-    refreshLayout();
+    // skipLayoutRefresh=true (canReuseImagePreview): canvas size/CSS unchanged,
+    // so skip the full refreshLayout() recalculation and just draw once.
+    if (skipLayoutRefresh) {
+      safeRender();
+    } else {
+      refreshLayout();
+    }
     scheduleRefreshLayout();
 
     appRef.current?.ticker.start();
@@ -1577,7 +1583,7 @@ export function useRetroPreviewMedia({
           attachNativeImagePreview(image);
         } else {
           await ensureRendererReady();
-          await attachVisualPreview(image, "image");
+          await attachVisualPreview(image, "image", canReuseImagePreview);
           await ensureVisualStartupReady("image");
         }
         syncVideoState();

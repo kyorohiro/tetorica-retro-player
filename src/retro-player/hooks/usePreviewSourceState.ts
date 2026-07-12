@@ -14,6 +14,18 @@ export type PreviewStreamSource =
   | "camera"
   | "audio-preview";
 
+const retainedBlobPreviewSrcs = new Set<string>();
+
+export const retainPreviewBlobSrc = (src: string) => {
+  if (src.startsWith("blob:")) {
+    retainedBlobPreviewSrcs.add(src);
+  }
+};
+
+export const releasePreviewBlobSrc = (src: string) => {
+  retainedBlobPreviewSrcs.delete(src);
+};
+
 const attachStreamEndHandlers = (
   stream: MediaStream,
   onEnded: () => void,
@@ -103,7 +115,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
   }, []);
 
   const revokePreviewSrc = useCallback((src?: string) => {
-    if (src?.startsWith("blob:")) {
+    if (src?.startsWith("blob:") && !retainedBlobPreviewSrcs.has(src)) {
       URL.revokeObjectURL(src);
     }
   }, []);

@@ -10,10 +10,16 @@ import {
   saveStartupPreset,
   shouldPersistStartupPresetUrl,
 } from "./builtin-content/preset-config";
-import { usePreviewSourceState } from "../retro-player/hooks/usePreviewSourceState";
+import {
+  releasePreviewBlobSrc,
+  retainPreviewBlobSrc,
+  usePreviewSourceState,
+} from "../retro-player/hooks/usePreviewSourceState";
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
 import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
 import type { RetroPlayerLocale } from "../retro-player/types";
+import { isHeic, isImage } from "../mdrop-web/utils";
+import { primeImageElementCache } from "../retro-player/media/RetroMediaSource";
 
 const RetroPlayer = React.lazy(() => import("../retro-player/components/RetroPlayer"));
 
@@ -111,6 +117,19 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     useEffect(() => { previewSourceRef.current = previewSource; }, [previewSource]);
 
     const playlistRef = useRef<PlaylistItem[]>([]);
+    const filePlaylistBlobUrlsRef = useRef<string[]>([]);
+    const clearFilePlaylistBlobUrls = useCallback(() => {
+      for (const url of filePlaylistBlobUrlsRef.current) {
+        releasePreviewBlobSrc(url);
+        try { URL.revokeObjectURL(url); } catch {}
+      }
+      filePlaylistBlobUrlsRef.current = [];
+    }, []);
+    useEffect(() => {
+      return () => {
+        clearFilePlaylistBlobUrls();
+      };
+    }, [clearFilePlaylistBlobUrls]);
     const [playlistLength, setPlaylistLength] = useState(0);
     const [playlistIndex, setPlaylistIndex] = useState(0);
     const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
@@ -342,6 +361,21 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       });
     }, [previewItem]);
 
+    // Prefetch adjacent images into browser cache so createImageMediaSource finds them ready
+    useEffect(() => {
+      if (playlistLength <= 1) return;
+      const timer = window.setTimeout(() => {
+        const list = playlistRef.current;
+        for (const delta of [-1, 1]) {
+          const item = list[playlistIndex + delta];
+          if (!item || item.kind !== "path") continue;
+          if (!isImage(item.path) && !isHeic(item.path)) continue;
+          void primeImageElementCache(item.url);
+        }
+      }, 50);
+      return () => window.clearTimeout(timer);
+    }, [playlistIndex, playlistLength]);
+
     const jumpToPlaylistIndex = useCallback((targetIndex: number) => {
       const list = playlistRef.current;
       const item = list[targetIndex];
@@ -415,6 +449,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, [isMDropReadyRef]);
 
     const loadPaths = useCallback((items: { url: string; path: string }[], startIndex = 0) => {
+      clearFilePlaylistBlobUrls();
       if (items.length === 0) return;
       if (items.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForPath(items[0].url, items[0].path);
@@ -433,25 +468,38 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
       onPathPlaylistLoaded?.(sortedItems, sortedStartIndex);
-    }, [onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
+    }, [clearFilePlaylistBlobUrls, onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
 
     const loadFiles = useCallback((files: File[], _startIndex = 0) => {
+      // Revoke blob URLs from previous file playlist before creating new ones.
+      clearFilePlaylistBlobUrls();
+
       if (files.length === 0) return;
       if (files.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForBrowserFiles(files);
         return;
       }
       const sortedFiles = [...files].sort((a, b) => compareComicOrder(a.name, b.name));
+      // Pre-create stable blob URLs for all files so primeImageElementCache can
+      // prefetch adjacent images by URL before the user navigates to them.
+      const blobUrls = sortedFiles.map((file) => URL.createObjectURL(file));
+      for (const url of blobUrls) {
+        retainPreviewBlobSrc(url);
+      }
+      filePlaylistBlobUrlsRef.current = blobUrls;
       const sortedStartIndex = 0;
-      const target = sortedFiles[sortedStartIndex] ?? sortedFiles[0];
-      playlistRef.current = sortedFiles.map((file) => ({ kind: "file" as const, file }));
+      playlistRef.current = sortedFiles.map((file, index) => ({
+        kind: "path" as const,
+        url: blobUrls[index],
+        path: file.name,
+      }));
       setPlaylistLength(sortedFiles.length);
       setPlaylistIndex(sortedStartIndex);
       setIsPlaylistOpen(false);
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
-      previewSource.previewFile(target);
-    }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
+      previewSource.previewPath(blobUrls[0], sortedFiles[0].name);
+    }, [clearFilePlaylistBlobUrls, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };

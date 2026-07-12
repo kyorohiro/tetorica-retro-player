@@ -45,6 +45,7 @@ type UseRetroAudioEngineParams = {
   isPlaying: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   nativePlaybackMode: boolean;
+  playbackSource: "builtin-tone" | "media";
 };
 
 // Safari's createMediaElementSource() does not suppress the element's native audio output,
@@ -69,7 +70,9 @@ export function useRetroAudioEngine({
   isPlaying,
   isPlayingRef,
   nativePlaybackMode,
+  playbackSource,
 }: UseRetroAudioEngineParams) {
+  const shouldUseDestinationOutput = !nativePlaybackMode || playbackSource === "builtin-tone";
   const [latencyHint, setLatencyHintState] = useState<AudioContextLatencyCategory>(loadLatencyHint);
   const latencyHintRef = useRef<AudioContextLatencyCategory>(latencyHint);
 
@@ -226,7 +229,7 @@ export function useRetroAudioEngine({
         connectOutputToDestination: false,
         connectOutputToRecordingDestination: true,
       });
-      engine.setDestinationOutputEnabled(!nativePlaybackMode);
+      engine.setDestinationOutputEnabled(shouldUseDestinationOutput);
       audioEngineRef.current = engine;
     }
     return audioEngineRef.current;
@@ -456,7 +459,7 @@ export function useRetroAudioEngine({
         previewKindRef.current === "audio" ||
         previewKindRef.current === "capture",
     );
-    nextEngine.setDestinationOutputEnabled(!nativePlaybackMode);
+    nextEngine.setDestinationOutputEnabled(shouldUseDestinationOutput);
 
     debugAudio("recreateAudioEngine:ready", {
       audioContextState: initializedContext?.state ?? nextContext.state,
@@ -904,9 +907,9 @@ export function useRetroAudioEngine({
         previewKind === "audio" ||
         previewKind === "capture",
     );
-    setDestinationOutputEnabled(!nativePlaybackMode);
+    setDestinationOutputEnabled(shouldUseDestinationOutput);
     syncCurrentMediaSettings();
-  }, [isPlaying, nativePlaybackMode, previewKind, setDestinationOutputEnabled, setEngineIsPlaying, syncCurrentMediaSettings]);
+  }, [isPlaying, previewKind, setDestinationOutputEnabled, setEngineIsPlaying, shouldUseDestinationOutput, syncCurrentMediaSettings]);
 
   useEffect(() => {
     const id = setTimeout(() => {
