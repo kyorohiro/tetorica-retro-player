@@ -35,14 +35,12 @@ const isPlayableMediaPath = (path: string) =>
 
 const hlsSubUrl = (apiServer: string, folderId: string, file: TargetFile): string => {
   const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
-  const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
-  return `${apiServer}/hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
+  return `${apiServer}/hls-sub/${encodeURIComponent(folderId)}/index.m3u8?subpath=${encodeURIComponent(subpath)}`;
 };
 
 const audioSubUrl = (apiServer: string, folderId: string, file: TargetFile): string => {
   const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
-  const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
-  return `${apiServer}/audio-hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
+  return `${apiServer}/audio-hls-sub/${encodeURIComponent(folderId)}/index.m3u8?subpath=${encodeURIComponent(subpath)}`;
 };
 
 const playlistUrlForFolderFile = (

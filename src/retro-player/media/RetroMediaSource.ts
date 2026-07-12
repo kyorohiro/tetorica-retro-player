@@ -116,6 +116,15 @@ export const isHlsUrl = (url: string): boolean =>
   /\/hls-sub\/|\/audio-hls-sub\/|\/audio-hls\/.+\/index\.m3u8(?:$|\?)/.test(url) ||
   /\/hls\/.+\/index\.m3u8(?:$|\?)/.test(url);
 
+const shouldAllowNativeHlsFallback = (url: string): boolean =>
+  !(/\/hls-sub\/|\/audio-hls-sub\//.test(url));
+
+const shouldPreferNativeSubpathHls = (
+  media: HTMLMediaElement,
+  url: string,
+): boolean =>
+  /\/hls-sub\/|\/audio-hls-sub\//.test(url) && canUseNativeHls(media);
+
 export const getHlsInstance = (media: HTMLMediaElement): Hls | undefined =>
   hlsInstances.get(media);
 
@@ -150,9 +159,16 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
 
   const { default: HlsCtor } = await import("hls.js");
   const hls = new HlsCtor({
-    autoStartLoad: true,
+    autoStartLoad: false,
     backBufferLength: 0,
-    liveDurationInfinity: true,
+    // Our ffmpeg-generated manifests are "pseudo-live": they grow quickly
+    // from segment 0 while a finite local file is being transcoded. Chrome's
+    // hls.js path can otherwise drift toward the live edge and start pulling
+    // far-future segments before the early ones have played. Pin the live
+    // sync window absurdly far back so playback starts from the beginning.
+    liveMaxLatencyDurationCount: 999999,
+    liveSyncDurationCount: 999999,
+    liveDurationInfinity: false,
     maxBufferLength: 120,
     maxMaxBufferLength: 180,
     startPosition: 0,
@@ -189,6 +205,7 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
           : null,
       levels: data.levels?.length ?? 0,
     });
+    hls.startLoad(0);
   });
 
   hls.on(HlsCtor.Events.LEVEL_LOADED, (_event, data) => {
@@ -532,18 +549,22 @@ export async function createVideoMediaSource(
   if ("stream" in options) {
     video.srcObject = options.stream;
   } else if (isHlsUrl(options.url)) {
-    try {
-      await attachHlsSource(video, options.url);
-    } catch (error) {
-      if (!canUseNativeHls(video)) {
-        throw error;
-      }
-      console.warn("[retro-player hls] falling back to native playback after attach failure", {
-        url: options.url,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      destroyHlsInstance(video);
+    if (shouldPreferNativeSubpathHls(video, options.url)) {
       video.src = options.url;
+    } else {
+      try {
+        await attachHlsSource(video, options.url);
+      } catch (error) {
+        if (!canUseNativeHls(video) || !shouldAllowNativeHlsFallback(options.url)) {
+          throw error;
+        }
+        console.warn("[retro-player hls] falling back to native playback after attach failure", {
+          url: options.url,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        destroyHlsInstance(video);
+        video.src = options.url;
+      }
     }
   } else {
     video.src = options.url;
@@ -552,7 +573,13 @@ export async function createVideoMediaSource(
   try {
     await waitForVideoReady(video, callbacks?.onDebugEvent);
   } catch (error) {
-    if (!("url" in options) || !isHlsUrl(options.url) || !canUseNativeHls(video) || !getHlsInstance(video)) {
+    if (
+      !("url" in options) ||
+      !isHlsUrl(options.url) ||
+      !canUseNativeHls(video) ||
+      !getHlsInstance(video) ||
+      !shouldAllowNativeHlsFallback(options.url)
+    ) {
       throw error;
     }
     console.warn("[retro-player hls] falling back to native playback after readiness failure", {
@@ -578,7 +605,9 @@ export async function createAudioMediaSource(
   if ("stream" in options) {
     audio.srcObject = options.stream;
   } else if (isHlsUrl(options.url)) {
-    if (canUseNativeHls(audio)) {
+    if (shouldPreferNativeSubpathHls(audio, options.url)) {
+      audio.src = options.url;
+    } else if (canUseNativeHls(audio) && shouldAllowNativeHlsFallback(options.url)) {
       audio.src = options.url;
     } else {
       await attachHlsSource(audio, options.url);

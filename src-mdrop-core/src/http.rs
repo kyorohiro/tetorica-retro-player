@@ -587,8 +587,16 @@ impl SharedHttpServerContext {
                 get(http_stream::audio_stream),
             )
             .route(
+                "/hls-sub/{folder_id}/index.m3u8",
+                get(http_stream::hls_sub_playlist_m3u8),
+            )
+            .route(
                 "/hls-sub/{folder_id}/{*subpath}",
                 get(http_stream::hls_sub_playlist),
+            )
+            .route(
+                "/audio-hls-sub/{folder_id}/index.m3u8",
+                get(http_stream::audio_hls_sub_playlist_m3u8),
             )
             .route(
                 "/audio-hls-sub/{folder_id}/{*subpath}",
