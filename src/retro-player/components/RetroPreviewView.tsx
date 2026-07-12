@@ -15,6 +15,7 @@ import {
   savePersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
 import { useRetroAlarm } from "../hooks/useRetroAlarm";
+import { isHlsUrl } from "../media/RetroMediaSource";
 import {
   areRetroPreviewLayoutStatesEqual,
   normalizeRetroPreviewLayoutState,
@@ -178,6 +179,7 @@ export function RetroPreviewView({
   selectedPreset,
   onApplyPreset,
 }: RetroPreviewViewProps) {
+  const isFfmpegHlsSource = typeof _src === "string" && isHlsUrl(_src);
   // --- Internal UI state: everything layout/pin/maximize lives here ---
 
   const persistedUiSettings = React.useMemo(
@@ -811,8 +813,12 @@ export function RetroPreviewView({
           const confirmed = await confirmDialog({
             title: "Recording ready",
             body: player.prefersShareExport
-              ? "Share the recorded clip now?"
-              : "Save the recorded clip now?",
+              ? `Share the recorded clip now?${
+                  isFfmpegHlsSource ? "\n\nAudio is not recorded in ffmpeg mode." : ""
+                }`
+              : `Save the recorded clip now?${
+                  isFfmpegHlsSource ? "\n\nAudio is not recorded in ffmpeg mode." : ""
+                }`,
             okText: player.prefersShareExport ? "Share" : "Save",
             cancelText: "Cancel",
           });

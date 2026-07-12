@@ -1148,6 +1148,10 @@ export const VideoControls = memo(function VideoControls({
           0%, 100% { opacity: 0.20; }
           50% { opacity: 0.80; }
         }
+        @keyframes long-press-native-hint2 {
+          0%, 100% { font-weight: 400;  }
+          50% { font-weight: 500; }
+        }
       `}</style>
       <input
         ref={fileInputRef}
@@ -1465,8 +1469,8 @@ export const VideoControls = memo(function VideoControls({
                   style={{ animation: "long-press-charge 0.6s linear forwards" }}
                 />
               )}
-              <RotateCcw size={15} className="relative z-10" />
-              <span className="relative z-10">{isNativePlaybackMode ? "Native" : "Reset"}</span>
+              <RotateCcw size={15} className="relative z-10" style={isNativePlaybackMode ? { animation: "long-press-native-hint2 1.8s ease-in-out infinite" } : undefined}/>
+              <span className="relative z-10" style={isNativePlaybackMode ? { animation: "long-press-native-hint2 1.8s ease-in-out infinite" } : undefined}>{isNativePlaybackMode ? "Native" : "Reset"}</span>
             </button>
             {renderTooltip("reset", tooltipText.reset)}
           </div>
