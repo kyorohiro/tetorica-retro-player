@@ -77,8 +77,6 @@ type RetroPlayerProps = {
   onLoopLongPress?: () => void;
   previewLayoutState?: RetroPreviewLayoutState;
   onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
-  startupNativePlaybackMode?: boolean;
-  persistNativePlaybackMode?: boolean;
 };
 
 export function RetroPlayer({
@@ -107,8 +105,6 @@ export function RetroPlayer({
   onLoopLongPress,
   previewLayoutState,
   onPreviewLayoutStateChange,
-  startupNativePlaybackMode,
-  persistNativePlaybackMode = true,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
@@ -126,11 +122,7 @@ export function RetroPlayer({
     [],
   );
 
-  const startupNativeMode = React.useRef(
-    typeof startupNativePlaybackMode === "boolean"
-      ? startupNativePlaybackMode
-      : getNativePlaybackMode(),
-  ).current;
+  const startupNativeMode = React.useRef(getNativePlaybackMode()).current;
   const startupUseQsv = React.useRef(getFfmpegUseQsv()).current;
   const startupMaxConcurrentHlsSessions = React.useRef(getFfmpegMaxConcurrentHlsSessions()).current;
   const [nativePlaybackMode, setNativePlaybackModeState] = React.useState(startupNativeMode);
@@ -141,11 +133,9 @@ export function RetroPlayer({
 
   const handleToggleNativePlaybackMode = React.useCallback(() => {
     const next = !nativePlaybackMode;
-    if (persistNativePlaybackMode) {
-      setNativePlaybackMode(next);
-    }
+    setNativePlaybackMode(next);
     setNativePlaybackModeState(next);
-  }, [nativePlaybackMode, persistNativePlaybackMode]);
+  }, [nativePlaybackMode]);
 
   const syncFfmpegUseQsv = React.useCallback(async (enabled: boolean) => {
     if (!isTauriRuntime()) return;
