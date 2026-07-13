@@ -22,6 +22,7 @@ type ZipFileListDialogOptions = {
     title?: string;
     source: ZipSource;
     initialPath?: string;
+    isRetro?: boolean;
 };
 type ZipTargetFile = ArchiveExtractorEntry & {
     name?: string;
@@ -123,6 +124,7 @@ function ZipFileListDialog({
     title,
     source,
     initialPath = "/",
+    isRetro = !getNativePlaybackMode(),
     onClose,
 }: ZipFileListDialogOptions & { onClose: () => void }) {
     const [path, setPath] = useState(initialPath);
@@ -355,12 +357,10 @@ function ZipFileListDialog({
                                                     const previewIndex = previewFiles.findIndex(
                                                         (f) => f.path === file.path
                                                     );
-                                                    const shouldUseRetroPreview =
-                                                        !getNativePlaybackMode();
                                                     await showPreviewDialog({
                                                         files: previewFiles,
                                                         initialIndex: previewIndex,
-                                                        isRetro: shouldUseRetroPreview,
+                                                        isRetro,
                                                         apiServer: "",
                                                         getObjectUrl: async (target, onProgress) => {
                                                             const entryBlob = await readArchiveFile(
@@ -393,6 +393,7 @@ function ZipFileListDialog({
                                                             blob: innerBlob,
                                                         },
                                                         initialPath: "/",
+                                                        isRetro,
                                                     });
                                                     return;
                                                 }

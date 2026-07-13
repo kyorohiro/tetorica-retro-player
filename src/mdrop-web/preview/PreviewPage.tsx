@@ -84,6 +84,8 @@ export function PreviewPage({
             : isAudio(file.path)
                 ? "audio"
                 : "image");
+    const shouldUseRetroPlayerForHls =
+        useHls && (resolvedKind === "video" || resolvedKind === "audio");
     const [status, setStatus] = React.useState<PreviewPageStatus>("none");
     const [src, setSrc] = React.useState("");
     const [text, setText] = React.useState("");
@@ -146,7 +148,7 @@ export function PreviewPage({
                 void loadReactReader();
             }
 
-            if (isRetro && (isVideoHere || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) {
+            if ((isRetro && (isVideoHere || isAudio(file.path) || isImage(file.path) || isHeic(file.path))) || shouldUseRetroPlayerForHls) {
                 void loadRetroPlayer();
             }
 
@@ -254,7 +256,7 @@ export function PreviewPage({
                 }
             }
         };
-    }, [debugPreview, file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, releaseObjectUrl, requestSequence, resolvedKind]);
+    }, [debugPreview, file, getUrlFromTargetFile, isRetro, isVideoHere, onDisplayReady, onLoadingMessage, releaseObjectUrl, requestSequence, resolvedKind, shouldUseRetroPlayerForHls]);
 
     if (status === "none" || status === "loading") {
         return <div className="text-sm text-slate-400">Loading...</div>;
@@ -271,7 +273,14 @@ export function PreviewPage({
         );
     }
 
-    if (isRetro && (resolvedKind === "video" || resolvedKind === "audio" || isImage(file.path) || isHeic(file.path))) {
+    if ((isRetro && (resolvedKind === "video" || resolvedKind === "audio" || isImage(file.path) || isHeic(file.path))) || shouldUseRetroPlayerForHls) {
+        console.log("[preview-page] render:retro-player", {
+            path: file.path,
+            resolvedKind,
+            isRetro,
+            useHls,
+            src,
+        });
         return (
             <div className="mx-auto w-full max-w-6xl touch-manipulation">
                 <React.Suspense
@@ -290,6 +299,8 @@ export function PreviewPage({
                         displayName={file.path}
                         looping={forcedKind === "audio" ? false : undefined}
                         autoPlay={false}
+                        startupNativePlaybackMode={!isRetro}
+                        persistNativePlaybackMode={false}
                         previewLayoutState={previewLayoutState}
                         onPreviewLayoutStateChange={onPreviewLayoutStateChange}
                         className="touch-manipulation border-0 bg-transparent p-0 shadow-none"
@@ -300,6 +311,13 @@ export function PreviewPage({
     }
 
     if (resolvedKind === "video") {
+        console.log("[preview-page] render:native-video", {
+            path: file.path,
+            resolvedKind,
+            isRetro,
+            useHls,
+            src,
+        });
         return (
             <video
                 src={src}

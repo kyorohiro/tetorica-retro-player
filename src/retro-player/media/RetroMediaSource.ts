@@ -23,6 +23,7 @@
 // (e.g. the plain web build, which has no mDrop/ffmpeg HLS server to talk
 // to) never pay for it in their bundle.
 import type Hls from "hls.js";
+import type { HlsConfig } from "hls.js";
 import { RetroPreviewError } from "../i18n";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
@@ -111,7 +112,33 @@ const hasEnoughHlsStartupBuffer = (media: HTMLMediaElement): boolean => {
   return Math.max(duration, bufferedEnd) >= HLS_STARTUP_MIN_BUFFER_SECONDS;
 };
 
-export const isHlsUrl = (url: string): boolean => url.includes(".m3u8");
+export const isHlsUrl = (url: string): boolean =>
+  url.includes(".m3u8") ||
+  /\/hls-sub\/|\/audio-hls-sub\/|\/audio-hls\/.+\/index\.m3u8(?:$|\?)/.test(url) ||
+  /\/hls\/.+\/index\.m3u8(?:$|\?)/.test(url);
+
+const shouldAllowNativeHlsFallback = (url: string): boolean =>
+  !(/\/hls-sub\/|\/audio-hls-sub\//.test(url));
+
+const shouldPreferNativeAppleHls = (): boolean => {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  const ua = navigator.userAgent ?? "";
+  const vendor = navigator.vendor ?? "";
+  const isAppleVendor = /Apple/i.test(vendor);
+  const isWebKit = /AppleWebKit/i.test(ua);
+  const isChromiumFamily = /Chrome|Chromium|CriOS|Edg|OPR|SamsungBrowser|DuckDuckGo/i.test(ua);
+  return isAppleVendor && isWebKit && !isChromiumFamily;
+};
+
+const shouldPreferNativeSubpathHls = (
+  media: HTMLMediaElement,
+  url: string,
+): boolean =>
+  /\/hls-sub\/|\/audio-hls-sub\//.test(url) &&
+  canUseNativeHls(media) &&
+  shouldPreferNativeAppleHls();
 
 export const getHlsInstance = (media: HTMLMediaElement): Hls | undefined =>
   hlsInstances.get(media);
@@ -144,16 +171,70 @@ const canUseNativeHls = (media: HTMLMediaElement): boolean =>
  */
 export const attachHlsSource = async (media: HTMLMediaElement, url: string): Promise<Hls> => {
   destroyHlsInstance(media);
+  console.log("[retro-player hls]", "attach:start", {
+    url,
+    currentSrc: media.currentSrc || media.src || null,
+    readyState: media.readyState,
+    networkState: media.networkState,
+  });
 
   const { default: HlsCtor } = await import("hls.js");
-  const hls = new HlsCtor({
-    autoStartLoad: true,
+  console.log("[retro-player hls]", "attach:module-ready", {
+    url,
+    isSupported: typeof HlsCtor.isSupported === "function" ? HlsCtor.isSupported() : null,
+    hasDefault: Boolean(HlsCtor),
+  });
+  const advancedConfig: Partial<HlsConfig> = {
+    autoStartLoad: false,
+    backBufferLength: 0,
+    initialLiveManifestSize: 3,
+    lowLatencyMode: false,
+    // Our ffmpeg-generated manifests are "pseudo-live": they grow quickly
+    // from segment 0 while a finite local file is being transcoded. Chrome's
+    // hls.js path can otherwise drift toward the live edge and start pulling
+    // far-future segments before the early ones have played. Pin the live
+    // sync window absurdly far back so playback starts from the beginning.
+    liveMaxLatencyDurationCount: 999999,
+    liveSyncDurationCount: 999999,
+    // Keep the media timeline open-ended while ffmpeg is still appending
+    // segments. With a finite duration here, Chrome can decide the stream is
+    // over around the first manifest window (roughly 10s) before later
+    // segments are observed.
+    liveDurationInfinity: true,
+    liveSyncMode: "buffered",
+    maxBufferLength: 120,
+    maxFragLookUpTolerance: 0,
+    maxMaxBufferLength: 180,
+    startPosition: 0,
+    startOnSegmentBoundary: true,
+  };
+  const fallbackConfig: Partial<HlsConfig> = {
+    autoStartLoad: false,
     backBufferLength: 0,
     liveDurationInfinity: true,
     maxBufferLength: 120,
     maxMaxBufferLength: 180,
     startPosition: 0,
-  });
+  };
+  let hls: Hls;
+  try {
+    hls = new HlsCtor(advancedConfig);
+    console.log("[retro-player hls]", "attach:instance-created", {
+      url,
+      configMode: "advanced",
+    });
+  } catch (error) {
+    console.error("[retro-player hls]", "attach:instance-create-failed", {
+      url,
+      configMode: "advanced",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    hls = new HlsCtor(fallbackConfig);
+    console.log("[retro-player hls]", "attach:instance-created", {
+      url,
+      configMode: "fallback",
+    });
+  }
   let networkRetries = 0;
   let mediaRetries = 0;
   let sourceLoaded = false;
@@ -186,6 +267,7 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
           : null,
       levels: data.levels?.length ?? 0,
     });
+    hls.startLoad(0);
   });
 
   hls.on(HlsCtor.Events.LEVEL_LOADED, (_event, data) => {
@@ -208,6 +290,17 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
       bufferedEnd: getBufferedEnd(media),
       currentTime: media.currentTime,
       sn: data.frag.sn,
+      type: data.frag.type,
+    });
+  });
+
+  hls.on(HlsCtor.Events.FRAG_LOADING, (_event, data) => {
+    logHls("frag-loading", {
+      bufferedEnd: getBufferedEnd(media),
+      currentTime: media.currentTime,
+      level: data.frag.level,
+      sn: data.frag.sn,
+      start: data.frag.start,
       type: data.frag.type,
     });
   });
@@ -247,6 +340,9 @@ export const attachHlsSource = async (media: HTMLMediaElement, url: string): Pro
 
   hlsInstances.set(media, hls);
   hlsSourceUrls.set(media, url);
+  console.log("[retro-player hls]", "attach:attach-media", {
+    url,
+  });
   hls.attachMedia(media);
   return hls;
 };
@@ -526,21 +622,40 @@ export async function createVideoMediaSource(
   },
 ): Promise<RetroMediaSource> {
   const video = document.createElement("video");
+  console.log("[retro-player media]", "createVideoMediaSource:start", {
+    sourceType: "stream" in options ? "stream" : "url",
+    url: "url" in options ? options.url : null,
+  });
   if ("stream" in options) {
     video.srcObject = options.stream;
   } else if (isHlsUrl(options.url)) {
-    try {
-      await attachHlsSource(video, options.url);
-    } catch (error) {
-      if (!canUseNativeHls(video)) {
-        throw error;
-      }
-      console.warn("[retro-player hls] falling back to native playback after attach failure", {
-        url: options.url,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      destroyHlsInstance(video);
+    console.log("[retro-player media]", "createVideoMediaSource:hls-detected", {
+      url: options.url,
+      nativeSubpathPreferred: shouldPreferNativeSubpathHls(video, options.url),
+      nativeHlsCapable: canUseNativeHls(video),
+    });
+    if (shouldPreferNativeSubpathHls(video, options.url)) {
       video.src = options.url;
+    } else {
+      try {
+        console.log("[retro-player media]", "createVideoMediaSource:hls-attach-start", {
+          url: options.url,
+        });
+        await attachHlsSource(video, options.url);
+        console.log("[retro-player media]", "createVideoMediaSource:hls-attach-done", {
+          url: options.url,
+        });
+      } catch (error) {
+        if (!canUseNativeHls(video) || !shouldAllowNativeHlsFallback(options.url)) {
+          throw error;
+        }
+        console.warn("[retro-player hls] falling back to native playback after attach failure", {
+          url: options.url,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        destroyHlsInstance(video);
+        video.src = options.url;
+      }
     }
   } else {
     video.src = options.url;
@@ -549,7 +664,13 @@ export async function createVideoMediaSource(
   try {
     await waitForVideoReady(video, callbacks?.onDebugEvent);
   } catch (error) {
-    if (!("url" in options) || !isHlsUrl(options.url) || !canUseNativeHls(video) || !getHlsInstance(video)) {
+    if (
+      !("url" in options) ||
+      !isHlsUrl(options.url) ||
+      !canUseNativeHls(video) ||
+      !getHlsInstance(video) ||
+      !shouldAllowNativeHlsFallback(options.url)
+    ) {
       throw error;
     }
     console.warn("[retro-player hls] falling back to native playback after readiness failure", {
@@ -561,6 +682,12 @@ export async function createVideoMediaSource(
     callbacks?.onCreated?.(video);
     await waitForVideoReady(video, callbacks?.onDebugEvent);
   }
+  console.log("[retro-player media]", "createVideoMediaSource:ready", {
+    sourceType: "stream" in options ? "stream" : "url",
+    url: "url" in options ? options.url : null,
+    currentSrc: video.currentSrc || video.src || null,
+    readyState: video.readyState,
+  });
   return { kind: "video", origin: "stream" in options ? "stream" : "url", element: video };
 }
 
@@ -575,7 +702,9 @@ export async function createAudioMediaSource(
   if ("stream" in options) {
     audio.srcObject = options.stream;
   } else if (isHlsUrl(options.url)) {
-    if (canUseNativeHls(audio)) {
+    if (shouldPreferNativeSubpathHls(audio, options.url)) {
+      audio.src = options.url;
+    } else if (canUseNativeHls(audio) && shouldAllowNativeHlsFallback(options.url)) {
       audio.src = options.url;
     } else {
       await attachHlsSource(audio, options.url);

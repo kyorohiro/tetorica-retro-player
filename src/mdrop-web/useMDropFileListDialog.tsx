@@ -42,6 +42,7 @@ type FileListDialogOptions = {
     targetId: string;
     initialPath?: string;
     useHls?: boolean;
+    isRetro?: boolean;
 };
 
 const parentPathOf = (path: string) => {
@@ -69,14 +70,12 @@ export function useMDropFileListDialog() {
 
 const hlsSubUrl = (apiServer: string, folderId: string, file: TargetFile): string => {
     const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
-    const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
-    return `${apiServer}/hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
+    return `${apiServer}/hls-sub/${encodeURIComponent(folderId)}/index.m3u8?subpath=${encodeURIComponent(subpath)}`;
 };
 
 const audioSubUrl = (apiServer: string, folderId: string, file: TargetFile): string => {
     const subpath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
-    const encodedSubpath = subpath.split("/").map(encodeURIComponent).join("/");
-    return `${apiServer}/audio-hls-sub/${encodeURIComponent(folderId)}/${encodedSubpath}`;
+    return `${apiServer}/audio-hls-sub/${encodeURIComponent(folderId)}/index.m3u8?subpath=${encodeURIComponent(subpath)}`;
 };
 
 function FileListDialog({
@@ -85,6 +84,7 @@ function FileListDialog({
     targetId,
     initialPath = "/",
     useHls = false,
+    isRetro = !getNativePlaybackMode(),
     onClose,
 }: FileListDialogOptions & { onClose: () => void }) {
     const [currentUseHls, setCurrentUseHls] = useState(
@@ -238,7 +238,7 @@ function FileListDialog({
             await showPreviewDialog({
                 files: sourceFiles,
                 initialIndex: index,
-                isRetro: !getNativePlaybackMode(),
+                isRetro,
                 useHls: (forceFfmpeg || forceFfmpegAudio) && canUseFfmpeg,
                 forcedKind: forceFfmpegAudio ? "audio" : undefined,
                 apiServer,
@@ -337,7 +337,7 @@ function FileListDialog({
                         url: downloadUrl(apiServer, file),
                     },
                     initialPath: "/",
-
+                    isRetro,
                 });
                 return;
             }
@@ -346,7 +346,7 @@ function FileListDialog({
                 downloadFile(file);
             }
         },
-        [apiServer, currentFfmpegMode, currentUseHls, downloadFile, openPreview, showSelectDialog, showZipFileListDialog]
+        [apiServer, currentFfmpegMode, currentUseHls, downloadFile, isRetro, openPreview, showSelectDialog, showZipFileListDialog]
     );
 
     return (

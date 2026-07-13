@@ -160,6 +160,11 @@ pub struct AudioSubStreamM4aQuery {
     subpath: String,
 }
 
+#[derive(Deserialize)]
+pub struct HlsSubPlaylistQuery {
+    subpath: String,
+}
+
 /// Stream AAC-in-MP4 audio for a file inside a registered folder with an
 /// explicit .m4a suffix in the URL so Safari/WebKit recognizes it as an MP4
 /// audio resource instead of keying off the original source extension.
@@ -170,6 +175,22 @@ pub async fn audio_sub_stream_m4a(
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let file_path = resolve_folder_subpath(&state, &folder_id, &query.subpath)?;
     stream_audio_for_path(&state, &file_path).await
+}
+
+pub async fn hls_sub_playlist_m3u8(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path(folder_id): Path<String>,
+    Query(query): Query<HlsSubPlaylistQuery>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    hls_sub_playlist(AxumState(state), Path((folder_id, query.subpath))).await
+}
+
+pub async fn audio_hls_sub_playlist_m3u8(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Path(folder_id): Path<String>,
+    Query(query): Query<HlsSubPlaylistQuery>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    audio_hls_sub_playlist(AxumState(state), Path((folder_id, query.subpath))).await
 }
 
 /// Serve an individual HLS segment (.ts).
@@ -426,16 +447,13 @@ async fn start_hls_for_path(
     // Phase 1: stream-copy (no re-encode, near-zero CPU — works for H.264/AAC sources).
     // Phase 2: optional hardware encode on supported platforms.
     // Phase 3: libx264 software fallback.
-    // -hls_playlist_type event: without this, ffmpeg doesn't tag the manifest
-    // as VOD or EVENT while it's still being written. Native HLS clients are
-    // supposed to keep re-polling any manifest lacking #EXT-X-ENDLIST
-    // regardless, but marking it "event" makes the still-growing intent
-    // explicit and is the standard idiom for "transcode while serving".
+    // Keep the manifest untyped while transcoding. Safari/native HLS happily
+    // re-polls a playlist with no #EXT-X-ENDLIST, and Chrome/hls.js proved
+    // more reliable when it did NOT see an explicit EVENT playlist here.
     let hls_common_args: Vec<&str> = vec![
         "-f", "hls",
         "-hls_time", HLS_SEGMENT_DURATION_SECONDS,
         "-hls_list_size", "0",
-        "-hls_playlist_type", "event",
         "-hls_flags", "independent_segments",
         "-muxpreload", "0",
         "-muxdelay", "0",
@@ -676,7 +694,6 @@ async fn start_audio_hls_for_path(
             "-f", "hls",
             "-hls_time", HLS_SEGMENT_DURATION_SECONDS,
             "-hls_list_size", "0",
-            "-hls_playlist_type", "event",
             "-hls_flags", "independent_segments",
             "-muxpreload", "0",
             "-muxdelay", "0",

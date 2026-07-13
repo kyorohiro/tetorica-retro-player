@@ -4,8 +4,18 @@ import { Loader } from "lucide-react";
 import { FileTargetFile, getDownloadList, getMeta, Target, TargetFile } from "./api";
 import { useMDropFileListDialog } from "./useMDropFileListDialog";
 import { usePreviewDialog } from "./usePreviewDialog";
-import { sleep, isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isArchive } from "./utils";
+import { sleep, isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isArchive, isVideoExtended } from "./utils";
 
+const WEBAPP_PREVIEW_MODE_KEY = "tetorica-webapp.previewMode";
+type WebAppPreviewMode = "native" | "retro";
+
+const loadWebAppPreviewMode = (): WebAppPreviewMode => {
+    if (typeof window === "undefined") {
+        return "native";
+    }
+    const raw = window.localStorage.getItem(WEBAPP_PREVIEW_MODE_KEY);
+    return raw === "retro" ? "retro" : "native";
+};
 
 function WebApp({ active }: { active?: boolean }) {
     const [errorMsg,] = useState<string>("");
@@ -13,9 +23,11 @@ function WebApp({ active }: { active?: boolean }) {
     const [apiServer, setApiServer] = useState("");
     const [useHls, setUseHls] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [previewMode, setPreviewMode] = useState<WebAppPreviewMode>(() => loadWebAppPreviewMode());
     const mainRef = useRef<HTMLElement>(null);
     const { showMDropFileListDialog: showFileListDialog } = useMDropFileListDialog();
     const { showPreviewDialog } = usePreviewDialog();
+    const isRetroPreview = previewMode === "retro";
     //
     const onReload = useCallback(async () => {
         setLoading(true);
@@ -41,6 +53,7 @@ function WebApp({ active }: { active?: boolean }) {
             targetId: target.id,
             initialPath: "/",
             useHls,
+            isRetro: isRetroPreview,
         });
     }
 
@@ -67,7 +80,7 @@ function WebApp({ active }: { active?: boolean }) {
         showPreviewDialog({
             files: targets,
             initialIndex: 0,
-            isRetro: true,
+            isRetro: isRetroPreview,
             apiServer,
             getObjectUrl: async (file: TargetFile): Promise<string> => {
                 return URL.createObjectURL((file as FileTargetFile).entry!);
@@ -100,14 +113,51 @@ function WebApp({ active }: { active?: boolean }) {
     useEffect(()=>{
         onReload()
     }, [onReload]);
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        window.localStorage.setItem(WEBAPP_PREVIEW_MODE_KEY, previewMode);
+    }, [previewMode]);
     return (
         <main ref={mainRef} onDrop={onDrop} onDragOver={onDragOver} className="h-screen overflow-y-auto bg-slate-950 text-slate-100">
             <div className="mx-auto max-w-3xl px-6 py-8">
                 <header className="mb-8">
                     <p className="text-sm text-slate-400">Local file sharing prototype</p>
-                    <h1 className="mt-1 text-3xl font-bold tracking-tight">
-                        Tetorica mDrop
-                    </h1>
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            Tetorica mDrop
+                        </h1>
+                        <div className="inline-flex rounded-xl border border-slate-700 bg-slate-900/80 p-1 text-xs">
+                            <button
+                                type="button"
+                                onClick={() => setPreviewMode("native")}
+                                className={[
+                                    "rounded-lg px-3 py-1.5 transition",
+                                    previewMode === "native"
+                                        ? "bg-sky-500/20 text-sky-200"
+                                        : "text-slate-300 hover:bg-slate-800",
+                                ].join(" ")}
+                            >
+                                Native
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPreviewMode("retro")}
+                                className={[
+                                    "rounded-lg px-3 py-1.5 transition",
+                                    previewMode === "retro"
+                                        ? "bg-amber-500/20 text-amber-200"
+                                        : "text-slate-300 hover:bg-slate-800",
+                                ].join(" ")}
+                            >
+                                Retro
+                            </button>
+                        </div>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                        Preview mode: {previewMode}
+                    </p>
                 </header>
                 {errorMsg && (
                     <div className="mb-6 rounded-xl border border-red-400/40 bg-red-950/50 p-4 text-sm text-red-100">
@@ -152,14 +202,27 @@ function WebApp({ active }: { active?: boolean }) {
 
                                                     //href={`${apiServer}/download/${file.id}`}
                                                     onClick={async () => {
-                                                        if (isImage(file.path) || isBrowserPlayableVideo(file.path) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path) || isArchive(file.path)) {
+                                                        console.log("[webapp] preview:open", {
+                                                            path: file.path,
+                                                            previewMode,
+                                                            isRetroPreview,
+                                                            useHlsForThisFile: useHls && isVideoExtended(file.path),
+                                                            apiServer,
+                                                            targetId: file.id,
+                                                        });
+                                                        if (isImage(file.path) || isBrowserPlayableVideo(file.path) || (useHls && isVideoExtended(file.path)) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path) || isArchive(file.path)) {
                                                             //const index = sortedFiles.findIndex((f) => f.path === file.path);
 
                                                             await showPreviewDialog({
                                                                 files: [{ ...file, createdAt: 0, modifiedAt: 0, size: 0, isRoot: true }],
                                                                 initialIndex: 0,
-                                                                isRetro: true,
+                                                                isRetro: isRetroPreview,
+                                                                useHls: useHls && isVideoExtended(file.path),
                                                                 apiServer,
+                                                                getObjectUrl: useHls && isVideoExtended(file.path)
+                                                                    ? async (target: TargetFile) =>
+                                                                        `${apiServer}/hls/${target.id}/index.m3u8`
+                                                                    : undefined,
                                                             });
                                                             return false;
                                                         } else {
