@@ -129,10 +129,6 @@ function App() {
     () => false,
     [],
   );
-  const shouldUseDialogRetroPreview = React.useMemo(
-    () => !getNativePlaybackMode(),
-    [],
-  );
   const { showConfirmDialog, showSelectDialog, showDialog } = useDialog();
   const { showBrowserFileListDialog } = useBrowserFileListDialog();
   const { showPreviewDialog } = usePreviewDialog();
@@ -331,6 +327,7 @@ function App() {
   );
 
   const showDialogPreviewForBrowserFiles = useCallback(async (files: FileList | File[]) => {
+    const shouldUseDialogRetroPreview = !getNativePlaybackMode();
     const previewFiles = Array.from(files).map((file) => ({
       id: "",
       entry: file,
@@ -366,9 +363,10 @@ function App() {
         }
       },
     });
-  }, [shouldUseDialogRetroPreview, showPreviewDialog]);
+  }, [showPreviewDialog]);
 
   const showDialogPreviewForPath = useCallback(async (url: string, path: string) => {
+    const shouldUseDialogRetroPreview = !getNativePlaybackMode();
     const previewFile: TargetFile = {
       id: path || url,
       path,
@@ -394,7 +392,7 @@ function App() {
         document.body.removeChild(a);
       },
     });
-  }, [shouldUseDialogRetroPreview, showPreviewDialog]);
+  }, [showPreviewDialog]);
 
   const openBrowserDialogTargets = useCallback(async (targets: FileTargetFile[]) => {
     if (targets.length === 0) return;

@@ -9,7 +9,6 @@ import {
     listenFfmpegStreamingEnabled,
     listenFfmpegStreamingMode,
 } from "./ffmpegPreference";
-import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideo, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
@@ -42,6 +41,7 @@ type FileListDialogOptions = {
     targetId: string;
     initialPath?: string;
     useHls?: boolean;
+    isRetro?: boolean;
 };
 
 const parentPathOf = (path: string) => {
@@ -83,6 +83,7 @@ function FileListDialog({
     targetId,
     initialPath = "/",
     useHls = false,
+    isRetro = false,
     onClose,
 }: FileListDialogOptions & { onClose: () => void }) {
     const [currentUseHls, setCurrentUseHls] = useState(
@@ -236,7 +237,7 @@ function FileListDialog({
             await showPreviewDialog({
                 files: sourceFiles,
                 initialIndex: index,
-                isRetro: !getNativePlaybackMode(),
+                isRetro,
                 useHls: (forceFfmpeg || forceFfmpegAudio) && canUseFfmpeg,
                 forcedKind: forceFfmpegAudio ? "audio" : undefined,
                 apiServer,
@@ -335,7 +336,7 @@ function FileListDialog({
                         url: downloadUrl(apiServer, file),
                     },
                     initialPath: "/",
-
+                    isRetro,
                 });
                 return;
             }
@@ -344,7 +345,7 @@ function FileListDialog({
                 downloadFile(file);
             }
         },
-        [apiServer, currentFfmpegMode, currentUseHls, downloadFile, openPreview, showSelectDialog, showZipFileListDialog]
+        [apiServer, currentFfmpegMode, currentUseHls, downloadFile, isRetro, openPreview, showSelectDialog, showZipFileListDialog]
     );
 
     return (

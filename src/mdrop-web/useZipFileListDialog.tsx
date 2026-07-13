@@ -2,7 +2,6 @@ import React, { useMemo, useRef, useState } from "react";
 import { File, Folder, Loader, Archive, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { usePreviewDialog } from "./usePreviewDialog";
-import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import {
     isAudio,
     isEpub,
@@ -22,6 +21,7 @@ type ZipFileListDialogOptions = {
     title?: string;
     source: ZipSource;
     initialPath?: string;
+    isRetro?: boolean;
 };
 type ZipTargetFile = ArchiveExtractorEntry & {
     name?: string;
@@ -123,6 +123,7 @@ function ZipFileListDialog({
     title,
     source,
     initialPath = "/",
+    isRetro = false,
     onClose,
 }: ZipFileListDialogOptions & { onClose: () => void }) {
     const [path, setPath] = useState(initialPath);
@@ -355,12 +356,10 @@ function ZipFileListDialog({
                                                     const previewIndex = previewFiles.findIndex(
                                                         (f) => f.path === file.path
                                                     );
-                                                    const shouldUseRetroPreview =
-                                                        !getNativePlaybackMode();
                                                     await showPreviewDialog({
                                                         files: previewFiles,
                                                         initialIndex: previewIndex,
-                                                        isRetro: shouldUseRetroPreview,
+                                                        isRetro,
                                                         apiServer: "",
                                                         getObjectUrl: async (target, onProgress) => {
                                                             const entryBlob = await readArchiveFile(
@@ -393,6 +392,7 @@ function ZipFileListDialog({
                                                             blob: innerBlob,
                                                         },
                                                         initialPath: "/",
+                                                        isRetro,
                                                     });
                                                     return;
                                                 }

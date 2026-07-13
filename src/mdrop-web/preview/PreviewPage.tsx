@@ -32,6 +32,8 @@ export type PreviewPageProps = {
     file: TargetFile;
     requestSequence?: number;
     isRetro?: boolean;
+    startupNativePlaybackMode?: boolean;
+    persistNativePlaybackMode?: boolean;
     useHls?: boolean;
     forcedKind?: "audio" | "video" | "image";
     apiServer?: string;
@@ -51,6 +53,8 @@ export function PreviewPage({
     file,
     requestSequence = 0,
     isRetro = false,
+    startupNativePlaybackMode,
+    persistNativePlaybackMode,
     useHls = false,
     forcedKind,
     apiServer = "",
@@ -290,6 +294,8 @@ export function PreviewPage({
                         displayName={file.path}
                         looping={forcedKind === "audio" ? false : undefined}
                         autoPlay={false}
+                        startupNativePlaybackMode={startupNativePlaybackMode ?? false}
+                        persistNativePlaybackMode={persistNativePlaybackMode}
                         previewLayoutState={previewLayoutState}
                         onPreviewLayoutStateChange={onPreviewLayoutStateChange}
                         className="touch-manipulation border-0 bg-transparent p-0 shadow-none"

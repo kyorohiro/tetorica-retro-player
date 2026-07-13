@@ -53,6 +53,8 @@ type PreviewDialogOptions = {
     files: TargetFile[];
     initialIndex: number;
     isRetro?: boolean;
+    startupNativePlaybackMode?: boolean;
+    persistNativePlaybackMode?: boolean;
     useHls?: boolean;
     forcedKind?: "audio" | "video" | "image";
     apiServer?: string;
@@ -109,6 +111,8 @@ function PreviewDialog({
     files,
     initialIndex,
     isRetro = false,
+    startupNativePlaybackMode,
+    persistNativePlaybackMode,
     useHls = false,
     forcedKind,
     apiServer = "",
@@ -468,6 +472,8 @@ function PreviewDialog({
                     file={file}
                     requestSequence={requestSequence}
                     isRetro={isRetro}
+                    startupNativePlaybackMode={startupNativePlaybackMode}
+                    persistNativePlaybackMode={persistNativePlaybackMode}
                     useHls={useHls}
                     forcedKind={forcedKind}
                     apiServer={apiServer}
