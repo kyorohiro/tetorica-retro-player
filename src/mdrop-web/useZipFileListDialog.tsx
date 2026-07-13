@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { File, Folder, Loader, Archive, X } from "lucide-react";
 import { useDialog } from "../useDialog";
 import { usePreviewDialog } from "./usePreviewDialog";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import {
     isAudio,
     isEpub,
@@ -123,7 +124,7 @@ function ZipFileListDialog({
     title,
     source,
     initialPath = "/",
-    isRetro = false,
+    isRetro = !getNativePlaybackMode(),
     onClose,
 }: ZipFileListDialogOptions & { onClose: () => void }) {
     const [path, setPath] = useState(initialPath);

@@ -9,6 +9,7 @@ import {
     listenFfmpegStreamingEnabled,
     listenFfmpegStreamingMode,
 } from "./ffmpegPreference";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import { isAudio, isBrowserPlayableVideo, isEpub, isImage, isPdf, isText, isVideo, isVideoExtended } from "./utils";
 import { useZipFileListDialog } from "./useZipFileListDialog";
 
@@ -83,7 +84,7 @@ function FileListDialog({
     targetId,
     initialPath = "/",
     useHls = false,
-    isRetro = false,
+    isRetro = !getNativePlaybackMode(),
     onClose,
 }: FileListDialogOptions & { onClose: () => void }) {
     const [currentUseHls, setCurrentUseHls] = useState(

@@ -202,6 +202,14 @@ function WebApp({ active }: { active?: boolean }) {
 
                                                     //href={`${apiServer}/download/${file.id}`}
                                                     onClick={async () => {
+                                                        console.log("[webapp] preview:open", {
+                                                            path: file.path,
+                                                            previewMode,
+                                                            isRetroPreview,
+                                                            useHlsForThisFile: useHls && isVideoExtended(file.path),
+                                                            apiServer,
+                                                            targetId: file.id,
+                                                        });
                                                         if (isImage(file.path) || isBrowserPlayableVideo(file.path) || (useHls && isVideoExtended(file.path)) || isText(file.path) || isAudio(file.path) || isPdf(file.path) || isEpub(file.path) || isArchive(file.path)) {
                                                             //const index = sortedFiles.findIndex((f) => f.path === file.path);
 
