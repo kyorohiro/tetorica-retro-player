@@ -1616,7 +1616,16 @@ export function useRetroPreviewMedia({
         mediaRef.current = audio;
         safeRender();
         await ensureRendererReady();
-        await connectMediaAudio(audio);
+        if (shouldBypassWebAudio(audio, preferNativeVideoSurface)) {
+          debugAudio("connectMediaAudio:bypass-native-hls", {
+            currentSrc: audio.currentSrc || audio.src || null,
+            previewKind: "audio",
+          });
+          mediaSourceRef.current?.disconnect();
+          mediaSourceRef.current = null;
+        } else {
+          await connectMediaAudio(audio);
+        }
         syncVideoState();
       }
 
