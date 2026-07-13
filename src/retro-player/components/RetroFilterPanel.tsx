@@ -1246,7 +1246,7 @@ export function RetroFilterPanel({
             <input
               type="range"
               min="0"
-              max="0.5"
+              max="1.0"
               step="0.001"
               value={spotMaskStrength}
               onChange={(ev) => {

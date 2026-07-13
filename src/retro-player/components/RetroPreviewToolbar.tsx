@@ -151,6 +151,7 @@ type RetroPreviewToolbarProps = {
   onBrightnessChange: (value: number) => void;
   onFlipHToggle: () => void;
   onFlipVToggle: () => void;
+  onAudioOptimizationModeChange: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
   onNativeAudioSuppressionOverrideChange: (nextValue: boolean | null) => void;
   onPreferNativeHlsOverrideChange: (nextValue: boolean | null) => void;
   onVideoFilterLiteOverrideChange: (nextValue: boolean | null) => void;
@@ -192,6 +193,7 @@ export function RetroPreviewToolbar({
   onBrightnessChange,
   onFlipHToggle,
   onFlipVToggle,
+  onAudioOptimizationModeChange,
   onNativeAudioSuppressionOverrideChange,
   onPreferNativeHlsOverrideChange,
   onVideoFilterLiteOverrideChange,
@@ -205,10 +207,12 @@ export function RetroPreviewToolbar({
 }: RetroPreviewToolbarProps) {
   const playbackProfileDefaults = resolvePlaybackProfileDefaults(player.audioOptimizationMode);
   const isPlaybackProfileAuto =
+    player.audioOptimizationMode === "auto" &&
     player.nativeAudioSuppressionOverride === null &&
     player.preferNativeHlsOverride === null &&
     player.videoFilterLiteOverride === null;
   const restorePlaybackProfileAuto = () => {
+    onAudioOptimizationModeChange("auto");
     onNativeAudioSuppressionOverrideChange(null);
     onPreferNativeHlsOverrideChange(null);
     onVideoFilterLiteOverrideChange(null);

@@ -1216,6 +1216,7 @@ export function RetroPreviewView({
                 onBrightnessChange={setBrightness}
                 onFlipHToggle={() => { setFlipH((v) => !v); }}
                 onFlipVToggle={() => { setFlipV((v) => !v); }}
+                onAudioOptimizationModeChange={player.setAudioOptimizationMode}
                 onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
                 onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
                 onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1270,6 +1271,7 @@ export function RetroPreviewView({
               onBrightnessChange={setBrightness}
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
+              onAudioOptimizationModeChange={player.setAudioOptimizationMode}
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
               onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1323,6 +1325,7 @@ export function RetroPreviewView({
               onBrightnessChange={setBrightness}
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
+              onAudioOptimizationModeChange={player.setAudioOptimizationMode}
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
               onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1376,6 +1379,7 @@ export function RetroPreviewView({
             onBrightnessChange={setBrightness}
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
+            onAudioOptimizationModeChange={player.setAudioOptimizationMode}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1429,6 +1433,7 @@ export function RetroPreviewView({
             onBrightnessChange={setBrightness}
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
+            onAudioOptimizationModeChange={player.setAudioOptimizationMode}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
