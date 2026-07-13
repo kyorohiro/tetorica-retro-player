@@ -125,6 +125,26 @@ type PersistedRetroSettings = {
   recentLaunch?: PersistedRecentLaunchSettings;
 };
 
+const normalizePersistedRetroSettings = (
+  settings: PersistedRetroSettings,
+): PersistedRetroSettings => {
+  const audio = settings.audio;
+  if (!audio || audio.audioOptimizationMode === "auto") {
+    return settings;
+  }
+
+  return {
+    ...settings,
+    audio: {
+      ...audio,
+      // Playback Profile no longer exposes Safari/Chrome presets directly.
+      // Migrate old persisted values to auto so existing users do not keep
+      // a stale silent-path policy after upgrading.
+      audioOptimizationMode: "auto",
+    },
+  };
+};
+
 const MAX_RECENT_LAUNCH_ITEMS = 3;
 
 const readSettings = (): PersistedRetroSettings | null => {
@@ -134,8 +154,12 @@ const readSettings = (): PersistedRetroSettings | null => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as PersistedRetroSettings;
+    const parsed = normalizePersistedRetroSettings(JSON.parse(raw) as PersistedRetroSettings);
     if (parsed.version !== STORAGE_VERSION) return null;
+
+    if (raw !== JSON.stringify(parsed)) {
+      writeSettings(parsed);
+    }
 
     return parsed;
   } catch {
