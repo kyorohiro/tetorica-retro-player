@@ -4,6 +4,7 @@ import {
   defaultPresetId,
   type MonoTintMode,
   type PaletteMode,
+  type PhosphorDotShape,
   type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
@@ -46,6 +47,7 @@ export type RetroFilterInitialState = Partial<{
   saturationKnee: number;
   outputBrightness: number;
   phosphorDotLightBalance: number;
+  phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
@@ -107,6 +109,7 @@ const doesPresetMatchState = (
     (preset.saturationKnee ?? 0.2) === state.saturationKnee &&
     (preset.outputBrightness ?? 1) === state.outputBrightness &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
+    (preset.phosphorDotShape ?? "circle") === state.phosphorDotShape &&
     (preset.phosphorDotInternalScale ?? false) === state.phosphorDotInternalScale &&
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
@@ -199,6 +202,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
     phosphorDotLightBalance:
       initialState.phosphorDotLightBalance ?? (DEFAULT_PRESET.phosphorDotLightBalance ?? 1),
+    phosphorDotShape:
+      initialState.phosphorDotShape ?? (DEFAULT_PRESET.phosphorDotShape ?? "circle"),
     phosphorDotInternalScale:
       initialState.phosphorDotInternalScale ?? (DEFAULT_PRESET.phosphorDotInternalScale ?? false),
     phosphorDotBrightCore:
@@ -412,6 +417,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPhosphorDotShape = (phosphorDotShape: PhosphorDotShape) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotShape === phosphorDotShape ? current : { ...current, phosphorDotShape }
+    ));
+  };
+
   const setPhosphorDotInternalScale = (phosphorDotInternalScale: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -554,6 +566,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       saturationKnee: presetSettings.saturationKnee ?? 0.2,
       outputBrightness: presetSettings.outputBrightness ?? 1,
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
+      phosphorDotShape: presetSettings.phosphorDotShape ?? "circle",
       phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? false,
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
@@ -634,6 +647,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSaturationKnee,
     setOutputBrightness,
     setPhosphorDotLightBalance,
+    setPhosphorDotShape,
     setPhosphorDotInternalScale,
     setPhosphorDotBrightCore,
     setPhosphorDotCellFill,

@@ -46,6 +46,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   saturationKnee: DEFAULT_PRESET.saturationKnee ?? 0.2,
   outputBrightness: 1,
   phosphorDotLightBalance: 1,
+  phosphorDotShape: "circle",
   phosphorDotInternalScale: false,
   phosphorDotBrightCore: false,
   phosphorDotCellFill: 0,

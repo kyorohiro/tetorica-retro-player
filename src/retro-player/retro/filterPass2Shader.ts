@@ -33,6 +33,7 @@ uniform float uPhosphorDotLightBalance;
 uniform float uOutputBrightness;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
+uniform float uPhosphorDotShape;
 uniform float uPhosphorDotInternalScale;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
@@ -217,6 +218,94 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   ) * radiusJitter;
   float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
   float haloRadius = dotRadius + mix(0.028, 0.12 + highlightBloom * 0.08, brightness);
+  bool useHeartShape = uPhosphorDotShape > 0.5;
+  if (useHeartShape) {
+    vec2 heartUv = dotUv / max(dotRadius, 0.0001);
+    heartUv.x *= 1.02;
+    heartUv.y = heartUv.y * 1.08 + 0.2;
+
+    vec2 heartCoreUv = dotUv / max(innerCoreRadius, 0.0001);
+    heartCoreUv.x *= 1.02;
+    heartCoreUv.y = heartCoreUv.y * 1.08 + 0.2;
+
+    vec2 heartHaloUv = dotUv / max(haloRadius, 0.0001);
+    heartHaloUv.x *= 1.02;
+    heartHaloUv.y = heartHaloUv.y * 1.08 + 0.2;
+
+    float heartField =
+      pow(heartUv.x * heartUv.x + heartUv.y * heartUv.y - 0.9, 3.0) -
+      heartUv.x * heartUv.x * pow(heartUv.y, 3.0);
+    float heartCoreField =
+      pow(heartCoreUv.x * heartCoreUv.x + heartCoreUv.y * heartCoreUv.y - 0.9, 3.0) -
+      heartCoreUv.x * heartCoreUv.x * pow(heartCoreUv.y, 3.0);
+    float heartHaloField =
+      pow(heartHaloUv.x * heartHaloUv.x + heartHaloUv.y * heartHaloUv.y - 0.9, 3.0) -
+      heartHaloUv.x * heartHaloUv.x * pow(heartHaloUv.y, 3.0);
+
+    float heartEdge = 0.12 + highlightBloom * 0.03;
+    float heartRoundMask = 1.0 - smoothstep(1.02, 1.42, length(vec2(heartUv.x, heartUv.y * 0.88)));
+    float heartCoreRoundMask = 1.0 - smoothstep(1.0, 1.34, length(vec2(heartCoreUv.x, heartCoreUv.y * 0.88)));
+    float heartHaloRoundMask = 1.0 - smoothstep(1.08, 1.56, length(vec2(heartHaloUv.x, heartHaloUv.y * 0.88)));
+    float innerCore = 1.0 - smoothstep(-heartEdge * 0.55, heartEdge * 0.55, heartCoreField);
+    float bulb = 1.0 - smoothstep(-heartEdge, heartEdge, heartField);
+    float flatDisc = 1.0 - smoothstep(-heartEdge * 0.72, heartEdge * 0.72, heartField);
+    float halo = 1.0 - smoothstep(-heartEdge * 1.95, heartEdge * 1.95, heartHaloField);
+    innerCore *= heartCoreRoundMask;
+    bulb *= heartRoundMask;
+    flatDisc *= heartRoundMask;
+    halo *= heartHaloRoundMask;
+    float cavity = mix(1.0, 0.92, smoothstep(0.1, 1.0, brightness));
+    float bodyGlow = bulb * mix(
+      0.3 + brightness * 0.34,
+      0.3 + brightness * 0.34,
+      brightCoreMix
+    );
+    float emission =
+      gate *
+      lit *
+      amount *
+      (
+        innerCore * mix(
+          0.96 + brightness * 0.62 + highlightBloom * 0.18,
+          1.52 + brightness * 1.06 + highlightBloom * 0.38,
+          brightCoreMix
+        ) +
+        bodyGlow +
+        bulb * cavity * mix(
+          0.26 + brightness * 0.3,
+          0.28 + brightness * 0.34,
+          brightCoreMix
+        ) +
+        halo * halo * (0.035 + brightness * 0.065 + highlightBloom * 0.1)
+      ) *
+      brightCoreCompensation *
+      emissionJitter;
+    float floorLight =
+      gate *
+      lit *
+      amount *
+      (uBlackFloor * (0.48 + halo * 0.58)) *
+      (1.0 + cellJitter * 0.025);
+    float cellFill =
+      gate *
+      lit *
+      amount *
+      uPhosphorDotCellFill *
+      (0.26 + brightness * 0.22);
+    float flatDiscFill =
+      gate *
+      lit *
+      amount *
+      flatDisc *
+      (0.78 + brightness * 0.18);
+    vec3 dotCoreColor = color * emission;
+    dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix);
+    vec3 discCoreColor = color * flatDiscFill;
+    vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+    dotColor += color * floorLight;
+    return dotColor * lightLevel;
+  }
+
   float innerCore = exp(-dist * dist * mix(useBrightCore ? 220.0 : 120.0, useBrightCore ? 110.0 : 72.0, brightness));
   float bulb = 1.0 - smoothstep(dotRadius - 0.014, dotRadius + 0.02, dist);
   float flatDisc = 1.0 - smoothstep(dotRadius - 0.01, dotRadius + 0.012, dist);

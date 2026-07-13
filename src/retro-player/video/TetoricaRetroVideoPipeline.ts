@@ -3,6 +3,7 @@ import {
   paletteModeToUniform,
   type MonoTintMode,
   type PaletteMode,
+  type PhosphorDotShape,
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1 } from "../retro/filterPass1Shader.ts";
 import { FILTER_FRAGMENT_PASS2 } from "../retro/filterPass2Shader.ts";
@@ -44,6 +45,7 @@ export type RetroVideoFilterState = {
   saturationKnee: number;
   outputBrightness: number;
   phosphorDotLightBalance: number;
+  phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
@@ -115,6 +117,7 @@ type Pass2UniformLocations = {
   uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
+  uPhosphorDotShape: WebGLUniformLocation | null;
   uPhosphorDotInternalScale: WebGLUniformLocation | null;
   uPhosphorDotBrightCore: WebGLUniformLocation | null;
   uPhosphorDotCellFill: WebGLUniformLocation | null;
@@ -763,6 +766,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotLightBalance: gl.getUniformLocation(program, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(program, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
+      uPhosphorDotShape: gl.getUniformLocation(program, "uPhosphorDotShape"),
       uPhosphorDotInternalScale: gl.getUniformLocation(program, "uPhosphorDotInternalScale"),
       uPhosphorDotBrightCore: gl.getUniformLocation(program, "uPhosphorDotBrightCore"),
       uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
@@ -1046,6 +1050,7 @@ export class TetoricaRetroVideoPipeline {
         (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
     );
     gl.uniform1f(this.pass2Locs.uPhosphorDotMode, isPhosphorDotMode ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotShape, filterState.phosphorDotShape === "heart" ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotInternalScale, filterState.phosphorDotInternalScale ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);

@@ -11,6 +11,7 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
+export type PhosphorDotShape = "circle" | "heart";
 
 export const MONO_TINTS: Record<
   MonoTintMode,
@@ -53,6 +54,7 @@ export type RetroPresetDefinition = {
   saturationKnee?: number;
   outputBrightness?: number;
   phosphorDotLightBalance?: number;
+  phosphorDotShape?: PhosphorDotShape;
   phosphorDotInternalScale?: boolean;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
