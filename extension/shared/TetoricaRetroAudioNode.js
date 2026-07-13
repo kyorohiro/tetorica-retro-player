@@ -1,6 +1,9 @@
 // src/retro-player/audio/preset.ts
 var DEFAULT_AUDIO_SETTINGS = {
   audioOptimizationMode: "auto",
+  nativeAudioSuppressionOverride: null,
+  preferNativeHlsOverride: null,
+  videoFilterLiteOverride: null,
   isMuted: false,
   volume: 0.72,
   playbackRate: 1,
