@@ -25,6 +25,7 @@
 import type Hls from "hls.js";
 import type { HlsConfig } from "hls.js";
 import { RetroPreviewError } from "../i18n";
+import { getPreferNativeHlsOverride } from "../hooks/persistedRetroSettings";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
 export type RetroMediaSourceKind = "video" | "audio" | "image";
@@ -121,6 +122,10 @@ const shouldAllowNativeHlsFallback = (url: string): boolean =>
   !(/\/hls-sub\/|\/audio-hls-sub\//.test(url));
 
 const shouldPreferNativeAppleHls = (): boolean => {
+  const override = getPreferNativeHlsOverride();
+  if (typeof override === "boolean") {
+    return override;
+  }
   if (typeof navigator === "undefined") {
     return false;
   }

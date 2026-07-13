@@ -10,7 +10,7 @@ import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
-import { isWindowsChromiumAngleRisk } from "../platform/runtime";
+import { resolveVideoFilterLiteDefault } from "../platform/runtime";
 
 export type RetroVideoFilterState = {
   targetWidth: number;
@@ -166,21 +166,6 @@ const QUAD_VERTICES = new Float32Array([
 
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
-
-const readSearchParams = () => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    return new URLSearchParams(window.location.search);
-  } catch {
-    return null;
-  }
-};
-
-const shouldForceRetroFilterCompile = () =>
-  readSearchParams()?.get("forceRetroFilterCompile") === "1";
 
 type WindowsLitePass1Variant = "basic" | "pc98";
 type WindowsLitePass2Variant = "basic" | "phosphor";
@@ -644,9 +629,12 @@ export class TetoricaRetroVideoPipeline {
   static async create(
     gl: WebGL2RenderingContext,
     onFilterReady?: () => void,
+    options?: {
+      videoFilterLiteMode?: boolean;
+    },
   ): Promise<TetoricaRetroVideoPipeline> {
     const shouldUseWindowsLiteMode =
-      isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile();
+      options?.videoFilterLiteMode ?? resolveVideoFilterLiteDefault();
 
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);

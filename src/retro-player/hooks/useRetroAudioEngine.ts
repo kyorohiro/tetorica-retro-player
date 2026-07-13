@@ -92,6 +92,15 @@ export function useRetroAudioEngine({
   const audioOptimizationModeRef = useRef<RetroAudioSettings["audioOptimizationMode"]>(
     initialAudioSettings.audioOptimizationMode,
   );
+  const nativeAudioSuppressionOverrideRef = useRef<boolean | null>(
+    initialAudioSettings.nativeAudioSuppressionOverride ?? null,
+  );
+  const preferNativeHlsOverrideRef = useRef<boolean | null>(
+    initialAudioSettings.preferNativeHlsOverride ?? null,
+  );
+  const videoFilterLiteOverrideRef = useRef<boolean | null>(
+    initialAudioSettings.videoFilterLiteOverride ?? null,
+  );
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
   const volumeRef = useRef<number>(initialAudioSettings.volume);
   const playbackRateRef = useRef<number>(initialAudioSettings.playbackRate);
@@ -130,6 +139,15 @@ export function useRetroAudioEngine({
   const [audioOptimizationMode, setAudioOptimizationModeState] = useState<
     RetroAudioSettings["audioOptimizationMode"]
   >(initialAudioSettings.audioOptimizationMode);
+  const [nativeAudioSuppressionOverride, setNativeAudioSuppressionOverrideState] = useState<boolean | null>(
+    initialAudioSettings.nativeAudioSuppressionOverride ?? null,
+  );
+  const [preferNativeHlsOverride, setPreferNativeHlsOverrideState] = useState<boolean | null>(
+    initialAudioSettings.preferNativeHlsOverride ?? null,
+  );
+  const [videoFilterLiteOverride, setVideoFilterLiteOverrideState] = useState<boolean | null>(
+    initialAudioSettings.videoFilterLiteOverride ?? null,
+  );
   const [isMuted, setIsMutedState] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRateState] = useState<number>(
     initialAudioSettings.playbackRate,
@@ -311,6 +329,9 @@ export function useRetroAudioEngine({
 
   const getCurrentAudioSettings = (): RetroAudioSettings => ({
     audioOptimizationMode: audioOptimizationModeRef.current,
+    nativeAudioSuppressionOverride: nativeAudioSuppressionOverrideRef.current,
+    preferNativeHlsOverride: preferNativeHlsOverrideRef.current,
+    videoFilterLiteOverride: videoFilterLiteOverrideRef.current,
     isMuted: isMutedRef.current,
     volume: volumeRef.current,
     playbackRate: playbackRateRef.current,
@@ -367,7 +388,13 @@ export function useRetroAudioEngine({
       return;
     }
 
-    if (needsNativeAudioSuppression(audioOptimizationModeRef.current) && mediaSourceRef.current) {
+    if (
+      needsNativeAudioSuppression(
+        audioOptimizationModeRef.current,
+        nativeAudioSuppressionOverrideRef.current,
+      ) &&
+      mediaSourceRef.current
+    ) {
       mediaRef.current.muted = false;
       mediaRef.current.volume = 0;
     } else {
@@ -396,6 +423,9 @@ export function useRetroAudioEngine({
 
         if (
           key === "audioOptimizationMode" ||
+          key === "nativeAudioSuppressionOverride" ||
+          key === "preferNativeHlsOverride" ||
+          key === "videoFilterLiteOverride" ||
           key === "isMuted" ||
           key === "volume" ||
           key === "playbackRate" ||
@@ -538,7 +568,13 @@ export function useRetroAudioEngine({
         } else {
           mediaSource = context.createMediaElementSource(media);
           mediaSource.connect(engine.input);
-          if (isHlsManaged || needsNativeAudioSuppression(audioOptimizationModeRef.current)) {
+          if (
+            isHlsManaged ||
+            needsNativeAudioSuppression(
+              audioOptimizationModeRef.current,
+              nativeAudioSuppressionOverrideRef.current,
+            )
+          ) {
             media.muted = true;
             media.volume = 0;
           } else {
@@ -705,6 +741,9 @@ export function useRetroAudioEngine({
 
   const applyAudioSettings = (nextSettings: RetroAudioSettings) => {
     audioOptimizationModeRef.current = nextSettings.audioOptimizationMode;
+    nativeAudioSuppressionOverrideRef.current = nextSettings.nativeAudioSuppressionOverride ?? null;
+    preferNativeHlsOverrideRef.current = nextSettings.preferNativeHlsOverride ?? null;
+    videoFilterLiteOverrideRef.current = nextSettings.videoFilterLiteOverride ?? null;
     isMutedRef.current = nextSettings.isMuted;
     volumeRef.current = nextSettings.volume;
     playbackRateRef.current = nextSettings.playbackRate;
@@ -737,6 +776,9 @@ export function useRetroAudioEngine({
     inputTrimAmountRef.current = nextSettings.inputTrimAmount;
 
     setAudioOptimizationModeState(nextSettings.audioOptimizationMode);
+    setNativeAudioSuppressionOverrideState(nextSettings.nativeAudioSuppressionOverride ?? null);
+    setPreferNativeHlsOverrideState(nextSettings.preferNativeHlsOverride ?? null);
+    setVideoFilterLiteOverrideState(nextSettings.videoFilterLiteOverride ?? null);
     setIsMutedState(nextSettings.isMuted);
     setVolumeState(nextSettings.volume);
     setPlaybackRateState(nextSettings.playbackRate);
@@ -780,6 +822,21 @@ export function useRetroAudioEngine({
     setAudioOptimizationModeState,
     audioOptimizationModeRef,
     "audioOptimizationMode",
+  );
+  const setNativeAudioSuppressionOverride = createPatchedSetter(
+    setNativeAudioSuppressionOverrideState,
+    nativeAudioSuppressionOverrideRef,
+    "nativeAudioSuppressionOverride",
+  );
+  const setPreferNativeHlsOverride = createPatchedSetter(
+    setPreferNativeHlsOverrideState,
+    preferNativeHlsOverrideRef,
+    "preferNativeHlsOverride",
+  );
+  const setVideoFilterLiteOverride = createPatchedSetter(
+    setVideoFilterLiteOverrideState,
+    videoFilterLiteOverrideRef,
+    "videoFilterLiteOverride",
   );
   const setIsMuted = createPatchedSetter(setIsMutedState, isMutedRef, "isMuted");
   const setPlaybackRate = createPatchedSetter(
@@ -915,6 +972,8 @@ export function useRetroAudioEngine({
     const id = setTimeout(() => {
       savePersistedRetroAudioSettings({
         audioOptimizationMode,
+        nativeAudioSuppressionOverride,
+        preferNativeHlsOverride,
         isMuted,
         volume,
         playbackRate,
@@ -950,6 +1009,8 @@ export function useRetroAudioEngine({
     return () => clearTimeout(id);
   }, [
     audioOptimizationMode,
+    nativeAudioSuppressionOverride,
+    preferNativeHlsOverride,
     isMuted,
     volume,
     playbackRate,
@@ -1021,6 +1082,15 @@ export function useRetroAudioEngine({
     audioOptimizationModeRef,
     audioOptimizationMode,
     setAudioOptimizationMode,
+    nativeAudioSuppressionOverrideRef,
+    nativeAudioSuppressionOverride,
+    setNativeAudioSuppressionOverride,
+    preferNativeHlsOverrideRef,
+    preferNativeHlsOverride,
+    setPreferNativeHlsOverride,
+    videoFilterLiteOverrideRef,
+    videoFilterLiteOverride,
+    setVideoFilterLiteOverride,
     latencyHint,
     setLatencyHint,
     isMutedRef,

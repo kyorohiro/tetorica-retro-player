@@ -1,5 +1,8 @@
 export type RetroAudioSettings = {
   audioOptimizationMode: "auto" | "chrome" | "safari";
+  nativeAudioSuppressionOverride?: boolean | null;
+  preferNativeHlsOverride?: boolean | null;
+  videoFilterLiteOverride?: boolean | null;
   isMuted: boolean;
   volume: number;
   playbackRate: number;
@@ -70,6 +73,9 @@ export type RetroAudioAmountSetters = {
 
 export const DEFAULT_AUDIO_SETTINGS = {
   audioOptimizationMode: "auto",
+  nativeAudioSuppressionOverride: null,
+  preferNativeHlsOverride: null,
+  videoFilterLiteOverride: null,
   isMuted: false,
   volume: 0.72,
   playbackRate: 1,

@@ -24,6 +24,7 @@ import {
   type RetroAudioPresetKey,
   type RetroAudioSettings,
 } from "../audio/preset";
+import { resolvePlaybackProfileDefaults } from "../platform/runtime";
 import { RETRO_PRESETS, type RetroPresetKey } from "../retro/config";
 import type { RetroAlarmStatus } from "../hooks/useRetroAlarm";
 import { useAnchoredPopover } from "../hooks/useAnchoredPopover";
@@ -100,6 +101,9 @@ type RetroPreviewToolbarPlayerSlice = {
   isRecording: boolean;
   isPoweredOn: boolean;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
+  nativeAudioSuppressionOverride: boolean | null;
+  preferNativeHlsOverride: boolean | null;
+  videoFilterLiteOverride: boolean | null;
   latencyHint: AudioContextLatencyCategory;
   isPlaying: boolean;
   togglePlayback: () => Promise<void>;
@@ -147,9 +151,9 @@ type RetroPreviewToolbarProps = {
   onBrightnessChange: (value: number) => void;
   onFlipHToggle: () => void;
   onFlipVToggle: () => void;
-  onAudioOptimizationModeChange: (
-    nextMode: RetroAudioSettings["audioOptimizationMode"],
-  ) => void;
+  onNativeAudioSuppressionOverrideChange: (nextValue: boolean | null) => void;
+  onPreferNativeHlsOverrideChange: (nextValue: boolean | null) => void;
+  onVideoFilterLiteOverrideChange: (nextValue: boolean | null) => void;
   onLatencyHintChange: (hint: AudioContextLatencyCategory) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
@@ -188,7 +192,9 @@ export function RetroPreviewToolbar({
   onBrightnessChange,
   onFlipHToggle,
   onFlipVToggle,
-  onAudioOptimizationModeChange,
+  onNativeAudioSuppressionOverrideChange,
+  onPreferNativeHlsOverrideChange,
+  onVideoFilterLiteOverrideChange,
   onLatencyHintChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
@@ -197,6 +203,16 @@ export function RetroPreviewToolbar({
   selectedPreset,
   onApplyPreset,
 }: RetroPreviewToolbarProps) {
+  const playbackProfileDefaults = resolvePlaybackProfileDefaults(player.audioOptimizationMode);
+  const isPlaybackProfileAuto =
+    player.nativeAudioSuppressionOverride === null &&
+    player.preferNativeHlsOverride === null &&
+    player.videoFilterLiteOverride === null;
+  const restorePlaybackProfileAuto = () => {
+    onNativeAudioSuppressionOverrideChange(null);
+    onPreferNativeHlsOverrideChange(null);
+    onVideoFilterLiteOverrideChange(null);
+  };
   const tooltipText =
     locale === "ja"
       ? {
@@ -525,32 +541,92 @@ export function RetroPreviewToolbar({
             </div>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Audio Optimize</span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                  {player.audioOptimizationMode}
-                </span>
+                <span>Playback Profile</span>
+                <button
+                  type="button"
+                  onClick={restorePlaybackProfileAuto}
+                  className={[
+                    "rounded border px-2 py-1 text-[10px] uppercase tracking-[0.2em] transition",
+                    isPlaybackProfileAuto
+                      ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                      : "border-slate-700 bg-slate-900/70 text-slate-400 hover:bg-slate-800",
+                  ].join(" ")}
+                >
+                  Auto
+                </button>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(["auto", "chrome", "safari"] as const).map((mode) => {
-                  const isActive = player.audioOptimizationMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        onAudioOptimizationModeChange(mode);
-                      }}
-                      className={[
-                        "inline-flex min-h-8 items-center justify-center rounded-md border px-1.5 py-1 text-[11px] font-medium capitalize transition",
-                        isActive
-                          ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
-                          : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
-                      ].join(" ")}
-                    >
-                      {mode}
-                    </button>
-                  );
-                })}
+              <div className="mb-2 text-[10px] leading-4 text-slate-500">
+                {locale === "ja"
+                  ? "環境に合わせて自動調整します。必要なときだけ個別 override を変更してください。"
+                  : "Adjust automatically for the current environment. Change overrides only when needed."}
+              </div>
+              <div className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-[10px] text-slate-300">
+                {[
+                  {
+                    key: "native-gain",
+                    label: "Suppress native gain",
+                    value: player.nativeAudioSuppressionOverride,
+                    effectiveValue:
+                      player.nativeAudioSuppressionOverride ?? playbackProfileDefaults.nativeAudioSuppression,
+                    onChange: onNativeAudioSuppressionOverrideChange,
+                  },
+                  {
+                    key: "native-hls",
+                    label: "Prefer native HLS",
+                    value: player.preferNativeHlsOverride,
+                    effectiveValue:
+                      player.preferNativeHlsOverride ?? playbackProfileDefaults.preferNativeHls,
+                    onChange: onPreferNativeHlsOverrideChange,
+                  },
+                  {
+                    key: "video-filter-lite",
+                    label: "Video filter lite",
+                    value: player.videoFilterLiteOverride,
+                    effectiveValue:
+                      player.videoFilterLiteOverride ?? playbackProfileDefaults.videoFilterLite,
+                    onChange: onVideoFilterLiteOverrideChange,
+                  },
+                ].map((item) => (
+                  <div key={item.key} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div>{item.label}</div>
+                      <div className="text-[9px] text-slate-500">
+                        {item.value === null
+                          ? `Preset: ${item.effectiveValue ? "On" : "Off"}`
+                          : item.effectiveValue
+                            ? "Override: On"
+                            : "Override: Off"}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        {
+                          label: item.effectiveValue ? "Preset On" : "Preset Off",
+                          value: null,
+                        },
+                        { label: "On", value: true },
+                        { label: "Off", value: false },
+                      ].map((option) => {
+                        const isActive = item.value === option.value;
+                        return (
+                          <button
+                            key={option.label}
+                            type="button"
+                            onClick={() => item.onChange(option.value)}
+                            className={[
+                              "rounded border px-1.5 py-1 text-[9px] transition",
+                              isActive
+                                ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                                : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                            ].join(" ")}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="mb-3 border-b border-slate-700 pb-3">

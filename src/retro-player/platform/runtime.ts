@@ -33,28 +33,67 @@ export const isWindowsChromiumAngleRisk = () => {
   return isWindowsRuntime() && isChromium;
 };
 
+export const isRealSafariWebKit = () => {
+  if (typeof navigator === "undefined") return false;
+  if (isTauriRuntime()) return false;
+  if (navigator.vendor !== "Apple Computer, Inc.") return false;
+  return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
+};
+
+const readSearchParams = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return new URLSearchParams(window.location.search);
+  } catch {
+    return null;
+  }
+};
+
+export const shouldForceRetroFilterCompile = () =>
+  readSearchParams()?.get("forceRetroFilterCompile") === "1";
+
+export const resolveVideoFilterLiteDefault = () =>
+  isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile();
+
+export const resolvePlaybackProfileDefaults = (
+  audioOptimizationMode: "auto" | "chrome" | "safari",
+) => {
+  if (audioOptimizationMode === "chrome") {
+    return {
+      nativeAudioSuppression: false,
+      preferNativeHls: false,
+      videoFilterLite: false,
+    };
+  }
+
+  if (audioOptimizationMode === "safari") {
+    return {
+      nativeAudioSuppression: true,
+      preferNativeHls: true,
+      videoFilterLite: false,
+    };
+  }
+
+  const isSafari = isRealSafariWebKit();
+  return {
+    nativeAudioSuppression: isSafari,
+    preferNativeHls: isSafari,
+    videoFilterLite: resolveVideoFilterLiteDefault(),
+  };
+};
+
 // navigator.vendor is used as the primary discriminator because it is not affected by
 // Chrome DevTools' UA override (Chrome always reports "Google Inc." regardless of
 // the emulated UA, so spoofed iOS Safari UA strings don't trigger this path).
 export const needsNativeAudioSuppression = (
   audioOptimizationMode: "auto" | "chrome" | "safari",
+  override?: boolean | null,
 ): boolean => {
-  if (audioOptimizationMode === "chrome") {
-    return false;
+  if (typeof override === "boolean") {
+    return override;
   }
-
-  if (audioOptimizationMode === "safari") {
-    return true;
-  }
-
-  if (typeof navigator === "undefined") return false;
-  if (isTauriRuntime()) {
-    return false;
-  }
-  // navigator.vendor === "Apple Computer, Inc." only in real Safari/WebKit.
-  // Chrome DevTools UA emulation does NOT change navigator.vendor.
-  if (navigator.vendor !== "Apple Computer, Inc.") return false;
-  // Exclude iOS Chrome (CriOS), Firefox for iOS (FxiOS), Opera for iOS (OPiOS)
-  // which also run on WebKit and share the same vendor string.
-  return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
+  return resolvePlaybackProfileDefaults(audioOptimizationMode).nativeAudioSuppression;
 };

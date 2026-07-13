@@ -248,11 +248,23 @@ export function usePixiVideoPlayer(
     [filterState, isVideoFxEnabled, isNativeModePreferred],
   );
 
+  const audio = useRetroAudioEngine({
+    instanceLabel: instanceLabelRef.current,
+    previewKind,
+    previewKindRef,
+    mediaRef,
+    isPlaying,
+    isPlayingRef,
+    nativePlaybackMode: isNativeModePreferred,
+    playbackSource: options?.playbackSource ?? "media",
+  });
+
   const stage = useRetroPixiStage({
     filterState: effectiveFilterState,
     fitMode,
     renderResolutionScale,
     isPoweredOn,
+    videoFilterLiteOverride: audio.videoFilterLiteOverride,
     isPlayingRef,
     isRecordingRef,
     previewKindRef,
@@ -303,17 +315,6 @@ export function usePixiVideoPlayer(
     Boolean(options?.preferNativeVideoSurface) &&
     nativeVisualElement !== null;
 
-  const audio = useRetroAudioEngine({
-    instanceLabel: instanceLabelRef.current,
-    previewKind,
-    previewKindRef,
-    mediaRef,
-    isPlaying,
-    isPlayingRef,
-    nativePlaybackMode: isNativeModePreferred,
-    playbackSource: options?.playbackSource ?? "media",
-  });
-
   const {
     audioContextRef,
     mediaSourceRef,
@@ -323,6 +324,13 @@ export function usePixiVideoPlayer(
     audioOptimizationModeRef,
     audioOptimizationMode,
     setAudioOptimizationMode,
+    nativeAudioSuppressionOverrideRef,
+    nativeAudioSuppressionOverride,
+    setNativeAudioSuppressionOverride,
+    preferNativeHlsOverride,
+    setPreferNativeHlsOverride,
+    videoFilterLiteOverride,
+    setVideoFilterLiteOverride,
     latencyHint,
     setLatencyHint,
     isMutedRef,
@@ -598,6 +606,7 @@ export function usePixiVideoPlayer(
     masterGainRef,
     noiseGainRef,
     audioOptimizationModeRef,
+    nativeAudioSuppressionOverrideRef,
     isMutedRef,
     volumeRef,
     playbackRateRef,
@@ -1390,6 +1399,9 @@ export function usePixiVideoPlayer(
     isRendererReady,
     isFilterReady,
     audioOptimizationMode,
+    nativeAudioSuppressionOverride,
+    preferNativeHlsOverride,
+    videoFilterLiteOverride,
     loadingLabel,
     isLoading,
     isBuffering,
@@ -1468,6 +1480,9 @@ export function usePixiVideoPlayer(
     applyAudioSettings,
     resetAudioSettings,
     setAudioOptimizationMode,
+    setNativeAudioSuppressionOverride,
+    setPreferNativeHlsOverride,
+    setVideoFilterLiteOverride,
     latencyHint,
     setLatencyHint,
     playVideoWithAudio,

@@ -57,6 +57,9 @@ export type PersistedRetroFilterSettings = {
 
 export type PersistedRetroAudioSettings = {
   audioOptimizationMode: "auto" | "chrome" | "safari";
+  nativeAudioSuppressionOverride?: boolean | null;
+  preferNativeHlsOverride?: boolean | null;
+  videoFilterLiteOverride?: boolean | null;
   isMuted: boolean;
   volume: number;
   playbackRate: number;
@@ -333,6 +336,11 @@ export const savePersistedRetroAudioSettings = (
     ui: current?.ui,
     preferredAudioInputDeviceId: current?.preferredAudioInputDeviceId,
   });
+};
+
+export const getPreferNativeHlsOverride = (): boolean | null => {
+  const value = readSettings()?.audio?.preferNativeHlsOverride;
+  return typeof value === "boolean" ? value : null;
 };
 
 export const savePersistedRetroUiSettings = (

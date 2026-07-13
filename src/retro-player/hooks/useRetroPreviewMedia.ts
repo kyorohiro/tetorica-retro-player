@@ -41,6 +41,7 @@ type UseRetroPreviewMediaParams = {
   masterGainRef: CurrentRef<GainNode | null>;
   noiseGainRef: CurrentRef<GainNode | null>;
   audioOptimizationModeRef: CurrentRef<RetroAudioSettings["audioOptimizationMode"]>;
+  nativeAudioSuppressionOverrideRef: CurrentRef<boolean | null>;
   isMutedRef: CurrentRef<boolean>;
   volumeRef: CurrentRef<number>;
   playbackRateRef: CurrentRef<number>;
@@ -117,6 +118,7 @@ export function useRetroPreviewMedia({
   masterGainRef,
   noiseGainRef,
   audioOptimizationModeRef,
+  nativeAudioSuppressionOverrideRef,
   isMutedRef,
   volumeRef,
   playbackRateRef,
@@ -889,7 +891,11 @@ export function useRetroPreviewMedia({
         return;
       }
       if (
-        (needsNativeAudioSuppression(audioOptimizationModeRef.current) &&
+        (
+          needsNativeAudioSuppression(
+            audioOptimizationModeRef.current,
+            nativeAudioSuppressionOverrideRef.current,
+          ) &&
           mediaSourceRef.current) ||
         bypassWebAudio
       ) {
@@ -989,7 +995,10 @@ export function useRetroPreviewMedia({
       }
       if (
         (audioContextState !== "running" &&
-          needsNativeAudioSuppression(audioOptimizationModeRef.current) &&
+          needsNativeAudioSuppression(
+            audioOptimizationModeRef.current,
+            nativeAudioSuppressionOverrideRef.current,
+          ) &&
           mediaSourceRef.current) ||
         bypassWebAudio
       ) {
