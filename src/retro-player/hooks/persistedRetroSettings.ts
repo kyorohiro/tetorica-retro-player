@@ -1,4 +1,4 @@
-import type { MonoTintMode, PaletteMode } from "../retro/config";
+import type { MonoTintMode, PaletteMode, PhosphorDotShape } from "../retro/config";
 
 const STORAGE_KEY = "tetorica-retro-player.settings";
 const RECENT_LAUNCH_STORAGE_KEY = "tetorica-retro-player.recentLaunch";
@@ -36,6 +36,7 @@ export type PersistedRetroFilterSettings = {
   saturationKnee: number;
   outputBrightness: number;
   phosphorDotLightBalance: number;
+  phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;

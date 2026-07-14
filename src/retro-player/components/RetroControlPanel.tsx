@@ -373,6 +373,7 @@ export function RetroControlPanel({
               saturationKnee={filterState.saturationKnee}
               outputBrightness={filterState.outputBrightness}
               phosphorDotLightBalance={filterState.phosphorDotLightBalance}
+              phosphorDotShape={filterState.phosphorDotShape}
               phosphorDotInternalScale={filterState.phosphorDotInternalScale}
               phosphorDotBrightCore={filterState.phosphorDotBrightCore}
               phosphorDotCellFill={filterState.phosphorDotCellFill}
@@ -421,6 +422,7 @@ export function RetroControlPanel({
               onSetSaturationKnee={filterState.setSaturationKnee}
               onSetOutputBrightness={filterState.setOutputBrightness}
               onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
+              onSetPhosphorDotShape={filterState.setPhosphorDotShape}
               onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
               onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
               onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}

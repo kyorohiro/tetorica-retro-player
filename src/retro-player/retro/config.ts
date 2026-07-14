@@ -11,6 +11,7 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
+export type PhosphorDotShape = "circle" | "heart";
 
 export const MONO_TINTS: Record<
   MonoTintMode,
@@ -53,6 +54,7 @@ export type RetroPresetDefinition = {
   saturationKnee?: number;
   outputBrightness?: number;
   phosphorDotLightBalance?: number;
+  phosphorDotShape?: PhosphorDotShape;
   phosphorDotInternalScale?: boolean;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
@@ -427,20 +429,21 @@ export const RETRO_PRESETS = {
     vignette: 0.00,
     glow: 0.28,
     phosphor: 0.0,
-    spotMask: 0.8,
+    spotMask: 0.22,
     bulbRadius: 0.38,
     blackFloor: 0.002,
-    phosphorDotLightBalance: 0.22,
-    phosphorDotInternalScale: false,
+    phosphorDotShape: "heart",  
+    phosphorDotLightBalance: 0.16,
+    phosphorDotInternalScale: true,
     phosphorDotBrightCore: true,
-    phosphorDotCellFill: 0.12,
+    phosphorDotCellFill: 0.28,
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: true,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    outputBrightness: 1.8,
+    outputBrightness: 1.0,
   },
   phosphorDot: {
     label: "Phosphor Dot",

@@ -7,6 +7,7 @@ import {
   RETRO_PRESETS,
   type MonoTintMode,
   type PaletteMode,
+  type PhosphorDotShape,
   type RetroPresetDefinition,
   type RetroPresetKey,
 } from "../retro/config";
@@ -71,6 +72,7 @@ type RetroFilterPanelProps = {
   saturationKnee: number;
   outputBrightness: number;
   phosphorDotLightBalance: number;
+  phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: boolean;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
@@ -119,6 +121,7 @@ type RetroFilterPanelProps = {
   onSetSaturationKnee: (value: number) => void;
   onSetOutputBrightness: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
+  onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
   onSetPhosphorDotInternalScale: (value: boolean) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
@@ -168,6 +171,7 @@ export function RetroFilterPanel({
   saturationKnee,
   outputBrightness,
   phosphorDotLightBalance,
+  phosphorDotShape,
   phosphorDotInternalScale,
   phosphorDotBrightCore,
   phosphorDotCellFill,
@@ -215,6 +219,7 @@ export function RetroFilterPanel({
   onSetSaturationKnee,
   onSetOutputBrightness,
   onSetPhosphorDotLightBalance,
+  onSetPhosphorDotShape,
   onSetPhosphorDotInternalScale,
   onSetPhosphorDotBrightCore,
   onSetPhosphorDotCellFill,
@@ -1177,6 +1182,34 @@ export function RetroFilterPanel({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotShape("circle");
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                phosphorDotShape === "circle"
+                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Dot shape: Circle
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotShape("heart");
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                phosphorDotShape === "heart"
+                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Dot shape: Heart
+            </button>
             <button
               type="button"
               onClick={() => {

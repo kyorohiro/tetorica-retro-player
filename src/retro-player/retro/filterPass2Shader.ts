@@ -33,6 +33,7 @@ uniform float uPhosphorDotLightBalance;
 uniform float uOutputBrightness;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
+uniform float uPhosphorDotShape;
 uniform float uPhosphorDotInternalScale;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
@@ -208,15 +209,109 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   bool useBrightCore = uPhosphorDotBrightCore > 0.5;
   float brightCoreMix = (useBrightCore ? 1.0 : 0.0) * (1.0 - cellFillMix) * (1.0 - flatDiscMode);
   float brightCoreCompensation = mix(1.0, 1.2 + brightness * 0.18 + highlightBloom * 0.08, brightCoreMix);
+  float brightCoreRadiusBoost = mix(1.0, 1.85 + highlightBloom * 0.35, brightCoreMix);
+  float brightCoreHaloBoost = mix(1.0, 2.1 + highlightBloom * 0.45, brightCoreMix);
   float radiusJitter = 1.0 + cellJitter * 0.045;
   float emissionJitter = 1.0 + cellJitter * 0.035;
   float dotRadius = mix(
     uBulbRadius * (useBrightCore ? 0.14 : 0.19),
     uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
     radiusBias
-  ) * radiusJitter;
+  ) * radiusJitter * brightCoreRadiusBoost;
   float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
-  float haloRadius = dotRadius + mix(0.028, 0.12 + highlightBloom * 0.08, brightness);
+  float haloRadius =
+    dotRadius +
+    mix(0.028, 0.12 + highlightBloom * 0.08, brightness) * brightCoreHaloBoost;
+  bool useHeartShape = uPhosphorDotShape > 0.5;
+  if (useHeartShape) {
+    vec2 heartUv = dotUv / max(dotRadius, 0.0001);
+    heartUv.x *= 1.02;
+    heartUv.y = heartUv.y * 1.08 + 0.2;
+
+    vec2 heartCoreUv = dotUv / max(innerCoreRadius, 0.0001);
+    heartCoreUv.x *= 1.02;
+    heartCoreUv.y = heartCoreUv.y * 1.08 + 0.2;
+
+    vec2 heartHaloUv = dotUv / max(haloRadius, 0.0001);
+    heartHaloUv.x *= 1.02;
+    heartHaloUv.y = heartHaloUv.y * 1.08 + 0.2;
+
+    float heartField =
+      pow(heartUv.x * heartUv.x + heartUv.y * heartUv.y - 0.9, 3.0) -
+      heartUv.x * heartUv.x * pow(heartUv.y, 3.0);
+    float heartCoreField =
+      pow(heartCoreUv.x * heartCoreUv.x + heartCoreUv.y * heartCoreUv.y - 0.9, 3.0) -
+      heartCoreUv.x * heartCoreUv.x * pow(heartCoreUv.y, 3.0);
+    float heartHaloField =
+      pow(heartHaloUv.x * heartHaloUv.x + heartHaloUv.y * heartHaloUv.y - 0.9, 3.0) -
+      heartHaloUv.x * heartHaloUv.x * pow(heartHaloUv.y, 3.0);
+
+    float heartEdge = 0.12 + highlightBloom * 0.03;
+    float heartRoundMask = 1.0 - smoothstep(1.02, 1.42, length(vec2(heartUv.x, heartUv.y * 0.88)));
+    float heartCoreRoundMask = 1.0 - smoothstep(1.0, 1.34, length(vec2(heartCoreUv.x, heartCoreUv.y * 0.88)));
+    float heartHaloRoundMask = 1.0 - smoothstep(1.08, 1.56, length(vec2(heartHaloUv.x, heartHaloUv.y * 0.88)));
+    float innerCore = 1.0 - smoothstep(-heartEdge * 0.55, heartEdge * 0.55, heartCoreField);
+    float bulb = 1.0 - smoothstep(-heartEdge, heartEdge, heartField);
+    float flatDisc = 1.0 - smoothstep(-heartEdge * 0.72, heartEdge * 0.72, heartField);
+    float halo = 1.0 - smoothstep(-heartEdge * 1.95, heartEdge * 1.95, heartHaloField);
+    innerCore *= heartCoreRoundMask;
+    bulb *= heartRoundMask;
+    flatDisc *= heartRoundMask;
+    halo *= heartHaloRoundMask;
+    float cavity = mix(1.0, 0.92, smoothstep(0.1, 1.0, brightness));
+    float bodyGlow = bulb * mix(
+      0.3 + brightness * 0.34,
+      0.3 + brightness * 0.34,
+      brightCoreMix
+    );
+    float emission =
+      gate *
+      lit *
+      amount *
+      (
+        innerCore * mix(
+          0.96 + brightness * 0.62 + highlightBloom * 0.18,
+          1.52 + brightness * 1.06 + highlightBloom * 0.38,
+          brightCoreMix
+        ) +
+        bodyGlow +
+        bulb * cavity * mix(
+          0.26 + brightness * 0.3,
+          0.28 + brightness * 0.34,
+          brightCoreMix
+        ) +
+        halo * halo * (0.035 + brightness * 0.065 + highlightBloom * 0.1)
+      ) *
+      brightCoreCompensation *
+      emissionJitter;
+    float floorLight =
+      gate *
+      lit *
+      amount *
+      (uBlackFloor * (0.48 + halo * 0.58)) *
+      (1.0 + cellJitter * 0.025);
+    float cellFill =
+      gate *
+      lit *
+      amount *
+      uPhosphorDotCellFill *
+      (0.26 + brightness * 0.22);
+    float flatDiscFill =
+      gate *
+      lit *
+      amount *
+      flatDisc *
+      (0.78 + brightness * 0.18);
+    float brightCoreCellClamp = mix(1.0, 0.08, brightCoreMix);
+    float brightCoreFloorClamp = mix(1.0, 0.18, brightCoreMix);
+    vec3 dotCoreColor = color * emission;
+    dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix) * brightCoreCellClamp;
+    vec3 discCoreColor = color * flatDiscFill;
+    vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+    dotColor += color * floorLight * brightCoreFloorClamp;
+    return dotColor * lightLevel;
+  }
+
   float innerCore = exp(-dist * dist * mix(useBrightCore ? 220.0 : 120.0, useBrightCore ? 110.0 : 72.0, brightness));
   float bulb = 1.0 - smoothstep(dotRadius - 0.014, dotRadius + 0.02, dist);
   float flatDisc = 1.0 - smoothstep(dotRadius - 0.01, dotRadius + 0.012, dist);
@@ -266,11 +361,13 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     amount *
     flatDisc *
     (0.78 + brightness * 0.18);
+  float brightCoreCellClamp = mix(1.0, 0.1, brightCoreMix);
+  float brightCoreFloorClamp = mix(1.0, 0.22, brightCoreMix);
   vec3 dotCoreColor = color * emission;
-  dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix);
+  dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix) * brightCoreCellClamp;
   vec3 discCoreColor = color * flatDiscFill;
   vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
-  dotColor += color * floorLight;
+  dotColor += color * floorLight * brightCoreFloorClamp;
   return dotColor * lightLevel;
 }
 
@@ -432,6 +529,7 @@ void main(void)
     vec3 leftColor = texture(uPass1Texture, leftUv).rgb;
     vec3 downColor = texture(uPass1Texture, downUv).rgb;
     vec3 upColor = texture(uPass1Texture, upUv).rgb;
+    bool useBrightCoreLeak = uPhosphorDotBrightCore > 0.5;
 
     float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
@@ -463,6 +561,70 @@ void main(void)
     float dist = length(dotUv);
     float highlightBloom = smoothstep(0.68, 1.0, phosphorBrightness);
     bool useBrightCore = uPhosphorDotBrightCore > 0.5;
+    if (useBrightCoreLeak) {
+      vec2 texel = 1.0 / vec2(textureSize(uPass1Texture, 0));
+      float leakRadius = (1.2 + phosphorBrightness * 2.2 + internalScaleMix * 0.8) * max(uBulbRadius, 0.08);
+      vec2 leakOffsetX = vec2(texel.x * leakRadius, 0.0);
+      vec2 leakOffsetY = vec2(0.0, texel.y * leakRadius);
+      vec2 leakOffsetD = vec2(texel.x, texel.y) * leakRadius * 0.82;
+      vec3 bloomSample =
+        texture(uPass1Texture, clamp(curvedUv + leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(curvedUv - leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(curvedUv + leakOffsetY, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(curvedUv - leakOffsetY, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(curvedUv + leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07 +
+        texture(uPass1Texture, clamp(curvedUv + vec2(leakOffsetD.x, -leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
+        texture(uPass1Texture, clamp(curvedUv + vec2(-leakOffsetD.x, leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
+        texture(uPass1Texture, clamp(curvedUv - leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07;
+      float leakStrength =
+        uSpotMaskStrength *
+        (0.14 + phosphorBrightness * 0.24 + neighborBlendMix * 0.08 + internalScaleMix * 0.1);
+      phosphorColor += bloomSample * leakStrength;
+
+      float overlapRadius = 0.96 + uBulbRadius * 3.4 + phosphorBrightness * 0.52;
+      vec2 rightNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x - 1.0, cellUv.y * aspectCompensation)
+        : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y);
+      vec2 leftNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x + 1.0, cellUv.y * aspectCompensation)
+        : vec2((cellUv.x + 1.0) / aspectCompensation, cellUv.y);
+      vec2 downNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x, (cellUv.y - 1.0) * aspectCompensation)
+        : vec2(cellUv.x / aspectCompensation, cellUv.y - 1.0);
+      vec2 upNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x, (cellUv.y + 1.0) * aspectCompensation)
+        : vec2(cellUv.x / aspectCompensation, cellUv.y + 1.0);
+      vec2 downRightNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x - 1.0, (cellUv.y - 1.0) * aspectCompensation)
+        : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y - 1.0);
+      vec2 downLeftNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x + 1.0, (cellUv.y - 1.0) * aspectCompensation)
+        : vec2((cellUv.x + 1.0) / aspectCompensation, cellUv.y - 1.0);
+      vec2 upRightNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x - 1.0, (cellUv.y + 1.0) * aspectCompensation)
+        : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y + 1.0);
+      vec2 upLeftNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x + 1.0, (cellUv.y + 1.0) * aspectCompensation)
+        : vec2((cellUv.x + 1.0) / aspectCompensation, cellUv.y + 1.0);
+      float rightNeighborHalo = exp(-pow(length(rightNeighborUv) / overlapRadius, 2.0));
+      float leftNeighborHalo = exp(-pow(length(leftNeighborUv) / overlapRadius, 2.0));
+      float downNeighborHalo = exp(-pow(length(downNeighborUv) / overlapRadius, 2.0));
+      float upNeighborHalo = exp(-pow(length(upNeighborUv) / overlapRadius, 2.0));
+      float downRightNeighborHalo = exp(-pow(length(downRightNeighborUv) / overlapRadius, 2.0));
+      float downLeftNeighborHalo = exp(-pow(length(downLeftNeighborUv) / overlapRadius, 2.0));
+      float upRightNeighborHalo = exp(-pow(length(upRightNeighborUv) / overlapRadius, 2.0));
+      float upLeftNeighborHalo = exp(-pow(length(upLeftNeighborUv) / overlapRadius, 2.0));
+      vec3 overlapHalo =
+        rightColor * rightNeighborHalo +
+        leftColor * leftNeighborHalo +
+        downColor * downNeighborHalo +
+        upColor * upNeighborHalo +
+        texture(uPass1Texture, clamp((dotCell + vec2(1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downRightNeighborHalo * 0.75 +
+        texture(uPass1Texture, clamp((dotCell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downLeftNeighborHalo * 0.75 +
+        texture(uPass1Texture, clamp((dotCell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upRightNeighborHalo * 0.75 +
+        texture(uPass1Texture, clamp((dotCell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upLeftNeighborHalo * 0.75;
+      phosphorColor += overlapHalo * uSpotMaskStrength * (0.22 + phosphorBrightness * 0.34);
+    }
     float dotRadius = mix(
       uBulbRadius * (useBrightCore ? 0.14 : 0.19),
       uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
@@ -509,7 +671,10 @@ void main(void)
     float phosphorBaseLift =
       uSpotMaskStrength *
       (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
-    phosphorColor += mixedSourceColor * phosphorBaseLift;
+    phosphorColor += mixedSourceColor * phosphorBaseLift * (useBrightCoreLeak ? 0.08 : 1.0);
+    if (useBrightCoreLeak) {
+      phosphorColor += mixedSourceColor * uSpotMaskStrength * (0.02 + phosphorBrightness * 0.06);
+    }
 
     float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, phosphorDotVignette) * uVignetteStrength;
