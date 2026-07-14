@@ -436,7 +436,7 @@ export const RETRO_PRESETS = {
     phosphorDotLightBalance: 0.16,
     phosphorDotInternalScale: true,
     phosphorDotBrightCore: true,
-    phosphorDotCellFill: 0.35,
+    phosphorDotCellFill: 0.28,
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: true,
     monoTint: "gray",
