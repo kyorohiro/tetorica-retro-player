@@ -112,6 +112,7 @@ export type RetroPreviewPlayerSlice = {
   setLatencyHint: (hint: AudioContextLatencyCategory) => void;
   powerOn: () => void;
   powerOff: () => void;
+  resetRenderer: () => Promise<void>;
   playVideoWithAudio: () => Promise<void>;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<string | null>;
@@ -849,6 +850,28 @@ export function RetroPreviewView({
     })();
   };
 
+  const handlePowerLongPress = React.useCallback(() => {
+    void (async () => {
+      const confirmed = await confirmDialog(
+        locale === "ja"
+          ? {
+              title: "Renderer reset",
+              body: "描画系を再起動しますか?\n\nフィルターの内部状態と shader cache を作り直します。",
+              okText: "Reset",
+              cancelText: "キャンセル",
+            }
+          : {
+              title: "Renderer reset",
+              body: "Reset the renderer?\n\nThis rebuilds the filter state and shader cache.",
+              okText: "Reset",
+              cancelText: "Cancel",
+            },
+      );
+      if (!confirmed) return;
+      await player.resetRenderer();
+    })();
+  }, [confirmDialog, locale, player]);
+
   const handleArmAlarm = () => {
     void armAlarmAtTime(alarmTime);
   };
@@ -1209,6 +1232,7 @@ export function RetroPreviewView({
                   }
                   player.powerOn();
                 }}
+                onPowerLongPress={handlePowerLongPress}
                 onHighResolutionToggle={onHighResolutionToggle}
                 onFitWidthToggle={handleFitWidthToggle}
                 onPinToggle={handlePinToggle}
@@ -1264,6 +1288,7 @@ export function RetroPreviewView({
                 }
                 player.powerOn();
               }}
+              onPowerLongPress={handlePowerLongPress}
               onHighResolutionToggle={onHighResolutionToggle}
               onFitWidthToggle={handleFitWidthToggle}
               onPinToggle={handlePinToggle}
@@ -1318,6 +1343,7 @@ export function RetroPreviewView({
                 }
                 player.powerOn();
               }}
+              onPowerLongPress={handlePowerLongPress}
               onHighResolutionToggle={onHighResolutionToggle}
               onFitWidthToggle={handleFitWidthToggle}
               onPinToggle={handlePinToggle}
@@ -1372,6 +1398,7 @@ export function RetroPreviewView({
               }
               player.powerOn();
             }}
+            onPowerLongPress={handlePowerLongPress}
             onHighResolutionToggle={onHighResolutionToggle}
             onFitWidthToggle={handleFitWidthToggle}
             onPinToggle={handlePinToggle}
@@ -1426,6 +1453,7 @@ export function RetroPreviewView({
               }
               player.powerOn();
             }}
+            onPowerLongPress={handlePowerLongPress}
             onHighResolutionToggle={onHighResolutionToggle}
             onFitWidthToggle={handleFitWidthToggle}
             onPinToggle={handlePinToggle}

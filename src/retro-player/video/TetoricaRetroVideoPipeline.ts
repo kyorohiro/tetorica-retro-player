@@ -509,11 +509,7 @@ export class TetoricaRetroVideoPipeline {
     { pass1: WebGLProgram; pass2: WebGLProgram }
   >();
   private windowsLitePrewarmStarted = false;
-  // Serializes the actual submitProgram()/waitAndVerifyPrograms() calls
-  // across both real switches and background prewarming, so they never
-  // compile two variants concurrently (which was slower than either alone —
-  // the driver's parallel-compile poll contends with itself).
-  private windowsLiteCompileLock: Promise<void> = Promise.resolve();
+  private isDisposed = false;
 
   // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
@@ -604,7 +600,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
-    if (!this.windowsLiteMode) {
+    if (!this.windowsLiteMode || this.isDisposed) {
       return;
     }
 
@@ -621,15 +617,7 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
-    this.windowsLiteCompilePromise = this.compilePendingWindowsLiteVariant().finally(() => {
-      this.windowsLiteCompilePromise = null;
-      if (
-        this.windowsLitePendingVariantKey &&
-        this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
-      ) {
-        this.queueWindowsLiteVariant(this.currentFilterState);
-      }
-    });
+    this.startWindowsLiteForegroundCompile();
   }
 
   // Compiles a variant at most once; subsequent requests for the same
@@ -638,41 +626,65 @@ export class TetoricaRetroVideoPipeline {
   // playback variant switch (e.g. enabling phosphor) from a multi-hundred-ms
   // main-thread stall into an instant program swap after the first use —
   // see docs/issues/windows-lite-shader-parity.md for the measured impact.
-  private async ensureWindowsLiteVariantCompiled(
+  private async compileWindowsLiteVariant(
     variantKey: WindowsLiteVariantKey,
   ): Promise<{ pass1: WebGLProgram; pass2: WebGLProgram }> {
     const cached = this.windowsLiteProgramCache.get(variantKey);
     if (cached) return cached;
+    if (this.isDisposed || this.gl.isContextLost()) {
+      throw new Error("Pipeline was disposed before shader compile started.");
+    }
 
-    const previousLock = this.windowsLiteCompileLock;
-    let release!: () => void;
-    this.windowsLiteCompileLock = new Promise((resolve) => { release = resolve; });
-    await previousLock;
+    const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
+    const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
+    const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
 
     try {
-      // Another caller may have compiled (and cached) this variant while we
-      // were waiting for the lock.
-      const cachedAfterWait = this.windowsLiteProgramCache.get(variantKey);
-      if (cachedAfterWait) return cachedAfterWait;
-
-      const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
-      const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
-      const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
       await waitAndVerifyPrograms(this.gl, [pass1Program, pass2Program]);
-      if (this.gl.isContextLost()) {
-        throw new Error("WebGL context lost during shader compile.");
+      if (this.isDisposed || this.gl.isContextLost()) {
+        throw new Error("Pipeline was disposed during shader compile.");
       }
 
       const entry = { pass1: pass1Program, pass2: pass2Program };
       this.windowsLiteProgramCache.set(variantKey, entry);
       return entry;
-    } finally {
-      release();
+    } catch (error) {
+      this.gl.deleteProgram(pass1Program);
+      this.gl.deleteProgram(pass2Program);
+      throw error;
     }
+  }
+
+  private startWindowsLiteForegroundCompile() {
+    if (
+      this.isDisposed ||
+      this.windowsLiteCompilePromise ||
+      !this.windowsLitePendingVariantKey ||
+      this.windowsLitePendingVariantKey === this.windowsLiteVariantKey
+    ) {
+      return;
+    }
+
+    this.windowsLiteCompilePromise = this.compilePendingWindowsLiteVariant().finally(() => {
+      this.windowsLiteCompilePromise = null;
+      if (this.isDisposed) return;
+
+      if (
+        this.windowsLitePendingVariantKey &&
+        this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
+      ) {
+        this.startWindowsLiteForegroundCompile();
+        return;
+      }
+
+      this.maybeStartWindowsLitePrewarm();
+    });
   }
 
   private async compilePendingWindowsLiteVariant() {
     while (
+      !this.isDisposed &&
+      !this.gl.isContextLost() &&
       this.windowsLitePendingVariantKey &&
       this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
     ) {
@@ -680,8 +692,8 @@ export class TetoricaRetroVideoPipeline {
       TetoricaRetroVideoPipeline.showDebug(`filter: loading Windows lite variant ${variantKey}...`);
 
       try {
-        const { pass1, pass2 } = await this.ensureWindowsLiteVariantCompiled(variantKey);
-        if (this.gl.isContextLost()) return;
+        const { pass1, pass2 } = await this.compileWindowsLiteVariant(variantKey);
+        if (this.isDisposed || this.gl.isContextLost()) return;
 
         if (this.windowsLitePendingVariantKey !== variantKey) {
           // A newer request superseded this one; the compiled programs stay
@@ -696,7 +708,6 @@ export class TetoricaRetroVideoPipeline {
 
         if (!this.windowsLitePrewarmStarted) {
           this.windowsLitePrewarmStarted = true;
-          void this.prewarmRemainingWindowsLiteVariants();
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -709,18 +720,55 @@ export class TetoricaRetroVideoPipeline {
     }
   }
 
-  // Fire-and-forget: compiles the remaining (not-yet-used) lite variants in
-  // the background so a later mid-playback switch never has to compile from
-  // scratch. ensureWindowsLiteVariantCompiled()'s own lock serializes this
-  // against any real user-triggered switch, so they never compile two
-  // variants at once.
+  private maybeStartWindowsLitePrewarm() {
+    if (
+      this.isDisposed ||
+      !this.windowsLitePrewarmStarted ||
+      this.windowsLiteCompilePromise ||
+      this.windowsLitePendingVariantKey ||
+      this.gl.isContextLost()
+    ) {
+      return;
+    }
+
+    const hasRemainingVariants = ALL_WINDOWS_LITE_VARIANT_KEYS.some(
+      (variantKey) => !this.windowsLiteProgramCache.has(variantKey),
+    );
+    if (!hasRemainingVariants) {
+      return;
+    }
+
+    this.windowsLiteCompilePromise = this.prewarmRemainingWindowsLiteVariants().finally(() => {
+      this.windowsLiteCompilePromise = null;
+      if (this.isDisposed) return;
+
+      if (
+        this.windowsLitePendingVariantKey &&
+        this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
+      ) {
+        this.startWindowsLiteForegroundCompile();
+        return;
+      }
+
+      this.maybeStartWindowsLitePrewarm();
+    });
+  }
+
+  // Prewarm only while the pipeline is idle. A real user-triggered switch
+  // sets windowsLitePendingVariantKey and takes over on the next turn through
+  // the worker loop, so cache growth never outranks active interaction.
   private async prewarmRemainingWindowsLiteVariants() {
     for (const variantKey of ALL_WINDOWS_LITE_VARIANT_KEYS) {
-      if (this.gl.isContextLost()) return;
+      if (this.isDisposed || this.gl.isContextLost()) return;
+      if (this.windowsLitePendingVariantKey) return;
       if (this.windowsLiteProgramCache.has(variantKey)) continue;
 
+      await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+      if (this.isDisposed || this.gl.isContextLost()) return;
+      if (this.windowsLitePendingVariantKey) return;
+
       try {
-        await this.ensureWindowsLiteVariantCompiled(variantKey);
+        await this.compileWindowsLiteVariant(variantKey);
       } catch {
         // Best-effort prewarm; a real switch to this variant will retry.
       }
@@ -1045,6 +1093,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   dispose() {
+    this.isDisposed = true;
+    this.windowsLitePendingVariantKey = null;
     const { gl } = this;
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);

@@ -144,6 +144,7 @@ type RetroPreviewToolbarProps = {
   onTestAlarm: () => void;
   onRecordClick: () => void;
   onPowerToggle: () => void;
+  onPowerLongPress: () => void;
   onHighResolutionToggle: () => void;
   onFitWidthToggle: () => void;
   onPinToggle: () => void;
@@ -186,6 +187,7 @@ export function RetroPreviewToolbar({
   onTestAlarm,
   onRecordClick,
   onPowerToggle,
+  onPowerLongPress,
   onHighResolutionToggle,
   onFitWidthToggle,
   onPinToggle,
@@ -222,8 +224,8 @@ export function RetroPreviewToolbar({
       ? {
           recordIdle: "録画: 現在のレトロ出力を記録します。",
           recordStop: "録画: 停止して書き出します。",
-          powerOn: "Power: フィルターをオンにします。",
-          powerOff: "Power: フィルターをオフにします。",
+          powerOn: "Power: フィルターをオンにします。長押しで描画系を再起動します。",
+          powerOff: "Power: フィルターをオフにします。長押しで描画系を再起動します。",
           hiRes: `Hi-res: 1x / 2x を切り替えます。現在 ${renderResolutionPreset}x。`,
           fitWidthOn: "Fit width: 有効です。",
           fitWidthOff: "Fit width: プレビューを横幅いっぱいに広げます。",
@@ -244,8 +246,8 @@ export function RetroPreviewToolbar({
       : {
           recordIdle: "Record: capture the current retro output.",
           recordStop: "Record: stop and export clip.",
-          powerOn: "Power: turn filter on.",
-          powerOff: "Power: turn filter off.",
+          powerOn: "Power: turn filter on. Long press resets the renderer.",
+          powerOff: "Power: turn filter off. Long press resets the renderer.",
           hiRes: `Hi-res: toggle between 1x and 2x. Current ${renderResolutionPreset}x.`,
           fitWidthOn: "Fit width: enabled.",
           fitWidthOff: "Fit width: stretch preview to the frame width.",
@@ -437,6 +439,11 @@ export function RetroPreviewToolbar({
   const { isHolding: isHiResHolding, ...hiResLongPressHandlers } = useLongPress(
     React.useCallback(() => { presetPopover.setIsOpen((v) => !v); }, [presetPopover]),
     React.useCallback(() => { hideTooltip(); onHighResolutionToggle(); }, [hideTooltip, onHighResolutionToggle]),
+  );
+
+  const { isHolding: isPowerHolding, ...powerLongPressHandlers } = useLongPress(
+    React.useCallback(() => { hideTooltip(); onPowerLongPress(); }, [hideTooltip, onPowerLongPress]),
+    React.useCallback(() => { hideTooltip(); onPowerToggle(); }, [hideTooltip, onPowerToggle]),
   );
 
   const { isHolding: isFitWidthHolding, ...fitWidthLongPressHandlers } = useLongPress(
@@ -875,7 +882,8 @@ export function RetroPreviewToolbar({
         <button
           type="button"
           aria-label={player.isPoweredOn ? "Power off" : "Power on"}
-          onClick={() => { hideTooltip(); onPowerToggle(); }}
+          title={locale === "ja" ? "Power (長押しで renderer reset)" : "Power (long press to reset renderer)"}
+          {...powerLongPressHandlers}
           onMouseEnter={() => scheduleTooltip("power")}
           onMouseLeave={hideTooltip}
           onFocus={() => scheduleTooltip("power")}
@@ -883,6 +891,7 @@ export function RetroPreviewToolbar({
           className={[
             floatingButtonClass,
             player.isPoweredOn ? glowingFloatingButtonClass : idleFloatingButtonClass,
+            isPowerHolding ? "scale-95" : "",
           ].join(" ")}
         >
           <Power size={16} />

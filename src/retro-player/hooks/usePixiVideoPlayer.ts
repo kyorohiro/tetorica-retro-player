@@ -287,6 +287,7 @@ export function usePixiVideoPlayer(
     fitSprite,
     initPixi,
     ensureFilterReady,
+    resetRenderer,
     refreshLayout,
     resetFilterInstance,
     safeRender,
@@ -1497,6 +1498,7 @@ export function usePixiVideoPlayer(
     startRecording,
     stopRecording,
     ensureAudioContext,
+    resetRenderer,
     refreshLayout,
     toggleAudioFx: () => {
       setIsAudioFxEnabled((current) => !current);

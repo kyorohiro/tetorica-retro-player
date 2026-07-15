@@ -573,6 +573,27 @@ export function useRetroPixiStage({
     await waitForCanvasPresentation();
   }, [initPixi, waitForCanvasPresentation]);
 
+  const resetRenderer = useCallback(async () => {
+    debugVideo("renderer:reset:start", {
+      poweredOn: isPoweredOnRef.current,
+      hasApp: Boolean(appRef.current),
+    });
+
+    destroyPixiRef.current();
+    await initPixiRef.current();
+
+    if (!isPoweredOnRef.current) {
+      appRef.current?.ticker.stop();
+    }
+
+    renderFrameRef.current();
+
+    debugVideo("renderer:reset:done", {
+      poweredOn: isPoweredOnRef.current,
+      hasApp: Boolean(appRef.current),
+    });
+  }, [debugVideo]);
+
   useEffect(() => {
     if (effectiveVideoFilterLiteModeRef.current === effectiveVideoFilterLiteMode) {
       return;
@@ -654,6 +675,7 @@ export function useRetroPixiStage({
     fitSprite,
     initPixi,
     ensureFilterReady,
+    resetRenderer,
     refreshLayout,
     resetFilterInstance,
     safeRender,
