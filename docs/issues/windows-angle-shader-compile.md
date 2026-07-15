@@ -149,3 +149,6 @@
 3. `phosphor` / `spotMask` / `phosphorDot` を必要な範囲だけ個別強化する
 
 full shader を Windows で無理に自動 compile へ戻すより、lite variant を段階的に育てる方が安全。
+
+pass1 の詳細な機能差分（Glow / neon / edge boost / PC98 の式レベルの違いなど）は
+[`windows-lite-shader-parity.md`](windows-lite-shader-parity.md) に棚卸し済み。
