@@ -78,7 +78,9 @@ export function useRetroPixiStage({
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const layoutTimeoutRef = useRef<number | null>(null);
+  const resizeValidationFrameRef = useRef<number | null>(null);
   const observedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const pendingObservedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
   const filterReadyPromiseRef = useRef<Promise<void> | null>(null);
   const resolveFilterReadyRef = useRef<(() => void) | null>(null);
   const viewportRectRef = useRef<{
@@ -95,6 +97,7 @@ export function useRetroPixiStage({
   const effectiveVideoFilterLiteModeRef = useRef(effectiveVideoFilterLiteMode);
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
   const destroyPixiRef = useRef<() => void>(() => {});
+  const appliedLayoutKeyRef = useRef<string | null>(null);
 
   filterStateRef.current = filterState;
   isPoweredOnRef.current = isPoweredOn;
@@ -363,13 +366,30 @@ export function useRetroPixiStage({
           : displayBufferHeight
       )
       : displayBufferHeight;
+    const nextLeft = Math.round(viewRect.x);
+    const nextTop = Math.round(viewRect.y);
+    const nextLayoutKey = [
+      styleWidth,
+      styleHeight,
+      nextWidth,
+      nextHeight,
+      nextLeft,
+      nextTop,
+      currentFilterState.isFilterEnabled ? 1 : 0,
+      shouldUseLogicalBufferUpscale ? 1 : 0,
+    ].join(":");
+
+    if (appliedLayoutKeyRef.current === nextLayoutKey) {
+      return;
+    }
+    appliedLayoutKeyRef.current = nextLayoutKey;
 
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
 
     app.canvas.style.position = "absolute";
-    app.canvas.style.left = `${Math.round(viewRect.x)}px`;
-    app.canvas.style.top = `${Math.round(viewRect.y)}px`;
+    app.canvas.style.left = `${nextLeft}px`;
+    app.canvas.style.top = `${nextTop}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
     app.canvas.style.imageRendering = "pixelated";
@@ -403,6 +423,8 @@ export function useRetroPixiStage({
       await initPromiseRef.current;
       return;
     }
+
+    appliedLayoutKeyRef.current = null;
 
     initPromiseRef.current = (async () => {
       const host = canvasHostRef.current;
@@ -519,6 +541,7 @@ export function useRetroPixiStage({
 
   const destroyPixi = useCallback(() => {
     initPromiseRef.current = null;
+    appliedLayoutKeyRef.current = null;
     resolveFilterReadyRef.current?.();
     resolveFilterReadyRef.current = null;
     filterReadyPromiseRef.current = null;
@@ -618,7 +641,7 @@ export function useRetroPixiStage({
       height: Math.round(host.clientHeight),
     });
 
-    const shouldRefreshForHostSize = (next: { width: number; height: number }) => {
+    const commitHostSizeIfChanged = (next: { width: number; height: number }) => {
       const current = observedHostSizeRef.current;
       if (current && current.width === next.width && current.height === next.height) {
         return false;
@@ -627,7 +650,26 @@ export function useRetroPixiStage({
       return true;
     };
 
+    const scheduleStableHostRefresh = (observed: { width: number; height: number }) => {
+      pendingObservedHostSizeRef.current = observed;
+      if (resizeValidationFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeValidationFrameRef.current);
+      }
+      resizeValidationFrameRef.current = window.requestAnimationFrame(() => {
+        resizeValidationFrameRef.current = null;
+        const pending = pendingObservedHostSizeRef.current;
+        if (!pending) return;
+        const settled = readHostSize();
+        if (settled.width !== pending.width || settled.height !== pending.height) {
+          return;
+        }
+        if (!commitHostSizeIfChanged(settled)) return;
+        scheduleRefreshLayout();
+      });
+    };
+
     observedHostSizeRef.current = readHostSize();
+    pendingObservedHostSizeRef.current = observedHostSizeRef.current;
 
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver((entries) => {
@@ -637,22 +679,28 @@ export function useRetroPixiStage({
           width: Math.round(entry.contentRect.width),
           height: Math.round(entry.contentRect.height),
         };
-        if (!shouldRefreshForHostSize(next)) return;
-        scheduleRefreshLayout();
+        scheduleStableHostRefresh(next);
       });
       observer.observe(host);
       return () => {
+        if (resizeValidationFrameRef.current !== null) {
+          window.cancelAnimationFrame(resizeValidationFrameRef.current);
+          resizeValidationFrameRef.current = null;
+        }
         observer.disconnect();
       };
     }
 
     const handleResize = () => {
-      if (!shouldRefreshForHostSize(readHostSize())) return;
-      scheduleRefreshLayout();
+      scheduleStableHostRefresh(readHostSize());
     };
 
     window.addEventListener("resize", handleResize);
     return () => {
+      if (resizeValidationFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeValidationFrameRef.current);
+        resizeValidationFrameRef.current = null;
+      }
       window.removeEventListener("resize", handleResize);
     };
   }, [scheduleRefreshLayout]);

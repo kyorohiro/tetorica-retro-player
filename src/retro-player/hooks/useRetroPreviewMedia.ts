@@ -97,6 +97,9 @@ type UseRetroPreviewMediaParams = {
 
 const HLS_STARTUP_RETRY_DATASET_KEY = "retroHlsStartupRetry";
 const HLS_STARTUP_RETRY_DELAYS_MS = [400, 900, 1600];
+const HLS_TERMINAL_BUFFERING_GRACE_MS = 1500;
+const HLS_TERMINAL_BUFFERING_EPSILON_SECONDS = 0.12;
+const HLS_TERMINAL_DURATION_MISMATCH_SECONDS = 5;
 
 export function useRetroPreviewMedia({
   locale,
@@ -619,8 +622,51 @@ export function useRetroPreviewMedia({
     return nearEnd;
   };
 
+  const getBufferedEnd = (media: HTMLMediaElement | null) => {
+    if (!media || media.buffered.length === 0) {
+      return 0;
+    }
+    return media.buffered.end(media.buffered.length - 1);
+  };
+
+  const isPotentialTerminalHlsBuffering = (media: HTMLMediaElement | null) => {
+    if (!media || media.loop || media.ended || media.paused) {
+      return false;
+    }
+    if (!getHlsSourceUrl(media)) {
+      return false;
+    }
+
+    const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+    const bufferedEnd = getBufferedEnd(media);
+    const duration = Number.isFinite(media.duration) ? media.duration : 0;
+    const nearBufferedEnd =
+      bufferedEnd > 0 &&
+      bufferedEnd - currentTime <= HLS_TERMINAL_BUFFERING_EPSILON_SECONDS;
+    const hasDurationMismatch =
+      duration > 0 &&
+      duration - bufferedEnd >= HLS_TERMINAL_DURATION_MISMATCH_SECONDS;
+
+    return (
+      currentTime > 1 &&
+      media.readyState < HTMLMediaElement.HAVE_FUTURE_DATA &&
+      nearBufferedEnd &&
+      hasDurationMismatch
+    );
+  };
+
   const attachMediaEventListeners = (media: HTMLMediaElement) => {
     const isCurrentMedia = () => mediaRef.current === media;
+    let forcedTerminalHlsEnd = false;
+    let terminalHlsBufferTimer: number | null = null;
+
+    const clearTerminalHlsBufferTimer = () => {
+      if (terminalHlsBufferTimer !== null) {
+        window.clearTimeout(terminalHlsBufferTimer);
+        terminalHlsBufferTimer = null;
+      }
+    };
+
     const syncIfCurrentMedia = () => {
       if (!isCurrentMedia()) {
         return;
@@ -647,12 +693,83 @@ export function useRetroPreviewMedia({
         src: media.currentSrc || media.src || null,
       });
     };
+    const resolveForcedTerminalHlsEnd = (reason: string) => {
+      if (!isCurrentMedia() || forcedTerminalHlsEnd) {
+        return;
+      }
+      if (!isPotentialTerminalHlsBuffering(media)) {
+        return;
+      }
+
+      forcedTerminalHlsEnd = true;
+      clearTerminalHlsBufferTimer();
+      const bufferedEnd = getBufferedEnd(media);
+      debugVideo("media:forced-terminal-hls-end", {
+        reason,
+        bufferedEnd,
+        currentTime: media.currentTime,
+        duration: media.duration,
+        src: media.currentSrc || media.src || null,
+      });
+
+      try {
+        media.pause();
+      } catch {
+        // pause() may fail on a detached/replaced element; state sync below
+        // still closes the lingering Buffering UI for the active element.
+      }
+
+      setCurrentTime(Math.max(media.currentTime, bufferedEnd));
+      setDuration(bufferedEnd > 0 ? bufferedEnd : media.duration || 0);
+      setIsBuffering(false);
+      finishLoading();
+      syncVideoState();
+      if (!media.loop) {
+        onEndedRef?.current?.();
+      }
+    };
+    const scheduleTerminalHlsBufferCheck = (reason: string) => {
+      if (!isCurrentMedia()) {
+        return;
+      }
+      if (!isPotentialTerminalHlsBuffering(media)) {
+        clearTerminalHlsBufferTimer();
+        return;
+      }
+
+      const snapshot = {
+        currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
+        bufferedEnd: getBufferedEnd(media),
+      };
+      clearTerminalHlsBufferTimer();
+      terminalHlsBufferTimer = window.setTimeout(() => {
+        terminalHlsBufferTimer = null;
+        if (!isCurrentMedia() || forcedTerminalHlsEnd) {
+          return;
+        }
+
+        const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+        const bufferedEnd = getBufferedEnd(media);
+        const playbackStable = Math.abs(currentTime - snapshot.currentTime) < 0.05;
+        const bufferStable = Math.abs(bufferedEnd - snapshot.bufferedEnd) < 0.05;
+        if (!playbackStable || !bufferStable) {
+          return;
+        }
+
+        resolveForcedTerminalHlsEnd(reason);
+      }, HLS_TERMINAL_BUFFERING_GRACE_MS);
+    };
 
     media.addEventListener("play", syncIfCurrentMedia);
-    media.addEventListener("play", () => debugMediaEvent("play"));
+    media.addEventListener("play", () => {
+      forcedTerminalHlsEnd = false;
+      clearTerminalHlsBufferTimer();
+      debugMediaEvent("play");
+    });
     media.addEventListener("pause", syncIfCurrentMedia);
     media.addEventListener("pause", () => debugMediaEvent("pause"));
     media.addEventListener("pause", () => {
+      clearTerminalHlsBufferTimer();
       if (!isCurrentMedia()) {
         return;
       }
@@ -678,15 +795,20 @@ export function useRetroPreviewMedia({
     // We DO track buffering state for the UI loading indicator (no audio impact).
     media.addEventListener("waiting", () => {
       if (isCurrentMedia()) setIsBuffering(true);
+      scheduleTerminalHlsBufferCheck("waiting");
       debugMediaEvent("waiting");
     });
     media.addEventListener("playing", () => {
       if (isCurrentMedia()) setIsBuffering(false);
+      clearTerminalHlsBufferTimer();
       debugMediaEvent("playing");
     });
     media.addEventListener("loadeddata", () => debugMediaEvent("loadeddata"));
     media.addEventListener("canplay", () => debugMediaEvent("canplay"));
-    media.addEventListener("stalled", () => debugMediaEvent("stalled"));
+    media.addEventListener("stalled", () => {
+      scheduleTerminalHlsBufferCheck("stalled");
+      debugMediaEvent("stalled");
+    });
     media.addEventListener("suspend", () => debugMediaEvent("suspend"));
     media.addEventListener("error", () => debugMediaEvent("error"));
     media.addEventListener("volumechange", syncIfCurrentMedia);
@@ -702,6 +824,7 @@ export function useRetroPreviewMedia({
       const t = mediaRef.current?.currentTime ?? 0;
       if (Math.abs(t - lastTimeupdateTime) < 0.08) return;
       lastTimeupdateTime = t;
+      clearTerminalHlsBufferTimer();
       debugMediaEvent("timeupdate");
       setCurrentTime(t);
     };
@@ -715,8 +838,9 @@ export function useRetroPreviewMedia({
     // correctly and no HLS-specific handling is needed here.
     media.addEventListener("ended", () => {
       if (!isCurrentMedia()) return;
+      clearTerminalHlsBufferTimer();
       syncVideoState();
-      if (!media.loop) {
+      if (!media.loop && !forcedTerminalHlsEnd) {
         onEndedRef?.current?.();
       }
     });
