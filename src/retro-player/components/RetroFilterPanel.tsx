@@ -79,6 +79,9 @@ type RetroFilterPanelProps = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
+  signalInstabilityEnabled: boolean;
+  signalInstabilityStrength: number;
+  signalInstabilityFrequency: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -128,6 +131,9 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
+  onSetSignalInstabilityEnabled: (value: boolean) => void;
+  onSetSignalInstabilityStrength: (value: number) => void;
+  onSetSignalInstabilityFrequency: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -178,6 +184,9 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   closeUpNoiseStrength,
+  signalInstabilityEnabled,
+  signalInstabilityStrength,
+  signalInstabilityFrequency,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -226,6 +235,9 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetCloseUpNoiseStrength,
+  onSetSignalInstabilityEnabled,
+  onSetSignalInstabilityStrength,
+  onSetSignalInstabilityFrequency,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -303,6 +315,10 @@ export function RetroFilterPanel({
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           closeUpNoise:
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
+          signalInstability:
+            "RF 接続が不安定な時のような、一瞬の横ずれやノイズ帯を短いイベントとして発生させます。最大でも常時壊れ続ける演出にはしません。",
+          signalInstabilityFrequency:
+            "不安定イベントの起きやすさです。0 なら発生せず、上げるほど短い乱れが起きやすくなります。",
           focus:
             "画面の周辺部をぼかして中央に焦点を合わせます。値を上げるほど周辺のぼけが強くなり、被写界深度のような効果が得られます。",
           focusWidth:
@@ -364,6 +380,10 @@ export function RetroFilterPanel({
             "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
           closeUpNoise:
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
+          signalInstability:
+            "Adds short RF-like sync stumbles instead of a modern digital glitch. Higher values make each instability event more visible without making the image stay broken all the time.",
+          signalInstabilityFrequency:
+            "Controls how often instability events can happen. Set it to 0 to disable events entirely; raise it to make brief disturbances appear more often.",
           focus:
             "Blurs the periphery of the image, keeping the center sharp. Higher values increase the defocus at the edges for a depth-of-field style effect.",
           focusWidth:
@@ -380,6 +400,7 @@ export function RetroFilterPanel({
       phosphorDotFlatDisc ||
       phosphorDotNeighborBlend
     );
+  const signalInstabilityControlsDisabled = !signalInstabilityEnabled;
 
   const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
     "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
@@ -944,6 +965,61 @@ export function RetroFilterPanel({
                 onChange={(ev) => onSetCloseUpNoiseStrength(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
+            </label>
+            <label className="block rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
+              <span className="flex items-center justify-between gap-3 text-[#12141c]">
+                <InfoTip
+                  label="Signal Instability"
+                  text={helpText.signalInstability}
+                  helpSuffix={helpText.helpSuffix}
+                />
+                <input
+                  type="checkbox"
+                  checked={signalInstabilityEnabled}
+                  onChange={(ev) => onSetSignalInstabilityEnabled(ev.currentTarget.checked)}
+                  className="h-4 w-4 rounded border-[#8a7f72] text-[#12141c]"
+                />
+              </span>
+              <div className="mt-3 flex flex-col gap-3">
+                <span className={signalInstabilityControlsDisabled ? "opacity-60" : ""}>
+                  <span className="text-[#12141c]">
+                    <InfoTip
+                      label={`Instability strength: ${signalInstabilityStrength.toFixed(2)}`}
+                      text={helpText.signalInstability}
+                      helpSuffix={helpText.helpSuffix}
+                    />
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={signalInstabilityStrength}
+                    onChange={(ev) => onSetSignalInstabilityStrength(Number(ev.currentTarget.value))}
+                    disabled={signalInstabilityControlsDisabled}
+                    className="mt-2 w-full"
+                  />
+                </span>
+                <span className={signalInstabilityControlsDisabled ? "opacity-60" : ""}>
+                  <span className="text-[#12141c]">
+                    <InfoTip
+                      label={`Instability frequency: ${signalInstabilityFrequency.toFixed(2)}`}
+                      text={helpText.signalInstabilityFrequency}
+                      helpSuffix={helpText.helpSuffix}
+                    />
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={signalInstabilityFrequency}
+                    onChange={(ev) => onSetSignalInstabilityFrequency(Number(ev.currentTarget.value))}
+                    disabled={signalInstabilityControlsDisabled}
+                    className="mt-2 w-full"
+                  />
+                </span>
+              </div>
             </label>
           </div>
         </div>

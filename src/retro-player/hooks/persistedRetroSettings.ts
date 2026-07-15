@@ -43,6 +43,9 @@ export type PersistedRetroFilterSettings = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
+  signalInstabilityEnabled: boolean;
+  signalInstabilityStrength: number;
+  signalInstabilityFrequency: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;

@@ -54,6 +54,9 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   closeUpNoiseStrength: number;
+  signalInstabilityEnabled: boolean;
+  signalInstabilityStrength: number;
+  signalInstabilityFrequency: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -115,6 +118,9 @@ const doesPresetMatchState = (
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
+    (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
+    (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
+    (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -215,6 +221,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     phosphorDotNeighborBlend:
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
+    signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
+    signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
+    signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -464,6 +473,33 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => (current.closeUpNoiseStrength === closeUpNoiseStrength ? current : { ...current, closeUpNoiseStrength }));
   };
 
+  const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.signalInstabilityEnabled === signalInstabilityEnabled
+        ? current
+        : { ...current, signalInstabilityEnabled }
+    ));
+  };
+
+  const setSignalInstabilityStrength = (signalInstabilityStrength: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.signalInstabilityStrength === signalInstabilityStrength
+        ? current
+        : { ...current, signalInstabilityStrength }
+    ));
+  };
+
+  const setSignalInstabilityFrequency = (signalInstabilityFrequency: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.signalInstabilityFrequency === signalInstabilityFrequency
+        ? current
+        : { ...current, signalInstabilityFrequency }
+    ));
+  };
+
   const setMonoTint = (monoTint: MonoTintMode) => {
     markPresetAsCustom();
     setSettings((current) => (current.monoTint === monoTint ? current : { ...current, monoTint }));
@@ -573,6 +609,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       closeUpNoiseStrength: presetSettings.closeUpNoiseStrength ?? 0,
+      signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
+      signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
+      signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -654,6 +693,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
     setCloseUpNoiseStrength,
+    setSignalInstabilityEnabled,
+    setSignalInstabilityStrength,
+    setSignalInstabilityFrequency,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

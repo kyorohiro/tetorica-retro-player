@@ -40,6 +40,13 @@ uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
 uniform float uPhosphorDotNeighborBlend;
 uniform float uCloseUpNoiseStrength;
+uniform float uSignalInstabilityAmount;
+uniform float uSignalHorizontalSync;
+uniform float uSignalVerticalSync;
+uniform float uSignalStaticNoise;
+uniform float uSignalChromaNoise;
+uniform float uSignalInstabilitySeed;
+uniform float uSignalInstabilityPhase;
 uniform float uFocusStrength;
 uniform vec2 uFocusSize;
 uniform vec2 uFocusCenter;
@@ -89,6 +96,102 @@ float hash13(vec3 p3)
   p3 = fract(p3 * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);
+}
+
+float signalBandMask(vec2 uv)
+{
+  float amount = max(uSignalStaticNoise, max(uSignalHorizontalSync * 0.35, uSignalVerticalSync * 0.2));
+  if (amount <= 0.001) {
+    return 0.0;
+  }
+
+  float phase = floor(uSignalInstabilityPhase);
+  float center = fract(uSignalInstabilitySeed * 0.173 + phase * 0.137 + 0.11);
+  float thickness =
+    mix(0.004, 0.065, hash13(vec3(uSignalInstabilitySeed, phase, 5.0))) *
+    (0.4 + amount * 0.6);
+  float dy = abs(uv.y - center);
+  dy = min(dy, 1.0 - dy);
+  return (1.0 - smoothstep(thickness * 0.45, thickness, dy)) * amount;
+}
+
+vec2 applySignalInstabilityUv(vec2 uv)
+{
+  if (uSignalInstabilityAmount <= 0.001) {
+    return uv;
+  }
+
+  float phase = floor(uSignalInstabilityPhase);
+
+  float lineSpan = 1.0 + floor(mix(0.0, 6.0, 1.0 - min(uSignalHorizontalSync, 1.0)));
+  float lineIndex = floor((uv.y * uTargetSize.y) / lineSpan);
+  float lineNoise = hash13(vec3(lineIndex + uSignalInstabilitySeed * 37.0, phase, 1.0));
+  float lineActive = smoothstep(0.72, 0.985, lineNoise);
+  float lineStrength = hash13(vec3(lineIndex + uSignalInstabilitySeed * 53.0, phase, 2.0));
+  float direction = hash13(vec3(lineIndex + uSignalInstabilitySeed * 71.0, phase, 3.0)) - 0.5;
+  float lineOffsetPixels =
+    direction *
+    (0.6 + lineStrength * (1.0 + uSignalInstabilityAmount * 7.0)) *
+    (0.4 + uSignalHorizontalSync * 2.8);
+  float bandOffsetPixels =
+    signalBandMask(uv) *
+    (hash13(vec3(uSignalInstabilitySeed, phase, 13.0)) - 0.5) *
+    (1.0 + uSignalInstabilityAmount * 6.0);
+
+  uv.x += (lineOffsetPixels * lineActive + bandOffsetPixels) / max(uTargetSize.x, 1.0);
+  return vec2(clamp(uv.x, 0.0, 1.0), fract(uv.y + 1.0));
+}
+
+vec3 applySignalChromaInstability(vec3 color, vec2 sampleUv)
+{
+  if (uSignalChromaNoise <= 0.001) {
+    return color;
+  }
+
+  float chromaOffset =
+    (0.35 + uSignalInstabilityAmount * 1.8 + uSignalChromaNoise * 1.2) /
+    max(uTargetSize.x, 1.0);
+  vec3 left = texture(
+    uPass1Texture,
+    clamp(sampleUv - vec2(chromaOffset, 0.0), vec2(0.0), vec2(1.0))
+  ).rgb;
+  vec3 right = texture(
+    uPass1Texture,
+    clamp(sampleUv + vec2(chromaOffset, 0.0), vec2(0.0), vec2(1.0))
+  ).rgb;
+  vec3 bled = vec3(
+    mix(color.r, right.r, 0.22),
+    color.g,
+    mix(color.b, left.b, 0.18)
+  );
+  float luma = dot(bled, vec3(0.299, 0.587, 0.114));
+  vec3 desaturated = mix(vec3(luma), bled, 1.0 - uSignalChromaNoise * 0.3);
+  float hueJitter = (hash13(vec3(uSignalInstabilitySeed, floor(uSignalInstabilityPhase), 21.0)) - 0.5) * uSignalChromaNoise;
+  desaturated.r += hueJitter * 0.05;
+  desaturated.b -= hueJitter * 0.04;
+  return clamp(mix(color, desaturated, min(0.75, uSignalChromaNoise)), 0.0, 1.0);
+}
+
+vec3 applySignalStaticNoise(vec3 color, vec2 uv)
+{
+  float band = signalBandMask(uv);
+  if (band <= 0.001) {
+    return color;
+  }
+
+  float phase = floor(uSignalInstabilityPhase);
+  vec2 coarse = floor(gl_FragCoord.xy * vec2(1.0, 0.35));
+  float noiseA = hash13(vec3(coarse.x + 13.0, coarse.y + 7.0, phase + uSignalInstabilitySeed * 97.0)) - 0.5;
+  float noiseB = hash13(vec3(coarse.x * 0.5 + 41.0, coarse.y + 17.0, phase * 0.7 + uSignalInstabilitySeed * 53.0)) - 0.5;
+  float stripe = hash13(vec3(floor(gl_FragCoord.y * 0.5), phase + 3.0, uSignalInstabilitySeed * 31.0)) - 0.5;
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float amplitude = band * (0.08 + uSignalStaticNoise * 0.26) * (1.0 - luma * 0.35);
+  vec3 noise = vec3(
+    noiseA * 0.9 + stripe * 0.25,
+    noiseA * 0.75 + noiseB * 0.25,
+    noiseA * 1.05 - stripe * 0.18
+  );
+  return clamp(color + noise * amplitude, 0.0, 1.0);
 }
 
 float closeUpNoiseAmount(vec2 uv, vec2 targetSize)
@@ -484,7 +587,8 @@ void main(void)
     return;
   }
 
-  vec2 cell = floor(curvedUv * uTargetSize);
+  vec2 unstableUv = applySignalInstabilityUv(curvedUv);
+  vec2 cell = floor(unstableUv * uTargetSize);
   vec2 pixelatedUv = (cell + 0.5) / uTargetSize;
   pixelatedUv = clamp(pixelatedUv, vec2(0.0), vec2(1.0));
 
@@ -492,8 +596,8 @@ void main(void)
   vec2 maskCentered = warpedMask - vec2(0.5);
   float edgeAmount = smoothstep(0.2, 0.95, length(maskCentered) * 1.35);
   vec2 chromaOffset = maskCentered * (uCurvature * 0.01) * edgeAmount;
-  vec2 redCell = floor(clamp(curvedUv + chromaOffset, vec2(0.0), vec2(1.0)) * uTargetSize);
-  vec2 blueCell = floor(clamp(curvedUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0)) * uTargetSize);
+  vec2 redCell = floor(clamp(unstableUv + chromaOffset, vec2(0.0), vec2(1.0)) * uTargetSize);
+  vec2 blueCell = floor(clamp(unstableUv - chromaOffset * 0.8, vec2(0.0), vec2(1.0)) * uTargetSize);
   vec2 redPixelatedUv = (redCell + 0.5) / uTargetSize;
   vec2 bluePixelatedUv = (blueCell + 0.5) / uTargetSize;
 
@@ -508,7 +612,7 @@ void main(void)
     float blurAmt = pow(blurMask, 1.35);
     if (blurAmt > 0.001) {
       float blurRadius = (2.0 + uFocusStrength * 38.0) * blurAmt;
-      vec3 blurredColor = sampleFocusBlur(curvedUv, blurRadius);
+      vec3 blurredColor = sampleFocusBlur(unstableUv, blurRadius);
       float blendFactor = clamp(blurAmt * (0.6 + uFocusStrength * 0.4), 0.0, 1.0);
       color.rgb = mix(color.rgb, blurredColor, blendFactor);
     }
@@ -542,7 +646,7 @@ void main(void)
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
     vec3 baseProcessedColor = color.rgb;
 
-    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
+    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, unstableUv, uTargetSize, uSpotMaskStrength);
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
@@ -554,7 +658,7 @@ void main(void)
 
     float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
     float aspectCompensation = sqrt(pixelAspect);
-    vec2 cellUv = fract(curvedUv * uTargetSize) - 0.5;
+    vec2 cellUv = fract(unstableUv * uTargetSize) - 0.5;
     vec2 dotUv = pixelAspect >= 1.0
       ? vec2(cellUv.x, cellUv.y * aspectCompensation)
       : vec2(cellUv.x / aspectCompensation, cellUv.y);
@@ -568,14 +672,14 @@ void main(void)
       vec2 leakOffsetY = vec2(0.0, texel.y * leakRadius);
       vec2 leakOffsetD = vec2(texel.x, texel.y) * leakRadius * 0.82;
       vec3 bloomSample =
-        texture(uPass1Texture, clamp(curvedUv + leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
-        texture(uPass1Texture, clamp(curvedUv - leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
-        texture(uPass1Texture, clamp(curvedUv + leakOffsetY, vec2(0.0), vec2(1.0))).rgb * 0.18 +
-        texture(uPass1Texture, clamp(curvedUv - leakOffsetY, vec2(0.0), vec2(1.0))).rgb * 0.18 +
-        texture(uPass1Texture, clamp(curvedUv + leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07 +
-        texture(uPass1Texture, clamp(curvedUv + vec2(leakOffsetD.x, -leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
-        texture(uPass1Texture, clamp(curvedUv + vec2(-leakOffsetD.x, leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
-        texture(uPass1Texture, clamp(curvedUv - leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07;
+        texture(uPass1Texture, clamp(unstableUv + leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(unstableUv - leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(unstableUv + leakOffsetY, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(unstableUv - leakOffsetY, vec2(0.0), vec2(1.0))).rgb * 0.18 +
+        texture(uPass1Texture, clamp(unstableUv + leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07 +
+        texture(uPass1Texture, clamp(unstableUv + vec2(leakOffsetD.x, -leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
+        texture(uPass1Texture, clamp(unstableUv + vec2(-leakOffsetD.x, leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
+        texture(uPass1Texture, clamp(unstableUv - leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07;
       float leakStrength =
         uSpotMaskStrength *
         (0.14 + phosphorBrightness * 0.24 + neighborBlendMix * 0.08 + internalScaleMix * 0.1);
@@ -689,6 +793,8 @@ void main(void)
     );
 
     color.rgb = clamp(phosphorColor, 0.0, 1.0);
+    color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
+    color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
     color.rgb = applyLumaToneCompression(color.rgb);
     color.rgb = applySaturationToneCompression(color.rgb);
     color.rgb = clamp(color.rgb * uOutputBrightness, 0.0, 1.0);
@@ -717,13 +823,16 @@ void main(void)
   }
 
   if (uSpotMaskStrength > 0.001) {
-    color.rgb = applySpotMask(color.rgb, curvedUv, uTargetSize, uSpotMaskStrength);
+    color.rgb = applySpotMask(color.rgb, unstableUv, uTargetSize, uSpotMaskStrength);
   }
 
   float closeUpAmount = uCloseUpNoiseStrength;
   if (closeUpAmount > 0.001) {
     color.rgb = applyCloseUpTubeNoise(color.rgb, vTextureCoord, cell, uTime, closeUpAmount);
   }
+
+  color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
+  color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;

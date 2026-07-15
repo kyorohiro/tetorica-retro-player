@@ -61,6 +61,9 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   closeUpNoiseStrength?: number;
+  signalInstabilityEnabled?: boolean;
+  signalInstabilityStrength?: number;
+  signalInstabilityFrequency?: number;
   scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -521,7 +524,10 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
     closeUpNoiseStrength: 1.2,
-    scanlineBrightnessFade: 0.98
+    scanlineBrightnessFade: 0.98,
+    signalInstabilityEnabled: true,
+    signalInstabilityStrength: 0.88,
+    signalInstabilityFrequency: 0.88,
   },
   animeCel: {
     label: "Anime Cel",
