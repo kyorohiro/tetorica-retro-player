@@ -117,6 +117,79 @@ compile エラー無し・`gl.getError()` 全モードで `0`・入力色 `(140,
 6. `highp` 精度指定の追加
 7. mode ≥ 10.5 フォールバックの整合
 
+## Glow のランタイム性能検証（2026-07-15）
+
+Glow は1ピクセルあたり6回の追加テクスチャサンプル + パレット関数再評価を行うため、
+実機 Windows GPU 上でのコストを計測した。
+
+**方法**: `TetoricaRetroVideoPipeline` を実際に呼び出し（`videoFilterLiteMode: true` 強制）、
+320×240 のノイズ画像ソースを 1280×720 / 1920×1080 キャンバスへ描画。
+`free` / `color32` / `mono` / `neon` / `anime` / `pc98_512` の各パレットモード ×
+`glowStrength: 0` / `0.6` で 120〜150 フレームを連続描画し `gl.finish()` で GPU 完了を待って平均フレーム時間を計測。
+
+**重要**: headless Chromium はデフォルトで SwiftShader（ソフトウェアレンダリング）にフォールバックするため、
+`chromium.launch({ headless: false })` で実 GPU（この検証機では Intel UHD 620 / `ANGLE ... Direct3D11 ... D3D11`）を使わせる必要があった。
+headless のままの計測値は実際の Windows ANGLE/GPU 性能を反映しないため使用していない。
+
+**ハマった点**: 初回計測で `free` モードだけ突出して遅く見えた（720p で ~4-9ms、他モードは ~0.1ms）。
+モード順を入れ替えて再現性を確認した結果、これは特定モードのコストではなく
+**その WebGL コンテキストで最初に呼ばれる `gl.finish()` 自体が持つ一回限りのコスト**
+（コンテキスト初期化・ドライバ側キュー確立など）であることが判明。
+同じ `free` モードを2回目以降に呼ぶと他モードと同じ速度になることを確認済み。
+
+**結果（ウォームアップ後、定常状態）**: `glowStrength: 0` と `0.6` の差は 720p/1080p いずれも
+全モードでフレームあたり ±0.2ms 未満（計測ノイズと同程度）。全モードともフレーム時間はおおむね
+0.03〜0.3ms/frame で、60fps 予算（16.6ms/frame）に対して圧倒的に余裕がある。
+
+**結論**: Glow の追加サンプリングコストは実 GPU（Intel UHD 620 / ANGLE D3D11）上では計測ノイズに埋もれるレベルで、
+実用上のボトルネックにはならない。より低スペックな GPU（古い Intel HD グラフィックス等）での再検証は
+将来必要になった場合に実施する。
+
+## 実プレイバック中の「もっさり」の正体と修正（2026-07-15）
+
+Glow 単体のコストは無視できるレベルだったが、ユーザーから「実際のところ少しもっさりする」との報告があり、
+静的ベンチマークではなく実際の RAF ループ + 実動画（`public/test_colorbars.mp4`）での CDP パフォーマンストレースを取得して調査した。
+
+**方法**: `TetoricaRetroVideoPipeline` に実 `<video>` を流し込み、`useRetroPixiStage.ts` の `tick()` と同じ
+`requestAnimationFrame` ループで継続描画。`chromium.launch({ headless: false })` の実 GPU 上で
+`Tracing.start`/`Tracing.end`（CDP）で4秒間トレースを取得し、`CrRendererMain` スレッドの長時間タスクを解析。
+
+**発見**: フレーム中に **583ms** もの単発の長時間タスクが見つかった。内訳は
+`RunTask` → `FireAnimationFrame` → `FunctionCall`（`functionName: "poll"`,
+`url: ".../TetoricaRetroVideoPipeline.ts"`）で、`tdur`（スレッド実行時間）も 512ms と、
+待機ではなく実際にスレッドがブロックされていたことを示す。
+
+**根本原因**: [`TetoricaRetroVideoPipeline.ts`](../../src/retro-player/video/TetoricaRetroVideoPipeline.ts) の
+Windows lite variant 切り替え（`queueWindowsLiteVariant` / `compilePendingWindowsLiteVariant`）は、
+`basic:basic` / `basic:phosphor` / `pc98:basic` / `pc98:phosphor` の4通りしかないにもかかわらず、
+**毎回新しい variant に切り替えるたびにゼロからシェーダーを再コンパイルしていた**。
+起動時に compile されるのは初期 variant（`basic:basic`）だけで、再生中に初めて
+phosphor を有効化したり PC98 パレットへ切り替えたりすると、その場で
+`submitProgram` → `waitAndVerifyPrograms`（`WEBGL_parallel_shader_compile` の `poll` ループ）が走り、
+これが実機で数百ms〜数秒のメインスレッドブロックになっていた。まさにこれが「もっさり」の正体だった。
+
+**修正**: `windowsLiteProgramCache`（`Map<WindowsLiteVariantKey, {pass1, pass2}>`）を追加し、
+各 variant は一度だけコンパイルしてキャッシュする方式に変更（`ensureWindowsLiteVariantCompiled`）。
+さらに初回 variant が ready になった直後、残り3種類の variant をバックグラウンドで
+先読みコンパイルする `prewarmRemainingWindowsLiteVariants` を追加。
+`setFilterPrograms` / `dispose` も、lite モードではプログラムの所有権がキャッシュ側にあるものとして
+二重解放しないよう調整した。
+
+**ハマった点**: 最初の実装ではバックグラウンド prewarm と実際のユーザー操作による切り替えが
+同じ GL コンテキストに対して**同時に**別々の shader コンパイルを投げてしまい、
+かえって遅くなる（1250ms〜2500ms）ケースが出た。`windowsLiteCompileLock` という
+Promise チェーン方式のロックを `ensureWindowsLiteVariantCompiled` 内に追加し、
+実切り替えと prewarm が同じ GL コンパイルパイプラインを取り合わないよう直列化して解消。
+
+**検証結果**:
+- 修正前: 初回 variant 切り替え時に 583ms（実トレース値）のメインスレッドブロック
+- 修正後、prewarm が完了してから切り替え: `basic:phosphor` への切り替えが **26.5ms**（実質1フレーム）
+- 2回目以降の同一 variant への切り替え: **32〜34ms**（キャッシュヒット、コンパイルなし）
+- 起動後 3 秒ほどで4 variant 全てがキャッシュ済みになることを確認
+
+## 関連ドキュメント
+
 ## 関連ドキュメント
 
 - [`windows-angle-shader-compile.md`](windows-angle-shader-compile.md) — lite shader 導入の背景（ANGLE compile freeze 対策）
+- [`webgl-windows-performance.md`](webgl-windows-performance.md) — Windows ANGLE のドローコール/テクスチャアップロード関連の別のパフォーマンスノウハウ

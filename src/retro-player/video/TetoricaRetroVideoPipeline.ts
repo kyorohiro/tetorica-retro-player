@@ -185,6 +185,17 @@ type WindowsLitePass1Variant = "basic" | "pc98";
 type WindowsLitePass2Variant = "basic" | "phosphor";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
+// Only 4 combinations exist. Compiling each at most once (cached) and
+// pre-warming the rest in the background avoids a multi-hundred-ms shader
+// recompile stall (see docs/issues/windows-lite-shader-parity.md) the first
+// time a user switches to a variant mid-playback (e.g. enabling phosphor).
+const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
+  "basic:basic",
+  "basic:phosphor",
+  "pc98:basic",
+  "pc98:phosphor",
+];
+
 const isPc98PaletteMode = (mode: PaletteMode) =>
   mode === "pc98" ||
   mode === "pc98_tile" ||
@@ -493,6 +504,16 @@ export class TetoricaRetroVideoPipeline {
   private windowsLiteVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLitePendingVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLiteCompilePromise: Promise<void> | null = null;
+  private readonly windowsLiteProgramCache = new Map<
+    WindowsLiteVariantKey,
+    { pass1: WebGLProgram; pass2: WebGLProgram }
+  >();
+  private windowsLitePrewarmStarted = false;
+  // Serializes the actual submitProgram()/waitAndVerifyPrograms() calls
+  // across both real switches and background prewarming, so they never
+  // compile two variants concurrently (which was slower than either alone —
+  // the driver's parallel-compile poll contends with itself).
+  private windowsLiteCompileLock: Promise<void> = Promise.resolve();
 
   // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
@@ -537,10 +558,17 @@ export class TetoricaRetroVideoPipeline {
   // Called once the background filter compilation succeeds.
   setFilterPrograms(pass1: WebGLProgram, pass2: WebGLProgram): void {
     const { gl } = this;
-    if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
-      gl.deleteProgram(this.filterPass1Program);
+    if (!this.windowsLiteMode) {
+      // Non-lite mode compiles the full shader exactly once, so it's safe to
+      // free the previous (passthrough) program immediately. In lite mode,
+      // pass1/pass2 always come from windowsLiteProgramCache, which owns
+      // their lifetime (freed in dispose()) so a previously-used variant can
+      // be swapped back in later without recompiling.
+      if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
+        gl.deleteProgram(this.filterPass1Program);
+      }
+      if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     }
-    if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
 
     this.filterPass1Program = pass1;
     this.filterPass2Program = pass2;
@@ -604,31 +632,72 @@ export class TetoricaRetroVideoPipeline {
     });
   }
 
+  // Compiles a variant at most once; subsequent requests for the same
+  // variant key are served from cache (near-instant, no shader compile or
+  // WEBGL_parallel_shader_compile poll wait). This is what turns a mid-
+  // playback variant switch (e.g. enabling phosphor) from a multi-hundred-ms
+  // main-thread stall into an instant program swap after the first use —
+  // see docs/issues/windows-lite-shader-parity.md for the measured impact.
+  private async ensureWindowsLiteVariantCompiled(
+    variantKey: WindowsLiteVariantKey,
+  ): Promise<{ pass1: WebGLProgram; pass2: WebGLProgram }> {
+    const cached = this.windowsLiteProgramCache.get(variantKey);
+    if (cached) return cached;
+
+    const previousLock = this.windowsLiteCompileLock;
+    let release!: () => void;
+    this.windowsLiteCompileLock = new Promise((resolve) => { release = resolve; });
+    await previousLock;
+
+    try {
+      // Another caller may have compiled (and cached) this variant while we
+      // were waiting for the lock.
+      const cachedAfterWait = this.windowsLiteProgramCache.get(variantKey);
+      if (cachedAfterWait) return cachedAfterWait;
+
+      const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
+      const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
+      const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
+      await waitAndVerifyPrograms(this.gl, [pass1Program, pass2Program]);
+      if (this.gl.isContextLost()) {
+        throw new Error("WebGL context lost during shader compile.");
+      }
+
+      const entry = { pass1: pass1Program, pass2: pass2Program };
+      this.windowsLiteProgramCache.set(variantKey, entry);
+      return entry;
+    } finally {
+      release();
+    }
+  }
+
   private async compilePendingWindowsLiteVariant() {
     while (
       this.windowsLitePendingVariantKey &&
       this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
     ) {
       const variantKey = this.windowsLitePendingVariantKey;
-      const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
       TetoricaRetroVideoPipeline.showDebug(`filter: loading Windows lite variant ${variantKey}...`);
 
       try {
-        const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
-        const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
-        await waitAndVerifyPrograms(this.gl, [pass1Program, pass2Program]);
+        const { pass1, pass2 } = await this.ensureWindowsLiteVariantCompiled(variantKey);
         if (this.gl.isContextLost()) return;
 
         if (this.windowsLitePendingVariantKey !== variantKey) {
-          this.gl.deleteProgram(pass1Program);
-          this.gl.deleteProgram(pass2Program);
+          // A newer request superseded this one; the compiled programs stay
+          // cached for whichever variant asks for them next.
           continue;
         }
 
-        this.setFilterPrograms(pass1Program, pass2Program);
+        this.setFilterPrograms(pass1, pass2);
         this.windowsLiteVariantKey = variantKey;
         this.windowsLitePendingVariantKey = null;
         TetoricaRetroVideoPipeline.showDebug(`filter: Windows lite variant ${variantKey} LOADED`);
+
+        if (!this.windowsLitePrewarmStarted) {
+          this.windowsLitePrewarmStarted = true;
+          void this.prewarmRemainingWindowsLiteVariants();
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         TetoricaRetroVideoPipeline.showDebug(
@@ -636,6 +705,24 @@ export class TetoricaRetroVideoPipeline {
         );
         this.windowsLitePendingVariantKey = null;
         return;
+      }
+    }
+  }
+
+  // Fire-and-forget: compiles the remaining (not-yet-used) lite variants in
+  // the background so a later mid-playback switch never has to compile from
+  // scratch. ensureWindowsLiteVariantCompiled()'s own lock serializes this
+  // against any real user-triggered switch, so they never compile two
+  // variants at once.
+  private async prewarmRemainingWindowsLiteVariants() {
+    for (const variantKey of ALL_WINDOWS_LITE_VARIANT_KEYS) {
+      if (this.gl.isContextLost()) return;
+      if (this.windowsLiteProgramCache.has(variantKey)) continue;
+
+      try {
+        await this.ensureWindowsLiteVariantCompiled(variantKey);
+      } catch {
+        // Best-effort prewarm; a real switch to this variant will retry.
       }
     }
   }
@@ -961,10 +1048,21 @@ export class TetoricaRetroVideoPipeline {
     const { gl } = this;
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);
-    if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
-      gl.deleteProgram(this.filterPass1Program);
+    if (this.windowsLiteMode) {
+      // filterPass1Program/filterPass2Program are just the currently-active
+      // entry from this cache, not separately owned — free the cache instead
+      // to also release the other pre-warmed variants.
+      for (const { pass1, pass2 } of this.windowsLiteProgramCache.values()) {
+        gl.deleteProgram(pass1);
+        gl.deleteProgram(pass2);
+      }
+      this.windowsLiteProgramCache.clear();
+    } else {
+      if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
+        gl.deleteProgram(this.filterPass1Program);
+      }
+      if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     }
-    if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     gl.deleteProgram(this.passthroughProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
