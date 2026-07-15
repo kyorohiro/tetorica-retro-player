@@ -17,6 +17,7 @@ uniform float uAnimeEdgeHigh;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
 uniform float uNeonSaturation;
+uniform float uGlowStrength;
 
 float bayer4x4(vec2 pos)
 {
@@ -82,6 +83,20 @@ vec3 quantizeColor(vec3 color, float levels)
   return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
 }
 
+vec3 nearestColor32(vec3 color)
+{
+  return vec3(
+    round(color.r * 3.0) / 3.0,
+    round(color.g * 3.0) / 3.0,
+    round(color.b)
+  );
+}
+
+vec3 nearestColor64(vec3 color)
+{
+  return round(color * 3.0) / 3.0;
+}
+
 vec3 rgb2hsv(vec3 c)
 {
   vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
@@ -121,6 +136,26 @@ vec3 nearestColorAnime(vec3 color)
   return hsv2rgb(vec3(hQ, sQ, vQ));
 }
 
+// Palette quantization for all modes except neon (mode 9), which uses its own
+// edge-based tint instead of quantizing a sampled color. Shared between the
+// center pixel and the raw neighbor samples used by the glow pass below.
+vec3 applyPaletteMode(vec3 color)
+{
+  if (uPaletteMode > 7.5 && uPaletteMode < 8.5) {
+    return monochromePalette(color, max(uColorLevels, 2.0), uMonoTint);
+  } else if (uPaletteMode > 9.5 && uPaletteMode < 10.5) {
+    return nearestColorAnime(color);
+  } else if (uPaletteMode > 10.5) {
+    return quantizeColor(color, max(min(uColorLevels, 24.0), 6.0));
+  } else if (uPaletteMode > 5.5 && uPaletteMode < 6.5) {
+    return nearestColor32(color);
+  } else if (uPaletteMode > 6.5 && uPaletteMode < 7.5) {
+    return nearestColor64(color);
+  }
+
+  return quantizeColor(color, max(uColorLevels, 2.0));
+}
+
 float computeSourceEdge(vec2 uv, vec2 texel)
 {
   float tl = dot(texture(uTexture, clamp(uv + vec2(-texel.x, -texel.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.299, 0.587, 0.114));
@@ -148,19 +183,31 @@ void main(void)
   color = clamp(color + dither, 0.0, 1.0);
   color = applyToonShading(color, uToonSteps);
 
-  if (uPaletteMode > 7.5 && uPaletteMode < 8.5) {
-    color = monochromePalette(color, max(uColorLevels, 2.0), uMonoTint);
-  } else if (uPaletteMode > 8.5 && uPaletteMode < 9.5) {
+  bool isNeon = uPaletteMode > 8.5 && uPaletteMode < 9.5;
+
+  if (isNeon) {
     float edge = pow(computeSourceEdge(pixelatedUv, texel), 0.7);
     vec3 neonTint = mix(uMonoTint, vec3(0.1, 1.0, 0.9), 0.45);
     color = neonTint * edge * (0.7 + clamp(uNeonBoost, 0.0, 2.0) * 0.5);
-  } else if (uPaletteMode > 9.5 && uPaletteMode < 10.5) {
-    color = nearestColorAnime(color);
-  } else if (uPaletteMode > 10.5) {
-    color = quantizeColor(color, max(min(uColorLevels, 24.0), 6.0));
   } else {
-    color = quantizeColor(color, max(uColorLevels, 2.0));
+    color = applyPaletteMode(color);
+
+    if (uGlowStrength > 0.001) {
+      vec3 glow = vec3(0.0);
+      glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb) * 0.34;
+      glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb) * 0.34;
+      glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv + vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb) * 0.18;
+      glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv - vec2(texel.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb) * 0.18;
+      glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb) * 0.10;
+      glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb) * 0.10;
+
+      float brightness = max(max(color.r, color.g), color.b);
+      float glowMask = smoothstep(0.45, 1.0, brightness);
+      color += glow * glowMask * uGlowStrength;
+    }
   }
+
+  color = clamp(color, 0.0, 1.0);
 
   float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
   if (edgeBoost > 0.001) {

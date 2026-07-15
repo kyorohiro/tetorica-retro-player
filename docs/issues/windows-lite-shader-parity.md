@@ -80,21 +80,28 @@ lite は `quantizeColor` を `levels = clamp(6, 24)` でかける独自分岐に
 （[filterPass1LiteShader.ts:159-160](../../src/retro-player/retro/filterPass1LiteShader.ts#L159-L160)）、
 本体とは別の挙動。実際に使われているモードかは要確認。
 
-### （既知・対応優先度低）color32 / color64
+### （対応済み・2026-07-15）color32 / color64
 
-`basic` variant では専用ロジックが無く、汎用 `quantizeColor(color, uColorLevels)` にフォールバックしている
-（[filterPass1LiteShader.ts:161-163](../../src/retro-player/retro/filterPass1LiteShader.ts#L161-L163)）。
-本体の `nearestColor32` は R/G 4段階・B 2段階の非対称パレット
-（[filterPass1Shader.ts:286-293](../../src/retro-player/retro/filterPass1Shader.ts#L286-L293)）、
-`nearestColor64` は R/G/B 均等4段階
-（[filterPass1Shader.ts:304-307](../../src/retro-player/retro/filterPass1Shader.ts#L304-L307)）。
-color64 は levels=4 の汎用量子化でほぼ近似できるが、color32 の非対称 B チャンネルは汎用量子化では再現できない。
+`basic` variant に本体と同じ `nearestColor32` / `nearestColor64` を移植し、`paletteMode` 6/7 を専用分岐にした
+（[filterPass1LiteShader.ts:85-97, 175-178](../../src/retro-player/retro/filterPass1LiteShader.ts#L85-L97)）。
+
+移植前は汎用 `quantizeColor(color, uColorLevels)` にフォールバックしていた。
+`color64`（R/G/B 均等4段階）は `uColorLevels=4` の汎用量子化とほぼ同じ結果になるため実害は小さかったが、
+`color32`（R/G 4段階・B 2段階の非対称パレット）は汎用量子化では B チャンネルの二値化を再現できず、
+本体と見た目が異なっていた。
+
+**検証方法**: `pc98` variant（ループ・配列を含む）が既に Windows lite として単独 compile できている実績から、
+それよりずっと軽い color32/64（`round()`/`mod()` のみ、ループ無し）の追加は compile freeze リスクが低いと判断。
+実機 Windows 上の Chromium (ANGLE) で headless に shader を直接 compile/link/描画し、
+compile エラー無し・`gl.getError()` 全モードで `0`・入力色 `(140,190,100)` に対し
+`color32` → `(170,170,0)`（B二値化）、`color64` → `(170,170,85)`（B含め4段階）と、
+本体と同じ計算式通りの出力になることを確認済み。
 
 ## 対応の優先順（案）
 
 1. Glow — 影響範囲が広い（neon 含む複数モードで使われる）
 2. エッジブーストのアルゴリズム統一（`computeEdgeBoost` 相当の追加）
-3. color32 専用ロジックの追加（B チャンネル非対称量子化）
+3. ~~color32 専用ロジックの追加（B チャンネル非対称量子化）~~ — 対応済み（2026-07-15）
 4. ネオンラインの多段階トーン合成化（`uNeonDetail` / `uNeonSaturation` の実装）
 5. PC98 タイル合成・512Sat の高精度化
 6. `highp` 精度指定の追加
