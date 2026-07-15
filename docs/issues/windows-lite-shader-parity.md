@@ -21,14 +21,24 @@ PC98 系パレット（`pc98` / `pc98_tile` / `pc98_512` / `pc98_512_sat` / `pc9
 
 ## 差分一覧
 
-### 1. Glow (`uGlowStrength`) が丸ごと未実装
+### 1. （対応済み・2026-07-15）Glow (`uGlowStrength`)
 
 本体は周囲6方向のパレット適用済みサンプルを加重合成してブルーム風グローを作る
 （[filterPass1Shader.ts:619-644](../../src/retro-player/retro/filterPass1Shader.ts#L619-L644)）。
 
-lite (`basic`) には `uGlowStrength` uniform 自体が存在しない
-（[filterPass1LiteShader.ts:1-19](../../src/retro-player/retro/filterPass1LiteShader.ts#L1-L19)）。
-ネオンモードのハーフピクセルオフセットによるハロー生成もセットで欠落。
+`basic` / `pc98` 両 lite variant に同じ6タップ加重合成（0.34/0.34/0.18/0.18/0.10/0.10、
+`smoothstep(0.45, 1.0, brightness)` の明部マスク）を移植した。
+パレット分岐は center pixel と glow の neighbor サンプルで共有できるよう
+`applyPaletteMode()` / `applyPc98PaletteMode()` に切り出し済み
+（[filterPass1LiteShader.ts:139-157, 192-208](../../src/retro-player/retro/filterPass1LiteShader.ts#L139-L157)、
+[filterPass1Pc98LiteShader.ts:129-144, 165-180](../../src/retro-player/retro/filterPass1Pc98LiteShader.ts#L129-L144)）。
+
+**スコープ外（未対応のまま）**: ネオンモード（mode9）のハーフピクセルオフセットによるハロー生成は
+本体特有の実装で、lite のネオンは元々別実装（項目2参照）のため今回は対象外。ネオン強化と合わせて別途対応する。
+
+**検証**: 実機 Windows 上の Chromium (ANGLE) で両 variant を headless に compile/link/描画し、
+チェッカーパターン入力で `uGlowStrength=0`/`1.5` を比較。全パレットモードで compile エラー・
+`gl.getError()` エラー無し、`uGlowStrength=1.5` 時に明部が加算合成で明るくなることを確認済み。
 
 ### 2. ネオンライン (`paletteMode` 9) がほぼ別実装
 
@@ -99,10 +109,10 @@ compile エラー無し・`gl.getError()` 全モードで `0`・入力色 `(140,
 
 ## 対応の優先順（案）
 
-1. Glow — 影響範囲が広い（neon 含む複数モードで使われる）
+1. ~~Glow — 影響範囲が広い（neon 含む複数モードで使われる）~~ — 対応済み（2026-07-15、neon のハロー部分は対象外）
 2. エッジブーストのアルゴリズム統一（`computeEdgeBoost` 相当の追加）
 3. ~~color32 専用ロジックの追加（B チャンネル非対称量子化）~~ — 対応済み（2026-07-15）
-4. ネオンラインの多段階トーン合成化（`uNeonDetail` / `uNeonSaturation` の実装）
+4. ネオンラインの多段階トーン合成化（`uNeonDetail` / `uNeonSaturation` の実装、glow ハローも含む）
 5. PC98 タイル合成・512Sat の高精度化
 6. `highp` 精度指定の追加
 7. mode ≥ 10.5 フォールバックの整合
