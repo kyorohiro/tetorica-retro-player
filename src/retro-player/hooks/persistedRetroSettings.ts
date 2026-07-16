@@ -1,4 +1,5 @@
 import type { MonoTintMode, PaletteMode, PhosphorDotShape } from "../retro/config";
+import { isWindowsRuntime } from "../platform/runtime";
 
 const STORAGE_KEY = "tetorica-retro-player.settings";
 const RECENT_LAUNCH_STORAGE_KEY = "tetorica-retro-player.recentLaunch";
@@ -438,19 +439,28 @@ export const setNativePlaybackMode = (enabled: boolean): void => {
 export const getFfmpegUseQsv = (): boolean => {
   if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem(FFMPEG_USE_QSV_KEY) === "true";
+    const stored = window.localStorage.getItem(FFMPEG_USE_QSV_KEY);
+    if (stored === null) {
+      return isWindowsRuntime();
+    }
+    return stored === "true";
   } catch {
-    return false;
+    return isWindowsRuntime();
   }
 };
 
 export const setFfmpegUseQsv = (enabled: boolean): void => {
   if (typeof window === "undefined") return;
   try {
+    const defaultEnabled = isWindowsRuntime();
+    if (enabled === defaultEnabled) {
+      window.localStorage.removeItem(FFMPEG_USE_QSV_KEY);
+      return;
+    }
     if (enabled) {
       window.localStorage.setItem(FFMPEG_USE_QSV_KEY, "true");
     } else {
-      window.localStorage.removeItem(FFMPEG_USE_QSV_KEY);
+      window.localStorage.setItem(FFMPEG_USE_QSV_KEY, "false");
     }
   } catch {}
 };
