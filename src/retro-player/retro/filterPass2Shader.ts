@@ -647,6 +647,9 @@ void main(void)
     vec3 baseProcessedColor = color.rgb;
 
     vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, unstableUv, uTargetSize, uSpotMaskStrength);
+    if (useBrightCoreLeak) {
+      phosphorColor *= 0.22;
+    }
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
@@ -685,7 +688,8 @@ void main(void)
         (0.14 + phosphorBrightness * 0.24 + neighborBlendMix * 0.08 + internalScaleMix * 0.1);
       phosphorColor += bloomSample * leakStrength;
 
-      float overlapRadius = 0.96 + uBulbRadius * 3.4 + phosphorBrightness * 0.52;
+      float strongLightLeak = smoothstep(0.72, 1.0, phosphorBrightness) * smoothstep(0.42, 0.92, uBulbRadius);
+      float overlapRadius = 1.04 + uBulbRadius * 4.2 + phosphorBrightness * 0.64 + strongLightLeak * 0.22;
       vec2 rightNeighborUv = pixelAspect >= 1.0
         ? vec2(cellUv.x - 1.0, cellUv.y * aspectCompensation)
         : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y);
@@ -727,7 +731,59 @@ void main(void)
         texture(uPass1Texture, clamp((dotCell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downLeftNeighborHalo * 0.75 +
         texture(uPass1Texture, clamp((dotCell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upRightNeighborHalo * 0.75 +
         texture(uPass1Texture, clamp((dotCell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upLeftNeighborHalo * 0.75;
-      phosphorColor += overlapHalo * uSpotMaskStrength * (0.22 + phosphorBrightness * 0.34);
+      phosphorColor += overlapHalo * uSpotMaskStrength * (0.18 + phosphorBrightness * 0.3 + strongLightLeak * 0.08);
+
+      float bulbSpread = smoothstep(0.18, 0.62, uBulbRadius);
+      float dotRadius = mix(
+        uBulbRadius * 0.14,
+        uBulbRadius * (0.64 + smoothstep(0.68, 1.0, phosphorBrightness) * 0.24),
+        pow(phosphorBrightness, 0.7)
+      );
+      vec2 globalCellUv = unstableUv * uTargetSize;
+      vec3 emitterLeak = vec3(0.0);
+      float emitterWeight = 0.0;
+      for (int oy = -1; oy <= 1; oy++) {
+        for (int ox = -1; ox <= 1; ox++) {
+          vec2 emitterOffset = vec2(float(ox), float(oy));
+          vec2 emitterCell = dotCell + emitterOffset;
+          vec2 emitterSampleUv = clamp((emitterCell + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+          vec3 emitterColor = texture(uPass1Texture, emitterSampleUv).rgb;
+          float emitterBrightness = max(max(emitterColor.r, emitterColor.g), emitterColor.b);
+          float emitterRadius =
+            0.28 +
+            uBulbRadius * 1.62 +
+            emitterBrightness * (1.0 + uBulbRadius * 0.78) +
+            highlightBloom * 0.24 +
+            strongLightLeak * 0.24;
+          vec2 emitterUv = globalCellUv - (emitterCell + 0.5);
+          emitterUv = pixelAspect >= 1.0
+            ? vec2(emitterUv.x, emitterUv.y * aspectCompensation)
+            : vec2(emitterUv.x / aspectCompensation, emitterUv.y);
+          float emitterDist = length(emitterUv);
+          float emitterGlow =
+            exp(-pow(emitterDist / max(emitterRadius, 0.0001), 2.0)) *
+            (1.0 - smoothstep(emitterRadius * 1.08, emitterRadius * 1.9, emitterDist));
+          float axialWeight = (ox == 0 || oy == 0) ? 1.0 : 0.78;
+          float weight = emitterGlow * axialWeight * smoothstep(0.16, 1.0, emitterBrightness);
+          emitterLeak += emitterColor * weight;
+          emitterWeight += weight;
+        }
+      }
+      vec3 circularEmitterLeak = emitterLeak / max(emitterWeight, 0.0001);
+      float centerLeakMask =
+        1.0 -
+        smoothstep(dotRadius * (0.24 + bulbSpread * 0.04), dotRadius * (0.76 + bulbSpread * 0.16) + 0.08, dist);
+      vec3 brightCoreBody =
+        circularEmitterLeak *
+        uSpotMaskStrength *
+        (0.72 + phosphorBrightness * 1.02 + uBulbRadius * 0.64 + strongLightLeak * 0.14);
+      brightCoreBody += mixedSourceColor * centerLeakMask * (0.28 + phosphorBrightness * 0.32);
+      float bubbleField = clamp(emitterWeight * (0.28 + bulbSpread * 0.46 + strongLightLeak * 0.14), 0.0, 1.0);
+      phosphorColor = mix(
+        phosphorColor,
+        max(phosphorColor, brightCoreBody),
+        clamp(bubbleField * (0.36 + bulbSpread * 0.34 + strongLightLeak * 0.12), 0.0, 1.0)
+      );
     }
     float dotRadius = mix(
       uBulbRadius * (useBrightCore ? 0.14 : 0.19),
@@ -742,7 +798,7 @@ void main(void)
       smoothstep(0.04, 0.32, colorDelta) *
       neighborBlendMix *
       (0.14 + phosphorBrightness * 0.18 + flatDiscMode * 0.1);
-    phosphorColor = mix(phosphorColor, mix(phosphorColor, neighborMix, 0.7), edgeBlend);
+    phosphorColor = mix(phosphorColor, mix(phosphorColor, neighborMix, 0.7), edgeBlend * (useBrightCoreLeak ? 0.08 : 1.0));
 
     vec3 fourWayMix =
       mixedSourceColor * 0.34 +
@@ -750,7 +806,7 @@ void main(void)
     float fourWayAmount =
       neighborBlendMix *
       (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08 + internalScaleMix * 0.06);
-    phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount);
+    phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount * (useBrightCoreLeak ? 0.04 : 1.0));
 
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
     float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
@@ -775,9 +831,9 @@ void main(void)
     float phosphorBaseLift =
       uSpotMaskStrength *
       (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
-    phosphorColor += mixedSourceColor * phosphorBaseLift * (useBrightCoreLeak ? 0.08 : 1.0);
+    phosphorColor += mixedSourceColor * phosphorBaseLift * (useBrightCoreLeak ? 0.02 : 1.0);
     if (useBrightCoreLeak) {
-      phosphorColor += mixedSourceColor * uSpotMaskStrength * (0.02 + phosphorBrightness * 0.06);
+      phosphorColor += mixedSourceColor * uSpotMaskStrength * (0.008 + phosphorBrightness * 0.02);
     }
 
     float phosphorDotVignette = distance(vMaskCoord, vec2(0.5));

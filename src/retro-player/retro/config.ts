@@ -437,7 +437,7 @@ export const RETRO_PRESETS = {
     bulbRadius: 0.38,
     blackFloor: 0.002,
     phosphorDotShape: "heart",  
-    phosphorDotLightBalance: 0.16,
+    phosphorDotLightBalance: 0.66,
     phosphorDotInternalScale: true,
     phosphorDotBrightCore: true,
     phosphorDotCellFill: 0.28,

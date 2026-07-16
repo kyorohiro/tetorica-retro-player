@@ -287,6 +287,13 @@ export function RetroPlayer({
     });
   }, [player]);
 
+  // phosphorDot preset needs aspect-aware dimension adjustment. This stays
+  // true while phosphorDot's auto-aspect is in control of targetWidth/Height,
+  // so a source that loads (or changes) later still gets corrected — see
+  // docs/issues/phosphor-dot-aspect-correction.md. It's cleared as soon as
+  // the user edits width/height manually or switches to another preset.
+  const phosphorDotAspectActiveRef = React.useRef(false);
+
   const syncTargetAspect = React.useCallback(() => {
     const dims = player.sourceDimensions;
     if (!dims || dims.width <= 0 || dims.height <= 0) return;
@@ -318,6 +325,8 @@ export function RetroPlayer({
 
   const handleSetTargetWidth = React.useCallback(
     (targetWidth: number) => {
+      // Manual edits take the user out of phosphorDot auto-aspect mode.
+      phosphorDotAspectActiveRef.current = false;
       filterState.setTargetWidth(targetWidth);
       if (!filterState.matchTargetAspect) return;
 
@@ -329,6 +338,7 @@ export function RetroPlayer({
 
   const handleSetTargetHeight = React.useCallback(
     (targetHeight: number) => {
+      phosphorDotAspectActiveRef.current = false;
       filterState.setTargetHeight(targetHeight);
       if (!filterState.matchTargetAspect) return;
 
@@ -341,30 +351,19 @@ export function RetroPlayer({
   const handleSetMatchTargetAspect = React.useCallback(
     (matchTargetAspect: boolean) => {
       filterState.setMatchTargetAspect(matchTargetAspect);
-      if (matchTargetAspect && player.sourceDimensions) {
+      if (matchTargetAspect && player.sourceDimensions && !phosphorDotAspectActiveRef.current) {
         syncTargetAspect();
       }
     },
     [filterState, player.sourceDimensions, syncTargetAspect],
   );
 
-  // phosphorDot preset needs aspect-aware dimension adjustment.
-  const applyPresetWithAspect = React.useCallback(
-    (presetKey: RetroPresetKey) => {
-      filterState.applyPreset(presetKey);
-
-      // "None" is meant to be a neutral pass-through, not a way to also
-      // silence audio effects — keep Effect on (Noise is left as-is).
-      if (presetKey === "none" && !player.isAudioFxEnabled) {
-        player.toggleAudioFx();
-      }
-
-      if (presetKey !== "phosphorDot" || !player.sourceDimensions) return;
-
+  const computePhosphorDotDimensions = React.useCallback(
+    (sourceWidth: number, sourceHeight: number) => {
       const preset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
-      const sourceWidth = Math.max(player.sourceDimensions.width, 1);
-      const sourceHeight = Math.max(player.sourceDimensions.height, 1);
-      const sourceAspect = sourceWidth / sourceHeight;
+      const safeWidth = Math.max(sourceWidth, 1);
+      const safeHeight = Math.max(sourceHeight, 1);
+      const sourceAspect = safeWidth / safeHeight;
       const presetAspect = preset.width / preset.height;
 
       let nextWidth = preset.width;
@@ -375,6 +374,30 @@ export function RetroPlayer({
       } else {
         nextWidth = Math.max(8, Math.round((preset.height * sourceAspect) / 8) * 8);
       }
+
+      return { width: nextWidth, height: nextHeight };
+    },
+    [],
+  );
+
+  const applyPresetWithAspect = React.useCallback(
+    (presetKey: RetroPresetKey) => {
+      filterState.applyPreset(presetKey);
+      phosphorDotAspectActiveRef.current = presetKey === "phosphorDot";
+
+      // "None" is meant to be a neutral pass-through, not a way to also
+      // silence audio effects — keep Effect on (Noise is left as-is).
+      if (presetKey === "none" && !player.isAudioFxEnabled) {
+        player.toggleAudioFx();
+      }
+
+      if (presetKey !== "phosphorDot" || !player.sourceDimensions) return;
+
+      const preset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
+      const { width: nextWidth, height: nextHeight } = computePhosphorDotDimensions(
+        player.sourceDimensions.width,
+        player.sourceDimensions.height,
+      );
 
       if (preset.width === nextWidth && preset.height === nextHeight) return;
       filterState.setTargetWidth(nextWidth);
@@ -387,13 +410,41 @@ export function RetroPlayer({
       player.sourceDimensions,
       player.isAudioFxEnabled,
       player.toggleAudioFx,
+      computePhosphorDotDimensions,
     ],
   );
+
+  // Catch the cases the click-time correction above misses: the preset was
+  // applied before a source was loaded, or a new source loads afterward.
+  React.useEffect(() => {
+    if (!phosphorDotAspectActiveRef.current) return;
+    if (!player.sourceDimensions) return;
+
+    const { width: nextWidth, height: nextHeight } = computePhosphorDotDimensions(
+      player.sourceDimensions.width,
+      player.sourceDimensions.height,
+    );
+
+    if (nextWidth === filterState.targetWidth && nextHeight === filterState.targetHeight) return;
+    filterState.setTargetWidth(nextWidth);
+    filterState.setTargetHeight(nextHeight);
+  }, [
+    player.sourceDimensions,
+    computePhosphorDotDimensions,
+    filterState.targetWidth,
+    filterState.targetHeight,
+    filterState.setTargetWidth,
+    filterState.setTargetHeight,
+  ]);
 
   // --- Effects ---
 
   // Sync target aspect when source dimensions become available.
+  // Skipped while phosphorDot's own aspect correction owns width/height —
+  // otherwise the two effects fight over targetWidth/targetHeight every
+  // time either one changes (visible as constant chattering in the UI).
   React.useEffect(() => {
+    if (phosphorDotAspectActiveRef.current) return;
     if (!filterState.matchTargetAspect) return;
     if (!player.sourceDimensions) return;
     syncTargetAspect();
