@@ -52,6 +52,7 @@ export type RetroVideoFilterState = {
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  phosphorDotGrainStrength: number;
   closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
@@ -127,6 +128,7 @@ type Pass2UniformLocations = {
   uPhosphorDotCellFill: WebGLUniformLocation | null;
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
+  uPhosphorDotGrainStrength: WebGLUniformLocation | null;
   uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uSignalInstabilityAmount: WebGLUniformLocation | null;
   uSignalHorizontalSync: WebGLUniformLocation | null;
@@ -919,6 +921,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
+      uPhosphorDotGrainStrength: gl.getUniformLocation(program, "uPhosphorDotGrainStrength"),
       uCloseUpNoiseStrength: gl.getUniformLocation(program, "uCloseUpNoiseStrength"),
       uSignalInstabilityAmount: gl.getUniformLocation(program, "uSignalInstabilityAmount"),
       uSignalHorizontalSync: gl.getUniformLocation(program, "uSignalHorizontalSync"),
@@ -1225,6 +1228,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotGrainStrength, filterState.phosphorDotGrainStrength);
     gl.uniform1f(this.pass2Locs.uCloseUpNoiseStrength, filterState.closeUpNoiseStrength);
     const signalTimeSec = (nowMs() - this.startedAt) / 1000;
     const signalState = this.signalInstabilityController.update(signalTimeSec, {

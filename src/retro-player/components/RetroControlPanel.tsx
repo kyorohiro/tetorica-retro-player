@@ -379,6 +379,7 @@ export function RetroControlPanel({
               phosphorDotCellFill={filterState.phosphorDotCellFill}
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
               phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
+              phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
               closeUpNoiseStrength={filterState.closeUpNoiseStrength}
               signalInstabilityEnabled={filterState.signalInstabilityEnabled}
               signalInstabilityStrength={filterState.signalInstabilityStrength}
@@ -431,6 +432,7 @@ export function RetroControlPanel({
               onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
               onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
+              onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
               onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
               onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
               onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}

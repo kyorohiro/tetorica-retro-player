@@ -52,6 +52,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   phosphorDotCellFill: 0,
   phosphorDotFlatDisc: false,
   phosphorDotNeighborBlend: false,
+  phosphorDotGrainStrength: 0,
   closeUpNoiseStrength: 0,
   signalInstabilityEnabled: false,
   signalInstabilityStrength: 0.35,

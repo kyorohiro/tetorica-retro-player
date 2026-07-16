@@ -13,6 +13,28 @@ import {
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
+// Grain strength spans from subtle (0.1) to extreme (~1000) — a linear
+// slider can't cover that range at a usable step size, so the slider itself
+// moves on a log2 scale (every GRAIN_SLIDER_UNITS_PER_DOUBLING units doubles
+// the value) while the stored/shader value stays a plain float. 0 is a
+// special case (off) since log2(0) is undefined.
+const GRAIN_LOG_BASE = 0.1;
+const GRAIN_SLIDER_UNITS_PER_DOUBLING = 10;
+const GRAIN_SLIDER_MAX = 133; // ~0.1 * 2^13.3 ≈ 1000
+
+const grainValueToSlider = (value: number) => {
+  if (value <= 0) return 0;
+  return Math.min(
+    GRAIN_SLIDER_MAX,
+    Math.max(0, GRAIN_SLIDER_UNITS_PER_DOUBLING * Math.log2(value / GRAIN_LOG_BASE)),
+  );
+};
+
+const grainSliderToValue = (slider: number) => {
+  if (slider <= 0) return 0;
+  return GRAIN_LOG_BASE * Math.pow(2, slider / GRAIN_SLIDER_UNITS_PER_DOUBLING);
+};
+
 function InfoTip({
   label,
   text,
@@ -78,6 +100,7 @@ type RetroFilterPanelProps = {
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  phosphorDotGrainStrength: number;
   closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
@@ -130,6 +153,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
+  onSetPhosphorDotGrainStrength: (value: number) => void;
   onSetCloseUpNoiseStrength: (value: number) => void;
   onSetSignalInstabilityEnabled: (value: boolean) => void;
   onSetSignalInstabilityStrength: (value: number) => void;
@@ -183,6 +207,7 @@ export function RetroFilterPanel({
   phosphorDotCellFill,
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
+  phosphorDotGrainStrength,
   closeUpNoiseStrength,
   signalInstabilityEnabled,
   signalInstabilityStrength,
@@ -234,6 +259,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotCellFill,
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
+  onSetPhosphorDotGrainStrength,
   onSetCloseUpNoiseStrength,
   onSetSignalInstabilityEnabled,
   onSetSignalInstabilityStrength,
@@ -1365,6 +1391,23 @@ export function RetroFilterPanel({
               Neighbor blend
             </button>
           </div>
+
+          <label className="mt-3 block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
+            <span className="text-[11px] leading-tight text-[#12141c]">
+              Grain: {phosphorDotGrainStrength <= 0 ? "off" : phosphorDotGrainStrength.toFixed(2)}
+            </span>
+            <input
+              type="range"
+              min="0"
+              max={GRAIN_SLIDER_MAX}
+              step="0.5"
+              value={grainValueToSlider(phosphorDotGrainStrength)}
+              onChange={(ev) => {
+                onSetPhosphorDotGrainStrength(grainSliderToValue(Number(ev.currentTarget.value)));
+              }}
+              className="mt-1 w-full"
+            />
+          </label>
 
           <label className="mt-3 block">
             <span className="text-[#12141c]">

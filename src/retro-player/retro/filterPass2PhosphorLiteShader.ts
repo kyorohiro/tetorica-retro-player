@@ -31,6 +31,7 @@ uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
 uniform float uPhosphorDotNeighborBlend;
+uniform float uPhosphorDotGrainStrength;
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
 uniform float uSignalVerticalSync;
@@ -434,6 +435,17 @@ void main(void)
     if (useBrightCoreLeak) {
       phosphorColor *= 0.22;
     }
+
+    // Phosphor moiré is a static per-cell brightness beat against the
+    // display's pixel grid. A smooth wobble on a fixed block grid just
+    // pulses that same fixed pattern in sync with itself — it doesn't
+    // decorrelate anything. Re-rolling each dot's brightness from an
+    // independent hash every frame (like film grain / static) actually
+    // gives eye persistence a different pattern to average out each frame.
+    float ditherFrame = floor(uTime * 20.0);
+    float ditherNoise = hash13(vec3(cell, ditherFrame)) - 0.5;
+    phosphorColor *= 1.0 + ditherNoise * uPhosphorDotGrainStrength * uSpotMaskStrength;
+
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
 

@@ -60,6 +60,7 @@ export type RetroPresetDefinition = {
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
+  phosphorDotGrainStrength?: number;
   closeUpNoiseStrength?: number;
   signalInstabilityEnabled?: boolean;
   signalInstabilityStrength?: number;

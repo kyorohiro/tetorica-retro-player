@@ -53,6 +53,7 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  phosphorDotGrainStrength: number;
   closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
@@ -118,6 +119,7 @@ const doesPresetMatchState = (
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
+    (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
     (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
     (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
     (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
@@ -220,6 +222,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotFlatDisc ?? (DEFAULT_PRESET.phosphorDotFlatDisc ?? false),
     phosphorDotNeighborBlend:
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
+    phosphorDotGrainStrength:
+      initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
     closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
     signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
@@ -468,6 +472,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPhosphorDotGrainStrength = (value: number) => {
+    const phosphorDotGrainStrength = Math.max(0, value);
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotGrainStrength === phosphorDotGrainStrength ? current : { ...current, phosphorDotGrainStrength }
+    ));
+  };
+
   const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.closeUpNoiseStrength === closeUpNoiseStrength ? current : { ...current, closeUpNoiseStrength }));
@@ -608,6 +620,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
+      phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
       closeUpNoiseStrength: presetSettings.closeUpNoiseStrength ?? 0,
       signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
       signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
@@ -692,6 +705,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotCellFill,
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
+    setPhosphorDotGrainStrength,
     setCloseUpNoiseStrength,
     setSignalInstabilityEnabled,
     setSignalInstabilityStrength,
