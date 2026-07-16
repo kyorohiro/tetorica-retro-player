@@ -55,7 +55,7 @@ export type RetroPresetDefinition = {
   outputBrightness?: number;
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
-  phosphorDotInternalScale?: boolean;
+  phosphorDotInternalScale?: 1 | 2 | 3;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
@@ -438,7 +438,7 @@ export const RETRO_PRESETS = {
     blackFloor: 0.002,
     phosphorDotShape: "heart",  
     phosphorDotLightBalance: 0.66,
-    phosphorDotInternalScale: true,
+    phosphorDotInternalScale: 2,
     phosphorDotBrightCore: true,
     phosphorDotCellFill: 0.28,
     phosphorDotFlatDisc: false,
@@ -468,7 +468,7 @@ export const RETRO_PRESETS = {
     bulbRadius: 0.5,
     blackFloor: 0.001,
     phosphorDotLightBalance: 0.22,
-    phosphorDotInternalScale: true,
+    phosphorDotInternalScale: 2,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.12,
     phosphorDotFlatDisc: true,

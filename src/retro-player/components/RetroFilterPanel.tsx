@@ -73,7 +73,7 @@ type RetroFilterPanelProps = {
   outputBrightness: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: boolean;
+  phosphorDotInternalScale: 1 | 2 | 3;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -125,7 +125,7 @@ type RetroFilterPanelProps = {
   onSetOutputBrightness: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
-  onSetPhosphorDotInternalScale: (value: boolean) => void;
+  onSetPhosphorDotInternalScale: (value: 1 | 2 | 3) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
@@ -394,7 +394,7 @@ export function RetroFilterPanel({
   const isPhosphorDotModeActive =
     spotMaskStrength > 0.001 &&
     (
-      phosphorDotInternalScale ||
+      phosphorDotInternalScale > 1 ||
       phosphorDotBrightCore ||
       phosphorDotCellFill > 0.001 ||
       phosphorDotFlatDisc ||
@@ -1286,20 +1286,42 @@ export function RetroFilterPanel({
             >
               Dot shape: Heart
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSetPhosphorDotInternalScale(!phosphorDotInternalScale);
-              }}
-              className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                phosphorDotInternalScale
-                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              2x internal resolution
-            </button>
+            <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
+              <span
+                className={[
+                  "text-[11px] leading-tight",
+                  phosphorDotInternalScale >= 3
+                    ? "font-semibold text-red-600"
+                    : "text-[#12141c]",
+                ].join(" ")}
+              >
+                Internal res: {phosphorDotInternalScale}x
+              </span>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="text-[9px] text-[#7a7268]">1</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="1"
+                  list="phosphor-dot-internal-res-ticks"
+                  value={phosphorDotInternalScale}
+                  onChange={(ev) => {
+                    onSetPhosphorDotInternalScale(Number(ev.currentTarget.value) as 1 | 2 | 3);
+                  }}
+                  className={[
+                    "w-full",
+                    phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-emerald-600",
+                  ].join(" ")}
+                />
+                <span className="text-[9px] text-[#7a7268]">3</span>
+              </div>
+              <datalist id="phosphor-dot-internal-res-ticks">
+                <option value="1" label="1" />
+                <option value="2" label="2" />
+                <option value="3" label="3" />
+              </datalist>
+            </label>
             <button
               type="button"
               onClick={() => {

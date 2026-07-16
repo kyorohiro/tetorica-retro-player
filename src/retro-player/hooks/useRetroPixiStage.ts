@@ -98,6 +98,11 @@ export function useRetroPixiStage({
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
   const destroyPixiRef = useRef<() => void>(() => {});
   const appliedLayoutKeyRef = useRef<string | null>(null);
+  // Populated once the WebGL2 context exists (see initPixi below). Backing
+  // buffer size feeds straight into the pipeline's FBO textures, so at 3x/4x
+  // render resolution on a large preview this is the only thing standing
+  // between a user picking "4x" and a driver-level texture allocation error.
+  const maxTextureSizeRef = useRef<number>(4096);
 
   filterStateRef.current = filterState;
   isPoweredOnRef.current = isPoweredOn;
@@ -352,20 +357,33 @@ export function useRetroPixiStage({
       Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, effectiveRenderResolutionScale)),
     );
     const shouldUseLogicalBufferUpscale = isPhosphorDotModeEnabled(currentFilterState);
-    const nextWidth = currentFilterState.isFilterEnabled
+    const rawNextWidth = currentFilterState.isFilterEnabled
       ? (
         shouldUseLogicalBufferUpscale
           ? Math.max(displayBufferWidth, logicalBufferWidth)
           : displayBufferWidth
       )
       : displayBufferWidth;
-    const nextHeight = currentFilterState.isFilterEnabled
+    const rawNextHeight = currentFilterState.isFilterEnabled
       ? (
         shouldUseLogicalBufferUpscale
           ? Math.max(displayBufferHeight, logicalBufferHeight)
           : displayBufferHeight
       )
       : displayBufferHeight;
+
+    // The backing buffer becomes the pipeline's FBO texture size 1:1, so it
+    // must not exceed what the GPU actually supports (3x/4x render
+    // resolution on a large preview can get there fast). Scale both axes
+    // down together to keep the aspect ratio intact.
+    const maxTextureSize = maxTextureSizeRef.current;
+    const overLimitFactor = Math.max(
+      rawNextWidth / maxTextureSize,
+      rawNextHeight / maxTextureSize,
+      1,
+    );
+    const nextWidth = Math.max(1, Math.floor(rawNextWidth / overLimitFactor));
+    const nextHeight = Math.max(1, Math.floor(rawNextHeight / overLimitFactor));
     const nextLeft = Math.round(viewRect.x);
     const nextTop = Math.round(viewRect.y);
     const nextLayoutKey = [
@@ -392,7 +410,14 @@ export function useRetroPixiStage({
     app.canvas.style.top = `${nextTop}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
-    app.canvas.style.imageRendering = "pixelated";
+    // "pixelated" keeps the classic crisp/pixel-perfect look when the backing
+    // buffer matches the display's native pixel density (1x/2x Hi-Res), but it
+    // forces nearest-neighbor sampling when the browser composites the canvas
+    // down to its CSS box — so pushing render resolution past that density
+    // (3x/4x) gets discarded on the way down instead of smoothing anything.
+    // Switch to normal (smooth) scaling once we're supersampling beyond it.
+    app.canvas.style.imageRendering =
+      effectiveRenderResolutionScale > getPreferredOutputScale() ? "auto" : "pixelated";
 
     renderFrame();
   }, [effectiveRenderResolutionScale, fitCurrentSprite, renderFrame]);
@@ -450,6 +475,12 @@ export function useRetroPixiStage({
       if (!gl) {
         throw new Error("WebGL2 is not available in this app view.");
       }
+
+      const reportedMaxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      maxTextureSizeRef.current =
+        typeof reportedMaxTextureSize === "number" && reportedMaxTextureSize > 0
+          ? reportedMaxTextureSize
+          : 4096;
 
       debugVideo("startup:initPixi:webgl2-ready", {
         elapsedMs:

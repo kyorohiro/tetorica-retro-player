@@ -47,7 +47,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   outputBrightness: 1,
   phosphorDotLightBalance: 1,
   phosphorDotShape: "circle",
-  phosphorDotInternalScale: false,
+  phosphorDotInternalScale: 1,
   phosphorDotBrightCore: false,
   phosphorDotCellFill: 0,
   phosphorDotFlatDisc: false,

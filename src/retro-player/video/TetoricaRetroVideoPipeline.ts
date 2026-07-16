@@ -47,7 +47,7 @@ export type RetroVideoFilterState = {
   outputBrightness: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: boolean;
+  phosphorDotInternalScale: 1 | 2 | 3;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -262,7 +262,7 @@ export const getRetroVideoSourceSize = (source: RetroVideoSource) => ({
 export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
   filterState.spotMaskStrength > 0.001 &&
   (
-    filterState.phosphorDotInternalScale ||
+    filterState.phosphorDotInternalScale > 1 ||
     filterState.phosphorDotBrightCore ||
     filterState.phosphorDotCellFill > 0.001 ||
     filterState.phosphorDotFlatDisc ||
@@ -270,7 +270,7 @@ export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
   );
 
 const getPhosphorDotInternalScale = (filterState: RetroVideoFilterState) =>
-  isPhosphorDotModeEnabled(filterState) && filterState.phosphorDotInternalScale ? 2 : 1;
+  isPhosphorDotModeEnabled(filterState) ? filterState.phosphorDotInternalScale : 1;
 
 const getAspectCorrectedSize = (
   requestedWidth: number,
@@ -1220,7 +1220,7 @@ export class TetoricaRetroVideoPipeline {
     );
     gl.uniform1f(this.pass2Locs.uPhosphorDotMode, isPhosphorDotMode ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotShape, filterState.phosphorDotShape === "heart" ? 1 : 0);
-    gl.uniform1f(this.pass2Locs.uPhosphorDotInternalScale, filterState.phosphorDotInternalScale ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotInternalScale, filterState.phosphorDotInternalScale > 1 ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
