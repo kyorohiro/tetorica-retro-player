@@ -1136,7 +1136,7 @@ export const VideoControls = memo(function VideoControls({
   return (
     <div
       className={[
-        "mt-3 space-y-3 rounded-xl transition-colors",
+        "mt-3 min-w-0 space-y-3 overflow-x-hidden rounded-xl transition-colors",
         isDragOver ? "bg-cyan-500/10 outline-dashed outline-1 outline-cyan-500/50" : "",
       ].join(" ")}
       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}

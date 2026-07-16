@@ -211,10 +211,11 @@ export function RetroPreviewView({
     persistedUiSettings?.flipV ?? false,
   );
   const [pinnedPreviewMetrics, setPinnedPreviewMetrics] = React.useState<{
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
+      left: number;
+      right: number;
+      width: number;
+      height: number;
+    } | null>(null);
   const [isStartingPlay, setIsStartingPlay] = React.useState(false);
 
   const previewFrameRef = React.useRef<HTMLDivElement | null>(null);
@@ -232,6 +233,7 @@ export function RetroPreviewView({
   const setPinnedPreviewMetricsIfChanged = React.useCallback((
     nextMetrics: {
       left: number;
+      right: number;
       width: number;
       height: number;
     } | null,
@@ -243,6 +245,7 @@ export function RetroPreviewView({
           current
           && nextMetrics
           && current.left === nextMetrics.left
+          && current.right === nextMetrics.right
           && current.width === nextMetrics.width
           && current.height === nextMetrics.height
         )
@@ -269,11 +272,30 @@ export function RetroPreviewView({
     if (!frame || !shell) return null;
 
     const frameRect = frame.getBoundingClientRect();
+    const parentRect = frame.parentElement?.getBoundingClientRect();
     const shellRect = shell.getBoundingClientRect();
+    const candidateRects = [frameRect, shellRect];
+    if (parentRect) {
+      candidateRects.push(parentRect);
+    }
+    const baseRect = candidateRects.reduce((best, rect) => {
+      if (!Number.isFinite(rect.width) || rect.width <= 1) {
+        return best;
+      }
+      if (!best || rect.width > best.width) {
+        return rect;
+      }
+      return best;
+    }, null as DOMRect | null);
+
+    if (!baseRect) {
+      return null;
+    }
 
     return {
-      left: frameRect.left,
-      width: frameRect.width,
+      left: baseRect.left,
+      right: Math.max(0, window.innerWidth - baseRect.right),
+      width: baseRect.width,
       height: shellRect.height,
     };
   }, []);
@@ -460,7 +482,16 @@ export function RetroPreviewView({
 
   // Auto-pin when the settings panel is open and user scrolls up.
   React.useEffect(() => {
-    if (controlPanelMode === "playback" || isPreviewMaximized || isPreviewPinned || isFitWidthEnabled) {
+    // In the fixed-height player layouts, the preview is already kept visible
+    // above the scrollable settings area, so auto-pin just adds extra scroll
+    // listeners and layout measurement work without helping UX.
+    if (
+      fillHeight ||
+      controlPanelMode === "playback" ||
+      isPreviewMaximized ||
+      isPreviewPinned ||
+      isFitWidthEnabled
+    ) {
       setIsAutoPreviewPinned(false);
       setAutoPinnedHiddenOffset(0);
       return;
@@ -537,6 +568,7 @@ export function RetroPreviewView({
     };
   }, [
     controlPanelMode,
+    fillHeight,
     isFitWidthEnabled,
     isPreviewMaximized,
     isPreviewPinned,
@@ -547,7 +579,7 @@ export function RetroPreviewView({
   // Keep pinned shell metrics in sync with layout changes.
   React.useEffect(() => {
     const shouldPinPreview =
-      (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
+      (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized && !fillHeight;
 
     if (!shouldPinPreview) {
       setPinnedPreviewMetricsIfChanged(null);
@@ -582,6 +614,7 @@ export function RetroPreviewView({
     };
   }, [
     controlPanelMode,
+    fillHeight,
     isAutoPreviewPinned,
     isPreviewMaximized,
     isPreviewPinned,
@@ -594,9 +627,38 @@ export function RetroPreviewView({
   // Refresh canvas layout when pin/maximize state changes.
   React.useEffect(() => {
     scheduleRefreshLayout();
+    const shouldHoldRefresh =
+      ((isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized) || isPreviewMaximized;
+    if (!shouldHoldRefresh) {
+      return;
+    }
+
+    let raf1: number | null = window.requestAnimationFrame(() => {
+      raf1 = null;
+      scheduleRefreshLayout();
+      raf2 = window.requestAnimationFrame(() => {
+        raf2 = null;
+        scheduleRefreshLayout();
+      });
+    });
+    let raf2: number | null = null;
+
+    return () => {
+      if (raf1 !== null) {
+        window.cancelAnimationFrame(raf1);
+      }
+      if (raf2 !== null) {
+        window.cancelAnimationFrame(raf2);
+      }
+    };
   }, [
+    isAutoPreviewPinned,
     isPreviewPinned,
     isPreviewMaximized,
+    pinnedPreviewMetrics?.left,
+    pinnedPreviewMetrics?.right,
+    pinnedPreviewMetrics?.width,
+    pinnedPreviewMetrics?.height,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
     scheduleRefreshLayout,
@@ -789,19 +851,10 @@ export function RetroPreviewView({
     return `${effectiveDimensions.width} / ${effectiveDimensions.height}`;
   }, [effectiveDimensions]);
 
-  // For pin mode: compute explicit pixel width from JS to avoid Safari
-  // aspect-ratio + vh interaction issues.
-  const pinnedContentWidth = React.useMemo(() => {
-    if (!effectiveDimensions || !pinnedPreviewMetrics) return undefined;
-    const { width: srcW, height: srcH } = effectiveDimensions;
-    const ar = srcW / Math.max(srcH, 1);
-    const maxH = typeof window !== "undefined" ? window.innerHeight * 0.5 : 300;
-    const idealW = maxH * ar;
-    return `${Math.floor(Math.min(idealW, pinnedPreviewMetrics.width))}px`;
-  }, [effectiveDimensions, pinnedPreviewMetrics]);
-
   const isPinnedPreview =
     (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
+  const shouldUseFloatingPinnedLayout = isPinnedPreview && !fillHeight;
+  const shouldUseInlinePinnedLayout = isPinnedPreview && fillHeight;
   const pinnedPreviewTop = isAutoPreviewPinned
     ? `calc(max(0.0rem, env(safe-area-inset-top)) - ${autoPinnedHiddenOffset}px)`
     : undefined;
@@ -975,7 +1028,14 @@ export function RetroPreviewView({
   }, []);
 
   return (
-    <div ref={previewFrameRef} className={isPinnedPreview || isPreviewMaximized || !fillHeight ? "space-y-4" : "h-full flex flex-col"}>
+    <div
+      ref={previewFrameRef}
+      className={
+        shouldUseFloatingPinnedLayout || isPreviewMaximized || !fillHeight
+          ? "space-y-4"
+          : "h-full flex flex-col"
+      }
+    >
       <div ref={previewAnchorRef} aria-hidden="true" />
       <div
         ref={previewShellRef}
@@ -986,16 +1046,18 @@ export function RetroPreviewView({
               // content (e.g. portrait manga/capture) can be read in full.
               ? "fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-y-auto"
               : "fixed inset-0 z-50 border-0 bg-slate-950/95 p-3 overflow-visible flex items-stretch justify-stretch"
-            : isPinnedPreview
+            : shouldUseFloatingPinnedLayout
               ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
-              : fillHeight ? "flex-1 min-h-0 overflow-visible" : "overflow-visible"
+              : fillHeight
+                ? "flex-1 min-h-0 overflow-visible"
+                : "overflow-visible"
         }`}
         style={
-          isPinnedPreview && pinnedPreviewMetrics
+          shouldUseFloatingPinnedLayout && pinnedPreviewMetrics
             ? {
                 left: `${pinnedPreviewMetrics.left}px`,
+                right: `${pinnedPreviewMetrics.right}px`,
                 top: pinnedPreviewTop ?? "calc(max(0.0rem, env(safe-area-inset-top)) + 0.5rem)",
-                width: `${pinnedPreviewMetrics.width}px`,
               }
             : !isPreviewMaximized
               ? { overflow: "visible" }
@@ -1005,7 +1067,7 @@ export function RetroPreviewView({
         <div
           className={`relative ${
             isPreviewMaximized ? "w-full" : "max-w-full min-w-0 overflow-visible"
-          } ${fillHeight && !isPreviewMaximized && !isPinnedPreview && !isFitWidthEnabled ? "h-full" : ""}`}
+          } ${fillHeight && !isPreviewMaximized && !shouldUseFloatingPinnedLayout && !isFitWidthEnabled ? "h-full" : ""}`}
           style={
             isPreviewMaximized
               ? isFitWidthEnabled && previewAspectRatio
@@ -1020,15 +1082,21 @@ export function RetroPreviewView({
                     aspectRatio: previewAspectRatio,
                     width: "100%",
                   }
-                : isPinnedPreview
+                : shouldUseFloatingPinnedLayout
                   ? {
-                      // Pin mode: use JS-computed pixel width to avoid Safari
-                      // aspect-ratio + vh interaction expanding beyond window.
                       height: "50vh",
-                      width: pinnedContentWidth ?? "100%",
+                      width: "100%",
                       maxWidth: "100%",
                       margin: "0 auto",
                     }
+                  : shouldUseInlinePinnedLayout && previewAspectRatio
+                    ? {
+                        aspectRatio: previewAspectRatio,
+                        height: "100%",
+                        width: "auto",
+                        maxWidth: "100%",
+                        margin: "0 auto",
+                      }
                   : previewAspectRatio
                     ? {
                         aspectRatio: previewAspectRatio,
@@ -1284,7 +1352,7 @@ export function RetroPreviewView({
 
         {/* Pinned mode toolbar — absolute relative to the fixed shell (not the canvas),
             so horizontal position tracks the shell width and stays stable. */}
-        {!isFitWidthEnabled && isPinnedPreview && (
+        {!isFitWidthEnabled && shouldUseFloatingPinnedLayout && (
           <div className="absolute -bottom-8 right-0 z-50 flex items-center gap-2">
             <RetroPreviewToolbar
               locale={locale}
@@ -1394,7 +1462,60 @@ export function RetroPreviewView({
       </div>
 
       {/* Normal mode toolbar: document flow, right-aligned, overlapping shell bottom */}
-      {!isFitWidthEnabled && !isPreviewMaximized && !isPinnedPreview && (
+      {!isFitWidthEnabled && !isPreviewMaximized && !shouldUseFloatingPinnedLayout && !shouldUseInlinePinnedLayout && (
+        <div className="flex items-center justify-end gap-2 -mt-3 pr-1">
+          <RetroPreviewToolbar
+            locale={locale}
+            player={player}
+            isHighResolution={isHighResolution}
+            renderResolutionPreset={renderResolutionPreset}
+            isFitWidthEnabled={isFitWidthEnabled}
+            isPinnedPreview={isPinnedPreview}
+            isPreviewMaximized={isPreviewMaximized}
+            brightness={brightness}
+            flipH={flipH}
+            flipV={flipV}
+            alarmTime={alarmTime}
+            alarmTargetAt={alarmTargetAt}
+            alarmStatus={alarmStatus}
+            formatAlarmTarget={formatAlarmTarget}
+            onAlarmTimeChange={setAlarmTime}
+            onArmAlarm={handleArmAlarm}
+            onArmAlarmIn={handleArmAlarmIn}
+            onClearAlarm={handleClearAlarm}
+            onTestAlarm={handleTestAlarm}
+            onRecordClick={handleRecordClick}
+            onPowerToggle={() => {
+              if (player.isPoweredOn) {
+                player.powerOff();
+                return;
+              }
+              player.powerOn();
+            }}
+            onPowerLongPress={handlePowerLongPress}
+            onHighResolutionToggle={onHighResolutionToggle}
+            onFitWidthToggle={handleFitWidthToggle}
+            onPinToggle={handlePinToggle}
+            onMaximizeToggle={handleMaximizeToggle}
+            onBrightnessChange={setBrightness}
+            onFlipHToggle={() => { setFlipH((v) => !v); }}
+            onFlipVToggle={() => { setFlipV((v) => !v); }}
+            onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
+            onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
+            onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
+            onLatencyHintChange={player.setLatencyHint}
+            ffmpegUseQsv={ffmpegUseQsv}
+            onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
+            ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
+            onFfmpegMaxConcurrentHlsSessionsChange={onFfmpegMaxConcurrentHlsSessionsChange}
+            selectedPreset={selectedPreset}
+            onApplyPreset={onApplyPreset}
+          />
+        </div>
+      )}
+
+      {!isFitWidthEnabled && !isPreviewMaximized && shouldUseInlinePinnedLayout && (
         <div className="flex items-center justify-end gap-2 -mt-3 pr-1">
           <RetroPreviewToolbar
             locale={locale}
@@ -1503,7 +1624,7 @@ export function RetroPreviewView({
       )}
 
       {/* Spacer that holds layout space while the shell is fixed/pinned */}
-      {isPinnedPreview && pinnedPreviewMetrics && (
+      {shouldUseFloatingPinnedLayout && pinnedPreviewMetrics && (
         <div style={{ height: `min(${pinnedPreviewMetrics.height}px, 50vh)` }} />
       )}
 

@@ -596,7 +596,7 @@ export function RetroPlayer({
   const layoutMode: RetroLayoutMode =
     isFitWidthEnabled
       ? "fitwidth"
-      : controlPanelMode !== "playback"
+      : controlPanelMode !== "playback" || isPinnedInPreview
         ? "settings"
         : "playback";
 
@@ -629,6 +629,20 @@ export function RetroPlayer({
     onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
     isAudioFxUnavailable,
   } as const;
+
+  const controlPanel = layoutMode === "settings"
+    ? (
+      <RetroControlPanel
+        {...controlPanelProps}
+        controlPanelMode={controlPanelMode}
+      />
+    )
+    : (
+      <RetroControlPanel
+        {...controlPanelProps}
+        controlPanelMode={layoutMode === "fitwidth" ? controlPanelMode : "playback"}
+      />
+    );
 
   return (
     <div
@@ -670,12 +684,8 @@ export function RetroPlayer({
               onApplyPreset={applyPresetWithAspect}
             />
           }
-          playbackControls={
-            <RetroControlPanel {...controlPanelProps} controlPanelMode={layoutMode === "fitwidth" ? controlPanelMode : "playback"} />
-          }
-          settingsOverlay={
-            <RetroControlPanel {...controlPanelProps} controlPanelMode={controlPanelMode} />
-          }
+          playbackControls={controlPanel}
+          settingsOverlay={controlPanel}
           isPinnedInSettings={isPinnedInPreview && layoutMode === "settings"}
         />
       </section>
