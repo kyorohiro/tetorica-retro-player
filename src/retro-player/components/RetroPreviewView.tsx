@@ -226,6 +226,8 @@ export function RetroPreviewView({
   const pinnedMetricsFrameRef = React.useRef<number | null>(null);
   const emittedPreviewLayoutStateRef = React.useRef<RetroPreviewLayoutState | undefined>(undefined);
   const refreshLayoutFrameRef = React.useRef<number | null>(null);
+  const autoPinRequiresScrollRef = React.useRef(false);
+  const lastWindowScrollYRef = React.useRef(0);
 
   const setPinnedPreviewMetricsIfChanged = React.useCallback((
     nextMetrics: {
@@ -281,6 +283,7 @@ export function RetroPreviewView({
     setIsPreviewMaximized(false);
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
+    autoPinRequiresScrollRef.current = true;
 
     setIsPreviewPinned((current) => {
       const next = !current;
@@ -310,6 +313,7 @@ export function RetroPreviewView({
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetricsIfChanged(null);
+    autoPinRequiresScrollRef.current = true;
     onFitWidthChange(next);
   }, [isFitWidthEnabled, onFitWidthChange, setPinnedPreviewMetricsIfChanged]);
 
@@ -320,6 +324,7 @@ export function RetroPreviewView({
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetricsIfChanged(null);
     onFitWidthChange(false);
+    autoPinRequiresScrollRef.current = true;
     setIsPreviewMaximized(next);
   }, [isPreviewMaximized, onFitWidthChange, setPinnedPreviewMetricsIfChanged]);
 
@@ -425,6 +430,7 @@ export function RetroPreviewView({
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetricsIfChanged(null);
+    autoPinRequiresScrollRef.current = true;
   }, [isPreviewMaximized, setPinnedPreviewMetricsIfChanged]);
 
   // Fit Width ON: reset pin state (after render so layout has settled).
@@ -435,7 +441,13 @@ export function RetroPreviewView({
     setIsAutoPreviewPinned(false);
     setAutoPinnedHiddenOffset(0);
     setPinnedPreviewMetricsIfChanged(null);
+    autoPinRequiresScrollRef.current = true;
   }, [isFitWidthEnabled, setPinnedPreviewMetricsIfChanged]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    lastWindowScrollYRef.current = window.scrollY;
+  }, []);
 
   // Reset the transient "starting" UI once playback either begins or falls
   // back to a manual retry state.
@@ -466,6 +478,12 @@ export function RetroPreviewView({
       );
       const pinTriggerTop = -Math.max(120, maxHiddenHeight);
 
+      if (autoPinRequiresScrollRef.current) {
+        setIsAutoPreviewPinned((current) => (current ? false : current));
+        setAutoPinnedHiddenOffset(0);
+        return;
+      }
+
       setIsAutoPreviewPinned((current) => {
         if (!current && anchorTop <= pinTriggerTop) {
           setAutoPinnedHiddenOffset(Math.max(120, maxHiddenHeight));
@@ -489,7 +507,15 @@ export function RetroPreviewView({
       });
     };
 
-    const scheduleUpdateAutoPin = () => {
+    const scheduleUpdateAutoPin = (event?: Event) => {
+      if (event?.type === "scroll") {
+        const nextScrollY = window.scrollY;
+        const scrollDelta = Math.abs(nextScrollY - lastWindowScrollYRef.current);
+        lastWindowScrollYRef.current = nextScrollY;
+        if (autoPinRequiresScrollRef.current && scrollDelta > 6) {
+          autoPinRequiresScrollRef.current = false;
+        }
+      }
       if (autoPinFrameRef.current !== null) return;
       autoPinFrameRef.current = window.requestAnimationFrame(() => {
         autoPinFrameRef.current = null;
