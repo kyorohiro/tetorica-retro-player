@@ -528,7 +528,6 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
     closeUpNoiseStrength: 1.2,
-    scanlineBrightnessFade: 0.98,
     signalInstabilityEnabled: true,
     signalInstabilityStrength: 0.88,
     signalInstabilityFrequency: 0.88,
