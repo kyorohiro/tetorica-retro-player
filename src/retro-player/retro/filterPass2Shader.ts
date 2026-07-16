@@ -660,7 +660,13 @@ void main(void)
     // gives eye persistence a different pattern to average out each frame.
     float ditherFrame = floor(uTime * 20.0);
     float ditherNoise = hash13(vec3(dotCell, ditherFrame)) - 0.5;
-    phosphorColor *= 1.0 + ditherNoise * uPhosphorDotGrainStrength * uSpotMaskStrength;
+    float grainAmount = uPhosphorDotGrainStrength * uSpotMaskStrength;
+    // Multiplying alone leaves the near-black gaps between dots untouched
+    // (anything * 0 is still 0), so the grain only ever showed up on the lit
+    // dots themselves. Adding a matching additive term makes it show
+    // uniformly across the whole cell, gaps included.
+    phosphorColor *= 1.0 + ditherNoise * grainAmount;
+    phosphorColor += vec3(ditherNoise) * grainAmount;
     float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
     vec3 bleedColor = vec3(0.0);
