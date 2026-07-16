@@ -3,21 +3,21 @@
 Update versions before release:
 
 ```sh
-npm run version:set -- 0.38.2
+npm run version:set -- 0.38.3
 ```
 
 ```sh
 sh deploy_mac.sh
 ~/bin/butler login
-~/bin/butler push target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.38.2_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.38.2
-~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.38.2_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.38.2
-~/bin/butler push "tetorica-retro-player_0.38.2_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.38.2
-~/bin/butler push "tetorica-retro-player_0.38.2_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.38.2
-~/bin/butler push "tetorica-retro-player_0.38.2_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.38.2
+~/bin/butler push target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.38.3_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.38.3
+~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.38.3_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.38.3
+~/bin/butler push "tetorica-retro-player_0.38.3_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.38.3
+~/bin/butler push "tetorica-retro-player_0.38.3_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.38.3
+~/bin/butler push "tetorica-retro-player_0.38.3_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.38.3
 ~/bin/butler push \
-  "app-release-signed_0.38.2.apk" \
+  "app-release-signed_0.38.3.apk" \
   kyorohiro/tetorica-retro-player:android \
-  --userversion 0.38.2
+  --userversion 0.38.3
 ```
 
 Web build archive:
@@ -25,10 +25,10 @@ Web build archive:
 ```sh
 npm run build
 cd dist
-zip -r ../web-build_0.38.2_gh.zip .
+zip -r ../web-build_0.38.3_gh.zip .
 ```
 
-## v0.38.2 Changes
+## v0.38.3 Changes
 
 - Playlist: D&D / Open With で複数ファイル → Auto Next / Loop All モード時に連続再生
 - SkipBack / SkipForward 長押しで前/次トラックへ移動
@@ -47,7 +47,7 @@ npm run tauri android build -- --apk
 
 ~/Library/Android/sdk/build-tools/35.0.0/apksigner sign \
   --ks my-release-key.jks \
-  --out app-release-signed_0.38.2.apk \
+  --out app-release-signed_0.38.3.apk \
   src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
 ```
 
