@@ -16,12 +16,15 @@ import {
   type CurrentRef,
   type RetroAudioPreviewKind,
 } from "../audio/TetoricaRetroAudioNode";
-import { isRealSafariWebKit, needsNativeAudioSuppression } from "../platform/runtime";
 import { getHlsInstance } from "../media/RetroMediaSource";
 import {
   DEFAULT_AUDIO_PRESET_SETTINGS,
   type RetroAudioSettings,
 } from "../audio/preset";
+import {
+  applyElementAudioMode,
+  resolvePlaybackAudioRoute,
+} from "../media/RetroAudioRouting";
 
 const LATENCY_HINT_STORAGE_KEY = "tetorica-retro-player.latency-hint";
 
@@ -390,30 +393,33 @@ export function useRetroAudioEngine({
   const setDestinationOutputEnabled = (isEnabled: boolean) =>
     audioEngineRef.current?.setDestinationOutputEnabled(isEnabled);
 
+  const resolveCurrentPlaybackAudioRoute = useCallback(
+    (media: HTMLMediaElement) =>
+      resolvePlaybackAudioRoute({
+        preferNativeVideoSurface: nativePlaybackMode,
+        isHlsManaged: media instanceof HTMLVideoElement && Boolean(getHlsInstance(media)),
+        isMediaStreamSource: media.srcObject instanceof MediaStream,
+        audioOptimizationMode: audioOptimizationModeRef.current,
+        nativeAudioSuppressionOverride: nativeAudioSuppressionOverrideRef.current,
+      }),
+    [nativePlaybackMode],
+  );
+
   const syncCurrentMediaSettings = useCallback(() => {
     if (!mediaRef.current) {
       return;
     }
 
-    if (
-      (
-        isRealSafariWebKit() ||
-        needsNativeAudioSuppression(
-          audioOptimizationModeRef.current,
-          nativeAudioSuppressionOverrideRef.current,
-        )
-      ) &&
-      mediaSourceRef.current
-    ) {
-      mediaRef.current.muted = false;
-      mediaRef.current.volume = 0;
-    } else {
-      mediaRef.current.muted = isMutedRef.current;
-      mediaRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
-    }
+    const route = resolveCurrentPlaybackAudioRoute(mediaRef.current);
+    applyElementAudioMode(
+      mediaRef.current,
+      mediaSourceRef.current ? route.elementAudioMode : "user-volume",
+      isMutedRef.current,
+      volumeRef.current,
+    );
     mediaRef.current.playbackRate = playbackRateRef.current;
     mediaRef.current.loop = isLoopingRef.current;
-  }, [mediaRef]);
+  }, [mediaRef, resolveCurrentPlaybackAudioRoute]);
 
   const createPatchedSetter = useCallback(
     <T,>(
@@ -529,13 +535,39 @@ export function useRetroAudioEngine({
     }
 
     try {
+      const route = resolveCurrentPlaybackAudioRoute(media);
+      if (route.bypassWebAudio) {
+        applyElementAudioMode(
+          media,
+          "user-volume",
+          isMutedRef.current,
+          volumeRef.current,
+        );
+        debugAudio("connectMediaAudio:bypass", {
+          mediaTag: media.tagName,
+          previewKind: previewKindRef.current,
+          isHlsManaged: route.isHlsManaged,
+          inputMode: route.inputMode,
+        });
+        return;
+      }
+
       let mediaSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode;
 
-      if (media.srcObject instanceof MediaStream) {
-        const audioTracks = media.srcObject.getAudioTracks();
+      if (route.inputMode === "media-stream-source") {
+        const sourceStream =
+          media.srcObject instanceof MediaStream ? media.srcObject : null;
+        if (!sourceStream) {
+          debugAudio("connectMediaAudio:missing-stream-source", {
+            audioContextState: context.state,
+            mediaTag: media.tagName,
+            previewKind: previewKindRef.current,
+          });
+          return;
+        }
+        const audioTracks = sourceStream?.getAudioTracks() ?? [];
         if (audioTracks.length === 0) {
-          media.muted = true;
-          media.volume = 0;
+          applyElementAudioMode(media, "force-muted", isMutedRef.current, volumeRef.current);
           engine.setOutputEnabled(false);
           updateAudioNodes();
           debugAudio("connectMediaAudio:no-audio-tracks", {
@@ -549,23 +581,10 @@ export function useRetroAudioEngine({
         // For MediaStream sources (Tone.js, etc.): createMediaElementSource does not
         // route audio through the Web Audio chain on Safari when srcObject is a
         // MediaStream from a different AudioContext. Use createMediaStreamSource directly.
-        mediaSource = context.createMediaStreamSource(media.srcObject);
+        mediaSource = context.createMediaStreamSource(sourceStream);
         mediaSource.connect(engine.input);
-        // Mute the HTML element — audio flows exclusively through Web Audio chain.
-        media.muted = true;
-        media.volume = 0;
       } else {
-        // MediaSource-backed (hls.js) <video> was confirmed NOT to have its
-        // native audio output redirected by createMediaElementSource() on
-        // Tauri's WKWebView — raw, un-effected audio keeps playing through
-        // speakers regardless of .muted/.volume (both verified to have no
-        // effect). captureStream() + createMediaStreamSource() goes through
-        // the same mechanism already proven to work for MediaStream
-        // srcObject sources (Tone.js, see the branch above) — try that
-        // first for hls.js-managed elements, falling back to the plain
-        // element tap if captureStream() isn't available or has no audio.
-        const isHlsManaged = media instanceof HTMLVideoElement && Boolean(getHlsInstance(media));
-        const capturedStream = isHlsManaged
+        const capturedStream = route.inputMode === "captured-media-stream"
           ? (media as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream?.()
           : undefined;
         const capturedAudioTracks = capturedStream?.getAudioTracks() ?? [];
@@ -573,33 +592,32 @@ export function useRetroAudioEngine({
         if (capturedStream && capturedAudioTracks.length > 0) {
           mediaSource = context.createMediaStreamSource(capturedStream);
           mediaSource.connect(engine.input);
-          media.muted = true;
-          media.volume = 0;
         } else {
           mediaSource = context.createMediaElementSource(media);
           mediaSource.connect(engine.input);
-          if (
-            isRealSafariWebKit() ||
-            isHlsManaged ||
-            needsNativeAudioSuppression(
-              audioOptimizationModeRef.current,
-              nativeAudioSuppressionOverrideRef.current,
-            )
-          ) {
-            media.muted = true;
-            media.volume = 0;
-          } else {
-            media.muted = isMutedRef.current;
-            media.volume = isMutedRef.current ? 0 : volumeRef.current;
-          }
         }
+        applyElementAudioMode(
+          media,
+          route.elementAudioMode,
+          isMutedRef.current,
+          volumeRef.current,
+        );
         debugAudio("connectMediaAudio:native-suppression", {
-          isHlsManaged,
+          isHlsManaged: route.isHlsManaged,
           usedCaptureStream: Boolean(capturedStream && capturedAudioTracks.length > 0),
           capturedAudioTrackCount: capturedAudioTracks.length,
           mediaMuted: media.muted,
           mediaVolume: media.volume,
+          inputMode: route.inputMode,
         });
+      }
+      if (route.inputMode === "media-stream-source") {
+        applyElementAudioMode(
+          media,
+          route.elementAudioMode,
+          isMutedRef.current,
+          volumeRef.current,
+        );
       }
       mediaSourceRef.current = mediaSource;
 
@@ -607,6 +625,7 @@ export function useRetroAudioEngine({
         audioContextState: context.state,
         mediaTag: media.tagName,
         previewKind: previewKindRef.current,
+        inputMode: route.inputMode,
       });
       // Sync isOutputEnabled immediately from the current previewKindRef so that
       // updateAudioNodes() uses the correct masterGain value. Without this, Safari

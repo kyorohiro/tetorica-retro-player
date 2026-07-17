@@ -2,7 +2,7 @@ import { useRef } from "react";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
-import { isAndroidRuntime, needsNativeAudioSuppression } from "../platform/runtime";
+import { isAndroidRuntime } from "../platform/runtime";
 import {
   attachHlsSource,
   createAudioMediaSource,
@@ -11,9 +11,12 @@ import {
   destroyHlsInstance,
   getHlsSourceUrl,
   getHlsInstance,
-  shouldBypassWebAudio,
   shouldUseNativeVideoSurface,
 } from "../media/RetroMediaSource";
+import {
+  applyElementAudioMode,
+  resolvePlaybackAudioRoute,
+} from "../media/RetroAudioRouting";
 import { resolvePreviewErrorMessage, retroT } from "../i18n";
 import type { RetroPlayerLocale } from "../types";
 
@@ -174,6 +177,14 @@ export function useRetroPreviewMedia({
 }: UseRetroPreviewMediaParams) {
   const _setPreviewError = setPreviewError;
   const playbackStartAttemptRef = useRef(0);
+  const resolveCurrentPlaybackAudioRoute = (media: HTMLMediaElement) =>
+    resolvePlaybackAudioRoute({
+      preferNativeVideoSurface,
+      isHlsManaged: media instanceof HTMLVideoElement && Boolean(getHlsInstance(media)),
+      isMediaStreamSource: media.srcObject instanceof MediaStream,
+      audioOptimizationMode: audioOptimizationModeRef.current,
+      nativeAudioSuppressionOverride: nativeAudioSuppressionOverrideRef.current,
+    });
 
   const waitForMediaSwitchCooldown = async () => {
     if (!isAndroidRuntime()) {
@@ -1008,27 +1019,25 @@ export function useRetroPreviewMedia({
 
     try {
       const media = mediaRef.current;
-      const bypassWebAudio = shouldBypassWebAudio(media, preferNativeVideoSurface);
       const contextWasSuspended = audioContextRef.current?.state === "suspended";
       const context = await ensureAudioContext();
       if (isPlaybackAttemptStale()) {
         return;
       }
-      if (
-        (
-          needsNativeAudioSuppression(
-            audioOptimizationModeRef.current,
-            nativeAudioSuppressionOverrideRef.current,
-          ) &&
-          mediaSourceRef.current) ||
-        bypassWebAudio
-      ) {
-        media.muted = false;
-        media.volume = 0;
-      } else {
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
+      let route = resolveCurrentPlaybackAudioRoute(media);
+      if (!route.bypassWebAudio && !mediaSourceRef.current) {
+        await connectMediaAudio(media);
+        if (isPlaybackAttemptStale()) {
+          return;
+        }
+        route = resolveCurrentPlaybackAudioRoute(media);
       }
+      applyElementAudioMode(
+        media,
+        mediaSourceRef.current ? route.elementAudioMode : "user-volume",
+        isMutedRef.current,
+        volumeRef.current,
+      );
       // Restore gain immediately before play in case a "suspend" event fired
       // during ensureAudioContext() and scheduled a ramp-to-0.
       updateAudioNodes();
@@ -1119,19 +1128,21 @@ export function useRetroPreviewMedia({
       }
       if (
         (audioContextState !== "running" &&
-          needsNativeAudioSuppression(
-            audioOptimizationModeRef.current,
-            nativeAudioSuppressionOverrideRef.current,
-          ) &&
-          mediaSourceRef.current) ||
-        bypassWebAudio
+          mediaSourceRef.current &&
+          route.elementAudioMode !== "user-volume") ||
+        route.bypassWebAudio
       ) {
-        media.muted = isMutedRef.current;
-        media.volume = isMutedRef.current ? 0 : volumeRef.current;
+        applyElementAudioMode(
+          media,
+          "user-volume",
+          isMutedRef.current,
+          volumeRef.current,
+        );
         debugAudio("playVideoWithAudio:native-audio-fallback", {
           audioContextState,
-          bypassWebAudio,
+          bypassWebAudio: route.bypassWebAudio,
           currentTime: media.currentTime,
+          elementAudioMode: route.elementAudioMode,
         });
       }
       debugAudio("playVideoWithAudio", {
@@ -1148,6 +1159,8 @@ export function useRetroPreviewMedia({
         smallSpeakerRoomAmount,
         isMuted,
         volume,
+        routeInputMode: route.inputMode,
+        routeElementAudioMode: route.elementAudioMode,
       });
       updateAudioNodes();
       syncVideoState();
@@ -1685,16 +1698,7 @@ export function useRetroPreviewMedia({
           await attachVisualPreview(media, "video");
           await ensureVisualStartupReady("video");
         }
-        if (shouldBypassWebAudio(media, preferNativeVideoSurface)) {
-          debugAudio("connectMediaAudio:bypass-native-hls", {
-            currentSrc: media.currentSrc || media.src || null,
-            previewKind: "video",
-          });
-          mediaSourceRef.current?.disconnect();
-          mediaSourceRef.current = null;
-        } else {
-          await connectMediaAudio(media);
-        }
+        await connectMediaAudio(media);
         syncVideoState();
       } else if (kind === "image") {
         const imageSource = await createImageMediaSource({ url });
@@ -1749,16 +1753,7 @@ export function useRetroPreviewMedia({
         mediaRef.current = audio;
         safeRender();
         await ensureRendererReady();
-        if (shouldBypassWebAudio(audio, preferNativeVideoSurface)) {
-          debugAudio("connectMediaAudio:bypass-native-hls", {
-            currentSrc: audio.currentSrc || audio.src || null,
-            previewKind: "audio",
-          });
-          mediaSourceRef.current?.disconnect();
-          mediaSourceRef.current = null;
-        } else {
-          await connectMediaAudio(audio);
-        }
+        await connectMediaAudio(audio);
         syncVideoState();
       }
 

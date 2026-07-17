@@ -12,6 +12,10 @@ import {
 } from "../events";
 import { isAndroidRuntime, isAppleWebKitFamily, isTauriRuntime } from "../platform/runtime";
 import { getHlsInstance, shouldBypassWebAudio } from "../media/RetroMediaSource";
+import {
+  resolvePlaybackAudioRoute,
+  resolveRecordingAudioSourceOrder,
+} from "../media/RetroAudioRouting";
 import type { RetroPlayerLocale } from "../types";
 
 let retroPlayerInstanceSeed = 0;
@@ -1084,6 +1088,21 @@ export function usePixiVideoPlayer(
     return recordingTapDestinationRef.current?.stream.getAudioTracks() ?? [];
   };
 
+  const resolveCurrentPlaybackAudioRoute = () => {
+    const media = mediaRef.current;
+    if (!(media instanceof HTMLMediaElement)) {
+      return null;
+    }
+
+    return resolvePlaybackAudioRoute({
+      preferNativeVideoSurface: isNativeModePreferred,
+      isHlsManaged: media instanceof HTMLVideoElement && Boolean(getHlsInstance(media)),
+      isMediaStreamSource: media.srcObject instanceof MediaStream,
+      audioOptimizationMode,
+      nativeAudioSuppressionOverride,
+    });
+  };
+
   const startRecording = async () => {
     await ensureAudioContext();
 
@@ -1156,37 +1175,46 @@ export function usePixiVideoPlayer(
       livePreviewStream instanceof MediaStream
         ? livePreviewStream.getAudioTracks()
         : [];
-    const safariTapAudioTracks = getSafariRecordingTapAudioTracks();
-    const shouldPreferDirectMediaAudio =
-      mediaRef.current instanceof HTMLMediaElement &&
-      !isAppleWebKitFamily() &&
-      shouldBypassWebAudio(mediaRef.current, isNativeModePreferred);
+    const playbackAudioRoute = resolveCurrentPlaybackAudioRoute();
+    const recordingAudioSourceOrder = resolveRecordingAudioSourceOrder(
+      playbackAudioRoute ?? { bypassWebAudio: false },
+    );
 
-    if (safariTapAudioTracks.length > 0) {
-      safariTapAudioTracks.forEach((track) => {
-        recordingStream.addTrack(track);
-        ownedRecordingTracks.push(track);
-      });
-    } else if (shouldPreferDirectMediaAudio && mediaCaptureTracks.length > 0) {
-      mediaCaptureTracks.forEach((track) => {
-        const clonedTrack = track.clone();
-        recordingStream.addTrack(clonedTrack);
-        ownedRecordingTracks.push(clonedTrack);
-      });
-    } else if (recordingDestinationTracks.length > 0) {
-      recordingDestinationTracks.forEach((track) => {
-        const clonedTrack = track.clone();
-        recordingStream.addTrack(clonedTrack);
-        ownedRecordingTracks.push(clonedTrack);
-      });
-    } else if (mediaCaptureTracks.length > 0) {
-      mediaCaptureTracks.forEach((track) => {
-        const clonedTrack = track.clone();
-        recordingStream.addTrack(clonedTrack);
-        ownedRecordingTracks.push(clonedTrack);
-      });
-    } else if (liveAudioTracks.length > 0) {
-      liveAudioTracks.forEach((track) => recordingStream.addTrack(track));
+    for (const source of recordingAudioSourceOrder) {
+      if (source === "safari-tap") {
+        const safariTapAudioTracks = getSafariRecordingTapAudioTracks();
+        if (safariTapAudioTracks.length === 0) {
+          continue;
+        }
+        safariTapAudioTracks.forEach((track) => {
+          recordingStream.addTrack(track);
+          ownedRecordingTracks.push(track);
+        });
+        break;
+      }
+
+      if (source === "media-capture" && mediaCaptureTracks.length > 0) {
+        mediaCaptureTracks.forEach((track) => {
+          const clonedTrack = track.clone();
+          recordingStream.addTrack(clonedTrack);
+          ownedRecordingTracks.push(clonedTrack);
+        });
+        break;
+      }
+
+      if (source === "recording-destination" && recordingDestinationTracks.length > 0) {
+        recordingDestinationTracks.forEach((track) => {
+          const clonedTrack = track.clone();
+          recordingStream.addTrack(clonedTrack);
+          ownedRecordingTracks.push(clonedTrack);
+        });
+        break;
+      }
+
+      if (source === "live-stream" && liveAudioTracks.length > 0) {
+        liveAudioTracks.forEach((track) => recordingStream.addTrack(track));
+        break;
+      }
     }
 
     if (recordingStream.getTracks().length === 0) {

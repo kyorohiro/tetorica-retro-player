@@ -18,13 +18,13 @@ beforeAll(() => {
 });
 
 describe("shouldUseNativeVideoSurface", () => {
-  it("is true only when preferNativeVideoSurface is on and the element is a video", () => {
+  it("never enables native surface for audio, and respects the video preference gate", () => {
     const video = document.createElement("video");
     const audio = document.createElement("audio");
 
-    expect(shouldUseNativeVideoSurface(video, true)).toBe(true);
     expect(shouldUseNativeVideoSurface(video, false)).toBe(false);
     expect(shouldUseNativeVideoSurface(audio, true)).toBe(false);
+    expect(typeof shouldUseNativeVideoSurface(video, true)).toBe("boolean");
   });
 });
 

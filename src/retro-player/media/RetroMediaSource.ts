@@ -26,7 +26,8 @@ import type Hls from "hls.js";
 import type { HlsConfig } from "hls.js";
 import { RetroPreviewError } from "../i18n";
 import { getPreferNativeHlsOverride } from "../hooks/persistedRetroSettings";
-import { isAppleWebKitFamily, isTauriRuntime } from "../platform/runtime";
+import { isAppleWebKitFamily } from "../platform/runtime";
+import { shouldBypassPlaybackWebAudio } from "./RetroAudioRouting";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
 export type RetroMediaSourceKind = "video" | "audio" | "image";
@@ -829,8 +830,8 @@ export function shouldBypassWebAudio(
   media: HTMLMediaElement,
   preferNativeVideoSurface: boolean,
 ): boolean {
-  return (
-    preferNativeVideoSurface ||
-    (isTauriRuntime() && Boolean(getHlsInstance(media)))
-  );
+  return shouldBypassPlaybackWebAudio({
+    preferNativeVideoSurface,
+    isHlsManaged: Boolean(getHlsInstance(media)),
+  });
 }
