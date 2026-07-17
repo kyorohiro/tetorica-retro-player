@@ -77,7 +77,6 @@ export function useRetroPixiStage({
   const isPoweredOnRef = useRef(isPoweredOn);
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
-  const layoutTimeoutRef = useRef<number | null>(null);
   const resizeValidationFrameRef = useRef<number | null>(null);
   const observedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pendingObservedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -427,19 +426,11 @@ export function useRetroPixiStage({
       window.cancelAnimationFrame(layoutFrameRef.current);
       layoutFrameRef.current = null;
     }
-    if (layoutTimeoutRef.current !== null) {
-      window.clearTimeout(layoutTimeoutRef.current);
-      layoutTimeoutRef.current = null;
-    }
 
     layoutFrameRef.current = window.requestAnimationFrame(() => {
       layoutFrameRef.current = null;
       refreshLayout();
     });
-    layoutTimeoutRef.current = window.setTimeout(() => {
-      layoutTimeoutRef.current = null;
-      refreshLayout();
-    }, 120);
   }, [refreshLayout]);
 
   const initPixi = useCallback(async () => {
@@ -581,10 +572,6 @@ export function useRetroPixiStage({
     if (layoutFrameRef.current !== null) {
       window.cancelAnimationFrame(layoutFrameRef.current);
       layoutFrameRef.current = null;
-    }
-    if (layoutTimeoutRef.current !== null) {
-      window.clearTimeout(layoutTimeoutRef.current);
-      layoutTimeoutRef.current = null;
     }
 
     const app = appRef.current;

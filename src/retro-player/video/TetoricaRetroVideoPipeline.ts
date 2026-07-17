@@ -517,6 +517,8 @@ export class TetoricaRetroVideoPipeline {
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
   // are never equal by reference, so they always upload too.
   private lastUploadedImageSource: HTMLImageElement | null = null;
+  private lastUploadedVideoSource: HTMLVideoElement | null = null;
+  private lastUploadedVideoTime = Number.NaN;
 
   // Ensure the FBO matches the current drawing buffer size.
   private ensureFbo(width: number, height: number) {
@@ -938,6 +940,11 @@ export class TetoricaRetroVideoPipeline {
   }
 
   setSource(source: RetroVideoSource | null) {
+    if (source !== this.currentSource) {
+      this.lastUploadedImageSource = null;
+      this.lastUploadedVideoSource = null;
+      this.lastUploadedVideoTime = Number.NaN;
+    }
     this.currentSource = source;
   }
 
@@ -985,6 +992,23 @@ export class TetoricaRetroVideoPipeline {
 
   private renderCount = 0;
 
+  private shouldSkipUpload(uploadSource: RetroVideoSource): boolean {
+    if (isHtmlImageElement(uploadSource)) {
+      return uploadSource === this.lastUploadedImageSource;
+    }
+
+    if (isHtmlVideoElement(uploadSource)) {
+      const currentTime = uploadSource.currentTime;
+      const sameFrame =
+        uploadSource === this.lastUploadedVideoSource &&
+        Number.isFinite(currentTime) &&
+        currentTime === this.lastUploadedVideoTime;
+      return sameFrame;
+    }
+
+    return false;
+  }
+
   render() {
     const { gl } = this;
     if (gl.isContextLost()) {
@@ -1023,7 +1047,8 @@ export class TetoricaRetroVideoPipeline {
     const textureFilter = gl.NEAREST;
     this.syncTextureSamplingFilter(textureFilter);
     const isImageSource = isHtmlImageElement(uploadSource);
-    const skipUpload = isImageSource && uploadSource === this.lastUploadedImageSource;
+    const isVideoSource = isHtmlVideoElement(uploadSource);
+    const skipUpload = this.shouldSkipUpload(uploadSource);
     if (!skipUpload) {
       if (isRawRetroVideoFrame(uploadSource)) {
         gl.texImage2D(
@@ -1038,9 +1063,11 @@ export class TetoricaRetroVideoPipeline {
           uploadSource.data,
         );
       } else {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
       }
       this.lastUploadedImageSource = isImageSource ? (uploadSource as HTMLImageElement) : null;
+      this.lastUploadedVideoSource = isVideoSource ? (uploadSource as HTMLVideoElement) : null;
+      this.lastUploadedVideoTime = isVideoSource ? uploadSource.currentTime : Number.NaN;
     }
 
     const usingFilter = filterState.isFilterEnabled && this.filterPass1Program && this.filterPass2Program;
@@ -1122,6 +1149,8 @@ export class TetoricaRetroVideoPipeline {
     this.currentSource = null;
     this.currentFilterState = null;
     this.lastUploadedImageSource = null;
+    this.lastUploadedVideoSource = null;
+    this.lastUploadedVideoTime = Number.NaN;
     this.signalInstabilityController.reset();
   }
 

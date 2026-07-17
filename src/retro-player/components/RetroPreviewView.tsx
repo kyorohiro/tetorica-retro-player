@@ -639,19 +639,11 @@ export function RetroPreviewView({
     let raf1: number | null = window.requestAnimationFrame(() => {
       raf1 = null;
       scheduleRefreshLayout();
-      raf2 = window.requestAnimationFrame(() => {
-        raf2 = null;
-        scheduleRefreshLayout();
-      });
     });
-    let raf2: number | null = null;
 
     return () => {
       if (raf1 !== null) {
         window.cancelAnimationFrame(raf1);
-      }
-      if (raf2 !== null) {
-        window.cancelAnimationFrame(raf2);
       }
     };
   }, [
