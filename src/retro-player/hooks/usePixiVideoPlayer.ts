@@ -115,6 +115,7 @@ export function usePixiVideoPlayer(
   const stopRecordingResolverRef = useRef<((value: string | null) => void) | null>(null);
   const previewRequestIdRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
+  const playbackIntentRef = useRef<"play" | "pause" | null>(null);
   const previewKindRef = useRef<"video" | "audio" | "image" | "capture" | null>(null);
   const wasPlayingBeforePowerOffRef = useRef(false);
   const onEndedRef = useRef<(() => void) | undefined>(options?.onEnded);
@@ -612,6 +613,7 @@ export function usePixiVideoPlayer(
     streamOwnedRef,
     previewRequestIdRef,
     isPlayingRef,
+    playbackIntentRef,
     previewKindRef,
     audioContextRef,
     mediaSourceRef,
@@ -757,6 +759,7 @@ export function usePixiVideoPlayer(
       if (!isPoweredOn) {
         powerOn();
       }
+      playbackIntentRef.current = "play";
       const shouldRestartFromSource =
         mediaRef.current.error ||
         mediaRef.current.ended ||
@@ -787,6 +790,7 @@ export function usePixiVideoPlayer(
     }
 
     cancelPendingPlaybackStart();
+    playbackIntentRef.current = "pause";
     mediaRef.current.pause();
     setIsBuffering(false);
     finishLoading();
@@ -1396,6 +1400,7 @@ export function usePixiVideoPlayer(
       }
 
       cancelPendingPlaybackStart();
+      playbackIntentRef.current = "pause";
       mediaRef.current.pause();
       setIsBuffering(false);
       finishLoading();
@@ -1506,6 +1511,7 @@ export function usePixiVideoPlayer(
       isVideoReady &&
       isFilterReady &&
       !isPlaying &&
+      playbackIntentRef.current !== "pause" &&
       !previewError &&
       !isEnded &&
       (audioContextRef.current?.state === "suspended" || isAtStart)

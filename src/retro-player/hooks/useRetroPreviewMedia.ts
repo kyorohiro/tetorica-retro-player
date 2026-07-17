@@ -21,6 +21,7 @@ import { resolvePreviewErrorMessage, retroT } from "../i18n";
 import type { RetroPlayerLocale } from "../types";
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
+type PlaybackIntent = "play" | "pause" | null;
 type CurrentRef<T> = { current: T };
 
 type UseRetroPreviewMediaParams = {
@@ -38,6 +39,7 @@ type UseRetroPreviewMediaParams = {
   streamOwnedRef: CurrentRef<boolean>;
   previewRequestIdRef: CurrentRef<number>;
   isPlayingRef: CurrentRef<boolean>;
+  playbackIntentRef: CurrentRef<PlaybackIntent>;
   previewKindRef: CurrentRef<PreviewKind>;
   audioContextRef: CurrentRef<AudioContext | null>;
   mediaSourceRef: CurrentRef<MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null>;
@@ -118,6 +120,7 @@ export function useRetroPreviewMedia({
   streamOwnedRef,
   previewRequestIdRef,
   isPlayingRef,
+  playbackIntentRef,
   previewKindRef,
   audioContextRef,
   mediaSourceRef,
@@ -177,6 +180,7 @@ export function useRetroPreviewMedia({
 }: UseRetroPreviewMediaParams) {
   const _setPreviewError = setPreviewError;
   const playbackStartAttemptRef = useRef(0);
+  const isPauseRequested = () => playbackIntentRef.current === "pause";
   const resolveCurrentPlaybackAudioRoute = (media: HTMLMediaElement) =>
     resolvePlaybackAudioRoute({
       preferNativeVideoSurface,
@@ -518,6 +522,7 @@ export function useRetroPreviewMedia({
       return;
     }
 
+    playbackIntentRef.current = "pause";
     cancelPendingPlaybackStart();
     media.pause();
     isPlayingRef.current = false;
@@ -1032,6 +1037,7 @@ export function useRetroPreviewMedia({
         }
         route = resolveCurrentPlaybackAudioRoute(media);
       }
+      playbackIntentRef.current = "play";
       applyElementAudioMode(
         media,
         mediaSourceRef.current ? route.elementAudioMode : "user-volume",
@@ -1084,6 +1090,16 @@ export function useRetroPreviewMedia({
       }
       if (media instanceof HTMLVideoElement) {
         delete media.dataset[HLS_STARTUP_RETRY_DATASET_KEY];
+      }
+      if (isPauseRequested()) {
+        media.pause();
+        isPlayingRef.current = false;
+        setEngineIsPlaying(false);
+        setIsPlaying(false);
+        finishLoading();
+        setNeedsUserPlay(false);
+        syncVideoState();
+        return;
       }
       isPlayingRef.current = true;
       setEngineIsPlaying(true);
@@ -1228,6 +1244,7 @@ export function useRetroPreviewMedia({
       });
       setEngineIsPlaying(false);
       setIsPlaying(false);
+      playbackIntentRef.current = "pause";
       finishLoading();
       if (isHlsStartupRetryableError(media, error)) {
         media?.pause();
