@@ -36,8 +36,16 @@ export const isWindowsChromiumAngleRisk = () => {
 export const isRealSafariWebKit = () => {
   if (typeof navigator === "undefined") return false;
   if (isTauriRuntime()) return false;
+  return isAppleWebKitFamily();
+};
+
+export const isAppleWebKitFamily = () => {
+  if (typeof navigator === "undefined") return false;
   if (navigator.vendor !== "Apple Computer, Inc.") return false;
-  return !/CriOS|FxiOS|OPiOS/i.test(navigator.userAgent);
+  const userAgent = navigator.userAgent ?? "";
+  const isWebKit = /AppleWebKit/i.test(userAgent);
+  const isChromiumFamily = /CriOS|FxiOS|OPiOS|Chrome|Chromium|Edg|OPR|SamsungBrowser|DuckDuckGo/i.test(userAgent);
+  return isWebKit && !isChromiumFamily;
 };
 
 const readSearchParams = () => {

@@ -1,5 +1,6 @@
 export type RetroAudioSettings = {
   audioOptimizationMode: "auto" | "chrome" | "safari";
+  recordingContainer: "auto" | "webm" | "mp4";
   nativeAudioSuppressionOverride?: boolean | null;
   preferNativeHlsOverride?: boolean | null;
   videoFilterLiteOverride?: boolean | null;
@@ -73,6 +74,7 @@ export type RetroAudioAmountSetters = {
 
 export const DEFAULT_AUDIO_SETTINGS = {
   audioOptimizationMode: "auto",
+  recordingContainer: "auto",
   nativeAudioSuppressionOverride: null,
   preferNativeHlsOverride: null,
   videoFilterLiteOverride: null,

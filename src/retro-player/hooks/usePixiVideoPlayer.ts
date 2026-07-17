@@ -10,8 +10,8 @@ import {
   RETRO_PLAYER_PAUSE_PLAYBACK_EVENT,
   RETRO_PLAYER_PREPARE_EXTERNAL_NAVIGATION_EVENT,
 } from "../events";
-import { isAndroidRuntime, isTauriRuntime } from "../platform/runtime";
-import { getHlsInstance } from "../media/RetroMediaSource";
+import { isAndroidRuntime, isAppleWebKitFamily, isTauriRuntime } from "../platform/runtime";
+import { getHlsInstance, shouldBypassWebAudio } from "../media/RetroMediaSource";
 import type { RetroPlayerLocale } from "../types";
 
 let retroPlayerInstanceSeed = 0;
@@ -100,6 +100,11 @@ export function usePixiVideoPlayer(
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingOwnedTracksRef = useRef<MediaStreamTrack[]>([]);
+  const recordingTapNodeRef = useRef<AudioNode | null>(null);
+  const recordingTapOutputNodeRef = useRef<AudioNode | null>(null);
+  const recordingTapSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const recordingTapDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recordingTapMediaRef = useRef<HTMLMediaElement | null>(null);
   const pendingDownloadUrlRef = useRef<string | null>(null);
   const pendingRecordingBlobRef = useRef<Blob | null>(null);
   const pendingRecordingFilenameRef = useRef<string | null>(null);
@@ -324,6 +329,8 @@ export function usePixiVideoPlayer(
     noiseGainRef,
     audioOptimizationModeRef,
     audioOptimizationMode,
+    recordingContainer,
+    setRecordingContainer,
     setAudioOptimizationMode,
     nativeAudioSuppressionOverrideRef,
     nativeAudioSuppressionOverride,
@@ -883,8 +890,16 @@ export function usePixiVideoPlayer(
 
     const blob = new Blob(chunks, { type: mimeType || "video/webm" });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const isAudioOnly = (mimeType || blob.type).startsWith("audio/");
-    const filename = `tetorica-retro-player-${timestamp}.${isAudioOnly ? "weba" : "webm"}`;
+    const resolvedMimeType = mimeType || blob.type || "video/webm";
+    const isAudioOnly = resolvedMimeType.startsWith("audio/");
+    const extension = isAudioOnly
+      ? resolvedMimeType.includes("mp4")
+        ? "m4a"
+        : "weba"
+      : resolvedMimeType.includes("mp4")
+        ? "mp4"
+        : "webm";
+    const filename = `tetorica-retro-player-${timestamp}.${extension}`;
     const url = window.URL.createObjectURL(blob);
 
     pendingDownloadUrlRef.current = url;
@@ -957,18 +972,116 @@ export function usePixiVideoPlayer(
   };
 
   const getRecordingMimeType = (hasVideoTrack: boolean) => {
+    const effectiveRecordingContainer =
+      recordingContainer === "auto"
+        ? isAppleWebKitFamily()
+          ? "mp4"
+          : "webm"
+        : recordingContainer;
+    const videoWebm = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ];
+    const videoMp4 = [
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4",
+    ];
+    const audioWebm = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+    ];
+    const audioMp4 = [
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/mp4",
+    ];
     const candidates = hasVideoTrack
-      ? [
-          "video/webm;codecs=vp9,opus",
-          "video/webm;codecs=vp8,opus",
-          "video/webm",
-        ]
-      : [
-          "audio/webm;codecs=opus",
-          "audio/webm",
-        ];
+      ? effectiveRecordingContainer === "webm"
+        ? videoWebm
+        : effectiveRecordingContainer === "mp4"
+          ? videoMp4
+          : videoWebm
+      : effectiveRecordingContainer === "webm"
+        ? audioWebm
+        : effectiveRecordingContainer === "mp4"
+          ? audioMp4
+          : audioWebm;
 
     return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
+  };
+
+  const releaseRecordingTap = () => {
+    try {
+      if (recordingTapNodeRef.current && recordingTapDestinationRef.current) {
+        recordingTapNodeRef.current.disconnect(recordingTapDestinationRef.current);
+      }
+    } catch {}
+    try {
+      if (recordingTapSourceRef.current && recordingTapOutputNodeRef.current) {
+        recordingTapSourceRef.current.disconnect(recordingTapOutputNodeRef.current);
+      }
+    } catch {}
+    try {
+      recordingTapDestinationRef.current?.disconnect();
+    } catch {}
+    recordingTapNodeRef.current = null;
+    recordingTapOutputNodeRef.current = null;
+    recordingTapSourceRef.current = null;
+    recordingTapDestinationRef.current = null;
+    recordingTapMediaRef.current = null;
+  };
+
+  const getSafariRecordingTapAudioTracks = (): MediaStreamTrack[] => {
+    if (!isAppleWebKitFamily()) {
+      return [];
+    }
+
+    const media = mediaRef.current;
+    const audioContext = audioContextRef.current;
+    if (!(media instanceof HTMLMediaElement) || !audioContext) {
+      return [];
+    }
+
+    if (recordingTapMediaRef.current !== media) {
+      releaseRecordingTap();
+    }
+
+    if (!recordingTapDestinationRef.current) {
+      try {
+        const shouldBypassCurrentMedia =
+          shouldBypassWebAudio(media, isNativeModePreferred);
+        const destination = audioContext.createMediaStreamDestination();
+        let tapNode: AudioNode | null = null;
+        let ownedSource: MediaElementAudioSourceNode | null = null;
+
+        if (!shouldBypassCurrentMedia && masterGainRef.current) {
+          tapNode = masterGainRef.current;
+        } else if (mediaSourceRef.current) {
+          tapNode = mediaSourceRef.current;
+        } else {
+          ownedSource = audioContext.createMediaElementSource(media);
+          tapNode = ownedSource;
+          ownedSource.connect(audioContext.destination);
+          recordingTapOutputNodeRef.current = audioContext.destination;
+        }
+
+        tapNode.connect(destination);
+        recordingTapNodeRef.current = tapNode;
+        recordingTapSourceRef.current = ownedSource;
+        recordingTapDestinationRef.current = destination;
+        recordingTapMediaRef.current = media;
+      } catch (error) {
+        debugVideo("recording:safari-tap-audio-unavailable", {
+          message: error instanceof Error ? error.message : String(error),
+          currentSrc: media.currentSrc || media.src || null,
+          audioContextState: audioContext.state,
+        });
+        releaseRecordingTap();
+        return [];
+      }
+    }
+
+    return recordingTapDestinationRef.current?.stream.getAudioTracks() ?? [];
   };
 
   const startRecording = async () => {
@@ -980,29 +1093,94 @@ export function usePixiVideoPlayer(
     const ownedRecordingTracks: MediaStreamTrack[] = [];
 
     if (shouldRecordVideo) {
-      const canvas = appRef.current?.canvas;
+      const nativeVideoTracks =
+        shouldUseNativeVisualSurface && mediaRef.current instanceof HTMLVideoElement
+          ? (
+            (
+              mediaRef.current as HTMLVideoElement & {
+                captureStream?: () => MediaStream;
+                mozCaptureStream?: () => MediaStream;
+              }
+            ).captureStream?.() ??
+            (
+              mediaRef.current as HTMLVideoElement & {
+                captureStream?: () => MediaStream;
+                mozCaptureStream?: () => MediaStream;
+              }
+            ).mozCaptureStream?.()
+          )?.getVideoTracks() ?? []
+          : [];
 
-      if (!(canvas instanceof HTMLCanvasElement)) {
-        throw new Error("Preview canvas is not ready yet.");
+      if (nativeVideoTracks.length > 0) {
+        nativeVideoTracks.forEach((track) => {
+          const clonedTrack = track.clone();
+          recordingStream.addTrack(clonedTrack);
+          ownedRecordingTracks.push(clonedTrack);
+        });
+      } else {
+        const canvas = appRef.current?.canvas;
+
+        if (!(canvas instanceof HTMLCanvasElement)) {
+          throw new Error("Preview canvas is not ready yet.");
+        }
+
+        const canvasStream = canvas.captureStream(30);
+        canvasStream.getVideoTracks().forEach((track) => {
+          recordingStream.addTrack(track);
+          ownedRecordingTracks.push(track);
+        });
       }
-
-      const canvasStream = canvas.captureStream(30);
-      canvasStream.getVideoTracks().forEach((track) => {
-        recordingStream.addTrack(track);
-        ownedRecordingTracks.push(track);
-      });
     }
 
     const recordingDestinationTracks =
       recordingDestinationRef.current?.stream
         .getAudioTracks() ?? [];
+    const mediaCaptureTracks =
+      mediaRef.current instanceof HTMLMediaElement
+        ? (
+          (
+            mediaRef.current as HTMLMediaElement & {
+              captureStream?: () => MediaStream;
+              mozCaptureStream?: () => MediaStream;
+            }
+          ).captureStream?.() ??
+          (
+            mediaRef.current as HTMLMediaElement & {
+              captureStream?: () => MediaStream;
+              mozCaptureStream?: () => MediaStream;
+            }
+          ).mozCaptureStream?.()
+        )?.getAudioTracks() ?? []
+        : [];
     const liveAudioTracks =
       livePreviewStream instanceof MediaStream
         ? livePreviewStream.getAudioTracks()
         : [];
+    const safariTapAudioTracks = getSafariRecordingTapAudioTracks();
+    const shouldPreferDirectMediaAudio =
+      mediaRef.current instanceof HTMLMediaElement &&
+      !isAppleWebKitFamily() &&
+      shouldBypassWebAudio(mediaRef.current, isNativeModePreferred);
 
-    if (recordingDestinationTracks.length > 0) {
+    if (safariTapAudioTracks.length > 0) {
+      safariTapAudioTracks.forEach((track) => {
+        recordingStream.addTrack(track);
+        ownedRecordingTracks.push(track);
+      });
+    } else if (shouldPreferDirectMediaAudio && mediaCaptureTracks.length > 0) {
+      mediaCaptureTracks.forEach((track) => {
+        const clonedTrack = track.clone();
+        recordingStream.addTrack(clonedTrack);
+        ownedRecordingTracks.push(clonedTrack);
+      });
+    } else if (recordingDestinationTracks.length > 0) {
       recordingDestinationTracks.forEach((track) => {
+        const clonedTrack = track.clone();
+        recordingStream.addTrack(clonedTrack);
+        ownedRecordingTracks.push(clonedTrack);
+      });
+    } else if (mediaCaptureTracks.length > 0) {
+      mediaCaptureTracks.forEach((track) => {
         const clonedTrack = track.clone();
         recordingStream.addTrack(clonedTrack);
         ownedRecordingTracks.push(clonedTrack);
@@ -1039,6 +1217,7 @@ export function usePixiVideoPlayer(
       recordingOwnedTracksRef.current = [];
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
+      releaseRecordingTap();
       isRecordingRef.current = false;
       setIsRecording(false);
       void ensureAudioContext();
@@ -1073,6 +1252,7 @@ export function usePixiVideoPlayer(
       recordingOwnedTracksRef.current = [];
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
+      releaseRecordingTap();
       isRecordingRef.current = false;
       setIsRecording(false);
       stopRecordingResolverRef.current?.(pendingRecordingFilenameRef.current);
@@ -1403,6 +1583,7 @@ export function usePixiVideoPlayer(
     isRendererReady,
     isFilterReady,
     audioOptimizationMode,
+    recordingContainer,
     nativeAudioSuppressionOverride,
     preferNativeHlsOverride,
     videoFilterLiteOverride,
@@ -1484,6 +1665,7 @@ export function usePixiVideoPlayer(
     applyAudioSettings,
     resetAudioSettings,
     setAudioOptimizationMode,
+    setRecordingContainer,
     setNativeAudioSuppressionOverride,
     setPreferNativeHlsOverride,
     setVideoFilterLiteOverride,

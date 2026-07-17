@@ -26,6 +26,7 @@ import type Hls from "hls.js";
 import type { HlsConfig } from "hls.js";
 import { RetroPreviewError } from "../i18n";
 import { getPreferNativeHlsOverride } from "../hooks/persistedRetroSettings";
+import { isAppleWebKitFamily, isTauriRuntime } from "../platform/runtime";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
 export type RetroMediaSourceKind = "video" | "audio" | "image";
@@ -811,20 +812,25 @@ export function shouldUseNativeVideoSurface(
   media: HTMLMediaElement,
   preferNativeVideoSurface: boolean,
 ): boolean {
-  return preferNativeVideoSurface && media instanceof HTMLVideoElement;
+  return (
+    preferNativeVideoSurface &&
+    media instanceof HTMLVideoElement &&
+    !isAppleWebKitFamily()
+  );
 }
 
 /**
  * Mirrors useRetroPreviewMedia.ts's shouldBypassWebAudioForMedia exactly.
- * Native mode is a full passthrough regardless of media kind: the Web Audio
- * FX chain drops out the same way the WebGL retro filter does. Unlike
- * shouldUseNativeVideoSurface, this doesn't require an HTMLVideoElement —
- * the `media` param is kept for signature symmetry / future use even though
- * today's logic only checks the raw setting.
+ * Native mode is a full passthrough regardless of media kind. In addition,
+ * Tauri + hls.js media stays on the element's native playback path because
+ * WKWebView does not reliably route that HLS audio through Web Audio.
  */
 export function shouldBypassWebAudio(
-  _media: HTMLMediaElement,
+  media: HTMLMediaElement,
   preferNativeVideoSurface: boolean,
 ): boolean {
-  return preferNativeVideoSurface;
+  return (
+    preferNativeVideoSurface ||
+    (isTauriRuntime() && Boolean(getHlsInstance(media)))
+  );
 }

@@ -101,6 +101,7 @@ type RetroPreviewToolbarPlayerSlice = {
   isRecording: boolean;
   isPoweredOn: boolean;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
+  recordingContainer: RetroAudioSettings["recordingContainer"];
   nativeAudioSuppressionOverride: boolean | null;
   preferNativeHlsOverride: boolean | null;
   videoFilterLiteOverride: boolean | null;
@@ -153,6 +154,7 @@ type RetroPreviewToolbarProps = {
   onFlipHToggle: () => void;
   onFlipVToggle: () => void;
   onAudioOptimizationModeChange: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
+  onRecordingContainerChange: (nextMode: RetroAudioSettings["recordingContainer"]) => void;
   onNativeAudioSuppressionOverrideChange: (nextValue: boolean | null) => void;
   onPreferNativeHlsOverrideChange: (nextValue: boolean | null) => void;
   onVideoFilterLiteOverrideChange: (nextValue: boolean | null) => void;
@@ -196,6 +198,7 @@ export function RetroPreviewToolbar({
   onFlipHToggle,
   onFlipVToggle,
   onAudioOptimizationModeChange,
+  onRecordingContainerChange,
   onNativeAudioSuppressionOverrideChange,
   onPreferNativeHlsOverrideChange,
   onVideoFilterLiteOverrideChange,
@@ -571,6 +574,52 @@ export function RetroPreviewToolbar({
                   ? "環境に合わせて自動調整します。必要なときだけ個別 override を変更してください。"
                   : "Adjust automatically for the current environment. Change overrides only when needed."}
               </div>
+              <div className="mb-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-[10px] text-slate-300">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <div>
+                    <div>Recording container</div>
+                    <div className="text-[9px] text-slate-500">
+                      {locale === "ja"
+                        ? "Safari で再生しやすい形式に切り替えます。"
+                        : "Switch the recorded file container for easier playback."}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    {
+                      label:
+                        player.recordingContainer === "auto"
+                          ? `Preset ${playbackProfileDefaults.preferNativeHls ? "MP4" : "WebM"}`
+                          : "Auto",
+                      value: "auto",
+                    },
+                    { label: "WebM", value: "webm" },
+                    { label: "MP4", value: "mp4" },
+                  ].map((option) => {
+                    const isActive = player.recordingContainer === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          onRecordingContainerChange(
+                            option.value as RetroAudioSettings["recordingContainer"],
+                          );
+                        }}
+                        className={[
+                          "rounded border px-1.5 py-1 text-[9px] transition",
+                          isActive
+                            ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                            : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-[10px] text-slate-300">
                 {[
                   {
@@ -603,7 +652,7 @@ export function RetroPreviewToolbar({
                       <div>{item.label}</div>
                       <div className="text-[9px] text-slate-500">
                         {item.value === null
-                          ? `Preset: ${item.effectiveValue ? "On" : "Off"}`
+                          ? `Auto now: ${item.effectiveValue ? "On" : "Off"}`
                           : item.effectiveValue
                             ? "Override: On"
                             : "Override: Off"}

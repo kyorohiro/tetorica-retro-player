@@ -16,6 +16,7 @@ import {
 } from "../hooks/persistedRetroSettings";
 import { useRetroAlarm } from "../hooks/useRetroAlarm";
 import { isHlsUrl } from "../media/RetroMediaSource";
+import { isTauriRuntime } from "../platform/runtime";
 import {
   areRetroPreviewLayoutStatesEqual,
   normalizeRetroPreviewLayoutState,
@@ -81,6 +82,7 @@ export type RetroPreviewPlayerSlice = {
   sourceDimensions: { width: number; height: number } | null;
   viewportRect: { width: number; height: number; x: number; y: number } | null;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
+  recordingContainer: RetroAudioSettings["recordingContainer"];
   nativeAudioSuppressionOverride: boolean | null;
   preferNativeHlsOverride: boolean | null;
   videoFilterLiteOverride: boolean | null;
@@ -106,6 +108,7 @@ export type RetroPreviewPlayerSlice = {
   changePlaybackRate: (nextRate: number) => void;
   setLoopingEnabled: (nextLooping: boolean) => void;
   setAudioOptimizationMode: (nextMode: RetroAudioSettings["audioOptimizationMode"]) => void;
+  setRecordingContainer: (nextMode: RetroAudioSettings["recordingContainer"]) => void;
   setNativeAudioSuppressionOverride: (nextValue: boolean | null) => void;
   setPreferNativeHlsOverride: (nextValue: boolean | null) => void;
   setVideoFilterLiteOverride: (nextValue: boolean | null) => void;
@@ -921,6 +924,24 @@ export function RetroPreviewView({
         }
         return;
       }
+      if (isTauriRuntime() && isFfmpegHlsSource) {
+        const confirmed = await confirmDialog(
+          locale === "ja"
+            ? {
+                title: "ffmpeg(HLS) 録画",
+                body: "Tauri macOS の ffmpeg(HLS) 再生では、録画した音声が無音になることがあります。\n\nこのまま録画を開始しますか?",
+                okText: "録画する",
+                cancelText: "キャンセル",
+              }
+            : {
+                title: "ffmpeg (HLS) recording",
+                body: "On Tauri macOS, ffmpeg (HLS) playback can produce silent recorded audio.\n\nStart recording anyway?",
+                okText: "Record",
+                cancelText: "Cancel",
+              },
+        );
+        if (!confirmed) return;
+      }
       try {
         await player.startRecording();
       } catch (error) {
@@ -1335,6 +1356,7 @@ export function RetroPreviewView({
                 onFlipHToggle={() => { setFlipH((v) => !v); }}
                 onFlipVToggle={() => { setFlipV((v) => !v); }}
                 onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+                onRecordingContainerChange={player.setRecordingContainer}
                 onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
                 onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
                 onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1391,6 +1413,7 @@ export function RetroPreviewView({
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
               onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+              onRecordingContainerChange={player.setRecordingContainer}
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
               onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1446,6 +1469,7 @@ export function RetroPreviewView({
               onFlipHToggle={() => { setFlipH((v) => !v); }}
               onFlipVToggle={() => { setFlipV((v) => !v); }}
               onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+              onRecordingContainerChange={player.setRecordingContainer}
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
               onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1501,6 +1525,7 @@ export function RetroPreviewView({
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            onRecordingContainerChange={player.setRecordingContainer}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1554,6 +1579,7 @@ export function RetroPreviewView({
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            onRecordingContainerChange={player.setRecordingContainer}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
@@ -1609,6 +1635,7 @@ export function RetroPreviewView({
             onFlipHToggle={() => { setFlipH((v) => !v); }}
             onFlipVToggle={() => { setFlipV((v) => !v); }}
             onAudioOptimizationModeChange={player.setAudioOptimizationMode}
+            onRecordingContainerChange={player.setRecordingContainer}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}

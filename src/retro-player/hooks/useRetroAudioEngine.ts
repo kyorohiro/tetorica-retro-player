@@ -16,7 +16,7 @@ import {
   type CurrentRef,
   type RetroAudioPreviewKind,
 } from "../audio/TetoricaRetroAudioNode";
-import { needsNativeAudioSuppression } from "../platform/runtime";
+import { isRealSafariWebKit, needsNativeAudioSuppression } from "../platform/runtime";
 import { getHlsInstance } from "../media/RetroMediaSource";
 import {
   DEFAULT_AUDIO_PRESET_SETTINGS,
@@ -92,6 +92,9 @@ export function useRetroAudioEngine({
   const audioOptimizationModeRef = useRef<RetroAudioSettings["audioOptimizationMode"]>(
     initialAudioSettings.audioOptimizationMode,
   );
+  const recordingContainerRef = useRef<RetroAudioSettings["recordingContainer"]>(
+    initialAudioSettings.recordingContainer,
+  );
   const nativeAudioSuppressionOverrideRef = useRef<boolean | null>(
     initialAudioSettings.nativeAudioSuppressionOverride ?? null,
   );
@@ -139,6 +142,9 @@ export function useRetroAudioEngine({
   const [audioOptimizationMode, setAudioOptimizationModeState] = useState<
     RetroAudioSettings["audioOptimizationMode"]
   >(initialAudioSettings.audioOptimizationMode);
+  const [recordingContainer, setRecordingContainerState] = useState<
+    RetroAudioSettings["recordingContainer"]
+  >(initialAudioSettings.recordingContainer);
   const [nativeAudioSuppressionOverride, setNativeAudioSuppressionOverrideState] = useState<boolean | null>(
     initialAudioSettings.nativeAudioSuppressionOverride ?? null,
   );
@@ -329,6 +335,7 @@ export function useRetroAudioEngine({
 
   const getCurrentAudioSettings = (): RetroAudioSettings => ({
     audioOptimizationMode: audioOptimizationModeRef.current,
+    recordingContainer: recordingContainerRef.current,
     nativeAudioSuppressionOverride: nativeAudioSuppressionOverrideRef.current,
     preferNativeHlsOverride: preferNativeHlsOverrideRef.current,
     videoFilterLiteOverride: videoFilterLiteOverrideRef.current,
@@ -389,9 +396,12 @@ export function useRetroAudioEngine({
     }
 
     if (
-      needsNativeAudioSuppression(
-        audioOptimizationModeRef.current,
-        nativeAudioSuppressionOverrideRef.current,
+      (
+        isRealSafariWebKit() ||
+        needsNativeAudioSuppression(
+          audioOptimizationModeRef.current,
+          nativeAudioSuppressionOverrideRef.current,
+        )
       ) &&
       mediaSourceRef.current
     ) {
@@ -569,6 +579,7 @@ export function useRetroAudioEngine({
           mediaSource = context.createMediaElementSource(media);
           mediaSource.connect(engine.input);
           if (
+            isRealSafariWebKit() ||
             isHlsManaged ||
             needsNativeAudioSuppression(
               audioOptimizationModeRef.current,
@@ -741,6 +752,7 @@ export function useRetroAudioEngine({
 
   const applyAudioSettings = (nextSettings: RetroAudioSettings) => {
     audioOptimizationModeRef.current = nextSettings.audioOptimizationMode;
+    recordingContainerRef.current = nextSettings.recordingContainer;
     nativeAudioSuppressionOverrideRef.current = nextSettings.nativeAudioSuppressionOverride ?? null;
     preferNativeHlsOverrideRef.current = nextSettings.preferNativeHlsOverride ?? null;
     videoFilterLiteOverrideRef.current = nextSettings.videoFilterLiteOverride ?? null;
@@ -776,6 +788,7 @@ export function useRetroAudioEngine({
     inputTrimAmountRef.current = nextSettings.inputTrimAmount;
 
     setAudioOptimizationModeState(nextSettings.audioOptimizationMode);
+    setRecordingContainerState(nextSettings.recordingContainer);
     setNativeAudioSuppressionOverrideState(nextSettings.nativeAudioSuppressionOverride ?? null);
     setPreferNativeHlsOverrideState(nextSettings.preferNativeHlsOverride ?? null);
     setVideoFilterLiteOverrideState(nextSettings.videoFilterLiteOverride ?? null);
@@ -822,6 +835,11 @@ export function useRetroAudioEngine({
     setAudioOptimizationModeState,
     audioOptimizationModeRef,
     "audioOptimizationMode",
+  );
+  const setRecordingContainer = createPatchedSetter(
+    setRecordingContainerState,
+    recordingContainerRef,
+    "recordingContainer",
   );
   const setNativeAudioSuppressionOverride = createPatchedSetter(
     setNativeAudioSuppressionOverrideState,
@@ -972,6 +990,7 @@ export function useRetroAudioEngine({
     const id = setTimeout(() => {
       savePersistedRetroAudioSettings({
         audioOptimizationMode,
+        recordingContainer,
         nativeAudioSuppressionOverride,
         preferNativeHlsOverride,
         videoFilterLiteOverride,
@@ -1010,6 +1029,7 @@ export function useRetroAudioEngine({
     return () => clearTimeout(id);
   }, [
     audioOptimizationMode,
+    recordingContainer,
     nativeAudioSuppressionOverride,
     preferNativeHlsOverride,
     videoFilterLiteOverride,
@@ -1083,6 +1103,9 @@ export function useRetroAudioEngine({
     analyserRef,
     audioOptimizationModeRef,
     audioOptimizationMode,
+    recordingContainerRef,
+    recordingContainer,
+    setRecordingContainer,
     setAudioOptimizationMode,
     nativeAudioSuppressionOverrideRef,
     nativeAudioSuppressionOverride,
