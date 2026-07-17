@@ -11,7 +11,20 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
-export type PhosphorDotShape = "circle" | "heart";
+export type PhosphorDotShape = "circle" | "heart" | "crt_stripe";
+export type LegacyPhosphorDotShape = PhosphorDotShape | "rgb_block";
+
+export const normalizePhosphorDotShape = (
+  shape: LegacyPhosphorDotShape | null | undefined,
+): PhosphorDotShape => {
+  if (shape === "heart") {
+    return "heart";
+  }
+  if (shape === "crt_stripe" || shape === "rgb_block") {
+    return "crt_stripe";
+  }
+  return "circle";
+};
 
 export const MONO_TINTS: Record<
   MonoTintMode,
@@ -482,6 +495,38 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
     outputBrightness: 2.1,
   },
+  crtStripe: {
+    label: "CRT Stripe",
+    featured: true,
+    width: 320,
+    height: 180,
+    colors: 32,
+    dither: 0.48,
+    smoothStrength: 0.48,
+    palette: "free",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.015,
+    vignette: 0.16,
+    glow: 0.12,
+    phosphor: 0.0,
+    spotMask: 0.331,
+    bulbRadius: 0.5,
+    blackFloor: 0.001,
+    phosphorDotShape: "crt_stripe",
+    phosphorDotLightBalance: 2.0,
+    phosphorDotInternalScale: 1,
+    phosphorDotBrightCore: true,
+    phosphorDotCellFill: 0.5,
+    phosphorDotFlatDisc: true,
+    phosphorDotNeighborBlend: true,
+    phosphorDotGrainStrength: 0.06,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    outputBrightness: 1.72,
+  },
   crtOnly: {
     label: "CRT Only",
     width: 1280,
@@ -688,6 +733,7 @@ export const RETRO_PRESET_CATEGORIES = {
   amberCrt: "crt",
   phosphorDotLite: "crt",
   phosphorDot: "crt",
+  crtStripe: "crt",
   crtOnly: "crt",
   crtEdge: "crt",
   warmBokeh: "crt",

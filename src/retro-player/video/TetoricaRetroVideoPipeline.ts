@@ -1,5 +1,6 @@
 import {
   MONO_TINTS,
+  normalizePhosphorDotShape,
   paletteModeToUniform,
   type MonoTintMode,
   type PaletteMode,
@@ -80,6 +81,16 @@ export type RawRetroVideoFrame = {
   height: number;
   data: Uint8Array | Uint8ClampedArray;
 };
+
+function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
+  if (shape === "heart") {
+    return 1;
+  }
+  if (normalizePhosphorDotShape(shape) === "crt_stripe") {
+    return 2;
+  }
+  return 0;
+}
 
 type Pass1UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
@@ -1251,7 +1262,10 @@ export class TetoricaRetroVideoPipeline {
         (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
     );
     gl.uniform1f(this.pass2Locs.uPhosphorDotMode, isPhosphorDotMode ? 1 : 0);
-    gl.uniform1f(this.pass2Locs.uPhosphorDotShape, filterState.phosphorDotShape === "heart" ? 1 : 0);
+    gl.uniform1f(
+      this.pass2Locs.uPhosphorDotShape,
+      getPhosphorDotShapeValue(filterState.phosphorDotShape),
+    );
     gl.uniform1f(this.pass2Locs.uPhosphorDotInternalScale, filterState.phosphorDotInternalScale > 1 ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);

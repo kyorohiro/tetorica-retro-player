@@ -426,6 +426,8 @@ export function RetroFilterPanel({
       phosphorDotFlatDisc ||
       phosphorDotNeighborBlend
     );
+  const isCrtStripeMode = phosphorDotShape === "crt_stripe";
+  const phosphorModelLabel = isCrtStripeMode ? "CRT Stripe" : "Dot phosphor";
   const signalInstabilityControlsDisabled = !signalInstabilityEnabled;
 
   const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
@@ -1280,7 +1282,7 @@ export function RetroFilterPanel({
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
           <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
-            Phosphor Dot / Spot Mask
+            {phosphorModelLabel} / Spot Mask
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -1291,27 +1293,141 @@ export function RetroFilterPanel({
               }}
               className={[
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                phosphorDotShape === "circle"
+                !isCrtStripeMode
                   ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
-              Dot shape: Circle
+              Dot phosphor
             </button>
             <button
               type="button"
               onClick={() => {
-                onSetPhosphorDotShape("heart");
+                onSetPhosphorDotShape("crt_stripe");
               }}
               className={[
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                phosphorDotShape === "heart"
+                isCrtStripeMode
                   ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
                   : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
               ].join(" ")}
             >
-              Dot shape: Heart
+              CRT Stripe
             </button>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-2 text-[11px] leading-5 text-[#5f5649]">
+            {isCrtStripeMode
+              ? "CRT Stripe は明部で合成色を前に出し、暗部で RGB subpixel を見せる専用モードです。"
+              : "Dot phosphor は Circle / Heart の発光セルを使う phosphor 系モードです。"}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {isCrtStripeMode ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotNeighborBlend
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Merged highlight
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotBrightCore(!phosphorDotBrightCore);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotBrightCore
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Gap fill
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotShape("circle");
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotShape === "circle"
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Dot shape: Circle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotShape("heart");
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotShape === "heart"
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Dot shape: Heart
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotBrightCore(!phosphorDotBrightCore);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotBrightCore
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Bright core
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotFlatDisc(!phosphorDotFlatDisc);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotFlatDisc
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Flat disc
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotNeighborBlend
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Neighbor blend
+                </button>
+              </>
+            )}
             <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
               <span
                 className={[
@@ -1348,48 +1464,6 @@ export function RetroFilterPanel({
                 <option value="3" label="3" />
               </datalist>
             </label>
-            <button
-              type="button"
-              onClick={() => {
-                onSetPhosphorDotBrightCore(!phosphorDotBrightCore);
-              }}
-              className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                phosphorDotBrightCore
-                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              Bright core
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSetPhosphorDotFlatDisc(!phosphorDotFlatDisc);
-              }}
-              className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                phosphorDotFlatDisc
-                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              Flat disc
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
-              }}
-              className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                phosphorDotNeighborBlend
-                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              Neighbor blend
-            </button>
           </div>
 
           <label className="mt-3 block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
@@ -1412,7 +1486,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
+                label={`${isCrtStripeMode ? "Subpixel mask" : "Spot mask"}: ${spotMaskStrength.toFixed(3)}`}
                 text={helpText.spotMask}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1433,7 +1507,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Cell fill: ${phosphorDotCellFill.toFixed(3)}`}
+                label={`${isCrtStripeMode ? "Beam bloom" : "Cell fill"}: ${phosphorDotCellFill.toFixed(3)}`}
                 text={helpText.cellFill}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1454,7 +1528,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
+                label={`${isCrtStripeMode ? "Stripe width" : "Bulb radius"}: ${bulbRadius.toFixed(3)}`}
                 text={helpText.bulbRadius}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1496,7 +1570,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Light level: ${phosphorDotLightBalance.toFixed(2)}`}
+                label={`${isCrtStripeMode ? "Stripe light level" : "Light level"}: ${phosphorDotLightBalance.toFixed(2)}`}
                 text={helpText.lightLevel}
                 helpSuffix={helpText.helpSuffix}
               />

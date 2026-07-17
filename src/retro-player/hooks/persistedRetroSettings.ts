@@ -1,4 +1,10 @@
-import type { MonoTintMode, PaletteMode, PhosphorDotShape } from "../retro/config";
+import {
+  normalizePhosphorDotShape,
+  type LegacyPhosphorDotShape,
+  type MonoTintMode,
+  type PaletteMode,
+  type PhosphorDotShape,
+} from "../retro/config";
 import { isWindowsRuntime } from "../platform/runtime";
 
 const STORAGE_KEY = "tetorica-retro-player.settings";
@@ -125,36 +131,49 @@ export type PersistedRecentLaunchSettings = {
 
 type PersistedRetroSettings = {
   version: number;
-  filter?: PersistedRetroFilterSettings;
+  filter?: Omit<PersistedRetroFilterSettings, "phosphorDotShape"> & {
+    phosphorDotShape?: LegacyPhosphorDotShape;
+  };
   audio?: PersistedRetroAudioSettings;
   ui?: PersistedRetroUiSettings;
   preferredAudioInputDeviceId?: string;
   recentLaunch?: PersistedRecentLaunchSettings;
 };
 
+type NormalizedPersistedRetroSettings = Omit<PersistedRetroSettings, "filter"> & {
+  filter?: PersistedRetroFilterSettings;
+};
+
 const normalizePersistedRetroSettings = (
   settings: PersistedRetroSettings,
-): PersistedRetroSettings => {
+): NormalizedPersistedRetroSettings => {
   const audio = settings.audio;
-  if (!audio || audio.audioOptimizationMode === "auto") {
-    return settings;
-  }
+  const filter = settings.filter;
+  const normalizedShape = normalizePhosphorDotShape(filter?.phosphorDotShape);
 
   return {
     ...settings,
-    audio: {
-      ...audio,
-      // Playback Profile no longer exposes Safari/Chrome presets directly.
-      // Migrate old persisted values to auto so existing users do not keep
-      // a stale silent-path policy after upgrading.
-      audioOptimizationMode: "auto",
-    },
+    filter: filter
+      ? {
+        ...filter,
+        phosphorDotShape: normalizedShape,
+      }
+      : filter,
+    audio: audio
+      ? {
+        ...audio,
+        // Playback Profile no longer exposes Safari/Chrome presets directly.
+        // Migrate old persisted values to auto so existing users do not keep
+        // a stale silent-path policy after upgrading.
+        audioOptimizationMode: audio.audioOptimizationMode === "auto" ? "auto" : "auto",
+      }
+      : audio,
   };
 };
 
 const MAX_RECENT_LAUNCH_ITEMS = 3;
 
-const readSettings = (): PersistedRetroSettings | null => {
+const readSettings = (): NormalizedPersistedRetroSettings | null => {
   if (typeof window === "undefined") return null;
 
   try {
@@ -217,7 +236,7 @@ const writeRecentLaunchStorage = (recentLaunch: PersistedRecentLaunchSettings) =
   }
 };
 
-export const loadPersistedRetroSettings = () => readSettings();
+export const loadPersistedRetroSettings = (): NormalizedPersistedRetroSettings | null => readSettings();
 
 export const getPreferredAudioInputDeviceId = (): string | null =>
   readSettings()?.preferredAudioInputDeviceId ?? null;

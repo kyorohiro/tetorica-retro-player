@@ -69,6 +69,7 @@ uniform float uSaturationKnee;
 uniform float uPhosphorDotLightBalance;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
+uniform float uPhosphorDotShape;
 uniform float uPhosphorDotInternalScale;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
@@ -779,6 +780,184 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   ) * radiusJitter;
   float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
   float haloRadius = dotRadius + mix(0.028, 0.12 + highlightBloom * 0.08, brightness);
+  bool useHeartShape = uPhosphorDotShape > 0.5 && uPhosphorDotShape < 1.5;
+  bool useRgbBlockShape = uPhosphorDotShape > 1.5;
+
+  if (useRgbBlockShape) {
+    vec2 stripeGrid = gridUv * vec2(targetSize.x * 3.0, targetSize.y);
+    float triadIndex = floor(stripeGrid.x / 3.0);
+    float triadParity = mod(triadIndex, 2.0);
+    float shiftedY = stripeGrid.y + triadParity * 0.5;
+    float triadX = mod(stripeGrid.x, 3.0);
+    float localY = fract(shiftedY);
+    float sourceLuma = dot(color, vec3(0.299, 0.587, 0.114));
+    float darkSuppression = smoothstep(0.12, 0.34, sourceLuma);
+    vec3 channelDrive = clamp(
+      vec3(
+        sourceLuma + (color.r - sourceLuma) * 0.38,
+        sourceLuma + (color.g - sourceLuma) * 0.38,
+        sourceLuma + (color.b - sourceLuma) * 0.38
+      ),
+      0.0,
+      1.0
+    ) * darkSuppression;
+    float brightFill = smoothstep(0.56, 0.96, sourceLuma);
+    channelDrive = channelDrive / (vec3(1.0) + channelDrive * 0.42);
+    float rectHalfWidth = 0.46;
+    float rectHalfHeight = 0.48;
+    float glowHalfWidth = 0.72;
+    float glowHalfHeight = 0.92;
+    float bloomHalfWidth = 0.98;
+    float coreHalfWidth = 0.16;
+    float verticalCore = exp(-pow(abs(localY - 0.5) / max(rectHalfHeight, 0.001), 2.4));
+    float verticalGlow = exp(-pow(abs(localY - 0.5) / max(glowHalfHeight, 0.001), 1.45));
+    float verticalCoreLine = exp(-pow(abs(localY - 0.5) / 0.56, 2.2));
+    float verticalTail =
+      exp(-max(localY - 0.5, 0.0) * 2.0) * 0.62 +
+      exp(-max(0.5 - localY, 0.0) * 3.4) * 0.18;
+    float verticalBloom = exp(-pow(abs(localY - 0.5) / 0.96, 1.35));
+    float rRect = exp(-pow(abs(triadX - 0.5) / max(rectHalfWidth, 0.001), 4.8)) * verticalCore;
+    float gRect = exp(-pow(abs(triadX - 1.5) / max(rectHalfWidth, 0.001), 4.8)) * verticalCore;
+    float bRect = exp(-pow(abs(triadX - 2.5) / max(rectHalfWidth, 0.001), 4.8)) * verticalCore;
+    float rCore = exp(-pow(abs(triadX - 0.5) / coreHalfWidth, 2.4)) * verticalCoreLine;
+    float gCore = exp(-pow(abs(triadX - 1.5) / coreHalfWidth, 2.4)) * verticalCoreLine;
+    float bCore = exp(-pow(abs(triadX - 2.5) / coreHalfWidth, 2.4)) * verticalCoreLine;
+    float rGlow = exp(-pow(abs(triadX - 0.5) / max(glowHalfWidth, 0.001), 2.3)) * verticalGlow;
+    float gGlow = exp(-pow(abs(triadX - 1.5) / max(glowHalfWidth, 0.001), 2.3)) * verticalGlow;
+    float bGlow = exp(-pow(abs(triadX - 2.5) / max(glowHalfWidth, 0.001), 2.3)) * verticalGlow;
+    float rBloom = exp(-pow(abs(triadX - 0.5) / max(bloomHalfWidth, 0.001), 1.7)) * verticalBloom;
+    float gBloom = exp(-pow(abs(triadX - 1.5) / max(bloomHalfWidth, 0.001), 1.7)) * verticalBloom;
+    float bBloom = exp(-pow(abs(triadX - 2.5) / max(bloomHalfWidth, 0.001), 1.7)) * verticalBloom;
+    vec3 rectMask = vec3(rRect, gRect, bRect);
+    vec3 coreMask = vec3(rCore, gCore, bCore);
+    vec3 glowMask = vec3(rGlow, gGlow, bGlow);
+    vec3 bloomMask = vec3(rBloom, gBloom, bBloom);
+    float matrixMask = clamp(max(max(rectMask.r, rectMask.g), rectMask.b), 0.0, 1.0);
+    float glowPresence = clamp(max(max(glowMask.r, glowMask.g), glowMask.b), 0.0, 1.0);
+    float stripeNeighborBlend = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend) * 0.28;
+    vec3 horizontalMix = color * 0.58 + vec3(sourceLuma) * 0.42;
+    vec3 blendedDrive = mix(channelDrive, horizontalMix, stripeNeighborBlend * darkSuppression);
+    float stripeBrightCore =
+      mix(0.18, 1.0, uPhosphorDotBrightCore > 0.5 ? 1.0 : 0.0) *
+      smoothstep(0.42, 0.92, sourceLuma);
+    vec3 channelColor = blendedDrive * rectMask;
+    channelColor += blendedDrive * coreMask * stripeBrightCore * (0.28 + sourceLuma * 0.64);
+    vec3 sideBleedMask = vec3(gGlow + bGlow, rGlow + bGlow, rGlow + gGlow) * 0.12;
+    vec3 bleedColor =
+      mix(vec3(sourceLuma), channelDrive, 0.24) *
+      (glowMask * (0.14 + amount * (0.24 + brightFill * 0.26)) + sideBleedMask * (1.0 + brightFill * 0.85)) *
+      verticalTail *
+      darkSuppression;
+    vec3 bloomColor =
+      mix(vec3(sourceLuma), color, 0.18) *
+      bloomMask *
+      sourceLuma *
+      smoothstep(0.22, 0.72, sourceLuma) *
+      (0.12 + highlightBloom * (0.4 + brightFill * 0.28) + amount * (0.12 + brightFill * 0.18));
+    vec3 floorLight =
+      vec3(sourceLuma) *
+      (uBlackFloor * 0.006 + amount * 0.0012) *
+      glowPresence *
+      darkSuppression;
+    float emission =
+      gate *
+      lit *
+      (0.94 + sourceLuma * 0.3) *
+      darkSuppression *
+      brightCoreCompensation *
+      emissionJitter;
+    vec3 stripeColor = (channelColor * emission + bleedColor + bloomColor + floorLight) * lightLevel;
+    float blackMatrix = 1.0 - (1.0 - matrixMask) * mix(0.68, 0.1, brightFill);
+    return stripeColor * blackMatrix;
+  }
+
+  if (useHeartShape) {
+    vec2 heartUv = dotUv / max(dotRadius, 0.0001);
+    heartUv.x *= 1.02;
+    heartUv.y = heartUv.y * 1.08 + 0.2;
+
+    vec2 heartCoreUv = dotUv / max(innerCoreRadius, 0.0001);
+    heartCoreUv.x *= 1.02;
+    heartCoreUv.y = heartCoreUv.y * 1.08 + 0.2;
+
+    vec2 heartHaloUv = dotUv / max(haloRadius, 0.0001);
+    heartHaloUv.x *= 1.02;
+    heartHaloUv.y = heartHaloUv.y * 1.08 + 0.2;
+
+    float heartField =
+      pow(heartUv.x * heartUv.x + heartUv.y * heartUv.y - 0.9, 3.0) -
+      heartUv.x * heartUv.x * pow(heartUv.y, 3.0);
+    float heartCoreField =
+      pow(heartCoreUv.x * heartCoreUv.x + heartCoreUv.y * heartCoreUv.y - 0.9, 3.0) -
+      heartCoreUv.x * heartCoreUv.x * pow(heartCoreUv.y, 3.0);
+    float heartHaloField =
+      pow(heartHaloUv.x * heartHaloUv.x + heartHaloUv.y * heartHaloUv.y - 0.9, 3.0) -
+      heartHaloUv.x * heartHaloUv.x * pow(heartHaloUv.y, 3.0);
+
+    float heartEdge = 0.12 + highlightBloom * 0.03;
+    float heartRoundMask = 1.0 - smoothstep(1.02, 1.42, length(vec2(heartUv.x, heartUv.y * 0.88)));
+    float heartCoreRoundMask = 1.0 - smoothstep(1.0, 1.34, length(vec2(heartCoreUv.x, heartCoreUv.y * 0.88)));
+    float heartHaloRoundMask = 1.0 - smoothstep(1.08, 1.56, length(vec2(heartHaloUv.x, heartHaloUv.y * 0.88)));
+    float innerCore = 1.0 - smoothstep(-heartEdge * 0.55, heartEdge * 0.55, heartCoreField);
+    float bulb = 1.0 - smoothstep(-heartEdge, heartEdge, heartField);
+    float flatDisc = 1.0 - smoothstep(-heartEdge * 0.72, heartEdge * 0.72, heartField);
+    float halo = 1.0 - smoothstep(-heartEdge * 1.95, heartEdge * 1.95, heartHaloField);
+    innerCore *= heartCoreRoundMask;
+    bulb *= heartRoundMask;
+    flatDisc *= heartRoundMask;
+    halo *= heartHaloRoundMask;
+    float cavity = mix(1.0, 0.92, smoothstep(0.1, 1.0, brightness));
+    float bodyGlow = bulb * mix(
+      0.3 + brightness * 0.34,
+      0.3 + brightness * 0.34,
+      brightCoreMix
+    );
+    float emission =
+      gate *
+      lit *
+      amount *
+      (
+        innerCore * mix(
+          0.96 + brightness * 0.62 + highlightBloom * 0.18,
+          1.52 + brightness * 1.06 + highlightBloom * 0.38,
+          brightCoreMix
+        ) +
+        bodyGlow +
+        bulb * cavity * mix(
+          0.26 + brightness * 0.3,
+          0.28 + brightness * 0.34,
+          brightCoreMix
+        ) +
+        halo * halo * (0.035 + brightness * 0.065 + highlightBloom * 0.1)
+      ) *
+      brightCoreCompensation *
+      emissionJitter;
+    float floorLight =
+      gate *
+      lit *
+      amount *
+      (uBlackFloor * (0.48 + halo * 0.58)) *
+      (1.0 + cellJitter * 0.025);
+    float cellFill =
+      gate *
+      lit *
+      amount *
+      uPhosphorDotCellFill *
+      (0.26 + brightness * 0.22);
+    float flatDiscFill =
+      gate *
+      lit *
+      amount *
+      flatDisc *
+      (0.78 + brightness * 0.18);
+    vec3 dotCoreColor = color * emission;
+    dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix);
+    vec3 discCoreColor = color * flatDiscFill;
+    vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+    dotColor += color * floorLight;
+    return dotColor * lightLevel;
+  }
+
   float innerCore = exp(-dist * dist * mix(useBrightCore ? 220.0 : 120.0, useBrightCore ? 110.0 : 72.0, brightness));
   float bulb = 1.0 - smoothstep(dotRadius - 0.014, dotRadius + 0.02, dist);
   float flatDisc = 1.0 - smoothstep(dotRadius - 0.01, dotRadius + 0.012, dist);

@@ -1,7 +1,12 @@
 import { DEFAULT_AUDIO_PRESET_SETTINGS } from "../audio/preset";
 import { loadLocalePreference } from "../../i18n";
 import type { LocalePreference } from "../../i18n";
-import { RETRO_PRESETS, defaultPresetId, type RetroPresetDefinition } from "../retro/config";
+import {
+  RETRO_PRESETS,
+  defaultPresetId,
+  normalizePhosphorDotShape,
+  type RetroPresetDefinition,
+} from "../retro/config";
 import { loadPersistedRetroSettings } from "./persistedRetroSettings";
 import type {
   PersistedRetroAudioSettings,
@@ -96,8 +101,12 @@ export type PresetFileData = {
 };
 
 const applyFilterDefaults = (
-  raw: Partial<PersistedRetroFilterSettings>,
-): PersistedRetroFilterSettings => ({ ...DEFAULT_FILTER_SETTINGS, ...raw });
+  raw: Partial<PersistedRetroFilterSettings> & { phosphorDotShape?: string },
+): PersistedRetroFilterSettings => ({
+  ...DEFAULT_FILTER_SETTINGS,
+  ...raw,
+  phosphorDotShape: normalizePhosphorDotShape(raw.phosphorDotShape),
+});
 
 const applyAudioDefaults = (
   raw: Partial<PersistedRetroAudioSettings>,
