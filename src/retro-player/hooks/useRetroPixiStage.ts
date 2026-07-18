@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  type RetroPresentationSamplingMode,
   TetoricaRetroVideoPipeline,
   getEffectiveRetroTargetSize,
   getRetroVideoSourceSize,
@@ -328,6 +329,12 @@ export function useRetroPixiStage({
     const previewSourceSize = previewElementRef.current
       ? getRetroVideoSourceSize(previewElementRef.current)
       : null;
+    const sourceWidth = Math.max(previewSourceSize?.width ?? styleWidth, 1);
+    const sourceHeight = Math.max(previewSourceSize?.height ?? styleHeight, 1);
+    const isUpscalingContent =
+      styleWidth > sourceWidth + 0.5 || styleHeight > sourceHeight + 0.5;
+    const presentationSamplingMode: RetroPresentationSamplingMode =
+      isUpscalingContent ? "crisp" : "smooth";
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
@@ -392,6 +399,7 @@ export function useRetroPixiStage({
       nextHeight,
       nextLeft,
       nextTop,
+      presentationSamplingMode,
       currentFilterState.isFilterEnabled ? 1 : 0,
       shouldUseLogicalBufferUpscale ? 1 : 0,
     ].join(":");
@@ -409,14 +417,8 @@ export function useRetroPixiStage({
     app.canvas.style.top = `${nextTop}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
-    // "pixelated" keeps the classic crisp/pixel-perfect look when the backing
-    // buffer matches the display's native pixel density (1x/2x Hi-Res), but it
-    // forces nearest-neighbor sampling when the browser composites the canvas
-    // down to its CSS box — so pushing render resolution past that density
-    // (3x/4x) gets discarded on the way down instead of smoothing anything.
-    // Switch to normal (smooth) scaling once we're supersampling beyond it.
-    app.canvas.style.imageRendering =
-      effectiveRenderResolutionScale > getPreferredOutputScale() ? "auto" : "pixelated";
+    app.canvas.style.imageRendering = isUpscalingContent ? "pixelated" : "auto";
+    app.pipeline.setPresentationSamplingMode(presentationSamplingMode);
 
     renderFrame();
   }, [effectiveRenderResolutionScale, fitCurrentSprite, renderFrame]);
@@ -459,7 +461,7 @@ export function useRetroPixiStage({
       canvas.style.display = "block";
       canvas.style.width = "100%";
       canvas.style.height = "100%";
-      canvas.style.imageRendering = "pixelated";
+      canvas.style.imageRendering = "auto";
       canvas.style.background = "#020617";
 
       const gl = canvas.getContext("webgl2");

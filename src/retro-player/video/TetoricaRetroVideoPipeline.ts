@@ -82,6 +82,8 @@ export type RawRetroVideoFrame = {
   data: Uint8Array | Uint8ClampedArray;
 };
 
+export type RetroPresentationSamplingMode = "crisp" | "smooth";
+
 function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   if (shape === "heart") {
     return 1;
@@ -512,6 +514,7 @@ export class TetoricaRetroVideoPipeline {
   private readonly signalInstabilityController = createSignalInstabilityController();
 
   private outputEnabled = true;
+  private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
 
   private startedAt = nowMs();
   private windowsLiteVariantKey: WindowsLiteVariantKey | null = null;
@@ -968,6 +971,10 @@ export class TetoricaRetroVideoPipeline {
     this.outputEnabled = enabled;
   }
 
+  setPresentationSamplingMode(mode: RetroPresentationSamplingMode) {
+    this.presentationSamplingMode = mode;
+  }
+
   private syncTextureSamplingFilter(nextFilter: number) {
     if (this.textureSamplingFilter === nextFilter) {
       return;
@@ -1055,7 +1062,8 @@ export class TetoricaRetroVideoPipeline {
     const uploadSource = this.getUploadSource(source, filterState);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
-    const textureFilter = gl.NEAREST;
+    const textureFilter =
+      this.presentationSamplingMode === "smooth" ? gl.LINEAR : gl.NEAREST;
     this.syncTextureSamplingFilter(textureFilter);
     const isImageSource = isHtmlImageElement(uploadSource);
     const isVideoSource = isHtmlVideoElement(uploadSource);
