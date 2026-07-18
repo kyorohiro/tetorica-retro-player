@@ -104,9 +104,6 @@ export function useRetroAudioEngine({
   const preferNativeHlsOverrideRef = useRef<boolean | null>(
     initialAudioSettings.preferNativeHlsOverride ?? null,
   );
-  const videoFilterLiteOverrideRef = useRef<boolean | null>(
-    initialAudioSettings.videoFilterLiteOverride ?? null,
-  );
   const isMutedRef = useRef<boolean>(initialAudioSettings.isMuted);
   const volumeRef = useRef<number>(initialAudioSettings.volume);
   const playbackRateRef = useRef<number>(initialAudioSettings.playbackRate);
@@ -153,9 +150,6 @@ export function useRetroAudioEngine({
   );
   const [preferNativeHlsOverride, setPreferNativeHlsOverrideState] = useState<boolean | null>(
     initialAudioSettings.preferNativeHlsOverride ?? null,
-  );
-  const [videoFilterLiteOverride, setVideoFilterLiteOverrideState] = useState<boolean | null>(
-    initialAudioSettings.videoFilterLiteOverride ?? null,
   );
   const [isMuted, setIsMutedState] = useState<boolean>(initialAudioSettings.isMuted);
   const [playbackRate, setPlaybackRateState] = useState<number>(
@@ -341,7 +335,6 @@ export function useRetroAudioEngine({
     recordingContainer: recordingContainerRef.current,
     nativeAudioSuppressionOverride: nativeAudioSuppressionOverrideRef.current,
     preferNativeHlsOverride: preferNativeHlsOverrideRef.current,
-    videoFilterLiteOverride: videoFilterLiteOverrideRef.current,
     isMuted: isMutedRef.current,
     volume: volumeRef.current,
     playbackRate: playbackRateRef.current,
@@ -441,7 +434,6 @@ export function useRetroAudioEngine({
           key === "audioOptimizationMode" ||
           key === "nativeAudioSuppressionOverride" ||
           key === "preferNativeHlsOverride" ||
-          key === "videoFilterLiteOverride" ||
           key === "isMuted" ||
           key === "volume" ||
           key === "playbackRate" ||
@@ -774,7 +766,6 @@ export function useRetroAudioEngine({
     recordingContainerRef.current = nextSettings.recordingContainer;
     nativeAudioSuppressionOverrideRef.current = nextSettings.nativeAudioSuppressionOverride ?? null;
     preferNativeHlsOverrideRef.current = nextSettings.preferNativeHlsOverride ?? null;
-    videoFilterLiteOverrideRef.current = nextSettings.videoFilterLiteOverride ?? null;
     isMutedRef.current = nextSettings.isMuted;
     volumeRef.current = nextSettings.volume;
     playbackRateRef.current = nextSettings.playbackRate;
@@ -810,7 +801,6 @@ export function useRetroAudioEngine({
     setRecordingContainerState(nextSettings.recordingContainer);
     setNativeAudioSuppressionOverrideState(nextSettings.nativeAudioSuppressionOverride ?? null);
     setPreferNativeHlsOverrideState(nextSettings.preferNativeHlsOverride ?? null);
-    setVideoFilterLiteOverrideState(nextSettings.videoFilterLiteOverride ?? null);
     setIsMutedState(nextSettings.isMuted);
     setVolumeState(nextSettings.volume);
     setPlaybackRateState(nextSettings.playbackRate);
@@ -869,11 +859,6 @@ export function useRetroAudioEngine({
     setPreferNativeHlsOverrideState,
     preferNativeHlsOverrideRef,
     "preferNativeHlsOverride",
-  );
-  const setVideoFilterLiteOverride = createPatchedSetter(
-    setVideoFilterLiteOverrideState,
-    videoFilterLiteOverrideRef,
-    "videoFilterLiteOverride",
   );
   const setIsMuted = createPatchedSetter(setIsMutedState, isMutedRef, "isMuted");
   const setPlaybackRate = createPatchedSetter(
@@ -1012,7 +997,6 @@ export function useRetroAudioEngine({
         recordingContainer,
         nativeAudioSuppressionOverride,
         preferNativeHlsOverride,
-        videoFilterLiteOverride,
         isMuted,
         volume,
         playbackRate,
@@ -1051,7 +1035,6 @@ export function useRetroAudioEngine({
     recordingContainer,
     nativeAudioSuppressionOverride,
     preferNativeHlsOverride,
-    videoFilterLiteOverride,
     isMuted,
     volume,
     playbackRate,
@@ -1132,9 +1115,6 @@ export function useRetroAudioEngine({
     preferNativeHlsOverrideRef,
     preferNativeHlsOverride,
     setPreferNativeHlsOverride,
-    videoFilterLiteOverrideRef,
-    videoFilterLiteOverride,
-    setVideoFilterLiteOverride,
     latencyHint,
     setLatencyHint,
     isMutedRef,

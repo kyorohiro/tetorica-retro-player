@@ -5,13 +5,10 @@ import {
   type PaletteMode,
   type PhosphorDotShape,
 } from "../retro/config.ts";
-import { FILTER_FRAGMENT_PASS1 } from "../retro/filterPass1Shader.ts";
-import { FILTER_FRAGMENT_PASS2 } from "../retro/filterPass2Shader.ts";
 import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
-import { resolveVideoFilterLiteDefault } from "../platform/runtime";
 import { createSignalInstabilityController } from "./signalInstability";
 
 export type RetroVideoFilterState = {
@@ -779,51 +776,18 @@ export class TetoricaRetroVideoPipeline {
   static async create(
     gl: WebGL2RenderingContext,
     onFilterReady?: () => void,
-    options?: {
-      videoFilterLiteMode?: boolean;
-    },
   ): Promise<TetoricaRetroVideoPipeline> {
-    const shouldUseWindowsLiteMode =
-      options?.videoFilterLiteMode ?? resolveVideoFilterLiteDefault();
-
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
     await waitAndVerifyPrograms(gl, [passthroughProgram]);
-    const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, shouldUseWindowsLiteMode);
-
-    if (shouldUseWindowsLiteMode) {
-      requestAnimationFrame(async () => {
-        pipeline.queueWindowsLiteVariant(null);
-        if (pipeline.windowsLiteCompilePromise) {
-          await pipeline.windowsLiteCompilePromise;
-        }
-        onFilterReady?.();
-      });
-
-      return pipeline;
-    }
+    const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, true);
 
     requestAnimationFrame(async () => {
-      // Submit both filter passes simultaneously so the parallel-shader-compile
-      // extension can overlap their compilation.
-      // NOTE: Windows/ANGLE (D3D cache freeze) is already handled above by the
-      // shouldUseWindowsLiteMode branch, so no 3-second delay is needed here.
-      const pass1Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS1);
-      const pass2Program = submitProgram(gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2);
-
-      try {
-        await waitAndVerifyPrograms(gl, [pass1Program, pass2Program]);
-      } catch (err) {
-        TetoricaRetroVideoPipeline.showDebug(`filter: link failed: ${err}`);
-        gl.deleteProgram(pass1Program);
-        gl.deleteProgram(pass2Program);
-        return;
+      pipeline.queueWindowsLiteVariant(null);
+      if (pipeline.windowsLiteCompilePromise) {
+        await pipeline.windowsLiteCompilePromise;
       }
-      if (gl.isContextLost()) return;
-
-      pipeline.setFilterPrograms(pass1Program, pass2Program);
       onFilterReady?.();
-      TetoricaRetroVideoPipeline.showDebug("filter: LOADED (2-pass)");
     });
 
     return pipeline;

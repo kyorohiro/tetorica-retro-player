@@ -16,7 +16,7 @@ import {
   type RetroVideoFilterState,
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
-import { isTauriRuntime, resolveVideoFilterLiteDefault } from "../platform/runtime";
+import { isTauriRuntime } from "../platform/runtime";
 
 const TAURI_HIDDEN_TICK_MS = 250;
 const getPreferredOutputScale = () => {
@@ -43,7 +43,6 @@ type UseRetroPixiStageParams = {
   fitMode: "contain" | "width";
   renderResolutionScale: number;
   isPoweredOn: boolean;
-  videoFilterLiteOverride: boolean | null;
   isPlayingRef: MutableRefObject<boolean>;
   previewKindRef: MutableRefObject<PreviewKind>;
   isRecordingRef: MutableRefObject<boolean>;
@@ -55,7 +54,6 @@ export function useRetroPixiStage({
   fitMode,
   renderResolutionScale,
   isPoweredOn,
-  videoFilterLiteOverride,
   isRecordingRef,
   isPlayingRef,
   previewKindRef,
@@ -92,9 +90,6 @@ export function useRetroPixiStage({
   const [isRendererReady, setIsRendererReady] = useState(false);
   const [isFilterReady, setIsFilterReady] = useState(false);
   const viewportRect = viewportRectRef.current;
-  const effectiveVideoFilterLiteMode =
-    videoFilterLiteOverride ?? resolveVideoFilterLiteDefault();
-  const effectiveVideoFilterLiteModeRef = useRef(effectiveVideoFilterLiteMode);
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
   const destroyPixiRef = useRef<() => void>(() => {});
   const appliedLayoutKeyRef = useRef<string | null>(null);
@@ -496,9 +491,7 @@ export function useRetroPixiStage({
         renderFrameRef.current();
         startTicker();
       };
-      const pipeline = await TetoricaRetroVideoPipeline.create(gl, onFilterReady, {
-        videoFilterLiteMode: effectiveVideoFilterLiteMode,
-      });
+      const pipeline = await TetoricaRetroVideoPipeline.create(gl, onFilterReady);
       const app: CanvasStageApp = {
         canvas,
         pipeline,
@@ -555,7 +548,6 @@ export function useRetroPixiStage({
     }
   }, [
     debugVideo,
-    effectiveVideoFilterLiteMode,
     effectiveRenderResolutionScale,
     isPoweredOn,
     refreshLayout,
@@ -636,21 +628,6 @@ export function useRetroPixiStage({
       hasApp: Boolean(appRef.current),
     });
   }, [debugVideo]);
-
-  useEffect(() => {
-    if (effectiveVideoFilterLiteModeRef.current === effectiveVideoFilterLiteMode) {
-      return;
-    }
-
-    effectiveVideoFilterLiteModeRef.current = effectiveVideoFilterLiteMode;
-
-    if (!appRef.current) {
-      return;
-    }
-
-    destroyPixiRef.current();
-    void initPixiRef.current();
-  }, [effectiveVideoFilterLiteMode]);
 
   useEffect(() => {
     const host = canvasHostRef.current;

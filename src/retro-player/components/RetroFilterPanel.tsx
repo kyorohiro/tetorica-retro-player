@@ -206,8 +206,6 @@ export function RetroFilterPanel({
   autoTargetSize,
   matchTargetAspect,
   vignetteStrength,
-  focusWidth,
-  focusHeight,
   onApplyPreset,
   onSetIsFilterEnabled,
   onSetColorLevels,
@@ -250,10 +248,6 @@ export function RetroFilterPanel({
   onSetAutoTargetSize,
   onSetMatchTargetAspect,
   onSetVignetteStrength,
-  focusStrength,
-  onSetFocusStrength,
-  onSetFocusWidth,
-  onSetFocusHeight,
 }: RetroFilterPanelProps) {
   const [localTargetWidth, setLocalTargetWidth] = useState(targetWidth);
   const [localTargetHeight, setLocalTargetHeight] = useState(targetHeight);
@@ -929,60 +923,6 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={vignetteStrength}
                 onChange={(ev) => onSetVignetteStrength(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Focus blur: ${focusStrength.toFixed(2)}`}
-                  text={helpText.focus}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={focusStrength}
-                onChange={(ev) => onSetFocusStrength(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Focus width: ${focusWidth.toFixed(2)}`}
-                  text={helpText.focusWidth}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.08"
-                max="0.48"
-                step="0.01"
-                value={focusWidth}
-                onChange={(ev) => onSetFocusWidth(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Focus height: ${focusHeight.toFixed(2)}`}
-                  text={helpText.focusHeight}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.08"
-                max="0.48"
-                step="0.01"
-                value={focusHeight}
-                onChange={(ev) => onSetFocusHeight(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

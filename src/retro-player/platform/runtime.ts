@@ -63,9 +63,6 @@ const readSearchParams = () => {
 export const shouldForceRetroFilterCompile = () =>
   readSearchParams()?.get("forceRetroFilterCompile") === "1";
 
-export const resolveVideoFilterLiteDefault = () =>
-  isWindowsChromiumAngleRisk() && !shouldForceRetroFilterCompile();
-
 export const resolvePlaybackProfileDefaults = (
   audioOptimizationMode: "auto" | "chrome" | "safari",
 ) => {
@@ -73,7 +70,6 @@ export const resolvePlaybackProfileDefaults = (
     return {
       nativeAudioSuppression: false,
       preferNativeHls: false,
-      videoFilterLite: false,
     };
   }
 
@@ -81,7 +77,6 @@ export const resolvePlaybackProfileDefaults = (
     return {
       nativeAudioSuppression: true,
       preferNativeHls: true,
-      videoFilterLite: false,
     };
   }
 
@@ -89,7 +84,6 @@ export const resolvePlaybackProfileDefaults = (
   return {
     nativeAudioSuppression: isSafari,
     preferNativeHls: isSafari,
-    videoFilterLite: resolveVideoFilterLiteDefault(),
   };
 };
 

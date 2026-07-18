@@ -85,7 +85,6 @@ export type RetroPreviewPlayerSlice = {
   recordingContainer: RetroAudioSettings["recordingContainer"];
   nativeAudioSuppressionOverride: boolean | null;
   preferNativeHlsOverride: boolean | null;
-  videoFilterLiteOverride: boolean | null;
   latencyHint: AudioContextLatencyCategory;
   hasPlayableMedia: boolean;
   hasAudibleMedia: boolean;
@@ -111,7 +110,6 @@ export type RetroPreviewPlayerSlice = {
   setRecordingContainer: (nextMode: RetroAudioSettings["recordingContainer"]) => void;
   setNativeAudioSuppressionOverride: (nextValue: boolean | null) => void;
   setPreferNativeHlsOverride: (nextValue: boolean | null) => void;
-  setVideoFilterLiteOverride: (nextValue: boolean | null) => void;
   setLatencyHint: (hint: AudioContextLatencyCategory) => void;
   powerOn: () => void;
   powerOff: () => void;
@@ -1351,7 +1349,6 @@ export function RetroPreviewView({
                 onRecordingContainerChange={player.setRecordingContainer}
                 onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
                 onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
-                onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
                 onLatencyHintChange={player.setLatencyHint}
                 ffmpegUseQsv={ffmpegUseQsv}
                 onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
@@ -1408,7 +1405,6 @@ export function RetroPreviewView({
               onRecordingContainerChange={player.setRecordingContainer}
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
-              onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
               onLatencyHintChange={player.setLatencyHint}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
@@ -1464,7 +1460,6 @@ export function RetroPreviewView({
               onRecordingContainerChange={player.setRecordingContainer}
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
-              onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
               onLatencyHintChange={player.setLatencyHint}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
@@ -1520,7 +1515,6 @@ export function RetroPreviewView({
             onRecordingContainerChange={player.setRecordingContainer}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
-            onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
             onLatencyHintChange={player.setLatencyHint}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
@@ -1574,7 +1568,6 @@ export function RetroPreviewView({
             onRecordingContainerChange={player.setRecordingContainer}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
-            onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
             onLatencyHintChange={player.setLatencyHint}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
@@ -1630,7 +1623,6 @@ export function RetroPreviewView({
             onRecordingContainerChange={player.setRecordingContainer}
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
-            onVideoFilterLiteOverrideChange={player.setVideoFilterLiteOverride}
             onLatencyHintChange={player.setLatencyHint}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}

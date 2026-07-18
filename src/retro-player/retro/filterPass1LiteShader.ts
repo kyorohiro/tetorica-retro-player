@@ -17,6 +17,7 @@ uniform float uAnimeEdgeHigh;
 uniform vec3 uMonoTint;
 uniform float uNeonBoost;
 uniform float uNeonSaturation;
+uniform float uNeonDetail;
 uniform float uGlowStrength;
 
 float bayer4x4(vec2 pos)
@@ -113,6 +114,12 @@ vec3 hsv2rgb(vec3 c)
   return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+vec3 adjustSaturation(vec3 color, float saturation)
+{
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  return mix(vec3(luminance), color, saturation);
+}
+
 vec3 nearestColorAnime(vec3 color)
 {
   vec3 hsv = rgb2hsv(color);
@@ -172,6 +179,70 @@ float computeSourceEdge(vec2 uv, vec2 texel)
   return clamp(length(vec2(gx, gy)), 0.0, 1.0);
 }
 
+vec3 applyNeonLinePalette(vec2 uv, vec2 texel, float levels, vec3 monoTint)
+{
+  vec3 center = texture(uTexture, uv).rgb;
+  vec3 left = texture(uTexture, clamp(uv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 right = texture(uTexture, clamp(uv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 up = texture(uTexture, clamp(uv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 down = texture(uTexture, clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
+
+  float centerLum = dot(center, vec3(0.299, 0.587, 0.114));
+  float leftLum = dot(left, vec3(0.299, 0.587, 0.114));
+  float rightLum = dot(right, vec3(0.299, 0.587, 0.114));
+  float upLum = dot(up, vec3(0.299, 0.587, 0.114));
+  float downLum = dot(down, vec3(0.299, 0.587, 0.114));
+
+  float gradient = length(vec2(rightLum - leftLum, downLum - upLum));
+  float detailScale = mix(2.0, 4.2, clamp(uNeonDetail - 0.5, 0.0, 1.5) / 1.5);
+  float edge = pow(
+    clamp(gradient * detailScale, 0.0, 1.0),
+    mix(0.95, 0.58, clamp(uNeonDetail, 0.0, 2.0) * 0.5)
+  );
+  float silhouette = smoothstep(0.18, 0.8, centerLum);
+  float line = clamp(edge + silhouette * 0.2, 0.0, 1.0);
+  float stepped = floor(line * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+
+  vec3 tintCore = adjustSaturation(monoTint, 1.14);
+  vec3 tintWarm = vec3(
+    monoTint.r,
+    max(monoTint.g * 0.62, 0.04),
+    max(monoTint.b * 0.28, 0.02)
+  );
+  vec3 tintCool = vec3(
+    max(monoTint.r * 0.34, 0.03),
+    monoTint.g * 0.82,
+    monoTint.b
+  );
+  float tintVariance = max(max(monoTint.r, monoTint.g), monoTint.b)
+    - min(min(monoTint.r, monoTint.g), monoTint.b);
+  vec3 tintAccent = adjustSaturation(
+    mix(tintCool, tintWarm, smoothstep(0.52, 0.9, monoTint.r)),
+    1.28
+  );
+  vec3 neonCore = vec3(0.08, 0.94, 1.0);
+  vec3 neonAccent = vec3(1.0, 0.16, 0.82);
+  vec3 primary = mix(neonCore, tintCore, 0.56);
+  vec3 accent = mix(neonAccent, tintAccent, clamp(tintVariance * 1.85, 0.18, 0.82));
+  vec3 backgroundTint = mix(vec3(0.01, 0.012, 0.03), tintCore * vec3(0.09, 0.07, 0.13), 0.38);
+  vec3 background = mix(
+    backgroundTint,
+    backgroundTint + neonAccent * 0.06 + accent * 0.04,
+    silhouette * 0.18
+  );
+  vec3 beamBase = mix(primary, accent, smoothstep(0.2, 1.0, centerLum + edge * 0.6));
+  float saturation = clamp(uNeonSaturation, 0.0, 2.5);
+  vec3 beam = adjustSaturation(beamBase, saturation);
+  float boost = clamp(uNeonBoost, 0.0, 2.5);
+  vec3 haloBase = mix(primary, accent, 0.72);
+  vec3 halo = adjustSaturation(haloBase, 0.65 + saturation * 0.8)
+    * pow(stepped, 1.8 + boost * 0.35)
+    * (0.40 + boost * 0.23);
+
+  vec3 neon = background + beam * stepped * (0.7 + boost * 0.45) + halo;
+  return adjustSaturation(neon, 0.85 + saturation * 0.35);
+}
+
 void main(void)
 {
   vec2 cell = floor(vTextureCoord * uTargetSize);
@@ -186,9 +257,20 @@ void main(void)
   bool isNeon = uPaletteMode > 8.5 && uPaletteMode < 9.5;
 
   if (isNeon) {
-    float edge = pow(computeSourceEdge(pixelatedUv, texel), 0.7);
-    vec3 neonTint = mix(uMonoTint, vec3(0.1, 1.0, 0.9), 0.45);
-    color = neonTint * edge * (0.7 + clamp(uNeonBoost, 0.0, 2.0) * 0.5);
+    color = applyNeonLinePalette(pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
+    if (uGlowStrength > 0.001) {
+      vec3 halo = applyNeonLinePalette(
+        clamp(pixelatedUv + vec2(texel.x * 0.5, texel.y * 0.5), vec2(0.0), vec2(1.0)),
+        texel,
+        max(uColorLevels, 2.0),
+        uMonoTint
+      );
+      color = mix(
+        color,
+        color + halo * uGlowStrength * (0.35 + uNeonBoost * 0.22),
+        0.45
+      );
+    }
   } else {
     color = applyPaletteMode(color);
 

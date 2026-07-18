@@ -3,7 +3,6 @@ export type RetroAudioSettings = {
   recordingContainer: "auto" | "webm" | "mp4";
   nativeAudioSuppressionOverride?: boolean | null;
   preferNativeHlsOverride?: boolean | null;
-  videoFilterLiteOverride?: boolean | null;
   isMuted: boolean;
   volume: number;
   playbackRate: number;
@@ -77,7 +76,6 @@ export const DEFAULT_AUDIO_SETTINGS = {
   recordingContainer: "auto",
   nativeAudioSuppressionOverride: null,
   preferNativeHlsOverride: null,
-  videoFilterLiteOverride: null,
   isMuted: false,
   volume: 0.72,
   playbackRate: 1,

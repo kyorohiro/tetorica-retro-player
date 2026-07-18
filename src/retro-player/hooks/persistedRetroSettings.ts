@@ -66,7 +66,6 @@ export type PersistedRetroAudioSettings = {
   recordingContainer: "auto" | "webm" | "mp4";
   nativeAudioSuppressionOverride?: boolean | null;
   preferNativeHlsOverride?: boolean | null;
-  videoFilterLiteOverride?: boolean | null;
   isMuted: boolean;
   volume: number;
   playbackRate: number;
