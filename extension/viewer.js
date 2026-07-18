@@ -1,5 +1,3 @@
-import { FILTER_FRAGMENT_PASS1 } from "./shared/filterPass1Shader.js";
-import { FILTER_FRAGMENT_PASS2 } from "./shared/filterPass2Shader.js";
 import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
 import { FILTER_FRAGMENT_PASS2_LITE } from "./shared/filterPass2LiteShader.js";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "./shared/filterPass1Pc98LiteShader.js";
@@ -881,12 +879,9 @@ function setupRenderer(webgl) {
     }
   }
 
-  // --- Full filter program (async; D3D cache can block if checked immediately) ---
+  // --- Filter programs (lite variants only) ---
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const shouldUseWindowsLiteMode = isWindowsChromiumAngleRisk();
-  const shaderSources = shouldUseWindowsLiteMode
-    ? getWindowsLiteShaderSources(currentSettings)
-    : { pass1: FILTER_FRAGMENT_PASS1, pass2: FILTER_FRAGMENT_PASS2 };
+  const shaderSources = getWindowsLiteShaderSources(currentSettings);
   const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1);
   const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2);
 

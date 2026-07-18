@@ -4,7 +4,6 @@ var DEFAULT_AUDIO_SETTINGS = {
   recordingContainer: "auto",
   nativeAudioSuppressionOverride: null,
   preferNativeHlsOverride: null,
-  videoFilterLiteOverride: null,
   isMuted: false,
   volume: 0.72,
   playbackRate: 1,
