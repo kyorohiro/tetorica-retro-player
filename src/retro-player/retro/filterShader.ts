@@ -38,6 +38,7 @@ in vec2 vMaskCoord;
 out vec4 finalColor;
 
 uniform sampler2D uTexture;
+uniform sampler2D uEmissionTexture;
 uniform vec2 uTargetSize;
 uniform vec2 uSampleTargetSize;
 uniform float uColorLevels;
@@ -790,35 +791,46 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     float shiftedY = stripeGrid.y + triadParity * 0.5;
     float triadX = mod(stripeGrid.x, 3.0);
     float localY = fract(shiftedY);
-    float sourceLuma = dot(color, vec3(0.299, 0.587, 0.114));
+    vec2 shiftedUv = clamp(
+      vec2(
+        gridUv.x,
+        gridUv.y + (triadParity - 0.5) / max(targetSize.y, 1.0)
+      ),
+      vec2(0.0),
+      vec2(1.0)
+    );
+    vec3 sourceColor = texture(uTexture, shiftedUv).rgb;
+    vec3 filteredColor = texture(uEmissionTexture, shiftedUv).rgb;
+    float sourceLuma = dot(filteredColor, vec3(0.299, 0.587, 0.114));
     float darkSuppression = smoothstep(0.12, 0.34, sourceLuma);
+    vec3 chromaSource = mix(filteredColor, sourceColor, 0.42);
     vec3 channelDrive = clamp(
       vec3(
-        sourceLuma + (color.r - sourceLuma) * 0.38,
-        sourceLuma + (color.g - sourceLuma) * 0.38,
-        sourceLuma + (color.b - sourceLuma) * 0.38
+        sourceLuma + (chromaSource.r - sourceLuma) * 0.46,
+        sourceLuma + (chromaSource.g - sourceLuma) * 0.46,
+        sourceLuma + (chromaSource.b - sourceLuma) * 0.46
       ),
       0.0,
       1.0
     ) * darkSuppression;
     float brightFill = smoothstep(0.56, 0.96, sourceLuma);
     channelDrive = channelDrive / (vec3(1.0) + channelDrive * 0.42);
-    float rectHalfWidth = 0.46;
-    float rectHalfHeight = 0.48;
-    float glowHalfWidth = 0.72;
-    float glowHalfHeight = 0.92;
-    float bloomHalfWidth = 0.98;
+    float rectHalfWidth = 0.44;
+    float rectHalfHeight = 0.44;
+    float glowHalfWidth = 1.02;
+    float glowHalfHeight = 0.72;
+    float bloomHalfWidth = 1.32;
     float coreHalfWidth = 0.16;
     float verticalCore = exp(-pow(abs(localY - 0.5) / max(rectHalfHeight, 0.001), 2.4));
     float verticalGlow = exp(-pow(abs(localY - 0.5) / max(glowHalfHeight, 0.001), 1.45));
     float verticalCoreLine = exp(-pow(abs(localY - 0.5) / 0.56, 2.2));
     float verticalTail =
-      exp(-max(localY - 0.5, 0.0) * 2.0) * 0.62 +
-      exp(-max(0.5 - localY, 0.0) * 3.4) * 0.18;
-    float verticalBloom = exp(-pow(abs(localY - 0.5) / 0.96, 1.35));
-    float rRect = exp(-pow(abs(triadX - 0.5) / max(rectHalfWidth, 0.001), 4.8)) * verticalCore;
-    float gRect = exp(-pow(abs(triadX - 1.5) / max(rectHalfWidth, 0.001), 4.8)) * verticalCore;
-    float bRect = exp(-pow(abs(triadX - 2.5) / max(rectHalfWidth, 0.001), 4.8)) * verticalCore;
+      exp(-max(localY - 0.5, 0.0) * 2.9) * 0.42 +
+      exp(-max(0.5 - localY, 0.0) * 4.2) * 0.12;
+    float verticalBloom = exp(-pow(abs(localY - 0.5) / 0.76, 1.55));
+    float rRectBase = exp(-pow(abs(triadX - 0.5) / max(rectHalfWidth, 0.001), 2.6)) * verticalCore;
+    float gRectBase = exp(-pow(abs(triadX - 1.5) / max(rectHalfWidth, 0.001), 2.6)) * verticalCore;
+    float bRectBase = exp(-pow(abs(triadX - 2.5) / max(rectHalfWidth, 0.001), 2.6)) * verticalCore;
     float rCore = exp(-pow(abs(triadX - 0.5) / coreHalfWidth, 2.4)) * verticalCoreLine;
     float gCore = exp(-pow(abs(triadX - 1.5) / coreHalfWidth, 2.4)) * verticalCoreLine;
     float bCore = exp(-pow(abs(triadX - 2.5) / coreHalfWidth, 2.4)) * verticalCoreLine;
@@ -828,32 +840,54 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     float rBloom = exp(-pow(abs(triadX - 0.5) / max(bloomHalfWidth, 0.001), 1.7)) * verticalBloom;
     float gBloom = exp(-pow(abs(triadX - 1.5) / max(bloomHalfWidth, 0.001), 1.7)) * verticalBloom;
     float bBloom = exp(-pow(abs(triadX - 2.5) / max(bloomHalfWidth, 0.001), 1.7)) * verticalBloom;
-    vec3 rectMask = vec3(rRect, gRect, bRect);
+    vec3 rectMask = min(
+      vec3(1.0),
+      vec3(rRectBase, gRectBase, bRectBase) * 0.68 + vec3(rGlow, gGlow, bGlow) * 0.32
+    );
     vec3 coreMask = vec3(rCore, gCore, bCore);
     vec3 glowMask = vec3(rGlow, gGlow, bGlow);
     vec3 bloomMask = vec3(rBloom, gBloom, bBloom);
     float matrixMask = clamp(max(max(rectMask.r, rectMask.g), rectMask.b), 0.0, 1.0);
     float glowPresence = clamp(max(max(glowMask.r, glowMask.g), glowMask.b), 0.0, 1.0);
-    float stripeNeighborBlend = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend) * 0.28;
-    vec3 horizontalMix = color * 0.58 + vec3(sourceLuma) * 0.42;
+    float stripeNeighborBlend = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend) * 0.34;
+    vec3 horizontalMix = mix(filteredColor, chromaSource, 0.24);
     vec3 blendedDrive = mix(channelDrive, horizontalMix, stripeNeighborBlend * darkSuppression);
     float stripeBrightCore =
       mix(0.18, 1.0, uPhosphorDotBrightCore > 0.5 ? 1.0 : 0.0) *
       smoothstep(0.42, 0.92, sourceLuma);
-    vec3 channelColor = blendedDrive * rectMask;
-    channelColor += blendedDrive * coreMask * stripeBrightCore * (0.28 + sourceLuma * 0.64);
-    vec3 sideBleedMask = vec3(gGlow + bGlow, rGlow + bGlow, rGlow + gGlow) * 0.12;
+    vec3 sideBleedMask = vec3(gGlow + bGlow, rGlow + bGlow, rGlow + gGlow) * 0.18;
+    vec3 mergedHighlightMask = max(glowMask * 0.72, sideBleedMask * 0.92);
+    vec3 mergedHighlightField =
+      mix(blendedDrive, vec3(sourceLuma), 0.34) *
+      mergedHighlightMask *
+      stripeNeighborBlend *
+      (0.08 + brightFill * 0.46) *
+      darkSuppression;
+    vec3 gapFillField =
+      mix(blendedDrive, vec3(sourceLuma), 0.18) *
+      sideBleedMask *
+      stripeBrightCore *
+      (0.04 + brightFill * 0.3) *
+      darkSuppression;
+    vec3 highlightDrive = clamp(mergedHighlightField + gapFillField, vec3(0.0), vec3(1.0));
+    float highlightLuma = max(max(highlightDrive.r, highlightDrive.g), highlightDrive.b);
+    vec3 channelColor = channelDrive * rectMask * (0.78 + sourceLuma * 0.18);
+    channelColor += blendedDrive * coreMask * (0.22 + sourceLuma * 0.28 + highlightDrive * 0.3);
+    channelColor += channelDrive * glowMask * (highlightDrive * 0.18);
     vec3 bleedColor =
       mix(vec3(sourceLuma), channelDrive, 0.24) *
-      (glowMask * (0.14 + amount * (0.24 + brightFill * 0.26)) + sideBleedMask * (1.0 + brightFill * 0.85)) *
+      (
+        glowMask * (0.14 + amount * (0.24 + brightFill * 0.26 + highlightLuma * 0.22)) +
+        sideBleedMask * (1.0 + brightFill * 0.85 + highlightLuma * 0.3)
+      ) *
       verticalTail *
       darkSuppression;
     vec3 bloomColor =
-      mix(vec3(sourceLuma), color, 0.18) *
+      mix(vec3(sourceLuma), filteredColor, 0.18) *
       bloomMask *
       sourceLuma *
       smoothstep(0.22, 0.72, sourceLuma) *
-      (0.12 + highlightBloom * (0.4 + brightFill * 0.28) + amount * (0.12 + brightFill * 0.18));
+      (0.12 + highlightBloom * (0.4 + brightFill * 0.28 + highlightLuma * 0.22) + amount * (0.12 + brightFill * 0.18));
     vec3 floorLight =
       vec3(sourceLuma) *
       (uBlackFloor * 0.006 + amount * 0.0012) *
@@ -862,7 +896,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     float emission =
       gate *
       lit *
-      (0.94 + sourceLuma * 0.3) *
+      (0.94 + sourceLuma * 0.3 + highlightLuma * 0.36) *
       darkSuppression *
       brightCoreCompensation *
       emissionJitter;

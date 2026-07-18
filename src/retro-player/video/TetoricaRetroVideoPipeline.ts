@@ -154,6 +154,10 @@ type Pass2UniformLocations = {
   uTime: WebGLUniformLocation | null;
 };
 
+type EmissionUniformLocations = {
+  uTexelSize: WebGLUniformLocation | null;
+};
+
 const PASS_THROUGH_FRAGMENT = `#version 300 es
 precision mediump float;
 
@@ -165,6 +169,47 @@ uniform sampler2D uTexture;
 void main(void)
 {
   finalColor = texture(uTexture, vTextureCoord);
+}
+`;
+
+const EMISSION_FIELD_FRAGMENT = `#version 300 es
+precision mediump float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform vec2 uTexelSize;
+
+void main(void)
+{
+  vec3 center = texture(uTexture, vTextureCoord).rgb;
+  vec3 left1 = texture(uTexture, clamp(vTextureCoord - vec2(uTexelSize.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 right1 = texture(uTexture, clamp(vTextureCoord + vec2(uTexelSize.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 left2 = texture(uTexture, clamp(vTextureCoord - vec2(uTexelSize.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 right2 = texture(uTexture, clamp(vTextureCoord + vec2(uTexelSize.x * 2.0, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 up1 = texture(uTexture, clamp(vTextureCoord - vec2(0.0, uTexelSize.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 down1 = texture(uTexture, clamp(vTextureCoord + vec2(0.0, uTexelSize.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 up2 = texture(uTexture, clamp(vTextureCoord - vec2(0.0, uTexelSize.y * 2.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 down2 = texture(uTexture, clamp(vTextureCoord + vec2(0.0, uTexelSize.y * 2.0), vec2(0.0), vec2(1.0))).rgb;
+
+  vec3 horizontalBloom =
+    center * 0.34 +
+    (left1 + right1) * 0.2 +
+    (left2 + right2) * 0.09;
+  vec3 verticalBloom =
+    center * 0.2 +
+    (up1 + down1) * 0.1 +
+    (up2 + down2) * 0.04;
+  vec3 bloom = horizontalBloom + verticalBloom;
+
+  float luma = dot(bloom, vec3(0.299, 0.587, 0.114));
+  float brightMask = smoothstep(0.08, 0.72, luma);
+  vec3 emissive = mix(center * 0.82, bloom, 0.78);
+  emissive += vec3(luma * brightMask * 0.08);
+  emissive = emissive / (vec3(1.0) + emissive * 0.34);
+
+  finalColor = vec4(clamp(emissive, 0.0, 1.0), 1.0);
 }
 `;
 
@@ -491,6 +536,7 @@ export class TetoricaRetroVideoPipeline {
   private filterPass2Program: WebGLProgram | null = null;
 
   private readonly passthroughProgram: WebGLProgram;
+  private readonly emissionProgram: WebGLProgram;
 
   private readonly texture: WebGLTexture;
   private textureSamplingFilter: number | null = null;
@@ -499,12 +545,17 @@ export class TetoricaRetroVideoPipeline {
 
   private pass1Locs: Pass1UniformLocations | null = null;
   private pass2Locs: Pass2UniformLocations | null = null;
+  private readonly emissionLocs: EmissionUniformLocations;
 
   // Framebuffer for Pass 1 output (palette-quantized frame)
   private fbo: WebGLFramebuffer | null = null;
   private fboTexture: WebGLTexture | null = null;
   private fboWidth = 0;
   private fboHeight = 0;
+  private emissionFbo: WebGLFramebuffer | null = null;
+  private emissionFboTexture: WebGLTexture | null = null;
+  private emissionFboWidth = 0;
+  private emissionFboHeight = 0;
 
   private currentSource: RetroVideoSource | null = null;
 
@@ -564,6 +615,43 @@ export class TetoricaRetroVideoPipeline {
     this.fboTexture = tex;
     this.fboWidth = width;
     this.fboHeight = height;
+    this.fboTextureSamplingFilter = gl.NEAREST;
+  }
+
+  private ensureEmissionFbo(width: number, height: number) {
+    if (
+      this.emissionFboWidth === width &&
+      this.emissionFboHeight === height &&
+      this.emissionFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.emissionFbo) gl.deleteFramebuffer(this.emissionFbo);
+    if (this.emissionFboTexture) gl.deleteTexture(this.emissionFboTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create emission FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create emission FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.emissionFbo = fbo;
+    this.emissionFboTexture = tex;
+    this.emissionFboWidth = width;
+    this.emissionFboHeight = height;
   }
 
   // Called once the background filter compilation succeeds.
@@ -590,6 +678,7 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(pass2);
     gl.uniform1i(gl.getUniformLocation(pass2, "uPass1Texture"), 0);
+    gl.uniform1i(gl.getUniformLocation(pass2, "uEmissionTexture"), 1);
     this.pass2Locs = this.buildPass2UniformLocations(pass2);
 
     // Reset time so CRT/glow animations start from t=0.
@@ -803,8 +892,14 @@ export class TetoricaRetroVideoPipeline {
 
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
-    await waitAndVerifyPrograms(gl, [passthroughProgram]);
-    const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, shouldUseWindowsLiteMode);
+    const emissionProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, EMISSION_FIELD_FRAGMENT);
+    await waitAndVerifyPrograms(gl, [passthroughProgram, emissionProgram]);
+    const pipeline = new TetoricaRetroVideoPipeline(
+      gl,
+      passthroughProgram,
+      emissionProgram,
+      shouldUseWindowsLiteMode,
+    );
 
     if (shouldUseWindowsLiteMode) {
       requestAnimationFrame(async () => {
@@ -847,10 +942,12 @@ export class TetoricaRetroVideoPipeline {
   constructor(
     gl: WebGL2RenderingContext,
     passthroughProgram: WebGLProgram,
+    emissionProgram: WebGLProgram,
     windowsLiteMode = false,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
+    this.emissionProgram = emissionProgram;
     this.windowsLiteMode = windowsLiteMode;
 
     const vertexBuffer = gl.createBuffer();
@@ -880,6 +977,11 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(this.passthroughProgram);
     gl.uniform1i(gl.getUniformLocation(this.passthroughProgram, "uTexture"), 0);
+    gl.useProgram(this.emissionProgram);
+    gl.uniform1i(gl.getUniformLocation(this.emissionProgram, "uTexture"), 0);
+    this.emissionLocs = {
+      uTexelSize: gl.getUniformLocation(this.emissionProgram, "uTexelSize"),
+    };
   }
 
   private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
@@ -1002,6 +1104,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private renderCount = 0;
+  private fboTextureSamplingFilter: number | null = null;
 
   private shouldSkipUpload(uploadSource: RetroVideoSource): boolean {
     if (isHtmlImageElement(uploadSource)) {
@@ -1018,6 +1121,12 @@ export class TetoricaRetroVideoPipeline {
     }
 
     return false;
+  }
+
+  private syncBoundTextureFilter(nextFilter: number) {
+    const { gl } = this;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
   }
 
   render() {
@@ -1087,6 +1196,20 @@ export class TetoricaRetroVideoPipeline {
       const w = gl.drawingBufferWidth;
       const h = gl.drawingBufferHeight;
       const sourceSize = getRetroVideoSourceSize(source);
+      const isCrtStripe = normalizePhosphorDotShape(filterState.phosphorDotShape) === "crt_stripe";
+      const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
+      const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
+      const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+      const {
+        width: effectiveTargetWidth,
+        height: effectiveTargetHeight,
+      } = getEffectiveRetroTargetSize(
+        filterState,
+        sourceSize.width,
+        sourceSize.height,
+        visibleWidth,
+        visibleHeight,
+      );
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
       this.ensureFbo(w, h);
@@ -1098,6 +1221,25 @@ export class TetoricaRetroVideoPipeline {
       this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+      if (isCrtStripe) {
+        this.ensureEmissionFbo(w, h);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.emissionFbo);
+        gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+        this.syncBoundTextureFilter(gl.LINEAR);
+        this.fboTextureSamplingFilter = gl.LINEAR;
+        gl.useProgram(this.emissionProgram);
+        gl.uniform2f(
+          this.emissionLocs.uTexelSize,
+          1 / Math.max(effectiveTargetWidth, 1),
+          1 / Math.max(effectiveTargetHeight, 1),
+        );
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
       // Pass 2: FBO → screen (CRT effects: curvature, scanlines, phosphor dots, vignette)
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, w, h);
@@ -1105,12 +1247,25 @@ export class TetoricaRetroVideoPipeline {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+      const pass2TextureFilter =
+        isCrtStripe ? gl.LINEAR : gl.NEAREST;
+      if (this.fboTextureSamplingFilter !== pass2TextureFilter) {
+        this.syncBoundTextureFilter(pass2TextureFilter);
+        this.fboTextureSamplingFilter = pass2TextureFilter;
+      }
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(
+        gl.TEXTURE_2D,
+        isCrtStripe ? this.emissionFboTexture : this.fboTexture,
+      );
       gl.useProgram(this.filterPass2Program);
       this.applyPass2Uniforms(filterState, sourceSize.width, sourceSize.height);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       // Restore source texture binding for next frame's upload
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
+      this.syncTextureSamplingFilter(textureFilter);
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -1155,8 +1310,11 @@ export class TetoricaRetroVideoPipeline {
       if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     }
     gl.deleteProgram(this.passthroughProgram);
+    gl.deleteProgram(this.emissionProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
+    if (this.emissionFbo) gl.deleteFramebuffer(this.emissionFbo);
+    if (this.emissionFboTexture) gl.deleteTexture(this.emissionFboTexture);
     this.currentSource = null;
     this.currentFilterState = null;
     this.lastUploadedImageSource = null;
