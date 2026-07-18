@@ -15,17 +15,11 @@ import {
 } from "./persistedRetroSettings";
 
 const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
-const CRT_STRIPE_DEFAULTS = {
-  spotMaskStrength: 0.331,
-  phosphorDotLightBalance: 2.0,
-  phosphorDotBrightCore: true,
-  phosphorDotCellFill: 0.5,
-  phosphorDotNeighborBlend: true,
-} as const;
 
 export type RetroFilterInitialState = Partial<{
   targetWidth: number;
   targetHeight: number;
+  autoTargetSize: boolean;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -45,15 +39,9 @@ export type RetroFilterInitialState = Partial<{
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
-  lumaAmount: number;
-  lumaLow: number;
-  lumaHigh: number;
-  lumaKnee: number;
-  saturationAmount: number;
-  saturationLow: number;
-  saturationHigh: number;
-  saturationKnee: number;
   outputBrightness: number;
+  basicContrast: number;
+  basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: 1 | 2 | 3;
@@ -62,7 +50,6 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -94,6 +81,7 @@ const doesPresetMatchState = (
         preset.width === state.targetWidth &&
         preset.height === state.targetHeight
       )) &&
+    (preset.autoTargetSize ?? false) === state.autoTargetSize &&
     preset.colors === state.colorLevels &&
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
@@ -111,15 +99,9 @@ const doesPresetMatchState = (
     preset.spotMask === state.spotMaskStrength &&
     preset.bulbRadius === state.bulbRadius &&
     preset.blackFloor === state.blackFloor &&
-    (preset.lumaAmount ?? 1) === state.lumaAmount &&
-    (preset.lumaLow ?? 0) === state.lumaLow &&
-    (preset.lumaHigh ?? 1) === state.lumaHigh &&
-    (preset.lumaKnee ?? 0.2) === state.lumaKnee &&
-    (preset.saturationAmount ?? 1) === state.saturationAmount &&
-    (preset.saturationLow ?? 0) === state.saturationLow &&
-    (preset.saturationHigh ?? 1) === state.saturationHigh &&
-    (preset.saturationKnee ?? 0.2) === state.saturationKnee &&
     (preset.outputBrightness ?? 1) === state.outputBrightness &&
+    (preset.basicContrast ?? 1) === state.basicContrast &&
+    (preset.basicSaturation ?? 1) === state.basicSaturation &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     normalizePhosphorDotShape(preset.phosphorDotShape ?? "circle") === state.phosphorDotShape &&
     (preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
@@ -188,6 +170,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const [baseInitialState] = useState<RetroFilterSettings>(() => ({
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
+    autoTargetSize: initialState.autoTargetSize ?? (DEFAULT_PRESET.autoTargetSize ?? false),
     matchTargetAspect: initialState.matchTargetAspect ?? true,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
@@ -207,15 +190,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
     blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
-    lumaAmount: initialState.lumaAmount ?? (DEFAULT_PRESET.lumaAmount ?? 1),
-    lumaLow: initialState.lumaLow ?? (DEFAULT_PRESET.lumaLow ?? 0),
-    lumaHigh: initialState.lumaHigh ?? (DEFAULT_PRESET.lumaHigh ?? 1),
-    lumaKnee: initialState.lumaKnee ?? (DEFAULT_PRESET.lumaKnee ?? 0.2),
-    saturationAmount: initialState.saturationAmount ?? (DEFAULT_PRESET.saturationAmount ?? 1),
-    saturationLow: initialState.saturationLow ?? (DEFAULT_PRESET.saturationLow ?? 0),
-    saturationHigh: initialState.saturationHigh ?? (DEFAULT_PRESET.saturationHigh ?? 1),
-    saturationKnee: initialState.saturationKnee ?? (DEFAULT_PRESET.saturationKnee ?? 0.2),
     outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
+    basicContrast: initialState.basicContrast ?? (DEFAULT_PRESET.basicContrast ?? 1),
+    basicSaturation: initialState.basicSaturation ?? (DEFAULT_PRESET.basicSaturation ?? 1),
     phosphorDotLightBalance:
       initialState.phosphorDotLightBalance ?? (DEFAULT_PRESET.phosphorDotLightBalance ?? 1),
     phosphorDotShape:
@@ -234,7 +211,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     phosphorDotGrainStrength:
       initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
-    closeUpNoiseStrength: initialState.closeUpNoiseStrength ?? 0,
     signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
     signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
     signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
@@ -291,6 +267,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       current.matchTargetAspect === matchTargetAspect
         ? current
         : { ...current, matchTargetAspect }
+    ));
+  }, [markPresetAsCustom]);
+
+  const setAutoTargetSize = useCallback((autoTargetSize: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.autoTargetSize === autoTargetSize
+        ? current
+        : { ...current, autoTargetSize }
     ));
   }, [markPresetAsCustom]);
 
@@ -388,49 +373,19 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => (current.blackFloor === blackFloor ? current : { ...current, blackFloor }));
   };
 
-  const setLumaAmount = (lumaAmount: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.lumaAmount === lumaAmount ? current : { ...current, lumaAmount }));
-  };
-
-  const setLumaLow = (lumaLow: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.lumaLow === lumaLow ? current : { ...current, lumaLow }));
-  };
-
-  const setLumaHigh = (lumaHigh: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.lumaHigh === lumaHigh ? current : { ...current, lumaHigh }));
-  };
-
-  const setLumaKnee = (lumaKnee: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.lumaKnee === lumaKnee ? current : { ...current, lumaKnee }));
-  };
-
-  const setSaturationAmount = (saturationAmount: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.saturationAmount === saturationAmount ? current : { ...current, saturationAmount }));
-  };
-
-  const setSaturationLow = (saturationLow: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.saturationLow === saturationLow ? current : { ...current, saturationLow }));
-  };
-
-  const setSaturationHigh = (saturationHigh: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.saturationHigh === saturationHigh ? current : { ...current, saturationHigh }));
-  };
-
-  const setSaturationKnee = (saturationKnee: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.saturationKnee === saturationKnee ? current : { ...current, saturationKnee }));
-  };
-
   const setOutputBrightness = (outputBrightness: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.outputBrightness === outputBrightness ? current : { ...current, outputBrightness }));
+  };
+
+  const setBasicContrast = (basicContrast: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (current.basicContrast === basicContrast ? current : { ...current, basicContrast }));
+  };
+
+  const setBasicSaturation = (basicSaturation: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (current.basicSaturation === basicSaturation ? current : { ...current, basicSaturation }));
   };
 
   const setPhosphorDotLightBalance = (phosphorDotLightBalance: number) => {
@@ -442,19 +397,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
 
   const setPhosphorDotShape = (phosphorDotShape: PhosphorDotShape) => {
     markPresetAsCustom();
-    setSettings((current) => {
-      if (current.phosphorDotShape === phosphorDotShape) {
-        return current;
-      }
-      if (phosphorDotShape !== "crt_stripe") {
-        return { ...current, phosphorDotShape };
-      }
-      return {
-        ...current,
-        phosphorDotShape,
-        ...CRT_STRIPE_DEFAULTS,
-      };
-    });
+    setSettings((current) => (
+      current.phosphorDotShape === phosphorDotShape
+        ? current
+        : { ...current, phosphorDotShape }
+    ));
   };
 
   const setPhosphorDotInternalScale = (phosphorDotInternalScale: 1 | 2 | 3) => {
@@ -498,11 +445,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => (
       current.phosphorDotGrainStrength === phosphorDotGrainStrength ? current : { ...current, phosphorDotGrainStrength }
     ));
-  };
-
-  const setCloseUpNoiseStrength = (closeUpNoiseStrength: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (current.closeUpNoiseStrength === closeUpNoiseStrength ? current : { ...current, closeUpNoiseStrength }));
   };
 
   const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
@@ -607,6 +549,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       ...current,
       targetWidth: presetSettings.width,
       targetHeight: presetSettings.height,
+      autoTargetSize: presetSettings.autoTargetSize ?? false,
       colorLevels: presetSettings.colors,
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
@@ -624,15 +567,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       spotMaskStrength: presetSettings.spotMask,
       bulbRadius: presetSettings.bulbRadius,
       blackFloor: presetSettings.blackFloor,
-      lumaAmount: presetSettings.lumaAmount ?? 1,
-      lumaLow: presetSettings.lumaLow ?? 0,
-      lumaHigh: presetSettings.lumaHigh ?? 1,
-      lumaKnee: presetSettings.lumaKnee ?? 0.2,
-      saturationAmount: presetSettings.saturationAmount ?? 1,
-      saturationLow: presetSettings.saturationLow ?? 0,
-      saturationHigh: presetSettings.saturationHigh ?? 1,
-      saturationKnee: presetSettings.saturationKnee ?? 0.2,
       outputBrightness: presetSettings.outputBrightness ?? 1,
+      basicContrast: presetSettings.basicContrast ?? 1,
+      basicSaturation: presetSettings.basicSaturation ?? 1,
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotShape: normalizePhosphorDotShape(presetSettings.phosphorDotShape ?? "circle"),
       phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? 1,
@@ -641,7 +578,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
-      closeUpNoiseStrength: presetSettings.closeUpNoiseStrength ?? 0,
       signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
       signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
       signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
@@ -690,6 +626,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     selectedPreset,
     setTargetWidth,
     setTargetHeight,
+    setAutoTargetSize,
     setMatchTargetAspect,
     setColorLevels,
     setDitherStrength,
@@ -709,15 +646,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSpotMaskStrength,
     setBulbRadius,
     setBlackFloor,
-    setLumaAmount,
-    setLumaLow,
-    setLumaHigh,
-    setLumaKnee,
-    setSaturationAmount,
-    setSaturationLow,
-    setSaturationHigh,
-    setSaturationKnee,
     setOutputBrightness,
+    setBasicContrast,
+    setBasicSaturation,
     setPhosphorDotLightBalance,
     setPhosphorDotShape,
     setPhosphorDotInternalScale,
@@ -726,7 +657,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
     setPhosphorDotGrainStrength,
-    setCloseUpNoiseStrength,
     setSignalInstabilityEnabled,
     setSignalInstabilityStrength,
     setSignalInstabilityFrequency,

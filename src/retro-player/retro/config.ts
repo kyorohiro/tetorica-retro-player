@@ -11,17 +11,14 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
-export type PhosphorDotShape = "circle" | "heart" | "crt_stripe";
-export type LegacyPhosphorDotShape = PhosphorDotShape | "rgb_block";
+export type PhosphorDotShape = "circle" | "heart";
+export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 
 export const normalizePhosphorDotShape = (
   shape: LegacyPhosphorDotShape | null | undefined,
 ): PhosphorDotShape => {
   if (shape === "heart") {
     return "heart";
-  }
-  if (shape === "crt_stripe" || shape === "rgb_block") {
-    return "crt_stripe";
   }
   return "circle";
 };
@@ -38,6 +35,7 @@ export const MONO_TINTS: Record<
 
 export type RetroPresetDefinition = {
   label: string;
+  autoTargetSize?: boolean;
   width: number;
   height: number;
   colors: number;
@@ -57,15 +55,9 @@ export type RetroPresetDefinition = {
   spotMask: number;
   bulbRadius: number;
   blackFloor: number;
-  lumaAmount?: number;
-  lumaLow?: number;
-  lumaHigh?: number;
-  lumaKnee?: number;
-  saturationAmount?: number;
-  saturationLow?: number;
-  saturationHigh?: number;
-  saturationKnee?: number;
   outputBrightness?: number;
+  basicContrast?: number;
+  basicSaturation?: number;
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
   phosphorDotInternalScale?: 1 | 2 | 3;
@@ -74,7 +66,6 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
-  closeUpNoiseStrength?: number;
   signalInstabilityEnabled?: boolean;
   signalInstabilityStrength?: number;
   signalInstabilityFrequency?: number;
@@ -92,6 +83,7 @@ export type RetroPresetDefinition = {
 export const RETRO_PRESETS = {
   none: {
     label: "None",
+    autoTargetSize: true,
     width: 1920,
     height: 1080,
     colors: 256,
@@ -495,38 +487,6 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
     outputBrightness: 2.1,
   },
-  crtStripe: {
-    label: "CRT Stripe",
-    featured: true,
-    width: 320,
-    height: 180,
-    colors: 32,
-    dither: 0.48,
-    smoothStrength: 0.48,
-    palette: "free",
-    curvature: 0.0,
-    scanline: 0.0,
-    scanline2: 0.015,
-    vignette: 0.16,
-    glow: 0.06,
-    phosphor: 0.0,
-    spotMask: 0.331,
-    bulbRadius: 0.0,
-    blackFloor: 0.001,
-    phosphorDotShape: "crt_stripe",
-    phosphorDotLightBalance: 0.16,
-    phosphorDotInternalScale: 2,
-    phosphorDotBrightCore: true,
-    phosphorDotCellFill: 0.5,
-    phosphorDotFlatDisc: true,
-    phosphorDotNeighborBlend: true,
-    phosphorDotGrainStrength: 0.06,
-    monoTint: "gray",
-    neonBoost: 1.0,
-    neonSaturation: 1.0,
-    neonDetail: 1.0,
-    outputBrightness: 1.0,
-  },
   crtOnly: {
     label: "CRT Only",
     width: 1280,
@@ -572,7 +532,6 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    closeUpNoiseStrength: 1.2,
     signalInstabilityEnabled: true,
     signalInstabilityStrength: 0.88,
     signalInstabilityFrequency: 0.88,
@@ -628,7 +587,6 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    closeUpNoiseStrength: 1.8,
     scanlineBrightnessFade: 0.92,
   },
   animeToon: {
@@ -680,10 +638,6 @@ export const RETRO_PRESETS = {
     focusStrength: 0.28,
     focusWidth: 0.24,
     focusHeight: 0.16,
-    saturationAmount: 0.35,
-    saturationLow: 0.0,
-    saturationHigh: 0.35,
-    saturationKnee: 0.5,
   },
 } as const satisfies Record<
   string,
@@ -733,7 +687,6 @@ export const RETRO_PRESET_CATEGORIES = {
   amberCrt: "crt",
   phosphorDotLite: "crt",
   phosphorDot: "crt",
-  crtStripe: "crt",
   crtOnly: "crt",
   crtEdge: "crt",
   warmBokeh: "crt",

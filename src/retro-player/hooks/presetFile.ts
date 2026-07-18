@@ -20,6 +20,7 @@ const FILE_VERSION = 1;
 const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 
 const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
+  autoTargetSize: DEFAULT_PRESET.autoTargetSize ?? false,
   targetWidth: DEFAULT_PRESET.width,
   targetHeight: DEFAULT_PRESET.height,
   matchTargetAspect: true,
@@ -41,15 +42,9 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   spotMaskStrength: DEFAULT_PRESET.spotMask,
   bulbRadius: DEFAULT_PRESET.bulbRadius,
   blackFloor: DEFAULT_PRESET.blackFloor,
-  lumaAmount: DEFAULT_PRESET.lumaAmount ?? 1,
-  lumaLow: DEFAULT_PRESET.lumaLow ?? 0,
-  lumaHigh: DEFAULT_PRESET.lumaHigh ?? 1,
-  lumaKnee: DEFAULT_PRESET.lumaKnee ?? 0.2,
-  saturationAmount: DEFAULT_PRESET.saturationAmount ?? 1,
-  saturationLow: DEFAULT_PRESET.saturationLow ?? 0,
-  saturationHigh: DEFAULT_PRESET.saturationHigh ?? 1,
-  saturationKnee: DEFAULT_PRESET.saturationKnee ?? 0.2,
   outputBrightness: 1,
+  basicContrast: DEFAULT_PRESET.basicContrast ?? 1,
+  basicSaturation: DEFAULT_PRESET.basicSaturation ?? 1,
   phosphorDotLightBalance: 1,
   phosphorDotShape: "circle",
   phosphorDotInternalScale: 1,
@@ -58,7 +53,6 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   phosphorDotFlatDisc: false,
   phosphorDotNeighborBlend: false,
   phosphorDotGrainStrength: 0,
-  closeUpNoiseStrength: 0,
   signalInstabilityEnabled: false,
   signalInstabilityStrength: 0.35,
   signalInstabilityFrequency: 0.3,

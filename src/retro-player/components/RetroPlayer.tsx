@@ -293,6 +293,21 @@ export function RetroPlayer({
   // docs/issues/phosphor-dot-aspect-correction.md. It's cleared as soon as
   // the user edits width/height manually or switches to another preset.
   const phosphorDotAspectActiveRef = React.useRef(false);
+  const autoTargetSizeAppliedKeyRef = React.useRef<string | null>(null);
+
+  const clampAutoTargetSize = React.useCallback((width: number, height: number) => {
+    const safeWidth = Math.max(1, Math.round(width));
+    const safeHeight = Math.max(1, Math.round(height));
+    const isPortrait = safeHeight > safeWidth;
+    const maxWidth = isPortrait ? 1080 : 1920;
+    const maxHeight = isPortrait ? 1920 : 1080;
+    const scale = Math.min(1, maxWidth / safeWidth, maxHeight / safeHeight);
+
+    return {
+      width: Math.max(1, Math.round(safeWidth * scale)),
+      height: Math.max(1, Math.round(safeHeight * scale)),
+    };
+  }, []);
 
   const syncTargetAspect = React.useCallback(() => {
     const dims = player.sourceDimensions;
@@ -435,6 +450,39 @@ export function RetroPlayer({
     filterState.targetHeight,
     filterState.setTargetWidth,
     filterState.setTargetHeight,
+  ]);
+
+  React.useEffect(() => {
+    if (!filterState.autoTargetSize) {
+      autoTargetSizeAppliedKeyRef.current = null;
+      return;
+    }
+
+    const dims = player.sourceDimensions;
+    if (!dims?.width || !dims?.height) return;
+
+    const sourceKey = `${src ?? "stream"}:${stream?.id ?? ""}:${kind}:${dims.width}x${dims.height}`;
+    if (autoTargetSizeAppliedKeyRef.current === sourceKey) return;
+    autoTargetSizeAppliedKeyRef.current = sourceKey;
+
+    const { width: nextWidth, height: nextHeight } = clampAutoTargetSize(dims.width, dims.height);
+    if (nextWidth !== filterState.targetWidth) {
+      filterState.setTargetWidth(nextWidth);
+    }
+    if (nextHeight !== filterState.targetHeight) {
+      filterState.setTargetHeight(nextHeight);
+    }
+  }, [
+    clampAutoTargetSize,
+    filterState.autoTargetSize,
+    filterState.targetHeight,
+    filterState.targetWidth,
+    filterState.setTargetHeight,
+    filterState.setTargetWidth,
+    kind,
+    player.sourceDimensions,
+    src,
+    stream?.id,
   ]);
 
   // --- Effects ---

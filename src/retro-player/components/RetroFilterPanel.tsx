@@ -84,15 +84,9 @@ type RetroFilterPanelProps = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
-  lumaAmount: number;
-  lumaLow: number;
-  lumaHigh: number;
-  lumaKnee: number;
-  saturationAmount: number;
-  saturationLow: number;
-  saturationHigh: number;
-  saturationKnee: number;
   outputBrightness: number;
+  basicContrast: number;
+  basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: 1 | 2 | 3;
@@ -101,7 +95,6 @@ type RetroFilterPanelProps = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -115,6 +108,7 @@ type RetroFilterPanelProps = {
   sourceDimensions: { width: number; height: number } | null;
   targetHeight: number;
   targetWidth: number;
+  autoTargetSize: boolean;
   matchTargetAspect: boolean;
   vignetteStrength: number;
   focusStrength: number;
@@ -137,15 +131,9 @@ type RetroFilterPanelProps = {
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
-  onSetLumaAmount: (value: number) => void;
-  onSetLumaLow: (value: number) => void;
-  onSetLumaHigh: (value: number) => void;
-  onSetLumaKnee: (value: number) => void;
-  onSetSaturationAmount: (value: number) => void;
-  onSetSaturationLow: (value: number) => void;
-  onSetSaturationHigh: (value: number) => void;
-  onSetSaturationKnee: (value: number) => void;
   onSetOutputBrightness: (value: number) => void;
+  onSetBasicContrast: (value: number) => void;
+  onSetBasicSaturation: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
   onSetPhosphorDotInternalScale: (value: 1 | 2 | 3) => void;
@@ -154,7 +142,6 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
-  onSetCloseUpNoiseStrength: (value: number) => void;
   onSetSignalInstabilityEnabled: (value: boolean) => void;
   onSetSignalInstabilityStrength: (value: number) => void;
   onSetSignalInstabilityFrequency: (value: number) => void;
@@ -166,6 +153,7 @@ type RetroFilterPanelProps = {
   onSetNeonDetail: (value: number) => void;
   onSetTargetHeight: (value: number) => void;
   onSetTargetWidth: (value: number) => void;
+  onSetAutoTargetSize: (value: boolean) => void;
   onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
   onSetFocusStrength: (value: number) => void;
@@ -191,15 +179,9 @@ export function RetroFilterPanel({
   spotMaskStrength,
   bulbRadius,
   blackFloor,
-  lumaAmount,
-  lumaLow,
-  lumaHigh,
-  lumaKnee,
-  saturationAmount,
-  saturationLow,
-  saturationHigh,
-  saturationKnee,
   outputBrightness,
+  basicContrast,
+  basicSaturation,
   phosphorDotLightBalance,
   phosphorDotShape,
   phosphorDotInternalScale,
@@ -208,7 +190,6 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
-  closeUpNoiseStrength,
   signalInstabilityEnabled,
   signalInstabilityStrength,
   signalInstabilityFrequency,
@@ -222,6 +203,7 @@ export function RetroFilterPanel({
   sourceDimensions,
   targetHeight,
   targetWidth,
+  autoTargetSize,
   matchTargetAspect,
   vignetteStrength,
   focusWidth,
@@ -243,15 +225,9 @@ export function RetroFilterPanel({
   onSetSpotMaskStrength,
   onSetBulbRadius,
   onSetBlackFloor,
-  onSetLumaAmount,
-  onSetLumaLow,
-  onSetLumaHigh,
-  onSetLumaKnee,
-  onSetSaturationAmount,
-  onSetSaturationLow,
-  onSetSaturationHigh,
-  onSetSaturationKnee,
   onSetOutputBrightness,
+  onSetBasicContrast,
+  onSetBasicSaturation,
   onSetPhosphorDotLightBalance,
   onSetPhosphorDotShape,
   onSetPhosphorDotInternalScale,
@@ -260,7 +236,6 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
-  onSetCloseUpNoiseStrength,
   onSetSignalInstabilityEnabled,
   onSetSignalInstabilityStrength,
   onSetSignalInstabilityFrequency,
@@ -272,6 +247,7 @@ export function RetroFilterPanel({
   onSetNeonDetail,
   onSetTargetHeight,
   onSetTargetWidth,
+  onSetAutoTargetSize,
   onSetMatchTargetAspect,
   onSetVignetteStrength,
   focusStrength,
@@ -339,6 +315,10 @@ export function RetroFilterPanel({
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
+          basicContrast:
+            "映像全体の明暗差を素直に広げたり弱めたりします。1.00 が標準で、下げると柔らかく、上げるとメリハリが強くなります。",
+          basicSaturation:
+            "映像全体の色の強さを一括で調整します。1.00 が標準で、下げると落ち着いた色、上げると鮮やかな色になります。",
           closeUpNoise:
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
           signalInstability:
@@ -404,6 +384,10 @@ export function RetroFilterPanel({
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
           outputBrightness:
             "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
+          basicContrast:
+            "Adjusts overall contrast in a straightforward way. 1.00 is neutral; lower values soften the image, while higher values add punch.",
+          basicSaturation:
+            "Adjusts overall color intensity across the whole image. 1.00 is neutral; lower values mute the image, higher values make it more vivid.",
           closeUpNoise:
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
           signalInstability:
@@ -426,8 +410,6 @@ export function RetroFilterPanel({
       phosphorDotFlatDisc ||
       phosphorDotNeighborBlend
     );
-  const isCrtStripeMode = phosphorDotShape === "crt_stripe";
-  const phosphorModelLabel = isCrtStripeMode ? "CRT Stripe" : "Dot phosphor";
   const signalInstabilityControlsDisabled = !signalInstabilityEnabled;
 
   const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
@@ -585,60 +567,70 @@ export function RetroFilterPanel({
           </label>
         )}
 
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-[#2c2418]">
-          <input
-            type="checkbox"
-            checked={realtimeTargetSize}
-            onChange={(ev) => setRealtimeTargetSize(ev.currentTarget.checked)}
-            className="accent-[#111014]"
-          />
-          Live update
-        </label>
-
-        <label className="block">
-          <span className="text-[#12141c]">Target width: {localTargetWidth}px</span>
-          <input
-            type="range"
-            min="1"
-            max="2560"
-            step="1"
-            value={localTargetWidth}
-            onChange={(ev) => {
-              const v = Number(ev.currentTarget.value);
-              setLocalTargetWidth(v);
-              if (realtimeTargetSize) onSetTargetWidth(v);
-            }}
-            onPointerUp={(ev) => onSetTargetWidth(Number(ev.currentTarget.value))}
-            onKeyUp={(ev) => onSetTargetWidth(Number(ev.currentTarget.value))}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-[#12141c]">Target height: {localTargetHeight}px</span>
-          <input
-            type="range"
-            min="1"
-            max="2560"
-            step="1"
-            value={localTargetHeight}
-            onChange={(ev) => {
-              const v = Number(ev.currentTarget.value);
-              setLocalTargetHeight(v);
-              if (realtimeTargetSize) onSetTargetHeight(v);
-            }}
-            onPointerUp={(ev) => onSetTargetHeight(Number(ev.currentTarget.value))}
-            onKeyUp={(ev) => onSetTargetHeight(Number(ev.currentTarget.value))}
-            className="mt-2 w-full"
-          />
-        </label>
-
         <div className="flex flex-col gap-3 rounded-lg border border-[#cac0b2] bg-[#ede8e2] px-3 py-3">
           <div className="text-[11px] leading-5 text-[#7a7268]">
             {sourceDimensions
               ? `Source aspect: ${sourceDimensions.width} x ${sourceDimensions.height}`
               : "Source aspect: unavailable for audio-only preview"}
           </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-[#2c2418]">
+            <input
+              type="checkbox"
+              checked={realtimeTargetSize}
+              onChange={(ev) => setRealtimeTargetSize(ev.currentTarget.checked)}
+              className="accent-[#111014]"
+            />
+            Live update
+          </label>
+          <label className="block">
+            <span className="text-[#12141c]">Target width: {localTargetWidth}px</span>
+            <input
+              type="range"
+              min="1"
+              max="2560"
+              step="1"
+              value={localTargetWidth}
+              disabled={autoTargetSize}
+              onChange={(ev) => {
+                const v = Number(ev.currentTarget.value);
+                setLocalTargetWidth(v);
+                if (realtimeTargetSize) onSetTargetWidth(v);
+              }}
+              onPointerUp={(ev) => onSetTargetWidth(Number(ev.currentTarget.value))}
+              onKeyUp={(ev) => onSetTargetWidth(Number(ev.currentTarget.value))}
+              className="mt-2 w-full"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[#12141c]">Target height: {localTargetHeight}px</span>
+            <input
+              type="range"
+              min="1"
+              max="2560"
+              step="1"
+              value={localTargetHeight}
+              disabled={autoTargetSize}
+              onChange={(ev) => {
+                const v = Number(ev.currentTarget.value);
+                setLocalTargetHeight(v);
+                if (realtimeTargetSize) onSetTargetHeight(v);
+              }}
+              onPointerUp={(ev) => onSetTargetHeight(Number(ev.currentTarget.value))}
+              onKeyUp={(ev) => onSetTargetHeight(Number(ev.currentTarget.value))}
+              className="mt-2 w-full"
+            />
+          </label>
+          <label className="flex min-h-11 items-center justify-between rounded-lg border border-[#000000]/35 bg-[#111014]/10 px-3 py-2 text-[#12141c]">
+            <span>Auto target size</span>
+            <input
+              type="checkbox"
+              checked={autoTargetSize}
+              onChange={(ev) => {
+                onSetAutoTargetSize(ev.currentTarget.checked);
+              }}
+              className="h-5 w-5"
+            />
+          </label>
           <label className="flex min-h-11 items-center justify-between rounded-lg border border-[#000000]/35 bg-[#111014]/10 px-3 py-2 text-[#12141c]">
             <span>Match aspect</span>
             <input
@@ -652,69 +644,128 @@ export function RetroFilterPanel({
           </label>
         </div>
 
-        <label className="block">
-          <span className="text-[#12141c]">Color levels: {colorLevels}</span>
-          <input
-            type="range"
-            min="2"
-            max="256"
-            step="1"
-            value={colorLevels}
-            onChange={(ev) => {
-              onSetColorLevels(Number(ev.currentTarget.value));
-            }}
-            disabled={
-              paletteMode === "pc98" ||
-              paletteMode === "pc98_tile" ||
-              paletteMode === "pc98_512" ||
-              paletteMode === "pc98_512_sat" ||
-              paletteMode === "pc98_4096" ||
-              paletteMode === "color32" ||
-              paletteMode === "color64"
-            }
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-[#12141c]">
-            <InfoTip
-              label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
-              text={helpText.bayerDither}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={ditherStrength}
-            onChange={(ev) => {
-              onSetDitherStrength(Number(ev.currentTarget.value));
-            }}
-            className="mt-2 w-full"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-[#12141c]">
-            <InfoTip
-              label={`Smooth: ${smoothStrength.toFixed(2)}`}
-              text={helpText.smooth}
-              helpSuffix={helpText.helpSuffix}
-            />
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={smoothStrength}
-            onChange={(ev) => onSetSmoothStrength(Number(ev.currentTarget.value))}
-            className="mt-2 w-full"
-          />
-        </label>
+        <div className="rounded-lg border border-[#000000]/30 bg-[#111014]/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
+            Color Control
+          </div>
+          <div className="flex flex-col gap-3">
+            <label className="block">
+              <span className="text-[#12141c]">Color levels: {colorLevels}</span>
+              <input
+                type="range"
+                min="2"
+                max="256"
+                step="1"
+                value={colorLevels}
+                onChange={(ev) => {
+                  onSetColorLevels(Number(ev.currentTarget.value));
+                }}
+                disabled={
+                  paletteMode === "pc98" ||
+                  paletteMode === "pc98_tile" ||
+                  paletteMode === "pc98_512" ||
+                  paletteMode === "pc98_512_sat" ||
+                  paletteMode === "pc98_4096" ||
+                  paletteMode === "color32" ||
+                  paletteMode === "color64"
+                }
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
+                  text={helpText.bayerDither}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={ditherStrength}
+                onChange={(ev) => {
+                  onSetDitherStrength(Number(ev.currentTarget.value));
+                }}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Smooth: ${smoothStrength.toFixed(2)}`}
+                  text={helpText.smooth}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={smoothStrength}
+                onChange={(ev) => onSetSmoothStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Brightness: ${outputBrightness.toFixed(2)}`}
+                  text={helpText.outputBrightness}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.4"
+                max="2.5"
+                step="0.01"
+                value={outputBrightness}
+                onChange={(ev) => onSetOutputBrightness(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Contrast: ${basicContrast.toFixed(2)}`}
+                  text={helpText.basicContrast}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={basicContrast}
+                onChange={(ev) => onSetBasicContrast(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Saturation: ${basicSaturation.toFixed(2)}`}
+                  text={helpText.basicSaturation}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={basicSaturation}
+                onChange={(ev) => onSetBasicSaturation(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+          </div>
+        </div>
 
         {paletteMode === "neon" && (
           <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-3">
@@ -884,24 +935,6 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Output brightness: ${outputBrightness.toFixed(2)}`}
-                  text={helpText.outputBrightness}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.4"
-                max="2.5"
-                step="0.01"
-                value={outputBrightness}
-                onChange={(ev) => onSetOutputBrightness(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
                   label={`Focus blur: ${focusStrength.toFixed(2)}`}
                   text={helpText.focus}
                   helpSuffix={helpText.helpSuffix}
@@ -976,24 +1009,6 @@ export function RetroFilterPanel({
                 </span>
               ) : null}
             </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Close-up noise: ${closeUpNoiseStrength.toFixed(2)}`}
-                  text={helpText.closeUpNoise}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="2"
-                step="0.01"
-                value={closeUpNoiseStrength}
-                onChange={(ev) => onSetCloseUpNoiseStrength(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
             <label className="block rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
               <span className="flex items-center justify-between gap-3 text-[#12141c]">
                 <InfoTip
@@ -1048,158 +1063,6 @@ export function RetroFilterPanel({
                   />
                 </span>
               </div>
-            </label>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-3">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#6b7688]">
-            Luma / Tone
-          </div>
-          <div className="flex flex-col gap-3">
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Luma Amount: ${lumaAmount.toFixed(2)}`}
-                  text={helpText.lumaAmount}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="2"
-                step="0.01"
-                value={lumaAmount}
-                onChange={(ev) => onSetLumaAmount(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Luma Low: ${lumaLow.toFixed(2)}`}
-                  text={helpText.lumaLow}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="0.5"
-                step="0.01"
-                value={lumaLow}
-                onChange={(ev) => onSetLumaLow(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Luma High: ${lumaHigh.toFixed(2)}`}
-                  text={helpText.lumaHigh}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.5"
-                max="1"
-                step="0.01"
-                value={lumaHigh}
-                onChange={(ev) => onSetLumaHigh(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Luma Knee: ${lumaKnee.toFixed(2)}`}
-                  text={helpText.lumaKnee}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.02"
-                max="0.5"
-                step="0.01"
-                value={lumaKnee}
-                onChange={(ev) => onSetLumaKnee(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Saturation Amount: ${saturationAmount.toFixed(2)}`}
-                  text={helpText.saturationAmount}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="2"
-                step="0.01"
-                value={saturationAmount}
-                onChange={(ev) => onSetSaturationAmount(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Saturation Low: ${saturationLow.toFixed(2)}`}
-                  text={helpText.saturationLow}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="0.5"
-                step="0.01"
-                value={saturationLow}
-                onChange={(ev) => onSetSaturationLow(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Saturation High: ${saturationHigh.toFixed(2)}`}
-                  text={helpText.saturationHigh}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.1"
-                max="1"
-                step="0.01"
-                value={saturationHigh}
-                onChange={(ev) => onSetSaturationHigh(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[#12141c]">
-                <InfoTip
-                  label={`Saturation Knee: ${saturationKnee.toFixed(2)}`}
-                  text={helpText.saturationKnee}
-                  helpSuffix={helpText.helpSuffix}
-                />
-              </span>
-              <input
-                type="range"
-                min="0.02"
-                max="1"
-                step="0.01"
-                value={saturationKnee}
-                onChange={(ev) => onSetSaturationKnee(Number(ev.currentTarget.value))}
-                className="mt-2 w-full"
-              />
             </label>
           </div>
         </div>
@@ -1282,80 +1145,14 @@ export function RetroFilterPanel({
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
           <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
-            {phosphorModelLabel} / Spot Mask
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onSetPhosphorDotShape("circle");
-              }}
-              className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                !isCrtStripeMode
-                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              Dot phosphor
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSetPhosphorDotShape("crt_stripe");
-              }}
-              className={[
-                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                isCrtStripeMode
-                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              CRT Stripe
-            </button>
+            Dot phosphor / Spot Mask
           </div>
 
           <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-2 text-[11px] leading-5 text-[#5f5649]">
-            {isCrtStripeMode
-              ? "CRT Stripe は明部で合成色を前に出し、暗部で RGB subpixel を見せる専用モードです。"
-              : "Dot phosphor は Circle / Heart の発光セルを使う phosphor 系モードです。"}
+            Dot phosphor は Circle / Heart の発光セルを使う phosphor 系モードです。
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {isCrtStripeMode ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
-                  }}
-                  className={[
-                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                    phosphorDotNeighborBlend
-                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-                  ].join(" ")}
-                >
-                  Merged highlight
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSetPhosphorDotBrightCore(!phosphorDotBrightCore);
-                  }}
-                  className={[
-                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
-                    phosphorDotBrightCore
-                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-                  ].join(" ")}
-                >
-                  Gap fill
-                </button>
-              </>
-            ) : (
-              <>
                 <button
                   type="button"
                   onClick={() => {
@@ -1426,8 +1223,6 @@ export function RetroFilterPanel({
                 >
                   Neighbor blend
                 </button>
-              </>
-            )}
             <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
               <span
                 className={[
@@ -1486,7 +1281,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`${isCrtStripeMode ? "Subpixel mask" : "Spot mask"}: ${spotMaskStrength.toFixed(3)}`}
+                label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
                 text={helpText.spotMask}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1507,7 +1302,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`${isCrtStripeMode ? "Beam bloom" : "Cell fill"}: ${phosphorDotCellFill.toFixed(3)}`}
+                label={`Cell fill: ${phosphorDotCellFill.toFixed(3)}`}
                 text={helpText.cellFill}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1528,7 +1323,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`${isCrtStripeMode ? "Stripe width" : "Bulb radius"}: ${bulbRadius.toFixed(3)}`}
+                label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
                 text={helpText.bulbRadius}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1570,7 +1365,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`${isCrtStripeMode ? "Stripe light level" : "Light level"}: ${phosphorDotLightBalance.toFixed(2)}`}
+                label={`Light level: ${phosphorDotLightBalance.toFixed(2)}`}
                 text={helpText.lightLevel}
                 helpSuffix={helpText.helpSuffix}
               />

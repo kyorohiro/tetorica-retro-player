@@ -1,6 +1,5 @@
 import {
   MONO_TINTS,
-  normalizePhosphorDotShape,
   paletteModeToUniform,
   type MonoTintMode,
   type PaletteMode,
@@ -37,15 +36,9 @@ export type RetroVideoFilterState = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
-  lumaAmount: number;
-  lumaLow: number;
-  lumaHigh: number;
-  lumaKnee: number;
-  saturationAmount: number;
-  saturationLow: number;
-  saturationHigh: number;
-  saturationKnee: number;
   outputBrightness: number;
+  basicContrast: number;
+  basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: 1 | 2 | 3;
@@ -54,7 +47,6 @@ export type RetroVideoFilterState = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -88,9 +80,6 @@ function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   if (shape === "heart") {
     return 1;
   }
-  if (normalizePhosphorDotShape(shape) === "crt_stripe") {
-    return 2;
-  }
   return 0;
 }
 
@@ -123,15 +112,9 @@ type Pass2UniformLocations = {
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
-  uLumaAmount: WebGLUniformLocation | null;
-  uLumaLow: WebGLUniformLocation | null;
-  uLumaHigh: WebGLUniformLocation | null;
-  uLumaKnee: WebGLUniformLocation | null;
-  uSaturationAmount: WebGLUniformLocation | null;
-  uSaturationLow: WebGLUniformLocation | null;
-  uSaturationHigh: WebGLUniformLocation | null;
-  uSaturationKnee: WebGLUniformLocation | null;
   uOutputBrightness: WebGLUniformLocation | null;
+  uBasicContrast: WebGLUniformLocation | null;
+  uBasicSaturation: WebGLUniformLocation | null;
   uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
@@ -142,7 +125,6 @@ type Pass2UniformLocations = {
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uPhosphorDotGrainStrength: WebGLUniformLocation | null;
-  uCloseUpNoiseStrength: WebGLUniformLocation | null;
   uSignalInstabilityAmount: WebGLUniformLocation | null;
   uSignalHorizontalSync: WebGLUniformLocation | null;
   uSignalVerticalSync: WebGLUniformLocation | null;
@@ -919,15 +901,9 @@ export class TetoricaRetroVideoPipeline {
       uSpotMaskStrength: gl.getUniformLocation(program, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(program, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(program, "uBlackFloor"),
-      uLumaAmount: gl.getUniformLocation(program, "uLumaAmount"),
-      uLumaLow: gl.getUniformLocation(program, "uLumaLow"),
-      uLumaHigh: gl.getUniformLocation(program, "uLumaHigh"),
-      uLumaKnee: gl.getUniformLocation(program, "uLumaKnee"),
-      uSaturationAmount: gl.getUniformLocation(program, "uSaturationAmount"),
-      uSaturationLow: gl.getUniformLocation(program, "uSaturationLow"),
-      uSaturationHigh: gl.getUniformLocation(program, "uSaturationHigh"),
-      uSaturationKnee: gl.getUniformLocation(program, "uSaturationKnee"),
       uOutputBrightness: gl.getUniformLocation(program, "uOutputBrightness"),
+      uBasicContrast: gl.getUniformLocation(program, "uBasicContrast"),
+      uBasicSaturation: gl.getUniformLocation(program, "uBasicSaturation"),
       uPhosphorDotLightBalance: gl.getUniformLocation(program, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(program, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
@@ -938,7 +914,6 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
       uPhosphorDotGrainStrength: gl.getUniformLocation(program, "uPhosphorDotGrainStrength"),
-      uCloseUpNoiseStrength: gl.getUniformLocation(program, "uCloseUpNoiseStrength"),
       uSignalInstabilityAmount: gl.getUniformLocation(program, "uSignalInstabilityAmount"),
       uSignalHorizontalSync: gl.getUniformLocation(program, "uSignalHorizontalSync"),
       uSignalVerticalSync: gl.getUniformLocation(program, "uSignalVerticalSync"),
@@ -1254,15 +1229,9 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.pass2Locs.uBulbRadius, filterState.bulbRadius);
     gl.uniform1f(this.pass2Locs.uBlackFloor, filterState.blackFloor);
-    gl.uniform1f(this.pass2Locs.uLumaAmount, filterState.lumaAmount);
-    gl.uniform1f(this.pass2Locs.uLumaLow, filterState.lumaLow);
-    gl.uniform1f(this.pass2Locs.uLumaHigh, filterState.lumaHigh);
-    gl.uniform1f(this.pass2Locs.uLumaKnee, filterState.lumaKnee);
-    gl.uniform1f(this.pass2Locs.uSaturationAmount, filterState.saturationAmount);
-    gl.uniform1f(this.pass2Locs.uSaturationLow, filterState.saturationLow);
-    gl.uniform1f(this.pass2Locs.uSaturationHigh, filterState.saturationHigh);
-    gl.uniform1f(this.pass2Locs.uSaturationKnee, filterState.saturationKnee);
     gl.uniform1f(this.pass2Locs.uOutputBrightness, filterState.outputBrightness);
+    gl.uniform1f(this.pass2Locs.uBasicContrast, filterState.basicContrast);
+    gl.uniform1f(this.pass2Locs.uBasicSaturation, filterState.basicSaturation);
     gl.uniform1f(this.pass2Locs.uPhosphorDotLightBalance, filterState.phosphorDotLightBalance);
     gl.uniform1f(
       this.pass2Locs.uPixelAspect,
@@ -1280,7 +1249,6 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotGrainStrength, filterState.phosphorDotGrainStrength);
-    gl.uniform1f(this.pass2Locs.uCloseUpNoiseStrength, filterState.closeUpNoiseStrength);
     const signalTimeSec = (nowMs() - this.startedAt) / 1000;
     const signalState = this.signalInstabilityController.update(signalTimeSec, {
       enabled: filterState.signalInstabilityEnabled,

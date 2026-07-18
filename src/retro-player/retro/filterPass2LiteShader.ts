@@ -13,6 +13,8 @@ uniform float uScanline2Strength;
 uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uOutputBrightness;
+uniform float uBasicContrast;
+uniform float uBasicSaturation;
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
 uniform float uSignalVerticalSync;
@@ -154,6 +156,16 @@ vec3 sampleFocusBlur(vec2 uv, float blurRadius)
   return accum / max(totalWeight, 0.0001);
 }
 
+vec3 applyBasicColorControls(vec3 color)
+{
+  float saturation = max(uBasicSaturation, 0.0);
+  float contrast = max(uBasicContrast, 0.0);
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  vec3 saturated = mix(vec3(luma), color, saturation);
+  vec3 contrasted = (saturated - 0.5) * contrast + 0.5;
+  return clamp(contrasted, 0.0, 1.0);
+}
+
 void main(void)
 {
   vec2 curvedUv = curveUv(vTextureCoord, uCurvature);
@@ -196,6 +208,7 @@ void main(void)
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
+  color.rgb = applyBasicColorControls(color.rgb);
 
   finalColor = vec4(clamp(color.rgb * uOutputBrightness, 0.0, 1.0), 1.0);
 }

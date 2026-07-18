@@ -363,15 +363,9 @@ export function RetroControlPanel({
               spotMaskStrength={filterState.spotMaskStrength}
               bulbRadius={filterState.bulbRadius}
               blackFloor={filterState.blackFloor}
-              lumaAmount={filterState.lumaAmount}
-              lumaLow={filterState.lumaLow}
-              lumaHigh={filterState.lumaHigh}
-              lumaKnee={filterState.lumaKnee}
-              saturationAmount={filterState.saturationAmount}
-              saturationLow={filterState.saturationLow}
-              saturationHigh={filterState.saturationHigh}
-              saturationKnee={filterState.saturationKnee}
               outputBrightness={filterState.outputBrightness}
+              basicContrast={filterState.basicContrast}
+              basicSaturation={filterState.basicSaturation}
               phosphorDotLightBalance={filterState.phosphorDotLightBalance}
               phosphorDotShape={filterState.phosphorDotShape}
               phosphorDotInternalScale={filterState.phosphorDotInternalScale}
@@ -380,7 +374,6 @@ export function RetroControlPanel({
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
               phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
               phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
-              closeUpNoiseStrength={filterState.closeUpNoiseStrength}
               signalInstabilityEnabled={filterState.signalInstabilityEnabled}
               signalInstabilityStrength={filterState.signalInstabilityStrength}
               signalInstabilityFrequency={filterState.signalInstabilityFrequency}
@@ -391,6 +384,7 @@ export function RetroControlPanel({
               sourceDimensions={player.sourceDimensions}
               targetHeight={filterState.targetHeight}
               targetWidth={filterState.targetWidth}
+              autoTargetSize={filterState.autoTargetSize}
               matchTargetAspect={filterState.matchTargetAspect}
               vignetteStrength={filterState.vignetteStrength}
               focusStrength={filterState.focusStrength}
@@ -416,15 +410,9 @@ export function RetroControlPanel({
               onSetSpotMaskStrength={filterState.setSpotMaskStrength}
               onSetBulbRadius={filterState.setBulbRadius}
               onSetBlackFloor={filterState.setBlackFloor}
-              onSetLumaAmount={filterState.setLumaAmount}
-              onSetLumaLow={filterState.setLumaLow}
-              onSetLumaHigh={filterState.setLumaHigh}
-              onSetLumaKnee={filterState.setLumaKnee}
-              onSetSaturationAmount={filterState.setSaturationAmount}
-              onSetSaturationLow={filterState.setSaturationLow}
-              onSetSaturationHigh={filterState.setSaturationHigh}
-              onSetSaturationKnee={filterState.setSaturationKnee}
               onSetOutputBrightness={filterState.setOutputBrightness}
+              onSetBasicContrast={filterState.setBasicContrast}
+              onSetBasicSaturation={filterState.setBasicSaturation}
               onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
               onSetPhosphorDotShape={filterState.setPhosphorDotShape}
               onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
@@ -433,7 +421,6 @@ export function RetroControlPanel({
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
               onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
               onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
-              onSetCloseUpNoiseStrength={filterState.setCloseUpNoiseStrength}
               onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
               onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}
               onSetSignalInstabilityFrequency={filterState.setSignalInstabilityFrequency}
@@ -442,6 +429,7 @@ export function RetroControlPanel({
               onSetScanline2Strength={filterState.setScanline2Strength}
               onSetTargetHeight={onSetTargetHeight}
               onSetTargetWidth={onSetTargetWidth}
+              onSetAutoTargetSize={filterState.setAutoTargetSize}
               onSetMatchTargetAspect={onSetMatchTargetAspect}
               onSetVignetteStrength={filterState.setVignetteStrength}
               onSetFocusStrength={filterState.setFocusStrength}

@@ -12,6 +12,7 @@ const RECENT_LAUNCH_STORAGE_KEY = "tetorica-retro-player.recentLaunch";
 const STORAGE_VERSION = 1;
 
 export type PersistedRetroFilterSettings = {
+  autoTargetSize: boolean;
   targetWidth: number;
   targetHeight: number;
   matchTargetAspect: boolean;
@@ -33,15 +34,9 @@ export type PersistedRetroFilterSettings = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
-  lumaAmount: number;
-  lumaLow: number;
-  lumaHigh: number;
-  lumaKnee: number;
-  saturationAmount: number;
-  saturationLow: number;
-  saturationHigh: number;
-  saturationKnee: number;
   outputBrightness: number;
+  basicContrast: number;
+  basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: 1 | 2 | 3;
@@ -50,7 +45,6 @@ export type PersistedRetroFilterSettings = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  closeUpNoiseStrength: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
