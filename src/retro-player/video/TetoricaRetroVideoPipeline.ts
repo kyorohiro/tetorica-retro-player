@@ -7,6 +7,7 @@ import {
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "../retro/filterPass2BeamLiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
 import { createSignalInstabilityController } from "./signalInstability";
@@ -77,6 +78,9 @@ function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   if (shape === "heart") {
     return 1;
   }
+  if (shape === "beam") {
+    return 2;
+  }
   return 0;
 }
 
@@ -99,6 +103,7 @@ type Pass1UniformLocations = {
 
 type Pass2UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
+  uBeamSourceSize: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
   uScanlineStrength: WebGLUniformLocation | null;
   uScanline2Strength: WebGLUniformLocation | null;
@@ -176,7 +181,7 @@ const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
 type WindowsLitePass1Variant = "basic" | "pc98";
-type WindowsLitePass2Variant = "basic" | "phosphor";
+type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
 // Only 4 combinations exist. Compiling each at most once (cached) and
@@ -185,8 +190,10 @@ type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Varia
 // time a user switches to a variant mid-playback (e.g. enabling phosphor).
 const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
   "basic:basic",
+  "basic:beam",
   "basic:phosphor",
   "pc98:basic",
+  "pc98:beam",
   "pc98:phosphor",
 ];
 
@@ -202,6 +209,9 @@ const getWindowsLiteVariantKey = (
 ): WindowsLiteVariantKey => {
   const pass1: WindowsLitePass1Variant =
     filterState && isPc98PaletteMode(filterState.paletteMode) ? "pc98" : "basic";
+  if (filterState && isBeamCrossModeEnabled(filterState)) {
+    return `${pass1}:beam`;
+  }
   const pass2: WindowsLitePass2Variant =
     filterState &&
     (
@@ -254,6 +264,7 @@ export const getRetroVideoSourceSize = (source: RetroVideoSource) => ({
 });
 
 export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
+  filterState.phosphorDotShape !== "beam" &&
   filterState.spotMaskStrength > 0.001 &&
   (
     filterState.phosphorDotInternalScale > 1 ||
@@ -263,8 +274,13 @@ export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
     filterState.phosphorDotNeighborBlend
   );
 
+export const isBeamCrossModeEnabled = (filterState: RetroVideoFilterState) =>
+  filterState.phosphorDotShape === "beam";
+
 const getPhosphorDotInternalScale = (filterState: RetroVideoFilterState) =>
-  isPhosphorDotModeEnabled(filterState) ? filterState.phosphorDotInternalScale : 1;
+  isPhosphorDotModeEnabled(filterState) || isBeamCrossModeEnabled(filterState)
+    ? filterState.phosphorDotInternalScale
+    : 1;
 
 const getAspectCorrectedSize = (
   requestedWidth: number,
@@ -309,7 +325,7 @@ const getPhosphorDotViewportLimitedSize = (
   visibleHeight?: number,
 ) => {
   if (
-    !isPhosphorDotModeEnabled(filterState) ||
+    (!isPhosphorDotModeEnabled(filterState) && !isBeamCrossModeEnabled(filterState)) ||
     visibleWidth === undefined ||
     visibleHeight === undefined ||
     visibleWidth <= 0 ||
@@ -372,7 +388,8 @@ export const getEffectiveRetroTargetSize = (
     sampleWidth: Math.max(1, Math.round(scaledWidth)),
     sampleHeight: Math.max(1, Math.round(scaledHeight)),
     internalScale,
-    isPhosphorDotMode: isPhosphorDotModeEnabled(filterState),
+    isPhosphorDotMode:
+      isPhosphorDotModeEnabled(filterState) || isBeamCrossModeEnabled(filterState),
   };
 };
 
@@ -486,6 +503,7 @@ export class TetoricaRetroVideoPipeline {
   private fboTexture: WebGLTexture | null = null;
   private fboWidth = 0;
   private fboHeight = 0;
+  private fboTextureSamplingFilter: number | null = null;
 
   private currentSource: RetroVideoSource | null = null;
 
@@ -546,6 +564,19 @@ export class TetoricaRetroVideoPipeline {
     this.fboTexture = tex;
     this.fboWidth = width;
     this.fboHeight = height;
+    this.fboTextureSamplingFilter = gl.NEAREST;
+  }
+
+  private syncFboTextureSamplingFilter(nextFilter: number) {
+    if (!this.fboTexture || this.fboTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.fboTextureSamplingFilter = nextFilter;
   }
 
   // Called once the background filter compilation succeeds.
@@ -572,6 +603,7 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(pass2);
     gl.uniform1i(gl.getUniformLocation(pass2, "uPass1Texture"), 0);
+    gl.uniform1i(gl.getUniformLocation(pass2, "uSourceTexture"), 1);
     this.pass2Locs = this.buildPass2UniformLocations(pass2);
 
     // Reset time so CRT/glow animations start from t=0.
@@ -590,9 +622,11 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
           : FILTER_FRAGMENT_PASS1_LITE,
       pass2:
-        pass2Variant === "phosphor"
-          ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
-          : FILTER_FRAGMENT_PASS2_LITE,
+        pass2Variant === "beam"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE
+          : pass2Variant === "phosphor"
+            ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
+            : FILTER_FRAGMENT_PASS2_LITE,
     };
   }
 
@@ -855,6 +889,7 @@ export class TetoricaRetroVideoPipeline {
     const { gl } = this;
     return {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
+      uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
       uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
@@ -1050,14 +1085,25 @@ export class TetoricaRetroVideoPipeline {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      const isBeamVariant = this.windowsLiteVariantKey?.endsWith(":beam") ?? false;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+      const pass2TextureFilter =
+        isBeamVariant ? gl.LINEAR : gl.NEAREST;
+      this.syncFboTextureSamplingFilter(pass2TextureFilter);
+      if (isBeamVariant) {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.syncTextureSamplingFilter(gl.LINEAR);
+      }
       gl.useProgram(this.filterPass2Program);
       this.applyPass2Uniforms(filterState, sourceSize.width, sourceSize.height);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       // Restore source texture binding for next frame's upload
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
+      this.syncTextureSamplingFilter(textureFilter);
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -1183,6 +1229,11 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(this.filterPass2Program);
     gl.uniform2f(this.pass2Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
+    gl.uniform2f(
+      this.pass2Locs.uBeamSourceSize,
+      Math.max(sourceWidth ?? effectiveTargetWidth, 1),
+      Math.max(sourceHeight ?? effectiveTargetHeight, 1),
+    );
     gl.uniform1f(this.pass2Locs.uCurvature, filterState.curvature);
     gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
@@ -1202,7 +1253,10 @@ export class TetoricaRetroVideoPipeline {
       (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
         (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
     );
-    gl.uniform1f(this.pass2Locs.uPhosphorDotMode, isPhosphorDotMode ? 1 : 0);
+    gl.uniform1f(
+      this.pass2Locs.uPhosphorDotMode,
+      isPhosphorDotMode || isBeamCrossModeEnabled(filterState) ? 1 : 0,
+    );
     gl.uniform1f(
       this.pass2Locs.uPhosphorDotShape,
       getPhosphorDotShapeValue(filterState.phosphorDotShape),

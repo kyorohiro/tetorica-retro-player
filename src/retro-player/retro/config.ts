@@ -11,7 +11,7 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
-export type PhosphorDotShape = "circle" | "heart";
+export type PhosphorDotShape = "circle" | "heart" | "beam";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 
 export const normalizePhosphorDotShape = (
@@ -19,6 +19,9 @@ export const normalizePhosphorDotShape = (
 ): PhosphorDotShape => {
   if (shape === "heart") {
     return "heart";
+  }
+  if (shape === "beam") {
+    return "beam";
   }
   return "circle";
 };

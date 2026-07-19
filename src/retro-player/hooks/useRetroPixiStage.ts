@@ -12,6 +12,7 @@ import {
   TetoricaRetroVideoPipeline,
   getEffectiveRetroTargetSize,
   getRetroVideoSourceSize,
+  isBeamCrossModeEnabled,
   isPhosphorDotModeEnabled,
   type RetroVideoFilterState,
 } from "../video/TetoricaRetroVideoPipeline";
@@ -357,7 +358,9 @@ export function useRetroPixiStage({
       1,
       Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, effectiveRenderResolutionScale)),
     );
-    const shouldUseLogicalBufferUpscale = isPhosphorDotModeEnabled(currentFilterState);
+    const shouldUseLogicalBufferUpscale =
+      isPhosphorDotModeEnabled(currentFilterState) ||
+      isBeamCrossModeEnabled(currentFilterState);
     const rawNextWidth = currentFilterState.isFilterEnabled
       ? (
         shouldUseLogicalBufferUpscale

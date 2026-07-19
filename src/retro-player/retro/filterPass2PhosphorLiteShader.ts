@@ -186,7 +186,10 @@ vec3 applyBasicColorControls(vec3 color)
 vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
 {
   if (amount <= 0.0) {
-    return color;
+    bool useBeamShapeEarly = uPhosphorDotShape > 1.5;
+    if (!useBeamShapeEarly) {
+      return color;
+    }
   }
 
   float brightness = max(max(color.r, color.g), color.b);
@@ -227,7 +230,96 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float haloRadius =
     dotRadius +
     mix(0.028, 0.12 + highlightBloom * 0.08, brightness) * brightCoreHaloBoost;
-  bool useHeartShape = uPhosphorDotShape > 0.5;
+  bool useBeamShape = uPhosphorDotShape > 1.5;
+  bool useHeartShape = uPhosphorDotShape > 0.5 && uPhosphorDotShape < 1.5;
+  if (useBeamShape) {
+    float beamAmount = max(amount, 0.68);
+    float beamLightLevel = 1.42;
+    float beamDotRadius = mix(0.16, 0.34, radiusBias) * radiusJitter;
+    float beamHaloRadius = beamDotRadius + mix(0.08, 0.24, brightness);
+    float beamEdge = 0.012 + highlightBloom * 0.006;
+    float beamBarHalfWidth = beamDotRadius * (0.18 + brightness * 0.03);
+    float beamBarHalfHeight = beamDotRadius * (0.96 + brightness * 0.14 + highlightBloom * 0.1);
+    float beamHorizontalHalfWidth = beamHaloRadius * (2.85 + brightness * 0.9 + highlightBloom * 0.7);
+    float beamHorizontalHalfHeight = beamDotRadius * (0.14 + brightness * 0.03);
+    float beamVerticalCoreX = dotUv.x / max(beamDotRadius * 0.18, 0.0001);
+    float beamVerticalCoreY = dotUv.y / max(beamDotRadius * 0.76, 0.0001);
+    float beamHorizontalX = dotUv.x / max(beamHorizontalHalfWidth, 0.0001);
+    float beamHorizontalY = dotUv.y / max(beamHorizontalHalfHeight, 0.0001);
+    float beamVerticalGlowX = dotUv.x / max(beamDotRadius * 0.34, 0.0001);
+    float beamVerticalGlowY = dotUv.y / max(beamHaloRadius * 1.06, 0.0001);
+    float beamCrossHaloX = dotUv.x / max(beamHaloRadius * 0.92, 0.0001);
+    float beamCrossHaloY = dotUv.y / max(beamHaloRadius * 0.92, 0.0001);
+
+    float verticalBar =
+      (1.0 - smoothstep(beamBarHalfWidth, beamBarHalfWidth + beamEdge, abs(dotUv.x))) *
+      (1.0 - smoothstep(beamBarHalfHeight, beamBarHalfHeight + beamEdge, abs(dotUv.y)));
+    float verticalCore =
+      exp(
+        -(
+          beamVerticalCoreX * beamVerticalCoreX +
+          beamVerticalCoreY * beamVerticalCoreY
+        )
+      );
+    float horizontalBeam =
+      exp(
+        -(
+          beamHorizontalX * beamHorizontalX +
+          beamHorizontalY * beamHorizontalY
+        )
+      );
+    float verticalGlow =
+      exp(
+        -(
+          beamVerticalGlowX * beamVerticalGlowX +
+          beamVerticalGlowY * beamVerticalGlowY
+        )
+      );
+    float crossHalo =
+      exp(
+        -(
+          beamCrossHaloX * beamCrossHaloX +
+          beamCrossHaloY * beamCrossHaloY
+        )
+      );
+
+    float beamEmission =
+      gate *
+      lit *
+      beamAmount *
+      (
+        verticalCore * mix(
+          1.0 + brightness * 0.56 + highlightBloom * 0.16,
+          1.18 + brightness * 0.74 + highlightBloom * 0.22,
+          0.0
+        ) +
+        verticalBar * (0.1 + brightness * 0.08) +
+        horizontalBeam * (0.58 + brightness * 0.68 + highlightBloom * 0.4) +
+        verticalGlow * (0.04 + brightness * 0.05) +
+        crossHalo * crossHalo * (0.03 + brightness * 0.04 + highlightBloom * 0.05)
+      ) *
+      emissionJitter;
+    float beamFloor =
+      gate *
+      lit *
+      beamAmount *
+      ((0.01 + verticalGlow * 0.02 + crossHalo * 0.01)) *
+      (1.0 + cellJitter * 0.02);
+    float beamCellFill =
+      gate *
+      lit *
+      beamAmount *
+      (0.06 + brightness * 0.06) *
+      verticalBar;
+    float whiteMix = smoothstep(0.78, 1.0, luminance) * (1.0 - smoothstep(0.08, 0.36, saturation));
+    float flareCore = verticalCore * (0.24 + highlightBloom * 0.28) + horizontalBeam * (0.34 + highlightBloom * 0.42);
+    vec3 beamColor = color * beamEmission;
+    beamColor += color * beamCellFill;
+    beamColor += color * beamFloor;
+    beamColor += vec3(1.0) * flareCore * whiteMix * beamAmount * (0.38 + highlightBloom * 0.42);
+    return beamColor * beamLightLevel;
+  }
+
   if (useHeartShape) {
     vec2 heartUv = dotUv / max(dotRadius, 0.0001);
     heartUv.x *= 1.02;

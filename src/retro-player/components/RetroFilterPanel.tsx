@@ -396,6 +396,7 @@ export function RetroFilterPanel({
             "Sets how tall the sharp center stays vertically. Lower values make the top and bottom blur sooner; higher values preserve a taller in-focus band.",
         };
   const isPhosphorDotModeActive =
+    phosphorDotShape !== "beam" &&
     spotMaskStrength > 0.001 &&
     (
       phosphorDotInternalScale > 1 ||
@@ -404,6 +405,7 @@ export function RetroFilterPanel({
       phosphorDotFlatDisc ||
       phosphorDotNeighborBlend
     );
+  const isBeamCrossModeActive = phosphorDotShape === "beam";
   const signalInstabilityControlsDisabled = !signalInstabilityEnabled;
 
   const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
@@ -1322,6 +1324,49 @@ export function RetroFilterPanel({
               className="mt-2 w-full"
             />
           </label>
+        </div>
+
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
+            Beam Cross
+          </div>
+
+          <div className="rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-2 text-[11px] leading-5 text-[#5f5649]">
+            打たれた pixel を光源として扱い、横 beam と縦 flare を合成する別モードです。
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotShape("beam");
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                isBeamCrossModeActive
+                  ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Beam Cross: On
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (phosphorDotShape === "beam") {
+                  onSetPhosphorDotShape("circle");
+                }
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                !isBeamCrossModeActive
+                  ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Beam Cross: Off
+            </button>
+          </div>
         </div>
 
       </div>
