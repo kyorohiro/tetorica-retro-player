@@ -1,5 +1,6 @@
 import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
 import { FILTER_FRAGMENT_PASS2_LITE } from "./shared/filterPass2LiteShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "./shared/filterPass2BeamLiteShader.js";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "./shared/filterPass1Pc98LiteShader.js";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "./shared/filterPass2PhosphorLiteShader.js";
 import {
@@ -86,7 +87,9 @@ function getWindowsLiteShaderSources(settings) {
   const pass1 = isPc98PaletteMode(settings.paletteMode)
     ? FILTER_FRAGMENT_PASS1_PC98_LITE
     : FILTER_FRAGMENT_PASS1_LITE;
-  const pass2 =
+  const pass2 = settings.phosphorDotShape === "beam"
+    ? FILTER_FRAGMENT_PASS2_BEAM_LITE
+    :
     settings.phosphorStrength > 0.001
     || settings.spotMaskStrength > 0.001
     || settings.phosphorDotMode
