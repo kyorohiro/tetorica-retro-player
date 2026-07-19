@@ -653,7 +653,7 @@ export function useRetroPixiStage({
     const scheduleStableHostRefresh = (observed: { width: number; height: number }) => {
       const changed = commitHostSizeIfChanged(observed);
       if (changed) {
-        refreshLayout();
+        scheduleRefreshLayout();
       }
       pendingObservedHostSizeRef.current = observed;
       if (resizeValidationFrameRef.current !== null) {
@@ -668,10 +668,9 @@ export function useRetroPixiStage({
           return;
         }
         if (commitHostSizeIfChanged(settled)) {
-          refreshLayout();
+          scheduleRefreshLayout();
           return;
         }
-        scheduleRefreshLayout();
       });
     };
 
@@ -710,7 +709,7 @@ export function useRetroPixiStage({
       }
       window.removeEventListener("resize", handleResize);
     };
-  }, [refreshLayout, scheduleRefreshLayout]);
+  }, [scheduleRefreshLayout]);
 
   return {
     canvasHostRef,

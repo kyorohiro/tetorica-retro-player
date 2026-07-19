@@ -629,7 +629,7 @@ export function RetroPreviewView({
   React.useEffect(() => {
     scheduleRefreshLayout();
     const shouldHoldRefresh =
-      ((isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized) || isPreviewMaximized;
+      (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
     if (!shouldHoldRefresh) {
       return;
     }
