@@ -99,9 +99,6 @@ type RetroFilterPanelProps = {
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -150,9 +147,6 @@ type RetroFilterPanelProps = {
   onSetBeamHorizontalSpread: (value: number) => void;
   onSetBeamStripeStrength: (value: number) => void;
   onSetBeamWhiteBloom: (value: number) => void;
-  onSetSignalInstabilityEnabled: (value: boolean) => void;
-  onSetSignalInstabilityStrength: (value: number) => void;
-  onSetSignalInstabilityFrequency: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -202,9 +196,6 @@ export function RetroFilterPanel({
   beamHorizontalSpread,
   beamStripeStrength,
   beamWhiteBloom,
-  signalInstabilityEnabled,
-  signalInstabilityStrength,
-  signalInstabilityFrequency,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -250,9 +241,6 @@ export function RetroFilterPanel({
   onSetBeamHorizontalSpread,
   onSetBeamStripeStrength,
   onSetBeamWhiteBloom,
-  onSetSignalInstabilityEnabled,
-  onSetSignalInstabilityStrength,
-  onSetSignalInstabilityFrequency,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -438,8 +426,6 @@ export function RetroFilterPanel({
       phosphorDotNeighborBlend
     );
   const isBeamCrossModeActive = phosphorDotShape === "beam";
-  const signalInstabilityControlsDisabled = !signalInstabilityEnabled;
-
   const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
     "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
     isSelected
@@ -982,61 +968,6 @@ export function RetroFilterPanel({
                   Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
                 </span>
               ) : null}
-            </label>
-            <label className="block rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
-              <span className="flex items-center justify-between gap-3 text-[#12141c]">
-                <InfoTip
-                  label="Signal Instability"
-                  text={helpText.signalInstability}
-                  helpSuffix={helpText.helpSuffix}
-                />
-                <input
-                  type="checkbox"
-                  checked={signalInstabilityEnabled}
-                  onChange={(ev) => onSetSignalInstabilityEnabled(ev.currentTarget.checked)}
-                  className="h-4 w-4 rounded border-[#8a7f72] text-[#12141c]"
-                />
-              </span>
-              <div className="mt-3 flex flex-col gap-3">
-                <span className={signalInstabilityControlsDisabled ? "opacity-60" : ""}>
-                  <span className="text-[#12141c]">
-                    <InfoTip
-                      label={`Instability strength: ${signalInstabilityStrength.toFixed(2)}`}
-                      text={helpText.signalInstability}
-                      helpSuffix={helpText.helpSuffix}
-                    />
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={signalInstabilityStrength}
-                    onChange={(ev) => onSetSignalInstabilityStrength(Number(ev.currentTarget.value))}
-                    disabled={signalInstabilityControlsDisabled}
-                    className="mt-2 w-full"
-                  />
-                </span>
-                <span className={signalInstabilityControlsDisabled ? "opacity-60" : ""}>
-                  <span className="text-[#12141c]">
-                    <InfoTip
-                      label={`Instability frequency: ${signalInstabilityFrequency.toFixed(2)}`}
-                      text={helpText.signalInstabilityFrequency}
-                      helpSuffix={helpText.helpSuffix}
-                    />
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={signalInstabilityFrequency}
-                    onChange={(ev) => onSetSignalInstabilityFrequency(Number(ev.currentTarget.value))}
-                    disabled={signalInstabilityControlsDisabled}
-                    className="mt-2 w-full"
-                  />
-                </span>
-              </div>
             </label>
           </div>
         </div>

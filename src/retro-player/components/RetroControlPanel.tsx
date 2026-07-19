@@ -365,9 +365,6 @@ export function RetroControlPanel({
               beamHorizontalSpread={filterState.beamHorizontalSpread}
               beamStripeStrength={filterState.beamStripeStrength}
               beamWhiteBloom={filterState.beamWhiteBloom}
-              signalInstabilityEnabled={filterState.signalInstabilityEnabled}
-              signalInstabilityStrength={filterState.signalInstabilityStrength}
-              signalInstabilityFrequency={filterState.signalInstabilityFrequency}
               scanlineBrightnessFade={filterState.scanlineBrightnessFade}
               scanlineStrength={filterState.scanlineStrength}
               scanline2Strength={filterState.scanline2Strength}
@@ -416,9 +413,6 @@ export function RetroControlPanel({
               onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
               onSetBeamStripeStrength={filterState.setBeamStripeStrength}
               onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
-              onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
-              onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}
-              onSetSignalInstabilityFrequency={filterState.setSignalInstabilityFrequency}
               onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
               onSetScanlineStrength={filterState.setScanlineStrength}
               onSetScanline2Strength={filterState.setScanline2Strength}

@@ -106,6 +106,7 @@ export type PersistedRetroUiSettings = {
   isPreviewMaximized: boolean;
   isHighResolution: boolean;
   renderResolutionPreset?: number;
+  maximizePerformanceMode?: "auto" | "on" | "off";
   brightness: number;
   flipH: boolean;
   flipV: boolean;
@@ -165,6 +166,16 @@ const normalizePersistedRetroSettings = (
         audioOptimizationMode: audio.audioOptimizationMode === "auto" ? "auto" : "auto",
       }
       : audio,
+    ui: settings.ui
+      ? {
+        ...settings.ui,
+        maximizePerformanceMode:
+          settings.ui.maximizePerformanceMode === "on" ||
+          settings.ui.maximizePerformanceMode === "off"
+            ? settings.ui.maximizePerformanceMode
+            : "auto",
+      }
+      : settings.ui,
   };
 };
 
