@@ -37,6 +37,70 @@ uniform float uTime;
 
 const float PI = 3.141592653589793;
 
+/*
+ * Beam tuning
+ *
+ * Keep these values together so we can tune the beam look without hunting
+ * through the kernel math.
+ */
+const float BEAM_GATE_LOW = 0.0;
+const float BEAM_GATE_HIGH = 0.03;
+
+const float BEAM_CORE_SIGMA_X = 0.26;
+const float BEAM_CORE_SIGMA_Y = 0.24;
+
+const float BEAM_FLARE_SIGMA_X = 1.35;
+const float BEAM_FLARE_SIGMA_Y = 0.30;
+
+const float BEAM_LEAK_SIGMA_X = 0.34;
+const float BEAM_LEAK_SIGMA_Y = 0.88;
+
+const float BEAM_HALO_SIGMA_X = 1.58;
+const float BEAM_HALO_SIGMA_Y = 1.08;
+
+const float BEAM_BRIDGE_SIGMA_X = 0.72;
+const float BEAM_BRIDGE_SIGMA_Y = 0.52;
+
+const float BEAM_AURA_SIGMA_X = 1.95;
+const float BEAM_AURA_SIGMA_Y = 1.42;
+
+const float BEAM_SPARKLE_SIGMA_X = 0.14;
+const float BEAM_SPARKLE_SIGMA_Y = 0.14;
+
+const float BEAM_EXTENT_X_OUTER = 3.5;
+const float BEAM_EXTENT_X_INNER = 2.6;
+const float BEAM_EXTENT_Y_OUTER = 2.4;
+const float BEAM_EXTENT_Y_INNER = 1.55;
+
+const float BEAM_CORE_GAIN = 0.82;
+const float BEAM_FLARE_GAIN = 0.48;
+const float BEAM_LEAK_GAIN = 0.18;
+const float BEAM_HALO_GAIN = 0.24;
+const float BEAM_BRIDGE_GAIN = 0.42;
+const float BEAM_AURA_GAIN = 0.10;
+
+const float BEAM_SOFT_FIELD_THRESHOLD_LOW = 0.02;
+const float BEAM_SOFT_FIELD_THRESHOLD_HIGH = 0.18;
+const float BEAM_SOFT_FIELD_GAIN = 0.07;
+
+const float BEAM_HIGHLIGHT_THRESHOLD_LOW = 0.025;
+const float BEAM_HIGHLIGHT_THRESHOLD_HIGH = 0.11;
+const float BEAM_HIGHLIGHT_LUMA_GAIN = 0.68;
+
+const float BEAM_BASE_TONE = 0.38;
+const float BEAM_BASE_HIGHLIGHT_GAIN = 0.08;
+const float BEAM_WHITE_CORE_BASE = 0.08;
+const float BEAM_WHITE_CORE_LUMA_GAIN = 0.20;
+
+const float BEAM_SOFT_SAMPLE_OFFSET_X = 0.18;
+const float BEAM_SOFT_SAMPLE_OFFSET_Y = 0.16;
+const float BEAM_SOFT_CENTER_WEIGHT = 0.72;
+const float BEAM_SOFT_HORIZONTAL_WEIGHT = 0.09;
+const float BEAM_SOFT_VERTICAL_WEIGHT = 0.05;
+
+const float BEAM_SOFT_BLEND = 0.28;
+const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.42;
+
 
 /*
  * CRT curvature
@@ -659,8 +723,8 @@ vec3 applyBeamCross(vec2 gridUv)
       );
 
       float sampleGate = smoothstep(
-        0.0,
-        0.03,
+        BEAM_GATE_LOW,
+        BEAM_GATE_HIGH,
         sampleBrightness
       );
 
@@ -673,67 +737,67 @@ vec3 applyBeamCross(vec2 gridUv)
 
       float core = exp(
         -(
-          dx * dx / (0.26 * 0.26) +
-          dy * dy / (0.24 * 0.24)
+          dx * dx / (BEAM_CORE_SIGMA_X * BEAM_CORE_SIGMA_X) +
+          dy * dy / (BEAM_CORE_SIGMA_Y * BEAM_CORE_SIGMA_Y)
         )
       );
 
       float horizontalFlare = exp(
         -(
-          dx * dx / (1.35 * 1.35) +
-          dy * dy / (0.30 * 0.30)
+          dx * dx / (BEAM_FLARE_SIGMA_X * BEAM_FLARE_SIGMA_X) +
+          dy * dy / (BEAM_FLARE_SIGMA_Y * BEAM_FLARE_SIGMA_Y)
         )
       );
 
       float verticalLeak = exp(
         -(
-          dx * dx / (0.34 * 0.34) +
-          dy * dy / (0.88 * 0.88)
+          dx * dx / (BEAM_LEAK_SIGMA_X * BEAM_LEAK_SIGMA_X) +
+          dy * dy / (BEAM_LEAK_SIGMA_Y * BEAM_LEAK_SIGMA_Y)
         )
       );
 
       float halo = exp(
         -(
-          dx * dx / (1.58 * 1.58) +
-          dy * dy / (1.08 * 1.08)
+          dx * dx / (BEAM_HALO_SIGMA_X * BEAM_HALO_SIGMA_X) +
+          dy * dy / (BEAM_HALO_SIGMA_Y * BEAM_HALO_SIGMA_Y)
         )
       );
 
       float bridge = exp(
         -(
-          dx * dx / (0.72 * 0.72) +
-          dy * dy / (0.52 * 0.52)
+          dx * dx / (BEAM_BRIDGE_SIGMA_X * BEAM_BRIDGE_SIGMA_X) +
+          dy * dy / (BEAM_BRIDGE_SIGMA_Y * BEAM_BRIDGE_SIGMA_Y)
         )
       );
 
       float broadAura = exp(
         -(
-          dx * dx / (1.95 * 1.95) +
-          dy * dy / (1.42 * 1.42)
+          dx * dx / (BEAM_AURA_SIGMA_X * BEAM_AURA_SIGMA_X) +
+          dy * dy / (BEAM_AURA_SIGMA_Y * BEAM_AURA_SIGMA_Y)
         )
       );
 
       float sparkle = exp(
         -(
-          dx * dx / (0.14 * 0.14) +
-          dy * dy / (0.14 * 0.14)
+          dx * dx / (BEAM_SPARKLE_SIGMA_X * BEAM_SPARKLE_SIGMA_X) +
+          dy * dy / (BEAM_SPARKLE_SIGMA_Y * BEAM_SPARKLE_SIGMA_Y)
         )
       );
 
       float extentMask =
-        smoothstep(3.5, 2.6, abs(dx)) *
-        smoothstep(2.4, 1.55, abs(dy));
+        smoothstep(BEAM_EXTENT_X_OUTER, BEAM_EXTENT_X_INNER, abs(dx)) *
+        smoothstep(BEAM_EXTENT_Y_OUTER, BEAM_EXTENT_Y_INNER, abs(dy));
 
       float kernel =
         sampleGate *
         extentMask *
         (
-          core * 0.82 +
-          horizontalFlare * 0.48 +
-          verticalLeak * 0.18 +
-          halo * 0.24 +
-          bridge * 0.42 +
-          broadAura * 0.10
+          core * BEAM_CORE_GAIN +
+          horizontalFlare * BEAM_FLARE_GAIN +
+          verticalLeak * BEAM_LEAK_GAIN +
+          halo * BEAM_HALO_GAIN +
+          bridge * BEAM_BRIDGE_GAIN +
+          broadAura * BEAM_AURA_GAIN
         );
 
       accumulatedStreak +=
@@ -772,29 +836,29 @@ vec3 applyBeamCross(vec2 gridUv)
   );
 
   float floorMask = smoothstep(
-    0.02,
-    0.18,
+    BEAM_SOFT_FIELD_THRESHOLD_LOW,
+    BEAM_SOFT_FIELD_THRESHOLD_HIGH,
     accumulatedEnergy
   );
 
   vec3 softField =
     beamTint *
     accumulatedEnergy *
-    0.07 *
+    BEAM_SOFT_FIELD_GAIN *
     floorMask;
 
   float highlightMask = smoothstep(
-    0.025,
-    0.11,
+    BEAM_HIGHLIGHT_THRESHOLD_LOW,
+    BEAM_HIGHLIGHT_THRESHOLD_HIGH,
     accumulatedHighlight +
-    luminance * 0.68
+    luminance * BEAM_HIGHLIGHT_LUMA_GAIN
   );
 
   vec3 coloredHalo =
     beamBase *
     (
-      0.38 +
-      highlightMask * 0.08
+      BEAM_BASE_TONE +
+      highlightMask * BEAM_BASE_HIGHLIGHT_GAIN
     ) +
     softField;
 
@@ -802,8 +866,8 @@ vec3 applyBeamCross(vec2 gridUv)
     vec3(1.0) *
     highlightMask *
     (
-      0.08 +
-      luminance * 0.20
+      BEAM_WHITE_CORE_BASE +
+      luminance * BEAM_WHITE_CORE_LUMA_GAIN
     );
 
   return coloredHalo + whiteCore;
@@ -825,22 +889,22 @@ vec3 sampleBeamCrossSoft(vec2 uv, vec2 sourceSize)
 
   vec3 center = applyBeamCross(uv);
   vec3 offsetA = applyBeamCross(
-    uv + sourceTexel * vec2(0.18, 0.0)
+    uv + sourceTexel * vec2(BEAM_SOFT_SAMPLE_OFFSET_X, 0.0)
   );
   vec3 offsetB = applyBeamCross(
-    uv + sourceTexel * vec2(-0.18, 0.0)
+    uv + sourceTexel * vec2(-BEAM_SOFT_SAMPLE_OFFSET_X, 0.0)
   );
   vec3 offsetC = applyBeamCross(
-    uv + sourceTexel * vec2(0.0, 0.16)
+    uv + sourceTexel * vec2(0.0, BEAM_SOFT_SAMPLE_OFFSET_Y)
   );
   vec3 offsetD = applyBeamCross(
-    uv + sourceTexel * vec2(0.0, -0.16)
+    uv + sourceTexel * vec2(0.0, -BEAM_SOFT_SAMPLE_OFFSET_Y)
   );
 
   return
-    center * 0.72 +
-    (offsetA + offsetB) * 0.09 +
-    (offsetC + offsetD) * 0.05;
+    center * BEAM_SOFT_CENTER_WEIGHT +
+    (offsetA + offsetB) * BEAM_SOFT_HORIZONTAL_WEIGHT +
+    (offsetC + offsetD) * BEAM_SOFT_VERTICAL_WEIGHT;
 }
 
 
@@ -908,7 +972,7 @@ void main(void)
       unstableUv,
       sourceSize
     ),
-    0.28
+    BEAM_SOFT_BLEND
   );
 
   vec3 sourceDetailColor = mix(
@@ -920,7 +984,7 @@ void main(void)
       sourceCoord,
       sourceSize
     ),
-    0.42
+    BEAM_SOURCE_DETAIL_SMOOTH_BLEND
   );
 
   float sourceDetailLuma = max(
