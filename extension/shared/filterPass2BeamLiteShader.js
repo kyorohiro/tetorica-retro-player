@@ -1076,18 +1076,6 @@ void main(void)
     beamLuma
   );
 
-  float directHitMask = smoothstep(
-    0.035,
-    0.24,
-    sourceDetailLuma
-  );
-
-  vec3 directEmitterColor = mix(
-    beamColor,
-    sourceDetailColor,
-    0.78
-  );
-
   vec3 beamField =
     beamColor *
     (
@@ -1097,12 +1085,11 @@ void main(void)
 
   vec3 stripeGlow =
     stripeMask *
-    directEmitterColor *
+    beamColor *
     (
       BEAM_STRIPE_GLOW_BASE +
       lightMask * BEAM_STRIPE_GLOW_LIGHT_GAIN
     ) *
-    mix(0.5, 1.25, directHitMask) *
     getBeamStripeStrength();
 
   vec3 stripeBleed =
@@ -1112,17 +1099,7 @@ void main(void)
       BEAM_STRIPE_BLEED_BASE +
       lightMask * BEAM_STRIPE_BLEED_LIGHT_GAIN
     ) *
-    mix(0.35, 0.75, directHitMask) *
     getBeamStripeStrength();
-
-  vec3 emitterCore =
-    stripeMask *
-    sourceDetailColor *
-    directHitMask *
-    (
-      0.14 +
-      lightMask * 0.32
-    );
 
   vec3 mergedFlare =
     beamColor *
@@ -1137,10 +1114,9 @@ void main(void)
    * remains visible in bright areas.
    */
   vec3 whiteBloom =
-    vec3(max(beamLuma, sourceDetailLuma)) *
-    mix(lightMask, 1.0, directHitMask * 0.55) *
+    vec3(beamLuma) *
+    lightMask *
     BEAM_WHITE_BLOOM_GAIN *
-    (0.85 + directHitMask * 0.55) *
     getBeamWhiteBloom();
 
   vec3 sourceDetail =
@@ -1159,7 +1135,6 @@ void main(void)
     beamField +
     stripeGlow +
     stripeBleed +
-    emitterCore +
     mergedFlare +
     whiteBloom +
     sourceDetail;
@@ -1194,7 +1169,7 @@ void main(void)
     (scanline * 0.5 + 0.5) *
     max(uScanlineStrength, 0.0) *
     visibility *
-    0.02;
+    0.04;
 
   finalBeamColor *=
     1.0 -
