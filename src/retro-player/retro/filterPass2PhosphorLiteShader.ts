@@ -737,8 +737,9 @@ void main(void)
 
     float vignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-    phosphorColor = applySignalChromaInstability(phosphorColor, pixelatedUv);
-    phosphorColor = applySignalStaticNoise(phosphorColor, unstableUv);
+    // Temporarily disabled for performance/chattering investigation on Windows.
+    // phosphorColor = applySignalChromaInstability(phosphorColor, pixelatedUv);
+    // phosphorColor = applySignalStaticNoise(phosphorColor, unstableUv);
 
     finalColor = vec4(clamp(phosphorColor * uOutputBrightness, 0.0, 1.0), 1.0);
     return;
@@ -769,23 +770,25 @@ void main(void)
     // cells bleed a little of their neighbors' color in. Works on the
     // existing target grid (no small-grid downscale), so it can't alias the
     // way the phosphor-dot mode's per-cell rendering does.
-    vec3 glowRightColor = texture(uPass1Texture, clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowLeftColor = texture(uPass1Texture, clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowUpColor = texture(uPass1Texture, clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowDownColor = texture(uPass1Texture, clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowNeighborAvg = (glowRightColor + glowLeftColor + glowUpColor + glowDownColor) * 0.25;
-    float glowAmount = smoothstep(0.5, 1.0, brightness) * uPhosphorStrength;
-    color.rgb += glowNeighborAvg * glowAmount * 0.28;
-    float glowLuma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    color.rgb = mix(color.rgb, mix(vec3(glowLuma), glowNeighborAvg, 0.6), glowAmount * 0.35);
+    // Temporarily disabled for performance/moire investigation on Windows.
+    // vec3 glowRightColor = texture(uPass1Texture, clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+    // vec3 glowLeftColor = texture(uPass1Texture, clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+    // vec3 glowUpColor = texture(uPass1Texture, clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+    // vec3 glowDownColor = texture(uPass1Texture, clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+    // vec3 glowNeighborAvg = (glowRightColor + glowLeftColor + glowUpColor + glowDownColor) * 0.25;
+    // float glowAmount = smoothstep(0.5, 1.0, brightness) * uPhosphorStrength;
+    // color.rgb += glowNeighborAvg * glowAmount * 0.28;
+    // float glowLuma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    // color.rgb = mix(color.rgb, mix(vec3(glowLuma), glowNeighborAvg, 0.6), glowAmount * 0.35);
   }
 
   if (uSpotMaskStrength > 0.001) {
     color.rgb = applySpotMask(color.rgb, unstableUv, uTargetSize, uSpotMaskStrength);
   }
 
-  color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
-  color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
+  // Temporarily disabled for performance/chattering investigation on Windows.
+  // color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
+  // color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
