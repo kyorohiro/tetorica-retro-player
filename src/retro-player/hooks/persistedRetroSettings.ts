@@ -45,6 +45,7 @@ export type PersistedRetroFilterSettings = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotGlowColorStrength: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;

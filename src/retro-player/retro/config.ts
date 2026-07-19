@@ -76,6 +76,7 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
+  phosphorDotGlowColorStrength?: number;
   beamDarkCutoff?: number;
   beamHorizontalSpread?: number;
   beamStripeStrength?: number;
@@ -441,6 +442,7 @@ export const RETRO_PRESETS = {
   phosphorDotLite: {
     label: "Phosphor Dot Lite",
     featured: true,
+    autoTargetSize: true,
     width: 320,
     height: 180,
     colors: 32,
@@ -473,6 +475,7 @@ export const RETRO_PRESETS = {
   phosphorDot: {
     label: "Phosphor Dot",
     featured: true,
+    autoTargetSize: true,
     width: 320,
     height: 180,
     colors: 32,
@@ -557,6 +560,7 @@ export const RETRO_PRESETS = {
     featured: true,
     width: 1280,
     height: 800,
+    autoTargetSize: true,
     colors: 32,
     dither: 0.8,
     smoothStrength: 0.8,
@@ -576,7 +580,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    signalInstabilityEnabled: true,
+    signalInstabilityEnabled: false,
     signalInstabilityStrength: 0.88,
     signalInstabilityFrequency: 0.88,
   },
@@ -609,6 +613,7 @@ export const RETRO_PRESETS = {
   tetorica: {
     label: "Tetorica",
     featured: true,
+    autoTargetSize: true,
     width: 1280,
     height: 800,
     colors: 256,

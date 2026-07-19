@@ -45,6 +45,7 @@ export type RetroVideoFilterState = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotGlowColorStrength: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
@@ -131,6 +132,7 @@ type Pass2UniformLocations = {
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uPhosphorDotGrainStrength: WebGLUniformLocation | null;
+  uPhosphorDotGlowColorStrength: WebGLUniformLocation | null;
   uBeamDarkCutoff: WebGLUniformLocation | null;
   uBeamHorizontalSpread: WebGLUniformLocation | null;
   uBeamStripeStrength: WebGLUniformLocation | null;
@@ -921,6 +923,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
       uPhosphorDotGrainStrength: gl.getUniformLocation(program, "uPhosphorDotGrainStrength"),
+      uPhosphorDotGlowColorStrength: gl.getUniformLocation(program, "uPhosphorDotGlowColorStrength"),
       uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
       uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
       uBeamStripeStrength: gl.getUniformLocation(program, "uBeamStripeStrength"),
@@ -1279,6 +1282,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotGrainStrength, filterState.phosphorDotGrainStrength);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotGlowColorStrength, filterState.phosphorDotGlowColorStrength);
     gl.uniform1f(this.pass2Locs.uBeamDarkCutoff, filterState.beamDarkCutoff);
     gl.uniform1f(this.pass2Locs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
     gl.uniform1f(this.pass2Locs.uBeamStripeStrength, filterState.beamStripeStrength);

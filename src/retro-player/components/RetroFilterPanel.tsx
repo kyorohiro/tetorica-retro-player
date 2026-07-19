@@ -95,10 +95,14 @@ type RetroFilterPanelProps = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotGlowColorStrength: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
+  signalInstabilityEnabled: boolean;
+  signalInstabilityStrength: number;
+  signalInstabilityFrequency: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -143,10 +147,14 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
+  onSetPhosphorDotGlowColorStrength: (value: number) => void;
   onSetBeamDarkCutoff: (value: number) => void;
   onSetBeamHorizontalSpread: (value: number) => void;
   onSetBeamStripeStrength: (value: number) => void;
   onSetBeamWhiteBloom: (value: number) => void;
+  onSetSignalInstabilityEnabled: (value: boolean) => void;
+  onSetSignalInstabilityStrength: (value: number) => void;
+  onSetSignalInstabilityFrequency: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -192,10 +200,14 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
+  phosphorDotGlowColorStrength,
   beamDarkCutoff,
   beamHorizontalSpread,
   beamStripeStrength,
   beamWhiteBloom,
+  signalInstabilityEnabled,
+  signalInstabilityStrength,
+  signalInstabilityFrequency,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -237,10 +249,14 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
+  onSetPhosphorDotGlowColorStrength,
   onSetBeamDarkCutoff,
   onSetBeamHorizontalSpread,
   onSetBeamStripeStrength,
   onSetBeamWhiteBloom,
+  onSetSignalInstabilityEnabled,
+  onSetSignalInstabilityStrength,
+  onSetSignalInstabilityFrequency,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -969,6 +985,81 @@ export function RetroFilterPanel({
                 </span>
               ) : null}
             </label>
+            <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
+              <span className="text-[11px] leading-tight text-[#12141c]">
+                CRT GlowColor bar: {phosphorDotGlowColorStrength <= 0 ? "off" : phosphorDotGlowColorStrength.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={phosphorDotGlowColorStrength}
+                onChange={(ev) => {
+                  onSetPhosphorDotGlowColorStrength(Number(ev.currentTarget.value));
+                }}
+                className="mt-1 w-full"
+              />
+            </label>
+            <div className="rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onSetSignalInstabilityEnabled(!signalInstabilityEnabled);
+                }}
+                className={[
+                  "w-full rounded-lg border px-3 py-2 text-left text-[11px] leading-tight text-[#12141c]",
+                  signalInstabilityEnabled
+                    ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                <span className="block">Signal Instability</span>
+                <span className="mt-1 block text-[10px] font-normal text-[#7a7268]">
+                  {signalInstabilityEnabled ? "On" : "Off"}
+                </span>
+              </button>
+              {signalInstabilityEnabled ? (
+                <div className="mt-3 flex flex-col gap-3">
+                  <label className="block">
+                    <span className="text-[#12141c]">
+                      <InfoTip
+                        label={`Signal Instability: ${signalInstabilityStrength.toFixed(2)}`}
+                        text={helpText.signalInstability}
+                        helpSuffix={helpText.helpSuffix}
+                      />
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={signalInstabilityStrength}
+                      onChange={(ev) => onSetSignalInstabilityStrength(Number(ev.currentTarget.value))}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[#12141c]">
+                      <InfoTip
+                        label={`Signal Frequency: ${signalInstabilityFrequency.toFixed(2)}`}
+                        text={helpText.signalInstabilityFrequency}
+                        helpSuffix={helpText.helpSuffix}
+                      />
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={signalInstabilityFrequency}
+                      onChange={(ev) => onSetSignalInstabilityFrequency(Number(ev.currentTarget.value))}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 

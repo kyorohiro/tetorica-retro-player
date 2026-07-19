@@ -51,6 +51,7 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotGlowColorStrength: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
@@ -115,6 +116,7 @@ const doesPresetMatchState = (
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
     (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
+    (preset.phosphorDotGlowColorStrength ?? 0) === state.phosphorDotGlowColorStrength &&
     (preset.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff) === state.beamDarkCutoff &&
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
@@ -220,6 +222,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     phosphorDotGrainStrength:
       initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
+    phosphorDotGlowColorStrength:
+      initialState.phosphorDotGlowColorStrength ?? (DEFAULT_PRESET.phosphorDotGlowColorStrength ?? 0),
     beamDarkCutoff:
       initialState.beamDarkCutoff ?? (DEFAULT_PRESET.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff),
     beamHorizontalSpread:
@@ -464,6 +468,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPhosphorDotGlowColorStrength = (value: number) => {
+    const phosphorDotGlowColorStrength = Math.max(0, value);
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotGlowColorStrength === phosphorDotGlowColorStrength
+        ? current
+        : { ...current, phosphorDotGlowColorStrength }
+    ));
+  };
+
   const setBeamDarkCutoff = (beamDarkCutoff: number) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -623,6 +637,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
+      phosphorDotGlowColorStrength: presetSettings.phosphorDotGlowColorStrength ?? 0,
       beamDarkCutoff: presetSettings.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
@@ -706,6 +721,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
     setPhosphorDotGrainStrength,
+    setPhosphorDotGlowColorStrength,
     setBeamDarkCutoff,
     setBeamHorizontalSpread,
     setBeamStripeStrength,
