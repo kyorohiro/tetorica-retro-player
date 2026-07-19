@@ -24,6 +24,10 @@ uniform float uVignetteStrength;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
 uniform float uBasicSaturation;
+uniform float uBeamDarkCutoff;
+uniform float uBeamHorizontalSpread;
+uniform float uBeamStripeStrength;
+uniform float uBeamWhiteBloom;
 
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
@@ -44,7 +48,7 @@ const float PI = 3.141592653589793;
  * through the kernel math.
  */
 const float BEAM_GATE_LOW = 0.0;
-const float BEAM_GATE_HIGH = 0.03;
+const float BEAM_GATE_HIGH = 0.04;
 
 const float BEAM_CORE_SIGMA_X = 0.26;
 const float BEAM_CORE_SIGMA_Y = 0.24;
@@ -74,23 +78,23 @@ const float BEAM_EXTENT_Y_INNER = 1.55;
 
 const float BEAM_CORE_GAIN = 0.82;
 const float BEAM_FLARE_GAIN = 0.48;
-const float BEAM_LEAK_GAIN = 0.18;
-const float BEAM_HALO_GAIN = 0.24;
-const float BEAM_BRIDGE_GAIN = 0.42;
-const float BEAM_AURA_GAIN = 0.10;
+const float BEAM_LEAK_GAIN = 0.16;
+const float BEAM_HALO_GAIN = 0.21;
+const float BEAM_BRIDGE_GAIN = 0.39;
+const float BEAM_AURA_GAIN = 0.08;
 
 const float BEAM_SOFT_FIELD_THRESHOLD_LOW = 0.02;
 const float BEAM_SOFT_FIELD_THRESHOLD_HIGH = 0.18;
-const float BEAM_SOFT_FIELD_GAIN = 0.07;
+const float BEAM_SOFT_FIELD_GAIN = 0.06;
 
 const float BEAM_HIGHLIGHT_THRESHOLD_LOW = 0.025;
 const float BEAM_HIGHLIGHT_THRESHOLD_HIGH = 0.11;
-const float BEAM_HIGHLIGHT_LUMA_GAIN = 0.68;
+const float BEAM_HIGHLIGHT_LUMA_GAIN = 0.64;
 
-const float BEAM_BASE_TONE = 0.38;
-const float BEAM_BASE_HIGHLIGHT_GAIN = 0.08;
-const float BEAM_WHITE_CORE_BASE = 0.08;
-const float BEAM_WHITE_CORE_LUMA_GAIN = 0.20;
+const float BEAM_BASE_TONE = 0.34;
+const float BEAM_BASE_HIGHLIGHT_GAIN = 0.07;
+const float BEAM_WHITE_CORE_BASE = 0.065;
+const float BEAM_WHITE_CORE_LUMA_GAIN = 0.17;
 
 const float BEAM_SOFT_SAMPLE_OFFSET_X = 0.18;
 const float BEAM_SOFT_SAMPLE_OFFSET_Y = 0.16;
@@ -98,8 +102,23 @@ const float BEAM_SOFT_CENTER_WEIGHT = 0.72;
 const float BEAM_SOFT_HORIZONTAL_WEIGHT = 0.09;
 const float BEAM_SOFT_VERTICAL_WEIGHT = 0.05;
 
-const float BEAM_SOFT_BLEND = 0.28;
-const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.42;
+const float BEAM_SOFT_BLEND = 0.24;
+const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.36;
+
+const float BEAM_LIGHTMASK_LOW = 0.025;
+const float BEAM_LIGHTMASK_HIGH = 0.23;
+
+const float BEAM_FIELD_BASE = 0.095;
+const float BEAM_FIELD_LIGHT_GAIN = 0.04;
+const float BEAM_STRIPE_GLOW_BASE = 0.08;
+const float BEAM_STRIPE_GLOW_LIGHT_GAIN = 0.18;
+const float BEAM_STRIPE_BLEED_BASE = 0.10;
+const float BEAM_STRIPE_BLEED_LIGHT_GAIN = 0.14;
+const float BEAM_MERGED_FLARE_BASE = 0.14;
+const float BEAM_MERGED_FLARE_LIGHT_GAIN = 0.19;
+const float BEAM_WHITE_BLOOM_GAIN = 0.15;
+const float BEAM_SOURCE_DETAIL_BASE = 0.018;
+const float BEAM_SOURCE_DETAIL_LIGHT_GAIN = 0.013;
 
 
 /*
@@ -457,6 +476,42 @@ vec3 applyBasicColorControls(vec3 color)
   );
 }
 
+float getBeamDarkCutoff()
+{
+  return clamp(
+    uBeamDarkCutoff,
+    0.0,
+    0.15
+  );
+}
+
+float getBeamHorizontalSpread()
+{
+  return clamp(
+    uBeamHorizontalSpread,
+    0.5,
+    2.0
+  );
+}
+
+float getBeamStripeStrength()
+{
+  return clamp(
+    uBeamStripeStrength,
+    0.0,
+    2.0
+  );
+}
+
+float getBeamWhiteBloom()
+{
+  return clamp(
+    uBeamWhiteBloom,
+    0.0,
+    2.0
+  );
+}
+
 
 /*
  * RGB stripe and bleed masks
@@ -688,6 +743,7 @@ vec3 sampleEmitterColorSmooth(
  */
 vec3 applyBeamCross(vec2 gridUv)
 {
+  float horizontalSpread = getBeamHorizontalSpread();
   vec2 sourceSize = max(
     uBeamSourceSize,
     vec2(1.0)
@@ -724,7 +780,7 @@ vec3 applyBeamCross(vec2 gridUv)
 
       float sampleGate = smoothstep(
         BEAM_GATE_LOW,
-        BEAM_GATE_HIGH,
+        getBeamDarkCutoff(),
         sampleBrightness
       );
 
@@ -744,7 +800,7 @@ vec3 applyBeamCross(vec2 gridUv)
 
       float horizontalFlare = exp(
         -(
-          dx * dx / (BEAM_FLARE_SIGMA_X * BEAM_FLARE_SIGMA_X) +
+          dx * dx / ((BEAM_FLARE_SIGMA_X * horizontalSpread) * (BEAM_FLARE_SIGMA_X * horizontalSpread)) +
           dy * dy / (BEAM_FLARE_SIGMA_Y * BEAM_FLARE_SIGMA_Y)
         )
       );
@@ -765,14 +821,14 @@ vec3 applyBeamCross(vec2 gridUv)
 
       float bridge = exp(
         -(
-          dx * dx / (BEAM_BRIDGE_SIGMA_X * BEAM_BRIDGE_SIGMA_X) +
+          dx * dx / ((BEAM_BRIDGE_SIGMA_X * horizontalSpread) * (BEAM_BRIDGE_SIGMA_X * horizontalSpread)) +
           dy * dy / (BEAM_BRIDGE_SIGMA_Y * BEAM_BRIDGE_SIGMA_Y)
         )
       );
 
       float broadAura = exp(
         -(
-          dx * dx / (BEAM_AURA_SIGMA_X * BEAM_AURA_SIGMA_X) +
+          dx * dx / ((BEAM_AURA_SIGMA_X * horizontalSpread) * (BEAM_AURA_SIGMA_X * horizontalSpread)) +
           dy * dy / (BEAM_AURA_SIGMA_Y * BEAM_AURA_SIGMA_Y)
         )
       );
@@ -868,7 +924,8 @@ vec3 applyBeamCross(vec2 gridUv)
     (
       BEAM_WHITE_CORE_BASE +
       luminance * BEAM_WHITE_CORE_LUMA_GAIN
-    );
+    ) *
+    getBeamWhiteBloom();
 
   return coloredHalo + whiteCore;
 }
@@ -1014,40 +1071,42 @@ void main(void)
   );
 
   float lightMask = smoothstep(
-    0.02,
-    0.22,
+    BEAM_LIGHTMASK_LOW,
+    BEAM_LIGHTMASK_HIGH,
     beamLuma
   );
 
   vec3 beamField =
     beamColor *
     (
-      0.10 +
-      lightMask * 0.04
+      BEAM_FIELD_BASE +
+      lightMask * BEAM_FIELD_LIGHT_GAIN
     );
 
   vec3 stripeGlow =
     stripeMask *
     beamColor *
     (
-      0.12 +
-      lightMask * 0.24
-    );
+      BEAM_STRIPE_GLOW_BASE +
+      lightMask * BEAM_STRIPE_GLOW_LIGHT_GAIN
+    ) *
+    getBeamStripeStrength();
 
   vec3 stripeBleed =
     stripeBleedMask *
     beamColor *
     (
-      0.14 +
-      lightMask * 0.18
-    );
+      BEAM_STRIPE_BLEED_BASE +
+      lightMask * BEAM_STRIPE_BLEED_LIGHT_GAIN
+    ) *
+    getBeamStripeStrength();
 
   vec3 mergedFlare =
     beamColor *
     beamLuma *
     (
-      0.16 +
-      lightMask * 0.22
+      BEAM_MERGED_FLARE_BASE +
+      lightMask * BEAM_MERGED_FLARE_LIGHT_GAIN
     );
 
   /*
@@ -1057,7 +1116,8 @@ void main(void)
   vec3 whiteBloom =
     vec3(beamLuma) *
     lightMask *
-    0.18;
+    BEAM_WHITE_BLOOM_GAIN *
+    getBeamWhiteBloom();
 
   vec3 sourceDetail =
     sourceDetailColor *
@@ -1067,8 +1127,8 @@ void main(void)
       sourceDetailLuma
     ) *
     (
-      0.02 +
-      lightMask * 0.015
+      BEAM_SOURCE_DETAIL_BASE +
+      lightMask * BEAM_SOURCE_DETAIL_LIGHT_GAIN
     );
 
   vec3 finalBeamColor =
@@ -1109,7 +1169,7 @@ void main(void)
     (scanline * 0.5 + 0.5) *
     max(uScanlineStrength, 0.0) *
     visibility *
-    0.06;
+    0.04;
 
   finalBeamColor *=
     1.0 -

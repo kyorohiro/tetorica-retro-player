@@ -14,6 +14,13 @@ export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 export type PhosphorDotShape = "circle" | "heart" | "beam";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 
+export const DEFAULT_BEAM_CROSS_SETTINGS = {
+  beamDarkCutoff: 0.04,
+  beamHorizontalSpread: 1,
+  beamStripeStrength: 1,
+  beamWhiteBloom: 1,
+} as const;
+
 export const normalizePhosphorDotShape = (
   shape: LegacyPhosphorDotShape | null | undefined,
 ): PhosphorDotShape => {
@@ -69,6 +76,10 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
+  beamDarkCutoff?: number;
+  beamHorizontalSpread?: number;
+  beamStripeStrength?: number;
+  beamWhiteBloom?: number;
   signalInstabilityEnabled?: boolean;
   signalInstabilityStrength?: number;
   signalInstabilityFrequency?: number;

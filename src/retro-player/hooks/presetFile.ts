@@ -2,6 +2,7 @@ import { DEFAULT_AUDIO_PRESET_SETTINGS } from "../audio/preset";
 import { loadLocalePreference } from "../../i18n";
 import type { LocalePreference } from "../../i18n";
 import {
+  DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
   normalizePhosphorDotShape,
@@ -53,6 +54,10 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   phosphorDotFlatDisc: false,
   phosphorDotNeighborBlend: false,
   phosphorDotGrainStrength: 0,
+  beamDarkCutoff: DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
+  beamHorizontalSpread: DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
+  beamStripeStrength: DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
+  beamWhiteBloom: DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
   signalInstabilityEnabled: false,
   signalInstabilityStrength: 0.35,
   signalInstabilityFrequency: 0.3,
