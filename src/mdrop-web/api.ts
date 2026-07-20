@@ -17,6 +17,14 @@ type TargetFile = {
     isRoot?: boolean,
 }
 
+type SharedFileInfo = {
+    id: string,
+    name: string,
+    path: string,
+    url: string,
+    isDir: boolean,
+};
+
 type FileTargetFile = TargetFile & {
     entry?: File;
     resolveEntry?: () => Promise<File>;
@@ -78,15 +86,36 @@ const getFiles = async (id: string, path: string): Promise<TargetFile[]> => {
     return JSON.parse(data);
 }
 
+const shareBlobFile = async (blob: Blob, filename: string): Promise<SharedFileInfo> => {
+    const meta = await getMeta();
+    const resp = await fetch(
+        `${meta.apiServer}/api/shareBlobFile?filename=${encodeURIComponent(filename)}`,
+        {
+            method: "POST",
+            headers: {
+                "X-mDrop-API-Key": window.__MDROP_CONFIG__?.apiKey ?? "",
+                "Content-Type": "application/octet-stream",
+            },
+            body: blob,
+        }
+    );
+    if (!resp.ok) {
+        throw new Error(`shareBlobFile failed: ${resp.status}`);
+    }
+    return await resp.json();
+}
+
 
 export {
     getDownloadList,
     getFiles,
     getMeta,
+    shareBlobFile,
 }
 
 export type {
     Target,
     TargetFile,
-    FileTargetFile
+    FileTargetFile,
+    SharedFileInfo,
 }

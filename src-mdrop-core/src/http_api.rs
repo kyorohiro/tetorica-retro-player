@@ -11,6 +11,7 @@ fn system_time_to_millis(t: SystemTime) -> Option<u128> {
 
 }
 
+use axum::body::Bytes;
 use axum::extract::Query;
 use axum::http::{HeaderMap, Request};
 use axum::middleware::Next;
@@ -126,6 +127,97 @@ pub async fn api_get_files(
     }
 
     serde_json::to_string(&files).unwrap()
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SharedFileInfo {
+    id: String,
+    name: String,
+    path: String,
+    url: String,
+    is_dir: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareBlobFileQuery {
+    filename: Option<String>,
+}
+
+fn build_shared_file_info(
+    state: &SharedHttpServerContext,
+    path: PathBuf,
+    display_path: String,
+) -> Result<SharedFileInfo, String> {
+    let name = PathBuf::from(&display_path)
+        .file_name()
+        .ok_or("invalid file name")?
+        .to_string_lossy()
+        .to_string();
+
+    let id = uuid::Uuid::new_v4().simple().to_string();
+    let is_dir = path.is_dir();
+
+    let (hostname, port) = {
+        let server = state.inner.lock().map_err(|e| e.to_string())?;
+        (
+            server.status.hostname.clone().ok_or("server not started")?,
+            server.status.port.ok_or("server not started")?,
+        )
+    };
+
+    state
+        .inner
+        .lock()
+        .map_err(|e| e.to_string())?
+        .files
+        .insert(id.clone(), path);
+
+    Ok(SharedFileInfo {
+        id: id.clone(),
+        name,
+        is_dir,
+        path: display_path,
+        url: format!("http://{hostname}:{port}/download/{id}"),
+    })
+}
+
+pub async fn api_share_blob_file(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    Query(query): Query<ShareBlobFileQuery>,
+    body: Bytes,
+) -> Result<String, (StatusCode, String)> {
+    let filename = query
+        .filename
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("archive-entry.bin");
+    let safe_filename = PathBuf::from(filename)
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "archive-entry.bin".to_string());
+
+    let export_dir = std::env::temp_dir().join("tetorica-mdrop-shared-blobs");
+    std::fs::create_dir_all(&export_dir)
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+
+    let stored_path = export_dir.join(format!(
+        "{}-{}",
+        uuid::Uuid::new_v4().simple(),
+        safe_filename
+    ));
+
+    std::fs::write(&stored_path, body)
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+
+    let shared = build_shared_file_info(&state, stored_path, safe_filename)
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
+
+    serde_json::to_string(&shared)
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
 }
 
 

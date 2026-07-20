@@ -10,8 +10,12 @@ import {
     isPdf,
     isText,
     isVideo,
+    isVideoExtended,
     isArchive,
 } from "./utils";
+import { getFfmpegStreamingEnabled, getFfmpegStreamingMode } from "./ffmpegPreference";
+import { resolvePlayableUrl } from "./resolvePlayableSource";
+import { shareBlobFile } from "./api";
 import type {
     ZipSource,
     ArchiveExtractorEntry,
@@ -134,8 +138,11 @@ function ZipFileListDialog({
     const [loadingMessage, setLoadingMessage] = useState("");
     const [password, setPassword] = useState("");
     const extractorRef = useRef<ArchiveExtractor | null>(null);
+    const sharedArchivePlaybackUrlCacheRef = useRef<Map<string, Promise<string>>>(new Map());
     const { showPreviewDialog } = usePreviewDialog();
     const { showZipFileListDialog } = useZipFileListDialog();
+    const isArchiveFfmpegEnabled = getFfmpegStreamingEnabled();
+    const archiveFfmpegMode = getFfmpegStreamingMode();
 
     React.useEffect(() => {
         let cancelled = false;
@@ -189,6 +196,36 @@ function ZipFileListDialog({
             }
         },
         [path]
+    );
+    const shareArchiveEntryForPlayback = React.useCallback(
+        async (
+            file: ZipTargetFile,
+            onProgress?: (loaded: number, total: number) => void
+        ) => {
+            const cacheKey = `${archiveFfmpegMode}:${file.path}`;
+            const existing = sharedArchivePlaybackUrlCacheRef.current.get(cacheKey);
+            if (existing) {
+                return await existing;
+            }
+
+            const pending = (async () => {
+                const entryBlob = await readArchiveFile(file, onProgress);
+                const shared = await shareBlobFile(
+                    entryBlob,
+                    file.path.replace(/^\/+/, "").replace(/\//g, "__")
+                );
+                return resolvePlayableUrl(shared, true, archiveFfmpegMode);
+            })();
+
+            sharedArchivePlaybackUrlCacheRef.current.set(cacheKey, pending);
+            try {
+                return await pending;
+            } catch (error) {
+                sharedArchivePlaybackUrlCacheRef.current.delete(cacheKey);
+                throw error;
+            }
+        },
+        [archiveFfmpegMode, readArchiveFile]
     );
     const sortedFiles = useMemo<ZipTargetFile[]>(() => {
         const next = [...files];
@@ -348,23 +385,70 @@ function ZipFileListDialog({
                                                 if (
                                                     isImage(file.path) ||
                                                     isVideo(file.path) ||
+                                                    isVideoExtended(file.path) ||
                                                     isText(file.path) ||
                                                     isAudio(file.path) ||
                                                     isPdf(file.path) ||
                                                     isEpub(file.path)
                                                 ) {
-                                                    const previewFiles = [...sortedFiles];
+                                                    const targetCanUseArchiveFfmpeg =
+                                                        isArchiveFfmpegEnabled &&
+                                                        (isVideoExtended(file.path) ||
+                                                            isAudio(file.path));
+                                                    const previewFiles =
+                                                        targetCanUseArchiveFfmpeg &&
+                                                        archiveFfmpegMode === "audio"
+                                                            ? sortedFiles.filter(
+                                                                  (target) =>
+                                                                      target.isFile &&
+                                                                      (isVideo(target.path) ||
+                                                                          isVideoExtended(target.path) ||
+                                                                          isAudio(target.path))
+                                                              )
+                                                            : sortedFiles.filter(
+                                                                  (target) =>
+                                                                      target.isFile &&
+                                                                      (isImage(target.path) ||
+                                                                          isVideo(target.path) ||
+                                                                          isVideoExtended(target.path) ||
+                                                                          isText(target.path) ||
+                                                                          isAudio(target.path) ||
+                                                                          isPdf(target.path) ||
+                                                                          isEpub(target.path))
+                                                              );
                                                     const previewIndex = previewFiles.findIndex(
                                                         (f) => f.path === file.path
                                                     );
+                                                    if (previewIndex < 0) {
+                                                        await downloadZipEntry(file);
+                                                        return;
+                                                    }
                                                     await showPreviewDialog({
                                                         files: previewFiles,
                                                         initialIndex: previewIndex,
                                                         isRetro,
+                                                        useHls: targetCanUseArchiveFfmpeg,
+                                                        forcedKind:
+                                                            targetCanUseArchiveFfmpeg &&
+                                                            archiveFfmpegMode === "audio"
+                                                                ? "audio"
+                                                                : undefined,
                                                         apiServer: "",
                                                         getObjectUrl: async (target, onProgress) => {
+                                                            const archiveTarget =
+                                                                target as ZipTargetFile;
+                                                            if (
+                                                                isArchiveFfmpegEnabled &&
+                                                                (isVideoExtended(archiveTarget.path) ||
+                                                                    isAudio(archiveTarget.path))
+                                                            ) {
+                                                                return await shareArchiveEntryForPlayback(
+                                                                    archiveTarget,
+                                                                    onProgress
+                                                                );
+                                                            }
                                                             const entryBlob = await readArchiveFile(
-                                                                target as ZipTargetFile,
+                                                                archiveTarget,
                                                                 onProgress
                                                             );
                                                             return URL.createObjectURL(entryBlob);

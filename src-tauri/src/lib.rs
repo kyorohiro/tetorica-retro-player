@@ -168,6 +168,45 @@ struct SharedFileInfo {
     is_dir: bool,
 }
 
+fn build_shared_file_info(
+    state: &State<'_, MDropState>,
+    path: PathBuf,
+    display_path: String,
+) -> Result<SharedFileInfo, String> {
+    let name = PathBuf::from(&display_path)
+        .file_name()
+        .ok_or("invalid file name")?
+        .to_string_lossy()
+        .to_string();
+
+    let id = uuid::Uuid::new_v4().simple().to_string();
+    let is_dir = path.is_dir();
+
+    let (hostname, port) = {
+        let server = state.server.inner.lock().map_err(|e| e.to_string())?;
+        (
+            server.status.hostname.clone().ok_or("server not started")?,
+            server.status.port.ok_or("server not started")?,
+        )
+    };
+
+    state
+        .server
+        .inner
+        .lock()
+        .map_err(|e| e.to_string())?
+        .files
+        .insert(id.clone(), path);
+
+    Ok(SharedFileInfo {
+        id: id.clone(),
+        name,
+        is_dir,
+        path: display_path,
+        url: format!("http://{hostname}:{port}/download/{id}"),
+    })
+}
+
 #[tauri::command]
 async fn mdrop_share_file(
     state: State<'_, MDropState>,
@@ -183,38 +222,7 @@ async fn mdrop_share_file(
     #[cfg(not(target_os = "android"))]
     {
         let path = PathBuf::from(&req.path);
-        let name = path
-            .file_name()
-            .ok_or("invalid file name")?
-            .to_string_lossy()
-            .to_string();
-
-        let id = uuid::Uuid::new_v4().simple().to_string();
-        let is_dir = path.is_dir();
-
-        let (hostname, port) = {
-            let server = state.server.inner.lock().map_err(|e| e.to_string())?;
-            (
-                server.status.hostname.clone().ok_or("server not started")?,
-                server.status.port.ok_or("server not started")?,
-            )
-        };
-
-        state
-            .server
-            .inner
-            .lock()
-            .map_err(|e| e.to_string())?
-            .files
-            .insert(id.clone(), path);
-
-        Ok(SharedFileInfo {
-            id: id.clone(),
-            name,
-            is_dir,
-            path: req.path,
-            url: format!("http://{hostname}:{port}/download/{id}"),
-        })
+        build_shared_file_info(&state, path, req.path)
     }
 }
 

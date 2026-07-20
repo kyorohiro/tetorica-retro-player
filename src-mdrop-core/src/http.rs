@@ -1,4 +1,5 @@
 use axum::body::Body;
+use axum::extract::DefaultBodyLimit;
 use axum::extract::Path;
 use axum::http::{header, Method, StatusCode};
 use axum::middleware::{self};
@@ -548,6 +549,11 @@ impl SharedHttpServerContext {
         let api_routes = Router::new()
             .route("/downloadList", get(http_api::api_get_download_lists))
             .route("/files", get(http_api::api_get_files))
+            .route(
+                "/shareBlobFile",
+                axum::routing::post(http_api::api_share_blob_file)
+                    .layer(DefaultBodyLimit::disable()),
+            )
             .route_layer(middleware::from_fn_with_state(
                 self.clone(),
                 api_key_guard_middleware,
