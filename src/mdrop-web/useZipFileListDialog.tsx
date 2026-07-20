@@ -15,7 +15,7 @@ import {
 } from "./utils";
 import { getFfmpegStreamingEnabled, getFfmpegStreamingMode } from "./ffmpegPreference";
 import { resolvePlayableUrl } from "./resolvePlayableSource";
-import { shareBlobFile } from "./api";
+import { shareBlobFile, unshareBlobFiles } from "./api";
 import type {
     ZipSource,
     ArchiveExtractorEntry,
@@ -139,10 +139,25 @@ function ZipFileListDialog({
     const [password, setPassword] = useState("");
     const extractorRef = useRef<ArchiveExtractor | null>(null);
     const sharedArchivePlaybackUrlCacheRef = useRef<Map<string, Promise<string>>>(new Map());
+    const sharedArchivePlaybackIdsRef = useRef<Set<string>>(new Set());
     const { showPreviewDialog } = usePreviewDialog();
     const { showZipFileListDialog } = useZipFileListDialog();
     const isArchiveFfmpegEnabled = getFfmpegStreamingEnabled();
     const archiveFfmpegMode = getFfmpegStreamingMode();
+
+    const cleanupSharedArchivePlaybackFiles = React.useCallback(async () => {
+        const ids = [...sharedArchivePlaybackIdsRef.current];
+        if (ids.length === 0) {
+            return;
+        }
+        sharedArchivePlaybackIdsRef.current.clear();
+        sharedArchivePlaybackUrlCacheRef.current.clear();
+        try {
+            await unshareBlobFiles(ids);
+        } catch (error) {
+            console.warn("[archive-preview] failed to cleanup shared blob files", error);
+        }
+    }, []);
 
     React.useEffect(() => {
         let cancelled = false;
@@ -165,8 +180,9 @@ function ZipFileListDialog({
         return () => {
             cancelled = true;
             extractorRef.current = null;
+            void cleanupSharedArchivePlaybackFiles();
         };
-    }, [source, initialPath, title]);
+    }, [cleanupSharedArchivePlaybackFiles, source, initialPath, title]);
     const readArchiveFile = React.useCallback(
         async (
             file: ZipTargetFile,
@@ -214,6 +230,7 @@ function ZipFileListDialog({
                     entryBlob,
                     file.path.replace(/^\/+/, "").replace(/\//g, "__")
                 );
+                sharedArchivePlaybackIdsRef.current.add(shared.id);
                 return resolvePlayableUrl(shared, true, archiveFfmpegMode);
             })();
 
@@ -315,7 +332,10 @@ function ZipFileListDialog({
                     </button>
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => {
+                            void cleanupSharedArchivePlaybackFiles();
+                            onClose();
+                        }}
                         aria-label="Close"
                         className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                     >

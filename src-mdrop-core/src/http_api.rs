@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio_util::io::ReaderStream;
 
-use crate::http::SharedHttpServerContext;
+use crate::http::{shared_blob_temp_dir, SharedHttpServerContext};
 use crate::http_utils::{content_disposition_inline, natural_sort_key, parse_range_header};
 use crate::http_utils::{
     content_type_from_path, escape_header_value, escape_html, url_encode_path_segment,
@@ -149,37 +149,15 @@ fn build_shared_file_info(
     state: &SharedHttpServerContext,
     path: PathBuf,
     display_path: String,
+    temporary: bool,
 ) -> Result<SharedFileInfo, String> {
-    let name = PathBuf::from(&display_path)
-        .file_name()
-        .ok_or("invalid file name")?
-        .to_string_lossy()
-        .to_string();
-
-    let id = uuid::Uuid::new_v4().simple().to_string();
-    let is_dir = path.is_dir();
-
-    let (hostname, port) = {
-        let server = state.inner.lock().map_err(|e| e.to_string())?;
-        (
-            server.status.hostname.clone().ok_or("server not started")?,
-            server.status.port.ok_or("server not started")?,
-        )
-    };
-
-    state
-        .inner
-        .lock()
-        .map_err(|e| e.to_string())?
-        .files
-        .insert(id.clone(), path);
-
+    let shared = state.register_shared_file(path, display_path, temporary)?;
     Ok(SharedFileInfo {
-        id: id.clone(),
-        name,
-        is_dir,
-        path: display_path,
-        url: format!("http://{hostname}:{port}/download/{id}"),
+        id: shared.id,
+        name: shared.name,
+        path: shared.path,
+        url: shared.url,
+        is_dir: shared.is_dir,
     })
 }
 
@@ -200,7 +178,7 @@ pub async fn api_share_blob_file(
         .filter(|name| !name.trim().is_empty())
         .unwrap_or_else(|| "archive-entry.bin".to_string());
 
-    let export_dir = std::env::temp_dir().join("tetorica-mdrop-shared-blobs");
+    let export_dir = shared_blob_temp_dir();
     std::fs::create_dir_all(&export_dir)
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
 
@@ -213,11 +191,25 @@ pub async fn api_share_blob_file(
     std::fs::write(&stored_path, body)
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
 
-    let shared = build_shared_file_info(&state, stored_path, safe_filename)
+    let shared = build_shared_file_info(&state, stored_path, safe_filename, true)
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
 
     serde_json::to_string(&shared)
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+}
+
+pub async fn api_unshare_blob_files(
+    AxumState(state): AxumState<SharedHttpServerContext>,
+    body: Bytes,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let ids: Vec<String> = serde_json::from_slice(&body)
+        .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+
+    for id in ids {
+        let _ = state.unshare_file(&id);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 

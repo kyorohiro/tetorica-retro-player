@@ -105,12 +105,34 @@ const shareBlobFile = async (blob: Blob, filename: string): Promise<SharedFileIn
     return await resp.json();
 }
 
+const unshareBlobFiles = async (ids: string[]): Promise<void> => {
+    if (ids.length === 0) {
+        return;
+    }
+    const meta = await getMeta();
+    const resp = await fetch(
+        `${meta.apiServer}/api/unshareBlobFiles`,
+        {
+            method: "POST",
+            headers: {
+                "X-mDrop-API-Key": window.__MDROP_CONFIG__?.apiKey ?? "",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(ids),
+        }
+    );
+    if (!resp.ok) {
+        throw new Error(`unshareBlobFiles failed: ${resp.status}`);
+    }
+}
+
 
 export {
     getDownloadList,
     getFiles,
     getMeta,
     shareBlobFile,
+    unshareBlobFiles,
 }
 
 export type {

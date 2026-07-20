@@ -164,6 +164,8 @@ pub struct HttpServerContext {
     pub local_only: bool,
     pub web_enabled: bool,
     pub files: HashMap<String, PathBuf>,
+    pub temporary_files: HashSet<String>,
+    pub temporary_file_order: VecDeque<String>,
     pub hls_sessions: HashMap<String, PathBuf>,
     pub hls_starting_sessions: HashSet<String>,
     pub hls_children: HashMap<String, tokio::process::Child>,
@@ -177,6 +179,24 @@ pub struct HttpServerContext {
     /// Receives `true` once the ffmpeg pre-warm finishes so HLS requests can
     /// wait for GateKeeper to clear before spawning a new ffmpeg process.
     pub ffmpeg_prewarm_rx: Option<watch::Receiver<bool>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RegisteredSharedFile {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub url: String,
+    pub is_dir: bool,
+}
+
+pub fn shared_blob_temp_dir() -> PathBuf {
+    std::env::temp_dir().join("tetorica-mdrop-shared-blobs")
+}
+
+fn cleanup_shared_blob_temp_dir() {
+    let dir = shared_blob_temp_dir();
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 fn bind_to_free_port(preferred: u16) -> Result<(std::net::TcpListener, u16), String> {
@@ -209,6 +229,8 @@ impl HttpServerContext {
             local_only: true,
             web_enabled: false,
             files: HashMap::new(),
+            temporary_files: HashSet::new(),
+            temporary_file_order: VecDeque::new(),
             hls_sessions: HashMap::new(),
             hls_starting_sessions: HashSet::new(),
             hls_children: HashMap::new(),
@@ -357,9 +379,127 @@ fn embedded_file_response(path: &str) -> Response {
 
 impl SharedHttpServerContext {
     pub fn new() -> Self {
+        cleanup_shared_blob_temp_dir();
         Self {
             inner: Arc::new(Mutex::new(HttpServerContext::new())),
         }
+    }
+
+    pub fn register_shared_file(
+        &self,
+        path: PathBuf,
+        display_path: String,
+        temporary: bool,
+    ) -> Result<RegisteredSharedFile, String> {
+        let name = PathBuf::from(&display_path)
+            .file_name()
+            .ok_or("invalid file name")?
+            .to_string_lossy()
+            .to_string();
+
+        let id = uuid::Uuid::new_v4().simple().to_string();
+        let is_dir = path.is_dir();
+
+        let (hostname, port, stale_paths) = {
+            let mut server = self.inner.lock().map_err(|e| e.to_string())?;
+            let hostname = server.status.hostname.clone().ok_or("server not started")?;
+            let port = server.status.port.ok_or("server not started")?;
+            server.files.insert(id.clone(), path);
+            if temporary {
+                server.temporary_files.insert(id.clone());
+                if let Some(index) = server
+                    .temporary_file_order
+                    .iter()
+                    .position(|existing| existing == &id)
+                {
+                    server.temporary_file_order.remove(index);
+                }
+                server.temporary_file_order.push_back(id.clone());
+            }
+            let stale_paths = if temporary {
+                let limit = server.ffmpeg_max_concurrent_hls_sessions.max(1);
+                Self::collect_stale_temporary_files(&mut server, limit)
+            } else {
+                Vec::new()
+            };
+            (hostname, port, stale_paths)
+        };
+
+        for path in stale_paths {
+            if path.is_file() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+
+        Ok(RegisteredSharedFile {
+            id: id.clone(),
+            name,
+            is_dir,
+            path: display_path,
+            url: format!("http://{hostname}:{port}/download/{id}"),
+        })
+    }
+
+    pub fn unshare_file(&self, id: &str) -> Result<(), String> {
+        let (path, was_temporary) = {
+            let mut server = self.inner.lock().map_err(|e| e.to_string())?;
+            let path = server.files.remove(id).ok_or("not found")?;
+            let was_temporary = server.temporary_files.remove(id);
+            if let Some(index) = server
+                .temporary_file_order
+                .iter()
+                .position(|existing| existing == id)
+            {
+                server.temporary_file_order.remove(index);
+            }
+            (path, was_temporary)
+        };
+
+        if was_temporary && path.is_file() {
+            let _ = std::fs::remove_file(&path);
+        }
+        Ok(())
+    }
+
+    pub fn unshare_all_files(&self) {
+        let temporary_paths = {
+            let mut server = match self.inner.lock() {
+                Ok(server) => server,
+                Err(_) => return,
+            };
+            let temporary_ids: HashSet<String> = server.temporary_files.drain().collect();
+            let files = std::mem::take(&mut server.files);
+            server.temporary_file_order.clear();
+            files
+                .into_iter()
+                .filter_map(|(id, path)| temporary_ids.contains(&id).then_some(path))
+                .collect::<Vec<_>>()
+        };
+
+        for path in temporary_paths {
+            if path.is_file() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+
+    fn collect_stale_temporary_files(
+        server: &mut HttpServerContext,
+        limit: usize,
+    ) -> Vec<PathBuf> {
+        let mut stale_paths = Vec::new();
+        while server.temporary_files.len() > limit {
+            let Some(oldest_id) = server.temporary_file_order.pop_front() else {
+                break;
+            };
+            if !server.temporary_files.remove(&oldest_id) {
+                continue;
+            }
+            if let Some(path) = server.files.remove(&oldest_id) {
+                stale_paths.push(path);
+            }
+        }
+        stale_paths
     }
 
     pub fn set_message_callback<F>(&self, callback: F)
@@ -553,6 +693,10 @@ impl SharedHttpServerContext {
                 "/shareBlobFile",
                 axum::routing::post(http_api::api_share_blob_file)
                     .layer(DefaultBodyLimit::disable()),
+            )
+            .route(
+                "/unshareBlobFiles",
+                axum::routing::post(http_api::api_unshare_blob_files),
             )
             .route_layer(middleware::from_fn_with_state(
                 self.clone(),

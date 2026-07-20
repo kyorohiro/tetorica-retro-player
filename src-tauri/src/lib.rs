@@ -109,9 +109,12 @@ async fn mdrop_stop_server(state: State<'_, MDropState>) -> Result<ServerStatus,
         Err("mDrop is disabled on android".to_string())
     }
 
-    #[cfg(not(target_os = "android"))]
+#[cfg(not(target_os = "android"))]
     {
-        state.server.stop_server()
+        let status = state.server.stop_server()?;
+        state.server.unshare_all_files();
+        state.server.cleanup_hls_sessions();
+        Ok(status)
     }
 }
 
@@ -173,37 +176,13 @@ fn build_shared_file_info(
     path: PathBuf,
     display_path: String,
 ) -> Result<SharedFileInfo, String> {
-    let name = PathBuf::from(&display_path)
-        .file_name()
-        .ok_or("invalid file name")?
-        .to_string_lossy()
-        .to_string();
-
-    let id = uuid::Uuid::new_v4().simple().to_string();
-    let is_dir = path.is_dir();
-
-    let (hostname, port) = {
-        let server = state.server.inner.lock().map_err(|e| e.to_string())?;
-        (
-            server.status.hostname.clone().ok_or("server not started")?,
-            server.status.port.ok_or("server not started")?,
-        )
-    };
-
-    state
-        .server
-        .inner
-        .lock()
-        .map_err(|e| e.to_string())?
-        .files
-        .insert(id.clone(), path);
-
+    let shared = state.server.register_shared_file(path, display_path, false)?;
     Ok(SharedFileInfo {
-        id: id.clone(),
-        name,
-        is_dir,
-        path: display_path,
-        url: format!("http://{hostname}:{port}/download/{id}"),
+        id: shared.id,
+        name: shared.name,
+        is_dir: shared.is_dir,
+        path: shared.path,
+        url: shared.url,
     })
 }
 
@@ -312,9 +291,7 @@ async fn mdrop_unshare_file(
 
     #[cfg(not(target_os = "android"))]
     {
-        let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
-        server.files.remove(&req.id).ok_or("not found")?;
-        Ok(())
+        state.server.unshare_file(&req.id)
     }
 }
 
@@ -328,9 +305,7 @@ async fn mdrop_unshare_all(state: State<'_, MDropState>) -> Result<(), String> {
 
     #[cfg(not(target_os = "android"))]
     {
-        let mut server = state.server.inner.lock().map_err(|e| e.to_string())?;
-        server.files.clear();
-        drop(server);
+        state.server.unshare_all_files();
         state.server.cleanup_hls_sessions();
         Ok(())
     }
