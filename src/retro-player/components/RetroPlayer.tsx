@@ -180,9 +180,15 @@ export function RetroPlayer({
   const [renderResolutionPreset, setRenderResolutionPreset] = React.useState<1 | 2>(
     resolveRenderResolutionPreset(persistedUiSettings),
   );
+  const [maximizePerformanceMode, setMaximizePerformanceMode] = React.useState<"auto" | "on" | "off">(
+    persistedUiSettings?.maximizePerformanceMode ?? "auto",
+  );
   const isHighResolution = renderResolutionPreset > 1;
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(
     () => previewLayoutState?.isFitWidthEnabled ?? false,
+  );
+  const [isPreviewMaximizedForRenderer, setIsPreviewMaximizedForRenderer] = React.useState(
+    () => previewLayoutState?.isPreviewMaximized ?? persistedUiSettings?.isPreviewMaximized ?? false,
   );
   const [controlPanelMode, setControlPanelMode] = React.useState<
     "playback" | "audio-settings" | "video-settings"
@@ -242,6 +248,8 @@ export function RetroPlayer({
       onNextTrack,
       playbackSource,
       preferNativeVideoSurface: nativePlaybackMode,
+      isPreviewMaximized: isPreviewMaximizedForRenderer,
+      maximizePerformanceMode,
       locale,
       requestedKind: kind,
       requestedIndex: displayIndex,
@@ -399,6 +407,7 @@ export function RetroPlayer({
     (presetKey: RetroPresetKey) => {
       filterState.applyPreset(presetKey);
       phosphorDotAspectActiveRef.current = presetKey === "phosphorDot";
+      autoTargetSizeAppliedKeyRef.current = null;
 
       // "None" is meant to be a neutral pass-through, not a way to also
       // silence audio effects — keep Effect on (Noise is left as-is).
@@ -605,8 +614,11 @@ export function RetroPlayer({
             onFitWidthChange={setIsFitWidthEnabled}
             onError={onError}
             onIsPinnedPreviewChange={setIsPinnedInPreview}
+            onIsPreviewMaximizedChange={setIsPreviewMaximizedForRenderer}
             previewLayoutState={previewLayoutState}
             onPreviewLayoutStateChange={onPreviewLayoutStateChange}
+            maximizePerformanceMode={maximizePerformanceMode}
+            onMaximizePerformanceModeChange={setMaximizePerformanceMode}
             analyserRef={player.analyserRef}
             showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}
@@ -718,8 +730,11 @@ export function RetroPlayer({
               onFitWidthChange={setIsFitWidthEnabled}
               onError={onError}
               onIsPinnedPreviewChange={setIsPinnedInPreview}
+              onIsPreviewMaximizedChange={setIsPreviewMaximizedForRenderer}
               previewLayoutState={previewLayoutState}
               onPreviewLayoutStateChange={onPreviewLayoutStateChange}
+              maximizePerformanceMode={maximizePerformanceMode}
+              onMaximizePerformanceModeChange={setMaximizePerformanceMode}
               analyserRef={player.analyserRef}
               showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}

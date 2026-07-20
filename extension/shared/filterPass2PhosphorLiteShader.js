@@ -35,6 +35,7 @@ uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
 uniform float uPhosphorDotNeighborBlend;
 uniform float uPhosphorDotGrainStrength;
+uniform float uPhosphorDotGlowColorStrength;
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
 uniform float uSignalVerticalSync;
@@ -187,7 +188,10 @@ vec3 applyBasicColorControls(vec3 color)
 vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
 {
   if (amount <= 0.0) {
-    return color;
+    bool useBeamShapeEarly = uPhosphorDotShape > 1.5;
+    if (!useBeamShapeEarly) {
+      return color;
+    }
   }
 
   float brightness = max(max(color.r, color.g), color.b);
@@ -228,7 +232,96 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float haloRadius =
     dotRadius +
     mix(0.028, 0.12 + highlightBloom * 0.08, brightness) * brightCoreHaloBoost;
-  bool useHeartShape = uPhosphorDotShape > 0.5;
+  bool useBeamShape = uPhosphorDotShape > 1.5;
+  bool useHeartShape = uPhosphorDotShape > 0.5 && uPhosphorDotShape < 1.5;
+  if (useBeamShape) {
+    float beamAmount = max(amount, 0.68);
+    float beamLightLevel = 1.42;
+    float beamDotRadius = mix(0.16, 0.34, radiusBias) * radiusJitter;
+    float beamHaloRadius = beamDotRadius + mix(0.08, 0.24, brightness);
+    float beamEdge = 0.012 + highlightBloom * 0.006;
+    float beamBarHalfWidth = beamDotRadius * (0.18 + brightness * 0.03);
+    float beamBarHalfHeight = beamDotRadius * (0.96 + brightness * 0.14 + highlightBloom * 0.1);
+    float beamHorizontalHalfWidth = beamHaloRadius * (2.85 + brightness * 0.9 + highlightBloom * 0.7);
+    float beamHorizontalHalfHeight = beamDotRadius * (0.14 + brightness * 0.03);
+    float beamVerticalCoreX = dotUv.x / max(beamDotRadius * 0.18, 0.0001);
+    float beamVerticalCoreY = dotUv.y / max(beamDotRadius * 0.76, 0.0001);
+    float beamHorizontalX = dotUv.x / max(beamHorizontalHalfWidth, 0.0001);
+    float beamHorizontalY = dotUv.y / max(beamHorizontalHalfHeight, 0.0001);
+    float beamVerticalGlowX = dotUv.x / max(beamDotRadius * 0.34, 0.0001);
+    float beamVerticalGlowY = dotUv.y / max(beamHaloRadius * 1.06, 0.0001);
+    float beamCrossHaloX = dotUv.x / max(beamHaloRadius * 0.92, 0.0001);
+    float beamCrossHaloY = dotUv.y / max(beamHaloRadius * 0.92, 0.0001);
+
+    float verticalBar =
+      (1.0 - smoothstep(beamBarHalfWidth, beamBarHalfWidth + beamEdge, abs(dotUv.x))) *
+      (1.0 - smoothstep(beamBarHalfHeight, beamBarHalfHeight + beamEdge, abs(dotUv.y)));
+    float verticalCore =
+      exp(
+        -(
+          beamVerticalCoreX * beamVerticalCoreX +
+          beamVerticalCoreY * beamVerticalCoreY
+        )
+      );
+    float horizontalBeam =
+      exp(
+        -(
+          beamHorizontalX * beamHorizontalX +
+          beamHorizontalY * beamHorizontalY
+        )
+      );
+    float verticalGlow =
+      exp(
+        -(
+          beamVerticalGlowX * beamVerticalGlowX +
+          beamVerticalGlowY * beamVerticalGlowY
+        )
+      );
+    float crossHalo =
+      exp(
+        -(
+          beamCrossHaloX * beamCrossHaloX +
+          beamCrossHaloY * beamCrossHaloY
+        )
+      );
+
+    float beamEmission =
+      gate *
+      lit *
+      beamAmount *
+      (
+        verticalCore * mix(
+          1.0 + brightness * 0.56 + highlightBloom * 0.16,
+          1.18 + brightness * 0.74 + highlightBloom * 0.22,
+          0.0
+        ) +
+        verticalBar * (0.1 + brightness * 0.08) +
+        horizontalBeam * (0.58 + brightness * 0.68 + highlightBloom * 0.4) +
+        verticalGlow * (0.04 + brightness * 0.05) +
+        crossHalo * crossHalo * (0.03 + brightness * 0.04 + highlightBloom * 0.05)
+      ) *
+      emissionJitter;
+    float beamFloor =
+      gate *
+      lit *
+      beamAmount *
+      ((0.01 + verticalGlow * 0.02 + crossHalo * 0.01)) *
+      (1.0 + cellJitter * 0.02);
+    float beamCellFill =
+      gate *
+      lit *
+      beamAmount *
+      (0.06 + brightness * 0.06) *
+      verticalBar;
+    float whiteMix = smoothstep(0.78, 1.0, luminance) * (1.0 - smoothstep(0.08, 0.36, saturation));
+    float flareCore = verticalCore * (0.24 + highlightBloom * 0.28) + horizontalBeam * (0.34 + highlightBloom * 0.42);
+    vec3 beamColor = color * beamEmission;
+    beamColor += color * beamCellFill;
+    beamColor += color * beamFloor;
+    beamColor += vec3(1.0) * flareCore * whiteMix * beamAmount * (0.38 + highlightBloom * 0.42);
+    return beamColor * beamLightLevel;
+  }
+
   if (useHeartShape) {
     vec2 heartUv = dotUv / max(dotRadius, 0.0001);
     heartUv.x *= 1.02;
@@ -646,8 +739,9 @@ void main(void)
 
     float vignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
-    phosphorColor = applySignalChromaInstability(phosphorColor, pixelatedUv);
-    phosphorColor = applySignalStaticNoise(phosphorColor, unstableUv);
+    // Temporarily disabled for performance/chattering investigation on Windows.
+    // phosphorColor = applySignalChromaInstability(phosphorColor, pixelatedUv);
+    // phosphorColor = applySignalStaticNoise(phosphorColor, unstableUv);
 
     finalColor = vec4(clamp(phosphorColor * uOutputBrightness, 0.0, 1.0), 1.0);
     return;
@@ -674,27 +768,35 @@ void main(void)
     phosphorTriad = mix(vec3(0.5), phosphorTriad, 0.7);
     color.rgb *= mix(vec3(1.0), 0.82 + phosphorTriad * 0.42, uPhosphorStrength);
 
-    // Approximates a phosphor "glow" feel without a discrete dot grid: bright
-    // cells bleed a little of their neighbors' color in. Works on the
-    // existing target grid (no small-grid downscale), so it can't alias the
-    // way the phosphor-dot mode's per-cell rendering does.
-    vec3 glowRightColor = texture(uPass1Texture, clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowLeftColor = texture(uPass1Texture, clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowUpColor = texture(uPass1Texture, clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowDownColor = texture(uPass1Texture, clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
-    vec3 glowNeighborAvg = (glowRightColor + glowLeftColor + glowUpColor + glowDownColor) * 0.25;
-    float glowAmount = smoothstep(0.5, 1.0, brightness) * uPhosphorStrength;
-    color.rgb += glowNeighborAvg * glowAmount * 0.28;
-    float glowLuma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    color.rgb = mix(color.rgb, mix(vec3(glowLuma), glowNeighborAvg, 0.6), glowAmount * 0.35);
+    // 0 keeps the current performance-safe path. Raising this revives the old
+    // 4-neighbor glow blend experimentally for comparison/tuning.
+    if (uPhosphorDotGlowColorStrength > 0.001) {
+      vec3 glowRightColor = texture(uPass1Texture, clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+      vec3 glowLeftColor = texture(uPass1Texture, clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+      vec3 glowUpColor = texture(uPass1Texture, clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+      vec3 glowDownColor = texture(uPass1Texture, clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb;
+      vec3 glowNeighborAvg = (glowRightColor + glowLeftColor + glowUpColor + glowDownColor) * 0.25;
+      float glowAmount =
+        smoothstep(0.5, 1.0, brightness) *
+        uPhosphorStrength *
+        uPhosphorDotGlowColorStrength;
+      color.rgb += glowNeighborAvg * glowAmount * 0.28;
+      float glowLuma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      color.rgb = mix(
+        color.rgb,
+        mix(vec3(glowLuma), glowNeighborAvg, 0.6),
+        glowAmount * 0.35
+      );
+    }
   }
 
   if (uSpotMaskStrength > 0.001) {
     color.rgb = applySpotMask(color.rgb, unstableUv, uTargetSize, uSpotMaskStrength);
   }
 
-  color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
-  color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
+  // Temporarily disabled for performance/chattering investigation on Windows.
+  // color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
+  // color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;

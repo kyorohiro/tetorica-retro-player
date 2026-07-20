@@ -95,6 +95,11 @@ type RetroFilterPanelProps = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotGlowColorStrength: number;
+  beamDarkCutoff: number;
+  beamHorizontalSpread: number;
+  beamStripeStrength: number;
+  beamWhiteBloom: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -142,6 +147,11 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
+  onSetPhosphorDotGlowColorStrength: (value: number) => void;
+  onSetBeamDarkCutoff: (value: number) => void;
+  onSetBeamHorizontalSpread: (value: number) => void;
+  onSetBeamStripeStrength: (value: number) => void;
+  onSetBeamWhiteBloom: (value: number) => void;
   onSetSignalInstabilityEnabled: (value: boolean) => void;
   onSetSignalInstabilityStrength: (value: number) => void;
   onSetSignalInstabilityFrequency: (value: number) => void;
@@ -190,6 +200,11 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
+  phosphorDotGlowColorStrength,
+  beamDarkCutoff,
+  beamHorizontalSpread,
+  beamStripeStrength,
+  beamWhiteBloom,
   signalInstabilityEnabled,
   signalInstabilityStrength,
   signalInstabilityFrequency,
@@ -234,6 +249,11 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
+  onSetPhosphorDotGlowColorStrength,
+  onSetBeamDarkCutoff,
+  onSetBeamHorizontalSpread,
+  onSetBeamStripeStrength,
+  onSetBeamWhiteBloom,
   onSetSignalInstabilityEnabled,
   onSetSignalInstabilityStrength,
   onSetSignalInstabilityFrequency,
@@ -307,6 +327,14 @@ export function RetroFilterPanel({
             "Saturation Low / High の閾値外で圧縮できる余裕幅です。上げると閾値を超えた先まで緩やかに追従し、下げるとタイトに切れます。",
           lightLevel:
             "色付き phosphor バルブ全体の明るさを一様に調整します。下げると全体が暗くなり、上げると均一に明るくなります。",
+          beamDarkCutoff:
+            "暗い pixel を beam 光源として扱い始めるしきい値です。上げると暗部の RGB やモアレが減り、下げると細部まで光りやすくなります。",
+          beamHorizontalSpread:
+            "横方向へ光が伸びる広がりです。上げるほど beam が左右へつながりやすくなり、下げると点の独立感が強くなります。",
+          beamStripeStrength:
+            "RGB バー自体の見えやすさです。上げると格子や triad が前に出て、下げると発光面の印象が強くなります。",
+          beamWhiteBloom:
+            "明るい部分の白い発光芯の強さです。上げるとハイライトが熱っぽく光り、下げると色バーの輪郭が残りやすくなります。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -376,6 +404,14 @@ export function RetroFilterPanel({
             "Sets the headroom beyond the Low and High thresholds before the compressor clips. Higher values allow more range; lower values are tighter.",
           lightLevel:
             "Scales the brightness of the colored phosphor bulbs uniformly, like changing the drive voltage. Lower values dim the whole dot; higher values brighten it evenly.",
+          beamDarkCutoff:
+            "Sets how bright a source pixel must be before Beam Cross treats it as a light source. Higher values reduce dark-area RGB and moire; lower values let dim detail glow more easily.",
+          beamHorizontalSpread:
+            "Controls how far the beam stretches horizontally. Higher values connect neighboring light more easily; lower values keep each lit point more separate.",
+          beamStripeStrength:
+            "Controls how visible the RGB bar structure is. Higher values bring the stripe grid forward; lower values favor the luminous surface instead.",
+          beamWhiteBloom:
+            "Controls the strength of the white hot core in bright highlights. Higher values feel hotter and more emissive; lower values preserve more of the colored bar structure.",
           outputBrightness:
             "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
           basicContrast:
@@ -396,6 +432,7 @@ export function RetroFilterPanel({
             "Sets how tall the sharp center stays vertically. Lower values make the top and bottom blur sooner; higher values preserve a taller in-focus band.",
         };
   const isPhosphorDotModeActive =
+    phosphorDotShape !== "beam" &&
     spotMaskStrength > 0.001 &&
     (
       phosphorDotInternalScale > 1 ||
@@ -404,8 +441,7 @@ export function RetroFilterPanel({
       phosphorDotFlatDisc ||
       phosphorDotNeighborBlend
     );
-  const signalInstabilityControlsDisabled = !signalInstabilityEnabled;
-
+  const isBeamCrossModeActive = phosphorDotShape === "beam";
   const presetButtonClass = (isSelected: boolean, isFeatured?: boolean) => [
     "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
     isSelected
@@ -949,61 +985,81 @@ export function RetroFilterPanel({
                 </span>
               ) : null}
             </label>
-            <label className="block rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
-              <span className="flex items-center justify-between gap-3 text-[#12141c]">
-                <InfoTip
-                  label="Signal Instability"
-                  text={helpText.signalInstability}
-                  helpSuffix={helpText.helpSuffix}
-                />
-                <input
-                  type="checkbox"
-                  checked={signalInstabilityEnabled}
-                  onChange={(ev) => onSetSignalInstabilityEnabled(ev.currentTarget.checked)}
-                  className="h-4 w-4 rounded border-[#8a7f72] text-[#12141c]"
-                />
+            <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
+              <span className="text-[11px] leading-tight text-[#12141c]">
+                CRT GlowColor bar: {phosphorDotGlowColorStrength <= 0 ? "off" : phosphorDotGlowColorStrength.toFixed(2)}
               </span>
-              <div className="mt-3 flex flex-col gap-3">
-                <span className={signalInstabilityControlsDisabled ? "opacity-60" : ""}>
-                  <span className="text-[#12141c]">
-                    <InfoTip
-                      label={`Instability strength: ${signalInstabilityStrength.toFixed(2)}`}
-                      text={helpText.signalInstability}
-                      helpSuffix={helpText.helpSuffix}
-                    />
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={signalInstabilityStrength}
-                    onChange={(ev) => onSetSignalInstabilityStrength(Number(ev.currentTarget.value))}
-                    disabled={signalInstabilityControlsDisabled}
-                    className="mt-2 w-full"
-                  />
-                </span>
-                <span className={signalInstabilityControlsDisabled ? "opacity-60" : ""}>
-                  <span className="text-[#12141c]">
-                    <InfoTip
-                      label={`Instability frequency: ${signalInstabilityFrequency.toFixed(2)}`}
-                      text={helpText.signalInstabilityFrequency}
-                      helpSuffix={helpText.helpSuffix}
-                    />
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={signalInstabilityFrequency}
-                    onChange={(ev) => onSetSignalInstabilityFrequency(Number(ev.currentTarget.value))}
-                    disabled={signalInstabilityControlsDisabled}
-                    className="mt-2 w-full"
-                  />
-                </span>
-              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={phosphorDotGlowColorStrength}
+                onChange={(ev) => {
+                  onSetPhosphorDotGlowColorStrength(Number(ev.currentTarget.value));
+                }}
+                className="mt-1 w-full"
+              />
             </label>
+            <div className="rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onSetSignalInstabilityEnabled(!signalInstabilityEnabled);
+                }}
+                className={[
+                  "w-full rounded-lg border px-3 py-2 text-left text-[11px] leading-tight text-[#12141c]",
+                  signalInstabilityEnabled
+                    ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                <span className="block">Signal Instability</span>
+                <span className="mt-1 block text-[10px] font-normal text-[#7a7268]">
+                  {signalInstabilityEnabled ? "On" : "Off"}
+                </span>
+              </button>
+              {signalInstabilityEnabled ? (
+                <div className="mt-3 flex flex-col gap-3">
+                  <label className="block">
+                    <span className="text-[#12141c]">
+                      <InfoTip
+                        label={`Signal Instability: ${signalInstabilityStrength.toFixed(2)}`}
+                        text={helpText.signalInstability}
+                        helpSuffix={helpText.helpSuffix}
+                      />
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={signalInstabilityStrength}
+                      onChange={(ev) => onSetSignalInstabilityStrength(Number(ev.currentTarget.value))}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[#12141c]">
+                      <InfoTip
+                        label={`Signal Frequency: ${signalInstabilityFrequency.toFixed(2)}`}
+                        text={helpText.signalInstabilityFrequency}
+                        helpSuffix={helpText.helpSuffix}
+                      />
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={signalInstabilityFrequency}
+                      onChange={(ev) => onSetSignalInstabilityFrequency(Number(ev.currentTarget.value))}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -1322,6 +1378,137 @@ export function RetroFilterPanel({
               className="mt-2 w-full"
             />
           </label>
+        </div>
+
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
+            Beam Cross
+          </div>
+
+          <div className="rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-2 text-[11px] leading-5 text-[#5f5649]">
+            打たれた pixel を光源として扱い、横 beam と縦 flare を合成する別モードです。
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSetPhosphorDotShape("beam");
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                isBeamCrossModeActive
+                  ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Beam Cross: On
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (phosphorDotShape === "beam") {
+                  onSetPhosphorDotShape("circle");
+                }
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                !isBeamCrossModeActive
+                  ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Beam Cross: Off
+            </button>
+          </div>
+
+          {isBeamCrossModeActive && (
+            <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
+              <label className="block">
+                <span className="text-[#12141c]">
+                  <InfoTip
+                    label={`Beam cutoff: ${beamDarkCutoff.toFixed(3)}`}
+                    text={helpText.beamDarkCutoff}
+                    helpSuffix={helpText.helpSuffix}
+                  />
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.15"
+                  step="0.001"
+                  value={beamDarkCutoff}
+                  onChange={(ev) => {
+                    onSetBeamDarkCutoff(Number(ev.currentTarget.value));
+                  }}
+                  className="mt-2 w-full"
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="text-[#12141c]">
+                  <InfoTip
+                    label={`Horizontal spread: ${beamHorizontalSpread.toFixed(2)}`}
+                    text={helpText.beamHorizontalSpread}
+                    helpSuffix={helpText.helpSuffix}
+                  />
+                </span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.01"
+                  value={beamHorizontalSpread}
+                  onChange={(ev) => {
+                    onSetBeamHorizontalSpread(Number(ev.currentTarget.value));
+                  }}
+                  className="mt-2 w-full"
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="text-[#12141c]">
+                  <InfoTip
+                    label={`Stripe strength: ${beamStripeStrength.toFixed(2)}`}
+                    text={helpText.beamStripeStrength}
+                    helpSuffix={helpText.helpSuffix}
+                  />
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  value={beamStripeStrength}
+                  onChange={(ev) => {
+                    onSetBeamStripeStrength(Number(ev.currentTarget.value));
+                  }}
+                  className="mt-2 w-full"
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="text-[#12141c]">
+                  <InfoTip
+                    label={`White bloom: ${beamWhiteBloom.toFixed(2)}`}
+                    text={helpText.beamWhiteBloom}
+                    helpSuffix={helpText.helpSuffix}
+                  />
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  value={beamWhiteBloom}
+                  onChange={(ev) => {
+                    onSetBeamWhiteBloom(Number(ev.currentTarget.value));
+                  }}
+                  className="mt-2 w-full"
+                />
+              </label>
+            </div>
+          )}
         </div>
 
       </div>

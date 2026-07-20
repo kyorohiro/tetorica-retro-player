@@ -67,6 +67,7 @@ export type RetroPreviewPlayerSlice = {
   canvasHostRef: React.RefObject<HTMLDivElement | null>;
   nativeVisualElement: HTMLVideoElement | HTMLImageElement | null;
   shouldUseNativeVisualSurface: boolean;
+  previewKind: "video" | "audio" | "image" | "capture" | null;
   previewName: string;
   requestedKind: "video" | "audio" | "image";
   requestedIndex: number | null;
@@ -150,8 +151,11 @@ export type RetroPreviewViewProps = {
   onError?: (error: Error) => void;
   fillHeight?: boolean;
   onIsPinnedPreviewChange?: (isPinned: boolean) => void;
+  onIsPreviewMaximizedChange?: (isMaximized: boolean) => void;
   previewLayoutState?: RetroPreviewLayoutState;
   onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
+  maximizePerformanceMode: "auto" | "on" | "off";
+  onMaximizePerformanceModeChange: (value: "auto" | "on" | "off") => void;
   analyserRef?: React.RefObject<AnalyserNode | null>;
   showVideoSpectrum?: boolean;
   showClockOverlay?: boolean;
@@ -179,8 +183,11 @@ export function RetroPreviewView({
   onError,
   fillHeight = false,
   onIsPinnedPreviewChange,
+  onIsPreviewMaximizedChange,
   previewLayoutState,
   onPreviewLayoutStateChange,
+  maximizePerformanceMode,
+  onMaximizePerformanceModeChange,
   analyserRef,
   showVideoSpectrum,
   showClockOverlay,
@@ -387,6 +394,7 @@ export function RetroPreviewView({
         isPreviewMaximized,
         isHighResolution,
         renderResolutionPreset,
+        maximizePerformanceMode,
         brightness,
         flipH,
         flipV,
@@ -395,7 +403,19 @@ export function RetroPreviewView({
     return () => {
       window.clearTimeout(id);
     };
-  }, [isHighResolution, isPreviewMaximized, renderResolutionPreset, brightness, flipH, flipV]);
+  }, [
+    brightness,
+    flipH,
+    flipV,
+    isHighResolution,
+    isPreviewMaximized,
+    maximizePerformanceMode,
+    renderResolutionPreset,
+  ]);
+
+  React.useEffect(() => {
+    onIsPreviewMaximizedChange?.(isPreviewMaximized);
+  }, [isPreviewMaximized, onIsPreviewMaximizedChange]);
 
   React.useEffect(() => {
     if (!previewLayoutState) return;
@@ -629,7 +649,7 @@ export function RetroPreviewView({
   React.useEffect(() => {
     scheduleRefreshLayout();
     const shouldHoldRefresh =
-      ((isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized) || isPreviewMaximized;
+      (isPreviewPinned || isAutoPreviewPinned) && !isPreviewMaximized;
     if (!shouldHoldRefresh) {
       return;
     }
@@ -1350,6 +1370,8 @@ export function RetroPreviewView({
                 onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
                 onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
                 onLatencyHintChange={player.setLatencyHint}
+                maximizePerformanceMode={maximizePerformanceMode}
+                onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
                 ffmpegUseQsv={ffmpegUseQsv}
                 onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
                 ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1406,6 +1428,8 @@ export function RetroPreviewView({
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
               onLatencyHintChange={player.setLatencyHint}
+              maximizePerformanceMode={maximizePerformanceMode}
+              onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1461,6 +1485,8 @@ export function RetroPreviewView({
               onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
               onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
               onLatencyHintChange={player.setLatencyHint}
+              maximizePerformanceMode={maximizePerformanceMode}
+              onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1516,6 +1542,8 @@ export function RetroPreviewView({
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onLatencyHintChange={player.setLatencyHint}
+            maximizePerformanceMode={maximizePerformanceMode}
+            onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1569,6 +1597,8 @@ export function RetroPreviewView({
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onLatencyHintChange={player.setLatencyHint}
+            maximizePerformanceMode={maximizePerformanceMode}
+            onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1624,6 +1654,8 @@ export function RetroPreviewView({
             onNativeAudioSuppressionOverrideChange={player.setNativeAudioSuppressionOverride}
             onPreferNativeHlsOverrideChange={player.setPreferNativeHlsOverride}
             onLatencyHintChange={player.setLatencyHint}
+            maximizePerformanceMode={maximizePerformanceMode}
+            onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}

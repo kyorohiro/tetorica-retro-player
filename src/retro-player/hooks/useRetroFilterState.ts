@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
   normalizePhosphorDotShape,
@@ -50,6 +51,11 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotGlowColorStrength: number;
+  beamDarkCutoff: number;
+  beamHorizontalSpread: number;
+  beamStripeStrength: number;
+  beamWhiteBloom: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -110,6 +116,11 @@ const doesPresetMatchState = (
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
     (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
+    (preset.phosphorDotGlowColorStrength ?? 0) === state.phosphorDotGlowColorStrength &&
+    (preset.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff) === state.beamDarkCutoff &&
+    (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
+    (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
+    (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
     (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
     (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
     (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
@@ -211,6 +222,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     phosphorDotGrainStrength:
       initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
+    phosphorDotGlowColorStrength:
+      initialState.phosphorDotGlowColorStrength ?? (DEFAULT_PRESET.phosphorDotGlowColorStrength ?? 0),
+    beamDarkCutoff:
+      initialState.beamDarkCutoff ?? (DEFAULT_PRESET.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff),
+    beamHorizontalSpread:
+      initialState.beamHorizontalSpread ?? (DEFAULT_PRESET.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread),
+    beamStripeStrength:
+      initialState.beamStripeStrength ?? (DEFAULT_PRESET.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength),
+    beamWhiteBloom:
+      initialState.beamWhiteBloom ?? (DEFAULT_PRESET.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom),
     signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
     signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
     signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
@@ -447,6 +468,44 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPhosphorDotGlowColorStrength = (value: number) => {
+    const phosphorDotGlowColorStrength = Math.max(0, value);
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotGlowColorStrength === phosphorDotGlowColorStrength
+        ? current
+        : { ...current, phosphorDotGlowColorStrength }
+    ));
+  };
+
+  const setBeamDarkCutoff = (beamDarkCutoff: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamDarkCutoff === beamDarkCutoff ? current : { ...current, beamDarkCutoff }
+    ));
+  };
+
+  const setBeamHorizontalSpread = (beamHorizontalSpread: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamHorizontalSpread === beamHorizontalSpread ? current : { ...current, beamHorizontalSpread }
+    ));
+  };
+
+  const setBeamStripeStrength = (beamStripeStrength: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamStripeStrength === beamStripeStrength ? current : { ...current, beamStripeStrength }
+    ));
+  };
+
+  const setBeamWhiteBloom = (beamWhiteBloom: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamWhiteBloom === beamWhiteBloom ? current : { ...current, beamWhiteBloom }
+    ));
+  };
+
   const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -578,6 +637,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
+      phosphorDotGlowColorStrength: presetSettings.phosphorDotGlowColorStrength ?? 0,
+      beamDarkCutoff: presetSettings.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
+      beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
+      beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
+      beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
       signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
       signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
       signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
@@ -657,6 +721,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
     setPhosphorDotGrainStrength,
+    setPhosphorDotGlowColorStrength,
+    setBeamDarkCutoff,
+    setBeamHorizontalSpread,
+    setBeamStripeStrength,
+    setBeamWhiteBloom,
     setSignalInstabilityEnabled,
     setSignalInstabilityStrength,
     setSignalInstabilityFrequency,

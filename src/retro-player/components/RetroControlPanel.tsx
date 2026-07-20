@@ -361,6 +361,11 @@ export function RetroControlPanel({
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
               phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
               phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
+              phosphorDotGlowColorStrength={filterState.phosphorDotGlowColorStrength}
+              beamDarkCutoff={filterState.beamDarkCutoff}
+              beamHorizontalSpread={filterState.beamHorizontalSpread}
+              beamStripeStrength={filterState.beamStripeStrength}
+              beamWhiteBloom={filterState.beamWhiteBloom}
               signalInstabilityEnabled={filterState.signalInstabilityEnabled}
               signalInstabilityStrength={filterState.signalInstabilityStrength}
               signalInstabilityFrequency={filterState.signalInstabilityFrequency}
@@ -408,6 +413,11 @@ export function RetroControlPanel({
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
               onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
               onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
+              onSetPhosphorDotGlowColorStrength={filterState.setPhosphorDotGlowColorStrength}
+              onSetBeamDarkCutoff={filterState.setBeamDarkCutoff}
+              onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
+              onSetBeamStripeStrength={filterState.setBeamStripeStrength}
+              onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
               onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
               onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}
               onSetSignalInstabilityFrequency={filterState.setSignalInstabilityFrequency}

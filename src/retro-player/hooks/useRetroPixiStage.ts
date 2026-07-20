@@ -12,11 +12,12 @@ import {
   TetoricaRetroVideoPipeline,
   getEffectiveRetroTargetSize,
   getRetroVideoSourceSize,
+  isBeamCrossModeEnabled,
   isPhosphorDotModeEnabled,
   type RetroVideoFilterState,
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
-import { isTauriRuntime } from "../platform/runtime";
+import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
 
 const TAURI_HIDDEN_TICK_MS = 250;
 const getPreferredOutputScale = () => {
@@ -42,6 +43,8 @@ type UseRetroPixiStageParams = {
   filterState: RetroFilterState;
   fitMode: "contain" | "width";
   renderResolutionScale: number;
+  isPreviewMaximized: boolean;
+  maximizePerformanceMode: "auto" | "on" | "off";
   isPoweredOn: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   previewKindRef: MutableRefObject<PreviewKind>;
@@ -49,10 +52,35 @@ type UseRetroPixiStageParams = {
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
 
+const resolveMaximizedBufferCap = (
+  mode: "auto" | "on" | "off",
+  previewKind: PreviewKind,
+) => {
+  if (mode === "off") {
+    return null;
+  }
+
+  if (mode === "auto") {
+    if (!isWindowsRuntime()) {
+      return null;
+    }
+    if (previewKind !== "video" && previewKind !== "capture") {
+      return null;
+    }
+  }
+
+  return {
+    width: 1280,
+    height: 720,
+  };
+};
+
 export function useRetroPixiStage({
   filterState,
   fitMode,
   renderResolutionScale,
+  isPreviewMaximized,
+  maximizePerformanceMode,
   isPoweredOn,
   isRecordingRef,
   isPlayingRef,
@@ -357,7 +385,9 @@ export function useRetroPixiStage({
       1,
       Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, effectiveRenderResolutionScale)),
     );
-    const shouldUseLogicalBufferUpscale = isPhosphorDotModeEnabled(currentFilterState);
+    const shouldUseLogicalBufferUpscale =
+      isPhosphorDotModeEnabled(currentFilterState) ||
+      isBeamCrossModeEnabled(currentFilterState);
     const rawNextWidth = currentFilterState.isFilterEnabled
       ? (
         shouldUseLogicalBufferUpscale
@@ -383,8 +413,19 @@ export function useRetroPixiStage({
       rawNextHeight / maxTextureSize,
       1,
     );
-    const nextWidth = Math.max(1, Math.floor(rawNextWidth / overLimitFactor));
-    const nextHeight = Math.max(1, Math.floor(rawNextHeight / overLimitFactor));
+    const maximizeBufferCap = isPreviewMaximized
+      ? resolveMaximizedBufferCap(maximizePerformanceMode, previewKindRef.current)
+      : null;
+    const maximizeCapFactor = maximizeBufferCap
+      ? Math.max(
+        rawNextWidth / maximizeBufferCap.width,
+        rawNextHeight / maximizeBufferCap.height,
+        1,
+      )
+      : 1;
+    const totalScaleDownFactor = Math.max(overLimitFactor, maximizeCapFactor);
+    const nextWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
+    const nextHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
     const nextLeft = Math.round(viewRect.x);
     const nextTop = Math.round(viewRect.y);
     const nextLayoutKey = [
@@ -416,7 +457,13 @@ export function useRetroPixiStage({
     app.pipeline.setPresentationSamplingMode(presentationSamplingMode);
 
     renderFrame();
-  }, [effectiveRenderResolutionScale, fitCurrentSprite, renderFrame]);
+  }, [
+    effectiveRenderResolutionScale,
+    fitCurrentSprite,
+    isPreviewMaximized,
+    maximizePerformanceMode,
+    renderFrame,
+  ]);
 
   const scheduleRefreshLayout = useCallback(() => {
     if (layoutFrameRef.current !== null) {
@@ -650,7 +697,7 @@ export function useRetroPixiStage({
     const scheduleStableHostRefresh = (observed: { width: number; height: number }) => {
       const changed = commitHostSizeIfChanged(observed);
       if (changed) {
-        refreshLayout();
+        scheduleRefreshLayout();
       }
       pendingObservedHostSizeRef.current = observed;
       if (resizeValidationFrameRef.current !== null) {
@@ -665,10 +712,9 @@ export function useRetroPixiStage({
           return;
         }
         if (commitHostSizeIfChanged(settled)) {
-          refreshLayout();
+          scheduleRefreshLayout();
           return;
         }
-        scheduleRefreshLayout();
       });
     };
 
@@ -707,7 +753,7 @@ export function useRetroPixiStage({
       }
       window.removeEventListener("resize", handleResize);
     };
-  }, [refreshLayout, scheduleRefreshLayout]);
+  }, [scheduleRefreshLayout]);
 
   return {
     canvasHostRef,

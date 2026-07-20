@@ -11,14 +11,24 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
-export type PhosphorDotShape = "circle" | "heart";
+export type PhosphorDotShape = "circle" | "heart" | "beam";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
+
+export const DEFAULT_BEAM_CROSS_SETTINGS = {
+  beamDarkCutoff: 0.04,
+  beamHorizontalSpread: 1,
+  beamStripeStrength: 1,
+  beamWhiteBloom: 1,
+} as const;
 
 export const normalizePhosphorDotShape = (
   shape: LegacyPhosphorDotShape | null | undefined,
 ): PhosphorDotShape => {
   if (shape === "heart") {
     return "heart";
+  }
+  if (shape === "beam") {
+    return "beam";
   }
   return "circle";
 };
@@ -66,6 +76,11 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
+  phosphorDotGlowColorStrength?: number;
+  beamDarkCutoff?: number;
+  beamHorizontalSpread?: number;
+  beamStripeStrength?: number;
+  beamWhiteBloom?: number;
   signalInstabilityEnabled?: boolean;
   signalInstabilityStrength?: number;
   signalInstabilityFrequency?: number;
@@ -427,6 +442,7 @@ export const RETRO_PRESETS = {
   phosphorDotLite: {
     label: "Phosphor Dot Lite",
     featured: true,
+    autoTargetSize: true,
     width: 320,
     height: 180,
     colors: 32,
@@ -459,6 +475,7 @@ export const RETRO_PRESETS = {
   phosphorDot: {
     label: "Phosphor Dot",
     featured: true,
+    autoTargetSize: true,
     width: 320,
     height: 180,
     colors: 32,
@@ -487,6 +504,36 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
     outputBrightness: 2.1,
   },
+  crtBeam: {
+    label: "CRT Beam",
+    width: 320,
+    height: 180,
+    colors: 32,
+    dither: 0.55,
+    smoothStrength: 0.55,
+    palette: "free",
+    curvature: 0.01,
+    scanline: 0.0,
+    scanline2: 0.01,
+    vignette: 0.3,
+    glow: 0.08,
+    phosphor: 0.0,
+    spotMask: 0.3,
+    bulbRadius: 0.5,
+    blackFloor: 0.001,
+    phosphorDotShape: "beam",
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 1.27,
+    beamStripeStrength: 0.08,
+    beamWhiteBloom: 1.8,
+    basicContrast: 2.0,
+    basicSaturation: 2.0,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    outputBrightness: 1.0,
+  },
   crtOnly: {
     label: "CRT Only",
     width: 1280,
@@ -513,6 +560,7 @@ export const RETRO_PRESETS = {
     featured: true,
     width: 1280,
     height: 800,
+    autoTargetSize: true,
     colors: 32,
     dither: 0.8,
     smoothStrength: 0.8,
@@ -532,7 +580,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    signalInstabilityEnabled: true,
+    signalInstabilityEnabled: false,
     signalInstabilityStrength: 0.88,
     signalInstabilityFrequency: 0.88,
   },
@@ -565,6 +613,7 @@ export const RETRO_PRESETS = {
   tetorica: {
     label: "Tetorica",
     featured: true,
+    autoTargetSize: true,
     width: 1280,
     height: 800,
     colors: 256,
@@ -687,6 +736,7 @@ export const RETRO_PRESET_CATEGORIES = {
   amberCrt: "crt",
   phosphorDotLite: "crt",
   phosphorDot: "crt",
+  crtBeam: "crt",
   crtOnly: "crt",
   crtEdge: "crt",
   warmBokeh: "crt",

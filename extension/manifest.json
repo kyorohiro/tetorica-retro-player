@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tetorica Retro Player",
-  "version": "0.40.1",
+  "version": "0.40.5",
   "description": "Capture the current tab and preview it with retro CRT video and lo-fi audio effects.",
   "homepage_url": "https://kyorohiro.itch.io/tetorica-retro-player",
   "icons": {
@@ -35,6 +35,7 @@
         "shared/bitcrusherWorklet.js",
         "shared/filterPass1LiteShader.js",
         "shared/filterPass2LiteShader.js",
+        "shared/filterPass2BeamLiteShader.js",
         "shared/filterPass1Pc98LiteShader.js",
         "shared/filterPass2PhosphorLiteShader.js",
         "shared/stereoWidthWorklet.js",

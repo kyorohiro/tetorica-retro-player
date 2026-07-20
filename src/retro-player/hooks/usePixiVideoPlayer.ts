@@ -90,6 +90,8 @@ export function usePixiVideoPlayer(
     onNextTrack?: () => void;
     playbackSource?: "builtin-tone" | "media";
     preferNativeVideoSurface?: boolean;
+    isPreviewMaximized?: boolean;
+    maximizePerformanceMode?: "auto" | "on" | "off";
     locale?: RetroPlayerLocale;
     requestedKind?: "video" | "audio" | "image";
     requestedIndex?: number | null;
@@ -273,6 +275,8 @@ export function usePixiVideoPlayer(
     filterState: effectiveFilterState,
     fitMode,
     renderResolutionScale,
+    isPreviewMaximized: options?.isPreviewMaximized ?? false,
+    maximizePerformanceMode: options?.maximizePerformanceMode ?? "auto",
     isPoweredOn,
     isPlayingRef,
     isRecordingRef,
@@ -1435,6 +1439,10 @@ export function usePixiVideoPlayer(
     filterState.spotMaskStrength,
     filterState.bulbRadius,
     filterState.blackFloor,
+    filterState.beamDarkCutoff,
+    filterState.beamHorizontalSpread,
+    filterState.beamStripeStrength,
+    filterState.beamWhiteBloom,
     filterState.selectedPreset,
     filterState.signalInstabilityEnabled,
     filterState.signalInstabilityStrength,
@@ -1661,6 +1669,7 @@ export function usePixiVideoPlayer(
     setInputTrimAmount,
     hasPlayableMedia,
     hasAudibleMedia,
+    previewKind,
     hasVideo: previewKind === "video" || previewKind === "capture",
     hasAudioOnly: previewKind === "audio",
     hasImage: previewKind === "image" || options?.requestedKind === "image",
