@@ -15,7 +15,7 @@ mod ffmpeg;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+    format!("Hello, {}! You've been greeted from Rust!", name).to_string()
 }
 
 #[tauri::command]
@@ -109,7 +109,7 @@ async fn mdrop_stop_server(state: State<'_, MDropState>) -> Result<ServerStatus,
         Err("mDrop is disabled on android".to_string())
     }
 
-#[cfg(not(target_os = "android"))]
+    #[cfg(not(target_os = "android"))]
     {
         let status = state.server.stop_server()?;
         state.server.unshare_all_files();
@@ -239,14 +239,15 @@ fn collect_native_path_entries(
     for child in children {
         let name = child
             .file_name()
-            .ok_or("invalid file name")?
+            .ok_or("invalid file name".to_string())?
             .to_string_lossy()
             .to_string();
-        let child_display_path = if display_path.is_empty() {
-            name
+        let child_display_path: String;
+        if display_path.is_empty() {
+            child_display_path = name;
         } else {
-            format!("{display_path}/{name}")
-        };
+            child_display_path = format!("{display_path}/{name}");
+        }
         collect_native_path_entries(&child, child_display_path, entries)?;
     }
 
@@ -263,7 +264,7 @@ async fn list_native_path_entries(
         let real_path = PathBuf::from(&path);
         let name = real_path
             .file_name()
-            .ok_or("invalid file name")?
+            .ok_or("invalid file name".to_string())?
             .to_string_lossy()
             .to_string();
         collect_native_path_entries(&real_path, name, &mut entries)?;
