@@ -8,11 +8,14 @@ export function useLongPress(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressedRef = useRef(false);
   const shortPressHandledRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
   const [isHolding, setIsHolding] = useState(false);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      activePointerIdRef.current = e.pointerId;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
       longPressedRef.current = false;
       shortPressHandledRef.current = false;
       setIsHolding(true);
@@ -34,7 +37,23 @@ export function useLongPress(
     }
   }, []);
 
-  const onPointerUp = useCallback(() => {
+  const releasePointer = useCallback((e: React.PointerEvent) => {
+    if (activePointerIdRef.current !== e.pointerId) {
+      return false;
+    }
+
+    activePointerIdRef.current = null;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    return true;
+  }, []);
+
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!releasePointer(e)) {
+      return;
+    }
+
     const shouldTriggerShortPress =
       !longPressedRef.current &&
       !shortPressHandledRef.current &&
@@ -44,12 +63,23 @@ export function useLongPress(
       shortPressHandledRef.current = true;
       onShortPress();
     }
-  }, [clearHold, onShortPress]);
+  }, [clearHold, onShortPress, releasePointer]);
 
-  const cancel = useCallback(() => {
+  const cancel = useCallback((e?: React.PointerEvent) => {
+    if (e && !releasePointer(e)) {
+      return;
+    }
+
     clearHold();
     shortPressHandledRef.current = false;
-  }, [clearHold]);
+  }, [clearHold, releasePointer]);
+
+  const onPointerLeave = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") {
+      return;
+    }
+    cancel(e);
+  }, [cancel]);
 
   const onClick = useCallback(
     (e: React.MouseEvent) => {
@@ -78,7 +108,7 @@ export function useLongPress(
     isHolding,
     onPointerDown,
     onPointerUp,
-    onPointerLeave: cancel,
+    onPointerLeave,
     onPointerCancel: cancel,
     onClick,
     onContextMenu,

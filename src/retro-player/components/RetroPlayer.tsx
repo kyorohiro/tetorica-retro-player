@@ -407,6 +407,7 @@ export function RetroPlayer({
     (presetKey: RetroPresetKey) => {
       filterState.applyPreset(presetKey);
       phosphorDotAspectActiveRef.current = presetKey === "phosphorDot";
+      autoTargetSizeAppliedKeyRef.current = null;
 
       // "None" is meant to be a neutral pass-through, not a way to also
       // silence audio effects — keep Effect on (Noise is left as-is).
