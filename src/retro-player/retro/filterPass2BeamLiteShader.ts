@@ -12,6 +12,10 @@ uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
 uniform vec2 uBeamSourceSize;
+uniform float uColorLevels;
+uniform float uDitherStrength;
+uniform float uHorizontalSharpness;
+uniform float uRgbConvergenceOffset;
 
 uniform float uCurvature;
 
@@ -23,6 +27,7 @@ uniform float uVignetteStrength;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
 uniform float uBasicSaturation;
+uniform float uSmoothStrength;
 uniform float uBeamDarkCutoff;
 uniform float uBeamHorizontalSpread;
 uniform float uBeamStripeStrength;
@@ -39,6 +44,135 @@ uniform float uSignalInstabilityPhase;
 uniform float uTime;
 
 const float PI = 3.141592653589793;
+
+vec3 quantizeBeamInputColor(vec3 color)
+{
+  float levels = max(uColorLevels, 2.0);
+  return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+}
+
+float bayer4x4(vec2 pos)
+{
+  int x = int(mod(pos.x, 4.0));
+  int y = int(mod(pos.y, 4.0));
+  int index = y * 4 + x;
+  float matrix[16];
+  matrix[0] = 0.0 / 16.0;
+  matrix[1] = 8.0 / 16.0;
+  matrix[2] = 2.0 / 16.0;
+  matrix[3] = 10.0 / 16.0;
+  matrix[4] = 12.0 / 16.0;
+  matrix[5] = 4.0 / 16.0;
+  matrix[6] = 14.0 / 16.0;
+  matrix[7] = 6.0 / 16.0;
+  matrix[8] = 3.0 / 16.0;
+  matrix[9] = 11.0 / 16.0;
+  matrix[10] = 1.0 / 16.0;
+  matrix[11] = 9.0 / 16.0;
+  matrix[12] = 15.0 / 16.0;
+  matrix[13] = 7.0 / 16.0;
+  matrix[14] = 13.0 / 16.0;
+  matrix[15] = 5.0 / 16.0;
+  return matrix[index];
+}
+
+vec3 applyBeamInputHorizontalSharpness(
+  vec3 center,
+  vec3 left,
+  vec3 right
+)
+{
+  float amount = clamp(
+    uHorizontalSharpness - 1.0,
+    -1.0,
+    1.0
+  );
+
+  if (abs(amount) <= 0.0001) {
+    return center;
+  }
+
+  vec3 horizontalBlur =
+    (left + center * 2.0 + right) *
+    0.25;
+
+  if (amount < 0.0) {
+    return mix(
+      center,
+      horizontalBlur,
+      -amount
+    );
+  }
+
+  vec3 sharpened =
+    center +
+    (center - 0.5 * (left + right)) * amount;
+
+  return clamp(
+    sharpened,
+    0.0,
+    1.0
+  );
+}
+
+vec3 applyBeamInputHalation(
+  vec3 baseColor,
+  vec2 emitterCell,
+  vec2 sourceSize
+)
+{
+  float halationAmount = clamp(
+    uGlowStrength,
+    0.0,
+    0.5
+  );
+
+  if (halationAmount <= 0.001) {
+    return baseColor;
+  }
+
+  vec3 glow = vec3(0.0);
+  glow += sampleEmitterColorRawConverged(
+    emitterCell + vec2(1.0, 0.0),
+    sourceSize
+  ) * 0.34;
+  glow += sampleEmitterColorRawConverged(
+    emitterCell + vec2(-1.0, 0.0),
+    sourceSize
+  ) * 0.34;
+  glow += sampleEmitterColorRawConverged(
+    emitterCell + vec2(2.0, 0.0),
+    sourceSize
+  ) * 0.18;
+  glow += sampleEmitterColorRawConverged(
+    emitterCell + vec2(-2.0, 0.0),
+    sourceSize
+  ) * 0.18;
+  glow += sampleEmitterColorRawConverged(
+    emitterCell + vec2(0.0, 1.0),
+    sourceSize
+  ) * 0.10;
+  glow += sampleEmitterColorRawConverged(
+    emitterCell + vec2(0.0, -1.0),
+    sourceSize
+  ) * 0.10;
+
+  float brightness = max(
+    max(baseColor.r, baseColor.g),
+    baseColor.b
+  );
+  float glowMask = smoothstep(
+    0.45,
+    1.0,
+    brightness
+  );
+
+  return clamp(
+    baseColor + glow * glowMask * halationAmount,
+    0.0,
+    1.0
+  );
+}
 
 /*
  * Beam tuning
@@ -640,7 +774,7 @@ void sampleBeamStripeMasks(
  *
  * Lite version intentionally avoids four-point interpolation.
  */
-vec3 sampleEmitterColor(
+vec3 sampleEmitterColorRaw(
   vec2 emitterCell,
   vec2 sourceSize
 )
@@ -677,6 +811,119 @@ vec3 sampleEmitterColor(
     pixel,
     0
   ).rgb;
+}
+
+vec3 sampleEmitterColorRawConverged(
+  vec2 emitterCell,
+  vec2 sourceSize
+)
+{
+  float convergenceOffset = max(
+    uRgbConvergenceOffset,
+    0.0
+  );
+
+  if (convergenceOffset <= 0.0001) {
+    return sampleEmitterColorRaw(
+      emitterCell,
+      sourceSize
+    );
+  }
+
+  vec3 center = sampleEmitterColorRaw(
+    emitterCell,
+    sourceSize
+  );
+  float r = sampleEmitterColorRaw(
+    emitterCell + vec2(convergenceOffset, 0.0),
+    sourceSize
+  ).r;
+  float b = sampleEmitterColorRaw(
+    emitterCell + vec2(-convergenceOffset, 0.0),
+    sourceSize
+  ).b;
+
+  return vec3(
+    r,
+    center.g,
+    b
+  );
+}
+
+vec3 sampleEmitterColor(
+  vec2 emitterCell,
+  vec2 sourceSize
+)
+{
+  vec3 center = sampleEmitterColorRawConverged(
+    emitterCell,
+    sourceSize
+  );
+
+  float smoothAmount = clamp(
+    uSmoothStrength,
+    0.0,
+    1.0
+  );
+
+  vec2 cell = floor(emitterCell);
+  float levels = max(uColorLevels, 2.0);
+  float dither =
+    (bayer4x4(cell) - 0.5) *
+    (uDitherStrength / max(levels, 1.0));
+
+  if (smoothAmount <= 0.001) {
+    return quantizeBeamInputColor(
+      clamp(center + dither, 0.0, 1.0)
+    );
+  }
+
+  vec3 left = sampleEmitterColorRawConverged(
+    emitterCell + vec2(-1.0, 0.0),
+    sourceSize
+  );
+  vec3 right = sampleEmitterColorRawConverged(
+    emitterCell + vec2(1.0, 0.0),
+    sourceSize
+  );
+  vec3 up = sampleEmitterColorRawConverged(
+    emitterCell + vec2(0.0, -1.0),
+    sourceSize
+  );
+  vec3 down = sampleEmitterColorRawConverged(
+    emitterCell + vec2(0.0, 1.0),
+    sourceSize
+  );
+
+  vec3 blurred =
+    center * 0.4 +
+    (left + right + up + down) * 0.15;
+
+  vec3 smoothed = mix(
+    center,
+    blurred,
+    smoothAmount
+  );
+
+  vec3 shaped = applyBeamInputHorizontalSharpness(
+    smoothed,
+    left,
+    right
+  );
+
+  vec3 withHalation = applyBeamInputHalation(
+    shaped,
+    emitterCell,
+    sourceSize
+  );
+
+  return quantizeBeamInputColor(
+    clamp(
+      withHalation + dither,
+      0.0,
+      1.0
+    )
+  );
 }
 
 

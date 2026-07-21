@@ -31,6 +31,8 @@ export type RetroFilterInitialState = Partial<{
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  horizontalSharpness: number;
+  rgbConvergenceOffset: number;
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
@@ -96,6 +98,8 @@ const doesPresetMatchState = (
     preset.scanline2 === state.scanline2Strength &&
     preset.vignette === state.vignetteStrength &&
     preset.glow === state.glowStrength &&
+    (preset.horizontalSharpness ?? 1) === state.horizontalSharpness &&
+    (preset.rgbConvergenceOffset ?? 0) === state.rgbConvergenceOffset &&
     (preset.smoothStrength ?? 0) === state.smoothStrength &&
     (preset.toonSteps ?? 0) === state.toonSteps &&
     (preset.edgeBoost ?? 0) === state.edgeBoost &&
@@ -192,6 +196,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
+    horizontalSharpness: initialState.horizontalSharpness ?? (DEFAULT_PRESET.horizontalSharpness ?? 1),
+    rgbConvergenceOffset: initialState.rgbConvergenceOffset ?? (DEFAULT_PRESET.rgbConvergenceOffset ?? 0),
     smoothStrength: initialState.smoothStrength ?? (DEFAULT_PRESET.smoothStrength ?? 0),
     toonSteps: initialState.toonSteps ?? (DEFAULT_PRESET.toonSteps ?? 0),
     edgeBoost: initialState.edgeBoost ?? (DEFAULT_PRESET.edgeBoost ?? 0),
@@ -347,6 +353,24 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setGlowStrength = (glowStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.glowStrength === glowStrength ? current : { ...current, glowStrength }));
+  };
+
+  const setHorizontalSharpness = (horizontalSharpness: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.horizontalSharpness === horizontalSharpness
+        ? current
+        : { ...current, horizontalSharpness }
+    ));
+  };
+
+  const setRgbConvergenceOffset = (rgbConvergenceOffset: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.rgbConvergenceOffset === rgbConvergenceOffset
+        ? current
+        : { ...current, rgbConvergenceOffset }
+    ));
   };
 
   const setSmoothStrength = (smoothStrength: number) => {
@@ -617,6 +641,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       scanline2Strength: presetSettings.scanline2,
       vignetteStrength: presetSettings.vignette,
       glowStrength: presetSettings.glow,
+      horizontalSharpness: presetSettings.horizontalSharpness ?? 1,
+      rgbConvergenceOffset: presetSettings.rgbConvergenceOffset ?? 0,
       smoothStrength: presetSettings.smoothStrength ?? 0,
       toonSteps: presetSettings.toonSteps ?? 0,
       edgeBoost: presetSettings.edgeBoost ?? 0,
@@ -701,6 +727,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineBrightnessFade,
     setVignetteStrength,
     setGlowStrength,
+    setHorizontalSharpness,
+    setRgbConvergenceOffset,
     setSmoothStrength,
     setToonSteps,
     setEdgeBoost,

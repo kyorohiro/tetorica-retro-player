@@ -25,6 +25,8 @@ export type RetroVideoFilterState = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  horizontalSharpness: number;
+  rgbConvergenceOffset: number;
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
@@ -95,6 +97,8 @@ type Pass1UniformLocations = {
   uDitherStrength: WebGLUniformLocation | null;
   uPaletteMode: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
+  uHorizontalSharpness: WebGLUniformLocation | null;
+  uRgbConvergenceOffset: WebGLUniformLocation | null;
   uSmoothStrength: WebGLUniformLocation | null;
   uToonSteps: WebGLUniformLocation | null;
   uEdgeBoost: WebGLUniformLocation | null;
@@ -109,12 +113,17 @@ type Pass1UniformLocations = {
 type Pass2UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
+  uColorLevels: WebGLUniformLocation | null;
+  uDitherStrength: WebGLUniformLocation | null;
+  uHorizontalSharpness: WebGLUniformLocation | null;
+  uRgbConvergenceOffset: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
   uScanlineStrength: WebGLUniformLocation | null;
   uScanline2Strength: WebGLUniformLocation | null;
   uScanlineBrightnessFade: WebGLUniformLocation | null;
   uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
+  uSmoothStrength: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
@@ -883,6 +892,8 @@ export class TetoricaRetroVideoPipeline {
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
       uPaletteMode: gl.getUniformLocation(program, "uPaletteMode"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
+      uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
       uToonSteps: gl.getUniformLocation(program, "uToonSteps"),
       uEdgeBoost: gl.getUniformLocation(program, "uEdgeBoost"),
@@ -900,12 +911,17 @@ export class TetoricaRetroVideoPipeline {
     return {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
+      uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
+      uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
+      uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
       uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
       uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
       uVignetteStrength: gl.getUniformLocation(program, "uVignetteStrength"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
+      uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
       uPhosphorStrength: gl.getUniformLocation(program, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(program, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(program, "uBulbRadius"),
@@ -1209,6 +1225,8 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
     gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
     gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.pass1Locs.uHorizontalSharpness, filterState.horizontalSharpness);
+    gl.uniform1f(this.pass1Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
     gl.uniform1f(this.pass1Locs.uSmoothStrength, filterState.smoothStrength);
     gl.uniform1f(this.pass1Locs.uToonSteps, filterState.toonSteps);
     gl.uniform1f(this.pass1Locs.uEdgeBoost, filterState.edgeBoost);
@@ -1249,12 +1267,17 @@ export class TetoricaRetroVideoPipeline {
       Math.max(sourceWidth ?? effectiveTargetWidth, 1),
       Math.max(sourceHeight ?? effectiveTargetHeight, 1),
     );
+    gl.uniform1f(this.pass2Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
+    gl.uniform1f(this.pass2Locs.uDitherStrength, filterState.ditherStrength);
+    gl.uniform1f(this.pass2Locs.uHorizontalSharpness, filterState.horizontalSharpness);
+    gl.uniform1f(this.pass2Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
     gl.uniform1f(this.pass2Locs.uCurvature, filterState.curvature);
     gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
     gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);
     gl.uniform1f(this.pass2Locs.uVignetteStrength, filterState.vignetteStrength);
     gl.uniform1f(this.pass2Locs.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.pass2Locs.uSmoothStrength, filterState.smoothStrength);
     gl.uniform1f(this.pass2Locs.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(this.pass2Locs.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.pass2Locs.uBulbRadius, filterState.bulbRadius);
