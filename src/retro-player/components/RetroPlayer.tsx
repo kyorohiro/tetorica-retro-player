@@ -303,6 +303,14 @@ export function RetroPlayer({
   const phosphorDotAspectActiveRef = React.useRef(false);
   const autoTargetSizeAppliedKeyRef = React.useRef<string | null>(null);
 
+  React.useEffect(() => {
+    const isPhosphorDotSelected = filterState.selectedPreset === "phosphorDot";
+    phosphorDotAspectActiveRef.current = isPhosphorDotSelected;
+    if (isPhosphorDotSelected) {
+      autoTargetSizeAppliedKeyRef.current = null;
+    }
+  }, [filterState.selectedPreset]);
+
   const clampAutoTargetSize = React.useCallback((width: number, height: number) => {
     const safeWidth = Math.max(1, Math.round(width));
     const safeHeight = Math.max(1, Math.round(height));
