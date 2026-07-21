@@ -625,7 +625,7 @@ export const RETRO_PRESETS = {
     vignette: 0.48,
     glow: 0.28,
     toonSteps: 3,
-    edgeBoost: 1.5,
+    edgeBoost: 0.3,
     animeEdgeLow: 0.08,
     animeEdgeHigh: 0.55,
     phosphor: 0.48,
