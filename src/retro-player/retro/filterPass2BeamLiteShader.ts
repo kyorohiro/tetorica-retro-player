@@ -12,6 +12,11 @@ uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
 uniform vec2 uBeamSourceSize;
+uniform float uColorLevels;
+uniform float uDitherStrength;
+uniform float uHorizontalSharpness;
+uniform float uRgbConvergenceOffset;
+uniform float uSmoothStrength;
 
 uniform float uCurvature;
 
@@ -39,6 +44,41 @@ uniform float uSignalInstabilityPhase;
 uniform float uTime;
 
 const float PI = 3.141592653589793;
+
+float bayer4x4(vec2 pos)
+{
+  int x = int(mod(pos.x, 4.0));
+  int y = int(mod(pos.y, 4.0));
+  int index = y * 4 + x;
+  float matrix[16];
+  matrix[0] = 0.0 / 16.0;
+  matrix[1] = 8.0 / 16.0;
+  matrix[2] = 2.0 / 16.0;
+  matrix[3] = 10.0 / 16.0;
+  matrix[4] = 12.0 / 16.0;
+  matrix[5] = 4.0 / 16.0;
+  matrix[6] = 14.0 / 16.0;
+  matrix[7] = 6.0 / 16.0;
+  matrix[8] = 3.0 / 16.0;
+  matrix[9] = 11.0 / 16.0;
+  matrix[10] = 1.0 / 16.0;
+  matrix[11] = 9.0 / 16.0;
+  matrix[12] = 15.0 / 16.0;
+  matrix[13] = 7.0 / 16.0;
+  matrix[14] = 13.0 / 16.0;
+  matrix[15] = 5.0 / 16.0;
+  return matrix[index];
+}
+
+vec3 quantizeBeamInputColor(vec3 color)
+{
+  if (uColorLevels >= 255.5) {
+    return color;
+  }
+
+  float levels = max(uColorLevels, 2.0);
+  return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+}
 
 /*
  * Beam tuning
@@ -679,6 +719,69 @@ vec3 sampleEmitterColor(
   ).rgb;
 }
 
+vec3 sampleEmitterColorConverged(
+  vec2 emitterCell,
+  vec2 sourceSize
+)
+{
+  float convergenceOffset = max(uRgbConvergenceOffset, 0.0);
+  if (convergenceOffset <= 0.0001) {
+    return sampleEmitterColor(emitterCell, sourceSize);
+  }
+
+  vec3 center = sampleEmitterColor(emitterCell, sourceSize);
+  float r = sampleEmitterColor(emitterCell + vec2(convergenceOffset, 0.0), sourceSize).r;
+  float b = sampleEmitterColor(emitterCell + vec2(-convergenceOffset, 0.0), sourceSize).b;
+  return vec3(r, center.g, b);
+}
+
+vec3 applyBeamInputHorizontalSharpness(
+  vec3 center,
+  vec3 left,
+  vec3 right
+)
+{
+  float amount = clamp(uHorizontalSharpness - 1.0, -1.0, 1.0);
+  if (abs(amount) <= 0.0001) {
+    return center;
+  }
+
+  vec3 horizontalBlur = (left + center * 2.0 + right) * 0.25;
+  if (amount < 0.0) {
+    return mix(center, horizontalBlur, -amount);
+  }
+
+  vec3 sharpened = center + (center - 0.5 * (left + right)) * amount;
+  return clamp(sharpened, 0.0, 1.0);
+}
+
+vec3 applyBeamInputPostProcess(
+  vec3 center,
+  vec3 left,
+  vec3 right,
+  vec3 up,
+  vec3 down,
+  vec2 emitterCell
+)
+{
+  vec3 color = center;
+
+  if (uSmoothStrength > 0.001) {
+    vec3 blurred = center * 0.4 + (left + right + up + down) * 0.15;
+    color = mix(color, blurred, clamp(uSmoothStrength, 0.0, 1.0));
+  }
+
+  color = applyBeamInputHorizontalSharpness(color, left, right);
+
+  if (uDitherStrength > 0.001 && uColorLevels < 255.5) {
+    float levels = max(uColorLevels, 2.0);
+    float dither = (bayer4x4(floor(emitterCell)) - 0.5) * (uDitherStrength / max(levels, 1.0));
+    color = clamp(color + dither, 0.0, 1.0);
+  }
+
+  return quantizeBeamInputColor(color);
+}
+
 
 /*
  * Smooth source lookup
@@ -695,22 +798,22 @@ vec3 sampleEmitterColorSmooth(
   vec2 base = floor(emitterCell);
   vec2 fracPart = fract(emitterCell);
 
-  vec3 c00 = sampleEmitterColor(
+  vec3 c00 = sampleEmitterColorConverged(
     base,
     sourceSize
   );
 
-  vec3 c10 = sampleEmitterColor(
+  vec3 c10 = sampleEmitterColorConverged(
     base + vec2(1.0, 0.0),
     sourceSize
   );
 
-  vec3 c01 = sampleEmitterColor(
+  vec3 c01 = sampleEmitterColorConverged(
     base + vec2(0.0, 1.0),
     sourceSize
   );
 
-  vec3 c11 = sampleEmitterColor(
+  vec3 c11 = sampleEmitterColorConverged(
     base + vec2(1.0, 1.0),
     sourceSize
   );
@@ -767,9 +870,33 @@ vec3 applyBeamCross(vec2 gridUv)
           float(sy)
         );
 
-      vec3 sampleColor = sampleEmitterColor(
+      vec3 centerSample = sampleEmitterColorConverged(
         emitterCell,
         sourceSize
+      );
+      vec3 leftSample = sampleEmitterColorConverged(
+        emitterCell + vec2(-1.0, 0.0),
+        sourceSize
+      );
+      vec3 rightSample = sampleEmitterColorConverged(
+        emitterCell + vec2(1.0, 0.0),
+        sourceSize
+      );
+      vec3 upSample = sampleEmitterColorConverged(
+        emitterCell + vec2(0.0, -1.0),
+        sourceSize
+      );
+      vec3 downSample = sampleEmitterColorConverged(
+        emitterCell + vec2(0.0, 1.0),
+        sourceSize
+      );
+      vec3 sampleColor = applyBeamInputPostProcess(
+        centerSample,
+        leftSample,
+        rightSample,
+        upSample,
+        downSample,
+        emitterCell
       );
 
       float sampleBrightness = max(

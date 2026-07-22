@@ -72,6 +72,8 @@ type RetroFilterPanelProps = {
   curvature: number;
   ditherStrength: number;
   glowStrength: number;
+  horizontalSharpness: number;
+  rgbConvergenceOffset: number;
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
@@ -125,6 +127,8 @@ type RetroFilterPanelProps = {
   onSetCurvature: (value: number) => void;
   onSetDitherStrength: (value: number) => void;
   onSetGlowStrength: (value: number) => void;
+  onSetHorizontalSharpness: (value: number) => void;
+  onSetRgbConvergenceOffset: (value: number) => void;
   onSetSmoothStrength: (value: number) => void;
   onSetToonSteps: (value: number) => void;
   onSetEdgeBoost: (value: number) => void;
@@ -177,6 +181,8 @@ export function RetroFilterPanel({
   curvature,
   ditherStrength,
   glowStrength,
+  horizontalSharpness,
+  rgbConvergenceOffset,
   smoothStrength,
   toonSteps,
   edgeBoost,
@@ -227,6 +233,8 @@ export function RetroFilterPanel({
   onSetCurvature,
   onSetDitherStrength,
   onSetGlowStrength,
+  onSetHorizontalSharpness,
+  onSetRgbConvergenceOffset,
   onSetSmoothStrength,
   onSetToonSteps,
   onSetEdgeBoost,
@@ -293,6 +301,10 @@ export function RetroFilterPanel({
             "画面の外周を暗くします。値を上げるほど中央に視線が集まり、レトロな額縁感も強くなります。",
           glow:
             "明るい部分のまわりに柔らかな光のにじみを足します。値を上げるほどハイライトが広がって熱っぽく見えます。",
+          horizontalSharpness:
+            "横方向の輪郭の硬さです。1.00 が中立で、下げると少しにじみ、上げると横線や文字のエッジが立ちます。",
+          rgbConvergenceOffset:
+            "R と B を左右にわずかにずらして、ブラウン管の色収差や調整ずれのような発光縁を作ります。少量でも効きやすいです。",
           smooth:
             "近い色同士を少しだけならして、細かな質感を減らします。アニメ調では面がまとまりやすくなりますが、上げすぎると眠い絵になります。",
           toonSteps:
@@ -370,6 +382,10 @@ export function RetroFilterPanel({
             "Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.",
           glow:
             "Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look.",
+          horizontalSharpness:
+            "Controls edge firmness across the horizontal axis. 1.00 is neutral; lower values soften sideways detail, higher values make text and vertical edges snap harder.",
+          rgbConvergenceOffset:
+            "Offsets the red and blue channels slightly left and right to mimic CRT convergence error. Even small values can add a convincing colored glow fringe.",
           smooth:
             "Gently blends nearby colors to knock back fine texture. This helps toon-style presets form cleaner color regions, but too much will make the image feel sleepy.",
           toonSteps:
@@ -791,6 +807,42 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={basicSaturation}
                 onChange={(ev) => onSetBasicSaturation(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Horizontal sharpness: ${horizontalSharpness.toFixed(2)}`}
+                  text={helpText.horizontalSharpness}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={horizontalSharpness}
+                onChange={(ev) => onSetHorizontalSharpness(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`RGB convergence: ${rgbConvergenceOffset.toFixed(2)}`}
+                  text={helpText.rgbConvergenceOffset}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1.5"
+                step="0.01"
+                value={rgbConvergenceOffset}
+                onChange={(ev) => onSetRgbConvergenceOffset(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

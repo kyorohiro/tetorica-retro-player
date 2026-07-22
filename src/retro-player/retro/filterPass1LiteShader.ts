@@ -9,6 +9,8 @@ uniform vec2 uTargetSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
 uniform float uPaletteMode;
+uniform float uHorizontalSharpness;
+uniform float uRgbConvergenceOffset;
 uniform float uSmoothStrength;
 uniform float uToonSteps;
 uniform float uEdgeBoost;
@@ -58,6 +60,35 @@ vec3 smoothSourceColor(vec2 uv, vec2 texel, float amount)
   vec3 down = texture(uTexture, clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
   vec3 blurred = center * 0.4 + (left + right + up + down) * 0.15;
   return mix(center, blurred, clamp(amount, 0.0, 1.0));
+}
+
+vec3 sampleConvergedColor(vec2 uv, vec2 texel)
+{
+  if (uRgbConvergenceOffset <= 0.0001) {
+    return texture(uTexture, uv).rgb;
+  }
+
+  vec2 offset = vec2(texel.x * uRgbConvergenceOffset, 0.0);
+  float r = texture(uTexture, clamp(uv + offset, vec2(0.0), vec2(1.0))).r;
+  float g = texture(uTexture, uv).g;
+  float b = texture(uTexture, clamp(uv - offset, vec2(0.0), vec2(1.0))).b;
+  return vec3(r, g, b);
+}
+
+vec3 applyHorizontalSharpness(vec3 center, vec3 left, vec3 right)
+{
+  float amount = clamp(uHorizontalSharpness - 1.0, -1.0, 1.0);
+  if (abs(amount) <= 0.0001) {
+    return center;
+  }
+
+  vec3 horizontalBlur = (left + center * 2.0 + right) * 0.25;
+  if (amount < 0.0) {
+    return mix(center, horizontalBlur, -amount);
+  }
+
+  vec3 sharpened = center + (center - 0.5 * (left + right)) * amount;
+  return clamp(sharpened, 0.0, 1.0);
 }
 
 vec3 applyToonShading(vec3 color, float steps)
@@ -249,7 +280,14 @@ void main(void)
   vec2 pixelatedUv = clamp((cell + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
   vec2 texel = 1.0 / max(uTargetSize, vec2(1.0));
 
-  vec3 color = smoothSourceColor(pixelatedUv, texel, uSmoothStrength);
+  vec3 sourceColor = sampleConvergedColor(pixelatedUv, texel);
+  if (uSmoothStrength > 0.001) {
+    vec3 smoothed = smoothSourceColor(pixelatedUv, texel, uSmoothStrength);
+    sourceColor = mix(sourceColor, smoothed, clamp(uSmoothStrength, 0.0, 1.0));
+  }
+  vec3 leftSharp = sampleConvergedColor(clamp(pixelatedUv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0)), texel);
+  vec3 rightSharp = sampleConvergedColor(clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0)), texel);
+  vec3 color = applyHorizontalSharpness(sourceColor, leftSharp, rightSharp);
   float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
   color = clamp(color + dither, 0.0, 1.0);
   color = applyToonShading(color, uToonSteps);

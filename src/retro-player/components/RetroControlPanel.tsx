@@ -335,6 +335,8 @@ export function RetroControlPanel({
               curvature={filterState.curvature}
               ditherStrength={filterState.ditherStrength}
               glowStrength={filterState.glowStrength}
+              horizontalSharpness={filterState.horizontalSharpness}
+              rgbConvergenceOffset={filterState.rgbConvergenceOffset}
               smoothStrength={filterState.smoothStrength}
               toonSteps={filterState.toonSteps}
               edgeBoost={filterState.edgeBoost}
@@ -387,6 +389,8 @@ export function RetroControlPanel({
               onSetCurvature={filterState.setCurvature}
               onSetDitherStrength={filterState.setDitherStrength}
               onSetGlowStrength={filterState.setGlowStrength}
+              onSetHorizontalSharpness={filterState.setHorizontalSharpness}
+              onSetRgbConvergenceOffset={filterState.setRgbConvergenceOffset}
               onSetSmoothStrength={filterState.setSmoothStrength}
               onSetToonSteps={filterState.setToonSteps}
               onSetEdgeBoost={filterState.setEdgeBoost}

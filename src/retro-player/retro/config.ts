@@ -56,6 +56,8 @@ export type RetroPresetDefinition = {
   scanline2: number;
   vignette: number;
   glow: number;
+  horizontalSharpness?: number;
+  rgbConvergenceOffset?: number;
   smoothStrength?: number;
   toonSteps?: number;
   edgeBoost?: number;
@@ -109,6 +111,8 @@ export const RETRO_PRESETS = {
     scanline2: 0,
     vignette: 0,
     glow: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     phosphor: 0,
     spotMask: 0,
     bulbRadius: 0,
