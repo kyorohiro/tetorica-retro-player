@@ -658,7 +658,7 @@ export const PRESETS = {
     vignetteStrength: 0.48,
     glowStrength: 0.28,
     toonSteps: 3,
-    edgeBoost: 1.5,
+    edgeBoost: 0.3,
     animeEdgeLow: 0.08,
     animeEdgeHigh: 0.55,
     phosphorStrength: 0.48,
