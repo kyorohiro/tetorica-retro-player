@@ -723,6 +723,11 @@ vec3 sampleEmitterColor(
   vec2 sourceSize
 )
 {
+  ivec2 sourceTextureSize = textureSize(
+    uSourceTexture,
+    0
+  );
+
   vec2 safeSourceSize = max(
     sourceSize,
     vec2(1.0)
@@ -744,6 +749,27 @@ vec3 sampleEmitterColor(
     safeSourceSize;
 
   if (uSamplingMode < 0.5) {
+    if (uRgbConvergenceOffset <= 0.0001) {
+      ivec2 pixel = ivec2(
+        floor(sampleUv * vec2(sourceTextureSize))
+      );
+
+      pixel = clamp(
+        pixel,
+        ivec2(0),
+        max(
+          sourceTextureSize - ivec2(1),
+          ivec2(0)
+        )
+      );
+
+      return texelFetch(
+        uSourceTexture,
+        pixel,
+        0
+      ).rgb;
+    }
+
     return texture(
       uSourceTexture,
       clamp(sampleUv, vec2(0.0), vec2(1.0))
@@ -902,6 +928,11 @@ vec3 applyBeamCross(vec2 gridUv)
   vec3 accumulatedStreak = vec3(0.0);
   float accumulatedHighlight = 0.0;
   float accumulatedEnergy = 0.0;
+  bool needsHorizontalNeighbors =
+    abs(uHorizontalSharpness - 1.0) > 0.0001 ||
+    uSmoothStrength > 0.001;
+  bool needsVerticalNeighbors =
+    uSmoothStrength > 0.001;
 
   for (int sy = -1; sy <= 1; sy++) {
     for (int sx = -2; sx <= 2; sx++) {
@@ -916,22 +947,30 @@ vec3 applyBeamCross(vec2 gridUv)
         emitterCell,
         sourceSize
       );
-      vec3 leftSample = sampleEmitterColorConverged(
-        emitterCell + vec2(-1.0, 0.0),
-        sourceSize
-      );
-      vec3 rightSample = sampleEmitterColorConverged(
-        emitterCell + vec2(1.0, 0.0),
-        sourceSize
-      );
-      vec3 upSample = sampleEmitterColorConverged(
-        emitterCell + vec2(0.0, -1.0),
-        sourceSize
-      );
-      vec3 downSample = sampleEmitterColorConverged(
-        emitterCell + vec2(0.0, 1.0),
-        sourceSize
-      );
+      vec3 leftSample = needsHorizontalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(-1.0, 0.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 rightSample = needsHorizontalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(1.0, 0.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 upSample = needsVerticalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(0.0, -1.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 downSample = needsVerticalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(0.0, 1.0),
+          sourceSize
+        )
+        : centerSample;
       vec3 sampleColor = applyBeamInputPostProcess(
         centerSample,
         leftSample,
@@ -1102,7 +1141,7 @@ vec3 applyBeamCross(vec2 gridUv)
 /*
  * Soft beam neighborhood
  *
- * A very light 5-tap blend keeps the current single-light look as the base,
+ * A very light 3-tap blend keeps the current single-light look as the base,
  * then lets the surrounding glow connect a little more naturally.
  */
 vec3 sampleBeamCrossSoft(vec2 uv, vec2 sourceSize)
@@ -1119,17 +1158,13 @@ vec3 sampleBeamCrossSoft(vec2 uv, vec2 sourceSize)
   vec3 offsetB = applyBeamCross(
     uv + sourceTexel * vec2(-BEAM_SOFT_SAMPLE_OFFSET_X, 0.0)
   );
-  vec3 offsetC = applyBeamCross(
-    uv + sourceTexel * vec2(0.0, BEAM_SOFT_SAMPLE_OFFSET_Y)
-  );
-  vec3 offsetD = applyBeamCross(
-    uv + sourceTexel * vec2(0.0, -BEAM_SOFT_SAMPLE_OFFSET_Y)
-  );
 
   return
-    center * BEAM_SOFT_CENTER_WEIGHT +
-    (offsetA + offsetB) * BEAM_SOFT_HORIZONTAL_WEIGHT +
-    (offsetC + offsetD) * BEAM_SOFT_VERTICAL_WEIGHT;
+    center * (
+      BEAM_SOFT_CENTER_WEIGHT +
+      BEAM_SOFT_VERTICAL_WEIGHT * 2.0
+    ) +
+    (offsetA + offsetB) * BEAM_SOFT_HORIZONTAL_WEIGHT;
 }
 
 
