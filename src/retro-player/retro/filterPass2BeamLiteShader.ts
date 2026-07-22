@@ -196,8 +196,8 @@ const float BEAM_MERGED_FLARE_LIGHT_GAIN = 0.19;
 const float BEAM_WHITE_BLOOM_GAIN = 0.15;
 const float BEAM_SOURCE_DETAIL_BASE = 0.018;
 const float BEAM_SOURCE_DETAIL_LIGHT_GAIN = 0.013;
-const float BEAM_CHROMA_RESTORE_BASE = 0.28;
-const float BEAM_CHROMA_RESTORE_LIGHT_GAIN = 0.36;
+const float BEAM_CHROMA_RESTORE_BASE = 0.14;
+const float BEAM_CHROMA_RESTORE_LIGHT_GAIN = 0.26;
 const float BEAM_CONTRAST_RESTORE = 1.12;
 
 
@@ -567,28 +567,40 @@ vec3 applyBeamColorRestore(
     vec3(0.299, 0.587, 0.114)
   );
 
-  float sourceDetailLuma = max(
-    dot(sourceDetailColor, vec3(0.299, 0.587, 0.114)),
-    0.0001
+  float sourceSaturation = length(
+    sourceDetailColor - vec3(
+      dot(sourceDetailColor, vec3(0.299, 0.587, 0.114))
+    )
   );
 
-  vec3 sourceTint =
-    sourceDetailColor /
-    sourceDetailLuma;
+  float beamSaturation = length(
+    color - vec3(luma)
+  );
 
-  vec3 tintedColor = mix(
-    color,
-    sourceTint * luma,
+  float saturationGain =
+    1.0 +
     clamp(
       BEAM_CHROMA_RESTORE_BASE +
       lightMask * BEAM_CHROMA_RESTORE_LIGHT_GAIN,
       0.0,
-      0.9
-    )
+      0.7
+    ) *
+    clamp(sourceSaturation * 2.2, 0.0, 1.0);
+
+  vec3 saturatedColor = mix(
+    vec3(luma),
+    color,
+    saturationGain
+  );
+
+  float beamColorMask = smoothstep(
+    0.015,
+    0.18,
+    beamSaturation
   );
 
   vec3 contrasted =
-    (tintedColor - 0.5) *
+    (mix(color, saturatedColor, beamColorMask) - 0.5) *
     BEAM_CONTRAST_RESTORE +
     0.5;
 
