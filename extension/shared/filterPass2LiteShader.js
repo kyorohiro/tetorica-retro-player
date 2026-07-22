@@ -16,6 +16,7 @@ uniform float uVignetteStrength;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
 uniform float uBasicSaturation;
+uniform float uScreenFaceGlow;
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
 uniform float uSignalVerticalSync;
@@ -167,6 +168,26 @@ vec3 applyBasicColorControls(vec3 color)
   return clamp(contrasted, 0.0, 1.0);
 }
 
+float getScreenFaceGlow()
+{
+  return clamp(uScreenFaceGlow, 0.0, 0.5);
+}
+
+vec3 applyScreenFaceGlow(vec3 color)
+{
+  float amount = getScreenFaceGlow();
+  if (amount <= 0.001) {
+    return color;
+  }
+
+  float dist = distance(vMaskCoord, vec2(0.5));
+  float broadField = 1.0 - smoothstep(0.08, 0.9, dist);
+  float centerCore = exp(-pow(dist / 0.38, 2.0));
+  float faceGlow = clamp(broadField * 0.65 + centerCore * 0.75, 0.0, 1.25);
+
+  return color + vec3(0.40, 0.37, 0.31) * faceGlow * amount;
+}
+
 void main(void)
 {
   vec2 curvedUv = curveUv(vTextureCoord, uCurvature);
@@ -206,6 +227,7 @@ void main(void)
 
   color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
   color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
+  color.rgb = applyScreenFaceGlow(color.rgb);
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;

@@ -55,6 +55,7 @@ export type PersistedRetroFilterSettings = {
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
+  screenFaceGlow: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;

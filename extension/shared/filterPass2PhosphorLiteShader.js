@@ -21,6 +21,8 @@ uniform float uFocusStrength;
 uniform vec2 uFocusSize;
 uniform vec2 uFocusCenter;
 uniform float uGlowStrength;
+uniform float uBeamWarmBloom;
+uniform float uScreenFaceGlow;
 uniform float uTime;
 uniform float uPhosphorDotLightBalance;
 uniform float uOutputBrightness;
@@ -185,6 +187,31 @@ vec3 applyBasicColorControls(vec3 color)
   return clamp(contrasted, 0.0, 1.0);
 }
 
+float getWarmBloomAmount()
+{
+  return clamp(uBeamWarmBloom, 0.0, 1.5);
+}
+
+float getScreenFaceGlow()
+{
+  return clamp(uScreenFaceGlow, 0.0, 0.5);
+}
+
+vec3 applyScreenFaceGlow(vec3 color)
+{
+  float amount = getScreenFaceGlow();
+  if (amount <= 0.001) {
+    return color;
+  }
+
+  float dist = distance(vMaskCoord, vec2(0.5));
+  float broadField = 1.0 - smoothstep(0.08, 0.9, dist);
+  float centerCore = exp(-pow(dist / 0.38, 2.0));
+  float faceGlow = clamp(broadField * 0.65 + centerCore * 0.75, 0.0, 1.25);
+
+  return color + vec3(0.40, 0.37, 0.31) * faceGlow * amount;
+}
+
 vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
 {
   if (amount <= 0.0) {
@@ -319,6 +346,12 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     beamColor += color * beamCellFill;
     beamColor += color * beamFloor;
     beamColor += vec3(1.0) * flareCore * whiteMix * beamAmount * (0.38 + highlightBloom * 0.42);
+    beamColor +=
+      vec3(1.0, 0.72, 0.42) *
+      flareCore *
+      beamAmount *
+      (0.18 + highlightBloom * 0.28) *
+      getWarmBloomAmount();
     return beamColor * beamLightLevel;
   }
 
@@ -715,6 +748,18 @@ void main(void)
       phosphorColor += glowLift * (0.3 + bleedMask * 0.25 + phosphorBrightness * 0.15);
     }
 
+    if (getWarmBloomAmount() > 0.001) {
+      float warmBloomMask =
+        smoothstep(0.56, 1.0, phosphorBrightness) *
+        (0.44 + bleedMask * 0.48 + highlightBloom * 0.42);
+      phosphorColor +=
+        vec3(1.0, 0.82, 0.30) *
+        warmBloomMask *
+        getWarmBloomAmount() *
+        uSpotMaskStrength *
+        0.42;
+    }
+
     float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
     float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
     phosphorColor *= 1.0 - (
@@ -736,6 +781,8 @@ void main(void)
     if (useBrightCoreLeak) {
       phosphorColor += mixedSourceColor * uSpotMaskStrength * (0.008 + phosphorBrightness * 0.02);
     }
+
+    phosphorColor = applyScreenFaceGlow(phosphorColor);
 
     float vignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
@@ -794,9 +841,22 @@ void main(void)
     color.rgb = applySpotMask(color.rgb, unstableUv, uTargetSize, uSpotMaskStrength);
   }
 
+  if (getWarmBloomAmount() > 0.001) {
+    float warmBloomMask =
+      smoothstep(0.62, 1.0, brightness) *
+      (0.16 + uPhosphorStrength * 0.34 + uGlowStrength * 0.18 + uSpotMaskStrength * 0.14);
+    color.rgb +=
+      vec3(1.0, 0.82, 0.30) *
+      warmBloomMask *
+      getWarmBloomAmount() *
+      0.46;
+  }
+
   // Temporarily disabled for performance/chattering investigation on Windows.
   // color.rgb = applySignalChromaInstability(color.rgb, pixelatedUv);
   // color.rgb = applySignalStaticNoise(color.rgb, unstableUv);
+
+  color.rgb = applyScreenFaceGlow(color.rgb);
 
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;

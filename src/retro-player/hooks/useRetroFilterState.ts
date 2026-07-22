@@ -61,6 +61,7 @@ export type RetroFilterInitialState = Partial<{
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
+  screenFaceGlow: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -130,6 +131,7 @@ const doesPresetMatchState = (
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
     (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
+    (preset.screenFaceGlow ?? 0) === state.screenFaceGlow &&
     (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
     (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
     (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
@@ -246,6 +248,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamWhiteBloom ?? (DEFAULT_PRESET.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom),
     beamWarmBloom:
       initialState.beamWarmBloom ?? (DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom),
+    screenFaceGlow:
+      initialState.screenFaceGlow ?? (DEFAULT_PRESET.screenFaceGlow ?? 0),
     signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
     signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
     signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
@@ -554,6 +558,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setScreenFaceGlow = (screenFaceGlow: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.screenFaceGlow === screenFaceGlow ? current : { ...current, screenFaceGlow }
+    ));
+  };
+
   const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -694,6 +705,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
       beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
+      screenFaceGlow: presetSettings.screenFaceGlow ?? 0,
       signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
       signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
       signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
@@ -782,6 +794,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBeamStripeStrength,
     setBeamWhiteBloom,
     setBeamWarmBloom,
+    setScreenFaceGlow,
     setSignalInstabilityEnabled,
     setSignalInstabilityStrength,
     setSignalInstabilityFrequency,

@@ -13,8 +13,12 @@ uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
 uniform vec2 uBeamSourceSize;
+uniform float uColorLevels;
+uniform float uDitherStrength;
+uniform float uSamplingMode;
 uniform float uHorizontalSharpness;
 uniform float uRgbConvergenceOffset;
+uniform float uSmoothStrength;
 
 uniform float uCurvature;
 
@@ -30,6 +34,8 @@ uniform float uBeamDarkCutoff;
 uniform float uBeamHorizontalSpread;
 uniform float uBeamStripeStrength;
 uniform float uBeamWhiteBloom;
+uniform float uBeamWarmBloom;
+uniform float uScreenFaceGlow;
 
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
@@ -42,6 +48,78 @@ uniform float uSignalInstabilityPhase;
 uniform float uTime;
 
 const float PI = 3.141592653589793;
+
+float bayer4x4(vec2 pos)
+{
+  int x = int(mod(pos.x, 4.0));
+  int y = int(mod(pos.y, 4.0));
+  int index = y * 4 + x;
+  float matrix[16];
+  matrix[0] = 0.0 / 16.0;
+  matrix[1] = 8.0 / 16.0;
+  matrix[2] = 2.0 / 16.0;
+  matrix[3] = 10.0 / 16.0;
+  matrix[4] = 12.0 / 16.0;
+  matrix[5] = 4.0 / 16.0;
+  matrix[6] = 14.0 / 16.0;
+  matrix[7] = 6.0 / 16.0;
+  matrix[8] = 3.0 / 16.0;
+  matrix[9] = 11.0 / 16.0;
+  matrix[10] = 1.0 / 16.0;
+  matrix[11] = 9.0 / 16.0;
+  matrix[12] = 15.0 / 16.0;
+  matrix[13] = 7.0 / 16.0;
+  matrix[14] = 13.0 / 16.0;
+  matrix[15] = 5.0 / 16.0;
+  return matrix[index];
+}
+
+vec3 quantizeBeamInputColor(vec3 color)
+{
+  if (uColorLevels >= 255.5) {
+    return color;
+  }
+
+  float levels = max(uColorLevels, 2.0);
+  return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+}
+
+vec3 sampleSourceTextureAverage4(vec2 cellMin, vec2 cellSize)
+{
+  vec2 quarter = cellSize * 0.25;
+  vec3 sum = vec3(0.0);
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  return sum * 0.25;
+}
+
+vec3 sampleSourceTextureAverage8(vec2 cellMin, vec2 cellSize)
+{
+  vec3 sum = vec3(0.0);
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.25, 0.25), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.75, 0.25), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.25, 0.75), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.75, 0.75), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.50, 0.20), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.50, 0.80), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.20, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.80, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  return sum * 0.125;
+}
+
+vec3 sampleSourceTextureAverage16(vec2 cellMin, vec2 cellSize)
+{
+  vec3 sum = vec3(0.0);
+  for (int y = 0; y < 4; y++) {
+    for (int x = 0; x < 4; x++) {
+      vec2 offset = (vec2(float(x), float(y)) + 0.5) / 4.0;
+      sum += texture(uSourceTexture, clamp(cellMin + cellSize * offset, vec2(0.0), vec2(1.0))).rgb;
+    }
+  }
+  return sum * (1.0 / 16.0);
+}
 
 /*
  * Beam tuning
@@ -104,7 +182,6 @@ const float BEAM_SOFT_CENTER_WEIGHT = 0.72;
 const float BEAM_SOFT_HORIZONTAL_WEIGHT = 0.09;
 const float BEAM_SOFT_VERTICAL_WEIGHT = 0.05;
 
-const float BEAM_SOFT_BLEND = 0.24;
 const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.36;
 
 const float BEAM_LIGHTMASK_LOW = 0.025;
@@ -121,6 +198,9 @@ const float BEAM_MERGED_FLARE_LIGHT_GAIN = 0.19;
 const float BEAM_WHITE_BLOOM_GAIN = 0.15;
 const float BEAM_SOURCE_DETAIL_BASE = 0.018;
 const float BEAM_SOURCE_DETAIL_LIGHT_GAIN = 0.013;
+const float BEAM_CHROMA_RESTORE_BASE = 0.14;
+const float BEAM_CHROMA_RESTORE_LIGHT_GAIN = 0.26;
+const float BEAM_CONTRAST_RESTORE = 1.12;
 
 
 /*
@@ -478,6 +558,61 @@ vec3 applyBasicColorControls(vec3 color)
   );
 }
 
+vec3 applyBeamColorRestore(
+  vec3 color,
+  vec3 sourceDetailColor,
+  float lightMask
+)
+{
+  float luma = dot(
+    color,
+    vec3(0.299, 0.587, 0.114)
+  );
+
+  float sourceSaturation = length(
+    sourceDetailColor - vec3(
+      dot(sourceDetailColor, vec3(0.299, 0.587, 0.114))
+    )
+  );
+
+  float beamSaturation = length(
+    color - vec3(luma)
+  );
+
+  float saturationGain =
+    1.0 +
+    clamp(
+      BEAM_CHROMA_RESTORE_BASE +
+      lightMask * BEAM_CHROMA_RESTORE_LIGHT_GAIN,
+      0.0,
+      0.7
+    ) *
+    clamp(sourceSaturation * 2.2, 0.0, 1.0);
+
+  vec3 saturatedColor = mix(
+    vec3(luma),
+    color,
+    saturationGain
+  );
+
+  float beamColorMask = smoothstep(
+    0.015,
+    0.18,
+    beamSaturation
+  );
+
+  vec3 contrasted =
+    (mix(color, saturatedColor, beamColorMask) - 0.5) *
+    BEAM_CONTRAST_RESTORE +
+    0.5;
+
+  return clamp(
+    contrasted,
+    0.0,
+    1.0
+  );
+}
+
 float getBeamDarkCutoff()
 {
   return clamp(
@@ -512,6 +647,39 @@ float getBeamWhiteBloom()
     0.0,
     2.0
   );
+}
+
+float getBeamWarmBloom()
+{
+  return clamp(
+    uBeamWarmBloom,
+    0.0,
+    1.5
+  );
+}
+
+float getScreenFaceGlow()
+{
+  return clamp(
+    uScreenFaceGlow,
+    0.0,
+    0.5
+  );
+}
+
+vec3 applyScreenFaceGlow(vec3 color)
+{
+  float amount = getScreenFaceGlow();
+  if (amount <= 0.001) {
+    return color;
+  }
+
+  float dist = distance(vMaskCoord, vec2(0.5));
+  float broadField = 1.0 - smoothstep(0.08, 0.9, dist);
+  float centerCore = exp(-pow(dist / 0.38, 2.0));
+  float faceGlow = clamp(broadField * 0.65 + centerCore * 0.75, 0.0, 1.25);
+
+  return color + vec3(0.40, 0.37, 0.31) * faceGlow * amount;
 }
 
 
@@ -653,33 +821,63 @@ vec3 sampleEmitterColor(
     0
   );
 
+  vec2 safeSourceSize = max(
+    sourceSize,
+    vec2(1.0)
+  );
+
   vec2 maximumCell = max(
-    sourceSize - vec2(1.0),
+    safeSourceSize - vec2(1.0),
     vec2(0.0)
   );
 
   vec2 clampedCell = clamp(
-    floor(emitterCell),
+    emitterCell,
     vec2(0.0),
     maximumCell
   );
 
-  ivec2 pixel = ivec2(clampedCell);
+  vec2 sampleUv =
+    (clampedCell + vec2(0.5)) /
+    safeSourceSize;
 
-  pixel = clamp(
-    pixel,
-    ivec2(0),
-    max(
-      sourceTextureSize - ivec2(1),
-      ivec2(0)
-    )
-  );
+  if (uSamplingMode < 0.5) {
+    if (uRgbConvergenceOffset <= 0.0001) {
+      ivec2 pixel = ivec2(
+        floor(sampleUv * vec2(sourceTextureSize))
+      );
 
-  return texelFetch(
-    uSourceTexture,
-    pixel,
-    0
-  ).rgb;
+      pixel = clamp(
+        pixel,
+        ivec2(0),
+        max(
+          sourceTextureSize - ivec2(1),
+          ivec2(0)
+        )
+      );
+
+      return texelFetch(
+        uSourceTexture,
+        pixel,
+        0
+      ).rgb;
+    }
+
+    return texture(
+      uSourceTexture,
+      clamp(sampleUv, vec2(0.0), vec2(1.0))
+    ).rgb;
+  }
+
+  vec2 cellMin = (clampedCell - vec2(0.5)) / safeSourceSize;
+  vec2 cellSize = 1.0 / safeSourceSize;
+  if (uSamplingMode < 1.5) {
+    return sampleSourceTextureAverage4(cellMin, cellSize);
+  }
+  if (uSamplingMode < 2.5) {
+    return sampleSourceTextureAverage8(cellMin, cellSize);
+  }
+  return sampleSourceTextureAverage16(cellMin, cellSize);
 }
 
 vec3 sampleEmitterColorConverged(
@@ -716,6 +914,33 @@ vec3 applyBeamInputHorizontalSharpness(
 
   vec3 sharpened = center + (center - 0.5 * (left + right)) * amount;
   return clamp(sharpened, 0.0, 1.0);
+}
+
+vec3 applyBeamInputPostProcess(
+  vec3 center,
+  vec3 left,
+  vec3 right,
+  vec3 up,
+  vec3 down,
+  vec2 emitterCell
+)
+{
+  vec3 color = center;
+
+  if (uSmoothStrength > 0.001) {
+    vec3 blurred = center * 0.4 + (left + right + up + down) * 0.15;
+    color = mix(color, blurred, clamp(uSmoothStrength, 0.0, 1.0));
+  }
+
+  color = applyBeamInputHorizontalSharpness(color, left, right);
+
+  if (uDitherStrength > 0.001 && uColorLevels < 255.5) {
+    float levels = max(uColorLevels, 2.0);
+    float dither = (bayer4x4(floor(emitterCell)) - 0.5) * (uDitherStrength / max(levels, 1.0));
+    color = clamp(color + dither, 0.0, 1.0);
+  }
+
+  return quantizeBeamInputColor(color);
 }
 
 
@@ -796,6 +1021,11 @@ vec3 applyBeamCross(vec2 gridUv)
   vec3 accumulatedStreak = vec3(0.0);
   float accumulatedHighlight = 0.0;
   float accumulatedEnergy = 0.0;
+  bool needsHorizontalNeighbors =
+    abs(uHorizontalSharpness - 1.0) > 0.0001 ||
+    uSmoothStrength > 0.001;
+  bool needsVerticalNeighbors =
+    uSmoothStrength > 0.001;
 
   for (int sy = -1; sy <= 1; sy++) {
     for (int sx = -2; sx <= 2; sx++) {
@@ -810,18 +1040,37 @@ vec3 applyBeamCross(vec2 gridUv)
         emitterCell,
         sourceSize
       );
-      vec3 leftSample = sampleEmitterColorConverged(
-        emitterCell + vec2(-1.0, 0.0),
-        sourceSize
-      );
-      vec3 rightSample = sampleEmitterColorConverged(
-        emitterCell + vec2(1.0, 0.0),
-        sourceSize
-      );
-      vec3 sampleColor = applyBeamInputHorizontalSharpness(
+      vec3 leftSample = needsHorizontalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(-1.0, 0.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 rightSample = needsHorizontalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(1.0, 0.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 upSample = needsVerticalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(0.0, -1.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 downSample = needsVerticalNeighbors
+        ? sampleEmitterColorConverged(
+          emitterCell + vec2(0.0, 1.0),
+          sourceSize
+        )
+        : centerSample;
+      vec3 sampleColor = applyBeamInputPostProcess(
         centerSample,
         leftSample,
-        rightSample
+        rightSample,
+        upSample,
+        downSample,
+        emitterCell
       );
 
       float sampleBrightness = max(
@@ -985,7 +1234,7 @@ vec3 applyBeamCross(vec2 gridUv)
 /*
  * Soft beam neighborhood
  *
- * A very light 5-tap blend keeps the current single-light look as the base,
+ * A very light 3-tap blend keeps the current single-light look as the base,
  * then lets the surrounding glow connect a little more naturally.
  */
 vec3 sampleBeamCrossSoft(vec2 uv, vec2 sourceSize)
@@ -1002,17 +1251,13 @@ vec3 sampleBeamCrossSoft(vec2 uv, vec2 sourceSize)
   vec3 offsetB = applyBeamCross(
     uv + sourceTexel * vec2(-BEAM_SOFT_SAMPLE_OFFSET_X, 0.0)
   );
-  vec3 offsetC = applyBeamCross(
-    uv + sourceTexel * vec2(0.0, BEAM_SOFT_SAMPLE_OFFSET_Y)
-  );
-  vec3 offsetD = applyBeamCross(
-    uv + sourceTexel * vec2(0.0, -BEAM_SOFT_SAMPLE_OFFSET_Y)
-  );
 
   return
-    center * BEAM_SOFT_CENTER_WEIGHT +
-    (offsetA + offsetB) * BEAM_SOFT_HORIZONTAL_WEIGHT +
-    (offsetC + offsetD) * BEAM_SOFT_VERTICAL_WEIGHT;
+    center * (
+      BEAM_SOFT_CENTER_WEIGHT +
+      BEAM_SOFT_VERTICAL_WEIGHT * 2.0
+    ) +
+    (offsetA + offsetB) * BEAM_SOFT_HORIZONTAL_WEIGHT;
 }
 
 
@@ -1074,14 +1319,7 @@ void main(void)
    *
    * The previous implementation evaluated this five times.
    */
-  vec3 beamColor = mix(
-    applyBeamCross(unstableUv),
-    sampleBeamCrossSoft(
-      unstableUv,
-      sourceSize
-    ),
-    BEAM_SOFT_BLEND
-  );
+  vec3 beamColor = applyBeamCross(unstableUv);
 
   vec3 sourceDetailColor = mix(
     sampleEmitterColor(
@@ -1170,6 +1408,15 @@ void main(void)
     BEAM_WHITE_BLOOM_GAIN *
     getBeamWhiteBloom();
 
+  vec3 warmBloom =
+    vec3(1.0, 0.82, 0.30) *
+    beamLuma *
+    lightMask *
+    BEAM_WHITE_BLOOM_GAIN *
+    0.55 *
+    getBeamWhiteBloom() *
+    getBeamWarmBloom();
+
   vec3 sourceDetail =
     sourceDetailColor *
     smoothstep(
@@ -1188,6 +1435,7 @@ void main(void)
     stripeBleed +
     mergedFlare +
     whiteBloom +
+    warmBloom +
     sourceDetail;
 
   float brightness = max(
@@ -1249,6 +1497,10 @@ void main(void)
     unstableUv
   );
 
+  finalBeamColor = applyScreenFaceGlow(
+    finalBeamColor
+  );
+
   float vignette = distance(
     vMaskCoord,
     vec2(0.5)
@@ -1269,6 +1521,12 @@ void main(void)
   finalBeamColor *=
     1.0 -
     vignetteAmount;
+
+  finalBeamColor = applyBeamColorRestore(
+    finalBeamColor,
+    sourceDetailColor,
+    lightMask
+  );
 
   finalBeamColor = applyBasicColorControls(
     finalBeamColor

@@ -1444,6 +1444,7 @@ export function usePixiVideoPlayer(
     filterState.beamStripeStrength,
     filterState.beamWhiteBloom,
     filterState.beamWarmBloom,
+    filterState.screenFaceGlow,
     filterState.selectedPreset,
     filterState.signalInstabilityEnabled,
     filterState.signalInstabilityStrength,

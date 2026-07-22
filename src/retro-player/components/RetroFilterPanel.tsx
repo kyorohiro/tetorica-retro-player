@@ -104,6 +104,7 @@ type RetroFilterPanelProps = {
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
+  screenFaceGlow: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -160,6 +161,7 @@ type RetroFilterPanelProps = {
   onSetBeamStripeStrength: (value: number) => void;
   onSetBeamWhiteBloom: (value: number) => void;
   onSetBeamWarmBloom: (value: number) => void;
+  onSetScreenFaceGlow: (value: number) => void;
   onSetSignalInstabilityEnabled: (value: boolean) => void;
   onSetSignalInstabilityStrength: (value: number) => void;
   onSetSignalInstabilityFrequency: (value: number) => void;
@@ -217,6 +219,7 @@ export function RetroFilterPanel({
   beamStripeStrength,
   beamWhiteBloom,
   beamWarmBloom,
+  screenFaceGlow,
   signalInstabilityEnabled,
   signalInstabilityStrength,
   signalInstabilityFrequency,
@@ -270,6 +273,7 @@ export function RetroFilterPanel({
   onSetBeamStripeStrength,
   onSetBeamWhiteBloom,
   onSetBeamWarmBloom,
+  onSetScreenFaceGlow,
   onSetSignalInstabilityEnabled,
   onSetSignalInstabilityStrength,
   onSetSignalInstabilityFrequency,
@@ -358,6 +362,8 @@ export function RetroFilterPanel({
             "明るい部分の白い発光芯の強さです。上げるとハイライトが熱っぽく光り、下げると色バーの輪郭が残りやすくなります。",
           beamWarmBloom:
             "Beam Cross の bloom を少し暖色寄りにします。上げるほど白い光にアンバーの熱感が混ざり、実写でもゲームでも少し温かい発光に見えます。",
+          screenFaceGlow:
+            "画面中央に、うっすら面発光する明るさを足します。0 なら無効で、上げるほど黒背景でもブラウン管の表面がぼんやり光っている感じを出します。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -441,6 +447,8 @@ export function RetroFilterPanel({
             "Controls the strength of the white hot core in bright highlights. Higher values feel hotter and more emissive; lower values preserve more of the colored bar structure.",
           beamWarmBloom:
             "Warms up the Beam Cross bloom. Higher values mix a gentle amber heat into bright glow so highlights feel less sterile and more like a warm CRT flare.",
+          screenFaceGlow:
+            "Adds a subtle face glow centered on the screen. At 0 it is fully off; higher values make even dark scenes feel like the CRT glass itself is faintly glowing.",
           outputBrightness:
             "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
           basicContrast:
@@ -980,6 +988,24 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={glowStrength}
                 onChange={(ev) => onSetGlowStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Screen face glow: ${screenFaceGlow.toFixed(2)}`}
+                  text={helpText.screenFaceGlow}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.01"
+                value={screenFaceGlow}
+                onChange={(ev) => onSetScreenFaceGlow(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>
