@@ -850,6 +850,7 @@ export class TetoricaRetroVideoPipeline {
   // onFilterReady is called after the background filter compilation finishes.
   static async create(
     gl: WebGL2RenderingContext,
+    initialFilterState: RetroVideoFilterState | null,
     onFilterReady?: () => void,
   ): Promise<TetoricaRetroVideoPipeline> {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
@@ -858,7 +859,7 @@ export class TetoricaRetroVideoPipeline {
     const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, true);
 
     requestAnimationFrame(async () => {
-      pipeline.queueWindowsLiteVariant(null);
+      pipeline.queueWindowsLiteVariant(initialFilterState);
       if (pipeline.windowsLiteCompilePromise) {
         await pipeline.windowsLiteCompilePromise;
       }
