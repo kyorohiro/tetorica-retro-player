@@ -180,7 +180,6 @@ const float BEAM_SOFT_CENTER_WEIGHT = 0.72;
 const float BEAM_SOFT_HORIZONTAL_WEIGHT = 0.09;
 const float BEAM_SOFT_VERTICAL_WEIGHT = 0.05;
 
-const float BEAM_SOFT_BLEND = 0.24;
 const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.36;
 
 const float BEAM_LIGHTMASK_LOW = 0.025;
@@ -1294,14 +1293,7 @@ void main(void)
    *
    * The previous implementation evaluated this five times.
    */
-  vec3 beamColor = mix(
-    applyBeamCross(unstableUv),
-    sampleBeamCrossSoft(
-      unstableUv,
-      sourceSize
-    ),
-    BEAM_SOFT_BLEND
-  );
+  vec3 beamColor = applyBeamCross(unstableUv);
 
   vec3 sourceDetailColor = mix(
     sampleEmitterColor(
