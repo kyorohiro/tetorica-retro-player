@@ -14,6 +14,7 @@ import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2Phospho
 import { createSignalInstabilityController } from "./signalInstability";
 
 export type RetroVideoFilterState = {
+  autoTargetSize: boolean;
   targetWidth: number;
   targetHeight: number;
   samplingMode: TargetSamplingMode;

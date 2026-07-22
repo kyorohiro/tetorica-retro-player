@@ -22,6 +22,7 @@ const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 
 const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   autoTargetSize: DEFAULT_PRESET.autoTargetSize ?? false,
+  samplingMode: DEFAULT_PRESET.samplingMode ?? "nearest",
   targetWidth: DEFAULT_PRESET.width,
   targetHeight: DEFAULT_PRESET.height,
   matchTargetAspect: true,
@@ -34,6 +35,8 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   scanlineBrightnessFade: 0.6,
   vignetteStrength: DEFAULT_PRESET.vignette,
   glowStrength: DEFAULT_PRESET.glow,
+  horizontalSharpness: DEFAULT_PRESET.horizontalSharpness ?? 1,
+  rgbConvergenceOffset: DEFAULT_PRESET.rgbConvergenceOffset ?? 0,
   smoothStrength: DEFAULT_PRESET.smoothStrength ?? 0,
   toonSteps: DEFAULT_PRESET.toonSteps ?? 0,
   edgeBoost: DEFAULT_PRESET.edgeBoost ?? 0,
@@ -59,6 +62,8 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   beamHorizontalSpread: DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
   beamStripeStrength: DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
   beamWhiteBloom: DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
+  beamWarmBloom: DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
+  screenFaceGlow: DEFAULT_PRESET.screenFaceGlow ?? 0,
   signalInstabilityEnabled: false,
   signalInstabilityStrength: 0.35,
   signalInstabilityFrequency: 0.3,
