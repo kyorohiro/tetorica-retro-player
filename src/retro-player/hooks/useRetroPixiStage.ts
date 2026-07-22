@@ -310,25 +310,6 @@ export function useRetroPixiStage({
     renderFrame();
   }, [renderFrame]);
 
-  const hasPreparedFilterVariant = useCallback((nextFilterState: RetroVideoFilterState) => {
-    const app = appRef.current;
-    if (!app) {
-      return false;
-    }
-
-    return app.pipeline.hasPreparedFilterStateVariant(nextFilterState);
-  }, []);
-
-  const prepareFilterVariant = useCallback(async (nextFilterState: RetroVideoFilterState) => {
-    await initPixi();
-    const app = appRef.current;
-    if (!app) {
-      return;
-    }
-
-    await app.pipeline.prepareFilterStateVariant(nextFilterState);
-  }, [initPixi]);
-
   const resetFilterInstance = useCallback(() => {
     if (appRef.current) {
       appRef.current.pipeline.resetAnimationClock();
@@ -682,6 +663,25 @@ export function useRetroPixiStage({
     startTicker,
     stopTicker,
   ]);
+
+  const hasPreparedFilterVariant = useCallback((nextFilterState: RetroVideoFilterState) => {
+    const app = appRef.current;
+    if (!app) {
+      return false;
+    }
+
+    return app.pipeline.hasPreparedFilterStateVariant(nextFilterState);
+  }, []);
+
+  const prepareFilterVariant = useCallback(async (nextFilterState: RetroVideoFilterState) => {
+    await initPixi();
+    const app = appRef.current;
+    if (!app) {
+      return;
+    }
+
+    await app.pipeline.prepareFilterStateVariant(nextFilterState);
+  }, [initPixi]);
 
   const destroyPixi = useCallback(() => {
     initPromiseRef.current = null;

@@ -413,13 +413,13 @@ export function RetroPlayer({
 
   const applyPresetWithAspect = React.useCallback(
     async (presetKey: RetroPresetKey) => {
-      const preset = RETRO_PRESETS[presetKey];
-      const isBeamPreset = preset.phosphorDotShape === "beam";
+      const selectedPreset: RetroPresetDefinition = RETRO_PRESETS[presetKey];
+      const isBeamPreset = selectedPreset.phosphorDotShape === "beam";
       if (isWindowsRuntime() && isBeamPreset && !player.isCrtBeamPrepared({
-        paletteMode: preset.palette,
+        paletteMode: selectedPreset.palette,
         phosphorDotShape: "beam",
-        phosphorStrength: preset.phosphor,
-        spotMaskStrength: preset.spotMask,
+        phosphorStrength: selectedPreset.phosphor,
+        spotMaskStrength: selectedPreset.spotMask,
       })) {
         const confirmed = await confirmDialog({
           title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
@@ -433,10 +433,10 @@ export function RetroPlayer({
           return;
         }
         await player.prepareCrtBeam({
-          paletteMode: preset.palette,
+          paletteMode: selectedPreset.palette,
           phosphorDotShape: "beam",
-          phosphorStrength: preset.phosphor,
-          spotMaskStrength: preset.spotMask,
+          phosphorStrength: selectedPreset.phosphor,
+          spotMaskStrength: selectedPreset.spotMask,
         });
       }
 
@@ -452,13 +452,13 @@ export function RetroPlayer({
 
       if (presetKey !== "phosphorDot" || !player.sourceDimensions) return;
 
-      const preset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
+      const phosphorDotPreset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
       const { width: nextWidth, height: nextHeight } = computePhosphorDotDimensions(
         player.sourceDimensions.width,
         player.sourceDimensions.height,
       );
 
-      if (preset.width === nextWidth && preset.height === nextHeight) return;
+      if (phosphorDotPreset.width === nextWidth && phosphorDotPreset.height === nextHeight) return;
       filterState.setTargetWidth(nextWidth);
       filterState.setTargetHeight(nextHeight);
     },
