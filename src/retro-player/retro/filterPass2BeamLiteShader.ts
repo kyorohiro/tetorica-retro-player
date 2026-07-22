@@ -1383,7 +1383,7 @@ void main(void)
     getBeamWhiteBloom();
 
   vec3 warmBloom =
-    vec3(1.0, 0.72, 0.42) *
+    vec3(1.0, 0.82, 0.30) *
     beamLuma *
     lightMask *
     BEAM_WHITE_BLOOM_GAIN *

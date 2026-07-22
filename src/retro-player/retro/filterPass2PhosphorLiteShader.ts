@@ -731,7 +731,7 @@ void main(void)
         smoothstep(0.56, 1.0, phosphorBrightness) *
         (0.44 + bleedMask * 0.48 + highlightBloom * 0.42);
       phosphorColor +=
-        vec3(1.0, 0.72, 0.42) *
+        vec3(1.0, 0.82, 0.30) *
         warmBloomMask *
         getWarmBloomAmount() *
         uSpotMaskStrength *
@@ -822,7 +822,7 @@ void main(void)
       smoothstep(0.62, 1.0, brightness) *
       (0.16 + uPhosphorStrength * 0.34 + uGlowStrength * 0.18 + uSpotMaskStrength * 0.14);
     color.rgb +=
-      vec3(1.0, 0.72, 0.42) *
+      vec3(1.0, 0.82, 0.30) *
       warmBloomMask *
       getWarmBloomAmount() *
       0.46;
