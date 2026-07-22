@@ -94,13 +94,25 @@ const resolveWindowsFilterBufferCap = (
     if (!isWindowsRuntime()) {
       return null;
     }
-    if (!isBeamCrossModeEnabled(filterState)) {
+    const isBeamMode = isBeamCrossModeEnabled(filterState);
+    const isPhosphorMode =
+      filterState.spotMaskStrength > 0.001 ||
+      filterState.phosphorStrength > 0.001 ||
+      isPhosphorDotModeEnabled(filterState);
+    if (!isBeamMode && !isPhosphorMode) {
       return null;
     }
   }
 
+  if (isBeamCrossModeEnabled(filterState)) {
+    return {
+      width: 640,
+      height: 480,
+    };
+  }
+
   return {
-    width: 1280,
+    width: 960,
     height: 720,
   };
 };
