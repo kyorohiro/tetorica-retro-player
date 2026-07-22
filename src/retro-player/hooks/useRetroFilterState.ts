@@ -60,6 +60,7 @@ export type RetroFilterInitialState = Partial<{
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
+  beamWarmBloom: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -128,6 +129,7 @@ const doesPresetMatchState = (
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
+    (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
     (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
     (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
     (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
@@ -242,6 +244,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamStripeStrength ?? (DEFAULT_PRESET.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength),
     beamWhiteBloom:
       initialState.beamWhiteBloom ?? (DEFAULT_PRESET.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom),
+    beamWarmBloom:
+      initialState.beamWarmBloom ?? (DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom),
     signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
     signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
     signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
@@ -543,6 +547,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setBeamWarmBloom = (beamWarmBloom: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamWarmBloom === beamWarmBloom ? current : { ...current, beamWarmBloom }
+    ));
+  };
+
   const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -682,6 +693,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
+      beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
       signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
       signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
       signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
@@ -769,6 +781,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBeamHorizontalSpread,
     setBeamStripeStrength,
     setBeamWhiteBloom,
+    setBeamWarmBloom,
     setSignalInstabilityEnabled,
     setSignalInstabilityStrength,
     setSignalInstabilityFrequency,

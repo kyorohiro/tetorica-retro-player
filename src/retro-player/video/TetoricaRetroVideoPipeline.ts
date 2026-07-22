@@ -54,6 +54,7 @@ export type RetroVideoFilterState = {
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
+  beamWarmBloom: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -163,6 +164,7 @@ type Pass2UniformLocations = {
   uBeamHorizontalSpread: WebGLUniformLocation | null;
   uBeamStripeStrength: WebGLUniformLocation | null;
   uBeamWhiteBloom: WebGLUniformLocation | null;
+  uBeamWarmBloom: WebGLUniformLocation | null;
   uSignalInstabilityAmount: WebGLUniformLocation | null;
   uSignalHorizontalSync: WebGLUniformLocation | null;
   uSignalVerticalSync: WebGLUniformLocation | null;
@@ -963,6 +965,7 @@ export class TetoricaRetroVideoPipeline {
       uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
       uBeamStripeStrength: gl.getUniformLocation(program, "uBeamStripeStrength"),
       uBeamWhiteBloom: gl.getUniformLocation(program, "uBeamWhiteBloom"),
+      uBeamWarmBloom: gl.getUniformLocation(program, "uBeamWarmBloom"),
       uSignalInstabilityAmount: gl.getUniformLocation(program, "uSignalInstabilityAmount"),
       uSignalHorizontalSync: gl.getUniformLocation(program, "uSignalHorizontalSync"),
       uSignalVerticalSync: gl.getUniformLocation(program, "uSignalVerticalSync"),
@@ -1348,6 +1351,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
     gl.uniform1f(this.pass2Locs.uBeamStripeStrength, filterState.beamStripeStrength);
     gl.uniform1f(this.pass2Locs.uBeamWhiteBloom, filterState.beamWhiteBloom);
+    gl.uniform1f(this.pass2Locs.uBeamWarmBloom, filterState.beamWarmBloom);
     const signalTimeSec = (nowMs() - this.startedAt) / 1000;
     const signalState = this.signalInstabilityController.update(signalTimeSec, {
       enabled: filterState.signalInstabilityEnabled,

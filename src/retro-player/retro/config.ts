@@ -24,6 +24,7 @@ export const DEFAULT_BEAM_CROSS_SETTINGS = {
   beamHorizontalSpread: 1,
   beamStripeStrength: 1,
   beamWhiteBloom: 1,
+  beamWarmBloom: 0,
 } as const;
 
 export const normalizePhosphorDotShape = (
@@ -89,6 +90,7 @@ export type RetroPresetDefinition = {
   beamHorizontalSpread?: number;
   beamStripeStrength?: number;
   beamWhiteBloom?: number;
+  beamWarmBloom?: number;
   signalInstabilityEnabled?: boolean;
   signalInstabilityStrength?: number;
   signalInstabilityFrequency?: number;
@@ -538,6 +540,7 @@ export const RETRO_PRESETS = {
     beamHorizontalSpread: 1.27,
     beamStripeStrength: 0.08,
     beamWhiteBloom: 1.8,
+    beamWarmBloom: 0.32,
     basicContrast: 2.0,
     basicSaturation: 2.0,
     monoTint: "gray",

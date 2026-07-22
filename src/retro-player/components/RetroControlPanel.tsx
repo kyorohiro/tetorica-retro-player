@@ -368,6 +368,7 @@ export function RetroControlPanel({
               beamHorizontalSpread={filterState.beamHorizontalSpread}
               beamStripeStrength={filterState.beamStripeStrength}
               beamWhiteBloom={filterState.beamWhiteBloom}
+              beamWarmBloom={filterState.beamWarmBloom}
               signalInstabilityEnabled={filterState.signalInstabilityEnabled}
               signalInstabilityStrength={filterState.signalInstabilityStrength}
               signalInstabilityFrequency={filterState.signalInstabilityFrequency}
@@ -423,6 +424,7 @@ export function RetroControlPanel({
               onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
               onSetBeamStripeStrength={filterState.setBeamStripeStrength}
               onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
+              onSetBeamWarmBloom={filterState.setBeamWarmBloom}
               onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
               onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}
               onSetSignalInstabilityFrequency={filterState.setSignalInstabilityFrequency}

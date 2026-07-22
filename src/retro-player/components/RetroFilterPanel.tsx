@@ -103,6 +103,7 @@ type RetroFilterPanelProps = {
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
+  beamWarmBloom: number;
   signalInstabilityEnabled: boolean;
   signalInstabilityStrength: number;
   signalInstabilityFrequency: number;
@@ -158,6 +159,7 @@ type RetroFilterPanelProps = {
   onSetBeamHorizontalSpread: (value: number) => void;
   onSetBeamStripeStrength: (value: number) => void;
   onSetBeamWhiteBloom: (value: number) => void;
+  onSetBeamWarmBloom: (value: number) => void;
   onSetSignalInstabilityEnabled: (value: boolean) => void;
   onSetSignalInstabilityStrength: (value: number) => void;
   onSetSignalInstabilityFrequency: (value: number) => void;
@@ -214,6 +216,7 @@ export function RetroFilterPanel({
   beamHorizontalSpread,
   beamStripeStrength,
   beamWhiteBloom,
+  beamWarmBloom,
   signalInstabilityEnabled,
   signalInstabilityStrength,
   signalInstabilityFrequency,
@@ -266,6 +269,7 @@ export function RetroFilterPanel({
   onSetBeamHorizontalSpread,
   onSetBeamStripeStrength,
   onSetBeamWhiteBloom,
+  onSetBeamWarmBloom,
   onSetSignalInstabilityEnabled,
   onSetSignalInstabilityStrength,
   onSetSignalInstabilityFrequency,
@@ -352,6 +356,8 @@ export function RetroFilterPanel({
             "RGB バー自体の見えやすさです。上げると格子や triad が前に出て、下げると発光面の印象が強くなります。",
           beamWhiteBloom:
             "明るい部分の白い発光芯の強さです。上げるとハイライトが熱っぽく光り、下げると色バーの輪郭が残りやすくなります。",
+          beamWarmBloom:
+            "Beam Cross の bloom を少し暖色寄りにします。上げるほど白い光にアンバーの熱感が混ざり、実写でもゲームでも少し温かい発光に見えます。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -433,6 +439,8 @@ export function RetroFilterPanel({
             "Controls how visible the RGB bar structure is. Higher values bring the stripe grid forward; lower values favor the luminous surface instead.",
           beamWhiteBloom:
             "Controls the strength of the white hot core in bright highlights. Higher values feel hotter and more emissive; lower values preserve more of the colored bar structure.",
+          beamWarmBloom:
+            "Warms up the Beam Cross bloom. Higher values mix a gentle amber heat into bright glow so highlights feel less sterile and more like a warm CRT flare.",
           outputBrightness:
             "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
           basicContrast:
@@ -765,6 +773,26 @@ export function RetroFilterPanel({
                 value={ditherStrength}
                 onChange={(ev) => {
                   onSetDitherStrength(Number(ev.currentTarget.value));
+                }}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Warm bloom: ${beamWarmBloom.toFixed(2)}`}
+                  text={helpText.beamWarmBloom}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1.5"
+                step="0.01"
+                value={beamWarmBloom}
+                onChange={(ev) => {
+                  onSetBeamWarmBloom(Number(ev.currentTarget.value));
                 }}
                 className="mt-2 w-full"
               />

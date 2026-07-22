@@ -33,6 +33,7 @@ uniform float uBeamDarkCutoff;
 uniform float uBeamHorizontalSpread;
 uniform float uBeamStripeStrength;
 uniform float uBeamWhiteBloom;
+uniform float uBeamWarmBloom;
 
 uniform float uSignalInstabilityAmount;
 uniform float uSignalHorizontalSync;
@@ -644,6 +645,15 @@ float getBeamWhiteBloom()
     uBeamWhiteBloom,
     0.0,
     2.0
+  );
+}
+
+float getBeamWarmBloom()
+{
+  return clamp(
+    uBeamWarmBloom,
+    0.0,
+    1.5
   );
 }
 
@@ -1380,6 +1390,15 @@ void main(void)
     BEAM_WHITE_BLOOM_GAIN *
     getBeamWhiteBloom();
 
+  vec3 warmBloom =
+    vec3(1.0, 0.72, 0.42) *
+    beamLuma *
+    lightMask *
+    BEAM_WHITE_BLOOM_GAIN *
+    0.55 *
+    getBeamWhiteBloom() *
+    getBeamWarmBloom();
+
   vec3 sourceDetail =
     sourceDetailColor *
     smoothstep(
@@ -1398,6 +1417,7 @@ void main(void)
     stripeBleed +
     mergedFlare +
     whiteBloom +
+    warmBloom +
     sourceDetail;
 
   float brightness = max(
