@@ -1,6 +1,6 @@
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
-import { isTauriRuntime } from "../platform/runtime";
+import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
 import { isHlsUrl } from "../media/RetroMediaSource";
 import {
   useRetroFilterState,
@@ -412,7 +412,34 @@ export function RetroPlayer({
   );
 
   const applyPresetWithAspect = React.useCallback(
-    (presetKey: RetroPresetKey) => {
+    async (presetKey: RetroPresetKey) => {
+      const preset = RETRO_PRESETS[presetKey];
+      const isBeamPreset = preset.phosphorDotShape === "beam";
+      if (isWindowsRuntime() && isBeamPreset && !player.isCrtBeamPrepared({
+        paletteMode: preset.palette,
+        phosphorDotShape: "beam",
+        phosphorStrength: preset.phosphor,
+        spotMaskStrength: preset.spotMask,
+      })) {
+        const confirmed = await confirmDialog({
+          title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
+          body: locale === "ja"
+            ? "CRT Beam は Windows で準備に時間がかかることがあります。続行しますか？"
+            : "CRT Beam may take a while to prepare on Windows. Continue?",
+          okText: locale === "ja" ? "準備する" : "Prepare",
+          cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+        });
+        if (!confirmed) {
+          return;
+        }
+        await player.prepareCrtBeam({
+          paletteMode: preset.palette,
+          phosphorDotShape: "beam",
+          phosphorStrength: preset.phosphor,
+          spotMaskStrength: preset.spotMask,
+        });
+      }
+
       filterState.applyPreset(presetKey);
       phosphorDotAspectActiveRef.current = presetKey === "phosphorDot";
       autoTargetSizeAppliedKeyRef.current = null;
@@ -436,15 +463,57 @@ export function RetroPlayer({
       filterState.setTargetHeight(nextHeight);
     },
     [
+      confirmDialog,
       filterState.applyPreset,
       filterState.setTargetHeight,
       filterState.setTargetWidth,
+      locale,
+      player.isCrtBeamPrepared,
+      player.prepareCrtBeam,
       player.sourceDimensions,
       player.isAudioFxEnabled,
       player.toggleAudioFx,
       computePhosphorDotDimensions,
     ],
   );
+
+  const handleRequestEnableBeamCross = React.useCallback(async () => {
+    if (isWindowsRuntime() && !player.isCrtBeamPrepared({
+      paletteMode: filterState.paletteMode,
+      phosphorDotShape: "beam",
+      phosphorStrength: filterState.phosphorStrength,
+      spotMaskStrength: filterState.spotMaskStrength,
+    })) {
+      const confirmed = await confirmDialog({
+        title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
+        body: locale === "ja"
+          ? "CRT Beam は Windows で準備に時間がかかることがあります。続行しますか？"
+          : "CRT Beam may take a while to prepare on Windows. Continue?",
+        okText: locale === "ja" ? "準備する" : "Prepare",
+        cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+      });
+      if (!confirmed) {
+        return;
+      }
+      await player.prepareCrtBeam({
+        paletteMode: filterState.paletteMode,
+        phosphorDotShape: "beam",
+        phosphorStrength: filterState.phosphorStrength,
+        spotMaskStrength: filterState.spotMaskStrength,
+      });
+    }
+
+    filterState.setPhosphorDotShape("beam");
+  }, [
+    confirmDialog,
+    filterState.paletteMode,
+    filterState.phosphorStrength,
+    filterState.setPhosphorDotShape,
+    filterState.spotMaskStrength,
+    locale,
+    player.isCrtBeamPrepared,
+    player.prepareCrtBeam,
+  ]);
 
   // Catch the cases the click-time correction above misses: the preset was
   // applied before a source was loaded, or a new source loads afterward.
@@ -653,6 +722,7 @@ export function RetroPlayer({
             nativePlaybackNeedsReload={nativePlaybackMode !== startupNativeMode}
             onToggleNativePlaybackMode={handleToggleNativePlaybackMode}
             isAudioFxUnavailable={isAudioFxUnavailable}
+            onRequestEnableBeamCross={handleRequestEnableBeamCross}
           />
         </div>
       </section>
@@ -696,6 +766,7 @@ export function RetroPlayer({
     nativePlaybackNeedsReload: nativePlaybackMode !== startupNativeMode,
     onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
     isAudioFxUnavailable,
+    onRequestEnableBeamCross: handleRequestEnableBeamCross,
   } as const;
 
   const controlPanel = layoutMode === "settings"

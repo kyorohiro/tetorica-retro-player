@@ -92,6 +92,8 @@ export type RetroControlPlayerSlice = {
   toggleNoise: () => void;
   togglePlayback: () => Promise<void>;
   playVideoWithAudio: () => Promise<void>;
+  isCrtBeamPrepared: (overrides?: Record<string, unknown>) => boolean;
+  prepareCrtBeam: (overrides?: Record<string, unknown>) => Promise<void>;
   analyserRef?: React.RefObject<AnalyserNode | null>;
 };
 
@@ -123,6 +125,7 @@ export type RetroControlPanelProps = {
   nativePlaybackNeedsReload?: boolean;
   onToggleNativePlaybackMode?: () => void;
   isAudioFxUnavailable?: boolean;
+  onRequestEnableBeamCross?: () => void | Promise<void>;
 };
 
 const controlsFallback = (
@@ -176,6 +179,7 @@ export function RetroControlPanel({
   nativePlaybackNeedsReload,
   onToggleNativePlaybackMode,
   isAudioFxUnavailable,
+  onRequestEnableBeamCross,
 }: RetroControlPanelProps) {
   const canRetryPlayback = player.previewStatus?.kind === "retryable";
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia || canRetryPlayback);
@@ -442,6 +446,7 @@ export function RetroControlPanel({
               onSetFocusStrength={filterState.setFocusStrength}
               onSetFocusWidth={filterState.setFocusWidth}
               onSetFocusHeight={filterState.setFocusHeight}
+              onRequestEnableBeamCross={onRequestEnableBeamCross}
             />
           </React.Suspense>
         </div>

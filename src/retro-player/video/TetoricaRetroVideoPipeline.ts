@@ -999,6 +999,22 @@ export class TetoricaRetroVideoPipeline {
     this.queueWindowsLiteVariant(filterState);
   }
 
+  hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
+    if (!this.windowsLiteMode) {
+      return true;
+    }
+
+    return this.windowsLiteProgramCache.has(getWindowsLiteVariantKey(filterState));
+  }
+
+  async prepareFilterStateVariant(filterState: RetroVideoFilterState) {
+    if (!this.windowsLiteMode) {
+      return;
+    }
+
+    await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
+  }
+
   setOutputEnabled(enabled: boolean) {
     this.outputEnabled = enabled;
   }

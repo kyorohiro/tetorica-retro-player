@@ -168,6 +168,7 @@ type RetroFilterPanelProps = {
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
+  onRequestEnableBeamCross?: () => void | Promise<void>;
   onSetNeonBoost: (value: number) => void;
   onSetNeonSaturation: (value: number) => void;
   onSetNeonDetail: (value: number) => void;
@@ -280,6 +281,7 @@ export function RetroFilterPanel({
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
+  onRequestEnableBeamCross,
   onSetNeonBoost,
   onSetNeonSaturation,
   onSetNeonDetail,
@@ -1530,6 +1532,10 @@ export function RetroFilterPanel({
             <button
               type="button"
               onClick={() => {
+                if (onRequestEnableBeamCross) {
+                  void onRequestEnableBeamCross();
+                  return;
+                }
                 onSetPhosphorDotShape("beam");
               }}
               className={[
