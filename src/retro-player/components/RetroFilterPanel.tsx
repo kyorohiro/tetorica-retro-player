@@ -852,7 +852,7 @@ export function RetroFilterPanel({
               <input
                 type="range"
                 min="0"
-                max="2"
+                max="4"
                 step="0.01"
                 value={basicContrast}
                 onChange={(ev) => onSetBasicContrast(Number(ev.currentTarget.value))}
@@ -870,7 +870,7 @@ export function RetroFilterPanel({
               <input
                 type="range"
                 min="0"
-                max="2"
+                max="4"
                 step="0.01"
                 value={basicSaturation}
                 onChange={(ev) => onSetBasicSaturation(Number(ev.currentTarget.value))}
