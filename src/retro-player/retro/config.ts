@@ -13,6 +13,11 @@ export type PaletteMode =
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 export type PhosphorDotShape = "circle" | "heart" | "beam";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
+export type TargetSamplingMode =
+  | "nearest"
+  | "average_fast_4"
+  | "average_fast_8"
+  | "average";
 
 export const DEFAULT_BEAM_CROSS_SETTINGS = {
   beamDarkCutoff: 0.04,
@@ -46,6 +51,7 @@ export const MONO_TINTS: Record<
 export type RetroPresetDefinition = {
   label: string;
   autoTargetSize?: boolean;
+  samplingMode?: TargetSamplingMode;
   width: number;
   height: number;
   colors: number;
@@ -101,6 +107,7 @@ export const RETRO_PRESETS = {
   none: {
     label: "None",
     autoTargetSize: true,
+    samplingMode: "nearest",
     width: 1920,
     height: 1080,
     colors: 256,
@@ -510,6 +517,7 @@ export const RETRO_PRESETS = {
   },
   crtBeam: {
     label: "CRT Beam",
+    autoTargetSize: true,
     width: 320,
     height: 180,
     colors: 32,

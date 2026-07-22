@@ -10,6 +10,7 @@ import {
   type PhosphorDotShape,
   type RetroPresetDefinition,
   type RetroPresetKey,
+  type TargetSamplingMode,
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -116,6 +117,7 @@ type RetroFilterPanelProps = {
   targetHeight: number;
   targetWidth: number;
   autoTargetSize: boolean;
+  samplingMode: TargetSamplingMode;
   matchTargetAspect: boolean;
   vignetteStrength: number;
   focusStrength: number;
@@ -168,6 +170,7 @@ type RetroFilterPanelProps = {
   onSetTargetHeight: (value: number) => void;
   onSetTargetWidth: (value: number) => void;
   onSetAutoTargetSize: (value: boolean) => void;
+  onSetSamplingMode: (value: TargetSamplingMode) => void;
   onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
   onSetFocusStrength: (value: number) => void;
@@ -225,6 +228,7 @@ export function RetroFilterPanel({
   targetHeight,
   targetWidth,
   autoTargetSize,
+  samplingMode,
   matchTargetAspect,
   vignetteStrength,
   onApplyPreset,
@@ -274,6 +278,7 @@ export function RetroFilterPanel({
   onSetTargetHeight,
   onSetTargetWidth,
   onSetAutoTargetSize,
+  onSetSamplingMode,
   onSetMatchTargetAspect,
   onSetVignetteStrength,
 }: RetroFilterPanelProps) {
@@ -687,6 +692,32 @@ export function RetroFilterPanel({
               }}
               className="h-5 w-5"
             />
+          </label>
+          <label className="block">
+            <span className="text-[#12141c]">Sampling</span>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(["nearest", "average_fast_4", "average_fast_8"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    onSetSamplingMode(mode);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    samplingMode === mode
+                      ? "border-[#000000] bg-[#111014]/20"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {mode === "nearest"
+                    ? "Nearest"
+                    : mode === "average_fast_4"
+                      ? "Average Fast 4tap"
+                      : "Average Fast 8tap"}
+                </button>
+              ))}
+            </div>
           </label>
         </div>
 

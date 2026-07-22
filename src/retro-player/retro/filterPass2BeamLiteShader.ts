@@ -14,6 +14,7 @@ uniform vec2 uTargetSize;
 uniform vec2 uBeamSourceSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
+uniform float uSamplingMode;
 uniform float uHorizontalSharpness;
 uniform float uRgbConvergenceOffset;
 uniform float uSmoothStrength;
@@ -78,6 +79,43 @@ vec3 quantizeBeamInputColor(vec3 color)
 
   float levels = max(uColorLevels, 2.0);
   return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+}
+
+vec3 sampleSourceTextureAverage4(vec2 cellMin, vec2 cellSize)
+{
+  vec2 quarter = cellSize * 0.25;
+  vec3 sum = vec3(0.0);
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  return sum * 0.25;
+}
+
+vec3 sampleSourceTextureAverage8(vec2 cellMin, vec2 cellSize)
+{
+  vec3 sum = vec3(0.0);
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.25, 0.25), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.75, 0.25), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.25, 0.75), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.75, 0.75), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.50, 0.20), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.50, 0.80), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.20, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.80, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  return sum * 0.125;
+}
+
+vec3 sampleSourceTextureAverage16(vec2 cellMin, vec2 cellSize)
+{
+  vec3 sum = vec3(0.0);
+  for (int y = 0; y < 4; y++) {
+    for (int x = 0; x < 4; x++) {
+      vec2 offset = (vec2(float(x), float(y)) + 0.5) / 4.0;
+      sum += texture(uSourceTexture, clamp(cellMin + cellSize * offset, vec2(0.0), vec2(1.0))).rgb;
+    }
+  }
+  return sum * (1.0 / 16.0);
 }
 
 /*
@@ -685,38 +723,42 @@ vec3 sampleEmitterColor(
   vec2 sourceSize
 )
 {
-  ivec2 sourceTextureSize = textureSize(
-    uSourceTexture,
-    0
+  vec2 safeSourceSize = max(
+    sourceSize,
+    vec2(1.0)
   );
 
   vec2 maximumCell = max(
-    sourceSize - vec2(1.0),
+    safeSourceSize - vec2(1.0),
     vec2(0.0)
   );
 
   vec2 clampedCell = clamp(
-    floor(emitterCell),
+    emitterCell,
     vec2(0.0),
     maximumCell
   );
 
-  ivec2 pixel = ivec2(clampedCell);
+  vec2 sampleUv =
+    (clampedCell + vec2(0.5)) /
+    safeSourceSize;
 
-  pixel = clamp(
-    pixel,
-    ivec2(0),
-    max(
-      sourceTextureSize - ivec2(1),
-      ivec2(0)
-    )
-  );
+  if (uSamplingMode < 0.5) {
+    return texture(
+      uSourceTexture,
+      clamp(sampleUv, vec2(0.0), vec2(1.0))
+    ).rgb;
+  }
 
-  return texelFetch(
-    uSourceTexture,
-    pixel,
-    0
-  ).rgb;
+  vec2 cellMin = (clampedCell - vec2(0.5)) / safeSourceSize;
+  vec2 cellSize = 1.0 / safeSourceSize;
+  if (uSamplingMode < 1.5) {
+    return sampleSourceTextureAverage4(cellMin, cellSize);
+  }
+  if (uSamplingMode < 2.5) {
+    return sampleSourceTextureAverage8(cellMin, cellSize);
+  }
+  return sampleSourceTextureAverage16(cellMin, cellSize);
 }
 
 vec3 sampleEmitterColorConverged(

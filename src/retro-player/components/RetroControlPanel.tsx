@@ -379,6 +379,7 @@ export function RetroControlPanel({
               targetHeight={filterState.targetHeight}
               targetWidth={filterState.targetWidth}
               autoTargetSize={filterState.autoTargetSize}
+              samplingMode={filterState.samplingMode}
               matchTargetAspect={filterState.matchTargetAspect}
               vignetteStrength={filterState.vignetteStrength}
               focusStrength={filterState.focusStrength}
@@ -431,6 +432,7 @@ export function RetroControlPanel({
               onSetTargetHeight={onSetTargetHeight}
               onSetTargetWidth={onSetTargetWidth}
               onSetAutoTargetSize={filterState.setAutoTargetSize}
+              onSetSamplingMode={filterState.setSamplingMode}
               onSetMatchTargetAspect={onSetMatchTargetAspect}
               onSetVignetteStrength={filterState.setVignetteStrength}
               onSetFocusStrength={filterState.setFocusStrength}

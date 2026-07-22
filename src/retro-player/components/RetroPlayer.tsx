@@ -330,10 +330,10 @@ export function RetroPlayer({
     if (!dims || dims.width <= 0 || dims.height <= 0) return;
 
     const nextHeight = Math.max(
-      8,
+      1,
       Math.round(
-        (filterState.targetWidth / dims.width) * dims.height / 8,
-      ) * 8,
+        (filterState.targetWidth / dims.width) * dims.height,
+      ),
     );
 
     if (Number.isFinite(nextHeight) && nextHeight !== filterState.targetHeight) {

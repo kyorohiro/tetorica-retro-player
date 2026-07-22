@@ -9,6 +9,7 @@ import {
   type PhosphorDotShape,
   type RetroPresetDefinition,
   type RetroPresetKey,
+  type TargetSamplingMode,
 } from "../retro/config";
 import {
   loadPersistedRetroSettings,
@@ -21,6 +22,7 @@ export type RetroFilterInitialState = Partial<{
   targetWidth: number;
   targetHeight: number;
   autoTargetSize: boolean;
+  samplingMode: TargetSamplingMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -90,6 +92,7 @@ const doesPresetMatchState = (
         preset.height === state.targetHeight
       )) &&
     (preset.autoTargetSize ?? false) === state.autoTargetSize &&
+    (preset.samplingMode ?? "nearest") === state.samplingMode &&
     preset.colors === state.colorLevels &&
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
@@ -186,6 +189,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
     autoTargetSize: initialState.autoTargetSize ?? (DEFAULT_PRESET.autoTargetSize ?? false),
+    samplingMode: initialState.samplingMode ?? (DEFAULT_PRESET.samplingMode ?? "nearest"),
     matchTargetAspect: initialState.matchTargetAspect ?? true,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
@@ -303,6 +307,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       current.autoTargetSize === autoTargetSize
         ? current
         : { ...current, autoTargetSize }
+    ));
+  }, [markPresetAsCustom]);
+
+  const setSamplingMode = useCallback((samplingMode: TargetSamplingMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.samplingMode === samplingMode
+        ? current
+        : { ...current, samplingMode }
     ));
   }, [markPresetAsCustom]);
 
@@ -633,6 +646,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       targetWidth: presetSettings.width,
       targetHeight: presetSettings.height,
       autoTargetSize: presetSettings.autoTargetSize ?? false,
+      samplingMode: presetSettings.samplingMode ?? "nearest",
       colorLevels: presetSettings.colors,
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
@@ -717,6 +731,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setTargetWidth,
     setTargetHeight,
     setAutoTargetSize,
+    setSamplingMode,
     setMatchTargetAspect,
     setColorLevels,
     setDitherStrength,

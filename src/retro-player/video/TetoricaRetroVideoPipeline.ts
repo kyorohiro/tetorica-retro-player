@@ -4,6 +4,7 @@ import {
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
+  type TargetSamplingMode,
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
@@ -15,6 +16,7 @@ import { createSignalInstabilityController } from "./signalInstability";
 export type RetroVideoFilterState = {
   targetWidth: number;
   targetHeight: number;
+  samplingMode: TargetSamplingMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -91,10 +93,24 @@ function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   return 0;
 }
 
+function getSamplingModeValue(mode: TargetSamplingMode): number {
+  if (mode === "average_fast_4") {
+    return 1;
+  }
+  if (mode === "average_fast_8") {
+    return 2;
+  }
+  if (mode === "average") {
+    return 2;
+  }
+  return 0;
+}
+
 type Pass1UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
+  uSamplingMode: WebGLUniformLocation | null;
   uPaletteMode: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
   uHorizontalSharpness: WebGLUniformLocation | null;
@@ -115,6 +131,7 @@ type Pass2UniformLocations = {
   uBeamSourceSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
+  uSamplingMode: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
   uScanlineStrength: WebGLUniformLocation | null;
   uScanline2Strength: WebGLUniformLocation | null;
@@ -890,6 +907,7 @@ export class TetoricaRetroVideoPipeline {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
       uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
+      uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
       uPaletteMode: gl.getUniformLocation(program, "uPaletteMode"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
       uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
@@ -913,6 +931,7 @@ export class TetoricaRetroVideoPipeline {
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
       uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
+      uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
       uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
@@ -1223,6 +1242,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform2f(this.pass1Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
     gl.uniform1f(this.pass1Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
+    gl.uniform1f(this.pass1Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
     gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);
     gl.uniform1f(this.pass1Locs.uHorizontalSharpness, filterState.horizontalSharpness);
@@ -1259,16 +1279,34 @@ export class TetoricaRetroVideoPipeline {
       visibleWidth,
       visibleHeight,
     );
+    const isBeamMode = isBeamCrossModeEnabled(filterState);
+    const pass2TargetWidth =
+      isBeamMode && filterState.autoTargetSize
+        ? Math.max(sourceWidth ?? effectiveTargetWidth, 1)
+        : effectiveTargetWidth;
+    const pass2TargetHeight =
+      isBeamMode && filterState.autoTargetSize
+        ? Math.max(sourceHeight ?? effectiveTargetHeight, 1)
+        : effectiveTargetHeight;
 
     gl.useProgram(this.filterPass2Program);
-    gl.uniform2f(this.pass2Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
+    gl.uniform2f(this.pass2Locs.uTargetSize, pass2TargetWidth, pass2TargetHeight);
+    const beamSourceWidth =
+      isBeamMode && !filterState.autoTargetSize
+        ? pass2TargetWidth
+        : Math.max(sourceWidth ?? pass2TargetWidth, 1);
+    const beamSourceHeight =
+      isBeamMode && !filterState.autoTargetSize
+        ? pass2TargetHeight
+        : Math.max(sourceHeight ?? pass2TargetHeight, 1);
     gl.uniform2f(
       this.pass2Locs.uBeamSourceSize,
-      Math.max(sourceWidth ?? effectiveTargetWidth, 1),
-      Math.max(sourceHeight ?? effectiveTargetHeight, 1),
+      beamSourceWidth,
+      beamSourceHeight,
     );
     gl.uniform1f(this.pass2Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(this.pass2Locs.uDitherStrength, filterState.ditherStrength);
+    gl.uniform1f(this.pass2Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(this.pass2Locs.uCurvature, filterState.curvature);
     gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
@@ -1288,8 +1326,8 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotLightBalance, filterState.phosphorDotLightBalance);
     gl.uniform1f(
       this.pass2Locs.uPixelAspect,
-      (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
-        (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
+      (Math.max(gl.drawingBufferWidth, 1) * pass2TargetHeight) /
+        (Math.max(gl.drawingBufferHeight, 1) * pass2TargetWidth),
     );
     gl.uniform1f(
       this.pass2Locs.uPhosphorDotMode,
