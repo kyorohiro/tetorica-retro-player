@@ -8,7 +8,6 @@ in vec2 vMaskCoord;
 
 out vec4 finalColor;
 
-uniform sampler2D uPass1Texture;
 uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
@@ -37,14 +36,6 @@ uniform float uBeamWhiteBloom;
 uniform float uBeamWarmBloom;
 uniform float uScreenFaceGlow;
 
-uniform float uSignalInstabilityAmount;
-uniform float uSignalHorizontalSync;
-uniform float uSignalVerticalSync;
-uniform float uSignalStaticNoise;
-uniform float uSignalChromaNoise;
-uniform float uSignalInstabilitySeed;
-uniform float uSignalInstabilityPhase;
-
 uniform float uTime;
 
 const float PI = 3.141592653589793;
@@ -53,25 +44,28 @@ float bayer4x4(vec2 pos)
 {
   int x = int(mod(pos.x, 4.0));
   int y = int(mod(pos.y, 4.0));
-  int index = y * 4 + x;
-  float matrix[16];
-  matrix[0] = 0.0 / 16.0;
-  matrix[1] = 8.0 / 16.0;
-  matrix[2] = 2.0 / 16.0;
-  matrix[3] = 10.0 / 16.0;
-  matrix[4] = 12.0 / 16.0;
-  matrix[5] = 4.0 / 16.0;
-  matrix[6] = 14.0 / 16.0;
-  matrix[7] = 6.0 / 16.0;
-  matrix[8] = 3.0 / 16.0;
-  matrix[9] = 11.0 / 16.0;
-  matrix[10] = 1.0 / 16.0;
-  matrix[11] = 9.0 / 16.0;
-  matrix[12] = 15.0 / 16.0;
-  matrix[13] = 7.0 / 16.0;
-  matrix[14] = 13.0 / 16.0;
-  matrix[15] = 5.0 / 16.0;
-  return matrix[index];
+  if (y == 0) {
+    if (x == 0) return 0.0 / 16.0;
+    if (x == 1) return 8.0 / 16.0;
+    if (x == 2) return 2.0 / 16.0;
+    return 10.0 / 16.0;
+  }
+  if (y == 1) {
+    if (x == 0) return 12.0 / 16.0;
+    if (x == 1) return 4.0 / 16.0;
+    if (x == 2) return 14.0 / 16.0;
+    return 6.0 / 16.0;
+  }
+  if (y == 2) {
+    if (x == 0) return 3.0 / 16.0;
+    if (x == 1) return 11.0 / 16.0;
+    if (x == 2) return 1.0 / 16.0;
+    return 9.0 / 16.0;
+  }
+  if (x == 0) return 15.0 / 16.0;
+  if (x == 1) return 7.0 / 16.0;
+  if (x == 2) return 13.0 / 16.0;
+  return 5.0 / 16.0;
 }
 
 vec3 quantizeBeamInputColor(vec3 color)
@@ -128,7 +122,6 @@ vec3 sampleSourceTextureAverage16(vec2 cellMin, vec2 cellSize)
  * through the kernel math.
  */
 const float BEAM_GATE_LOW = 0.0;
-const float BEAM_GATE_HIGH = 0.04;
 
 const float BEAM_CORE_SIGMA_X = 0.26;
 const float BEAM_CORE_SIGMA_Y = 0.24;
@@ -176,12 +169,6 @@ const float BEAM_BASE_HIGHLIGHT_GAIN = 0.07;
 const float BEAM_WHITE_CORE_BASE = 0.065;
 const float BEAM_WHITE_CORE_LUMA_GAIN = 0.17;
 
-const float BEAM_SOFT_SAMPLE_OFFSET_X = 0.18;
-const float BEAM_SOFT_SAMPLE_OFFSET_Y = 0.16;
-const float BEAM_SOFT_CENTER_WEIGHT = 0.72;
-const float BEAM_SOFT_HORIZONTAL_WEIGHT = 0.09;
-const float BEAM_SOFT_VERTICAL_WEIGHT = 0.05;
-
 const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.36;
 
 const float BEAM_LIGHTMASK_LOW = 0.025;
@@ -215,317 +202,6 @@ vec2 curveUv(vec2 uv, float strength)
 
   return centered * 0.5 + 0.5;
 }
-
-
-/*
- * Pseudo-random hash
- */
-float hash13(vec3 p3)
-{
-  p3 = fract(p3 * 0.1031);
-  p3 += dot(p3, p3.zyx + 31.32);
-
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-
-/*
- * Signal disturbance band
- */
-float signalBandMask(vec2 uv)
-{
-  float staticNoise = clamp(uSignalStaticNoise, 0.0, 1.0);
-  float horizontalSync = clamp(uSignalHorizontalSync, 0.0, 1.0);
-  float verticalSync = clamp(uSignalVerticalSync, 0.0, 1.0);
-
-  float amount = clamp(
-    max(
-      staticNoise,
-      max(horizontalSync * 0.35, verticalSync * 0.2)
-    ),
-    0.0,
-    1.0
-  );
-
-  if (amount <= 0.001) {
-    return 0.0;
-  }
-
-  float phase = floor(uSignalInstabilityPhase);
-
-  float center = fract(
-    uSignalInstabilitySeed * 0.173 +
-    phase * 0.137 +
-    0.11
-  );
-
-  float thickness =
-    mix(
-      0.004,
-      0.065,
-      hash13(vec3(uSignalInstabilitySeed, phase, 5.0))
-    ) *
-    (0.4 + amount * 0.6);
-
-  float dy = abs(uv.y - center);
-  dy = min(dy, 1.0 - dy);
-
-  return
-    (1.0 - smoothstep(thickness * 0.45, thickness, dy)) *
-    amount;
-}
-
-
-/*
- * Horizontal synchronization disturbance
- */
-vec2 applySignalInstabilityUv(vec2 uv)
-{
-  float instability = clamp(uSignalInstabilityAmount, 0.0, 1.0);
-
-  if (instability <= 0.001) {
-    return uv;
-  }
-
-  float horizontalSync = clamp(uSignalHorizontalSync, 0.0, 1.0);
-  float phase = floor(uSignalInstabilityPhase);
-
-  float lineSpan =
-    1.0 +
-    floor(mix(0.0, 6.0, 1.0 - horizontalSync));
-
-  float targetHeight = max(uTargetSize.y, 1.0);
-  float targetWidth = max(uTargetSize.x, 1.0);
-
-  float lineIndex = floor(
-    (uv.y * targetHeight) /
-    max(lineSpan, 1.0)
-  );
-
-  float lineNoise = hash13(
-    vec3(
-      lineIndex + uSignalInstabilitySeed * 37.0,
-      phase,
-      1.0
-    )
-  );
-
-  float lineActive = smoothstep(0.72, 0.985, lineNoise);
-
-  float lineStrength = hash13(
-    vec3(
-      lineIndex + uSignalInstabilitySeed * 53.0,
-      phase,
-      2.0
-    )
-  );
-
-  float direction =
-    hash13(
-      vec3(
-        lineIndex + uSignalInstabilitySeed * 71.0,
-        phase,
-        3.0
-      )
-    ) -
-    0.5;
-
-  float lineOffsetPixels =
-    direction *
-    (0.6 + lineStrength * (1.0 + instability * 7.0)) *
-    (0.4 + horizontalSync * 2.8);
-
-  float bandOffsetPixels =
-    signalBandMask(uv) *
-    (
-      hash13(
-        vec3(
-          uSignalInstabilitySeed,
-          phase,
-          13.0
-        )
-      ) -
-      0.5
-    ) *
-    (1.0 + instability * 6.0);
-
-  uv.x +=
-    (
-      lineOffsetPixels * lineActive +
-      bandOffsetPixels
-    ) /
-    targetWidth;
-
-  return vec2(
-    clamp(uv.x, 0.0, 1.0),
-    fract(uv.y + 1.0)
-  );
-}
-
-
-/*
- * Chroma bleeding
- *
- * uPass1Texture is intentionally sampled here.
- * The source image's red and blue channels bleed into the Beam result.
- */
-vec3 applySignalChromaInstability(
-  vec3 color,
-  vec2 sampleUv
-)
-{
-  float chromaNoise = clamp(uSignalChromaNoise, 0.0, 1.0);
-
-  if (chromaNoise <= 0.001) {
-    return color;
-  }
-
-  float instability = clamp(uSignalInstabilityAmount, 0.0, 1.0);
-  float targetWidth = max(uTargetSize.x, 1.0);
-
-  float chromaOffset =
-    (
-      0.35 +
-      instability * 1.8 +
-      chromaNoise * 1.2
-    ) /
-    targetWidth;
-
-  vec2 leftUv = clamp(
-    sampleUv - vec2(chromaOffset, 0.0),
-    vec2(0.0),
-    vec2(1.0)
-  );
-
-  vec2 rightUv = clamp(
-    sampleUv + vec2(chromaOffset, 0.0),
-    vec2(0.0),
-    vec2(1.0)
-  );
-
-  vec3 left = texture(uPass1Texture, leftUv).rgb;
-  vec3 right = texture(uPass1Texture, rightUv).rgb;
-
-  vec3 bled = vec3(
-    mix(color.r, right.r, 0.22),
-    color.g,
-    mix(color.b, left.b, 0.18)
-  );
-
-  float luma = dot(
-    bled,
-    vec3(0.299, 0.587, 0.114)
-  );
-
-  vec3 desaturated = mix(
-    vec3(luma),
-    bled,
-    1.0 - chromaNoise * 0.3
-  );
-
-  float hueJitter =
-    (
-      hash13(
-        vec3(
-          uSignalInstabilitySeed,
-          floor(uSignalInstabilityPhase),
-          21.0
-        )
-      ) -
-      0.5
-    ) *
-    chromaNoise;
-
-  desaturated.r += hueJitter * 0.05;
-  desaturated.b -= hueJitter * 0.04;
-
-  return clamp(
-    mix(
-      color,
-      desaturated,
-      min(0.75, chromaNoise)
-    ),
-    0.0,
-    1.0
-  );
-}
-
-
-/*
- * Static noise within the disturbance band
- */
-vec3 applySignalStaticNoise(
-  vec3 color,
-  vec2 uv
-)
-{
-  float band = signalBandMask(uv);
-
-  if (band <= 0.001) {
-    return color;
-  }
-
-  float staticNoise = clamp(uSignalStaticNoise, 0.0, 1.0);
-  float phase = floor(uSignalInstabilityPhase);
-
-  vec2 coarse = floor(
-    gl_FragCoord.xy *
-    vec2(1.0, 0.35)
-  );
-
-  float noiseA =
-    hash13(
-      vec3(
-        coarse.x + 13.0,
-        coarse.y + 7.0,
-        phase + uSignalInstabilitySeed * 97.0
-      )
-    ) -
-    0.5;
-
-  float noiseB =
-    hash13(
-      vec3(
-        coarse.x * 0.5 + 41.0,
-        coarse.y + 17.0,
-        phase * 0.7 + uSignalInstabilitySeed * 53.0
-      )
-    ) -
-    0.5;
-
-  float stripe =
-    hash13(
-      vec3(
-        floor(gl_FragCoord.y * 0.5),
-        phase + 3.0,
-        uSignalInstabilitySeed * 31.0
-      )
-    ) -
-    0.5;
-
-  float luma = dot(
-    color,
-    vec3(0.299, 0.587, 0.114)
-  );
-
-  float amplitude =
-    band *
-    (0.08 + staticNoise * 0.26) *
-    (1.0 - luma * 0.35);
-
-  vec3 noise = vec3(
-    noiseA * 0.9 + stripe * 0.25,
-    noiseA * 0.75 + noiseB * 0.25,
-    noiseA * 1.05 - stripe * 0.18
-  );
-
-  return clamp(
-    color + noise * amplitude,
-    0.0,
-    1.0
-  );
-}
-
 
 /*
  * Basic color adjustment
@@ -676,7 +352,8 @@ vec3 applyScreenFaceGlow(vec3 color)
 
   float dist = distance(vMaskCoord, vec2(0.5));
   float broadField = 1.0 - smoothstep(0.08, 0.9, dist);
-  float centerCore = exp(-pow(dist / 0.38, 2.0));
+  float centerCoreDist = dist / 0.38;
+  float centerCore = exp(-(centerCoreDist * centerCoreDist));
   float faceGlow = clamp(broadField * 0.65 + centerCore * 0.75, 0.0, 1.25);
   vec3 floorGlow = vec3(0.22, 0.19, 0.15) * faceGlow * amount;
   vec3 lifted = max(color, floorGlow);
@@ -721,53 +398,23 @@ void sampleBeamStripeMasks(
     )
   );
 
-  vec3 stripeBars = vec3(
-    exp(
-      -pow(
-        (local.x - 1.0 / 6.0) /
-        0.15,
-        2.0
-      )
-    ),
-    exp(
-      -pow(
-        (local.x - 0.5) /
-        0.15,
-        2.0
-      )
-    ),
-    exp(
-      -pow(
-        (local.x - 5.0 / 6.0) /
-        0.15,
-        2.0
-      )
-    )
-  );
+  float stripeR = (local.x - 1.0 / 6.0) / 0.15;
+  float stripeG = (local.x - 0.5) / 0.15;
+  float stripeB = (local.x - 5.0 / 6.0) / 0.15;
+  vec3 stripeBars = exp(-vec3(
+    stripeR * stripeR,
+    stripeG * stripeG,
+    stripeB * stripeB
+  ));
 
-  vec3 bleedBars = vec3(
-    exp(
-      -pow(
-        (local.x - 1.0 / 6.0) /
-        0.21,
-        2.0
-      )
-    ),
-    exp(
-      -pow(
-        (local.x - 0.5) /
-        0.21,
-        2.0
-      )
-    ),
-    exp(
-      -pow(
-        (local.x - 5.0 / 6.0) /
-        0.21,
-        2.0
-      )
-    )
-  );
+  float bleedR = (local.x - 1.0 / 6.0) / 0.21;
+  float bleedG = (local.x - 0.5) / 0.21;
+  float bleedB = (local.x - 5.0 / 6.0) / 0.21;
+  vec3 bleedBars = exp(-vec3(
+    bleedR * bleedR,
+    bleedG * bleedG,
+    bleedB * bleedB
+  ));
 
   float flatBody =
     smoothstep(0.01, 0.1, local.y) *
@@ -776,13 +423,8 @@ void sampleBeamStripeMasks(
       smoothstep(0.9, 0.99, local.y)
     );
 
-  float roundedCaps = exp(
-    -pow(
-      (local.y - 0.5) /
-      0.62,
-      2.0
-    )
-  );
+  float roundedCapsCoord = (local.y - 0.5) / 0.62;
+  float roundedCaps = exp(-(roundedCapsCoord * roundedCapsCoord));
 
   float verticalShape = clamp(
     flatBody * 0.48 +
@@ -791,13 +433,8 @@ void sampleBeamStripeMasks(
     1.0
   );
 
-  float softVertical = exp(
-    -pow(
-      (local.y - 0.5) /
-      1.22,
-      2.0
-    )
-  );
+  float softVerticalCoord = (local.y - 0.5) / 1.22;
+  float softVertical = exp(-(softVerticalCoord * softVerticalCoord));
 
   stripeMask = clamp(
     stripeBars * verticalShape,
@@ -823,11 +460,6 @@ vec3 sampleEmitterColor(
   vec2 sourceSize
 )
 {
-  ivec2 sourceTextureSize = textureSize(
-    uSourceTexture,
-    0
-  );
-
   vec2 safeSourceSize = max(
     sourceSize,
     vec2(1.0)
@@ -850,6 +482,10 @@ vec3 sampleEmitterColor(
 
   if (uSamplingMode < 0.5) {
     if (uRgbConvergenceOffset <= 0.0001) {
+      ivec2 sourceTextureSize = textureSize(
+        uSourceTexture,
+        0
+      );
       ivec2 pixel = ivec2(
         floor(sampleUv * vec2(sourceTextureSize))
       );
@@ -876,8 +512,8 @@ vec3 sampleEmitterColor(
     ).rgb;
   }
 
-  vec2 cellMin = (clampedCell - vec2(0.5)) / safeSourceSize;
   vec2 cellSize = 1.0 / safeSourceSize;
+  vec2 cellMin = (clampedCell - vec2(0.5)) / safeSourceSize;
   if (uSamplingMode < 1.5) {
     return sampleSourceTextureAverage4(cellMin, cellSize);
   }
@@ -1097,53 +733,73 @@ vec3 applyBeamCross(vec2 gridUv)
 
       float dx = delta.x;
       float dy = delta.y;
+      float dx2 = dx * dx;
+      float dy2 = dy * dy;
+
+      float coreSigmaX2 = BEAM_CORE_SIGMA_X * BEAM_CORE_SIGMA_X;
+      float coreSigmaY2 = BEAM_CORE_SIGMA_Y * BEAM_CORE_SIGMA_Y;
+      float flareSigmaX = BEAM_FLARE_SIGMA_X * horizontalSpread;
+      float flareSigmaX2 = flareSigmaX * flareSigmaX;
+      float flareSigmaY2 = BEAM_FLARE_SIGMA_Y * BEAM_FLARE_SIGMA_Y;
+      float leakSigmaX2 = BEAM_LEAK_SIGMA_X * BEAM_LEAK_SIGMA_X;
+      float leakSigmaY2 = BEAM_LEAK_SIGMA_Y * BEAM_LEAK_SIGMA_Y;
+      float haloSigmaX2 = BEAM_HALO_SIGMA_X * BEAM_HALO_SIGMA_X;
+      float haloSigmaY2 = BEAM_HALO_SIGMA_Y * BEAM_HALO_SIGMA_Y;
+      float bridgeSigmaX = BEAM_BRIDGE_SIGMA_X * horizontalSpread;
+      float bridgeSigmaX2 = bridgeSigmaX * bridgeSigmaX;
+      float bridgeSigmaY2 = BEAM_BRIDGE_SIGMA_Y * BEAM_BRIDGE_SIGMA_Y;
+      float auraSigmaX = BEAM_AURA_SIGMA_X * horizontalSpread;
+      float auraSigmaX2 = auraSigmaX * auraSigmaX;
+      float auraSigmaY2 = BEAM_AURA_SIGMA_Y * BEAM_AURA_SIGMA_Y;
+      float sparkleSigmaX2 = BEAM_SPARKLE_SIGMA_X * BEAM_SPARKLE_SIGMA_X;
+      float sparkleSigmaY2 = BEAM_SPARKLE_SIGMA_Y * BEAM_SPARKLE_SIGMA_Y;
 
       float core = exp(
         -(
-          dx * dx / (BEAM_CORE_SIGMA_X * BEAM_CORE_SIGMA_X) +
-          dy * dy / (BEAM_CORE_SIGMA_Y * BEAM_CORE_SIGMA_Y)
+          dx2 / coreSigmaX2 +
+          dy2 / coreSigmaY2
         )
       );
 
       float horizontalFlare = exp(
         -(
-          dx * dx / ((BEAM_FLARE_SIGMA_X * horizontalSpread) * (BEAM_FLARE_SIGMA_X * horizontalSpread)) +
-          dy * dy / (BEAM_FLARE_SIGMA_Y * BEAM_FLARE_SIGMA_Y)
+          dx2 / flareSigmaX2 +
+          dy2 / flareSigmaY2
         )
       );
 
       float verticalLeak = exp(
         -(
-          dx * dx / (BEAM_LEAK_SIGMA_X * BEAM_LEAK_SIGMA_X) +
-          dy * dy / (BEAM_LEAK_SIGMA_Y * BEAM_LEAK_SIGMA_Y)
+          dx2 / leakSigmaX2 +
+          dy2 / leakSigmaY2
         )
       );
 
       float halo = exp(
         -(
-          dx * dx / (BEAM_HALO_SIGMA_X * BEAM_HALO_SIGMA_X) +
-          dy * dy / (BEAM_HALO_SIGMA_Y * BEAM_HALO_SIGMA_Y)
+          dx2 / haloSigmaX2 +
+          dy2 / haloSigmaY2
         )
       );
 
       float bridge = exp(
         -(
-          dx * dx / ((BEAM_BRIDGE_SIGMA_X * horizontalSpread) * (BEAM_BRIDGE_SIGMA_X * horizontalSpread)) +
-          dy * dy / (BEAM_BRIDGE_SIGMA_Y * BEAM_BRIDGE_SIGMA_Y)
+          dx2 / bridgeSigmaX2 +
+          dy2 / bridgeSigmaY2
         )
       );
 
       float broadAura = exp(
         -(
-          dx * dx / ((BEAM_AURA_SIGMA_X * horizontalSpread) * (BEAM_AURA_SIGMA_X * horizontalSpread)) +
-          dy * dy / (BEAM_AURA_SIGMA_Y * BEAM_AURA_SIGMA_Y)
+          dx2 / auraSigmaX2 +
+          dy2 / auraSigmaY2
         )
       );
 
       float sparkle = exp(
         -(
-          dx * dx / (BEAM_SPARKLE_SIGMA_X * BEAM_SPARKLE_SIGMA_X) +
-          dy * dy / (BEAM_SPARKLE_SIGMA_Y * BEAM_SPARKLE_SIGMA_Y)
+          dx2 / sparkleSigmaX2 +
+          dy2 / sparkleSigmaY2
         )
       );
 
@@ -1237,37 +893,6 @@ vec3 applyBeamCross(vec2 gridUv)
   return coloredHalo + whiteCore;
 }
 
-
-/*
- * Soft beam neighborhood
- *
- * A very light 3-tap blend keeps the current single-light look as the base,
- * then lets the surrounding glow connect a little more naturally.
- */
-vec3 sampleBeamCrossSoft(vec2 uv, vec2 sourceSize)
-{
-  vec2 sourceTexel = 1.0 / max(
-    sourceSize,
-    vec2(1.0)
-  );
-
-  vec3 center = applyBeamCross(uv);
-  vec3 offsetA = applyBeamCross(
-    uv + sourceTexel * vec2(BEAM_SOFT_SAMPLE_OFFSET_X, 0.0)
-  );
-  vec3 offsetB = applyBeamCross(
-    uv + sourceTexel * vec2(-BEAM_SOFT_SAMPLE_OFFSET_X, 0.0)
-  );
-
-  return
-    center * (
-      BEAM_SOFT_CENTER_WEIGHT +
-      BEAM_SOFT_VERTICAL_WEIGHT * 2.0
-    ) +
-    (offsetA + offsetB) * BEAM_SOFT_HORIZONTAL_WEIGHT;
-}
-
-
 void main(void)
 {
   vec2 curvedUv = curveUv(
@@ -1301,12 +926,8 @@ void main(void)
     vec2(1.0)
   );
 
-  vec2 unstableUv = applySignalInstabilityUv(
-    curvedUv
-  );
-
   vec2 targetCell = floor(
-    unstableUv *
+    curvedUv *
     targetSize
   );
 
@@ -1318,7 +939,7 @@ void main(void)
   );
 
   vec2 sourceCoord =
-    unstableUv *
+    curvedUv *
     sourceSize;
 
   /*
@@ -1326,7 +947,7 @@ void main(void)
    *
    * The previous implementation evaluated this five times.
    */
-  vec3 beamColor = applyBeamCross(unstableUv);
+  vec3 beamColor = applyBeamCross(curvedUv);
 
   vec3 sourceDetailColor = mix(
     sampleEmitterColor(
@@ -1360,7 +981,7 @@ void main(void)
   vec3 stripeBleedMask;
 
   sampleBeamStripeMasks(
-    unstableUv,
+    curvedUv,
     sourceSize,
     stripeMask,
     stripeBleedMask
@@ -1493,16 +1114,6 @@ void main(void)
     visibility;
 
   finalBeamColor += vec3(scanline2);
-
-  finalBeamColor = applySignalChromaInstability(
-    finalBeamColor,
-    pixelatedUv
-  );
-
-  finalBeamColor = applySignalStaticNoise(
-    finalBeamColor,
-    unstableUv
-  );
 
   finalBeamColor = applyScreenFaceGlow(
     finalBeamColor
