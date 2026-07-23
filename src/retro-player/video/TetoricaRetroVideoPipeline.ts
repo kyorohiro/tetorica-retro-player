@@ -11,7 +11,6 @@ import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "../retro/filterPass2BeamLiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
-import { createSignalInstabilityController } from "./signalInstability";
 
 export type RetroVideoFilterState = {
   autoTargetSize: boolean;
@@ -57,9 +56,6 @@ export type RetroVideoFilterState = {
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
@@ -168,13 +164,6 @@ type Pass2UniformLocations = {
   uBeamWhiteBloom: WebGLUniformLocation | null;
   uBeamWarmBloom: WebGLUniformLocation | null;
   uScreenFaceGlow: WebGLUniformLocation | null;
-  uSignalInstabilityAmount: WebGLUniformLocation | null;
-  uSignalHorizontalSync: WebGLUniformLocation | null;
-  uSignalVerticalSync: WebGLUniformLocation | null;
-  uSignalStaticNoise: WebGLUniformLocation | null;
-  uSignalChromaNoise: WebGLUniformLocation | null;
-  uSignalInstabilitySeed: WebGLUniformLocation | null;
-  uSignalInstabilityPhase: WebGLUniformLocation | null;
   uFocusStrength: WebGLUniformLocation | null;
   uFocusSize: WebGLUniformLocation | null;
   uFocusCenter: WebGLUniformLocation | null;
@@ -549,7 +538,6 @@ export class TetoricaRetroVideoPipeline {
   private currentSource: RetroVideoSource | null = null;
 
   private currentFilterState: RetroVideoFilterState | null = null;
-  private readonly signalInstabilityController = createSignalInstabilityController();
 
   private outputEnabled = true;
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
@@ -971,13 +959,6 @@ export class TetoricaRetroVideoPipeline {
       uBeamWhiteBloom: gl.getUniformLocation(program, "uBeamWhiteBloom"),
       uBeamWarmBloom: gl.getUniformLocation(program, "uBeamWarmBloom"),
       uScreenFaceGlow: gl.getUniformLocation(program, "uScreenFaceGlow"),
-      uSignalInstabilityAmount: gl.getUniformLocation(program, "uSignalInstabilityAmount"),
-      uSignalHorizontalSync: gl.getUniformLocation(program, "uSignalHorizontalSync"),
-      uSignalVerticalSync: gl.getUniformLocation(program, "uSignalVerticalSync"),
-      uSignalStaticNoise: gl.getUniformLocation(program, "uSignalStaticNoise"),
-      uSignalChromaNoise: gl.getUniformLocation(program, "uSignalChromaNoise"),
-      uSignalInstabilitySeed: gl.getUniformLocation(program, "uSignalInstabilitySeed"),
-      uSignalInstabilityPhase: gl.getUniformLocation(program, "uSignalInstabilityPhase"),
       uFocusStrength: gl.getUniformLocation(program, "uFocusStrength"),
       uFocusSize: gl.getUniformLocation(program, "uFocusSize"),
       uFocusCenter: gl.getUniformLocation(program, "uFocusCenter"),
@@ -1036,7 +1017,6 @@ export class TetoricaRetroVideoPipeline {
 
   resetAnimationClock(startedAt = nowMs()) {
     this.startedAt = startedAt;
-    this.signalInstabilityController.reset();
   }
 
   readPixels() {
@@ -1229,7 +1209,6 @@ export class TetoricaRetroVideoPipeline {
     this.lastUploadedImageSource = null;
     this.lastUploadedVideoSource = null;
     this.lastUploadedVideoTime = Number.NaN;
-    this.signalInstabilityController.reset();
   }
 
   private getUploadSource(
@@ -1374,22 +1353,10 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uBeamWhiteBloom, filterState.beamWhiteBloom);
     gl.uniform1f(this.pass2Locs.uBeamWarmBloom, filterState.beamWarmBloom);
     gl.uniform1f(this.pass2Locs.uScreenFaceGlow, filterState.screenFaceGlow);
-    const signalTimeSec = (nowMs() - this.startedAt) / 1000;
-    const signalState = this.signalInstabilityController.update(signalTimeSec, {
-      enabled: filterState.signalInstabilityEnabled,
-      strength: filterState.signalInstabilityStrength,
-      frequency: filterState.signalInstabilityFrequency,
-    });
-    gl.uniform1f(this.pass2Locs.uSignalInstabilityAmount, signalState.intensity);
-    gl.uniform1f(this.pass2Locs.uSignalHorizontalSync, signalState.horizontalSync);
-    gl.uniform1f(this.pass2Locs.uSignalVerticalSync, signalState.verticalSync);
-    gl.uniform1f(this.pass2Locs.uSignalStaticNoise, signalState.staticNoise);
-    gl.uniform1f(this.pass2Locs.uSignalChromaNoise, signalState.chromaNoise);
-    gl.uniform1f(this.pass2Locs.uSignalInstabilitySeed, signalState.seed);
-    gl.uniform1f(this.pass2Locs.uSignalInstabilityPhase, signalState.phase);
+    const timeSec = (nowMs() - this.startedAt) / 1000;
     gl.uniform1f(this.pass2Locs.uFocusStrength, filterState.focusStrength);
     gl.uniform2f(this.pass2Locs.uFocusSize, filterState.focusWidth, filterState.focusHeight);
     gl.uniform2f(this.pass2Locs.uFocusCenter, filterState.focusCenterX, filterState.focusCenterY);
-    gl.uniform1f(this.pass2Locs.uTime, signalTimeSec);
+    gl.uniform1f(this.pass2Locs.uTime, timeSec);
   }
 }

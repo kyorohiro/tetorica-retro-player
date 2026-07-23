@@ -62,9 +62,6 @@ export type RetroFilterInitialState = Partial<{
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -132,9 +129,6 @@ const doesPresetMatchState = (
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
     (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
     (preset.screenFaceGlow ?? 0) === state.screenFaceGlow &&
-    (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
-    (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
-    (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -250,9 +244,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamWarmBloom ?? (DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom),
     screenFaceGlow:
       initialState.screenFaceGlow ?? (DEFAULT_PRESET.screenFaceGlow ?? 0),
-    signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
-    signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
-    signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -565,33 +556,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
-  const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
-    markPresetAsCustom();
-    setSettings((current) => (
-      current.signalInstabilityEnabled === signalInstabilityEnabled
-        ? current
-        : { ...current, signalInstabilityEnabled }
-    ));
-  };
-
-  const setSignalInstabilityStrength = (signalInstabilityStrength: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (
-      current.signalInstabilityStrength === signalInstabilityStrength
-        ? current
-        : { ...current, signalInstabilityStrength }
-    ));
-  };
-
-  const setSignalInstabilityFrequency = (signalInstabilityFrequency: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (
-      current.signalInstabilityFrequency === signalInstabilityFrequency
-        ? current
-        : { ...current, signalInstabilityFrequency }
-    ));
-  };
-
   const setMonoTint = (monoTint: MonoTintMode) => {
     markPresetAsCustom();
     setSettings((current) => (current.monoTint === monoTint ? current : { ...current, monoTint }));
@@ -706,9 +670,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
       beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
       screenFaceGlow: presetSettings.screenFaceGlow ?? 0,
-      signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
-      signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
-      signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -795,9 +756,6 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBeamWhiteBloom,
     setBeamWarmBloom,
     setScreenFaceGlow,
-    setSignalInstabilityEnabled,
-    setSignalInstabilityStrength,
-    setSignalInstabilityFrequency,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

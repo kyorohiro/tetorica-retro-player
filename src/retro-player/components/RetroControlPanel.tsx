@@ -374,9 +374,6 @@ export function RetroControlPanel({
               beamWhiteBloom={filterState.beamWhiteBloom}
               beamWarmBloom={filterState.beamWarmBloom}
               screenFaceGlow={filterState.screenFaceGlow}
-              signalInstabilityEnabled={filterState.signalInstabilityEnabled}
-              signalInstabilityStrength={filterState.signalInstabilityStrength}
-              signalInstabilityFrequency={filterState.signalInstabilityFrequency}
               scanlineBrightnessFade={filterState.scanlineBrightnessFade}
               scanlineStrength={filterState.scanlineStrength}
               scanline2Strength={filterState.scanline2Strength}
@@ -431,9 +428,6 @@ export function RetroControlPanel({
               onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
               onSetBeamWarmBloom={filterState.setBeamWarmBloom}
               onSetScreenFaceGlow={filterState.setScreenFaceGlow}
-              onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
-              onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}
-              onSetSignalInstabilityFrequency={filterState.setSignalInstabilityFrequency}
               onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
               onSetScanlineStrength={filterState.setScanlineStrength}
               onSetScanline2Strength={filterState.setScanline2Strength}

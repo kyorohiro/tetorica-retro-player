@@ -105,9 +105,6 @@ type RetroFilterPanelProps = {
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -162,9 +159,6 @@ type RetroFilterPanelProps = {
   onSetBeamWhiteBloom: (value: number) => void;
   onSetBeamWarmBloom: (value: number) => void;
   onSetScreenFaceGlow: (value: number) => void;
-  onSetSignalInstabilityEnabled: (value: boolean) => void;
-  onSetSignalInstabilityStrength: (value: number) => void;
-  onSetSignalInstabilityFrequency: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -221,9 +215,6 @@ export function RetroFilterPanel({
   beamWhiteBloom,
   beamWarmBloom,
   screenFaceGlow,
-  signalInstabilityEnabled,
-  signalInstabilityStrength,
-  signalInstabilityFrequency,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -275,9 +266,6 @@ export function RetroFilterPanel({
   onSetBeamWhiteBloom,
   onSetBeamWarmBloom,
   onSetScreenFaceGlow,
-  onSetSignalInstabilityEnabled,
-  onSetSignalInstabilityStrength,
-  onSetSignalInstabilityFrequency,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -374,10 +362,6 @@ export function RetroFilterPanel({
             "映像全体の色の強さを一括で調整します。1.00 が標準で、下げると落ち着いた色、上げると鮮やかな色になります。",
           closeUpNoise:
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
-          signalInstability:
-            "RF 接続が不安定な時のような、一瞬の横ずれやノイズ帯を短いイベントとして発生させます。最大でも常時壊れ続ける演出にはしません。",
-          signalInstabilityFrequency:
-            "不安定イベントの起きやすさです。0 なら発生せず、上げるほど短い乱れが起きやすくなります。",
           focus:
             "画面の周辺部をぼかして中央に焦点を合わせます。値を上げるほど周辺のぼけが強くなり、被写界深度のような効果が得られます。",
           focusWidth:
@@ -459,10 +443,6 @@ export function RetroFilterPanel({
             "Adjusts overall color intensity across the whole image. 1.00 is neutral; lower values mute the image, higher values make it more vivid.",
           closeUpNoise:
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
-          signalInstability:
-            "Adds short RF-like sync stumbles instead of a modern digital glitch. Higher values make each instability event more visible without making the image stay broken all the time.",
-          signalInstabilityFrequency:
-            "Controls how often instability events can happen. Set it to 0 to disable events entirely; raise it to make brief disturbances appear more often.",
           focus:
             "Blurs the periphery of the image, keeping the center sharp. Higher values increase the defocus at the edges for a depth-of-field style effect.",
           focusWidth:
@@ -1140,65 +1120,6 @@ export function RetroFilterPanel({
                 className="mt-1 w-full"
               />
             </label>
-            <div className="rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-3">
-              <button
-                type="button"
-                onClick={() => {
-                  onSetSignalInstabilityEnabled(!signalInstabilityEnabled);
-                }}
-                className={[
-                  "w-full rounded-lg border px-3 py-2 text-left text-[11px] leading-tight text-[#12141c]",
-                  signalInstabilityEnabled
-                    ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
-                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-                ].join(" ")}
-              >
-                <span className="block">Signal Instability</span>
-                <span className="mt-1 block text-[10px] font-normal text-[#7a7268]">
-                  {signalInstabilityEnabled ? "On" : "Off"}
-                </span>
-              </button>
-              {signalInstabilityEnabled ? (
-                <div className="mt-3 flex flex-col gap-3">
-                  <label className="block">
-                    <span className="text-[#12141c]">
-                      <InfoTip
-                        label={`Signal Instability: ${signalInstabilityStrength.toFixed(2)}`}
-                        text={helpText.signalInstability}
-                        helpSuffix={helpText.helpSuffix}
-                      />
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={signalInstabilityStrength}
-                      onChange={(ev) => onSetSignalInstabilityStrength(Number(ev.currentTarget.value))}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[#12141c]">
-                      <InfoTip
-                        label={`Signal Frequency: ${signalInstabilityFrequency.toFixed(2)}`}
-                        text={helpText.signalInstabilityFrequency}
-                        helpSuffix={helpText.helpSuffix}
-                      />
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={signalInstabilityFrequency}
-                      onChange={(ev) => onSetSignalInstabilityFrequency(Number(ev.currentTarget.value))}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                </div>
-              ) : null}
-            </div>
           </div>
         </div>
 

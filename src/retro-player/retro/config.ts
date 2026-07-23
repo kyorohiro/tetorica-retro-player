@@ -92,9 +92,6 @@ export type RetroPresetDefinition = {
   beamWhiteBloom?: number;
   beamWarmBloom?: number;
   screenFaceGlow?: number;
-  signalInstabilityEnabled?: boolean;
-  signalInstabilityStrength?: number;
-  signalInstabilityFrequency?: number;
   scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -540,11 +537,12 @@ export const RETRO_PRESETS = {
     spotMask: 0.3,
     bulbRadius: 0.5,
     blackFloor: 0.001,
+    screenFaceGlow: 0.41,
     phosphorDotShape: "beam",
     beamDarkCutoff: 0.04,
     beamHorizontalSpread: 1.27,
-    beamStripeStrength: 0.08,
-    beamWhiteBloom: 1.8,
+    beamStripeStrength: 0.22,
+    beamWhiteBloom: 1.14,
     beamWarmBloom: 0.32,
     basicContrast: 2.0,
     basicSaturation: 2.0,
@@ -602,9 +600,6 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    signalInstabilityEnabled: false,
-    signalInstabilityStrength: 0.88,
-    signalInstabilityFrequency: 0.88,
   },
   animeCel: {
     label: "Anime Cel",
