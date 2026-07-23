@@ -9,6 +9,7 @@ import {
 import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "../retro/filterPass2BeamLiteShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
 
@@ -211,7 +212,7 @@ const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
 type WindowsLitePass1Variant = "basic" | "pc98";
-type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
+type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
 // Only 4 combinations exist. Compiling each at most once (cached) and
@@ -220,10 +221,12 @@ type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Varia
 // time a user switches to a variant mid-playback (e.g. enabling phosphor).
 const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
   "basic:basic",
-  "basic:beam",
+  "basic:beam_simple",
+  "basic:beam_full",
   "basic:phosphor",
   "pc98:basic",
-  "pc98:beam",
+  "pc98:beam_simple",
+  "pc98:beam_full",
   "pc98:phosphor",
 ];
 
@@ -234,13 +237,19 @@ const isPc98PaletteMode = (mode: PaletteMode) =>
   mode === "pc98_512_sat" ||
   mode === "pc98_4096";
 
+const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
+  isBeamCrossModeEnabled(filterState) &&
+  filterState.smoothStrength <= 0.001 &&
+  filterState.rgbConvergenceOffset <= 0.0001 &&
+  getSamplingModeValue(filterState.samplingMode) < 0.5;
+
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,
 ): WindowsLiteVariantKey => {
   const pass1: WindowsLitePass1Variant =
     filterState && isPc98PaletteMode(filterState.paletteMode) ? "pc98" : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
-    return `${pass1}:beam`;
+    return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
   }
   const pass2: WindowsLitePass2Variant =
     filterState &&
@@ -651,7 +660,9 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
           : FILTER_FRAGMENT_PASS1_LITE,
       pass2:
-        pass2Variant === "beam"
+        pass2Variant === "beam_simple"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
+          : pass2Variant === "beam_full"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE
           : pass2Variant === "phosphor"
             ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
@@ -1139,7 +1150,7 @@ export class TetoricaRetroVideoPipeline {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      const isBeamVariant = this.windowsLiteVariantKey?.endsWith(":beam") ?? false;
+      const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
       const pass2TextureFilter =
