@@ -10,6 +10,7 @@ out vec4 finalColor;
 uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
+uniform vec2 uOutputSize;
 uniform vec2 uBeamSourceSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
@@ -170,6 +171,31 @@ void sampleBeamStripeMasks(
 
   stripeMask = clamp(stripeBars * verticalShape, 0.0, 1.0);
   bleedMask = clamp(bleedBars * softVertical, 0.0, 1.0);
+}
+
+float getBeamStripeResolve(vec2 sourceSize)
+{
+  vec2 safeSourceSize = max(sourceSize, vec2(1.0));
+  float pixelsPerCellX = uOutputSize.x / safeSourceSize.x;
+  float pixelsPerCellY = uOutputSize.y / safeSourceSize.y;
+  float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
+  return clamp(smoothstep(0.9, 1.2, subpixelPixels), 0.0, 1.0);
+}
+
+vec3 sampleBeamMergedMask(
+  vec2 uv,
+  vec2 sourceSize,
+  float sigmaX,
+  float sigmaY
+)
+{
+  vec2 safeSourceSize = max(sourceSize, vec2(1.0));
+  vec2 cellCoord = uv * safeSourceSize;
+  vec2 local = fract(cellCoord);
+  float dx = (local.x - 0.5) / max(sigmaX, 0.0001);
+  float dy = (local.y - 0.5) / max(sigmaY, 0.0001);
+  float mask = clamp(exp(-(dx * dx + dy * dy)), 0.0, 1.0);
+  return vec3(mask);
 }
 
 vec3 sampleEmitterColor(vec2 emitterCell, vec2 sourceSize)
@@ -383,6 +409,11 @@ void main(void)
   vec3 stripeMask;
   vec3 stripeBleedMask;
   sampleBeamStripeMasks(curvedUv, sourceSize, stripeMask, stripeBleedMask);
+  float stripeResolve = getBeamStripeResolve(sourceSize);
+  vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.34, 0.58);
+  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.46, 0.86);
+  stripeMask = mix(mergedStripeMask, stripeMask, stripeResolve);
+  stripeBleedMask = mix(mergedBleedMask, stripeBleedMask, stripeResolve);
 
   float lightMask = smoothstep(0.025, 0.23, beamLuma);
   vec3 beamField = beamColor * (0.095 + lightMask * 0.04);

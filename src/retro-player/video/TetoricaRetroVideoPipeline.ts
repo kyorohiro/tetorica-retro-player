@@ -128,6 +128,7 @@ type Pass1UniformLocations = {
 
 type Pass2UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
+  uOutputSize: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
@@ -933,6 +934,7 @@ export class TetoricaRetroVideoPipeline {
     const { gl } = this;
     return {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
+      uOutputSize: gl.getUniformLocation(program, "uOutputSize"),
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
       uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
@@ -1305,6 +1307,11 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(this.filterPass2Program);
     gl.uniform2f(this.pass2Locs.uTargetSize, pass2TargetWidth, pass2TargetHeight);
+    gl.uniform2f(
+      this.pass2Locs.uOutputSize,
+      Math.max(gl.drawingBufferWidth, 1),
+      Math.max(gl.drawingBufferHeight, 1),
+    );
     const beamSourceWidth =
       isBeamMode && !filterState.autoTargetSize
         ? pass2TargetWidth
