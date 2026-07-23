@@ -528,7 +528,7 @@ export const RETRO_PRESETS = {
     dither: 0.55,
     smoothStrength: 0.55,
     palette: "free",
-    curvature: 0.01,
+    curvature: 0.0,
     scanline: 0.0,
     scanline2: 0.01,
     vignette: 0.3,
