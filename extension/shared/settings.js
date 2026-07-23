@@ -530,7 +530,7 @@ export const PRESETS = {
     colorLevels: 32,
     ditherStrength: 0.55,
     paletteMode: 0,
-    curvature: 0.01,
+    curvature: 0,
     scanlineStrength: 0,
     scanline2Strength: 0.01,
     vignetteStrength: 0.3,
