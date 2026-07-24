@@ -535,7 +535,7 @@ export const PRESETS = {
     scanline2Strength: 0.01,
     vignetteStrength: 0.3,
     glowStrength: 0.08,
-    smoothStrength: 0.55,
+    smoothStrength: 0,
     phosphorStrength: 0,
     spotMaskStrength: 0.3,
     bulbRadius: 0.5,
