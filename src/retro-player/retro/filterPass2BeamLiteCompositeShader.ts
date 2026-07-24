@@ -118,17 +118,6 @@ vec3 sampleSourceTextureAverage8(vec2 cellMin, vec2 cellSize) {
   return sum * 0.125;
 }
 
-vec3 sampleSourceTextureAverage16(vec2 cellMin, vec2 cellSize) {
-  vec3 sum = vec3(0.0);
-  for (int y = 0; y < 4; y++) {
-    for (int x = 0; x < 4; x++) {
-      vec2 offset = (vec2(float(x), float(y)) + 0.5) / 4.0;
-      sum += texture(uSourceTexture, clamp(cellMin + cellSize * offset, vec2(0.0), vec2(1.0))).rgb;
-    }
-  }
-  return sum * (1.0 / 16.0);
-}
-
 vec3 sampleEmitterColor(vec2 emitterCell, vec2 sourceSize) {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
   vec2 maximumCell = max(safeSourceSize - vec2(1.0), vec2(0.0));
@@ -147,7 +136,7 @@ vec3 sampleEmitterColor(vec2 emitterCell, vec2 sourceSize) {
   vec2 cellMin = clampedCell / safeSourceSize;
   if (uSamplingMode < 1.5) return sampleSourceTextureAverage4(cellMin, cellSize);
   if (uSamplingMode < 2.5) return sampleSourceTextureAverage8(cellMin, cellSize);
-  return sampleSourceTextureAverage16(cellMin, cellSize);
+  return sampleSourceTextureAverage8(cellMin, cellSize);
 }
 
 vec3 sampleEmitterColorSmooth(vec2 emitterCell, vec2 sourceSize) {
