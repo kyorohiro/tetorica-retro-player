@@ -412,13 +412,11 @@ void main(void)
   vec3 stripeBleedMask;
   sampleBeamStripeMasks(curvedUv, sourceSize, stripeMask, stripeBleedMask);
   float stripeResolve = getBeamStripeResolve(sourceSize);
-  vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.34, 0.58);
-  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.46, 0.86);
-  float mergedStripeMaskScalar = dot(mergedStripeMask, vec3(1.0 / 3.0));
-  float mergedBleedMaskScalar = dot(mergedBleedMask, vec3(1.0 / 3.0));
+  float mergedStripeMaskScalar = dot(stripeMask, vec3(1.0 / 3.0));
+  float mergedBleedMaskScalar = dot(stripeBleedMask, vec3(1.0 / 3.0));
   stripeMask = mix(vec3(mergedStripeMaskScalar), stripeMask, stripeResolve);
   stripeBleedMask = mix(vec3(mergedBleedMaskScalar), stripeBleedMask, stripeResolve);
-  float effectiveStripeStrength = getBeamStripeStrength() * stripeResolve;
+  float effectiveStripeStrength = getBeamStripeStrength() * mix(0.42, 1.0, stripeResolve);
 
   float lightMask = smoothstep(0.025, 0.23, beamLuma);
   vec3 beamField = beamColor * (0.095 + lightMask * 0.04);

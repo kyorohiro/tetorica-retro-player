@@ -1488,6 +1488,41 @@ export function RetroFilterPanel({
 
           {isBeamCrossModeActive && (
             <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
+              <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
+                <span
+                  className={[
+                    "text-[11px] leading-tight",
+                    phosphorDotInternalScale >= 3
+                      ? "font-semibold text-red-600"
+                      : "text-[#12141c]",
+                  ].join(" ")}
+                >
+                  Beam internal res: {phosphorDotInternalScale}x
+                </span>
+                <span className="mt-1 block text-[10px] leading-4 text-[#7a7268]">
+                  Beam Cross also uses this internal resolution. Higher values can make the beam pattern denser and cleaner.
+                </span>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="text-[9px] text-[#7a7268]">1</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="1"
+                    list="phosphor-dot-internal-res-ticks"
+                    value={phosphorDotInternalScale}
+                    onChange={(ev) => {
+                      onSetPhosphorDotInternalScale(Number(ev.currentTarget.value) as 1 | 2 | 3);
+                    }}
+                    className={[
+                      "w-full",
+                      phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-sky-600",
+                    ].join(" ")}
+                  />
+                  <span className="text-[9px] text-[#7a7268]">3</span>
+                </div>
+              </label>
+
               <label className="block">
                 <span className="text-[#12141c]">
                   <InfoTip

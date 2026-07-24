@@ -184,3 +184,130 @@ Do not shrink Beam after it has been generated.
 Instead:
 
 Shrink the source first, then generate Beam from that reduced source.
+
+## Result After Iteration
+
+After several attempts, the problem turned out to be a combination of:
+
+1. `Render Cap` changing the effective display size
+2. Beam still trying to preserve RGB stripe structure at frequencies the final
+   visible canvas could not represent
+3. fallback behavior that removed too much CRT-like structure when trying to
+   suppress rainbow moire
+
+What finally worked was not a single change, but a stack of corrections.
+
+## What Did Not Work Well
+
+### 1. Fixing Beam only inside the final shader
+
+Trying to suppress moire only by weakening scanlines, bloom, or stripe masks
+inside Beam was not enough.
+
+Reason:
+
+- the source had already reached Beam at a problematic density
+- the final shrink still reintroduced aliasing
+
+### 2. Disabling stripe too aggressively
+
+When low-resolution fallback effectively behaved like `Stripe strength: 0`, the
+rainbow artifacts improved, but CRT character was lost too.
+
+Symptoms:
+
+- vertical beam-stripe feel disappeared
+- the image became closer to merged dots than scanline-like emitters
+
+### 3. Dot-style fallback for unresolved RGB stripe
+
+A merged dot fallback reduced color breakup, but it removed the vertical
+"operation line" feel the Beam mode should keep.
+
+That was visually stable, but aesthetically wrong for this mode.
+
+## What Worked
+
+### 1. Pre-resize the source before Beam
+
+Using a Beam-specific pre-resize pass before the Beam shader helped separate:
+
+- source-resolution problems
+- Beam-generation problems
+- final presentation / render-cap problems
+
+This was an important structural fix even before the final stripe tuning.
+
+### 2. Use visible display size, not only drawing buffer size
+
+The key Beam stripe decision should be based on what the user can actually see,
+not only on internal framebuffer size.
+
+Important distinction:
+
+- unstable basis: `gl.drawingBufferWidth/Height`
+- useful basis: visible canvas size (`clientWidth/clientHeight`)
+
+This was a major reason `Render Cap On` behaved differently from `Off`.
+
+### 3. Keep stripe shape even when RGB must be abandoned
+
+The final useful fallback was:
+
+- abandon RGB separation when the display cannot represent it safely
+- keep the stripe shape
+- collapse color to monochrome stripe instead of switching to dot blobs
+
+In short:
+
+- bad fallback: `RGB stripe -> merged dot`
+- better fallback: `RGB stripe -> monochrome stripe`
+
+### 4. Do not reduce stripe strength all the way to zero
+
+A partial lower bound on fallback stripe strength preserved CRT character while
+still avoiding rainbow breakup.
+
+This kept:
+
+- vertical connection between bright emitters
+- the sense that bright regions can fill gaps
+
+without restoring the original moire problem.
+
+### 5. Beam Cross also benefits strongly from internal resolution
+
+`phosphorDotInternalScale` affects Beam Cross in a useful way.
+
+Why this matters:
+
+- it is not equivalent to simply increasing target width/height
+- it changes internal phosphor / beam cell density while still passing through
+  the viewport-limiting logic
+- this often improves Beam appearance without the same kind of instability as
+  brute-force target-size increases
+
+This should be exposed clearly in the UI for Beam users.
+
+## Current Practical Guidance
+
+If Beam moire returns in the future, check these first:
+
+1. Is the problem caused before Beam, inside Beam, or after Beam?
+2. Is the stripe-resolution decision using visible display size?
+3. Is fallback preserving stripe shape, or accidentally collapsing into dots?
+4. Is `Render Cap` changing the visible frequency budget?
+5. Is `Internal res` changing Beam quality in a helpful way before touching
+   target width/height?
+
+## Final Takeaway
+
+The eventual solution came from repeated iteration, not a single insight.
+
+The successful path was:
+
+1. separate source-resize issues from Beam issues
+2. switch stripe decisions to visible display size
+3. suppress unsafe RGB stripe only when necessary
+4. preserve monochrome stripe structure instead of removing it completely
+5. use internal-resolution control as a Beam-quality lever
