@@ -906,6 +906,16 @@ export class TetoricaRetroVideoPipeline {
     }
 
     const nextVariantKey = getWindowsLiteVariantKey(filterState);
+    const cached = this.windowsLiteProgramCache.get(nextVariantKey);
+    if (cached) {
+      this.setFilterPrograms(cached.pass1, cached.pass2, cached.beamKernel);
+      this.windowsLiteVariantKey = nextVariantKey;
+      if (this.windowsLitePendingVariantKey === nextVariantKey) {
+        this.windowsLitePendingVariantKey = null;
+      }
+      return;
+    }
+
     if (
       nextVariantKey === this.windowsLiteVariantKey ||
       nextVariantKey === this.windowsLitePendingVariantKey
