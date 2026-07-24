@@ -398,8 +398,11 @@ export function useRetroPixiStage({
     const sourceHeight = Math.max(previewSourceSize?.height ?? styleHeight, 1);
     const isUpscalingContent =
       styleWidth > sourceWidth + 0.5 || styleHeight > sourceHeight + 0.5;
+    const isBeamMode = isBeamCrossModeEnabled(currentFilterState);
     const presentationSamplingMode: RetroPresentationSamplingMode =
       isUpscalingContent ? "crisp" : "smooth";
+    const finalCanvasImageRendering =
+      isUpscalingContent && !isBeamMode ? "pixelated" : "auto";
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
@@ -494,6 +497,7 @@ export function useRetroPixiStage({
       nextLeft,
       nextTop,
       presentationSamplingMode,
+      finalCanvasImageRendering,
       currentFilterState.isFilterEnabled ? 1 : 0,
       shouldUseLogicalBufferUpscale ? 1 : 0,
     ].join(":");
@@ -511,7 +515,7 @@ export function useRetroPixiStage({
     app.canvas.style.top = `${nextTop}px`;
     app.canvas.style.width = `${styleWidth}px`;
     app.canvas.style.height = `${styleHeight}px`;
-    app.canvas.style.imageRendering = isUpscalingContent ? "pixelated" : "auto";
+    app.canvas.style.imageRendering = finalCanvasImageRendering;
     app.pipeline.setPresentationSamplingMode(presentationSamplingMode);
 
     renderFrame();

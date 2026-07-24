@@ -39,6 +39,39 @@ uniform float uScreenFaceGlow;
 uniform float uTime;
 
 const float PI = 3.141592653589793;
+const float BEAM_MERGED_MASK_CELL_PIXELS = 2.2;
+
+/*
+ * Analytic box-filtered sine.
+ *
+ * A single-sample sin() aliases once its period drops below the local
+ * pixel footprint (screen-space derivative of phase). This applies the
+ * closed-form average of sin() over that footprint (sinc falloff), so
+ * scanlines fade to a flat field instead of flickering/moire-ing as the
+ * output shrinks relative to the pattern frequency.
+ */
+float bandLimitedSin(float phase)
+{
+  float halfWidth = fwidth(phase) * 0.5;
+  float sincTerm = halfWidth > 0.0001
+    ? sin(halfWidth) / halfWidth
+    : 1.0;
+  return sin(phase) * sincTerm;
+}
+
+float getBeamPatternResolve(float patternCount)
+{
+  float pixelsPerPattern = uOutputSize.y / max(patternCount, 1.0);
+  return clamp(
+    smoothstep(
+      BEAM_MERGED_MASK_CELL_PIXELS * 0.5,
+      BEAM_MERGED_MASK_CELL_PIXELS,
+      pixelsPerPattern
+    ),
+    0.0,
+    1.0
+  );
+}
 
 float bayer4x4(vec2 pos)
 {
@@ -458,13 +491,17 @@ float getBeamStripeResolve(vec2 sourceSize)
 
   float pixelsPerCellX = uOutputSize.x / safeSourceSize.x;
   float pixelsPerCellY = uOutputSize.y / safeSourceSize.y;
-  float subpixelPixels = min(
-    pixelsPerCellX / 3.0,
+  float pixelsPerCell = min(
+    pixelsPerCellX,
     pixelsPerCellY
   );
 
   return clamp(
-    smoothstep(0.9, 1.2, subpixelPixels),
+    smoothstep(
+      BEAM_MERGED_MASK_CELL_PIXELS * 0.5,
+      BEAM_MERGED_MASK_CELL_PIXELS,
+      pixelsPerCell
+    ),
     0.0,
     1.0
   );
@@ -1159,7 +1196,10 @@ void main(void)
     brightnessFade
   );
 
-  float scanline = sin(
+  float scanlineResolve = getBeamPatternResolve(targetSize.y);
+  float scanline2Resolve = getBeamPatternResolve(720.0);
+
+  float scanline = bandLimitedSin(
     pixelatedUv.y *
     targetSize.y *
     PI
@@ -1168,6 +1208,7 @@ void main(void)
   float scanlineMask =
     (scanline * 0.5 + 0.5) *
     max(uScanlineStrength, 0.0) *
+    scanlineResolve *
     visibility *
     0.04;
 
@@ -1176,7 +1217,7 @@ void main(void)
     clamp(scanlineMask, 0.0, 1.0);
 
   float scanline2 =
-    sin(
+    bandLimitedSin(
       (
         vTextureCoord.y +
         uTime * 0.05
@@ -1184,6 +1225,7 @@ void main(void)
       720.0
     ) *
     uScanline2Strength *
+    scanline2Resolve *
     visibility;
 
   finalBeamColor += vec3(scanline2);

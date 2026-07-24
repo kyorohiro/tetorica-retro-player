@@ -356,16 +356,44 @@ const getAspectCorrectedSize = (
   };
 };
 
-const getPhosphorDotViewportLimitedSize = (
+const getViewportFloorSize = (
+  canvas: HTMLCanvasElement | null,
+  drawingBufferWidth: number,
+  drawingBufferHeight: number,
+) => {
+  const clientWidth = canvas?.clientWidth;
+  const clientHeight = canvas?.clientHeight;
+
+  return {
+    width: Math.max(
+      1,
+      clientWidth !== undefined
+        ? Math.min(clientWidth, drawingBufferWidth)
+        : drawingBufferWidth,
+    ),
+    height: Math.max(
+      1,
+      clientHeight !== undefined
+        ? Math.min(clientHeight, drawingBufferHeight)
+        : drawingBufferHeight,
+    ),
+  };
+};
+
+// Shared by any per-cell/per-emitter grid (Phosphor dots, Beam emitters):
+// caps how many grid cells fit across the actual viewport so each cell keeps
+// at least `minCellPixels` of real screen space. Without this, a grid sized
+// off the source/target resolution alone can pack sub-pixel cells into the
+// viewport, and analytic per-cell patterns (dot bulbs, beam Gaussians) alias
+// into flicker/moire instead of resolving.
+const applyViewportCellFloor = (
   width: number,
   height: number,
-  filterState: RetroVideoFilterState,
-  internalScale: number,
+  minCellPixels: number,
   visibleWidth?: number,
   visibleHeight?: number,
 ) => {
   if (
-    (!isPhosphorDotModeEnabled(filterState) && !isBeamCrossModeEnabled(filterState)) ||
     visibleWidth === undefined ||
     visibleHeight === undefined ||
     visibleWidth <= 0 ||
@@ -374,8 +402,6 @@ const getPhosphorDotViewportLimitedSize = (
     return { width, height };
   }
 
-  const baseMinCellPixels = Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
-  const minCellPixels = Math.max(1.0, baseMinCellPixels / Math.max(internalScale, 1));
   const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
   const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
   const scale = Math.min(
@@ -388,6 +414,45 @@ const getPhosphorDotViewportLimitedSize = (
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
   };
+};
+
+const getPhosphorDotViewportLimitedSize = (
+  width: number,
+  height: number,
+  filterState: RetroVideoFilterState,
+  internalScale: number,
+  visibleWidth?: number,
+  visibleHeight?: number,
+) => {
+  if (!isPhosphorDotModeEnabled(filterState)) {
+    return { width, height };
+  }
+
+  const baseMinCellPixels = Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / Math.max(internalScale, 1));
+  return applyViewportCellFloor(width, height, minCellPixels, visibleWidth, visibleHeight);
+};
+
+// Beam emitters have no bulbRadius-style control, so their floor is a fixed
+// constant sized to the narrowest Gaussian in the beam kernel (sparkle,
+// sigma ~0.14 cell — see BEAM_SPARKLE_SIGMA_* in filterPass2BeamLiteShader).
+// This is a starting point, not a measured optimum; expect to retune after
+// visual comparison at small canvas sizes.
+const BEAM_MIN_CELL_PIXELS = 2.2;
+
+const getBeamViewportLimitedSourceSize = (
+  width: number,
+  height: number,
+  visibleWidth?: number,
+  visibleHeight?: number,
+) => {
+  return applyViewportCellFloor(
+    width,
+    height,
+    BEAM_MIN_CELL_PIXELS,
+    visibleWidth,
+    visibleHeight,
+  );
 };
 
 export const getEffectiveRetroTargetSize = (
@@ -1241,8 +1306,16 @@ export class TetoricaRetroVideoPipeline {
     if (!this.pass1Locs || !this.filterPass1Program) return;
     const { gl } = this;
     const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-    const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+    // Use the smaller of CSS and backing-buffer size so both render caps and
+    // final CSS/browser downscaling can force unresolved high-frequency grids
+    // to collapse before they alias.
+    const viewportFloorSize = getViewportFloorSize(
+      canvasElement,
+      Math.max(gl.drawingBufferWidth, 1),
+      Math.max(gl.drawingBufferHeight, 1),
+    );
+    const visibleWidth = viewportFloorSize.width;
+    const visibleHeight = viewportFloorSize.height;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
@@ -1282,8 +1355,13 @@ export class TetoricaRetroVideoPipeline {
     if (!this.pass2Locs || !this.filterPass2Program) return;
     const { gl } = this;
     const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-    const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+    const viewportFloorSize = getViewportFloorSize(
+      canvasElement,
+      Math.max(gl.drawingBufferWidth, 1),
+      Math.max(gl.drawingBufferHeight, 1),
+    );
+    const visibleWidth = viewportFloorSize.width;
+    const visibleHeight = viewportFloorSize.height;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
@@ -1296,14 +1374,30 @@ export class TetoricaRetroVideoPipeline {
       visibleHeight,
     );
     const isBeamMode = isBeamCrossModeEnabled(filterState);
-    const pass2TargetWidth =
+    // autoTargetSize locks the emitter grid to the raw source resolution.
+    // That resolution has no relationship to the actual viewport, so once
+    // the canvas is smaller than sourceSize * BEAM_MIN_CELL_PIXELS, emitters
+    // pack sub-pixel and the beam Gaussians alias into flicker (same failure
+    // mode Phosphor dots hit — see getPhosphorDotViewportLimitedSize).
+    //
+    // visibleWidth/visibleHeight above use the smaller of CSS and
+    // backing-buffer size, so this floor reacts both to render caps and to
+    // final CSS/browser downscaling.
+    const beamAutoTargetSize =
       isBeamMode && filterState.autoTargetSize
-        ? Math.max(sourceWidth ?? effectiveTargetWidth, 1)
-        : effectiveTargetWidth;
-    const pass2TargetHeight =
-      isBeamMode && filterState.autoTargetSize
-        ? Math.max(sourceHeight ?? effectiveTargetHeight, 1)
-        : effectiveTargetHeight;
+        ? getBeamViewportLimitedSourceSize(
+          Math.max(sourceWidth ?? effectiveTargetWidth, 1),
+          Math.max(sourceHeight ?? effectiveTargetHeight, 1),
+          visibleWidth,
+          visibleHeight,
+        )
+        : null;
+    const pass2TargetWidth = beamAutoTargetSize
+      ? beamAutoTargetSize.width
+      : effectiveTargetWidth;
+    const pass2TargetHeight = beamAutoTargetSize
+      ? beamAutoTargetSize.height
+      : effectiveTargetHeight;
 
     gl.useProgram(this.filterPass2Program);
     gl.uniform2f(this.pass2Locs.uTargetSize, pass2TargetWidth, pass2TargetHeight);
@@ -1312,14 +1406,14 @@ export class TetoricaRetroVideoPipeline {
       Math.max(gl.drawingBufferWidth, 1),
       Math.max(gl.drawingBufferHeight, 1),
     );
-    const beamSourceWidth =
-      isBeamMode && !filterState.autoTargetSize
-        ? pass2TargetWidth
-        : Math.max(sourceWidth ?? pass2TargetWidth, 1);
-    const beamSourceHeight =
-      isBeamMode && !filterState.autoTargetSize
-        ? pass2TargetHeight
-        : Math.max(sourceHeight ?? pass2TargetHeight, 1);
+    // uBeamSourceSize always tracks uTargetSize in beam mode (both describe
+    // the same emitter grid), so the viewport floor above already applies.
+    const beamSourceWidth = isBeamMode
+      ? pass2TargetWidth
+      : Math.max(sourceWidth ?? pass2TargetWidth, 1);
+    const beamSourceHeight = isBeamMode
+      ? pass2TargetHeight
+      : Math.max(sourceHeight ?? pass2TargetHeight, 1);
     gl.uniform2f(
       this.pass2Locs.uBeamSourceSize,
       beamSourceWidth,
