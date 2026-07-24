@@ -13,12 +13,18 @@ export type PaletteMode =
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 export type PhosphorDotShape = "circle" | "heart" | "beam";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
+export type TargetSamplingMode =
+  | "nearest"
+  | "average_fast_4"
+  | "average_fast_8"
+  | "average";
 
 export const DEFAULT_BEAM_CROSS_SETTINGS = {
   beamDarkCutoff: 0.04,
   beamHorizontalSpread: 1,
   beamStripeStrength: 1,
   beamWhiteBloom: 1,
+  beamWarmBloom: 0,
 } as const;
 
 export const normalizePhosphorDotShape = (
@@ -46,6 +52,7 @@ export const MONO_TINTS: Record<
 export type RetroPresetDefinition = {
   label: string;
   autoTargetSize?: boolean;
+  samplingMode?: TargetSamplingMode;
   width: number;
   height: number;
   colors: number;
@@ -56,6 +63,8 @@ export type RetroPresetDefinition = {
   scanline2: number;
   vignette: number;
   glow: number;
+  horizontalSharpness?: number;
+  rgbConvergenceOffset?: number;
   smoothStrength?: number;
   toonSteps?: number;
   edgeBoost?: number;
@@ -81,9 +90,8 @@ export type RetroPresetDefinition = {
   beamHorizontalSpread?: number;
   beamStripeStrength?: number;
   beamWhiteBloom?: number;
-  signalInstabilityEnabled?: boolean;
-  signalInstabilityStrength?: number;
-  signalInstabilityFrequency?: number;
+  beamWarmBloom?: number;
+  screenFaceGlow?: number;
   scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -99,6 +107,7 @@ export const RETRO_PRESETS = {
   none: {
     label: "None",
     autoTargetSize: true,
+    samplingMode: "nearest",
     width: 1920,
     height: 1080,
     colors: 256,
@@ -109,6 +118,8 @@ export const RETRO_PRESETS = {
     scanline2: 0,
     vignette: 0,
     glow: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     phosphor: 0,
     spotMask: 0,
     bulbRadius: 0,
@@ -458,6 +469,8 @@ export const RETRO_PRESETS = {
     spotMask: 0.22,
     bulbRadius: 0.38,
     blackFloor: 0.002,
+    screenFaceGlow: 0.28,
+    beamWarmBloom: 0.28,
     phosphorDotShape: "heart",  
     phosphorDotLightBalance: 0.66,
     phosphorDotInternalScale: 2,
@@ -491,6 +504,8 @@ export const RETRO_PRESETS = {
     spotMask: 0.3,
     bulbRadius: 0.5,
     blackFloor: 0.001,
+    screenFaceGlow: 0.22,
+    beamWarmBloom: 0.22,
     phosphorDotLightBalance: 0.22,
     phosphorDotInternalScale: 2,
     phosphorDotBrightCore: false,
@@ -506,13 +521,14 @@ export const RETRO_PRESETS = {
   },
   crtBeam: {
     label: "CRT Beam",
+    autoTargetSize: true,
     width: 320,
     height: 180,
     colors: 32,
     dither: 0.55,
     smoothStrength: 0.55,
     palette: "free",
-    curvature: 0.01,
+    curvature: 0.0,
     scanline: 0.0,
     scanline2: 0.01,
     vignette: 0.3,
@@ -521,11 +537,13 @@ export const RETRO_PRESETS = {
     spotMask: 0.3,
     bulbRadius: 0.5,
     blackFloor: 0.001,
+    screenFaceGlow: 0.41,
     phosphorDotShape: "beam",
     beamDarkCutoff: 0.04,
     beamHorizontalSpread: 1.27,
-    beamStripeStrength: 0.08,
-    beamWhiteBloom: 1.8,
+    beamStripeStrength: 0.22,
+    beamWhiteBloom: 1.14,
+    beamWarmBloom: 0.32,
     basicContrast: 2.0,
     basicSaturation: 2.0,
     monoTint: "gray",
@@ -569,6 +587,8 @@ export const RETRO_PRESETS = {
     scanline: 0.00,
     scanline2: 0.03,
     scanlineBrightnessFade: 0.92,
+    screenFaceGlow: 0.28,
+    beamWarmBloom: 0.32,
     vignette: 0.48,
     glow: 0.28,
     edgeBoost: 0.0,
@@ -580,9 +600,6 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    signalInstabilityEnabled: false,
-    signalInstabilityStrength: 0.88,
-    signalInstabilityFrequency: 0.88,
   },
   animeCel: {
     label: "Anime Cel",

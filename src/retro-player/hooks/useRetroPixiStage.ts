@@ -70,7 +70,49 @@ const resolveMaximizedBufferCap = (
   }
 
   return {
-    width: 1280,
+    width: 640,
+    height: 480,
+  };
+};
+
+const resolveWindowsFilterBufferCap = (
+  mode: "auto" | "on" | "off",
+  previewKind: PreviewKind,
+  filterState: RetroVideoFilterState,
+) => {
+  if (mode === "off") {
+    return null;
+  }
+
+  const isRealtimeVisualPreview =
+    previewKind === "video" || previewKind === "capture";
+  if (!isRealtimeVisualPreview || !filterState.isFilterEnabled) {
+    return null;
+  }
+
+  if (mode === "auto") {
+    if (!isWindowsRuntime()) {
+      return null;
+    }
+    const isBeamMode = isBeamCrossModeEnabled(filterState);
+    const isPhosphorMode =
+      filterState.spotMaskStrength > 0.001 ||
+      filterState.phosphorStrength > 0.001 ||
+      isPhosphorDotModeEnabled(filterState);
+    if (!isBeamMode && !isPhosphorMode) {
+      return null;
+    }
+  }
+
+  if (isBeamCrossModeEnabled(filterState)) {
+    return {
+      width: 640,
+      height: 480,
+    };
+  }
+
+  return {
+    width: 960,
     height: 720,
   };
 };
@@ -416,6 +458,11 @@ export function useRetroPixiStage({
     const maximizeBufferCap = isPreviewMaximized
       ? resolveMaximizedBufferCap(maximizePerformanceMode, previewKindRef.current)
       : null;
+    const windowsFilterBufferCap = resolveWindowsFilterBufferCap(
+      maximizePerformanceMode,
+      previewKindRef.current,
+      currentFilterState as RetroVideoFilterState,
+    );
     const maximizeCapFactor = maximizeBufferCap
       ? Math.max(
         rawNextWidth / maximizeBufferCap.width,
@@ -423,7 +470,18 @@ export function useRetroPixiStage({
         1,
       )
       : 1;
-    const totalScaleDownFactor = Math.max(overLimitFactor, maximizeCapFactor);
+    const windowsFilterCapFactor = windowsFilterBufferCap
+      ? Math.max(
+        rawNextWidth / windowsFilterBufferCap.width,
+        rawNextHeight / windowsFilterBufferCap.height,
+        1,
+      )
+      : 1;
+    const totalScaleDownFactor = Math.max(
+      overLimitFactor,
+      maximizeCapFactor,
+      windowsFilterCapFactor,
+    );
     const nextWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
     const nextHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
     const nextLeft = Math.round(viewRect.x);
@@ -538,7 +596,11 @@ export function useRetroPixiStage({
         renderFrameRef.current();
         startTicker();
       };
-      const pipeline = await TetoricaRetroVideoPipeline.create(gl, onFilterReady);
+      const pipeline = await TetoricaRetroVideoPipeline.create(
+        gl,
+        filterStateRef.current as RetroVideoFilterState,
+        onFilterReady,
+      );
       const app: CanvasStageApp = {
         canvas,
         pipeline,
@@ -601,6 +663,25 @@ export function useRetroPixiStage({
     startTicker,
     stopTicker,
   ]);
+
+  const hasPreparedFilterVariant = useCallback((nextFilterState: RetroVideoFilterState) => {
+    const app = appRef.current;
+    if (!app) {
+      return false;
+    }
+
+    return app.pipeline.hasPreparedFilterStateVariant(nextFilterState);
+  }, []);
+
+  const prepareFilterVariant = useCallback(async (nextFilterState: RetroVideoFilterState) => {
+    await initPixi();
+    const app = appRef.current;
+    if (!app) {
+      return;
+    }
+
+    await app.pipeline.prepareFilterStateVariant(nextFilterState);
+  }, [initPixi]);
 
   const destroyPixi = useCallback(() => {
     initPromiseRef.current = null;
@@ -773,6 +854,8 @@ export function useRetroPixiStage({
     fitSprite,
     initPixi,
     ensureFilterReady,
+    hasPreparedFilterVariant,
+    prepareFilterVariant,
     resetRenderer,
     refreshLayout,
     resetFilterInstance,

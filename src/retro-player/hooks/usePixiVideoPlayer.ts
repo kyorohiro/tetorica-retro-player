@@ -17,6 +17,7 @@ import {
   resolveRecordingAudioSourceOrder,
 } from "../media/RetroAudioRouting";
 import type { RetroPlayerLocale } from "../types";
+import type { RetroVideoFilterState } from "../video/TetoricaRetroVideoPipeline";
 
 let retroPlayerInstanceSeed = 0;
 
@@ -300,6 +301,8 @@ export function usePixiVideoPlayer(
     fitSprite,
     initPixi,
     ensureFilterReady,
+    hasPreparedFilterVariant,
+    prepareFilterVariant,
     resetRenderer,
     refreshLayout,
     resetFilterInstance,
@@ -472,6 +475,37 @@ export function usePixiVideoPlayer(
     setIsLoading(false);
     setLoadingLabel("");
   };
+
+  const buildVariantPreparationState = useCallback((
+    overrides?: Partial<RetroVideoFilterState>,
+  ): RetroVideoFilterState => ({
+    ...(effectiveFilterState as RetroVideoFilterState),
+    ...overrides,
+    isFilterEnabled: true,
+  }), [effectiveFilterState]);
+
+  const isCrtBeamPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
+    return hasPreparedFilterVariant(
+      buildVariantPreparationState({
+        phosphorDotShape: "beam",
+        ...overrides,
+      }),
+    );
+  }, [buildVariantPreparationState, hasPreparedFilterVariant]);
+
+  const prepareCrtBeam = useCallback(async (overrides?: Partial<RetroVideoFilterState>) => {
+    beginLoading("Preparing CRT Beam...");
+    try {
+      await prepareFilterVariant(
+        buildVariantPreparationState({
+          phosphorDotShape: "beam",
+          ...overrides,
+        }),
+      );
+    } finally {
+      finishLoading();
+    }
+  }, [beginLoading, buildVariantPreparationState, finishLoading, prepareFilterVariant]);
 
   const recoverAudioOutput = async (reason: string) => {
     const context = await ensureAudioContextWithRecovery(reason);
@@ -1443,10 +1477,9 @@ export function usePixiVideoPlayer(
     filterState.beamHorizontalSpread,
     filterState.beamStripeStrength,
     filterState.beamWhiteBloom,
+    filterState.beamWarmBloom,
+    filterState.screenFaceGlow,
     filterState.selectedPreset,
-    filterState.signalInstabilityEnabled,
-    filterState.signalInstabilityStrength,
-    filterState.signalInstabilityFrequency,
     filterState.scanlineBrightnessFade,
     filterState.scanlineStrength,
     filterState.scanline2Strength,
@@ -1717,6 +1750,8 @@ export function usePixiVideoPlayer(
     startRecording,
     stopRecording,
     ensureAudioContext,
+    isCrtBeamPrepared,
+    prepareCrtBeam,
     resetRenderer,
     refreshLayout,
     toggleAudioFx: () => {

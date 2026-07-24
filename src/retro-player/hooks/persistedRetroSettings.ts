@@ -4,6 +4,7 @@ import {
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
+  type TargetSamplingMode,
 } from "../retro/config";
 import { isWindowsRuntime } from "../platform/runtime";
 
@@ -13,6 +14,7 @@ const STORAGE_VERSION = 1;
 
 export type PersistedRetroFilterSettings = {
   autoTargetSize: boolean;
+  samplingMode: TargetSamplingMode;
   targetWidth: number;
   targetHeight: number;
   matchTargetAspect: boolean;
@@ -25,6 +27,8 @@ export type PersistedRetroFilterSettings = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  horizontalSharpness: number;
+  rgbConvergenceOffset: number;
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
@@ -50,9 +54,8 @@ export type PersistedRetroFilterSettings = {
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
+  beamWarmBloom: number;
+  screenFaceGlow: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -156,6 +159,10 @@ const normalizePersistedRetroSettings = (
       ? {
         ...filter,
         phosphorDotShape: normalizedShape,
+        samplingMode:
+          filter.samplingMode === "average"
+            ? "average_fast_8"
+            : (filter.samplingMode ?? "nearest"),
       }
       : filter,
     audio: audio

@@ -4,17 +4,20 @@ import {
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
+  type TargetSamplingMode,
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "../retro/filterPass2BeamLiteShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
-import { createSignalInstabilityController } from "./signalInstability";
 
 export type RetroVideoFilterState = {
+  autoTargetSize: boolean;
   targetWidth: number;
   targetHeight: number;
+  samplingMode: TargetSamplingMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -25,6 +28,8 @@ export type RetroVideoFilterState = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  horizontalSharpness: number;
+  rgbConvergenceOffset: number;
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
@@ -50,9 +55,8 @@ export type RetroVideoFilterState = {
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
+  beamWarmBloom: number;
+  screenFaceGlow: number;
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
@@ -89,12 +93,28 @@ function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   return 0;
 }
 
+function getSamplingModeValue(mode: TargetSamplingMode): number {
+  if (mode === "average_fast_4") {
+    return 1;
+  }
+  if (mode === "average_fast_8") {
+    return 2;
+  }
+  if (mode === "average") {
+    return 2;
+  }
+  return 0;
+}
+
 type Pass1UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
+  uSamplingMode: WebGLUniformLocation | null;
   uPaletteMode: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
+  uHorizontalSharpness: WebGLUniformLocation | null;
+  uRgbConvergenceOffset: WebGLUniformLocation | null;
   uSmoothStrength: WebGLUniformLocation | null;
   uToonSteps: WebGLUniformLocation | null;
   uEdgeBoost: WebGLUniformLocation | null;
@@ -108,13 +128,20 @@ type Pass1UniformLocations = {
 
 type Pass2UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
+  uOutputSize: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
+  uColorLevels: WebGLUniformLocation | null;
+  uDitherStrength: WebGLUniformLocation | null;
+  uSamplingMode: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
   uScanlineStrength: WebGLUniformLocation | null;
   uScanline2Strength: WebGLUniformLocation | null;
   uScanlineBrightnessFade: WebGLUniformLocation | null;
   uVignetteStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
+  uHorizontalSharpness: WebGLUniformLocation | null;
+  uRgbConvergenceOffset: WebGLUniformLocation | null;
+  uSmoothStrength: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
@@ -137,13 +164,8 @@ type Pass2UniformLocations = {
   uBeamHorizontalSpread: WebGLUniformLocation | null;
   uBeamStripeStrength: WebGLUniformLocation | null;
   uBeamWhiteBloom: WebGLUniformLocation | null;
-  uSignalInstabilityAmount: WebGLUniformLocation | null;
-  uSignalHorizontalSync: WebGLUniformLocation | null;
-  uSignalVerticalSync: WebGLUniformLocation | null;
-  uSignalStaticNoise: WebGLUniformLocation | null;
-  uSignalChromaNoise: WebGLUniformLocation | null;
-  uSignalInstabilitySeed: WebGLUniformLocation | null;
-  uSignalInstabilityPhase: WebGLUniformLocation | null;
+  uBeamWarmBloom: WebGLUniformLocation | null;
+  uScreenFaceGlow: WebGLUniformLocation | null;
   uFocusStrength: WebGLUniformLocation | null;
   uFocusSize: WebGLUniformLocation | null;
   uFocusCenter: WebGLUniformLocation | null;
@@ -191,7 +213,7 @@ const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
 type WindowsLitePass1Variant = "basic" | "pc98";
-type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
+type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
 // Only 4 combinations exist. Compiling each at most once (cached) and
@@ -200,10 +222,12 @@ type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Varia
 // time a user switches to a variant mid-playback (e.g. enabling phosphor).
 const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
   "basic:basic",
-  "basic:beam",
+  "basic:beam_simple",
+  "basic:beam_full",
   "basic:phosphor",
   "pc98:basic",
-  "pc98:beam",
+  "pc98:beam_simple",
+  "pc98:beam_full",
   "pc98:phosphor",
 ];
 
@@ -214,13 +238,19 @@ const isPc98PaletteMode = (mode: PaletteMode) =>
   mode === "pc98_512_sat" ||
   mode === "pc98_4096";
 
+const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
+  isBeamCrossModeEnabled(filterState) &&
+  filterState.smoothStrength <= 0.001 &&
+  filterState.rgbConvergenceOffset <= 0.0001 &&
+  getSamplingModeValue(filterState.samplingMode) < 0.5;
+
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,
 ): WindowsLiteVariantKey => {
   const pass1: WindowsLitePass1Variant =
     filterState && isPc98PaletteMode(filterState.paletteMode) ? "pc98" : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
-    return `${pass1}:beam`;
+    return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
   }
   const pass2: WindowsLitePass2Variant =
     filterState &&
@@ -518,7 +548,6 @@ export class TetoricaRetroVideoPipeline {
   private currentSource: RetroVideoSource | null = null;
 
   private currentFilterState: RetroVideoFilterState | null = null;
-  private readonly signalInstabilityController = createSignalInstabilityController();
 
   private outputEnabled = true;
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
@@ -632,7 +661,9 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
           : FILTER_FRAGMENT_PASS1_LITE,
       pass2:
-        pass2Variant === "beam"
+        pass2Variant === "beam_simple"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
+          : pass2Variant === "beam_full"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE
           : pass2Variant === "phosphor"
             ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
@@ -819,6 +850,7 @@ export class TetoricaRetroVideoPipeline {
   // onFilterReady is called after the background filter compilation finishes.
   static async create(
     gl: WebGL2RenderingContext,
+    initialFilterState: RetroVideoFilterState | null,
     onFilterReady?: () => void,
   ): Promise<TetoricaRetroVideoPipeline> {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
@@ -827,7 +859,7 @@ export class TetoricaRetroVideoPipeline {
     const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, true);
 
     requestAnimationFrame(async () => {
-      pipeline.queueWindowsLiteVariant(null);
+      pipeline.queueWindowsLiteVariant(initialFilterState);
       if (pipeline.windowsLiteCompilePromise) {
         await pipeline.windowsLiteCompilePromise;
       }
@@ -881,8 +913,11 @@ export class TetoricaRetroVideoPipeline {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
       uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
+      uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
       uPaletteMode: gl.getUniformLocation(program, "uPaletteMode"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
+      uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
       uToonSteps: gl.getUniformLocation(program, "uToonSteps"),
       uEdgeBoost: gl.getUniformLocation(program, "uEdgeBoost"),
@@ -899,13 +934,20 @@ export class TetoricaRetroVideoPipeline {
     const { gl } = this;
     return {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
+      uOutputSize: gl.getUniformLocation(program, "uOutputSize"),
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
+      uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
+      uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
+      uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
       uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
       uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
       uVignetteStrength: gl.getUniformLocation(program, "uVignetteStrength"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
+      uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
+      uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
       uPhosphorStrength: gl.getUniformLocation(program, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(program, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(program, "uBulbRadius"),
@@ -928,13 +970,8 @@ export class TetoricaRetroVideoPipeline {
       uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
       uBeamStripeStrength: gl.getUniformLocation(program, "uBeamStripeStrength"),
       uBeamWhiteBloom: gl.getUniformLocation(program, "uBeamWhiteBloom"),
-      uSignalInstabilityAmount: gl.getUniformLocation(program, "uSignalInstabilityAmount"),
-      uSignalHorizontalSync: gl.getUniformLocation(program, "uSignalHorizontalSync"),
-      uSignalVerticalSync: gl.getUniformLocation(program, "uSignalVerticalSync"),
-      uSignalStaticNoise: gl.getUniformLocation(program, "uSignalStaticNoise"),
-      uSignalChromaNoise: gl.getUniformLocation(program, "uSignalChromaNoise"),
-      uSignalInstabilitySeed: gl.getUniformLocation(program, "uSignalInstabilitySeed"),
-      uSignalInstabilityPhase: gl.getUniformLocation(program, "uSignalInstabilityPhase"),
+      uBeamWarmBloom: gl.getUniformLocation(program, "uBeamWarmBloom"),
+      uScreenFaceGlow: gl.getUniformLocation(program, "uScreenFaceGlow"),
       uFocusStrength: gl.getUniformLocation(program, "uFocusStrength"),
       uFocusSize: gl.getUniformLocation(program, "uFocusSize"),
       uFocusCenter: gl.getUniformLocation(program, "uFocusCenter"),
@@ -954,6 +991,22 @@ export class TetoricaRetroVideoPipeline {
   setFilterState(filterState: RetroVideoFilterState) {
     this.currentFilterState = filterState;
     this.queueWindowsLiteVariant(filterState);
+  }
+
+  hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
+    if (!this.windowsLiteMode) {
+      return true;
+    }
+
+    return this.windowsLiteProgramCache.has(getWindowsLiteVariantKey(filterState));
+  }
+
+  async prepareFilterStateVariant(filterState: RetroVideoFilterState) {
+    if (!this.windowsLiteMode) {
+      return;
+    }
+
+    await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
   }
 
   setOutputEnabled(enabled: boolean) {
@@ -977,7 +1030,6 @@ export class TetoricaRetroVideoPipeline {
 
   resetAnimationClock(startedAt = nowMs()) {
     this.startedAt = startedAt;
-    this.signalInstabilityController.reset();
   }
 
   readPixels() {
@@ -1100,7 +1152,7 @@ export class TetoricaRetroVideoPipeline {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      const isBeamVariant = this.windowsLiteVariantKey?.endsWith(":beam") ?? false;
+      const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
       const pass2TextureFilter =
@@ -1170,7 +1222,6 @@ export class TetoricaRetroVideoPipeline {
     this.lastUploadedImageSource = null;
     this.lastUploadedVideoSource = null;
     this.lastUploadedVideoTime = Number.NaN;
-    this.signalInstabilityController.reset();
   }
 
   private getUploadSource(
@@ -1207,8 +1258,11 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform2f(this.pass1Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
     gl.uniform1f(this.pass1Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
+    gl.uniform1f(this.pass1Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
     gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.pass1Locs.uHorizontalSharpness, filterState.horizontalSharpness);
+    gl.uniform1f(this.pass1Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
     gl.uniform1f(this.pass1Locs.uSmoothStrength, filterState.smoothStrength);
     gl.uniform1f(this.pass1Locs.uToonSteps, filterState.toonSteps);
     gl.uniform1f(this.pass1Locs.uEdgeBoost, filterState.edgeBoost);
@@ -1241,20 +1295,48 @@ export class TetoricaRetroVideoPipeline {
       visibleWidth,
       visibleHeight,
     );
+    const isBeamMode = isBeamCrossModeEnabled(filterState);
+    const pass2TargetWidth =
+      isBeamMode && filterState.autoTargetSize
+        ? Math.max(sourceWidth ?? effectiveTargetWidth, 1)
+        : effectiveTargetWidth;
+    const pass2TargetHeight =
+      isBeamMode && filterState.autoTargetSize
+        ? Math.max(sourceHeight ?? effectiveTargetHeight, 1)
+        : effectiveTargetHeight;
 
     gl.useProgram(this.filterPass2Program);
-    gl.uniform2f(this.pass2Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
+    gl.uniform2f(this.pass2Locs.uTargetSize, pass2TargetWidth, pass2TargetHeight);
+    gl.uniform2f(
+      this.pass2Locs.uOutputSize,
+      Math.max(gl.drawingBufferWidth, 1),
+      Math.max(gl.drawingBufferHeight, 1),
+    );
+    const beamSourceWidth =
+      isBeamMode && !filterState.autoTargetSize
+        ? pass2TargetWidth
+        : Math.max(sourceWidth ?? pass2TargetWidth, 1);
+    const beamSourceHeight =
+      isBeamMode && !filterState.autoTargetSize
+        ? pass2TargetHeight
+        : Math.max(sourceHeight ?? pass2TargetHeight, 1);
     gl.uniform2f(
       this.pass2Locs.uBeamSourceSize,
-      Math.max(sourceWidth ?? effectiveTargetWidth, 1),
-      Math.max(sourceHeight ?? effectiveTargetHeight, 1),
+      beamSourceWidth,
+      beamSourceHeight,
     );
+    gl.uniform1f(this.pass2Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
+    gl.uniform1f(this.pass2Locs.uDitherStrength, filterState.ditherStrength);
+    gl.uniform1f(this.pass2Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(this.pass2Locs.uCurvature, filterState.curvature);
     gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
     gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);
     gl.uniform1f(this.pass2Locs.uVignetteStrength, filterState.vignetteStrength);
     gl.uniform1f(this.pass2Locs.uGlowStrength, filterState.glowStrength);
+    gl.uniform1f(this.pass2Locs.uHorizontalSharpness, filterState.horizontalSharpness);
+    gl.uniform1f(this.pass2Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
+    gl.uniform1f(this.pass2Locs.uSmoothStrength, filterState.smoothStrength);
     gl.uniform1f(this.pass2Locs.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(this.pass2Locs.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(this.pass2Locs.uBulbRadius, filterState.bulbRadius);
@@ -1265,8 +1347,8 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotLightBalance, filterState.phosphorDotLightBalance);
     gl.uniform1f(
       this.pass2Locs.uPixelAspect,
-      (Math.max(gl.drawingBufferWidth, 1) * effectiveTargetHeight) /
-        (Math.max(gl.drawingBufferHeight, 1) * effectiveTargetWidth),
+      (Math.max(gl.drawingBufferWidth, 1) * pass2TargetHeight) /
+        (Math.max(gl.drawingBufferHeight, 1) * pass2TargetWidth),
     );
     gl.uniform1f(
       this.pass2Locs.uPhosphorDotMode,
@@ -1287,22 +1369,12 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
     gl.uniform1f(this.pass2Locs.uBeamStripeStrength, filterState.beamStripeStrength);
     gl.uniform1f(this.pass2Locs.uBeamWhiteBloom, filterState.beamWhiteBloom);
-    const signalTimeSec = (nowMs() - this.startedAt) / 1000;
-    const signalState = this.signalInstabilityController.update(signalTimeSec, {
-      enabled: filterState.signalInstabilityEnabled,
-      strength: filterState.signalInstabilityStrength,
-      frequency: filterState.signalInstabilityFrequency,
-    });
-    gl.uniform1f(this.pass2Locs.uSignalInstabilityAmount, signalState.intensity);
-    gl.uniform1f(this.pass2Locs.uSignalHorizontalSync, signalState.horizontalSync);
-    gl.uniform1f(this.pass2Locs.uSignalVerticalSync, signalState.verticalSync);
-    gl.uniform1f(this.pass2Locs.uSignalStaticNoise, signalState.staticNoise);
-    gl.uniform1f(this.pass2Locs.uSignalChromaNoise, signalState.chromaNoise);
-    gl.uniform1f(this.pass2Locs.uSignalInstabilitySeed, signalState.seed);
-    gl.uniform1f(this.pass2Locs.uSignalInstabilityPhase, signalState.phase);
+    gl.uniform1f(this.pass2Locs.uBeamWarmBloom, filterState.beamWarmBloom);
+    gl.uniform1f(this.pass2Locs.uScreenFaceGlow, filterState.screenFaceGlow);
+    const timeSec = (nowMs() - this.startedAt) / 1000;
     gl.uniform1f(this.pass2Locs.uFocusStrength, filterState.focusStrength);
     gl.uniform2f(this.pass2Locs.uFocusSize, filterState.focusWidth, filterState.focusHeight);
     gl.uniform2f(this.pass2Locs.uFocusCenter, filterState.focusCenterX, filterState.focusCenterY);
-    gl.uniform1f(this.pass2Locs.uTime, signalTimeSec);
+    gl.uniform1f(this.pass2Locs.uTime, timeSec);
   }
 }

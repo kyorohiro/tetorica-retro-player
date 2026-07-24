@@ -9,6 +9,7 @@ import {
   type PhosphorDotShape,
   type RetroPresetDefinition,
   type RetroPresetKey,
+  type TargetSamplingMode,
 } from "../retro/config";
 import {
   loadPersistedRetroSettings,
@@ -21,6 +22,7 @@ export type RetroFilterInitialState = Partial<{
   targetWidth: number;
   targetHeight: number;
   autoTargetSize: boolean;
+  samplingMode: TargetSamplingMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -31,6 +33,8 @@ export type RetroFilterInitialState = Partial<{
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  horizontalSharpness: number;
+  rgbConvergenceOffset: number;
   smoothStrength: number;
   toonSteps: number;
   edgeBoost: number;
@@ -56,9 +60,8 @@ export type RetroFilterInitialState = Partial<{
   beamHorizontalSpread: number;
   beamStripeStrength: number;
   beamWhiteBloom: number;
-  signalInstabilityEnabled: boolean;
-  signalInstabilityStrength: number;
-  signalInstabilityFrequency: number;
+  beamWarmBloom: number;
+  screenFaceGlow: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -88,6 +91,7 @@ const doesPresetMatchState = (
         preset.height === state.targetHeight
       )) &&
     (preset.autoTargetSize ?? false) === state.autoTargetSize &&
+    (preset.samplingMode ?? "nearest") === state.samplingMode &&
     preset.colors === state.colorLevels &&
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
@@ -96,6 +100,8 @@ const doesPresetMatchState = (
     preset.scanline2 === state.scanline2Strength &&
     preset.vignette === state.vignetteStrength &&
     preset.glow === state.glowStrength &&
+    (preset.horizontalSharpness ?? 1) === state.horizontalSharpness &&
+    (preset.rgbConvergenceOffset ?? 0) === state.rgbConvergenceOffset &&
     (preset.smoothStrength ?? 0) === state.smoothStrength &&
     (preset.toonSteps ?? 0) === state.toonSteps &&
     (preset.edgeBoost ?? 0) === state.edgeBoost &&
@@ -121,9 +127,8 @@ const doesPresetMatchState = (
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
-    (preset.signalInstabilityEnabled ?? false) === state.signalInstabilityEnabled &&
-    (preset.signalInstabilityStrength ?? 0.35) === state.signalInstabilityStrength &&
-    (preset.signalInstabilityFrequency ?? 0.3) === state.signalInstabilityFrequency &&
+    (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
+    (preset.screenFaceGlow ?? 0) === state.screenFaceGlow &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -182,6 +187,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
     autoTargetSize: initialState.autoTargetSize ?? (DEFAULT_PRESET.autoTargetSize ?? false),
+    samplingMode: initialState.samplingMode ?? (DEFAULT_PRESET.samplingMode ?? "nearest"),
     matchTargetAspect: initialState.matchTargetAspect ?? true,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
@@ -192,6 +198,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
+    horizontalSharpness: initialState.horizontalSharpness ?? (DEFAULT_PRESET.horizontalSharpness ?? 1),
+    rgbConvergenceOffset: initialState.rgbConvergenceOffset ?? (DEFAULT_PRESET.rgbConvergenceOffset ?? 0),
     smoothStrength: initialState.smoothStrength ?? (DEFAULT_PRESET.smoothStrength ?? 0),
     toonSteps: initialState.toonSteps ?? (DEFAULT_PRESET.toonSteps ?? 0),
     edgeBoost: initialState.edgeBoost ?? (DEFAULT_PRESET.edgeBoost ?? 0),
@@ -232,9 +240,10 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamStripeStrength ?? (DEFAULT_PRESET.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength),
     beamWhiteBloom:
       initialState.beamWhiteBloom ?? (DEFAULT_PRESET.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom),
-    signalInstabilityEnabled: initialState.signalInstabilityEnabled ?? false,
-    signalInstabilityStrength: initialState.signalInstabilityStrength ?? 0.35,
-    signalInstabilityFrequency: initialState.signalInstabilityFrequency ?? 0.3,
+    beamWarmBloom:
+      initialState.beamWarmBloom ?? (DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom),
+    screenFaceGlow:
+      initialState.screenFaceGlow ?? (DEFAULT_PRESET.screenFaceGlow ?? 0),
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -300,6 +309,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   }, [markPresetAsCustom]);
 
+  const setSamplingMode = useCallback((samplingMode: TargetSamplingMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.samplingMode === samplingMode
+        ? current
+        : { ...current, samplingMode }
+    ));
+  }, [markPresetAsCustom]);
+
   const setColorLevels = (colorLevels: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.colorLevels === colorLevels ? current : { ...current, colorLevels }));
@@ -347,6 +365,24 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setGlowStrength = (glowStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.glowStrength === glowStrength ? current : { ...current, glowStrength }));
+  };
+
+  const setHorizontalSharpness = (horizontalSharpness: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.horizontalSharpness === horizontalSharpness
+        ? current
+        : { ...current, horizontalSharpness }
+    ));
+  };
+
+  const setRgbConvergenceOffset = (rgbConvergenceOffset: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.rgbConvergenceOffset === rgbConvergenceOffset
+        ? current
+        : { ...current, rgbConvergenceOffset }
+    ));
   };
 
   const setSmoothStrength = (smoothStrength: number) => {
@@ -506,30 +542,17 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
-  const setSignalInstabilityEnabled = (signalInstabilityEnabled: boolean) => {
+  const setBeamWarmBloom = (beamWarmBloom: number) => {
     markPresetAsCustom();
     setSettings((current) => (
-      current.signalInstabilityEnabled === signalInstabilityEnabled
-        ? current
-        : { ...current, signalInstabilityEnabled }
+      current.beamWarmBloom === beamWarmBloom ? current : { ...current, beamWarmBloom }
     ));
   };
 
-  const setSignalInstabilityStrength = (signalInstabilityStrength: number) => {
+  const setScreenFaceGlow = (screenFaceGlow: number) => {
     markPresetAsCustom();
     setSettings((current) => (
-      current.signalInstabilityStrength === signalInstabilityStrength
-        ? current
-        : { ...current, signalInstabilityStrength }
-    ));
-  };
-
-  const setSignalInstabilityFrequency = (signalInstabilityFrequency: number) => {
-    markPresetAsCustom();
-    setSettings((current) => (
-      current.signalInstabilityFrequency === signalInstabilityFrequency
-        ? current
-        : { ...current, signalInstabilityFrequency }
+      current.screenFaceGlow === screenFaceGlow ? current : { ...current, screenFaceGlow }
     ));
   };
 
@@ -609,6 +632,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       targetWidth: presetSettings.width,
       targetHeight: presetSettings.height,
       autoTargetSize: presetSettings.autoTargetSize ?? false,
+      samplingMode: presetSettings.samplingMode ?? "nearest",
       colorLevels: presetSettings.colors,
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
@@ -617,6 +641,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       scanline2Strength: presetSettings.scanline2,
       vignetteStrength: presetSettings.vignette,
       glowStrength: presetSettings.glow,
+      horizontalSharpness: presetSettings.horizontalSharpness ?? 1,
+      rgbConvergenceOffset: presetSettings.rgbConvergenceOffset ?? 0,
       smoothStrength: presetSettings.smoothStrength ?? 0,
       toonSteps: presetSettings.toonSteps ?? 0,
       edgeBoost: presetSettings.edgeBoost ?? 0,
@@ -642,9 +668,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
-      signalInstabilityEnabled: presetSettings.signalInstabilityEnabled ?? false,
-      signalInstabilityStrength: presetSettings.signalInstabilityStrength ?? 0.35,
-      signalInstabilityFrequency: presetSettings.signalInstabilityFrequency ?? 0.3,
+      beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
+      screenFaceGlow: presetSettings.screenFaceGlow ?? 0,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -691,6 +716,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setTargetWidth,
     setTargetHeight,
     setAutoTargetSize,
+    setSamplingMode,
     setMatchTargetAspect,
     setColorLevels,
     setDitherStrength,
@@ -701,6 +727,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineBrightnessFade,
     setVignetteStrength,
     setGlowStrength,
+    setHorizontalSharpness,
+    setRgbConvergenceOffset,
     setSmoothStrength,
     setToonSteps,
     setEdgeBoost,
@@ -726,9 +754,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBeamHorizontalSpread,
     setBeamStripeStrength,
     setBeamWhiteBloom,
-    setSignalInstabilityEnabled,
-    setSignalInstabilityStrength,
-    setSignalInstabilityFrequency,
+    setBeamWarmBloom,
+    setScreenFaceGlow,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

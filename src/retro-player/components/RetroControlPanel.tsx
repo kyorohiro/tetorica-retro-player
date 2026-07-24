@@ -92,6 +92,8 @@ export type RetroControlPlayerSlice = {
   toggleNoise: () => void;
   togglePlayback: () => Promise<void>;
   playVideoWithAudio: () => Promise<void>;
+  isCrtBeamPrepared: (overrides?: Record<string, unknown>) => boolean;
+  prepareCrtBeam: (overrides?: Record<string, unknown>) => Promise<void>;
   analyserRef?: React.RefObject<AnalyserNode | null>;
 };
 
@@ -123,6 +125,7 @@ export type RetroControlPanelProps = {
   nativePlaybackNeedsReload?: boolean;
   onToggleNativePlaybackMode?: () => void;
   isAudioFxUnavailable?: boolean;
+  onRequestEnableBeamCross?: () => void | Promise<void>;
 };
 
 const controlsFallback = (
@@ -176,6 +179,7 @@ export function RetroControlPanel({
   nativePlaybackNeedsReload,
   onToggleNativePlaybackMode,
   isAudioFxUnavailable,
+  onRequestEnableBeamCross,
 }: RetroControlPanelProps) {
   const canRetryPlayback = player.previewStatus?.kind === "retryable";
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia || canRetryPlayback);
@@ -335,6 +339,8 @@ export function RetroControlPanel({
               curvature={filterState.curvature}
               ditherStrength={filterState.ditherStrength}
               glowStrength={filterState.glowStrength}
+              horizontalSharpness={filterState.horizontalSharpness}
+              rgbConvergenceOffset={filterState.rgbConvergenceOffset}
               smoothStrength={filterState.smoothStrength}
               toonSteps={filterState.toonSteps}
               edgeBoost={filterState.edgeBoost}
@@ -366,9 +372,8 @@ export function RetroControlPanel({
               beamHorizontalSpread={filterState.beamHorizontalSpread}
               beamStripeStrength={filterState.beamStripeStrength}
               beamWhiteBloom={filterState.beamWhiteBloom}
-              signalInstabilityEnabled={filterState.signalInstabilityEnabled}
-              signalInstabilityStrength={filterState.signalInstabilityStrength}
-              signalInstabilityFrequency={filterState.signalInstabilityFrequency}
+              beamWarmBloom={filterState.beamWarmBloom}
+              screenFaceGlow={filterState.screenFaceGlow}
               scanlineBrightnessFade={filterState.scanlineBrightnessFade}
               scanlineStrength={filterState.scanlineStrength}
               scanline2Strength={filterState.scanline2Strength}
@@ -377,6 +382,7 @@ export function RetroControlPanel({
               targetHeight={filterState.targetHeight}
               targetWidth={filterState.targetWidth}
               autoTargetSize={filterState.autoTargetSize}
+              samplingMode={filterState.samplingMode}
               matchTargetAspect={filterState.matchTargetAspect}
               vignetteStrength={filterState.vignetteStrength}
               focusStrength={filterState.focusStrength}
@@ -387,6 +393,8 @@ export function RetroControlPanel({
               onSetCurvature={filterState.setCurvature}
               onSetDitherStrength={filterState.setDitherStrength}
               onSetGlowStrength={filterState.setGlowStrength}
+              onSetHorizontalSharpness={filterState.setHorizontalSharpness}
+              onSetRgbConvergenceOffset={filterState.setRgbConvergenceOffset}
               onSetSmoothStrength={filterState.setSmoothStrength}
               onSetToonSteps={filterState.setToonSteps}
               onSetEdgeBoost={filterState.setEdgeBoost}
@@ -418,20 +426,21 @@ export function RetroControlPanel({
               onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
               onSetBeamStripeStrength={filterState.setBeamStripeStrength}
               onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
-              onSetSignalInstabilityEnabled={filterState.setSignalInstabilityEnabled}
-              onSetSignalInstabilityStrength={filterState.setSignalInstabilityStrength}
-              onSetSignalInstabilityFrequency={filterState.setSignalInstabilityFrequency}
+              onSetBeamWarmBloom={filterState.setBeamWarmBloom}
+              onSetScreenFaceGlow={filterState.setScreenFaceGlow}
               onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
               onSetScanlineStrength={filterState.setScanlineStrength}
               onSetScanline2Strength={filterState.setScanline2Strength}
               onSetTargetHeight={onSetTargetHeight}
               onSetTargetWidth={onSetTargetWidth}
               onSetAutoTargetSize={filterState.setAutoTargetSize}
+              onSetSamplingMode={filterState.setSamplingMode}
               onSetMatchTargetAspect={onSetMatchTargetAspect}
               onSetVignetteStrength={filterState.setVignetteStrength}
               onSetFocusStrength={filterState.setFocusStrength}
               onSetFocusWidth={filterState.setFocusWidth}
               onSetFocusHeight={filterState.setFocusHeight}
+              onRequestEnableBeamCross={onRequestEnableBeamCross}
             />
           </React.Suspense>
         </div>
