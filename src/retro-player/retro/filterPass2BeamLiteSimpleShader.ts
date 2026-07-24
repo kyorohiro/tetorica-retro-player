@@ -11,9 +11,11 @@ uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
 uniform vec2 uOutputSize;
+uniform vec2 uDisplaySize;
 uniform vec2 uBeamSourceSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
+uniform float uSamplingMode;
 uniform float uHorizontalSharpness;
 uniform float uCurvature;
 uniform float uScanlineStrength;
@@ -76,6 +78,31 @@ vec3 quantizeBeamInputColor(vec3 color)
   }
   float levels = max(uColorLevels, 2.0);
   return floor(color * (levels - 1.0) + 0.5) / max(levels - 1.0, 1.0);
+}
+
+vec3 sampleSourceTextureAverage4(vec2 cellMin, vec2 cellSize)
+{
+  vec2 quarter = cellSize * 0.25;
+  vec3 sum = vec3(0.0);
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  return sum * 0.25;
+}
+
+vec3 sampleSourceTextureAverage8(vec2 cellMin, vec2 cellSize)
+{
+  vec3 sum = vec3(0.0);
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.25, 0.25), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.75, 0.25), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.25, 0.75), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.75, 0.75), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.50, 0.20), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.50, 0.80), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.20, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  sum += texture(uSourceTexture, clamp(cellMin + cellSize * vec2(0.80, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  return sum * 0.125;
 }
 
 vec3 applyBasicColorControls(vec3 color)
@@ -176,10 +203,11 @@ void sampleBeamStripeMasks(
 float getBeamStripeResolve(vec2 sourceSize)
 {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
-  float pixelsPerCellX = uOutputSize.x / safeSourceSize.x;
-  float pixelsPerCellY = uOutputSize.y / safeSourceSize.y;
+  vec2 visibleSize = max(uDisplaySize, vec2(1.0));
+  float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
+  float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
-  return clamp(smoothstep(0.9, 1.2, subpixelPixels), 0.0, 1.0);
+  return clamp(smoothstep(1.0, 1.45, subpixelPixels), 0.0, 1.0);
 }
 
 vec3 sampleBeamMergedMask(
@@ -203,6 +231,16 @@ vec3 sampleEmitterColor(vec2 emitterCell, vec2 sourceSize)
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
   vec2 maximumCell = max(safeSourceSize - vec2(1.0), vec2(0.0));
   vec2 clampedCell = clamp(emitterCell, vec2(0.0), maximumCell);
+
+  if (uSamplingMode >= 0.5) {
+    vec2 cellSize = 1.0 / safeSourceSize;
+    vec2 cellMin = clampedCell / safeSourceSize;
+    if (uSamplingMode < 1.5) {
+      return sampleSourceTextureAverage4(cellMin, cellSize);
+    }
+    return sampleSourceTextureAverage8(cellMin, cellSize);
+  }
+
   vec2 sampleUv = (clampedCell + vec2(0.5)) / safeSourceSize;
   ivec2 sourceTextureSize = textureSize(uSourceTexture, 0);
   ivec2 pixel = ivec2(floor(sampleUv * vec2(sourceTextureSize)));
@@ -281,7 +319,7 @@ vec3 applyBeamCross(vec2 gridUv)
   float horizontalSpread = getBeamHorizontalSpread();
   vec2 sourceSize = max(uBeamSourceSize, vec2(1.0));
   vec2 sourceCoord = gridUv * sourceSize;
-  vec2 sourceCenter = floor(sourceCoord) + vec2(0.5);
+  vec2 sourceCell = floor(sourceCoord);
 
   vec3 accumulatedStreak = vec3(0.0);
   float accumulatedHighlight = 0.0;
@@ -290,7 +328,8 @@ vec3 applyBeamCross(vec2 gridUv)
 
   for (int sy = -1; sy <= 1; sy++) {
     for (int sx = -2; sx <= 2; sx++) {
-      vec2 emitterCell = sourceCenter + vec2(float(sx), float(sy));
+      vec2 emitterCell = sourceCell + vec2(float(sx), float(sy));
+      vec2 emitterCenter = emitterCell + vec2(0.5);
       vec3 centerSample = sampleEmitterColor(emitterCell, sourceSize);
       vec3 leftSample = needsHorizontalNeighbors
         ? sampleEmitterColor(emitterCell + vec2(-1.0, 0.0), sourceSize)
@@ -308,7 +347,7 @@ vec3 applyBeamCross(vec2 gridUv)
       float sampleBrightness = max(max(sampleColor.r, sampleColor.g), sampleColor.b);
       float sampleGate = smoothstep(0.0, getBeamDarkCutoff(), sampleBrightness);
 
-      vec2 delta = sourceCoord - emitterCell;
+      vec2 delta = sourceCoord - emitterCenter;
       float dx = delta.x;
       float dy = delta.y;
       float dx2 = dx * dx;
@@ -410,15 +449,16 @@ void main(void)
   vec3 stripeBleedMask;
   sampleBeamStripeMasks(curvedUv, sourceSize, stripeMask, stripeBleedMask);
   float stripeResolve = getBeamStripeResolve(sourceSize);
-  vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.34, 0.58);
-  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.46, 0.86);
-  stripeMask = mix(mergedStripeMask, stripeMask, stripeResolve);
-  stripeBleedMask = mix(mergedBleedMask, stripeBleedMask, stripeResolve);
+  float mergedStripeMaskScalar = dot(stripeMask, vec3(1.0 / 3.0));
+  float mergedBleedMaskScalar = dot(stripeBleedMask, vec3(1.0 / 3.0));
+  stripeMask = mix(vec3(mergedStripeMaskScalar), stripeMask, stripeResolve);
+  stripeBleedMask = mix(vec3(mergedBleedMaskScalar), stripeBleedMask, stripeResolve);
+  float effectiveStripeStrength = getBeamStripeStrength() * mix(0.42, 1.0, stripeResolve);
 
   float lightMask = smoothstep(0.025, 0.23, beamLuma);
   vec3 beamField = beamColor * (0.095 + lightMask * 0.04);
-  vec3 stripeGlow = stripeMask * beamColor * (0.08 + lightMask * 0.18) * getBeamStripeStrength();
-  vec3 stripeBleed = stripeBleedMask * beamColor * (0.10 + lightMask * 0.14) * getBeamStripeStrength();
+  vec3 stripeGlow = stripeMask * beamColor * (0.08 + lightMask * 0.18) * effectiveStripeStrength;
+  vec3 stripeBleed = stripeBleedMask * beamColor * (0.10 + lightMask * 0.14) * effectiveStripeStrength;
   vec3 mergedFlare = beamColor * beamLuma * (0.14 + lightMask * 0.19);
   vec3 whiteBloom = vec3(beamLuma) * lightMask * 0.15 * getBeamWhiteBloom();
   vec3 warmBloom =
