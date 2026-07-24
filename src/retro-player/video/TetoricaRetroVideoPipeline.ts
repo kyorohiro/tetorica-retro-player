@@ -579,12 +579,26 @@ async function waitAndVerifyPrograms(
 
   if (ext) {
     await new Promise<void>((resolve) => {
+      const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const RAF_POLL_WINDOW_MS = 300;
+      const SLOW_POLL_INTERVAL_MS = 150;
+
       const poll = () => {
         const allDone = programs.every(
           (p) => gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR) as boolean,
         );
-        if (allDone) resolve();
-        else requestAnimationFrame(poll);
+        if (allDone) {
+          resolve();
+          return;
+        }
+
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (now - startedAt < RAF_POLL_WINDOW_MS) {
+          requestAnimationFrame(poll);
+          return;
+        }
+
+        window.setTimeout(poll, SLOW_POLL_INTERVAL_MS);
       };
       requestAnimationFrame(poll);
     });
