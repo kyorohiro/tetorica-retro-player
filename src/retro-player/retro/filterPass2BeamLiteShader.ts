@@ -11,6 +11,7 @@ uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
 uniform vec2 uOutputSize;
+uniform vec2 uDisplaySize;
 uniform vec2 uBeamSourceSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
@@ -66,6 +67,21 @@ float bayer4x4(vec2 pos)
   if (x == 1) return 7.0 / 16.0;
   if (x == 2) return 13.0 / 16.0;
   return 5.0 / 16.0;
+}
+
+float getBeamEnergyCompensation(vec2 sourceSize)
+{
+  vec2 safeSourceSize = max(sourceSize, vec2(1.0));
+  vec2 visibleSize = max(uDisplaySize, vec2(1.0));
+  float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
+  float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
+  float pixelsPerCell = sqrt(max(pixelsPerCellX * pixelsPerCellY, 0.0001));
+  float referencePixelsPerCell = 1.6;
+  return clamp(
+    sqrt(referencePixelsPerCell / max(pixelsPerCell, 0.0001)),
+    0.72,
+    1.18
+  );
 }
 
 vec3 quantizeBeamInputColor(vec3 color)
@@ -456,15 +472,20 @@ float getBeamStripeResolve(vec2 sourceSize)
     vec2(1.0)
   );
 
-  float pixelsPerCellX = uOutputSize.x / safeSourceSize.x;
-  float pixelsPerCellY = uOutputSize.y / safeSourceSize.y;
+  vec2 visibleSize = max(
+    uDisplaySize,
+    vec2(1.0)
+  );
+
+  float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
+  float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float subpixelPixels = min(
     pixelsPerCellX / 3.0,
     pixelsPerCellY
   );
 
   return clamp(
-    smoothstep(0.9, 1.2, subpixelPixels),
+    smoothstep(1.0, 1.45, subpixelPixels),
     0.0,
     1.0
   );
@@ -1048,17 +1069,30 @@ void main(void)
     0.86
   );
 
-  stripeMask = mix(
+  float mergedStripeMaskScalar = dot(
     mergedStripeMask,
+    vec3(1.0 / 3.0)
+  );
+  float mergedBleedMaskScalar = dot(
+    mergedBleedMask,
+    vec3(1.0 / 3.0)
+  );
+
+  stripeMask = mix(
+    vec3(mergedStripeMaskScalar),
     stripeMask,
     stripeResolve
   );
 
   stripeBleedMask = mix(
-    mergedBleedMask,
+    vec3(mergedBleedMaskScalar),
     stripeBleedMask,
     stripeResolve
   );
+
+  float effectiveStripeStrength =
+    getBeamStripeStrength() *
+    stripeResolve;
 
   float lightMask = smoothstep(
     BEAM_LIGHTMASK_LOW,
@@ -1080,7 +1114,7 @@ void main(void)
       BEAM_STRIPE_GLOW_BASE +
       lightMask * BEAM_STRIPE_GLOW_LIGHT_GAIN
     ) *
-    getBeamStripeStrength();
+    effectiveStripeStrength;
 
   vec3 stripeBleed =
     stripeBleedMask *
@@ -1089,7 +1123,7 @@ void main(void)
       BEAM_STRIPE_BLEED_BASE +
       lightMask * BEAM_STRIPE_BLEED_LIGHT_GAIN
     ) *
-    getBeamStripeStrength();
+    effectiveStripeStrength;
 
   vec3 mergedFlare =
     beamColor *
@@ -1138,6 +1172,8 @@ void main(void)
     whiteBloom +
     warmBloom +
     sourceDetail;
+
+  finalBeamColor *= getBeamEnergyCompensation(sourceSize);
 
   float brightness = max(
     max(

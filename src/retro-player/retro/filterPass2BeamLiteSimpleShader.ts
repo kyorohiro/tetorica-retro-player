@@ -11,6 +11,7 @@ uniform sampler2D uSourceTexture;
 
 uniform vec2 uTargetSize;
 uniform vec2 uOutputSize;
+uniform vec2 uDisplaySize;
 uniform vec2 uBeamSourceSize;
 uniform float uColorLevels;
 uniform float uDitherStrength;
@@ -176,10 +177,11 @@ void sampleBeamStripeMasks(
 float getBeamStripeResolve(vec2 sourceSize)
 {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
-  float pixelsPerCellX = uOutputSize.x / safeSourceSize.x;
-  float pixelsPerCellY = uOutputSize.y / safeSourceSize.y;
+  vec2 visibleSize = max(uDisplaySize, vec2(1.0));
+  float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
+  float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
-  return clamp(smoothstep(0.9, 1.2, subpixelPixels), 0.0, 1.0);
+  return clamp(smoothstep(1.0, 1.45, subpixelPixels), 0.0, 1.0);
 }
 
 vec3 sampleBeamMergedMask(
@@ -412,13 +414,16 @@ void main(void)
   float stripeResolve = getBeamStripeResolve(sourceSize);
   vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.34, 0.58);
   vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.46, 0.86);
-  stripeMask = mix(mergedStripeMask, stripeMask, stripeResolve);
-  stripeBleedMask = mix(mergedBleedMask, stripeBleedMask, stripeResolve);
+  float mergedStripeMaskScalar = dot(mergedStripeMask, vec3(1.0 / 3.0));
+  float mergedBleedMaskScalar = dot(mergedBleedMask, vec3(1.0 / 3.0));
+  stripeMask = mix(vec3(mergedStripeMaskScalar), stripeMask, stripeResolve);
+  stripeBleedMask = mix(vec3(mergedBleedMaskScalar), stripeBleedMask, stripeResolve);
+  float effectiveStripeStrength = getBeamStripeStrength() * stripeResolve;
 
   float lightMask = smoothstep(0.025, 0.23, beamLuma);
   vec3 beamField = beamColor * (0.095 + lightMask * 0.04);
-  vec3 stripeGlow = stripeMask * beamColor * (0.08 + lightMask * 0.18) * getBeamStripeStrength();
-  vec3 stripeBleed = stripeBleedMask * beamColor * (0.10 + lightMask * 0.14) * getBeamStripeStrength();
+  vec3 stripeGlow = stripeMask * beamColor * (0.08 + lightMask * 0.18) * effectiveStripeStrength;
+  vec3 stripeBleed = stripeBleedMask * beamColor * (0.10 + lightMask * 0.14) * effectiveStripeStrength;
   vec3 mergedFlare = beamColor * beamLuma * (0.14 + lightMask * 0.19);
   vec3 whiteBloom = vec3(beamLuma) * lightMask * 0.15 * getBeamWhiteBloom();
   vec3 warmBloom =

@@ -129,6 +129,7 @@ type Pass1UniformLocations = {
 type Pass2UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
   uOutputSize: WebGLUniformLocation | null;
+  uDisplaySize: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
   uDitherStrength: WebGLUniformLocation | null;
@@ -172,6 +173,21 @@ type Pass2UniformLocations = {
   uTime: WebGLUniformLocation | null;
 };
 
+type Pass2Sizing = {
+  pass2TargetWidth: number;
+  pass2TargetHeight: number;
+  beamSourceWidth: number;
+  beamSourceHeight: number;
+  isBeamMode: boolean;
+  isPhosphorDotMode: boolean;
+};
+
+type BeamDownscaleUniformLocations = {
+  uTexture: WebGLUniformLocation | null;
+  uSourceSize: WebGLUniformLocation | null;
+  uTargetSize: WebGLUniformLocation | null;
+};
+
 const PASS_THROUGH_FRAGMENT = `#version 300 es
 precision mediump float;
 
@@ -183,6 +199,39 @@ uniform sampler2D uTexture;
 void main(void)
 {
   finalColor = texture(uTexture, vTextureCoord);
+}
+`;
+
+const BEAM_SOURCE_DOWNSCALE_FRAGMENT = `#version 300 es
+precision mediump float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform vec2 uSourceSize;
+uniform vec2 uTargetSize;
+
+void main(void)
+{
+  vec2 sourceSize = max(uSourceSize, vec2(1.0));
+  vec2 targetSize = max(uTargetSize, vec2(1.0));
+  vec2 footprint = max(sourceSize / targetSize, vec2(1.0));
+  vec2 texel = 1.0 / sourceSize;
+  vec2 radius = 0.5 * max(footprint - 1.0, vec2(0.0)) * texel;
+
+  vec4 accum = vec4(0.0);
+  accum += texture(uTexture, vTextureCoord + radius * vec2(-1.0, -1.0));
+  accum += texture(uTexture, vTextureCoord + radius * vec2( 0.0, -1.0));
+  accum += texture(uTexture, vTextureCoord + radius * vec2( 1.0, -1.0));
+  accum += texture(uTexture, vTextureCoord + radius * vec2(-1.0,  0.0));
+  accum += texture(uTexture, vTextureCoord);
+  accum += texture(uTexture, vTextureCoord + radius * vec2( 1.0,  0.0));
+  accum += texture(uTexture, vTextureCoord + radius * vec2(-1.0,  1.0));
+  accum += texture(uTexture, vTextureCoord + radius * vec2( 0.0,  1.0));
+  accum += texture(uTexture, vTextureCoord + radius * vec2( 1.0,  1.0));
+
+  finalColor = accum / 9.0;
 }
 `;
 
@@ -353,6 +402,30 @@ const getAspectCorrectedSize = (
   return {
     width: requestedWidth,
     height: Math.max(1, Math.round(requestedWidth / sourceAspect)),
+  };
+};
+
+const getViewportFloorSize = (
+  canvas: HTMLCanvasElement | null,
+  drawingBufferWidth: number,
+  drawingBufferHeight: number,
+) => {
+  const clientWidth = canvas?.clientWidth;
+  const clientHeight = canvas?.clientHeight;
+
+  return {
+    width: Math.max(
+      1,
+      clientWidth !== undefined
+        ? Math.min(clientWidth, drawingBufferWidth)
+        : drawingBufferWidth,
+    ),
+    height: Math.max(
+      1,
+      clientHeight !== undefined
+        ? Math.min(clientHeight, drawingBufferHeight)
+        : drawingBufferHeight,
+    ),
   };
 };
 
@@ -529,6 +602,8 @@ export class TetoricaRetroVideoPipeline {
   private filterPass2Program: WebGLProgram | null = null;
 
   private readonly passthroughProgram: WebGLProgram;
+  private readonly beamDownscaleProgram: WebGLProgram;
+  private readonly beamDownscaleLocs: BeamDownscaleUniformLocations;
 
   private readonly texture: WebGLTexture;
   private textureSamplingFilter: number | null = null;
@@ -544,6 +619,11 @@ export class TetoricaRetroVideoPipeline {
   private fboWidth = 0;
   private fboHeight = 0;
   private fboTextureSamplingFilter: number | null = null;
+  private beamSourceFbo: WebGLFramebuffer | null = null;
+  private beamSourceTexture: WebGLTexture | null = null;
+  private beamSourceFboWidth = 0;
+  private beamSourceFboHeight = 0;
+  private beamSourceTextureSamplingFilter: number | null = null;
 
   private currentSource: RetroVideoSource | null = null;
 
@@ -606,6 +686,42 @@ export class TetoricaRetroVideoPipeline {
     this.fboTextureSamplingFilter = gl.NEAREST;
   }
 
+  private ensureBeamSourceFbo(width: number, height: number) {
+    if (
+      this.beamSourceFboWidth === width &&
+      this.beamSourceFboHeight === height &&
+      this.beamSourceFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
+    if (this.beamSourceTexture) gl.deleteTexture(this.beamSourceTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create Beam source FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create Beam source FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.beamSourceFbo = fbo;
+    this.beamSourceTexture = tex;
+    this.beamSourceFboWidth = width;
+    this.beamSourceFboHeight = height;
+    this.beamSourceTextureSamplingFilter = gl.LINEAR;
+  }
+
   private syncFboTextureSamplingFilter(nextFilter: number) {
     if (!this.fboTexture || this.fboTextureSamplingFilter === nextFilter) {
       return;
@@ -616,6 +732,18 @@ export class TetoricaRetroVideoPipeline {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
     this.fboTextureSamplingFilter = nextFilter;
+  }
+
+  private syncBeamSourceTextureSamplingFilter(nextFilter: number) {
+    if (!this.beamSourceTexture || this.beamSourceTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.beamSourceTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.beamSourceTextureSamplingFilter = nextFilter;
   }
 
   // Called once the background filter compilation succeeds.
@@ -855,8 +983,18 @@ export class TetoricaRetroVideoPipeline {
   ): Promise<TetoricaRetroVideoPipeline> {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
-    await waitAndVerifyPrograms(gl, [passthroughProgram]);
-    const pipeline = new TetoricaRetroVideoPipeline(gl, passthroughProgram, true);
+    const beamDownscaleProgram = submitProgram(
+      gl,
+      VERTEX_SHADER_SOURCE,
+      BEAM_SOURCE_DOWNSCALE_FRAGMENT,
+    );
+    await waitAndVerifyPrograms(gl, [passthroughProgram, beamDownscaleProgram]);
+    const pipeline = new TetoricaRetroVideoPipeline(
+      gl,
+      passthroughProgram,
+      beamDownscaleProgram,
+      true,
+    );
 
     requestAnimationFrame(async () => {
       pipeline.queueWindowsLiteVariant(initialFilterState);
@@ -872,10 +1010,12 @@ export class TetoricaRetroVideoPipeline {
   constructor(
     gl: WebGL2RenderingContext,
     passthroughProgram: WebGLProgram,
+    beamDownscaleProgram: WebGLProgram,
     windowsLiteMode = false,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
+    this.beamDownscaleProgram = beamDownscaleProgram;
     this.windowsLiteMode = windowsLiteMode;
 
     const vertexBuffer = gl.createBuffer();
@@ -905,6 +1045,13 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(this.passthroughProgram);
     gl.uniform1i(gl.getUniformLocation(this.passthroughProgram, "uTexture"), 0);
+    gl.useProgram(this.beamDownscaleProgram);
+    gl.uniform1i(gl.getUniformLocation(this.beamDownscaleProgram, "uTexture"), 0);
+    this.beamDownscaleLocs = {
+      uTexture: gl.getUniformLocation(this.beamDownscaleProgram, "uTexture"),
+      uSourceSize: gl.getUniformLocation(this.beamDownscaleProgram, "uSourceSize"),
+      uTargetSize: gl.getUniformLocation(this.beamDownscaleProgram, "uTargetSize"),
+    };
   }
 
   private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
@@ -935,6 +1082,7 @@ export class TetoricaRetroVideoPipeline {
     return {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
       uOutputSize: gl.getUniformLocation(program, "uOutputSize"),
+      uDisplaySize: gl.getUniformLocation(program, "uDisplaySize"),
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
       uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
@@ -1153,6 +1301,34 @@ export class TetoricaRetroVideoPipeline {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
+      let pass2SourceTexture: WebGLTexture = this.texture;
+      if (isBeamVariant) {
+        const {
+          beamSourceWidth,
+          beamSourceHeight,
+        } = this.resolvePass2Sizing(filterState, sourceSize.width, sourceSize.height);
+        this.ensureBeamSourceFbo(beamSourceWidth, beamSourceHeight);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.beamSourceFbo);
+        gl.viewport(0, 0, beamSourceWidth, beamSourceHeight);
+        gl.useProgram(this.beamDownscaleProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.syncTextureSamplingFilter(gl.LINEAR);
+        gl.uniform2f(
+          this.beamDownscaleLocs.uSourceSize,
+          Math.max(sourceSize.width, 1),
+          Math.max(sourceSize.height, 1),
+        );
+        gl.uniform2f(
+          this.beamDownscaleLocs.uTargetSize,
+          Math.max(beamSourceWidth, 1),
+          Math.max(beamSourceHeight, 1),
+        );
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        pass2SourceTexture = this.beamSourceTexture ?? this.texture;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, w, h);
+      }
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
       const pass2TextureFilter =
@@ -1160,8 +1336,12 @@ export class TetoricaRetroVideoPipeline {
       this.syncFboTextureSamplingFilter(pass2TextureFilter);
       if (isBeamVariant) {
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        this.syncTextureSamplingFilter(gl.LINEAR);
+        gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
+        if (pass2SourceTexture === this.beamSourceTexture) {
+          this.syncBeamSourceTextureSamplingFilter(gl.LINEAR);
+        } else {
+          this.syncTextureSamplingFilter(gl.LINEAR);
+        }
       }
       gl.useProgram(this.filterPass2Program);
       this.applyPass2Uniforms(filterState, sourceSize.width, sourceSize.height);
@@ -1215,8 +1395,11 @@ export class TetoricaRetroVideoPipeline {
       if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     }
     gl.deleteProgram(this.passthroughProgram);
+    gl.deleteProgram(this.beamDownscaleProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
+    if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
+    if (this.beamSourceTexture) gl.deleteTexture(this.beamSourceTexture);
     this.currentSource = null;
     this.currentFilterState = null;
     this.lastUploadedImageSource = null;
@@ -1233,6 +1416,51 @@ export class TetoricaRetroVideoPipeline {
     return source;
   }
 
+  private resolvePass2Sizing(
+    filterState: RetroVideoFilterState,
+    sourceWidth: number | undefined,
+    sourceHeight: number | undefined,
+  ): Pass2Sizing {
+    const { gl } = this;
+    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
+    const viewportFloorSize = getViewportFloorSize(
+      canvasElement,
+      Math.max(gl.drawingBufferWidth, 1),
+      Math.max(gl.drawingBufferHeight, 1),
+    );
+    const visibleWidth = viewportFloorSize.width;
+    const visibleHeight = viewportFloorSize.height;
+    const {
+      width: effectiveTargetWidth,
+      height: effectiveTargetHeight,
+      isPhosphorDotMode,
+    } = getEffectiveRetroTargetSize(
+      filterState,
+      sourceWidth,
+      sourceHeight,
+      visibleWidth,
+      visibleHeight,
+    );
+    const isBeamMode = isBeamCrossModeEnabled(filterState);
+    const pass2TargetWidth = effectiveTargetWidth;
+    const pass2TargetHeight = effectiveTargetHeight;
+    const beamSourceWidth = isBeamMode
+      ? pass2TargetWidth
+      : Math.max(sourceWidth ?? pass2TargetWidth, 1);
+    const beamSourceHeight = isBeamMode
+      ? pass2TargetHeight
+      : Math.max(sourceHeight ?? pass2TargetHeight, 1);
+
+    return {
+      pass2TargetWidth,
+      pass2TargetHeight,
+      beamSourceWidth,
+      beamSourceHeight,
+      isBeamMode,
+      isPhosphorDotMode,
+    };
+  }
+
   private applyPass1Uniforms(
     filterState: RetroVideoFilterState,
     sourceWidth: number | undefined,
@@ -1241,8 +1469,13 @@ export class TetoricaRetroVideoPipeline {
     if (!this.pass1Locs || !this.filterPass1Program) return;
     const { gl } = this;
     const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-    const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+    const viewportFloorSize = getViewportFloorSize(
+      canvasElement,
+      Math.max(gl.drawingBufferWidth, 1),
+      Math.max(gl.drawingBufferHeight, 1),
+    );
+    const visibleWidth = viewportFloorSize.width;
+    const visibleHeight = viewportFloorSize.height;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
@@ -1281,45 +1514,33 @@ export class TetoricaRetroVideoPipeline {
   ) {
     if (!this.pass2Locs || !this.filterPass2Program) return;
     const { gl } = this;
-    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const visibleWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-    const visibleHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
     const {
-      width: effectiveTargetWidth,
-      height: effectiveTargetHeight,
+      pass2TargetWidth,
+      pass2TargetHeight,
+      beamSourceWidth,
+      beamSourceHeight,
       isPhosphorDotMode,
-    } = getEffectiveRetroTargetSize(
+    } = this.resolvePass2Sizing(
       filterState,
       sourceWidth,
       sourceHeight,
-      visibleWidth,
-      visibleHeight,
     );
-    const isBeamMode = isBeamCrossModeEnabled(filterState);
-    const pass2TargetWidth =
-      isBeamMode && filterState.autoTargetSize
-        ? Math.max(sourceWidth ?? effectiveTargetWidth, 1)
-        : effectiveTargetWidth;
-    const pass2TargetHeight =
-      isBeamMode && filterState.autoTargetSize
-        ? Math.max(sourceHeight ?? effectiveTargetHeight, 1)
-        : effectiveTargetHeight;
 
     gl.useProgram(this.filterPass2Program);
+    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
+    const displayWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
+    const displayHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
     gl.uniform2f(this.pass2Locs.uTargetSize, pass2TargetWidth, pass2TargetHeight);
     gl.uniform2f(
       this.pass2Locs.uOutputSize,
       Math.max(gl.drawingBufferWidth, 1),
       Math.max(gl.drawingBufferHeight, 1),
     );
-    const beamSourceWidth =
-      isBeamMode && !filterState.autoTargetSize
-        ? pass2TargetWidth
-        : Math.max(sourceWidth ?? pass2TargetWidth, 1);
-    const beamSourceHeight =
-      isBeamMode && !filterState.autoTargetSize
-        ? pass2TargetHeight
-        : Math.max(sourceHeight ?? pass2TargetHeight, 1);
+    gl.uniform2f(
+      this.pass2Locs.uDisplaySize,
+      displayWidth,
+      displayHeight,
+    );
     gl.uniform2f(
       this.pass2Locs.uBeamSourceSize,
       beamSourceWidth,
