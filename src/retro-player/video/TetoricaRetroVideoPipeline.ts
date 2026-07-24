@@ -291,7 +291,7 @@ const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
   isBeamCrossModeEnabled(filterState) &&
   filterState.smoothStrength <= 0.001 &&
   filterState.rgbConvergenceOffset <= 0.0001 &&
-  getSamplingModeValue(filterState.samplingMode) < 0.5;
+  getSamplingModeValue(filterState.samplingMode) < 2.5;
 
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,

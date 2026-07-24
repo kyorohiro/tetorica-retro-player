@@ -581,7 +581,7 @@ vec3 sampleEmitterColor(
   }
 
   vec2 cellSize = 1.0 / safeSourceSize;
-  vec2 cellMin = (clampedCell - vec2(0.5)) / safeSourceSize;
+  vec2 cellMin = clampedCell / safeSourceSize;
   if (uSamplingMode < 1.5) {
     return sampleSourceTextureAverage4(cellMin, cellSize);
   }
@@ -724,10 +724,7 @@ vec3 applyBeamCross(vec2 gridUv)
   );
 
   vec2 sourceCoord = gridUv * sourceSize;
-
-  vec2 sourceCenter =
-    floor(sourceCoord) +
-    vec2(0.5);
+  vec2 sourceCell = floor(sourceCoord);
 
   vec3 accumulatedStreak = vec3(0.0);
   float accumulatedHighlight = 0.0;
@@ -741,11 +738,12 @@ vec3 applyBeamCross(vec2 gridUv)
   for (int sy = -1; sy <= 1; sy++) {
     for (int sx = -2; sx <= 2; sx++) {
       vec2 emitterCell =
-        sourceCenter +
+        sourceCell +
         vec2(
           float(sx),
           float(sy)
         );
+      vec2 emitterCenter = emitterCell + vec2(0.5);
 
       vec3 centerSample = sampleEmitterColorConverged(
         emitterCell,
@@ -797,7 +795,7 @@ vec3 applyBeamCross(vec2 gridUv)
 
       vec2 delta =
         sourceCoord -
-        emitterCell;
+        emitterCenter;
 
       float dx = delta.x;
       float dy = delta.y;
