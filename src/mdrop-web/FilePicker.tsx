@@ -159,7 +159,7 @@ export const FilePicker = React.forwardRef<FilePickerHandle, FilePickerProps>(
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*,audio/*,.zip,.cbz,.rar,.cbr,.pdf,.epub,.txt,.md"
+          accept="image/*,video/*,audio/*,.nes,.zip,.cbz,.rar,.cbr,.pdf,.epub,.txt,.md"
           multiple
           className="hidden"
           onChange={async (event) => {

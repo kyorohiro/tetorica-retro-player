@@ -1,0 +1,154 @@
+import { Controller, NES } from "jsnes";
+
+const NES_WIDTH = 256;
+const NES_HEIGHT = 240;
+const NES_FRAME_MS = 1000 / 60;
+const AUDIO_BUFFER_SIZE = 2048;
+const MAX_AUDIO_QUEUE_LENGTH = 48000;
+
+type NesSession = {
+  stream: MediaStream;
+  stop: () => void;
+};
+
+const KEY_TO_BUTTON = new Map<string, number>([
+  ["x", Controller.BUTTON_A],
+  ["z", Controller.BUTTON_B],
+  ["enter", Controller.BUTTON_START],
+  ["shift", Controller.BUTTON_SELECT],
+  ["arrowup", Controller.BUTTON_UP],
+  ["arrowdown", Controller.BUTTON_DOWN],
+  ["arrowleft", Controller.BUTTON_LEFT],
+  ["arrowright", Controller.BUTTON_RIGHT],
+  ["s", Controller.BUTTON_TURBO_A],
+  ["a", Controller.BUTTON_TURBO_B],
+]);
+
+const makeSilentStream = (canvas: HTMLCanvasElement) => canvas.captureStream(60);
+
+export const isNesRomFile = (file: File) => /\.nes$/i.test(file.name);
+
+export async function startNesSession(file: File): Promise<NesSession> {
+  const romData = await file.arrayBuffer();
+  const canvas = document.createElement("canvas");
+  canvas.width = NES_WIDTH;
+  canvas.height = NES_HEIGHT;
+  canvas.style.imageRendering = "pixelated";
+
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    throw new Error("Failed to create NES canvas context");
+  }
+
+  const imageData = context.getImageData(0, 0, NES_WIDTH, NES_HEIGHT);
+  const frameBuffer = new ArrayBuffer(imageData.data.length);
+  const frameBuffer8 = new Uint8ClampedArray(frameBuffer);
+  const frameBuffer32 = new Uint32Array(frameBuffer);
+  frameBuffer32.fill(0xff000000);
+
+  const AudioContextCtor = window.AudioContext;
+  const audioContext = AudioContextCtor ? new AudioContextCtor({ sampleRate: 48000 }) : null;
+  const audioDestination = audioContext?.createMediaStreamDestination() ?? null;
+  const audioProcessor = audioContext?.createScriptProcessor(AUDIO_BUFFER_SIZE, 0, 2) ?? null;
+  const audioMuteGain = audioContext?.createGain() ?? null;
+  const leftQueue: number[] = [];
+  const rightQueue: number[] = [];
+
+  if (audioProcessor && audioDestination && audioMuteGain && audioContext) {
+    audioMuteGain.gain.value = 0;
+    audioProcessor.onaudioprocess = (event) => {
+      const left = event.outputBuffer.getChannelData(0);
+      const right = event.outputBuffer.getChannelData(1);
+      for (let i = 0; i < left.length; i += 1) {
+        left[i] = leftQueue.length > 0 ? leftQueue.shift() ?? 0 : 0;
+        right[i] = rightQueue.length > 0 ? rightQueue.shift() ?? 0 : 0;
+      }
+    };
+    audioProcessor.connect(audioDestination);
+    audioProcessor.connect(audioMuteGain);
+    audioMuteGain.connect(audioContext.destination);
+    void audioContext.resume().catch(() => {});
+  }
+
+  const videoStream = makeSilentStream(canvas);
+  const stream = new MediaStream([
+    ...videoStream.getVideoTracks(),
+    ...(audioDestination?.stream.getAudioTracks() ?? []),
+  ]);
+
+  const nes = new NES({
+    sampleRate: 48000,
+    onFrame: (buffer) => {
+      for (let i = 0; i < frameBuffer32.length; i += 1) {
+        frameBuffer32[i] = 0xff000000 | buffer[i];
+      }
+      imageData.data.set(frameBuffer8);
+      context.putImageData(imageData, 0, 0);
+    },
+    onAudioSample: audioProcessor
+      ? (left, right) => {
+          if (leftQueue.length >= MAX_AUDIO_QUEUE_LENGTH) {
+            leftQueue.splice(0, leftQueue.length - MAX_AUDIO_QUEUE_LENGTH + 1);
+          }
+          if (rightQueue.length >= MAX_AUDIO_QUEUE_LENGTH) {
+            rightQueue.splice(0, rightQueue.length - MAX_AUDIO_QUEUE_LENGTH + 1);
+          }
+          leftQueue.push(left);
+          rightQueue.push(right);
+        }
+      : undefined,
+  });
+
+  nes.loadROM(romData);
+
+  let frameTimerId: number | null = null;
+  let stopped = false;
+
+  const stepFrame = () => {
+    if (stopped) return;
+    try {
+      nes.frame();
+    } catch (error) {
+      console.error("[jsnes] frame failed", error);
+      stop();
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    const button = KEY_TO_BUTTON.get(event.key.toLowerCase());
+    if (button === undefined) return;
+    event.preventDefault();
+    nes.buttonDown(1, button);
+  };
+
+  const handleKeyUp = (event: KeyboardEvent) => {
+    const button = KEY_TO_BUTTON.get(event.key.toLowerCase());
+    if (button === undefined) return;
+    event.preventDefault();
+    nes.buttonUp(1, button);
+  };
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    if (frameTimerId !== null) {
+      window.clearInterval(frameTimerId);
+      frameTimerId = null;
+    }
+    window.removeEventListener("keydown", handleKeyDown);
+    window.removeEventListener("keyup", handleKeyUp);
+    stream.getTracks().forEach((track) => track.stop());
+    audioProcessor?.disconnect();
+    audioMuteGain?.disconnect();
+    void audioContext?.close().catch(() => {});
+  };
+
+  frameTimerId = window.setInterval(stepFrame, NES_FRAME_MS);
+  window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("keyup", handleKeyUp);
+
+  return {
+    stream,
+    stop,
+  };
+}

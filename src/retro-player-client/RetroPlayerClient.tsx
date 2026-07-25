@@ -4,6 +4,7 @@ import { t } from "../i18n";
 import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
+import { isNesRomFile, startNesSession } from "./builtin-content/nes-session";
 import {
   type PresetConfig,
   loadStartupPreset,
@@ -50,6 +51,7 @@ const compareComicOrder = (a: string, b: string) =>
 type AutoStartState = 'pending' | 'blocked' | 'done';
 
 const retroPlayerKey = "player:root";
+type BuiltinSessionCleanup = () => void;
 
 export type RetroPlayerClientHandle = {
   loadPaths: (items: { url: string; path: string }[], startIndex?: number) => void;
@@ -108,7 +110,9 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       'audio'; // lofi / demo-song
 
     const currentPresetConfigRef = useRef<PresetConfig>(startupPreset);
-    const toneCleanupRef = useRef<(() => void) | null>(null);
+    const toneCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
+    const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
+    const nesLaunchTokenRef = useRef(0);
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
     useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
@@ -128,6 +132,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     useEffect(() => {
       return () => {
         clearFilePlaylistBlobUrls();
+        nesCleanupRef.current?.();
       };
     }, [clearFilePlaylistBlobUrls]);
     const [playlistLength, setPlaylistLength] = useState(0);
@@ -184,10 +189,17 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       toneCleanupRef.current = null;
     }, []);
 
+    const stopNesSession = useCallback(() => {
+      nesLaunchTokenRef.current += 1;
+      nesCleanupRef.current?.();
+      nesCleanupRef.current = null;
+    }, []);
+
     const stopBuiltinPlayback = useCallback(() => {
       stopTone();
+      stopNesSession();
       setAutoStartState('done');
-    }, [stopTone]);
+    }, [stopNesSession, stopTone]);
 
     const clearPlaylistSession = useCallback(() => {
       playlistRef.current = [];
@@ -313,6 +325,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const previewItem = useCallback((item: PlaylistItem) => {
       setShowFfmpegRetry(false);
       setShowPlaybackRetryHint(false);
+      stopNesSession();
       if (item.kind === "file") {
         currentPlayingPathRef.current = null;
         if (shouldPreferDialogRetroPreview) {
@@ -329,7 +342,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         }
         previewSource.previewPath(item.url, item.path);
       }
-    }, [shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath]);
+    }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath, stopNesSession]);
 
     const nextTrack = useCallback(() => {
       const list = playlistRef.current;
@@ -449,6 +462,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, [isMDropReadyRef]);
 
     const loadPaths = useCallback((items: { url: string; path: string }[], startIndex = 0) => {
+      stopNesSession();
       clearFilePlaylistBlobUrls();
       if (items.length === 0) return;
       if (items.length === 1 && shouldPreferDialogRetroPreview) {
@@ -468,13 +482,33 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
       onPathPlaylistLoaded?.(sortedItems, sortedStartIndex);
-    }, [clearFilePlaylistBlobUrls, onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
+    }, [clearFilePlaylistBlobUrls, onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath, stopNesSession]);
 
     const loadFiles = useCallback((files: File[], _startIndex = 0) => {
       // Revoke blob URLs from previous file playlist before creating new ones.
       clearFilePlaylistBlobUrls();
 
       if (files.length === 0) return;
+      if (files.length === 1 && isNesRomFile(files[0])) {
+        stopTone();
+        stopNesSession();
+        clearPlaylistSession();
+        currentPlayingPathRef.current = null;
+        const launchToken = nesLaunchTokenRef.current + 1;
+        nesLaunchTokenRef.current = launchToken;
+        void startNesSession(files[0]).then((session) => {
+          if (nesLaunchTokenRef.current !== launchToken) {
+            session.stop();
+            return;
+          }
+          nesCleanupRef.current = session.stop;
+          previewSource.previewVideoStream(session.stream, files[0].name);
+        }).catch((error) => {
+          console.error("[jsnes] failed to start", error);
+        });
+        return;
+      }
+      stopNesSession();
       if (files.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForBrowserFiles(files);
         return;
@@ -499,7 +533,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       previewSource.previewPath(blobUrls[0], sortedFiles[0].name);
-    }, [clearFilePlaylistBlobUrls, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
+    }, [clearFilePlaylistBlobUrls, clearPlaylistSession, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, stopNesSession, stopTone]);
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };

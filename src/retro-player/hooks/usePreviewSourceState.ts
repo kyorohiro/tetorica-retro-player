@@ -12,7 +12,8 @@ export type PreviewStreamSource =
   | "display-capture"
   | "microphone"
   | "camera"
-  | "audio-preview";
+  | "audio-preview"
+  | "video-preview";
 
 const retainedBlobPreviewSrcs = new Set<string>();
 
@@ -329,6 +330,18 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     });
   }, [clearPreviewSrc]);
 
+  const previewVideoStream = useCallback((stream: MediaStream, label: string) => {
+    clearPreviewSrc();
+    setCaptureError("");
+    setPreviewLabel(label);
+    setPreviewKind("video");
+    setPreviewStreamSource("video-preview");
+    setPreviewStream((current) => {
+      current?.getTracks().forEach((track) => track.stop());
+      return stream;
+    });
+  }, [clearPreviewSrc]);
+
   return {
     previewSrc,
     previewStream,
@@ -341,6 +354,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     previewFile,
     previewPath,
     previewAudioStream,
+    previewVideoStream,
     refreshAudioInputDevices,
     setPreferredAudioInputDeviceId: updatePreferredAudioInputDeviceId,
     startDisplayCapture,
