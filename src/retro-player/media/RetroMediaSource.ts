@@ -429,6 +429,17 @@ export function waitForVideoReady(
       return;
     }
 
+    // MediaStream-backed video behaves differently across browsers:
+    // some combinations (including iframe/canvas capture sources) never fire
+    // loadeddata/canplay in a timely way even though playback can proceed.
+    // Align with the existing audio MediaStream behavior and let the caller's
+    // later playback-start flow surface real failures.
+    if (video.srcObject instanceof MediaStream) {
+      onDebugEvent?.("waitForVideoReady:stream-short-circuit", describeState("stream"));
+      resolve();
+      return;
+    }
+
     // Diagnostic: some Safari builds have been observed to never fire
     // `loadeddata`/`canplay` for certain blob-URL sources even though
     // `readyState` does advance — log periodically so a stuck "Loading

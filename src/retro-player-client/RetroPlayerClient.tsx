@@ -4,7 +4,16 @@ import { t } from "../i18n";
 import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
-import { isNesRomFile, startNesSession } from "./builtin-content/nes-session";
+import {
+  isNesRomFile,
+  startEmulatorJsNesSession,
+} from "./builtin-content/emulatorjs-session";
+import {
+  probeLibretroWasm,
+  summarizeLibretroWasm,
+} from "./builtin-content/libretro-probe";
+import { loadLibretroCore } from "./builtin-content/libretro-core";
+import { startNesSession } from "./builtin-content/nes-session";
 import {
   type PresetConfig,
   loadStartupPreset,
@@ -113,6 +122,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const toneCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
     const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
     const nesLaunchTokenRef = useRef(0);
+    const hasLoggedLibretroProbeRef = useRef(false);
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
     useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
@@ -144,7 +154,10 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const [showPlaybackRetryHint, setShowPlaybackRetryHint] = useState(false);
     const shouldShowFfmpegRetry = false;
 
-    const isUsingDefaultPreview = !previewSource.previewSrc && !previewSource.previewStream;
+    const isUsingDefaultPreview =
+      !previewSource.previewSrc &&
+      !previewSource.previewStream &&
+      !previewSource.previewCanvas;
 
     useEffect(() => {
       const idleCallback = window.setTimeout(() => {
@@ -236,12 +249,12 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
 
     // When a file/URL/stream is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
     useEffect(() => {
-      if (!previewSource.previewSrc && !previewSource.previewStream) return;
+      if (!previewSource.previewSrc && !previewSource.previewStream && !previewSource.previewCanvas) return;
       if (autoStartState !== 'blocked') return;
       toneCleanupRef.current?.();
       toneCleanupRef.current = null;
       setAutoStartState('done');
-    }, [previewSource.previewSrc, previewSource.previewStream, autoStartState]);
+    }, [previewSource.previewSrc, previewSource.previewStream, previewSource.previewCanvas, autoStartState]);
 
     const savePreset = useCallback((config: PresetConfig) => {
       currentPresetConfigRef.current = config;
@@ -490,21 +503,65 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
 
       if (files.length === 0) return;
       if (files.length === 1 && isNesRomFile(files[0])) {
+        if (!hasLoggedLibretroProbeRef.current) {
+          hasLoggedLibretroProbeRef.current = true;
+          void probeLibretroWasm("/fceumm_libretro.wasm")
+            .then((descriptor) => {
+              console.info(
+                "[libretro probe] fceumm core summary",
+                summarizeLibretroWasm(descriptor),
+              );
+              console.info("[libretro probe] raw imports", descriptor.imports);
+              console.info("[libretro probe] raw exports", descriptor.exports);
+            })
+            .catch((error) => {
+              console.warn("[libretro probe] failed", error);
+            });
+          void loadLibretroCore("/fceumm_libretro.wasm")
+            .then((core) => {
+              console.info("[libretro core] instantiated", {
+                summary: core.summary,
+                apiVersion: core.exports.retro_api_version?.() ?? null,
+                hasRetroInit: typeof core.exports.retro_init === "function",
+                hasRetroLoadGame: typeof core.exports.retro_load_game === "function",
+                hasRetroRun: typeof core.exports.retro_run === "function",
+                hasCtors: typeof core.exports.__wasm_call_ctors === "function",
+                hasMemory: !!core.exports.memory,
+              });
+              core.exports.__wasm_call_ctors?.();
+              core.exports.retro_init?.();
+              core.exports.retro_deinit?.();
+            })
+            .catch((error) => {
+              console.warn("[libretro core] instantiate failed", error);
+            });
+        }
+
         stopTone();
         stopNesSession();
         clearPlaylistSession();
         currentPlayingPathRef.current = null;
         const launchToken = nesLaunchTokenRef.current + 1;
         nesLaunchTokenRef.current = launchToken;
-        void startNesSession(files[0]).then((session) => {
+        void startEmulatorJsNesSession(files[0]).then((session) => {
           if (nesLaunchTokenRef.current !== launchToken) {
             session.stop();
             return;
           }
           nesCleanupRef.current = session.stop;
-          previewSource.previewVideoStream(session.stream, files[0].name);
+          previewSource.previewCanvasSource(session.canvas, files[0].name);
+        }).catch((emulatorJsError) => {
+          console.warn("[emulatorjs] failed to start, falling back to jsnes", emulatorJsError);
+          return startNesSession(files[0]).then((session) => {
+            if (nesLaunchTokenRef.current !== launchToken) {
+              session.stop();
+              return;
+            }
+            nesCleanupRef.current = session.stop;
+            previewSource.previewVideoStream(session.stream, files[0].name);
+          });
         }).catch((error) => {
-          console.error("[jsnes] failed to start", error);
+          console.error("[nes] failed to start", error);
         });
         return;
       }
@@ -569,6 +626,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             locale={locale}
             key={retroPlayerKey}
             src={previewSource.previewSrc ?? defaultPreviewSrc}
+            canvasSource={previewSource.previewCanvas}
             displayName={previewSource.previewLabel}
             displayIndex={playlistLength > 0 ? playlistIndex + 1 : null}
             stream={previewSource.previewStream}

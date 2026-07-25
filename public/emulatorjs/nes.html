@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>EmulatorJS NES Host</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+
+      #game {
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script>
+      const EMULATORJS_ACTIVATE_MESSAGE = "emulatorjs-host-activate";
+      const search = new URLSearchParams(window.location.search);
+      const romUrl = search.get("rom");
+      const core = search.get("core") || "nestopia";
+      const gameId = Number.parseInt(search.get("gameId") || "1", 10) || 1;
+      const dataPath =
+        search.get("dataPath") || "https://cdn.emulatorjs.org/stable/data/";
+
+      if (!romUrl) {
+        throw new Error("Missing rom query parameter");
+      }
+
+      window.EJS_player = "#game";
+      window.EJS_core = core;
+      window.EJS_gameUrl = romUrl;
+      window.EJS_gameID = gameId;
+      window.EJS_pathtodata = dataPath;
+      window.EJS_disableAutoLang = true;
+      window.EJS_language = "en-US";
+      window.EJS_lightgun = false;
+      window.__EJS_CANVAS_REF = null;
+
+      const originalCreateElement = Document.prototype.createElement;
+      Document.prototype.createElement = function (...args) {
+        const element = originalCreateElement.apply(this, args);
+        if (
+          args[0] &&
+          typeof args[0] === "string" &&
+          args[0].toLowerCase() === "canvas" &&
+          element instanceof HTMLCanvasElement
+        ) {
+          window.__EJS_CANVAS_REF = element;
+          postDebug({
+            phase: "canvas-created",
+            width: element.width,
+            height: element.height,
+          });
+        }
+        return element;
+      };
+
+      const postDebug = (payload) => {
+        window.parent.postMessage(
+          {
+            type: "emulatorjs-debug",
+            payload,
+          },
+          window.location.origin,
+        );
+      };
+
+      postDebug({
+        phase: "host-init",
+        href: window.location.href,
+        core,
+        gameId,
+      });
+
+      const findCanvasDeep = (root) => {
+        if (!root || !root.querySelectorAll) {
+          return null;
+        }
+
+        const directCanvas = root.querySelector("canvas");
+        if (directCanvas) {
+          return directCanvas;
+        }
+
+        const allElements = root.querySelectorAll("*");
+        for (const element of allElements) {
+          if (element instanceof HTMLCanvasElement) {
+            return element;
+          }
+          if (element.shadowRoot) {
+            const nestedCanvas = findCanvasDeep(element.shadowRoot);
+            if (nestedCanvas) {
+              return nestedCanvas;
+            }
+          }
+        }
+
+        return null;
+      };
+
+      const findRenderSurface = () =>
+        (window.__EJS_CANVAS_REF instanceof HTMLCanvasElement
+          ? window.__EJS_CANVAS_REF
+          : null) ||
+        findCanvasDeep(document) ||
+        findCanvasDeep(document.body) ||
+        (window.Module && window.Module.canvas instanceof HTMLCanvasElement
+          ? window.Module.canvas
+          : null);
+
+      const describeDom = () => {
+        const canvases = Array.from(document.querySelectorAll("canvas"));
+        return {
+          phase: "dom-scan",
+          canvasCount: canvases.length,
+          canvasSizes: canvases.map((canvas) => ({
+            width: canvas.width,
+            height: canvas.height,
+          })),
+          hasTrackedCanvas:
+            window.__EJS_CANVAS_REF instanceof HTMLCanvasElement,
+          hasModuleCanvas:
+            !!(window.Module && window.Module.canvas instanceof HTMLCanvasElement),
+          bodyChildTags: Array.from(document.body.children)
+            .slice(0, 12)
+            .map((element) => element.tagName),
+        };
+      };
+
+      const tryStartGame = () => {
+        const buttons = Array.from(
+          document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]'),
+        );
+
+        for (const button of buttons) {
+          const label =
+            button.textContent?.trim() ||
+            button.getAttribute("aria-label") ||
+            button.getAttribute("value") ||
+            "";
+          if (!/start\s*game|touch\s*&\s*play|play/i.test(label)) {
+            continue;
+          }
+
+          postDebug({
+            phase: "auto-start-click",
+            label,
+          });
+          button.click();
+          return true;
+        }
+
+        return false;
+      };
+
+      const activateHost = () => {
+        try {
+          window.focus();
+        } catch {}
+
+        const clicked = tryStartGame();
+        const canvas = findRenderSurface();
+        if (canvas) {
+          try {
+            canvas.focus?.();
+          } catch {}
+        }
+
+        postDebug({
+          phase: "host-activate",
+          clicked,
+          hasCanvas: !!canvas,
+        });
+
+        return clicked || !!canvas;
+      };
+
+      window.addEventListener("message", (event) => {
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+        if (event.data?.type !== EMULATORJS_ACTIVATE_MESSAGE) {
+          return;
+        }
+        activateHost();
+      });
+
+      const notifyCanvasReady = () => {
+        const canvas = findRenderSurface();
+        if (!canvas) {
+          postDebug(describeDom());
+          return false;
+        }
+        window.parent.postMessage(
+          {
+            type: "emulatorjs-canvas-ready",
+            width: canvas.width,
+            height: canvas.height,
+          },
+          window.location.origin,
+        );
+        console.info("[emulatorjs-host] canvas ready");
+        return true;
+      };
+
+      const observer = new MutationObserver(() => {
+        if (notifyCanvasReady()) {
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+
+      const loader = document.createElement("script");
+      loader.src = `${dataPath.replace(/\/?$/, "/")}loader.js`;
+      loader.onload = () => {
+        postDebug({
+          phase: "loader-onload",
+          ...describeDom(),
+        });
+        const pollId = window.setInterval(() => {
+          if (notifyCanvasReady()) {
+            window.clearInterval(pollId);
+          }
+        }, 500);
+
+        window.setTimeout(() => {
+          if (!notifyCanvasReady()) {
+            window.setTimeout(() => {
+              notifyCanvasReady();
+            }, 500);
+          }
+        }, 300);
+      };
+      document.body.appendChild(loader);
+    </script>
+  </body>
+</html>

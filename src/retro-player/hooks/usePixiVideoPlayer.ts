@@ -713,6 +713,7 @@ export function usePixiVideoPlayer(
     playVideoWithAudio,
     restartCurrentMedia,
     previewFile,
+    previewCanvas,
     previewStream,
     previewUrl,
     startDisplayCapture,
@@ -1721,6 +1722,7 @@ export function usePixiVideoPlayer(
       previewKind === "image" ||
       previewKind === "audio",
     previewFile,
+    previewCanvas,
     previewStream,
     previewUrl,
     startDisplayCapture,

@@ -31,7 +31,7 @@ type UseRetroPreviewMediaParams = {
   appRef: CurrentRef<CanvasStageApp | null>;
   spriteRef: CurrentRef<null>;
   textureRef: CurrentRef<null>;
-  previewElementRef: CurrentRef<HTMLImageElement | HTMLMediaElement | null>;
+  previewElementRef: CurrentRef<HTMLImageElement | HTMLCanvasElement | HTMLMediaElement | null>;
   filterRef: CurrentRef<Record<string, never> | null>;
   mediaRef: CurrentRef<HTMLMediaElement | null>;
   objectUrlRef: CurrentRef<string | null>;
@@ -84,7 +84,7 @@ type UseRetroPreviewMediaParams = {
   connectMediaStream: (stream: MediaStream, mediaTag?: string) => Promise<void>;
   connectMediaAudio: (media: HTMLMediaElement) => Promise<void>;
   rebuildAudioGraphForCurrentMedia: (reason: string) => Promise<AudioContext | null>;
-  fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) =>
+  fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) =>
     | { width: number; height: number; x: number; y: number }
     | undefined;
   refreshLayout: () => void;
@@ -1291,7 +1291,7 @@ export function useRetroPreviewMedia({
   };
 
   const attachVisualPreview = async (
-    source: HTMLVideoElement | HTMLImageElement,
+    source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
     kind: "video" | "image" | "capture",
     skipLayoutRefresh = false,
   ) => {
@@ -1302,7 +1302,9 @@ export function useRetroPreviewMedia({
     setSourceDimensions(
       source instanceof HTMLVideoElement
         ? { width: source.videoWidth, height: source.videoHeight }
-        : { width: source.naturalWidth, height: source.naturalHeight },
+        : source instanceof HTMLImageElement
+          ? { width: source.naturalWidth, height: source.naturalHeight }
+          : { width: source.width, height: source.height },
     );
     // skipLayoutRefresh=true (canReuseImagePreview): canvas size/CSS unchanged,
     // so skip the full refreshLayout() recalculation and just draw once.
@@ -1623,6 +1625,35 @@ export function useRetroPreviewMedia({
     }
   };
 
+  const previewCanvas = async (
+    canvas: HTMLCanvasElement,
+    name = "Canvas Preview",
+  ) => {
+    try {
+      powerOn();
+      cleanupPreview();
+      resetFilterInstance();
+      _setPreviewError("");
+      setPreviewName(name);
+      beginLoading("Loading canvas preview...");
+      await ensureRendererReady();
+      await attachVisualPreview(canvas, "image");
+      await ensureVisualStartupReady("image");
+      finishLoading();
+      setNeedsUserPlay(false);
+      setIsBuffering(false);
+      isPlayingRef.current = false;
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      syncVideoState();
+    } catch (error) {
+      cleanupPreview();
+      await resetAudioGraphAfterPreviewFailure("previewCanvas:error", error);
+      _setPreviewError(resolvePreviewErrorMessage(error, locale, "video-preview-failed"));
+    }
+  };
+
   const previewUrl = async (
     url: string,
     kind: "video" | "image" | "audio" = "video",
@@ -1825,6 +1856,7 @@ export function useRetroPreviewMedia({
     playVideoWithAudio,
     restartCurrentMedia,
     previewFile,
+    previewCanvas,
     previewStream,
     previewUrl,
     startDisplayCapture,

@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Libretro FCEUmm Test</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      body {
+        margin: 0;
+        background: #10131a;
+        color: #e6edf3;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 24px;
+      }
+
+      p {
+        color: #9fb0c3;
+      }
+
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 16px 0 20px;
+      }
+
+      button {
+        appearance: none;
+        border: 1px solid #3d5068;
+        background: #1c2532;
+        color: #e6edf3;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #243145;
+      }
+
+      #status {
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #151c26;
+        border: 1px solid #293445;
+        white-space: pre-wrap;
+      }
+
+      #log {
+        min-height: 360px;
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: 12px;
+        background: #0b0f14;
+        border: 1px solid #293445;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Libretro FCEUmm Fixed Test</h1>
+      <p>
+        Fixed assets:
+        <code>/fceumm_libretro.wasm</code>
+        and
+        <code>/Matendouji.nes</code>
+      </p>
+      <p>
+        This test currently requires
+        <code>WebAssembly.Function</code>
+        for wiring libretro callbacks from JavaScript.
+      </p>
+
+      <div class="row">
+        <button id="probeButton">Probe Core</button>
+        <button id="instantiateButton">Instantiate Core</button>
+        <button id="wireButton">Wire Callbacks</button>
+        <button id="initButton">Call retro_init()</button>
+        <button id="loadRomButton">Fetch ROM</button>
+        <button id="clearButton">Clear Log</button>
+      </div>
+
+      <div id="status">Idle</div>
+      <pre id="log"></pre>
+    </main>
+
+    <script type="module">
+      const CORE_PATH = "/fceumm_libretro.wasm";
+      const ROM_PATH = "/Matendouji.nes";
+      const DEFAULT_MEMORY_PAGES = 1024;
+      const DEFAULT_MAX_MEMORY_PAGES = 2048;
+      const DEFAULT_TABLE_SIZE = 4096;
+
+      const statusEl = document.getElementById("status");
+      const logEl = document.getElementById("log");
+      const probeButton = document.getElementById("probeButton");
+      const instantiateButton = document.getElementById("instantiateButton");
+      const wireButton = document.getElementById("wireButton");
+      const initButton = document.getElementById("initButton");
+      const loadRomButton = document.getElementById("loadRomButton");
+      const clearButton = document.getElementById("clearButton");
+
+      let currentDescriptor = null;
+      let currentInstance = null;
+      let currentTable = null;
+      let currentMemory = null;
+      let callbackIndices = null;
+
+      const setStatus = (value) => {
+        statusEl.textContent = value;
+      };
+
+      const appendLog = (label, value = "") => {
+        const line = value
+          ? `[${new Date().toLocaleTimeString()}] ${label} ${typeof value === "string" ? value : JSON.stringify(value, null, 2)}`
+          : `[${new Date().toLocaleTimeString()}] ${label}`;
+        logEl.textContent += `${line}\n`;
+        logEl.scrollTop = logEl.scrollHeight;
+      };
+
+      const hasWebAssemblyFunctionSupport =
+        typeof WebAssembly.Function === "function";
+
+      const createStubImport = (moduleName, importName) => (...args) => {
+        appendLog("stub import", { moduleName, importName, args });
+        return 0;
+      };
+
+      const stackPointerInitialValue = (memory) => {
+        const stackGuardBytes = 64 * 1024;
+        return Math.max(1024, memory.buffer.byteLength - stackGuardBytes);
+      };
+
+      const createGlobal = (name, memory) =>
+        new WebAssembly.Global(
+          {
+            value: "i32",
+            mutable: !(name === "__memory_base" || name === "__table_base"),
+          },
+          name === "__stack_pointer" ? stackPointerInitialValue(memory) : 0,
+        );
+
+      const createImportObject = (descriptor) => {
+        const root = {};
+        const memory = new WebAssembly.Memory({
+          initial: DEFAULT_MEMORY_PAGES,
+          maximum: DEFAULT_MAX_MEMORY_PAGES,
+        });
+        const table = new WebAssembly.Table({
+          initial: DEFAULT_TABLE_SIZE,
+          element: "anyfunc",
+        });
+
+        for (const entry of descriptor.imports) {
+          const bucket = root[entry.module] ?? {};
+          root[entry.module] = bucket;
+
+          if (entry.kind === "function") {
+            bucket[entry.name] = createStubImport(entry.module, entry.name);
+            continue;
+          }
+
+          if (entry.kind === "global") {
+            bucket[entry.name] = createGlobal(entry.name, memory);
+            continue;
+          }
+
+          if (entry.kind === "memory") {
+            bucket[entry.name] = memory;
+            continue;
+          }
+
+          if (entry.kind === "table") {
+            bucket[entry.name] = table;
+            continue;
+          }
+
+          appendLog("unsupported import kind", entry);
+        }
+
+        return {
+          imports: root,
+          memory,
+          table,
+        };
+      };
+
+      const ensureWebAssemblyFunction = (signature, fn) => {
+        if (typeof WebAssembly.Function === "function") {
+          return new WebAssembly.Function(signature, fn);
+        }
+        throw new Error(
+          "WebAssembly.Function is not available in this browser. " +
+          "This libretro callback wiring path currently needs a browser with " +
+          "WebAssembly.Function support, such as a recent Chromium build.",
+        );
+      };
+
+      const registerCallback = (signature, fn) => {
+        if (!currentTable) {
+          throw new Error("WASM table is not ready");
+        }
+        const index = currentTable.length;
+        currentTable.grow(1);
+        currentTable.set(index, ensureWebAssemblyFunction(signature, fn));
+        return index;
+      };
+
+      const wireCallbacks = async () => {
+        setStatus("Wiring callbacks...");
+        if (!currentInstance) {
+          await instantiateCore();
+        }
+
+        const exports = currentInstance.exports;
+        if (typeof exports.retro_set_environment !== "function") {
+          throw new Error("retro_set_environment export is missing");
+        }
+        if (typeof exports.retro_set_video_refresh !== "function") {
+          throw new Error("retro_set_video_refresh export is missing");
+        }
+        if (typeof exports.retro_set_audio_sample !== "function") {
+          throw new Error("retro_set_audio_sample export is missing");
+        }
+        if (typeof exports.retro_set_audio_sample_batch !== "function") {
+          throw new Error("retro_set_audio_sample_batch export is missing");
+        }
+        if (typeof exports.retro_set_input_poll !== "function") {
+          throw new Error("retro_set_input_poll export is missing");
+        }
+        if (typeof exports.retro_set_input_state !== "function") {
+          throw new Error("retro_set_input_state export is missing");
+        }
+
+        const environmentIndex = registerCallback(
+          { parameters: ["i32", "i32"], results: ["i32"] },
+          (cmd, data) => {
+            appendLog("environment callback", { cmd, data });
+            return 0;
+          },
+        );
+
+        const videoIndex = registerCallback(
+          { parameters: ["i32", "i32", "i32", "i32"], results: [] },
+          (data, width, height, pitch) => {
+            appendLog("video callback", { data, width, height, pitch });
+          },
+        );
+
+        const audioSampleIndex = registerCallback(
+          { parameters: ["i32", "i32"], results: [] },
+          (left, right) => {
+            appendLog("audio sample callback", { left, right });
+          },
+        );
+
+        const audioBatchIndex = registerCallback(
+          { parameters: ["i32", "i32"], results: ["i32"] },
+          (data, frames) => {
+            appendLog("audio batch callback", { data, frames });
+            return frames;
+          },
+        );
+
+        const inputPollIndex = registerCallback(
+          { parameters: [], results: [] },
+          () => {
+            appendLog("input poll callback");
+          },
+        );
+
+        const inputStateIndex = registerCallback(
+          { parameters: ["i32", "i32", "i32", "i32"], results: ["i16"] },
+          (port, device, index, id) => {
+            appendLog("input state callback", { port, device, index, id });
+            return 0;
+          },
+        );
+
+        exports.retro_set_environment(environmentIndex);
+        exports.retro_set_video_refresh(videoIndex);
+        exports.retro_set_audio_sample(audioSampleIndex);
+        exports.retro_set_audio_sample_batch(audioBatchIndex);
+        exports.retro_set_input_poll(inputPollIndex);
+        exports.retro_set_input_state(inputStateIndex);
+
+        callbackIndices = {
+          environmentIndex,
+          videoIndex,
+          audioSampleIndex,
+          audioBatchIndex,
+          inputPollIndex,
+          inputStateIndex,
+        };
+
+        appendLog("callbacks wired", callbackIndices);
+        setStatus("Callbacks wired");
+      };
+
+      const fetchBytes = async (path) => {
+        const response = await fetch(path);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${path}: ${response.status}`);
+        }
+        return response.arrayBuffer();
+      };
+
+      const probeCore = async () => {
+        setStatus("Probing core...");
+        const bytes = await fetchBytes(CORE_PATH);
+        const module = await WebAssembly.compile(bytes);
+        currentDescriptor = {
+          imports: WebAssembly.Module.imports(module),
+          exports: WebAssembly.Module.exports(module),
+        };
+        appendLog("core summary", {
+          importCount: currentDescriptor.imports.length,
+          exportCount: currentDescriptor.exports.length,
+          hasRetroInit: currentDescriptor.exports.some((entry) => entry.name === "retro_init"),
+          hasRetroRun: currentDescriptor.exports.some((entry) => entry.name === "retro_run"),
+          hasRetroLoadGame: currentDescriptor.exports.some((entry) => entry.name === "retro_load_game"),
+        });
+        setStatus("Probe complete");
+      };
+
+      const instantiateCore = async () => {
+        setStatus("Instantiating core...");
+        if (!currentDescriptor) {
+          await probeCore();
+        }
+
+        const bytes = await fetchBytes(CORE_PATH);
+        const importState = createImportObject(currentDescriptor);
+        currentMemory = importState.memory;
+        currentTable = importState.table;
+        const { instance } = await WebAssembly.instantiate(bytes, importState.imports);
+        currentInstance = instance;
+        callbackIndices = null;
+
+        appendLog("instantiate ok", {
+          apiVersion:
+            typeof instance.exports.retro_api_version === "function"
+              ? instance.exports.retro_api_version()
+              : null,
+          hasCtors: typeof instance.exports.__wasm_call_ctors === "function",
+          exportKeys: Object.keys(instance.exports).slice(0, 24),
+        });
+        setStatus("Instantiate complete");
+      };
+
+      const callRetroInit = async () => {
+        setStatus("Calling retro_init()...");
+        if (!currentInstance) {
+          await instantiateCore();
+        }
+        if (!callbackIndices) {
+          await wireCallbacks();
+        }
+
+        if (typeof currentInstance.exports.retro_init !== "function") {
+          throw new Error("retro_init export is missing");
+        }
+
+        currentInstance.exports.__wasm_call_ctors?.();
+        currentInstance.exports.retro_init();
+        appendLog("retro_init ok");
+        setStatus("retro_init finished");
+      };
+
+      const fetchRom = async () => {
+        setStatus("Fetching ROM...");
+        const bytes = await fetchBytes(ROM_PATH);
+        appendLog("rom fetched", {
+          path: ROM_PATH,
+          byteLength: bytes.byteLength,
+        });
+        setStatus("ROM fetched");
+      };
+
+      probeButton.addEventListener("click", () => {
+        void probeCore().catch((error) => {
+          appendLog("probe failed", `${error}`);
+          setStatus("Probe failed");
+        });
+      });
+
+      instantiateButton.addEventListener("click", () => {
+        void instantiateCore().catch((error) => {
+          appendLog("instantiate failed", `${error}`);
+          setStatus("Instantiate failed");
+        });
+      });
+
+      wireButton.addEventListener("click", () => {
+        void wireCallbacks().catch((error) => {
+          appendLog("wire callbacks failed", `${error}`);
+          setStatus("Wire callbacks failed");
+        });
+      });
+
+      initButton.addEventListener("click", () => {
+        void callRetroInit().catch((error) => {
+          appendLog("retro_init failed", `${error}`);
+          setStatus("retro_init failed");
+        });
+      });
+
+      loadRomButton.addEventListener("click", () => {
+        void fetchRom().catch((error) => {
+          appendLog("rom fetch failed", `${error}`);
+          setStatus("ROM fetch failed");
+        });
+      });
+
+      clearButton.addEventListener("click", () => {
+        logEl.textContent = "";
+        setStatus("Idle");
+      });
+
+      appendLog("browser capability", {
+        userAgent: navigator.userAgent,
+        hasWebAssemblyFunctionSupport,
+      });
+      if (!hasWebAssemblyFunctionSupport) {
+        setStatus("Browser lacks WebAssembly.Function");
+      }
+    </script>
+  </body>
+</html>

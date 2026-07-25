@@ -97,6 +97,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     () => getPreferredAudioInputDeviceId(),
   );
   const [previewSrc, setPreviewSrc] = useState<string>();
+  const [previewCanvas, setPreviewCanvas] = useState<HTMLCanvasElement | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [previewStreamSource, setPreviewStreamSource] = useState<PreviewStreamSource | null>(null);
   const [previewLabel, setPreviewLabel] = useState<string>();
@@ -109,6 +110,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     setPreviewLabel(undefined);
     setPreviewStreamSource(null);
     setCaptureError("");
+    setPreviewCanvas(null);
     setPreviewStream((current) => {
       current?.getTracks().forEach((track) => track.stop());
       return null;
@@ -321,6 +323,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
   const previewAudioStream = useCallback((stream: MediaStream, label: string) => {
     clearPreviewSrc();
     setCaptureError("");
+    setPreviewCanvas(null);
     setPreviewLabel(label);
     setPreviewKind("audio");
     setPreviewStreamSource("audio-preview");
@@ -333,6 +336,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
   const previewVideoStream = useCallback((stream: MediaStream, label: string) => {
     clearPreviewSrc();
     setCaptureError("");
+    setPreviewCanvas(null);
     setPreviewLabel(label);
     setPreviewKind("video");
     setPreviewStreamSource("video-preview");
@@ -342,8 +346,18 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     });
   }, [clearPreviewSrc]);
 
+  const previewCanvasSource = useCallback((canvas: HTMLCanvasElement, label: string) => {
+    stopPreviewStream();
+    clearPreviewSrc();
+    setCaptureError("");
+    setPreviewLabel(label);
+    setPreviewCanvas(canvas);
+    setPreviewKind("image");
+  }, [clearPreviewSrc, stopPreviewStream]);
+
   return {
     previewSrc,
+    previewCanvas,
     previewStream,
     previewStreamSource,
     previewLabel,
@@ -355,6 +369,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     previewPath,
     previewAudioStream,
     previewVideoStream,
+    previewCanvasSource,
     refreshAudioInputDevices,
     setPreferredAudioInputDeviceId: updatePreferredAudioInputDeviceId,
     startDisplayCapture,

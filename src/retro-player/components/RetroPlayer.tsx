@@ -54,6 +54,7 @@ const resolveRenderResolutionPreset = (
 type RetroPlayerProps = {
   locale?: RetroPlayerLocale;
   src?: string;
+  canvasSource?: HTMLCanvasElement | null;
   displayName?: string;
   displayIndex?: number | null;
   stream?: MediaStream | null;
@@ -84,6 +85,7 @@ type RetroPlayerProps = {
 export function RetroPlayer({
   locale = "en",
   src,
+  canvasSource,
   displayName,
   displayIndex,
   stream,
@@ -547,7 +549,9 @@ export function RetroPlayer({
     const dims = player.sourceDimensions;
     if (!dims?.width || !dims?.height) return;
 
-    const sourceKey = `${src ?? "stream"}:${stream?.id ?? ""}:${kind}:${dims.width}x${dims.height}`;
+    const sourceKey = canvasSource
+      ? `canvas:${kind}:${dims.width}x${dims.height}`
+      : `${src ?? "stream"}:${stream?.id ?? ""}:${kind}:${dims.width}x${dims.height}`;
     if (autoTargetSizeAppliedKeyRef.current === sourceKey) return;
     autoTargetSizeAppliedKeyRef.current = sourceKey;
 
@@ -568,6 +572,7 @@ export function RetroPlayer({
     kind,
     player.sourceDimensions,
     src,
+    canvasSource,
     stream?.id,
   ]);
 
@@ -587,6 +592,21 @@ export function RetroPlayer({
   // Load source: src URL or MediaStream.
   // lastPreviewRequestRef prevents duplicate loads on re-render.
   React.useEffect(() => {
+    if (canvasSource) {
+      const canvasKey = `canvas:${kind}:${canvasSource.width}x${canvasSource.height}:${displayName ?? ""}`;
+      if (lastPreviewRequestRef.current === canvasKey) return;
+      lastPreviewRequestRef.current = canvasKey;
+
+      void (async () => {
+        try {
+          await player.previewCanvas(canvasSource, displayName);
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+      })();
+      return;
+    }
+
     if (stream) {
       const streamKey = `stream:${stream.id}:${kind}:${streamName ?? ""}`;
       if (lastPreviewRequestRef.current === streamKey) return;
@@ -622,7 +642,7 @@ export function RetroPlayer({
           onError?.(error instanceof Error ? error : new Error(String(error)));
         }
       })();
-  }, [displayName, src, stream, streamName, kind, onError, player]);
+  }, [canvasSource, displayName, src, stream, streamName, kind, onError, player]);
 
   // Layout refresh when fit-mode changes (pin/maximize handled in RetroPreviewView).
   React.useEffect(() => {

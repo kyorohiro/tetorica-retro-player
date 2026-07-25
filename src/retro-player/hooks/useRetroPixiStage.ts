@@ -137,7 +137,7 @@ export function useRetroPixiStage({
   const appRef = useRef<CanvasStageApp | null>(null);
   const spriteRef = useRef<null>(null);
   const textureRef = useRef<null>(null);
-  const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
+  const previewElementRef = useRef<HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | null>(null);
   const filterRef = useRef<Record<string, never> | null>(null);
   const initPromiseRef = useRef<Promise<void> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -322,7 +322,7 @@ export function useRetroPixiStage({
   const fitSprite = useCallback((
     app: CanvasStageApp | null,
     _sprite: null,
-    source: HTMLVideoElement | HTMLImageElement,
+    source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
   ) => {
     if (!app) return;
 

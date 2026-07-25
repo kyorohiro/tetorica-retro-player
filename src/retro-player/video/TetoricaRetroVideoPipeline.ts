@@ -339,7 +339,15 @@ const isHtmlImageElement = (value: unknown): value is HTMLImageElement =>
   typeof HTMLImageElement !== "undefined" && value instanceof HTMLImageElement;
 
 const isHtmlCanvasElement = (value: unknown): value is HTMLCanvasElement =>
-  typeof HTMLCanvasElement !== "undefined" && value instanceof HTMLCanvasElement;
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      ("tagName" in value || "nodeName" in value) &&
+      (((value as { tagName?: string }).tagName ?? (value as { nodeName?: string }).nodeName) === "CANVAS") &&
+      "width" in value &&
+      "height" in value &&
+      "getContext" in value,
+  );
 
 const isRawRetroVideoFrame = (value: unknown): value is RawRetroVideoFrame =>
   Boolean(
