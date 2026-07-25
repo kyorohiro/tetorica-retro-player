@@ -1448,12 +1448,12 @@ export class TetoricaRetroVideoPipeline {
         gl.viewport(0, 0, beamSourceWidth, beamSourceHeight);
         gl.useProgram(this.beamDownscaleProgram);
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        this.syncTextureSamplingFilter(gl.LINEAR);
+        gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+        this.syncFboTextureSamplingFilter(gl.LINEAR);
         gl.uniform2f(
           this.beamDownscaleLocs.uSourceSize,
-          Math.max(sourceSize.width, 1),
-          Math.max(sourceSize.height, 1),
+          Math.max(w, 1),
+          Math.max(h, 1),
         );
         gl.uniform2f(
           this.beamDownscaleLocs.uTargetSize,
