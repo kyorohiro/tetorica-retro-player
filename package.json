@@ -29,7 +29,7 @@
     "@zip.js/zip.js": "^2.8.26",
     "heic2any": "^0.0.4",
     "hls.js": "^1.6.16",
-    "jsnes": "^2.1.0",
+    "jsnes": "github:kyorohiro/jsnes#tetorica",
     "lucide-react": "^1.17.0",
     "node-unrar-js": "^2.0.2",
     "pdfjs-dist": "^6.0.227",

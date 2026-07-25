@@ -112,6 +112,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const currentPresetConfigRef = useRef<PresetConfig>(startupPreset);
     const toneCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
     const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
+    const nesResumeAudioRef = useRef<(() => Promise<boolean>) | null>(null);
     const nesLaunchTokenRef = useRef(0);
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
@@ -193,6 +194,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       nesLaunchTokenRef.current += 1;
       nesCleanupRef.current?.();
       nesCleanupRef.current = null;
+      nesResumeAudioRef.current = null;
     }, []);
 
     const stopBuiltinPlayback = useCallback(() => {
@@ -238,6 +240,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     useEffect(() => {
       if (!previewSource.previewSrc && !previewSource.previewStream) return;
       if (autoStartState !== 'blocked') return;
+      if (nesResumeAudioRef.current) return;
       toneCleanupRef.current?.();
       toneCleanupRef.current = null;
       setAutoStartState('done');
@@ -290,6 +293,12 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     // Restart the currently saved preset. Called from RetroPlayer's onRetry
     // (play button pressed while media is in error/ended state).
     const handleRetry = useCallback(async () => {
+      if (nesResumeAudioRef.current) {
+        const resumed = await nesResumeAudioRef.current();
+        setAutoStartState(resumed ? 'done' : 'blocked');
+        return;
+      }
+
       setAutoStartState('done');
       const preset = currentPresetConfigRef.current;
       stopTone();
@@ -502,7 +511,9 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             return;
           }
           nesCleanupRef.current = session.stop;
+          nesResumeAudioRef.current = session.resumeAudio;
           previewSource.previewVideoStream(session.stream, files[0].name);
+          setAutoStartState(session.needsUserGesture ? 'blocked' : 'done');
         }).catch((error) => {
           console.error("[jsnes] failed to start", error);
         });

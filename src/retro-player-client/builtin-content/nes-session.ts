@@ -1,17 +1,38 @@
 import { Controller, NES } from "jsnes";
+import type { ButtonKey } from "jsnes";
 
 const NES_WIDTH = 256;
 const NES_HEIGHT = 240;
 const NES_FRAME_MS = 1000 / 60;
 const AUDIO_BUFFER_SIZE = 2048;
 const MAX_AUDIO_QUEUE_LENGTH = 48000;
+const AUDIO_RESUME_TIMEOUT_MS = 1200;
 
 type NesSession = {
   stream: MediaStream;
+  needsUserGesture: boolean;
+  resumeAudio: () => Promise<boolean>;
   stop: () => void;
 };
 
-const KEY_TO_BUTTON = new Map<string, number>([
+type AudioContextCtor = new (contextOptions?: AudioContextOptions) => AudioContext;
+
+const getAudioContextCtor = (): AudioContextCtor | null => {
+  const windowWithWebkit = window as Window & {
+    webkitAudioContext?: AudioContextCtor;
+  };
+  return window.AudioContext ?? windowWithWebkit.webkitAudioContext ?? null;
+};
+
+const isSafariBrowser = () => {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  const userAgent = navigator.userAgent || "";
+  return /Safari/i.test(userAgent) && !/Chrome|Chromium|Android/i.test(userAgent);
+};
+
+const KEY_TO_BUTTON = new Map<string, ButtonKey>([
   ["x", Controller.BUTTON_A],
   ["z", Controller.BUTTON_B],
   ["enter", Controller.BUTTON_START],
@@ -46,16 +67,44 @@ export async function startNesSession(file: File): Promise<NesSession> {
   const frameBuffer32 = new Uint32Array(frameBuffer);
   frameBuffer32.fill(0xff000000);
 
-  const AudioContextCtor = window.AudioContext;
+  const useLocalAudioMonitor = isSafariBrowser();
+  const AudioContextCtor = getAudioContextCtor();
   const audioContext = AudioContextCtor ? new AudioContextCtor({ sampleRate: 48000 }) : null;
   const audioDestination = audioContext?.createMediaStreamDestination() ?? null;
   const audioProcessor = audioContext?.createScriptProcessor(AUDIO_BUFFER_SIZE, 0, 2) ?? null;
   const audioMuteGain = audioContext?.createGain() ?? null;
   const leftQueue: number[] = [];
   const rightQueue: number[] = [];
+  let needsUserGesture = false;
+  const isAudioRunning = () => audioContext?.state === "running";
+
+  const resumeAudio = async () => {
+    if (!audioContext) {
+      return false;
+    }
+
+    if (isAudioRunning()) {
+      needsUserGesture = false;
+      return true;
+    }
+
+    try {
+      const resumed = await Promise.race([
+        audioContext.resume().then(() => true).catch(() => false),
+        new Promise<boolean>((resolve) => {
+          window.setTimeout(() => resolve(false), AUDIO_RESUME_TIMEOUT_MS);
+        }),
+      ]);
+      needsUserGesture = !isAudioRunning();
+      return resumed && isAudioRunning();
+    } catch {
+      needsUserGesture = !isAudioRunning();
+      return false;
+    }
+  };
 
   if (audioProcessor && audioDestination && audioMuteGain && audioContext) {
-    audioMuteGain.gain.value = 0;
+    audioMuteGain.gain.value = useLocalAudioMonitor ? 1 : 0;
     audioProcessor.onaudioprocess = (event) => {
       const left = event.outputBuffer.getChannelData(0);
       const right = event.outputBuffer.getChannelData(1);
@@ -67,13 +116,13 @@ export async function startNesSession(file: File): Promise<NesSession> {
     audioProcessor.connect(audioDestination);
     audioProcessor.connect(audioMuteGain);
     audioMuteGain.connect(audioContext.destination);
-    void audioContext.resume().catch(() => {});
+    needsUserGesture = !(await resumeAudio());
   }
 
   const videoStream = makeSilentStream(canvas);
   const stream = new MediaStream([
     ...videoStream.getVideoTracks(),
-    ...(audioDestination?.stream.getAudioTracks() ?? []),
+    ...(!useLocalAudioMonitor ? (audioDestination?.stream.getAudioTracks() ?? []) : []),
   ]);
 
   const nes = new NES({
@@ -149,6 +198,8 @@ export async function startNesSession(file: File): Promise<NesSession> {
 
   return {
     stream,
+    needsUserGesture,
+    resumeAudio,
     stop,
   };
 }
