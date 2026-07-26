@@ -1,5 +1,6 @@
 import { Controller, NES } from "jsnes";
 import type { ButtonKey } from "jsnes";
+import type { NesControlButton } from "../../retro-player/types/gameControls";
 
 const NES_WIDTH = 256;
 const NES_HEIGHT = 240;
@@ -8,10 +9,13 @@ const AUDIO_BUFFER_SIZE = 2048;
 const MAX_AUDIO_QUEUE_LENGTH = 48000;
 const AUDIO_RESUME_TIMEOUT_MS = 1200;
 
-type NesSession = {
+export type NesSession = {
   stream: MediaStream;
   needsUserGesture: boolean;
   resumeAudio: () => Promise<boolean>;
+  pressButton: (button: NesControlButton) => void;
+  releaseButton: (button: NesControlButton) => void;
+  reset: () => void;
   stop: () => void;
 };
 
@@ -44,6 +48,17 @@ const KEY_TO_BUTTON = new Map<string, ButtonKey>([
   ["s", Controller.BUTTON_TURBO_A],
   ["a", Controller.BUTTON_TURBO_B],
 ]);
+
+const NES_BUTTON_TO_BUTTON_KEY: Record<NesControlButton, ButtonKey> = {
+  up: Controller.BUTTON_UP,
+  down: Controller.BUTTON_DOWN,
+  left: Controller.BUTTON_LEFT,
+  right: Controller.BUTTON_RIGHT,
+  a: Controller.BUTTON_A,
+  b: Controller.BUTTON_B,
+  start: Controller.BUTTON_START,
+  select: Controller.BUTTON_SELECT,
+};
 
 const makeSilentStream = (canvas: HTMLCanvasElement) => canvas.captureStream(60);
 
@@ -177,6 +192,28 @@ export async function startNesSession(file: File): Promise<NesSession> {
     nes.buttonUp(1, button);
   };
 
+  const pressButton = (button: NesControlButton) => {
+    nes.buttonDown(1, NES_BUTTON_TO_BUTTON_KEY[button]);
+  };
+
+  const releaseButton = (button: NesControlButton) => {
+    nes.buttonUp(1, NES_BUTTON_TO_BUTTON_KEY[button]);
+  };
+
+  const reset = () => {
+    leftQueue.length = 0;
+    rightQueue.length = 0;
+    releaseButton("up");
+    releaseButton("down");
+    releaseButton("left");
+    releaseButton("right");
+    releaseButton("a");
+    releaseButton("b");
+    releaseButton("start");
+    releaseButton("select");
+    nes.reloadROM();
+  };
+
   const stop = () => {
     if (stopped) return;
     stopped = true;
@@ -200,6 +237,9 @@ export async function startNesSession(file: File): Promise<NesSession> {
     stream,
     needsUserGesture,
     resumeAudio,
+    pressButton,
+    releaseButton,
+    reset,
     stop,
   };
 }

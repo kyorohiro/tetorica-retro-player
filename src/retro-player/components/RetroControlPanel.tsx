@@ -4,6 +4,7 @@ import type { RetroFilterState } from "../hooks/useRetroFilterState";
 import type { PresetFileData } from "../hooks/presetFile";
 import type { RetroPreviewStatus } from "../hooks/usePixiVideoPlayer";
 import type { RetroPresetKey } from "../retro/config";
+import type { RetroGameControls } from "../types/gameControls";
 import type { RetroPlayerLocale } from "../types";
 
 const VideoControls = React.lazy(() =>
@@ -102,6 +103,7 @@ export type RetroControlPanelProps = {
   player: RetroControlPlayerSlice;
   filterState: RetroFilterState;
   controlPanelMode: "playback" | "audio-settings" | "video-settings";
+  gameControls?: RetroGameControls | null;
   onControlPanelModeChange: (
     mode: "playback" | "audio-settings" | "video-settings",
   ) => void;
@@ -158,6 +160,7 @@ export function RetroControlPanel({
   player,
   filterState,
   controlPanelMode,
+  gameControls,
   onControlPanelModeChange,
   onApplyPreset,
   onSetTargetWidth,
@@ -209,9 +212,10 @@ export function RetroControlPanel({
         <p className={statusBanner.className}>{statusBanner.message}</p>
       )}
       {controlPanelMode !== "video-settings" && (
-          <React.Suspense fallback={controlsFallback}>
+        <React.Suspense fallback={controlsFallback}>
             <VideoControls
               locale={locale}
+              gameControls={gameControls}
               hasPlayback={hasPlaybackControls}
               currentTime={player.currentTime}
               duration={player.duration}

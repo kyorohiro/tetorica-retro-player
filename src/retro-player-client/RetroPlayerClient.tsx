@@ -18,6 +18,7 @@ import {
 } from "../retro-player/hooks/usePreviewSourceState";
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
 import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
+import type { RetroGameControls } from "../retro-player/types/gameControls";
 import type { RetroPlayerLocale } from "../retro-player/types";
 import { isHeic, isImage } from "../mdrop-web/utils";
 import { primeImageElementCache } from "../retro-player/media/RetroMediaSource";
@@ -114,6 +115,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
     const nesResumeAudioRef = useRef<(() => Promise<boolean>) | null>(null);
     const nesLaunchTokenRef = useRef(0);
+    const [nesGameControls, setNesGameControls] = useState<RetroGameControls | null>(null);
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
     useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
@@ -195,6 +197,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       nesCleanupRef.current?.();
       nesCleanupRef.current = null;
       nesResumeAudioRef.current = null;
+      setNesGameControls(null);
     }, []);
 
     const stopBuiltinPlayback = useCallback(() => {
@@ -512,6 +515,12 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
           }
           nesCleanupRef.current = session.stop;
           nesResumeAudioRef.current = session.resumeAudio;
+          setNesGameControls({
+            kind: "nes",
+            pressButton: session.pressButton,
+            releaseButton: session.releaseButton,
+            reset: session.reset,
+          });
           previewSource.previewVideoStream(session.stream, files[0].name);
           setAutoStartState(session.needsUserGesture ? 'blocked' : 'done');
         }).catch((error) => {
@@ -622,6 +631,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             loopMode={loopMode}
             onCycleLoopMode={onCycleLoopMode}
             onLoopLongPress={playlistLength > 1 ? handleLoopLongPress : undefined}
+            gameControls={nesGameControls}
           />
         </React.Suspense>
         {isPlaylistOpen && playlistLength > 1 && (

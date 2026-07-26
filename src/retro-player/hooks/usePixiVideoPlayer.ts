@@ -96,6 +96,7 @@ export function usePixiVideoPlayer(
     locale?: RetroPlayerLocale;
     requestedKind?: "video" | "audio" | "image";
     requestedIndex?: number | null;
+    disableTransportKeyboardShortcuts?: boolean;
   },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
@@ -130,6 +131,13 @@ export function usePixiVideoPlayer(
   const onNextTrackRef = useRef<(() => void) | undefined>(options?.onNextTrack);
   const requestedKindRef = useRef<"video" | "audio" | "image">(options?.requestedKind ?? "video");
   const requestedIndexRef = useRef<number | null>(options?.requestedIndex ?? null);
+  const disableTransportKeyboardShortcutsRef = useRef<boolean>(
+    options?.disableTransportKeyboardShortcuts ?? false,
+  );
+
+  useEffect(() => {
+    disableTransportKeyboardShortcutsRef.current = options?.disableTransportKeyboardShortcuts ?? false;
+  }, [options?.disableTransportKeyboardShortcuts]);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -1595,6 +1603,8 @@ export function usePixiVideoPlayer(
         onNextTrackRef.current();
         return;
       }
+
+      if (disableTransportKeyboardShortcutsRef.current) return;
 
       if (!mediaRef.current) return;
 

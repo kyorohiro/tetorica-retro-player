@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLongPress } from "../hooks/useLongPress";
 import {
   ChevronsRight,
@@ -30,10 +30,12 @@ import {
   type RetroAudioPresetDefinition,
   type RetroAudioPresetKey,
 } from "../audio/preset";
+import type { NesControlButton, RetroGameControls } from "../types/gameControls";
 import type { RetroPlayerLocale } from "../types";
 
 type VideoControlsProps = {
   locale: RetroPlayerLocale;
+  gameControls?: RetroGameControls | null;
   mode: "playback" | "audio-settings";
   hasPlayback: boolean;
   currentTime: number;
@@ -145,8 +147,45 @@ const formatTime = (seconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
 };
 
+function NesHoldButton({
+  label,
+  onPress,
+  onRelease,
+  className,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  onRelease: () => void;
+  className: string;
+  children?: ReactNode;
+}) {
+  const handleRelease = useCallback(() => {
+    onRelease();
+  }, [onRelease]);
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        onPress();
+      }}
+      onPointerUp={handleRelease}
+      onPointerCancel={handleRelease}
+      onPointerLeave={handleRelease}
+      className={className}
+    >
+      {children ?? label}
+    </button>
+  );
+}
+
 export const VideoControls = memo(function VideoControls({
   locale,
+  gameControls,
   mode,
   hasPlayback,
   currentTime,
@@ -479,6 +518,44 @@ export const VideoControls = memo(function VideoControls({
             onSeek(rawValue);
           },
         };
+  const isNesControllerMode = gameControls?.kind === "nes" && mode === "playback";
+  const nesText = locale === "ja"
+    ? {
+        up: "上",
+        down: "下",
+        left: "左",
+        right: "右",
+        micVolume: "Mic / Vol",
+        reset: "Reset",
+        a: "A",
+        b: "B",
+        select: "Select",
+        start: "Start",
+      }
+    : {
+        up: "Up",
+        down: "Down",
+        left: "Left",
+        right: "Right",
+        micVolume: "Mic / Vol",
+        reset: "Reset",
+        a: "A",
+        b: "B",
+        select: "Select",
+        start: "Start",
+      };
+  const createNesHandlers = useCallback((button: NesControlButton) => {
+    if (!gameControls || gameControls.kind !== "nes") {
+      return {
+        onPress: () => {},
+        onRelease: () => {},
+      };
+    }
+    return {
+      onPress: () => gameControls.pressButton(button),
+      onRelease: () => gameControls.releaseButton(button),
+    };
+  }, [gameControls]);
 
   const handleSettingsFile = async (file: File) => {
     if (!file.name.endsWith(".retro.json")) return;
@@ -1166,189 +1243,244 @@ export const VideoControls = memo(function VideoControls({
       />
       {hasPlayback && (
         <>
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
-              <span>{transportBarMeta.leftLabel}</span>
-              <span>{transportBarMeta.rightLabel}</span>
-            </div>
-            <input
-              type="range"
-              min={transportBarMeta.min}
-              max={transportBarMeta.max}
-              step={transportBarMeta.step}
-              value={transportBarMeta.value}
-              onChange={(ev) => {
-                transportBarMeta.onChange(Number(ev.currentTarget.value));
-              }}
-              className="w-full"
-            />
-          </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            <button
-              type="button"
-              {...playPauseLongPressHandlers}
-              aria-label={isPlaying ? "Pause" : "Play"}
-              title={isPlaying ? "Pause" : "Play"}
-              className={[
-                "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                isPlayPauseHolding
-                  ? "border-[#7fd4a8] bg-[#c9ecd7]"
-                  : "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20",
-              ].join(" ")}
-            >
-              {isPlayPauseHolding && (
-                <span
-                  className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+          {isNesControllerMode ? (
+            <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)] items-start gap-2">
+              <div className="grid grid-cols-3 grid-rows-3 gap-2 justify-self-start">
+                <div />
+                <NesHoldButton
+                  label={nesText.up}
+                  {...createNesHandlers("up")}
+                  className="inline-flex min-h-11 w-full max-w-36 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 />
-              )}
-              {isPlaying ? <Pause size={16} className="relative z-10" /> : <Play size={16} className="relative z-10" />}
-            </button>
-            <button
-              type="button"
-              {...volumeLongPressHandlers}
-              aria-label="Volume"
-              title="Volume"
-              className={[
-                "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                isVolumeHolding || activeTransportBar === "volume"
-                  ? "border-[#bcb4a6] bg-[#e2ddd5]"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              {isVolumeHolding && (
-                <span
-                  className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                <div />
+                <NesHoldButton
+                  label={nesText.left}
+                  {...createNesHandlers("left")}
+                  className="inline-flex min-h-11 w-full max-w-36 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 />
-              )}
-              {isMuted || volume === 0 ? <VolumeX size={16} className="relative z-10" /> : <Volume2 size={16} className="relative z-10" />}
-            </button>
-            <button
-              type="button"
-              {...loopButtonHandlers}
-              aria-label={loopLabel}
-              title={loopLabel}
-              className={[
-                "relative select-none overflow-hidden inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 text-[#12141c]",
-                isLoopHolding || loopActive
-                  ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
-                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-              ].join(" ")}
-            >
-              {isLoopHolding && (
-                <span
-                  className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                  style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                <div className="inline-flex min-h-11 w-full max-w-24 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#ece7de] px-3 py-2 text-sm text-[#7a7268]">
+                  []
+                </div>
+                <NesHoldButton
+                  label={nesText.right}
+                  {...createNesHandlers("right")}
+                  className="inline-flex min-h-11 w-full max-w-36 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
                 />
-              )}
-              {loopIcon}
-              <span className="relative z-10 text-[9px] font-semibold uppercase leading-none tracking-[0.08em]">
-                {loopShortLabel}
-              </span>
-            </button>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTransportBar((current) => (current === "speed" ? "seek" : "speed"));
-                }}
-                aria-label={`Speed ${playbackRate}x`}
-                title={`Speed ${playbackRate}x`}
-                className={[
-                  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
-                  activeTransportBar === "speed"
-                    ? "border-[#bcb4a6] bg-[#e2ddd5]"
-                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
-                ].join(" ")}
-              >
-                <Gauge size={14} />
-              </button>
-            </div>
-
-            {true ? (
-              <div className="col-span-4 grid grid-cols-6 gap-2">
-                <button
-                  type="button"
-                  onClick={() => { if (hasVideo) onStepFrame(-1); }}
-                  disabled={!hasVideo}
-                  aria-label="Previous frame"
-                  title="Previous frame"
-                  className={["col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border px-2 py-2",
-                    hasVideo ? "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]" : "border-[#bcb4a6]/40 bg-[#f5f1ea]/40 text-[#12141c]/30 cursor-default"].join(" ")}
-                >
-                  <StepBack size={16} />
-                </button>
-                <button
-                  type="button"
-                  {...prevTrackHandlers}
-                  className={["col-span-2 relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
-                    isPrevHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
-                >
-                  {isPrevHolding && onPrevTrack && (
-                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
-                  )}
-                  <SkipBack size={16} className="relative z-10" />
-                  <span className="relative z-10">{prevTrackLabel}</span>
-                </button>
-                <button
-                  type="button"
-                  {...nextTrackHandlers}
-                  className={["col-span-2 relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
-                    isNextHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
-                >
-                  {isNextHolding && onNextTrack && (
-                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
-                  )}
-                  <SkipForward size={16} className="relative z-10" />
-                  <span className="relative z-10">{nextTrackLabel}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { if (hasVideo) onStepFrame(1); }}
-                  disabled={!hasVideo}
-                  aria-label="Next frame"
-                  title="Next frame"
-                  className={["col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border px-2 py-2",
-                    hasVideo ? "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]" : "border-[#bcb4a6]/40 bg-[#f5f1ea]/40 text-[#12141c]/30 cursor-default"].join(" ")}
-                >
-                  <StepForward size={16} />
-                </button>
+                <div />
+                <NesHoldButton
+                  label={nesText.down}
+                  {...createNesHandlers("down")}
+                  className="inline-flex min-h-11 w-full max-w-36 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-3 py-2 text-[#12141c] hover:bg-[#e2ddd5]"
+                />
+                <div />
               </div>
-            ) : (
-              <>
+              <div className="grid gap-2 self-end justify-self-stretch">
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      gameControls?.reset();
+                    }}
+                    className="inline-flex min-h-8 items-center justify-center rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] text-[#12141c] hover:bg-rose-500/20"
+                  >
+                    {nesText.reset}
+                  </button>
+                  <NesHoldButton
+                    label={nesText.select}
+                    {...createNesHandlers("select")}
+                    className="inline-flex min-h-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1 text-[10px] text-[#12141c] hover:bg-[#e2ddd5]"
+                  />
+                  <NesHoldButton
+                    label={nesText.start}
+                    {...createNesHandlers("start")}
+                    className="inline-flex min-h-8 items-center justify-center rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1 text-[10px] text-[#12141c] hover:bg-[#e2ddd5]"
+                  />
+                </div>
+                <div className="rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={currentVolume}
+                    onChange={(ev) => {
+                      const next = Number(ev.currentTarget.value);
+                      if (isMuted && next > 0) onToggleMute();
+                      onChangeVolume(next);
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 justify-self-end">
+                  <NesHoldButton
+                    label={nesText.b}
+                    {...createNesHandlers("b")}
+                    className="inline-flex min-h-16 w-full max-w-44 items-center justify-center rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-lg font-semibold text-[#12141c] hover:bg-sky-500/20"
+                  />
+                  <NesHoldButton
+                    label={nesText.a}
+                    {...createNesHandlers("a")}
+                    className="inline-flex min-h-16 w-full max-w-44 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-lg font-semibold text-[#12141c] hover:bg-emerald-500/20"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] text-[#7a7268]">
+                  <span>{transportBarMeta.leftLabel}</span>
+                  <span>{transportBarMeta.rightLabel}</span>
+                </div>
+                <input
+                  type="range"
+                  min={transportBarMeta.min}
+                  max={transportBarMeta.max}
+                  step={transportBarMeta.step}
+                  value={transportBarMeta.value}
+                  onChange={(ev) => {
+                    transportBarMeta.onChange(Number(ev.currentTarget.value));
+                  }}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
                 <button
                   type="button"
-                  {...prevTrackHandlers}
-                  className={["relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
-                    isPrevHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
+                  {...playPauseLongPressHandlers}
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                  title={isPlaying ? "Pause" : "Play"}
+                  className={[
+                    "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                    isPlayPauseHolding
+                      ? "border-[#7fd4a8] bg-[#c9ecd7]"
+                      : "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20",
+                  ].join(" ")}
                 >
-                  {isPrevHolding && onPrevTrack && (
-                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                  {isPlayPauseHolding && (
+                    <span
+                      className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                    />
                   )}
-                  <SkipBack size={16} className="relative z-10" />
-                  <span className="relative z-10">{prevTrackLabel}</span>
+                  {isPlaying ? <Pause size={16} className="relative z-10" /> : <Play size={16} className="relative z-10" />}
                 </button>
                 <button
                   type="button"
-                  {...nextTrackHandlers}
-                  className={["relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
-                    isNextHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
+                  {...volumeLongPressHandlers}
+                  aria-label="Volume"
+                  title="Volume"
+                  className={[
+                    "relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                    isVolumeHolding || activeTransportBar === "volume"
+                      ? "border-[#bcb4a6] bg-[#e2ddd5]"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
                 >
-                  {isNextHolding && onNextTrack && (
-                    <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
-                      style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                  {isVolumeHolding && (
+                    <span
+                      className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                    />
                   )}
-                  <SkipForward size={16} className="relative z-10" />
-                  <span className="relative z-10">{nextTrackLabel}</span>
+                  {isMuted || volume === 0 ? <VolumeX size={16} className="relative z-10" /> : <Volume2 size={16} className="relative z-10" />}
                 </button>
-              </>
-            )}
-          </div>
+                <button
+                  type="button"
+                  {...loopButtonHandlers}
+                  aria-label={loopLabel}
+                  title={loopLabel}
+                  className={[
+                    "relative select-none overflow-hidden inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 text-[#12141c]",
+                    isLoopHolding || loopActive
+                      ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {isLoopHolding && (
+                    <span
+                      className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                      style={{ animation: "long-press-charge 0.6s linear forwards" }}
+                    />
+                  )}
+                  {loopIcon}
+                  <span className="relative z-10 text-[9px] font-semibold uppercase leading-none tracking-[0.08em]">
+                    {loopShortLabel}
+                  </span>
+                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTransportBar((current) => (current === "speed" ? "seek" : "speed"));
+                    }}
+                    aria-label={`Speed ${playbackRate}x`}
+                    title={`Speed ${playbackRate}x`}
+                    className={[
+                      "inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-3 py-2 text-[#12141c]",
+                      activeTransportBar === "speed"
+                        ? "border-[#bcb4a6] bg-[#e2ddd5]"
+                        : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                    ].join(" ")}
+                  >
+                    <Gauge size={14} />
+                  </button>
+                </div>
+
+                <div className="col-span-4 grid grid-cols-6 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { if (hasVideo) onStepFrame(-1); }}
+                    disabled={!hasVideo}
+                    aria-label="Previous frame"
+                    title="Previous frame"
+                    className={["col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border px-2 py-2",
+                      hasVideo ? "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]" : "border-[#bcb4a6]/40 bg-[#f5f1ea]/40 text-[#12141c]/30 cursor-default"].join(" ")}
+                  >
+                    <StepBack size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    {...prevTrackHandlers}
+                    className={["col-span-2 relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+                      isPrevHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
+                  >
+                    {isPrevHolding && onPrevTrack && (
+                      <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                        style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                    )}
+                    <SkipBack size={16} className="relative z-10" />
+                    <span className="relative z-10">{prevTrackLabel}</span>
+                  </button>
+                  <button
+                    type="button"
+                    {...nextTrackHandlers}
+                    className={["col-span-2 relative select-none overflow-hidden inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[#12141c]",
+                      isNextHolding ? "border-[#bcb4a6] bg-[#e2ddd5]" : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]"].join(" ")}
+                  >
+                    {isNextHolding && onNextTrack && (
+                      <span className="pointer-events-none absolute inset-0 origin-left bg-slate-400/20"
+                        style={{ animation: "long-press-charge 0.6s linear forwards" }} />
+                    )}
+                    <SkipForward size={16} className="relative z-10" />
+                    <span className="relative z-10">{nextTrackLabel}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { if (hasVideo) onStepFrame(1); }}
+                    disabled={!hasVideo}
+                    aria-label="Next frame"
+                    title="Next frame"
+                    className={["col-span-1 inline-flex min-h-11 items-center justify-center rounded-lg border px-2 py-2",
+                      hasVideo ? "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]" : "border-[#bcb4a6]/40 bg-[#f5f1ea]/40 text-[#12141c]/30 cursor-default"].join(" ")}
+                  >
+                    <StepForward size={16} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 

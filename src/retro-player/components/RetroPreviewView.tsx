@@ -23,6 +23,7 @@ import {
   type RetroPreviewLayoutState,
 } from "../previewLayoutState";
 import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
+import type { RetroGameControls } from "../types/gameControls";
 import { AudioSpectrum } from "./AudioSpectrum";
 
 // Casio-digital-watch style clock overlay — toggled by long-pressing the
@@ -161,6 +162,7 @@ export type RetroPreviewViewProps = {
   showClockOverlay?: boolean;
   selectedPreset: RetroPresetKey | null;
   onApplyPreset: (preset: RetroPresetKey) => void;
+  gameControls?: RetroGameControls | null;
 };
 
 export function RetroPreviewView({
@@ -193,6 +195,7 @@ export function RetroPreviewView({
   showClockOverlay,
   selectedPreset,
   onApplyPreset,
+  gameControls: _gameControls,
 }: RetroPreviewViewProps) {
   const isFfmpegHlsSource = typeof _src === "string" && isHlsUrl(_src);
   // --- Internal UI state: everything layout/pin/maximize lives here ---
