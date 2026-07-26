@@ -528,6 +528,12 @@ export function usePixiVideoPlayer(
     void (async () => {
       try {
         await connectMediaStream(auxAudioStream, "AUX_AUDIO_STREAM");
+        isPlayingRef.current = true;
+        setEngineIsPlaying(true);
+        setIsPlaying(true);
+        setNeedsUserPlay(false);
+        setIsBuffering(false);
+        updateAudioNodes();
         if (cancelled && !mediaRef.current) {
           disconnectMediaInput();
         }
@@ -549,6 +555,10 @@ export function usePixiVideoPlayer(
     debugAudio,
     disconnectMediaInput,
     mediaRef,
+    setEngineIsPlaying,
+    setNeedsUserPlay,
+    setIsBuffering,
+    updateAudioNodes,
     options?.auxAudioStream,
   ]);
 

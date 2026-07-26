@@ -235,8 +235,13 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, []);
 
     const currentPlaybackSource = React.useMemo<RetroPlaybackEvent["source"]>(
-      () => (previewSource.previewStreamSource === "audio-preview" ? "builtin-tone" : "media"),
-      [previewSource.previewStreamSource],
+      () => {
+        if (nesAudioStream) {
+          return "builtin-tone";
+        }
+        return previewSource.previewStreamSource === "audio-preview" ? "builtin-tone" : "media";
+      },
+      [nesAudioStream, previewSource.previewStreamSource],
     );
 
     useEffect(() => {
