@@ -29,6 +29,7 @@ import {
   type RetroPresetKey,
 } from "../retro/config";
 import type { RetroPreviewLayoutState } from "../previewLayoutState";
+import type { RetroGameControls } from "../types/gameControls";
 import type { ConfirmDialogFn, RetroPlayerLocale } from "../types";
 import { RetroPreviewView } from "./RetroPreviewView";
 import { RetroControlPanel } from "./RetroControlPanel";
@@ -79,6 +80,10 @@ type RetroPlayerProps = {
   onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
   startupNativePlaybackMode?: boolean;
   persistNativePlaybackMode?: boolean;
+  gameControls?: RetroGameControls | null;
+  nativeOverrideElement?: HTMLCanvasElement | null;
+  visualOverrideElement?: HTMLCanvasElement | null;
+  auxAudioStream?: MediaStream | null;
 };
 
 export function RetroPlayer({
@@ -109,6 +114,10 @@ export function RetroPlayer({
   onPreviewLayoutStateChange,
   startupNativePlaybackMode,
   persistNativePlaybackMode = true,
+  gameControls,
+  nativeOverrideElement,
+  visualOverrideElement,
+  auxAudioStream,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
@@ -253,6 +262,9 @@ export function RetroPlayer({
       locale,
       requestedKind: kind,
       requestedIndex: displayIndex,
+      disableTransportKeyboardShortcuts: gameControls?.kind === "nes",
+      visualOverrideElement,
+      auxAudioStream,
     },
   );
 
@@ -705,12 +717,19 @@ export function RetroPlayer({
             onFfmpegMaxConcurrentHlsSessionsChange={handleFfmpegMaxConcurrentHlsSessionsChange}
             selectedPreset={filterState.selectedPreset}
             onApplyPreset={applyPresetWithAspect}
+            gameControls={gameControls}
+            nativeOverrideElement={
+              nativePlaybackMode && gameControls?.kind === "nes"
+                ? nativeOverrideElement ?? null
+                : null
+            }
           />
           <RetroControlPanel
             locale={locale}
             player={player}
             filterState={filterState}
             controlPanelMode={controlPanelMode}
+            gameControls={gameControls}
             onControlPanelModeChange={setControlPanelMode}
             onApplyPreset={applyPresetWithAspect}
             onSetTargetWidth={handleSetTargetWidth}
@@ -752,6 +771,7 @@ export function RetroPlayer({
     onSetMatchTargetAspect: handleSetMatchTargetAspect,
     onResetSettings: resetAllSettings,
     onImportSettings: handleImportSettings,
+    gameControls,
     onPrevTrack,
     onNextTrack,
     onForceReplay: handleForceReplay,
@@ -824,6 +844,12 @@ export function RetroPlayer({
               onPreviewPointerMove={handlePreviewPointerMove}
               selectedPreset={filterState.selectedPreset}
               onApplyPreset={applyPresetWithAspect}
+              gameControls={gameControls}
+              nativeOverrideElement={
+                nativePlaybackMode && gameControls?.kind === "nes"
+                  ? nativeOverrideElement ?? null
+                  : null
+              }
             />
           }
           playbackControls={controlPanel}

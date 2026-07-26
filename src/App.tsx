@@ -42,6 +42,7 @@ import {
   getDroppedFiles,
   isAudio,
   isImage,
+  isNesRomPath,
   isVideo,
   isVideoExtended,
   mimeFromPath,
@@ -403,7 +404,33 @@ function App() {
     });
   }, [showBrowserFileListDialog]);
 
+  const loadNesFileFromPath = useCallback(async (path: string) => {
+    const fileName = basenameOfPath(path);
+
+    if (isMDropReadyRef.current) {
+      await mdropUnshareAll().catch(() => {});
+      const shared = await mdropShareFile(path);
+      const response = await fetch(shared.url);
+      const blob = await response.blob();
+      return new File([blob], fileName, {
+        type: mimeFromPath(path) || blob.type || "application/x-nes-rom",
+      });
+    }
+
+    const { convertFileSrc } = await import("@tauri-apps/api/core");
+    const response = await fetch(convertFileSrc(path));
+    const blob = await response.blob();
+    return new File([blob], fileName, {
+      type: mimeFromPath(path) || blob.type || "application/x-nes-rom",
+    });
+  }, [isMDropReadyRef]);
+
   const onInputFiles = useCallback(async (files: File[]) => {
+    if (files.length === 1 && isNesRomPath(files[0].name)) {
+      retroPlayerClientRef.current?.loadFiles(files);
+      return;
+    }
+
     const decision = decideBrowserFileSelection(files, loopModeRef.current);
     if (decision.kind === "play-files") {
       retroPlayerClientRef.current?.loadFiles(decision.files);
@@ -420,6 +447,11 @@ function App() {
     options?: { useExtendedMedia?: boolean },
   ) => {
     if (paths.length === 0) return;
+    if (paths.length === 1 && isNesRomPath(paths[0])) {
+      const nesFile = await loadNesFileFromPath(paths[0]);
+      retroPlayerClientRef.current?.loadFiles([nesFile]);
+      return;
+    }
 
     if (isMDropReadyRef.current) {
       await mdropUnshareAll().catch(() => {});
@@ -562,6 +594,7 @@ function App() {
     ffmpegStreamingModeRef,
     isFfmpegEnabledRef,
     isMDropReadyRef,
+    loadNesFileFromPath,
     openBrowserDialogTargets,
     rememberRecentFileList,
     rememberRecentFolder,
@@ -573,6 +606,7 @@ function App() {
   });
 
   const handleDisplayCapture = useCallback(async () => {
+    retroPlayerClientRef.current?.stopBuiltinPlayback();
     const errorMessage = await previewSource.startDisplayCapture();
     const isItchDisplayCaptureError =
       typeof errorMessage === "string" &&
@@ -700,6 +734,7 @@ function App() {
           { name: "Video", extensions: ["mp4", "m4v", "mov", "mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "mts", "ogv", "mpeg", "mpg", "m2v", "vob", "asf", "3gp", "f4v", "mxf", "divx", "xvid", "rm", "rmvb"] },
           { name: "Audio", extensions: ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "wma"] },
           { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif", "heic", "heif", "bmp"] },
+          { name: "NES ROM", extensions: ["nes"] },
         ],
       });
       if (!selected || Array.isArray(selected)) return;

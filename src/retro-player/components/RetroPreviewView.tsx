@@ -23,6 +23,7 @@ import {
   type RetroPreviewLayoutState,
 } from "../previewLayoutState";
 import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
+import type { RetroGameControls } from "../types/gameControls";
 import { AudioSpectrum } from "./AudioSpectrum";
 
 // Casio-digital-watch style clock overlay — toggled by long-pressing the
@@ -161,6 +162,8 @@ export type RetroPreviewViewProps = {
   showClockOverlay?: boolean;
   selectedPreset: RetroPresetKey | null;
   onApplyPreset: (preset: RetroPresetKey) => void;
+  gameControls?: RetroGameControls | null;
+  nativeOverrideElement?: HTMLCanvasElement | null;
 };
 
 export function RetroPreviewView({
@@ -193,6 +196,8 @@ export function RetroPreviewView({
   showClockOverlay,
   selectedPreset,
   onApplyPreset,
+  gameControls: _gameControls,
+  nativeOverrideElement,
 }: RetroPreviewViewProps) {
   const isFfmpegHlsSource = typeof _src === "string" && isHlsUrl(_src);
   // --- Internal UI state: everything layout/pin/maximize lives here ---
@@ -699,7 +704,8 @@ export function RetroPreviewView({
   const displayedImagePageTurnTokenRef = React.useRef(player.pageTurnToken);
   const delayedImageOverlayPendingRef = React.useRef(false);
   const isImagePreviewRequested = player.requestedKind === "image" || player.hasImage;
-  const shouldKeepNativeVisualVisible = player.shouldUseNativeVisualSurface;
+  const shouldKeepNativeVisualVisible =
+    player.shouldUseNativeVisualSurface || Boolean(nativeOverrideElement);
   const loadingPageLabel = resolveOverlayPrimaryLabel(
     player.previewName || "",
     player.requestedIndex,
@@ -807,9 +813,9 @@ export function RetroPreviewView({
 
   React.useEffect(() => {
     const host = nativeVideoHostRef.current;
-    const visual = player.nativeVisualElement;
+    const visual = nativeOverrideElement ?? player.nativeVisualElement;
 
-    if (!host || !player.shouldUseNativeVisualSurface || !visual) {
+    if (!host || !shouldKeepNativeVisualVisible || !visual) {
       return;
     }
 
@@ -820,16 +826,22 @@ export function RetroPreviewView({
     visual.style.width = "100%";
     visual.style.height = "100%";
     visual.style.display = "block";
-    visual.style.objectFit = "contain";
+    if (!(visual instanceof HTMLCanvasElement)) {
+      visual.style.objectFit = "contain";
+    }
     visual.style.backgroundColor = "black";
+    if (visual instanceof HTMLCanvasElement) {
+      visual.style.imageRendering = "pixelated";
+    }
 
     if (visual.parentElement !== host) {
       host.replaceChildren(visual);
     }
 
   }, [
+    nativeOverrideElement,
     player.nativeVisualElement,
-    player.shouldUseNativeVisualSurface,
+    shouldKeepNativeVisualVisible,
     player.sourceDimensions?.height,
     player.sourceDimensions?.width,
   ]);
@@ -1163,7 +1175,7 @@ export function RetroPreviewView({
               className="pointer-events-none relative h-full w-full touch-manipulation"
               style={{
                 opacity:
-                  player.shouldUseNativeVisualSurface
+                  shouldKeepNativeVisualVisible
                     ? 0
                     : isCanvasVisible
                       ? 1

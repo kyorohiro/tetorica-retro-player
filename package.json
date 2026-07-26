@@ -1,7 +1,7 @@
 {
   "name": "tetorica-retro-player",
   "private": true,
-  "version": "0.41.5",
+  "version": "0.41.10",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-sw.mjs && node scripts/sync-extension-shader.mjs && vite",
@@ -29,6 +29,7 @@
     "@zip.js/zip.js": "^2.8.26",
     "heic2any": "^0.0.4",
     "hls.js": "^1.6.16",
+    "jsnes": "github:kyorohiro/jsnes#tetorica",
     "lucide-react": "^1.17.0",
     "node-unrar-js": "^2.0.2",
     "pdfjs-dist": "^6.0.227",

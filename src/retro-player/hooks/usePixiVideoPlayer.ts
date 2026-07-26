@@ -96,6 +96,9 @@ export function usePixiVideoPlayer(
     locale?: RetroPlayerLocale;
     requestedKind?: "video" | "audio" | "image";
     requestedIndex?: number | null;
+    disableTransportKeyboardShortcuts?: boolean;
+    visualOverrideElement?: HTMLCanvasElement | null;
+    auxAudioStream?: MediaStream | null;
   },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
@@ -130,6 +133,13 @@ export function usePixiVideoPlayer(
   const onNextTrackRef = useRef<(() => void) | undefined>(options?.onNextTrack);
   const requestedKindRef = useRef<"video" | "audio" | "image">(options?.requestedKind ?? "video");
   const requestedIndexRef = useRef<number | null>(options?.requestedIndex ?? null);
+  const disableTransportKeyboardShortcutsRef = useRef<boolean>(
+    options?.disableTransportKeyboardShortcuts ?? false,
+  );
+
+  useEffect(() => {
+    disableTransportKeyboardShortcutsRef.current = options?.disableTransportKeyboardShortcuts ?? false;
+  }, [options?.disableTransportKeyboardShortcuts]);
 
   const [previewName, setPreviewName] = useState<string>("");
   const [previewError, _setPreviewErrorState] = useState<string>("");
@@ -420,6 +430,7 @@ export function usePixiVideoPlayer(
     updateAudioNodes,
     setEngineIsPlaying,
     connectMediaStream,
+    disconnectMediaInput,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
     rebuildAudioGraphForCurrentMedia,
@@ -465,6 +476,91 @@ export function usePixiVideoPlayer(
     sourceDimensionsRef.current = nextDimensions;
     setSourceDimensions(nextDimensions);
   };
+
+  useEffect(() => {
+    const visualOverride = options?.visualOverrideElement ?? null;
+    if (!visualOverride) {
+      return;
+    }
+
+    previewElementRef.current = visualOverride;
+    setPreviewKindState("capture");
+    setSourceDimensionsState({
+      width: visualOverride.width,
+      height: visualOverride.height,
+    });
+    scheduleRefreshLayout();
+    safeRender();
+    appRef.current?.ticker.start();
+
+    return () => {
+      if (previewElementRef.current === visualOverride) {
+        previewElementRef.current = null;
+      }
+      if (previewKindRef.current === "capture" && !mediaRef.current) {
+        setPreviewKindState(null);
+      }
+      if (!mediaRef.current) {
+        setSourceDimensionsState(null);
+        safeRender();
+      }
+    };
+  }, [
+    appRef,
+    mediaRef,
+    options?.visualOverrideElement,
+    previewElementRef,
+    previewKindRef,
+    safeRender,
+    scheduleRefreshLayout,
+  ]);
+
+  useEffect(() => {
+    const auxAudioStream = options?.auxAudioStream ?? null;
+    if (!auxAudioStream) {
+      if (!mediaRef.current) {
+        disconnectMediaInput();
+      }
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await connectMediaStream(auxAudioStream, "AUX_AUDIO_STREAM");
+        isPlayingRef.current = true;
+        setEngineIsPlaying(true);
+        setIsPlaying(true);
+        setNeedsUserPlay(false);
+        setIsBuffering(false);
+        updateAudioNodes();
+        if (cancelled && !mediaRef.current) {
+          disconnectMediaInput();
+        }
+      } catch (error) {
+        debugAudio("auxAudioStream:error", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (!mediaRef.current) {
+        disconnectMediaInput();
+      }
+    };
+  }, [
+    connectMediaStream,
+    debugAudio,
+    disconnectMediaInput,
+    mediaRef,
+    setEngineIsPlaying,
+    setNeedsUserPlay,
+    setIsBuffering,
+    updateAudioNodes,
+    options?.auxAudioStream,
+  ]);
 
   const beginLoading = (label: string) => {
     setLoadingLabel(label);
@@ -1595,6 +1691,8 @@ export function usePixiVideoPlayer(
         onNextTrackRef.current();
         return;
       }
+
+      if (disableTransportKeyboardShortcutsRef.current) return;
 
       if (!mediaRef.current) return;
 

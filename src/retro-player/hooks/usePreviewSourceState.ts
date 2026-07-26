@@ -12,7 +12,8 @@ export type PreviewStreamSource =
   | "display-capture"
   | "microphone"
   | "camera"
-  | "audio-preview";
+  | "audio-preview"
+  | "video-preview";
 
 const retainedBlobPreviewSrcs = new Set<string>();
 
@@ -127,6 +128,14 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
       return undefined;
     });
   }, [revokePreviewSrc]);
+
+  const clearPreview = useCallback(() => {
+    stopPreviewStream();
+    clearPreviewSrc();
+    setPreviewLabel(undefined);
+    setCaptureError("");
+    setPreviewKind(undefined);
+  }, [clearPreviewSrc, stopPreviewStream]);
 
   useEffect(() => {
     return () => {
@@ -329,6 +338,18 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     });
   }, [clearPreviewSrc]);
 
+  const previewVideoStream = useCallback((stream: MediaStream, label: string) => {
+    clearPreviewSrc();
+    setCaptureError("");
+    setPreviewLabel(label);
+    setPreviewKind("video");
+    setPreviewStreamSource("video-preview");
+    setPreviewStream((current) => {
+      current?.getTracks().forEach((track) => track.stop());
+      return stream;
+    });
+  }, [clearPreviewSrc]);
+
   return {
     previewSrc,
     previewStream,
@@ -341,11 +362,13 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     previewFile,
     previewPath,
     previewAudioStream,
+    previewVideoStream,
     refreshAudioInputDevices,
     setPreferredAudioInputDeviceId: updatePreferredAudioInputDeviceId,
     startDisplayCapture,
     startMicrophoneInput,
     startCameraInput,
     stopPreviewStream,
+    clearPreview,
   };
 }

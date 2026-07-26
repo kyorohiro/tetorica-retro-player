@@ -26,6 +26,9 @@ export const supportedExtensions = [
     "txt", "md", "markdown", "json", "html", "css", "js", "jsx",
     "ts", "tsx", "xml", "rs", "toml", "yaml", "yml", "sql",
     "sh", "py", "java", "c", "cpp", "h",
+
+    // ROM
+    "nes",
 ];
 export const mimeFromPath = (path: string): string => {
     const lower = path.toLowerCase();
@@ -72,9 +75,12 @@ export const mimeFromPath = (path: string): string => {
     }
     if (/\.(epub)$/i.test(lower)) return "application/epub+zip";
     if (/\.(zip|cbz)$/i.test(lower)) return "application/zip";
+    if (/\.(nes)$/i.test(lower)) return "application/x-nes-rom";
 
     return "application/octet-stream";
 };
+
+export const isNesRomPath = (path: string) => /\.(nes)$/i.test(path);
 
 export const isImage = (path: string) =>
     mimeFromPath(path).startsWith("image/");

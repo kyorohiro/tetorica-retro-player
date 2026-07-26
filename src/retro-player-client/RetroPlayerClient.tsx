@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { t } from "../i18n";
+import { useDialog } from "../useDialog";
 import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
+import { isNesRomFile, startNesSession } from "./builtin-content/nes-session";
 import {
   type PresetConfig,
   loadStartupPreset,
@@ -17,6 +19,8 @@ import {
 } from "../retro-player/hooks/usePreviewSourceState";
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
 import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
+import { isTauriRuntime } from "../retro-player/platform/runtime";
+import type { RetroGameControls } from "../retro-player/types/gameControls";
 import type { RetroPlayerLocale } from "../retro-player/types";
 import { isHeic, isImage } from "../mdrop-web/utils";
 import { primeImageElementCache } from "../retro-player/media/RetroMediaSource";
@@ -50,6 +54,7 @@ const compareComicOrder = (a: string, b: string) =>
 type AutoStartState = 'pending' | 'blocked' | 'done';
 
 const retroPlayerKey = "player:root";
+type BuiltinSessionCleanup = () => void;
 
 export type RetroPlayerClientHandle = {
   loadPaths: (items: { url: string; path: string }[], startIndex?: number) => void;
@@ -95,6 +100,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     },
     ref,
   ) {
+    const { showConfirmDialog } = useDialog();
     const [startupPreset] = useState<PresetConfig>(() => loadStartupPreset());
     const defaultPreviewSrc: string | undefined =
       startupPreset.type === 'colorbars-image' ? './test_colorbars.png' :
@@ -108,7 +114,14 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       'audio'; // lofi / demo-song
 
     const currentPresetConfigRef = useRef<PresetConfig>(startupPreset);
-    const toneCleanupRef = useRef<(() => void) | null>(null);
+    const toneCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
+    const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
+    const nesResumeAudioRef = useRef<(() => Promise<boolean>) | null>(null);
+    const nesLaunchTokenRef = useRef(0);
+    const [nesGameControls, setNesGameControls] = useState<RetroGameControls | null>(null);
+    const [nesCanvas, setNesCanvas] = useState<HTMLCanvasElement | null>(null);
+    const [nesAudioStream, setNesAudioStream] = useState<MediaStream | null>(null);
+    const [nesDisplayName, setNesDisplayName] = useState<string>("");
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
     useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
@@ -128,6 +141,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     useEffect(() => {
       return () => {
         clearFilePlaylistBlobUrls();
+        nesCleanupRef.current?.();
       };
     }, [clearFilePlaylistBlobUrls]);
     const [playlistLength, setPlaylistLength] = useState(0);
@@ -138,8 +152,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const [showFfmpegRetry, setShowFfmpegRetry] = useState(false);
     const [showPlaybackRetryHint, setShowPlaybackRetryHint] = useState(false);
     const shouldShowFfmpegRetry = false;
-
-    const isUsingDefaultPreview = !previewSource.previewSrc && !previewSource.previewStream;
 
     useEffect(() => {
       const idleCallback = window.setTimeout(() => {
@@ -184,10 +196,22 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       toneCleanupRef.current = null;
     }, []);
 
+    const stopNesSession = useCallback(() => {
+      nesLaunchTokenRef.current += 1;
+      nesCleanupRef.current?.();
+      nesCleanupRef.current = null;
+      nesResumeAudioRef.current = null;
+      setNesGameControls(null);
+      setNesCanvas(null);
+      setNesAudioStream(null);
+      setNesDisplayName("");
+    }, []);
+
     const stopBuiltinPlayback = useCallback(() => {
       stopTone();
+      stopNesSession();
       setAutoStartState('done');
-    }, [stopTone]);
+    }, [stopNesSession, stopTone]);
 
     const clearPlaylistSession = useCallback(() => {
       playlistRef.current = [];
@@ -211,8 +235,13 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, []);
 
     const currentPlaybackSource = React.useMemo<RetroPlaybackEvent["source"]>(
-      () => (previewSource.previewStreamSource === "audio-preview" ? "builtin-tone" : "media"),
-      [previewSource.previewStreamSource],
+      () => {
+        if (nesAudioStream) {
+          return "builtin-tone";
+        }
+        return previewSource.previewStreamSource === "audio-preview" ? "builtin-tone" : "media";
+      },
+      [nesAudioStream, previewSource.previewStreamSource],
     );
 
     useEffect(() => {
@@ -226,6 +255,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     useEffect(() => {
       if (!previewSource.previewSrc && !previewSource.previewStream) return;
       if (autoStartState !== 'blocked') return;
+      if (nesResumeAudioRef.current) return;
       toneCleanupRef.current?.();
       toneCleanupRef.current = null;
       setAutoStartState('done');
@@ -278,6 +308,12 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     // Restart the currently saved preset. Called from RetroPlayer's onRetry
     // (play button pressed while media is in error/ended state).
     const handleRetry = useCallback(async () => {
+      if (nesResumeAudioRef.current) {
+        const resumed = await nesResumeAudioRef.current();
+        setAutoStartState(resumed ? 'done' : 'blocked');
+        return;
+      }
+
       setAutoStartState('done');
       const preset = currentPresetConfigRef.current;
       stopTone();
@@ -310,9 +346,41 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       }
     }, [previewSource, stopTone]);
 
+    const launchNesFile = useCallback((file: File) => {
+      stopTone();
+      stopNesSession();
+      clearPlaylistSession();
+      previewSource.clearPreview();
+      currentPlayingPathRef.current = null;
+      const launchToken = nesLaunchTokenRef.current + 1;
+      nesLaunchTokenRef.current = launchToken;
+      void startNesSession(file).then((session) => {
+        if (nesLaunchTokenRef.current !== launchToken) {
+          session.stop();
+          return;
+        }
+        nesCleanupRef.current = session.stop;
+        nesResumeAudioRef.current = session.resumeAudio;
+        session.setLocalMonitorEnabled(false);
+        setNesCanvas(session.canvas);
+        setNesAudioStream(session.audioStream);
+        setNesDisplayName(file.name);
+        setNesGameControls({
+          kind: "nes",
+          pressButton: session.pressButton,
+          releaseButton: session.releaseButton,
+          reset: session.reset,
+        });
+        setAutoStartState(session.needsUserGesture ? "blocked" : "done");
+      }).catch((error) => {
+        console.error("[jsnes] failed to start", error);
+      });
+    }, [clearPlaylistSession, previewSource, stopNesSession, stopTone]);
+
     const previewItem = useCallback((item: PlaylistItem) => {
       setShowFfmpegRetry(false);
       setShowPlaybackRetryHint(false);
+      stopNesSession();
       if (item.kind === "file") {
         currentPlayingPathRef.current = null;
         if (shouldPreferDialogRetroPreview) {
@@ -329,7 +397,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         }
         previewSource.previewPath(item.url, item.path);
       }
-    }, [shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath]);
+    }, [previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, showDialogPreviewForPath, stopNesSession]);
 
     const nextTrack = useCallback(() => {
       const list = playlistRef.current;
@@ -449,6 +517,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, [isMDropReadyRef]);
 
     const loadPaths = useCallback((items: { url: string; path: string }[], startIndex = 0) => {
+      stopNesSession();
       clearFilePlaylistBlobUrls();
       if (items.length === 0) return;
       if (items.length === 1 && shouldPreferDialogRetroPreview) {
@@ -468,13 +537,34 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       setShowFfmpegRetry(false);
       previewSource.previewPath(target.url, target.path);
       onPathPlaylistLoaded?.(sortedItems, sortedStartIndex);
-    }, [clearFilePlaylistBlobUrls, onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath]);
+    }, [clearFilePlaylistBlobUrls, onPathPlaylistLoaded, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForPath, stopNesSession]);
 
     const loadFiles = useCallback((files: File[], _startIndex = 0) => {
       // Revoke blob URLs from previous file playlist before creating new ones.
       clearFilePlaylistBlobUrls();
 
       if (files.length === 0) return;
+      if (files.length === 1 && isNesRomFile(files[0])) {
+        if (!isTauriRuntime()) {
+          void showConfirmDialog({
+            title: locale === "ja" ? "NES を開始" : "Start NES",
+            body: locale === "ja"
+              ? "ブラウザ版では開始前にタップ操作が必要です。開始を押して ROM を起動します。"
+              : "Browser builds require a direct tap before starting NES playback. Press Start to launch the ROM.",
+            okText: locale === "ja" ? "開始" : "Start",
+            cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+          }).then((confirmed) => {
+            if (!confirmed) {
+              return;
+            }
+            launchNesFile(files[0]);
+          });
+          return;
+        }
+        launchNesFile(files[0]);
+        return;
+      }
+      stopNesSession();
       if (files.length === 1 && shouldPreferDialogRetroPreview) {
         void showDialogPreviewForBrowserFiles(files);
         return;
@@ -499,7 +589,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       previewSource.previewPath(blobUrls[0], sortedFiles[0].name);
-    }, [clearFilePlaylistBlobUrls, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles]);
+    }, [clearFilePlaylistBlobUrls, launchNesFile, locale, previewSource, shouldPreferDialogRetroPreview, showConfirmDialog, showDialogPreviewForBrowserFiles, stopNesSession]);
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };
@@ -528,18 +618,34 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       playPresetDemoSong,
     ]);
 
+    const isNesDirectPreviewActive = Boolean(nesCanvas);
+    const activePreviewSrc = isNesDirectPreviewActive
+      ? undefined
+      : (previewSource.previewSrc ?? defaultPreviewSrc);
+    const activePreviewStream = isNesDirectPreviewActive ? null : previewSource.previewStream;
+    const activePreviewKind = isNesDirectPreviewActive
+      ? "image"
+      : (previewSource.previewKind ?? defaultPreviewKind);
+    const activePreviewName = isNesDirectPreviewActive
+      ? nesDisplayName
+      : previewSource.previewLabel;
+    const isUsingDefaultPreview =
+      !isNesDirectPreviewActive &&
+      !previewSource.previewSrc &&
+      !previewSource.previewStream;
+
     return (
       <div className="relative flex-1 min-h-0">
         <React.Suspense fallback={null}>
           <RetroPlayer
             locale={locale}
             key={retroPlayerKey}
-            src={previewSource.previewSrc ?? defaultPreviewSrc}
-            displayName={previewSource.previewLabel}
+            src={activePreviewSrc}
+            displayName={activePreviewName}
             displayIndex={playlistLength > 0 ? playlistIndex + 1 : null}
-            stream={previewSource.previewStream}
-            streamName={previewSource.previewLabel}
-            kind={previewSource.previewKind ?? defaultPreviewKind}
+            stream={activePreviewStream}
+            streamName={activePreviewName}
+            kind={activePreviewKind}
             playbackSource={currentPlaybackSource}
             looping={
               !isUsingDefaultPreview &&
@@ -577,6 +683,10 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             loopMode={loopMode}
             onCycleLoopMode={onCycleLoopMode}
             onLoopLongPress={playlistLength > 1 ? handleLoopLongPress : undefined}
+            gameControls={nesGameControls}
+            nativeOverrideElement={nesCanvas}
+            visualOverrideElement={nesCanvas}
+            auxAudioStream={nesAudioStream}
           />
         </React.Suspense>
         {isPlaylistOpen && playlistLength > 1 && (

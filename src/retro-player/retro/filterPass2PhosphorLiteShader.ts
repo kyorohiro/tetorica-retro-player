@@ -478,14 +478,12 @@ void main(void)
       phosphorColor *= 0.22;
     }
 
-    // Phosphor moiré is a static per-cell brightness beat against the
-    // display's pixel grid. A smooth wobble on a fixed block grid just
-    // pulses that same fixed pattern in sync with itself — it doesn't
-    // decorrelate anything. Re-rolling each dot's brightness from an
-    // independent hash every frame (like film grain / static) actually
-    // gives eye persistence a different pattern to average out each frame.
-    float ditherFrame = floor(uTime * 20.0);
-    float ditherNoise = hash13(vec3(cell, ditherFrame)) - 0.5;
+    float grainFrame = floor(uTime * 60.0);
+    vec2 grainJitter = vec2(
+      fract(grainFrame * 0.75487766),
+      fract(grainFrame * 0.56984029)
+    ) - 0.5;
+    float ditherNoise = hash13(vec3(cell + grainJitter, grainFrame)) - 0.5;
     float grainAmount = uPhosphorDotGrainStrength * uSpotMaskStrength;
     // Multiplying alone leaves the near-black gaps between dots untouched
     // (anything * 0 is still 0), so the grain only ever showed up on the lit
