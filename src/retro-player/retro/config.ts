@@ -517,7 +517,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    outputBrightness: 2.1,
+    outputBrightness: 1.78,
   },
   crtBeam: {
     label: "CRT Beam",
