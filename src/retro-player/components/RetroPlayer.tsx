@@ -81,6 +81,7 @@ type RetroPlayerProps = {
   startupNativePlaybackMode?: boolean;
   persistNativePlaybackMode?: boolean;
   gameControls?: RetroGameControls | null;
+  nativeOverrideElement?: HTMLCanvasElement | null;
 };
 
 export function RetroPlayer({
@@ -112,6 +113,7 @@ export function RetroPlayer({
   startupNativePlaybackMode,
   persistNativePlaybackMode = true,
   gameControls,
+  nativeOverrideElement,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
@@ -710,6 +712,11 @@ export function RetroPlayer({
             selectedPreset={filterState.selectedPreset}
             onApplyPreset={applyPresetWithAspect}
             gameControls={gameControls}
+            nativeOverrideElement={
+              nativePlaybackMode && gameControls?.kind === "nes"
+                ? nativeOverrideElement ?? null
+                : null
+            }
           />
           <RetroControlPanel
             locale={locale}
@@ -832,6 +839,11 @@ export function RetroPlayer({
               selectedPreset={filterState.selectedPreset}
               onApplyPreset={applyPresetWithAspect}
               gameControls={gameControls}
+              nativeOverrideElement={
+                nativePlaybackMode && gameControls?.kind === "nes"
+                  ? nativeOverrideElement ?? null
+                  : null
+              }
             />
           }
           playbackControls={controlPanel}

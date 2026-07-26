@@ -11,6 +11,7 @@ const AUDIO_RESUME_TIMEOUT_MS = 1200;
 
 export type NesSession = {
   stream: MediaStream;
+  canvas: HTMLCanvasElement;
   needsUserGesture: boolean;
   resumeAudio: () => Promise<boolean>;
   pressButton: (button: NesControlButton) => void;
@@ -235,6 +236,7 @@ export async function startNesSession(file: File): Promise<NesSession> {
 
   return {
     stream,
+    canvas,
     needsUserGesture,
     resumeAudio,
     pressButton,

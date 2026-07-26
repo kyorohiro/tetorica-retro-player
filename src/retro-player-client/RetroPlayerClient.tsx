@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { t } from "../i18n";
+import { useDialog } from "../useDialog";
 import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
@@ -18,6 +19,7 @@ import {
 } from "../retro-player/hooks/usePreviewSourceState";
 import { dispatchRetroPlayerPausePlayback } from "../retro-player/events";
 import type { RetroPlaybackEvent } from "../retro-player/hooks/usePixiVideoPlayer";
+import { isTauriRuntime } from "../retro-player/platform/runtime";
 import type { RetroGameControls } from "../retro-player/types/gameControls";
 import type { RetroPlayerLocale } from "../retro-player/types";
 import { isHeic, isImage } from "../mdrop-web/utils";
@@ -98,6 +100,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     },
     ref,
   ) {
+    const { showConfirmDialog } = useDialog();
     const [startupPreset] = useState<PresetConfig>(() => loadStartupPreset());
     const defaultPreviewSrc: string | undefined =
       startupPreset.type === 'colorbars-image' ? './test_colorbars.png' :
@@ -116,6 +119,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const nesResumeAudioRef = useRef<(() => Promise<boolean>) | null>(null);
     const nesLaunchTokenRef = useRef(0);
     const [nesGameControls, setNesGameControls] = useState<RetroGameControls | null>(null);
+    const [nesCanvas, setNesCanvas] = useState<HTMLCanvasElement | null>(null);
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
     useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
@@ -198,6 +202,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       nesCleanupRef.current = null;
       nesResumeAudioRef.current = null;
       setNesGameControls(null);
+      setNesCanvas(null);
     }, []);
 
     const stopBuiltinPlayback = useCallback(() => {
@@ -333,6 +338,34 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         previewSource.previewPath(preset.url, preset.label);
       }
     }, [previewSource, stopTone]);
+
+    const launchNesFile = useCallback((file: File) => {
+      stopTone();
+      stopNesSession();
+      clearPlaylistSession();
+      currentPlayingPathRef.current = null;
+      const launchToken = nesLaunchTokenRef.current + 1;
+      nesLaunchTokenRef.current = launchToken;
+      void startNesSession(file).then((session) => {
+        if (nesLaunchTokenRef.current !== launchToken) {
+          session.stop();
+          return;
+        }
+        nesCleanupRef.current = session.stop;
+        nesResumeAudioRef.current = session.resumeAudio;
+        setNesCanvas(session.canvas);
+        setNesGameControls({
+          kind: "nes",
+          pressButton: session.pressButton,
+          releaseButton: session.releaseButton,
+          reset: session.reset,
+        });
+        previewSource.previewVideoStream(session.stream, file.name);
+        setAutoStartState(session.needsUserGesture ? "blocked" : "done");
+      }).catch((error) => {
+        console.error("[jsnes] failed to start", error);
+      });
+    }, [clearPlaylistSession, previewSource, stopNesSession, stopTone]);
 
     const previewItem = useCallback((item: PlaylistItem) => {
       setShowFfmpegRetry(false);
@@ -502,30 +535,23 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
 
       if (files.length === 0) return;
       if (files.length === 1 && isNesRomFile(files[0])) {
-        stopTone();
-        stopNesSession();
-        clearPlaylistSession();
-        currentPlayingPathRef.current = null;
-        const launchToken = nesLaunchTokenRef.current + 1;
-        nesLaunchTokenRef.current = launchToken;
-        void startNesSession(files[0]).then((session) => {
-          if (nesLaunchTokenRef.current !== launchToken) {
-            session.stop();
-            return;
-          }
-          nesCleanupRef.current = session.stop;
-          nesResumeAudioRef.current = session.resumeAudio;
-          setNesGameControls({
-            kind: "nes",
-            pressButton: session.pressButton,
-            releaseButton: session.releaseButton,
-            reset: session.reset,
+        if (!isTauriRuntime()) {
+          void showConfirmDialog({
+            title: locale === "ja" ? "NES を開始" : "Start NES",
+            body: locale === "ja"
+              ? "ブラウザ版では開始前にタップ操作が必要です。開始を押して ROM を起動します。"
+              : "Browser builds require a direct tap before starting NES playback. Press Start to launch the ROM.",
+            okText: locale === "ja" ? "開始" : "Start",
+            cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+          }).then((confirmed) => {
+            if (!confirmed) {
+              return;
+            }
+            launchNesFile(files[0]);
           });
-          previewSource.previewVideoStream(session.stream, files[0].name);
-          setAutoStartState(session.needsUserGesture ? 'blocked' : 'done');
-        }).catch((error) => {
-          console.error("[jsnes] failed to start", error);
-        });
+          return;
+        }
+        launchNesFile(files[0]);
         return;
       }
       stopNesSession();
@@ -553,7 +579,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       previewSource.previewPath(blobUrls[0], sortedFiles[0].name);
-    }, [clearFilePlaylistBlobUrls, clearPlaylistSession, previewSource, shouldPreferDialogRetroPreview, showDialogPreviewForBrowserFiles, stopNesSession, stopTone]);
+    }, [clearFilePlaylistBlobUrls, launchNesFile, locale, previewSource, shouldPreferDialogRetroPreview, showConfirmDialog, showDialogPreviewForBrowserFiles, stopNesSession]);
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };
@@ -632,6 +658,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             onCycleLoopMode={onCycleLoopMode}
             onLoopLongPress={playlistLength > 1 ? handleLoopLongPress : undefined}
             gameControls={nesGameControls}
+            nativeOverrideElement={nesCanvas}
           />
         </React.Suspense>
         {isPlaylistOpen && playlistLength > 1 && (
