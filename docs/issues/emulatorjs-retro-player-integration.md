@@ -95,6 +95,69 @@
 
 ---
 
+## What Worked With `jsnes`
+
+`EmulatorJS` 側は後付け `captureStream()` で安定接続できなかったが、
+`jsnes` では別アプローチで Retro Player と両立できた。
+
+### Working Structure
+
+- 映像: `jsnes` が描く `canvas` をそのまま Retro Player の visual source に渡す
+- 音声: audio-only `MediaStream` を別で Retro Player の audio chain に渡す
+
+つまり、
+
+- `video source`
+- `audio source`
+
+を最初から分離して扱う構成にした。
+
+### Why It Worked Better
+
+`canvas.captureStream()` で video/audio をまとめて既存 preview pipeline に流すと:
+
+- hidden `<video>` の管理が増える
+- `waiting` / `playing` / `timeupdate` など media state 同期が増える
+- Safari / WebKit で特に重くなりやすい
+
+一方で、`jsnes` direct path では:
+
+- 映像は `canvas` 直結なので video proxy が不要
+- Video Filter は `canvas` source としてそのまま通せる
+- 音声は audio-only `MediaStream` として Retro Audio FX に戻せる
+
+結果として:
+
+- 体感性能が改善した
+- NES controller UI を維持できた
+- Video Filter / Audio Effect の両方を使える形まで戻せた
+
+### Important Implementation Detail
+
+`mediaRef` を持たない direct path では、
+Retro Player 側の通常ロジックだと `isPlaying = false` 扱いになり、
+Audio Engine の出力が止まる。
+
+そのため、aux audio stream 接続時には:
+
+- `connectMediaStream(auxAudioStream)`
+- `setEngineIsPlaying(true)`
+- `setIsPlaying(true)`
+
+のように、再生中状態を明示的に立て直す必要があった。
+
+### Practical Takeaway
+
+emulator 系 source を Retro Player に入れたい時は、
+後付け `captureStream()` で全部を既存 video pipeline に押し込むより、
+
+1. 映像は `Canvas` / texture source として直接渡す
+2. 音は audio-only stream / node として別注入する
+
+方が、性能・安定性・Safari 耐性の面で有望。
+
+---
+
 ## Practical Takeaway
 
 次にこの話を再開する時は、次のように説明すると良い:
@@ -113,3 +176,5 @@ core か renderer をこちらが直接持つ方式を検討したい。
 - `src/retro-player-client/builtin-content/emulatorjs-session.ts`
 - `src/retro-player-client/builtin-content/nes-session.ts`
 - `src/retro-player-client/RetroPlayerClient.tsx`
+- `src/retro-player/hooks/usePixiVideoPlayer.ts`
+- `src/retro-player/hooks/useRetroAudioEngine.ts`
