@@ -483,7 +483,7 @@ export const RETRO_PRESETS = {
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    outputBrightness: 1.28,
+    outputBrightness: 1.13,
   },
   phosphorDot: {
     label: "Phosphor Dot",
