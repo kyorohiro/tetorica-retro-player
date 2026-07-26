@@ -120,6 +120,8 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const nesLaunchTokenRef = useRef(0);
     const [nesGameControls, setNesGameControls] = useState<RetroGameControls | null>(null);
     const [nesCanvas, setNesCanvas] = useState<HTMLCanvasElement | null>(null);
+    const [nesAudioStream, setNesAudioStream] = useState<MediaStream | null>(null);
+    const [nesDisplayName, setNesDisplayName] = useState<string>("");
     const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
     const isDialogActiveRef = useRef(isDialogActive);
     useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
@@ -150,8 +152,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const [showFfmpegRetry, setShowFfmpegRetry] = useState(false);
     const [showPlaybackRetryHint, setShowPlaybackRetryHint] = useState(false);
     const shouldShowFfmpegRetry = false;
-
-    const isUsingDefaultPreview = !previewSource.previewSrc && !previewSource.previewStream;
 
     useEffect(() => {
       const idleCallback = window.setTimeout(() => {
@@ -203,6 +203,8 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       nesResumeAudioRef.current = null;
       setNesGameControls(null);
       setNesCanvas(null);
+      setNesAudioStream(null);
+      setNesDisplayName("");
     }, []);
 
     const stopBuiltinPlayback = useCallback(() => {
@@ -343,6 +345,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       stopTone();
       stopNesSession();
       clearPlaylistSession();
+      previewSource.clearPreview();
       currentPlayingPathRef.current = null;
       const launchToken = nesLaunchTokenRef.current + 1;
       nesLaunchTokenRef.current = launchToken;
@@ -353,14 +356,16 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         }
         nesCleanupRef.current = session.stop;
         nesResumeAudioRef.current = session.resumeAudio;
+        session.setLocalMonitorEnabled(false);
         setNesCanvas(session.canvas);
+        setNesAudioStream(session.audioStream);
+        setNesDisplayName(file.name);
         setNesGameControls({
           kind: "nes",
           pressButton: session.pressButton,
           releaseButton: session.releaseButton,
           reset: session.reset,
         });
-        previewSource.previewVideoStream(session.stream, file.name);
         setAutoStartState(session.needsUserGesture ? "blocked" : "done");
       }).catch((error) => {
         console.error("[jsnes] failed to start", error);
@@ -608,18 +613,34 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       playPresetDemoSong,
     ]);
 
+    const isNesDirectPreviewActive = Boolean(nesCanvas);
+    const activePreviewSrc = isNesDirectPreviewActive
+      ? undefined
+      : (previewSource.previewSrc ?? defaultPreviewSrc);
+    const activePreviewStream = isNesDirectPreviewActive ? null : previewSource.previewStream;
+    const activePreviewKind = isNesDirectPreviewActive
+      ? "image"
+      : (previewSource.previewKind ?? defaultPreviewKind);
+    const activePreviewName = isNesDirectPreviewActive
+      ? nesDisplayName
+      : previewSource.previewLabel;
+    const isUsingDefaultPreview =
+      !isNesDirectPreviewActive &&
+      !previewSource.previewSrc &&
+      !previewSource.previewStream;
+
     return (
       <div className="relative flex-1 min-h-0">
         <React.Suspense fallback={null}>
           <RetroPlayer
             locale={locale}
             key={retroPlayerKey}
-            src={previewSource.previewSrc ?? defaultPreviewSrc}
-            displayName={previewSource.previewLabel}
+            src={activePreviewSrc}
+            displayName={activePreviewName}
             displayIndex={playlistLength > 0 ? playlistIndex + 1 : null}
-            stream={previewSource.previewStream}
-            streamName={previewSource.previewLabel}
-            kind={previewSource.previewKind ?? defaultPreviewKind}
+            stream={activePreviewStream}
+            streamName={activePreviewName}
+            kind={activePreviewKind}
             playbackSource={currentPlaybackSource}
             looping={
               !isUsingDefaultPreview &&
@@ -659,6 +680,8 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             onLoopLongPress={playlistLength > 1 ? handleLoopLongPress : undefined}
             gameControls={nesGameControls}
             nativeOverrideElement={nesCanvas}
+            visualOverrideElement={nesCanvas}
+            auxAudioStream={nesAudioStream}
           />
         </React.Suspense>
         {isPlaylistOpen && playlistLength > 1 && (

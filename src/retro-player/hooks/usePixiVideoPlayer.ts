@@ -97,6 +97,8 @@ export function usePixiVideoPlayer(
     requestedKind?: "video" | "audio" | "image";
     requestedIndex?: number | null;
     disableTransportKeyboardShortcuts?: boolean;
+    visualOverrideElement?: HTMLCanvasElement | null;
+    auxAudioStream?: MediaStream | null;
   },
 ) {
   const instanceLabelRef = useRef(`player-${(retroPlayerInstanceSeed += 1)}`);
@@ -428,6 +430,7 @@ export function usePixiVideoPlayer(
     updateAudioNodes,
     setEngineIsPlaying,
     connectMediaStream,
+    disconnectMediaInput,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
     rebuildAudioGraphForCurrentMedia,
@@ -473,6 +476,81 @@ export function usePixiVideoPlayer(
     sourceDimensionsRef.current = nextDimensions;
     setSourceDimensions(nextDimensions);
   };
+
+  useEffect(() => {
+    const visualOverride = options?.visualOverrideElement ?? null;
+    if (!visualOverride) {
+      return;
+    }
+
+    previewElementRef.current = visualOverride;
+    setPreviewKindState("capture");
+    setSourceDimensionsState({
+      width: visualOverride.width,
+      height: visualOverride.height,
+    });
+    scheduleRefreshLayout();
+    safeRender();
+    appRef.current?.ticker.start();
+
+    return () => {
+      if (previewElementRef.current === visualOverride) {
+        previewElementRef.current = null;
+      }
+      if (previewKindRef.current === "capture" && !mediaRef.current) {
+        setPreviewKindState(null);
+      }
+      if (!mediaRef.current) {
+        setSourceDimensionsState(null);
+        safeRender();
+      }
+    };
+  }, [
+    appRef,
+    mediaRef,
+    options?.visualOverrideElement,
+    previewElementRef,
+    previewKindRef,
+    safeRender,
+    scheduleRefreshLayout,
+  ]);
+
+  useEffect(() => {
+    const auxAudioStream = options?.auxAudioStream ?? null;
+    if (!auxAudioStream) {
+      if (!mediaRef.current) {
+        disconnectMediaInput();
+      }
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await connectMediaStream(auxAudioStream, "AUX_AUDIO_STREAM");
+        if (cancelled && !mediaRef.current) {
+          disconnectMediaInput();
+        }
+      } catch (error) {
+        debugAudio("auxAudioStream:error", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (!mediaRef.current) {
+        disconnectMediaInput();
+      }
+    };
+  }, [
+    connectMediaStream,
+    debugAudio,
+    disconnectMediaInput,
+    mediaRef,
+    options?.auxAudioStream,
+  ]);
 
   const beginLoading = (label: string) => {
     setLoadingLabel(label);

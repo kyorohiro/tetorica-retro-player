@@ -31,7 +31,9 @@ type UseRetroPreviewMediaParams = {
   appRef: CurrentRef<CanvasStageApp | null>;
   spriteRef: CurrentRef<null>;
   textureRef: CurrentRef<null>;
-  previewElementRef: CurrentRef<HTMLImageElement | HTMLMediaElement | null>;
+  previewElementRef: CurrentRef<
+    HTMLImageElement | HTMLCanvasElement | HTMLMediaElement | null
+  >;
   filterRef: CurrentRef<Record<string, never> | null>;
   mediaRef: CurrentRef<HTMLMediaElement | null>;
   objectUrlRef: CurrentRef<string | null>;
@@ -84,7 +86,11 @@ type UseRetroPreviewMediaParams = {
   connectMediaStream: (stream: MediaStream, mediaTag?: string) => Promise<void>;
   connectMediaAudio: (media: HTMLMediaElement) => Promise<void>;
   rebuildAudioGraphForCurrentMedia: (reason: string) => Promise<AudioContext | null>;
-  fitSprite: (app: CanvasStageApp | null, sprite: null, source: HTMLVideoElement | HTMLImageElement) =>
+  fitSprite: (
+    app: CanvasStageApp | null,
+    sprite: null,
+    source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  ) =>
     | { width: number; height: number; x: number; y: number }
     | undefined;
   refreshLayout: () => void;

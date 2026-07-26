@@ -82,6 +82,8 @@ type RetroPlayerProps = {
   persistNativePlaybackMode?: boolean;
   gameControls?: RetroGameControls | null;
   nativeOverrideElement?: HTMLCanvasElement | null;
+  visualOverrideElement?: HTMLCanvasElement | null;
+  auxAudioStream?: MediaStream | null;
 };
 
 export function RetroPlayer({
@@ -114,6 +116,8 @@ export function RetroPlayer({
   persistNativePlaybackMode = true,
   gameControls,
   nativeOverrideElement,
+  visualOverrideElement,
+  auxAudioStream,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
@@ -259,6 +263,8 @@ export function RetroPlayer({
       requestedKind: kind,
       requestedIndex: displayIndex,
       disableTransportKeyboardShortcuts: gameControls?.kind === "nes",
+      visualOverrideElement,
+      auxAudioStream,
     },
   );
 

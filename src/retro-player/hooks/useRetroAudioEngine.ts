@@ -700,6 +700,13 @@ export function useRetroAudioEngine({
     }
   };
 
+  const disconnectMediaInput = () => {
+    mediaSourceRef.current?.disconnect();
+    mediaSourceRef.current = null;
+    audioEngineRef.current?.setOutputEnabled(false);
+    updateAudioNodes();
+  };
+
   const reconnectCurrentMediaAudio = () => {
     const mediaSource = mediaSourceRef.current;
     const engine = audioEngineRef.current;
@@ -1211,6 +1218,7 @@ export function useRetroAudioEngine({
     setEngineIsPlaying,
     connectSourceNode,
     connectMediaStream,
+    disconnectMediaInput,
     connectMediaAudio,
     reconnectCurrentMediaAudio,
     rebuildAudioGraphForCurrentMedia,

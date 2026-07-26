@@ -129,6 +129,14 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     });
   }, [revokePreviewSrc]);
 
+  const clearPreview = useCallback(() => {
+    stopPreviewStream();
+    clearPreviewSrc();
+    setPreviewLabel(undefined);
+    setCaptureError("");
+    setPreviewKind(undefined);
+  }, [clearPreviewSrc, stopPreviewStream]);
+
   useEffect(() => {
     return () => {
       revokePreviewSrc(previewSrc);
@@ -361,5 +369,6 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     startMicrophoneInput,
     startCameraInput,
     stopPreviewStream,
+    clearPreview,
   };
 }

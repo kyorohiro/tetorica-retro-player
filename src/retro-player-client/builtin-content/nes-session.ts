@@ -11,9 +11,11 @@ const AUDIO_RESUME_TIMEOUT_MS = 1200;
 
 export type NesSession = {
   stream: MediaStream;
+  audioStream: MediaStream | null;
   canvas: HTMLCanvasElement;
   needsUserGesture: boolean;
   resumeAudio: () => Promise<boolean>;
+  setLocalMonitorEnabled: (enabled: boolean) => void;
   pressButton: (button: NesControlButton) => void;
   releaseButton: (button: NesControlButton) => void;
   reset: () => void;
@@ -136,10 +138,18 @@ export async function startNesSession(file: File): Promise<NesSession> {
   }
 
   const videoStream = makeSilentStream(canvas);
+  const audioStream = audioDestination?.stream ?? null;
   const stream = new MediaStream([
     ...videoStream.getVideoTracks(),
     ...(!useLocalAudioMonitor ? (audioDestination?.stream.getAudioTracks() ?? []) : []),
   ]);
+
+  const setLocalMonitorEnabled = (enabled: boolean) => {
+    if (!audioMuteGain) {
+      return;
+    }
+    audioMuteGain.gain.value = enabled ? 1 : 0;
+  };
 
   const nes = new NES({
     sampleRate: 48000,
@@ -236,9 +246,11 @@ export async function startNesSession(file: File): Promise<NesSession> {
 
   return {
     stream,
+    audioStream,
     canvas,
     needsUserGesture,
     resumeAudio,
+    setLocalMonitorEnabled,
     pressButton,
     releaseButton,
     reset,
