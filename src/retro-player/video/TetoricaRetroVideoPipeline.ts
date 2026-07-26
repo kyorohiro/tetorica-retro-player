@@ -672,6 +672,8 @@ export class TetoricaRetroVideoPipeline {
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
 
   private startedAt = nowMs();
+  private animationTimeSec = 0;
+  private lastAnimationTickAt = this.startedAt;
   private windowsLiteVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLitePendingVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLiteCompilePromise: Promise<void> | null = null;
@@ -861,8 +863,6 @@ export class TetoricaRetroVideoPipeline {
     this.pass2Locs = this.buildPass2UniformLocations(pass2);
     this.setBeamKernelProgram(beamKernel ?? null);
 
-    // Reset time so CRT/glow animations start from t=0.
-    this.resetAnimationClock();
   }
 
   private setBeamKernelProgram(program: WebGLProgram | null) {
@@ -1313,6 +1313,16 @@ export class TetoricaRetroVideoPipeline {
 
   resetAnimationClock(startedAt = nowMs()) {
     this.startedAt = startedAt;
+    this.lastAnimationTickAt = startedAt;
+    this.animationTimeSec = 0;
+  }
+
+  private advanceAnimationClock() {
+    const now = nowMs();
+    const deltaMs = Math.max(0, Math.min(250, now - this.lastAnimationTickAt));
+    this.lastAnimationTickAt = now;
+    this.animationTimeSec = (this.animationTimeSec + deltaMs / 1000) % 4096;
+    return this.animationTimeSec;
   }
 
   readPixels() {
@@ -1768,7 +1778,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uBeamWhiteBloom, filterState.beamWhiteBloom);
     gl.uniform1f(this.pass2Locs.uBeamWarmBloom, filterState.beamWarmBloom);
     gl.uniform1f(this.pass2Locs.uScreenFaceGlow, filterState.screenFaceGlow);
-    const timeSec = (nowMs() - this.startedAt) / 1000;
+    const timeSec = this.advanceAnimationClock();
     gl.uniform1f(this.pass2Locs.uFocusStrength, filterState.focusStrength);
     gl.uniform2f(this.pass2Locs.uFocusSize, filterState.focusWidth, filterState.focusHeight);
     gl.uniform2f(this.pass2Locs.uFocusCenter, filterState.focusCenterX, filterState.focusCenterY);
