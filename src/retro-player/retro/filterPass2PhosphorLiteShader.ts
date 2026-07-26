@@ -27,6 +27,7 @@ uniform float uPhosphorDotLightBalance;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
 uniform float uBasicSaturation;
+uniform float uSmoothStrength;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotShape;
@@ -458,15 +459,35 @@ void main(void)
     vec2 leftUv  = clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
     vec2 downUv  = clamp((cell + vec2(0.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
     vec2 upUv    = clamp((cell + vec2(0.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 downRightUv = clamp((cell + vec2(1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 downLeftUv = clamp((cell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upRightUv = clamp((cell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upLeftUv = clamp((cell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
     vec3 rightColor = texture(uPass1Texture, rightUv).rgb;
     vec3 leftColor  = texture(uPass1Texture, leftUv).rgb;
     vec3 downColor  = texture(uPass1Texture, downUv).rgb;
     vec3 upColor    = texture(uPass1Texture, upUv).rgb;
+    vec3 downRightColor = texture(uPass1Texture, downRightUv).rgb;
+    vec3 downLeftColor = texture(uPass1Texture, downLeftUv).rgb;
+    vec3 upRightColor = texture(uPass1Texture, upRightUv).rgb;
+    vec3 upLeftColor = texture(uPass1Texture, upLeftUv).rgb;
     bool useBrightCoreLeak = uPhosphorDotBrightCore > 0.5;
 
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
+    vec3 diagonalMix = (downRightColor + downLeftColor + upRightColor + upLeftColor) * 0.25;
+    vec2 pass1Size = vec2(textureSize(uPass1Texture, 0));
+    vec2 cellPixels = pass1Size / max(uTargetSize, vec2(1.0));
+    float enlargedCellMix =
+      clamp(uSmoothStrength, 0.0, 1.0) *
+      smoothstep(5.0, 11.0, max(cellPixels.x, cellPixels.y));
+    vec3 enlargedCellAverage =
+      centerColor * 0.36 +
+      neighborMix * 0.40 +
+      diagonalMix * 0.24;
+    centerColor = mix(centerColor, enlargedCellAverage, enlargedCellMix * 0.42);
+
     float sourceColorDelta = length(centerColor - neighborMix);
     float sourceBlendAmount =
       neighborBlendMix *
@@ -566,10 +587,10 @@ void main(void)
         leftColor * leftNeighborHalo +
         downColor * downNeighborHalo +
         upColor * upNeighborHalo +
-        texture(uPass1Texture, clamp((cell + vec2(1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downRightNeighborHalo * 0.75 +
-        texture(uPass1Texture, clamp((cell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downLeftNeighborHalo * 0.75 +
-        texture(uPass1Texture, clamp((cell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upRightNeighborHalo * 0.75 +
-        texture(uPass1Texture, clamp((cell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upLeftNeighborHalo * 0.75;
+        downRightColor * downRightNeighborHalo * 0.75 +
+        downLeftColor * downLeftNeighborHalo * 0.75 +
+        upRightColor * upRightNeighborHalo * 0.75 +
+        upLeftColor * upLeftNeighborHalo * 0.75;
       phosphorColor += overlapHalo * uSpotMaskStrength * (0.18 + phosphorBrightness * 0.3 + strongLightLeak * 0.08);
 
       float bulbSpread = smoothstep(0.18, 0.62, uBulbRadius);

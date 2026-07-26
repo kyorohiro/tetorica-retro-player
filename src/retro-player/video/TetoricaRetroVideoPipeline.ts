@@ -125,6 +125,7 @@ type Pass1UniformLocations = {
   uNeonBoost: WebGLUniformLocation | null;
   uNeonSaturation: WebGLUniformLocation | null;
   uNeonDetail: WebGLUniformLocation | null;
+  uPhosphorDitherSuppress: WebGLUniformLocation | null;
 };
 
 type Pass2UniformLocations = {
@@ -1208,6 +1209,7 @@ export class TetoricaRetroVideoPipeline {
       uNeonBoost: gl.getUniformLocation(program, "uNeonBoost"),
       uNeonSaturation: gl.getUniformLocation(program, "uNeonSaturation"),
       uNeonDetail: gl.getUniformLocation(program, "uNeonDetail"),
+      uPhosphorDitherSuppress: gl.getUniformLocation(program, "uPhosphorDitherSuppress"),
     };
   }
 
@@ -1691,6 +1693,10 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass1Locs.uNeonBoost, filterState.neonBoost);
     gl.uniform1f(this.pass1Locs.uNeonSaturation, filterState.neonSaturation);
     gl.uniform1f(this.pass1Locs.uNeonDetail, filterState.neonDetail);
+    gl.uniform1f(
+      this.pass1Locs.uPhosphorDitherSuppress,
+      isPhosphorDotModeEnabled(filterState) ? 1 : 0,
+    );
   }
 
   private applyPass2Uniforms(
