@@ -50,6 +50,7 @@ export type RetroVideoFilterState = {
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  phosphorLowFreqEnabled: boolean;
   phosphorDotGrainStrength: number;
   phosphorDotGlowColorStrength: number;
   beamDarkCutoff: number;
@@ -163,6 +164,7 @@ type Pass2UniformLocations = {
   uPhosphorDotCellFill: WebGLUniformLocation | null;
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
+  uPhosphorLowFreqEnabled: WebGLUniformLocation | null;
   uPhosphorDotGrainStrength: WebGLUniformLocation | null;
   uPhosphorDotGlowColorStrength: WebGLUniformLocation | null;
   uBeamDarkCutoff: WebGLUniformLocation | null;
@@ -1341,6 +1343,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
+      uPhosphorLowFreqEnabled: gl.getUniformLocation(program, "uPhosphorLowFreqEnabled"),
       uPhosphorDotGrainStrength: gl.getUniformLocation(program, "uPhosphorDotGrainStrength"),
       uPhosphorDotGlowColorStrength: gl.getUniformLocation(program, "uPhosphorDotGlowColorStrength"),
       uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
@@ -1537,7 +1540,10 @@ export class TetoricaRetroVideoPipeline {
         displayWidth / Math.max(pass2TargetWidth, 1),
         displayHeight / Math.max(pass2TargetHeight, 1),
       );
-      const needsPhosphorPrefilter = isPhosphorDotMode && displayCellPixels < 3.0;
+      const needsPhosphorPrefilter =
+        filterState.phosphorLowFreqEnabled &&
+        isPhosphorDotMode &&
+        displayCellPixels < 3.0;
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
       this.ensureFbo(w, h);
@@ -1909,6 +1915,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorLowFreqEnabled, filterState.phosphorLowFreqEnabled ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotGrainStrength, filterState.phosphorDotGrainStrength);
     gl.uniform1f(this.pass2Locs.uPhosphorDotGlowColorStrength, filterState.phosphorDotGlowColorStrength);
     gl.uniform1f(this.pass2Locs.uBeamDarkCutoff, filterState.beamDarkCutoff);

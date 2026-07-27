@@ -56,6 +56,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   phosphorDotCellFill: 0,
   phosphorDotFlatDisc: false,
   phosphorDotNeighborBlend: false,
+  phosphorLowFreqEnabled: false,
   phosphorDotGrainStrength: 0,
   phosphorDotGlowColorStrength: 0,
   beamDarkCutoff: DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,

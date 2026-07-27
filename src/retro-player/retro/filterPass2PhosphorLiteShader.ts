@@ -36,6 +36,7 @@ uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
 uniform float uPhosphorDotNeighborBlend;
+uniform float uPhosphorLowFreqEnabled;
 uniform float uPhosphorDotGrainStrength;
 uniform float uPhosphorDotGlowColorStrength;
 
@@ -461,8 +462,9 @@ void main(void)
   }
 
   if (uPhosphorDotMode > 0.5) {
-    float simplifiedDotMix = 1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels);
-    float mergedDotMix = 1.0 - smoothstep(1.6, 2.2, uDisplayCellPixels);
+    float lowFreqEnabled = smoothstep(0.5, 1.0, uPhosphorLowFreqEnabled);
+    float simplifiedDotMix = (1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels)) * lowFreqEnabled;
+    float mergedDotMix = (1.0 - smoothstep(1.6, 2.2, uDisplayCellPixels)) * lowFreqEnabled;
     vec3 centerColor = color.rgb;
 
     vec2 rightUv = clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
@@ -745,7 +747,9 @@ void main(void)
   color.rgb += vec3(scanline2);
 
   if (uPhosphorStrength > 0.001) {
-    float simplifiedTriadMix = 1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels);
+    float simplifiedTriadMix =
+      (1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels)) *
+      smoothstep(0.5, 1.0, uPhosphorLowFreqEnabled);
     float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
     vec3 phosphorTriad = vec3(
       sin(phosphorPhase) * 0.5 + 0.5,

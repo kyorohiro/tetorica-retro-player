@@ -37,6 +37,7 @@ uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
 uniform float uPhosphorDotNeighborBlend;
+uniform float uPhosphorLowFreqEnabled;
 uniform float uPhosphorDotGrainStrength;
 uniform float uPhosphorDotGlowColorStrength;
 
@@ -110,10 +111,18 @@ vec3 applyScreenFaceGlow(vec3 color)
   vec3 floorGlow = vec3(0.22, 0.19, 0.15) * faceGlow * amount;
   vec3 lifted = max(color, floorGlow);
   float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float saturation = max(max(color.r, color.g), color.b) - min(min(color.r, color.g), color.b);
   float hazeMask =
     faceGlow *
     (0.45 + smoothstep(0.02, 0.55, luma) * 0.90);
-  vec3 hazeGlow = vec3(0.34, 0.32, 0.29) * hazeMask * amount * 0.72;
+  vec3 glowTint = mix(vec3(luma), color, 0.34 + smoothstep(0.03, 0.28, saturation) * 0.42);
+  float brightClamp = 1.0 - smoothstep(0.74, 1.0, luma) * 0.52;
+  vec3 hazeGlow =
+    mix(vec3(0.34, 0.32, 0.29), glowTint, 0.6) *
+    hazeMask *
+    amount *
+    0.56 *
+    brightClamp;
 
   return lifted + hazeGlow;
 }
@@ -454,8 +463,9 @@ void main(void)
   }
 
   if (uPhosphorDotMode > 0.5) {
-    float simplifiedDotMix = 1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels);
-    float mergedDotMix = 1.0 - smoothstep(1.6, 2.2, uDisplayCellPixels);
+    float lowFreqEnabled = smoothstep(0.5, 1.0, uPhosphorLowFreqEnabled);
+    float simplifiedDotMix = (1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels)) * lowFreqEnabled;
+    float mergedDotMix = (1.0 - smoothstep(1.6, 2.2, uDisplayCellPixels)) * lowFreqEnabled;
     vec3 centerColor = color.rgb;
 
     vec2 rightUv = clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
@@ -674,7 +684,13 @@ void main(void)
 
     if (uGlowStrength > 0.001) {
       vec3 glowLift = max(centerColor - mergedSourceColor, vec3(0.0));
-      phosphorColor += glowLift * (0.3 + bleedMask * 0.25 + phosphorBrightness * 0.15);
+      float glowLiftLuma = dot(glowLift, vec3(0.299, 0.587, 0.114));
+      float glowLiftSat = max(max(glowLift.r, glowLift.g), glowLift.b) - min(min(glowLift.r, glowLift.g), glowLift.b);
+      float brightClamp = 1.0 - smoothstep(0.72, 1.0, phosphorBrightness) * 0.58;
+      vec3 glowLiftTint =
+        vec3(glowLiftLuma) * (0.28 + (1.0 - brightClamp) * 0.06) +
+        (glowLift - vec3(glowLiftLuma)) * (0.92 + smoothstep(0.02, 0.18, glowLiftSat) * 0.38);
+      phosphorColor += glowLiftTint * (0.22 + bleedMask * 0.18 + phosphorBrightness * 0.09) * brightClamp;
     }
 
     if (getWarmBloomAmount() > 0.001) {
@@ -732,7 +748,9 @@ void main(void)
   color.rgb += vec3(scanline2);
 
   if (uPhosphorStrength > 0.001) {
-    float simplifiedTriadMix = 1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels);
+    float simplifiedTriadMix =
+      (1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels)) *
+      smoothstep(0.5, 1.0, uPhosphorLowFreqEnabled);
     float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
     vec3 phosphorTriad = vec3(
       sin(phosphorPhase) * 0.5 + 0.5,

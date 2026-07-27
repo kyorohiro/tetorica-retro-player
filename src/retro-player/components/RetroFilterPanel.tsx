@@ -97,6 +97,7 @@ type RetroFilterPanelProps = {
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
+  phosphorLowFreqEnabled: boolean;
   phosphorDotGrainStrength: number;
   phosphorDotGlowColorStrength: number;
   beamDarkCutoff: number;
@@ -151,6 +152,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
+  onSetPhosphorLowFreqEnabled: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
   onSetPhosphorDotGlowColorStrength: (value: number) => void;
   onSetBeamDarkCutoff: (value: number) => void;
@@ -207,6 +209,7 @@ export function RetroFilterPanel({
   phosphorDotCellFill,
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
+  phosphorLowFreqEnabled,
   phosphorDotGrainStrength,
   phosphorDotGlowColorStrength,
   beamDarkCutoff,
@@ -258,6 +261,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotCellFill,
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
+  onSetPhosphorLowFreqEnabled,
   onSetPhosphorDotGrainStrength,
   onSetPhosphorDotGlowColorStrength,
   onSetBeamDarkCutoff,
@@ -1139,7 +1143,7 @@ export function RetroFilterPanel({
               <input
                 type="range"
                 min="0"
-                max="8"
+                max="100"
                 step="1"
                 value={toonSteps}
                 onChange={(ev) => onSetToonSteps(Number(ev.currentTarget.value))}
@@ -1278,6 +1282,20 @@ export function RetroFilterPanel({
                   ].join(" ")}
                 >
                   Neighbor blend
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorLowFreqEnabled(!phosphorLowFreqEnabled);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorLowFreqEnabled
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Low-frequency anti-moire
                 </button>
             <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
               <span
