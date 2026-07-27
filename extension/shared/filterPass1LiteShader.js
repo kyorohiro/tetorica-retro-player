@@ -23,6 +23,7 @@ uniform float uNeonBoost;
 uniform float uNeonSaturation;
 uniform float uNeonDetail;
 uniform float uGlowStrength;
+uniform float uColoredGlowEnabled;
 
 float bayer4x4(vec2 pos)
 {
@@ -389,7 +390,18 @@ void main(void)
 
       float brightness = max(max(color.r, color.g), color.b);
       float glowMask = smoothstep(0.45, 1.0, brightness);
-      color += glow * glowMask * uGlowStrength;
+      if (uColoredGlowEnabled > 0.5) {
+        float glowLuma = dot(glow, vec3(0.299, 0.587, 0.114));
+        float glowSat = max(max(glow.r, glow.g), glow.b) - min(min(glow.r, glow.g), glow.b);
+        vec3 glowChroma = glow - vec3(glowLuma);
+        float brightClamp = 1.0 - smoothstep(0.72, 1.0, brightness) * 0.55;
+        vec3 coloredGlow =
+          vec3(glowLuma) * (0.30 + (1.0 - brightClamp) * 0.06) +
+          glowChroma * (0.96 + smoothstep(0.03, 0.22, glowSat) * 0.42);
+        color += coloredGlow * glowMask * uGlowStrength * brightClamp;
+      } else {
+        color += glow * glowMask * uGlowStrength;
+      }
     }
   }
 

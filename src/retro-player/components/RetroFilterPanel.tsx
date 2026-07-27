@@ -99,6 +99,7 @@ type RetroFilterPanelProps = {
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
   phosphorDotGlowColorStrength: number;
+  coloredGlowEnabled: boolean;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
@@ -153,6 +154,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
   onSetPhosphorDotGlowColorStrength: (value: number) => void;
+  onSetColoredGlowEnabled: (value: boolean) => void;
   onSetBeamDarkCutoff: (value: number) => void;
   onSetBeamHorizontalSpread: (value: number) => void;
   onSetBeamStripeStrength: (value: number) => void;
@@ -209,6 +211,7 @@ export function RetroFilterPanel({
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
   phosphorDotGlowColorStrength,
+  coloredGlowEnabled,
   beamDarkCutoff,
   beamHorizontalSpread,
   beamStripeStrength,
@@ -260,6 +263,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
   onSetPhosphorDotGlowColorStrength,
+  onSetColoredGlowEnabled,
   onSetBeamDarkCutoff,
   onSetBeamHorizontalSpread,
   onSetBeamStripeStrength,
@@ -966,13 +970,25 @@ export function RetroFilterPanel({
               <input
                 type="range"
                 min="0"
-                max="0.5"
+                max="2.0"
                 step="0.01"
                 value={glowStrength}
                 onChange={(ev) => onSetGlowStrength(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>
+            <button
+              type="button"
+              onClick={() => onSetColoredGlowEnabled(!coloredGlowEnabled)}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                coloredGlowEnabled
+                  ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Colored glow
+            </button>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip

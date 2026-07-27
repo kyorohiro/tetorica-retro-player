@@ -86,6 +86,7 @@ export type RetroPresetDefinition = {
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
   phosphorDotGlowColorStrength?: number;
+  coloredGlowEnabled?: boolean;
   beamDarkCutoff?: number;
   beamHorizontalSpread?: number;
   beamStripeStrength?: number;
