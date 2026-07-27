@@ -23,6 +23,7 @@ uniform float uNeonBoost;
 uniform float uNeonSaturation;
 uniform float uNeonDetail;
 uniform float uGlowStrength;
+uniform float uPhosphorDitherSuppress;
 
 float bayer4x4(vec2 pos)
 {
@@ -353,8 +354,17 @@ void main(void)
   }
   vec3 leftSharp = sampleSourceColorAtCell(cell + vec2(-1.0, 0.0));
   vec3 rightSharp = sampleSourceColorAtCell(cell + vec2(1.0, 0.0));
+  vec3 upSmooth = sampleSourceColorAtCell(cell + vec2(0.0, -1.0));
+  vec3 downSmooth = sampleSourceColorAtCell(cell + vec2(0.0, 1.0));
   vec3 color = applyHorizontalSharpness(sourceColor, leftSharp, rightSharp);
-  float dither = (bayer4x4(cell) - 0.5) * (uDitherStrength / max(uColorLevels, 1.0));
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  float flatness = length(leftSharp - rightSharp) + length(upSmooth - downSmooth);
+  float suppressMask =
+    clamp(uPhosphorDitherSuppress, 0.0, 1.0) *
+    smoothstep(0.42, 0.9, luminance) *
+    (1.0 - smoothstep(0.08, 0.24, flatness));
+  float effectiveDitherStrength = uDitherStrength * (1.0 - suppressMask * 0.92);
+  float dither = (bayer4x4(cell) - 0.5) * (effectiveDitherStrength / max(uColorLevels, 1.0));
   color = clamp(color + dither, 0.0, 1.0);
   color = applyToonShading(color, uToonSteps);
 
@@ -398,8 +408,8 @@ void main(void)
   float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
   if (edgeBoost > 0.001) {
     float edge = computeSourceEdge(pixelatedUv, texel);
-    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-    float low = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, luminance));
+    float edgeLuminance = dot(color, vec3(0.299, 0.587, 0.114));
+    float low = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, edgeLuminance));
     float high = max(low + 0.02, uAnimeEdgeHigh);
     float edgeMix = smoothstep(low, high, edge) * min(edgeBoost, 1.0);
     color = mix(color, vec3(0.0), clamp(edgeMix, 0.0, 1.0));

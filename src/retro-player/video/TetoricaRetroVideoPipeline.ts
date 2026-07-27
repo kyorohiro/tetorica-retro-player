@@ -125,12 +125,14 @@ type Pass1UniformLocations = {
   uNeonBoost: WebGLUniformLocation | null;
   uNeonSaturation: WebGLUniformLocation | null;
   uNeonDetail: WebGLUniformLocation | null;
+  uPhosphorDitherSuppress: WebGLUniformLocation | null;
 };
 
 type Pass2UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
   uOutputSize: WebGLUniformLocation | null;
   uDisplaySize: WebGLUniformLocation | null;
+  uDisplayCellPixels: WebGLUniformLocation | null;
   uBeamKernelTexture: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
@@ -188,6 +190,12 @@ type BeamDownscaleUniformLocations = {
   uTexture: WebGLUniformLocation | null;
   uSourceSize: WebGLUniformLocation | null;
   uTargetSize: WebGLUniformLocation | null;
+};
+
+type PhosphorPrefilterUniformLocations = {
+  uTexture: WebGLUniformLocation | null;
+  uTargetSize: WebGLUniformLocation | null;
+  uBlurCells: WebGLUniformLocation | null;
 };
 
 type BeamKernelUniformLocations = {
@@ -250,6 +258,42 @@ void main(void)
   accum += texture(uTexture, vTextureCoord + radius * vec2( 1.0,  1.0));
 
   finalColor = accum / 9.0;
+}
+`;
+
+const PHOSPHOR_PREFILTER_FRAGMENT = `#version 300 es
+precision mediump float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform vec2 uTargetSize;
+uniform float uBlurCells;
+
+void main(void)
+{
+  vec2 targetSize = max(uTargetSize, vec2(1.0));
+  vec2 cell = floor(vTextureCoord * targetSize);
+  vec2 centerUv = clamp((cell + 0.5) / targetSize, vec2(0.0), vec2(1.0));
+  vec2 stepUv = 1.0 / targetSize;
+  float blurMix = clamp(uBlurCells, 0.0, 1.0);
+
+  vec3 center = texture(uTexture, centerUv).rgb;
+  vec3 right = texture(uTexture, clamp(centerUv + vec2(stepUv.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 left = texture(uTexture, clamp(centerUv - vec2(stepUv.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 down = texture(uTexture, clamp(centerUv + vec2(0.0, stepUv.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 up = texture(uTexture, clamp(centerUv - vec2(0.0, stepUv.y), vec2(0.0), vec2(1.0))).rgb;
+  vec3 downRight = texture(uTexture, clamp(centerUv + stepUv * vec2(1.0, 1.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 downLeft = texture(uTexture, clamp(centerUv + stepUv * vec2(-1.0, 1.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 upRight = texture(uTexture, clamp(centerUv + stepUv * vec2(1.0, -1.0), vec2(0.0), vec2(1.0))).rgb;
+  vec3 upLeft = texture(uTexture, clamp(centerUv + stepUv * vec2(-1.0, -1.0), vec2(0.0), vec2(1.0))).rgb;
+
+  vec3 cross = (right + left + down + up) * 0.25;
+  vec3 diagonal = (downRight + downLeft + upRight + upLeft) * 0.25;
+  vec3 lowFreq = center * 0.12 + cross * 0.50 + diagonal * 0.38;
+  vec3 color = mix(center, lowFreq, blurMix);
+  finalColor = vec4(color, 1.0);
 }
 `;
 
@@ -636,6 +680,8 @@ export class TetoricaRetroVideoPipeline {
   private readonly passthroughProgram: WebGLProgram;
   private readonly beamDownscaleProgram: WebGLProgram;
   private readonly beamDownscaleLocs: BeamDownscaleUniformLocations;
+  private readonly phosphorPrefilterProgram: WebGLProgram;
+  private readonly phosphorPrefilterLocs: PhosphorPrefilterUniformLocations;
   private beamKernelProgram: WebGLProgram | null = null;
   private beamKernelLocs: BeamKernelUniformLocations | null = null;
 
@@ -1122,11 +1168,17 @@ export class TetoricaRetroVideoPipeline {
       VERTEX_SHADER_SOURCE,
       BEAM_SOURCE_DOWNSCALE_FRAGMENT,
     );
-    await waitAndVerifyPrograms(gl, [passthroughProgram, beamDownscaleProgram]);
+    const phosphorPrefilterProgram = submitProgram(
+      gl,
+      VERTEX_SHADER_SOURCE,
+      PHOSPHOR_PREFILTER_FRAGMENT,
+    );
+    await waitAndVerifyPrograms(gl, [passthroughProgram, beamDownscaleProgram, phosphorPrefilterProgram]);
     const pipeline = new TetoricaRetroVideoPipeline(
       gl,
       passthroughProgram,
       beamDownscaleProgram,
+      phosphorPrefilterProgram,
       true,
     );
 
@@ -1145,11 +1197,13 @@ export class TetoricaRetroVideoPipeline {
     gl: WebGL2RenderingContext,
     passthroughProgram: WebGLProgram,
     beamDownscaleProgram: WebGLProgram,
+    phosphorPrefilterProgram: WebGLProgram,
     windowsLiteMode = false,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
     this.beamDownscaleProgram = beamDownscaleProgram;
+    this.phosphorPrefilterProgram = phosphorPrefilterProgram;
     this.windowsLiteMode = windowsLiteMode;
 
     const vertexBuffer = gl.createBuffer();
@@ -1186,6 +1240,13 @@ export class TetoricaRetroVideoPipeline {
       uSourceSize: gl.getUniformLocation(this.beamDownscaleProgram, "uSourceSize"),
       uTargetSize: gl.getUniformLocation(this.beamDownscaleProgram, "uTargetSize"),
     };
+    gl.useProgram(this.phosphorPrefilterProgram);
+    gl.uniform1i(gl.getUniformLocation(this.phosphorPrefilterProgram, "uTexture"), 0);
+    this.phosphorPrefilterLocs = {
+      uTexture: gl.getUniformLocation(this.phosphorPrefilterProgram, "uTexture"),
+      uTargetSize: gl.getUniformLocation(this.phosphorPrefilterProgram, "uTargetSize"),
+      uBlurCells: gl.getUniformLocation(this.phosphorPrefilterProgram, "uBlurCells"),
+    };
   }
 
   private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
@@ -1208,6 +1269,7 @@ export class TetoricaRetroVideoPipeline {
       uNeonBoost: gl.getUniformLocation(program, "uNeonBoost"),
       uNeonSaturation: gl.getUniformLocation(program, "uNeonSaturation"),
       uNeonDetail: gl.getUniformLocation(program, "uNeonDetail"),
+      uPhosphorDitherSuppress: gl.getUniformLocation(program, "uPhosphorDitherSuppress"),
     };
   }
 
@@ -1217,6 +1279,7 @@ export class TetoricaRetroVideoPipeline {
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
       uOutputSize: gl.getUniformLocation(program, "uOutputSize"),
       uDisplaySize: gl.getUniformLocation(program, "uDisplaySize"),
+      uDisplayCellPixels: gl.getUniformLocation(program, "uDisplayCellPixels"),
       uBeamKernelTexture: gl.getUniformLocation(program, "uBeamKernelTexture"),
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
       uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
@@ -1429,6 +1492,21 @@ export class TetoricaRetroVideoPipeline {
       const w = gl.drawingBufferWidth;
       const h = gl.drawingBufferHeight;
       const sourceSize = getRetroVideoSourceSize(source);
+      const {
+        pass2TargetWidth,
+        pass2TargetHeight,
+        beamSourceWidth,
+        beamSourceHeight,
+        isPhosphorDotMode,
+      } = this.resolvePass2Sizing(filterState, sourceSize.width, sourceSize.height);
+      const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
+      const displayWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
+      const displayHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+      const displayCellPixels = Math.min(
+        displayWidth / Math.max(pass2TargetWidth, 1),
+        displayHeight / Math.max(pass2TargetHeight, 1),
+      );
+      const needsPhosphorPrefilter = isPhosphorDotMode && displayCellPixels < 3.0;
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
       this.ensureFbo(w, h);
@@ -1448,28 +1526,41 @@ export class TetoricaRetroVideoPipeline {
       const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
       const isBeamFullVariant = this.windowsLiteVariantKey?.includes(":beam_full") ?? false;
       let pass2SourceTexture: WebGLTexture = this.texture;
-      if (isBeamVariant) {
-        const {
-          beamSourceWidth,
-          beamSourceHeight,
-        } = this.resolvePass2Sizing(filterState, sourceSize.width, sourceSize.height);
+      if (isBeamVariant || needsPhosphorPrefilter) {
         this.ensureBeamSourceFbo(beamSourceWidth, beamSourceHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.beamSourceFbo);
         gl.viewport(0, 0, beamSourceWidth, beamSourceHeight);
-        gl.useProgram(this.beamDownscaleProgram);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
-        this.syncFboTextureSamplingFilter(gl.LINEAR);
-        gl.uniform2f(
-          this.beamDownscaleLocs.uSourceSize,
-          Math.max(w, 1),
-          Math.max(h, 1),
-        );
-        gl.uniform2f(
-          this.beamDownscaleLocs.uTargetSize,
-          Math.max(beamSourceWidth, 1),
-          Math.max(beamSourceHeight, 1),
-        );
+        if (isBeamVariant) {
+          gl.useProgram(this.beamDownscaleProgram);
+          this.syncFboTextureSamplingFilter(gl.LINEAR);
+          gl.uniform2f(
+            this.beamDownscaleLocs.uSourceSize,
+            Math.max(w, 1),
+            Math.max(h, 1),
+          );
+          gl.uniform2f(
+            this.beamDownscaleLocs.uTargetSize,
+            Math.max(beamSourceWidth, 1),
+            Math.max(beamSourceHeight, 1),
+          );
+        } else {
+          gl.useProgram(this.phosphorPrefilterProgram);
+          this.syncFboTextureSamplingFilter(gl.NEAREST);
+          gl.uniform2f(
+            this.phosphorPrefilterLocs.uTargetSize,
+            Math.max(pass2TargetWidth, 1),
+            Math.max(pass2TargetHeight, 1),
+          );
+          gl.uniform1f(
+            this.phosphorPrefilterLocs.uBlurCells,
+            (() => {
+              const t = Math.max(0, Math.min(1, (displayCellPixels - 1.8) / (3.0 - 1.8)));
+              return 1.0 - (t * t * (3.0 - 2.0 * t));
+            })(),
+          );
+        }
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         pass2SourceTexture = this.beamSourceTexture ?? this.texture;
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1487,9 +1578,6 @@ export class TetoricaRetroVideoPipeline {
           } else {
             this.syncTextureSamplingFilter(gl.LINEAR);
           }
-          const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-          const displayWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-          const displayHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
           gl.uniform2f(this.beamKernelLocs.uBeamSourceSize, Math.max(beamSourceWidth, 1), Math.max(beamSourceHeight, 1));
           gl.uniform2f(this.beamKernelLocs.uDisplaySize, displayWidth, displayHeight);
           gl.uniform1f(this.beamKernelLocs.uColorLevels, Math.max(filterState.colorLevels, 2));
@@ -1508,10 +1596,17 @@ export class TetoricaRetroVideoPipeline {
         }
       }
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+      gl.bindTexture(
+        gl.TEXTURE_2D,
+        needsPhosphorPrefilter ? pass2SourceTexture : this.fboTexture,
+      );
       const pass2TextureFilter =
-        isBeamVariant ? gl.LINEAR : gl.NEAREST;
-      this.syncFboTextureSamplingFilter(pass2TextureFilter);
+        (isBeamVariant || needsPhosphorPrefilter) ? gl.LINEAR : gl.NEAREST;
+      if (needsPhosphorPrefilter) {
+        this.syncBeamSourceTextureSamplingFilter(pass2TextureFilter);
+      } else {
+        this.syncFboTextureSamplingFilter(pass2TextureFilter);
+      }
       if (isBeamVariant) {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
@@ -1580,6 +1675,7 @@ export class TetoricaRetroVideoPipeline {
     }
     gl.deleteProgram(this.passthroughProgram);
     gl.deleteProgram(this.beamDownscaleProgram);
+    gl.deleteProgram(this.phosphorPrefilterProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
     if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
@@ -1630,10 +1726,10 @@ export class TetoricaRetroVideoPipeline {
     const isBeamMode = isBeamCrossModeEnabled(filterState);
     const pass2TargetWidth = effectiveTargetWidth;
     const pass2TargetHeight = effectiveTargetHeight;
-    const beamSourceWidth = isBeamMode
+    const beamSourceWidth = (isBeamMode || isPhosphorDotMode)
       ? pass2TargetWidth
       : Math.max(sourceWidth ?? pass2TargetWidth, 1);
-    const beamSourceHeight = isBeamMode
+    const beamSourceHeight = (isBeamMode || isPhosphorDotMode)
       ? pass2TargetHeight
       : Math.max(sourceHeight ?? pass2TargetHeight, 1);
 
@@ -1691,6 +1787,10 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass1Locs.uNeonBoost, filterState.neonBoost);
     gl.uniform1f(this.pass1Locs.uNeonSaturation, filterState.neonSaturation);
     gl.uniform1f(this.pass1Locs.uNeonDetail, filterState.neonDetail);
+    gl.uniform1f(
+      this.pass1Locs.uPhosphorDitherSuppress,
+      isPhosphorDotModeEnabled(filterState) ? 1 : 0,
+    );
   }
 
   private applyPass2Uniforms(
@@ -1726,6 +1826,14 @@ export class TetoricaRetroVideoPipeline {
       this.pass2Locs.uDisplaySize,
       displayWidth,
       displayHeight,
+    );
+    const displayCellPixels = Math.min(
+      displayWidth / Math.max(pass2TargetWidth, 1),
+      displayHeight / Math.max(pass2TargetHeight, 1),
+    );
+    gl.uniform1f(
+      this.pass2Locs.uDisplayCellPixels,
+      Math.max(displayCellPixels, 0.0),
     );
     gl.uniform2f(
       this.pass2Locs.uBeamSourceSize,

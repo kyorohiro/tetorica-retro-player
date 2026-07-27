@@ -8,6 +8,7 @@ out vec4 finalColor;
 
 uniform sampler2D uPass1Texture;
 uniform vec2 uTargetSize;
+uniform float uDisplayCellPixels;
 uniform float uCurvature;
 uniform float uScanlineStrength;
 uniform float uScanline2Strength;
@@ -453,6 +454,8 @@ void main(void)
   }
 
   if (uPhosphorDotMode > 0.5) {
+    float simplifiedDotMix = 1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels);
+    float mergedDotMix = 1.0 - smoothstep(1.6, 2.2, uDisplayCellPixels);
     vec3 centerColor = color.rgb;
 
     vec2 rightUv = clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
@@ -468,13 +471,34 @@ void main(void)
     float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
+    vec3 diagonalMix =
+      (
+        texture(uPass1Texture, clamp((cell + vec2(1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb +
+        texture(uPass1Texture, clamp((cell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb +
+        texture(uPass1Texture, clamp((cell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb +
+        texture(uPass1Texture, clamp((cell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb
+      ) * 0.25;
     float sourceColorDelta = length(centerColor - neighborMix);
     float sourceBlendAmount =
-      neighborBlendMix *
-      (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
+      clamp(
+        neighborBlendMix *
+          (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28) +
+          simplifiedDotMix * 0.34,
+        0.0,
+        1.0
+      );
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
+    vec3 lowFreqSourceColor =
+      centerColor * 0.08 +
+      neighborMix * 0.52 +
+      diagonalMix * 0.40;
+    vec3 mergedSourceColor = mix(
+      mixedSourceColor,
+      lowFreqSourceColor,
+      clamp(simplifiedDotMix * 0.65 + mergedDotMix * 0.95, 0.0, 1.0)
+    );
 
-    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
+    vec3 phosphorColor = applyPhosphorDot(mergedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
     if (useBrightCoreLeak) {
       phosphorColor *= 0.22;
     }
@@ -485,7 +509,10 @@ void main(void)
       fract(grainFrame * 0.56984029)
     ) - 0.5;
     float ditherNoise = hash13(vec3(cell + grainJitter, grainFrame)) - 0.5;
-    float grainAmount = uPhosphorDotGrainStrength * uSpotMaskStrength;
+    float grainAmount =
+      uPhosphorDotGrainStrength *
+      uSpotMaskStrength *
+      (1.0 - simplifiedDotMix * 0.85);
     // Multiplying alone leaves the near-black gaps between dots untouched
     // (anything * 0 is still 0), so the grain only ever showed up on the lit
     // dots themselves. Adding a matching additive term makes it show
@@ -493,7 +520,7 @@ void main(void)
     phosphorColor *= 1.0 + ditherNoise * grainAmount;
     phosphorColor += vec3(ditherNoise) * grainAmount;
 
-    float phosphorBrightness = max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b);
+    float phosphorBrightness = max(max(mergedSourceColor.r, mergedSourceColor.g), mergedSourceColor.b);
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
 
     vec3 bleedColor = rightColor * 0.34 + leftColor * 0.34 + downColor * 0.16 + upColor * 0.16;
@@ -617,7 +644,7 @@ void main(void)
         circularEmitterLeak *
         uSpotMaskStrength *
         (0.72 + phosphorBrightness * 1.02 + uBulbRadius * 0.64 + strongLightLeak * 0.14);
-      brightCoreBody += mixedSourceColor * centerLeakMask * (0.28 + phosphorBrightness * 0.32);
+      brightCoreBody += mergedSourceColor * centerLeakMask * (0.28 + phosphorBrightness * 0.32);
       float bubbleField = clamp(emitterWeight * (0.28 + bulbSpread * 0.46 + strongLightLeak * 0.14), 0.0, 1.0);
       phosphorColor = mix(
         phosphorColor,
@@ -633,7 +660,7 @@ void main(void)
     );
     float edgeWidth = max(fwidth(dist) * mix(1.4, 2.2, flatDiscMode), 0.002);
     float edgeBand = 1.0 - smoothstep(0.0, edgeWidth, abs(dist - dotRadius));
-    float colorDelta = length(mixedSourceColor - neighborMix);
+    float colorDelta = length(mergedSourceColor - neighborMix);
     float edgeBlend =
       edgeBand *
       smoothstep(0.04, 0.32, colorDelta) *
@@ -641,12 +668,12 @@ void main(void)
       (0.14 + phosphorBrightness * 0.18 + flatDiscMode * 0.1);
     phosphorColor = mix(phosphorColor, mix(phosphorColor, neighborMix, 0.7), edgeBlend * (useBrightCoreLeak ? 0.08 : 1.0));
 
-    vec3 fourWayMix = mixedSourceColor * 0.34 + (rightColor + leftColor + upColor + downColor) * 0.165;
+    vec3 fourWayMix = mergedSourceColor * 0.34 + (rightColor + leftColor + upColor + downColor) * 0.165;
     float fourWayAmount = neighborBlendMix * (0.16 + phosphorBrightness * 0.16 + flatDiscMode * 0.08 + internalScaleMix * 0.06);
     phosphorColor = mix(phosphorColor, fourWayMix, fourWayAmount * (useBrightCoreLeak ? 0.04 : 1.0));
 
     if (uGlowStrength > 0.001) {
-      vec3 glowLift = max(centerColor - mixedSourceColor, vec3(0.0));
+      vec3 glowLift = max(centerColor - mergedSourceColor, vec3(0.0));
       phosphorColor += glowLift * (0.3 + bleedMask * 0.25 + phosphorBrightness * 0.15);
     }
 
@@ -678,10 +705,10 @@ void main(void)
 
     float phosphorBaseLift =
       uSpotMaskStrength *
-      (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
-    phosphorColor += mixedSourceColor * phosphorBaseLift * (useBrightCoreLeak ? 0.02 : 1.0);
+      (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04 + simplifiedDotMix * 0.06);
+    phosphorColor += mergedSourceColor * phosphorBaseLift * (useBrightCoreLeak ? 0.02 : 1.0);
     if (useBrightCoreLeak) {
-      phosphorColor += mixedSourceColor * uSpotMaskStrength * (0.008 + phosphorBrightness * 0.02);
+      phosphorColor += mergedSourceColor * uSpotMaskStrength * (0.008 + phosphorBrightness * 0.02);
     }
 
     float vignette = distance(vMaskCoord, vec2(0.5));
@@ -705,6 +732,7 @@ void main(void)
   color.rgb += vec3(scanline2);
 
   if (uPhosphorStrength > 0.001) {
+    float simplifiedTriadMix = 1.0 - smoothstep(2.2, 3.0, uDisplayCellPixels);
     float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;
     vec3 phosphorTriad = vec3(
       sin(phosphorPhase) * 0.5 + 0.5,
@@ -712,6 +740,7 @@ void main(void)
       sin(phosphorPhase + 4.1887902) * 0.5 + 0.5
     );
     phosphorTriad = mix(vec3(0.5), phosphorTriad, 0.7);
+    phosphorTriad = mix(vec3(dot(phosphorTriad, vec3(0.3333333))), phosphorTriad, 1.0 - simplifiedTriadMix);
     color.rgb *= mix(vec3(1.0), 0.82 + phosphorTriad * 0.42, uPhosphorStrength);
 
     // 0 keeps the current performance-safe path. Raising this revives the old
