@@ -1306,6 +1306,7 @@ export const VideoControls = memo(function VideoControls({
                     onChange={(ev) => {
                       const next = Number(ev.currentTarget.value);
                       if (isMuted && next > 0) onToggleMute();
+                      gameControls?.setVolume?.(next);
                       onChangeVolume(next);
                     }}
                     className="w-full"

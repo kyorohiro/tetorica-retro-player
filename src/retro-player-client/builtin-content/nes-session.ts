@@ -4,10 +4,63 @@ import type { NesControlButton } from "../../retro-player/types/gameControls";
 
 const NES_WIDTH = 256;
 const NES_HEIGHT = 240;
-const NES_FRAME_MS = 1000 / 60;
-const AUDIO_BUFFER_SIZE = 2048;
+const NES_EMULATION_FPS = 60;
+const NES_RENDER_FPS = 30;
+const NES_FRAME_MS = 1000 / NES_EMULATION_FPS;
+const NES_RENDER_EVERY_N_FRAMES = Math.max(1, Math.round(NES_EMULATION_FPS / NES_RENDER_FPS));
+const AUDIO_BUFFER_SIZE = 4096;
 const MAX_AUDIO_QUEUE_LENGTH = 48000;
 const AUDIO_RESUME_TIMEOUT_MS = 1200;
+const MAX_FRAME_DRIFT_MS = 250;
+const AUDIO_CATCH_UP_THRESHOLD = 1024;
+const AUDIO_CATCH_UP_FRAMES = 2;
+
+type StereoRingBuffer = {
+  push: (left: number, right: number) => void;
+  shift: () => [number, number] | null;
+  size: () => number;
+  clear: () => void;
+};
+
+const createStereoRingBuffer = (capacity: number): StereoRingBuffer => {
+  const left = new Float32Array(capacity);
+  const right = new Float32Array(capacity);
+  let readIndex = 0;
+  let writeIndex = 0;
+  let size = 0;
+
+  const advance = (index: number) => (index + 1) % capacity;
+
+  return {
+    push(sampleLeft, sampleRight) {
+      if (size >= capacity) {
+        readIndex = advance(readIndex);
+        size -= 1;
+      }
+      left[writeIndex] = sampleLeft;
+      right[writeIndex] = sampleRight;
+      writeIndex = advance(writeIndex);
+      size += 1;
+    },
+    shift() {
+      if (size <= 0) {
+        return null;
+      }
+      const sample: [number, number] = [left[readIndex], right[readIndex]];
+      readIndex = advance(readIndex);
+      size -= 1;
+      return sample;
+    },
+    size() {
+      return size;
+    },
+    clear() {
+      readIndex = 0;
+      writeIndex = 0;
+      size = 0;
+    },
+  };
+};
 
 export type NesSession = {
   stream: MediaStream;
@@ -16,6 +69,7 @@ export type NesSession = {
   needsUserGesture: boolean;
   resumeAudio: () => Promise<boolean>;
   setLocalMonitorEnabled: (enabled: boolean) => void;
+  setLocalMonitorVolume: (volume: number) => void;
   pressButton: (button: NesControlButton) => void;
   releaseButton: (button: NesControlButton) => void;
   reset: () => void;
@@ -84,16 +138,18 @@ export async function startNesSession(file: File): Promise<NesSession> {
   const frameBuffer8 = new Uint8ClampedArray(frameBuffer);
   const frameBuffer32 = new Uint32Array(frameBuffer);
   frameBuffer32.fill(0xff000000);
+  let renderedFrameCount = 0;
 
   const useLocalAudioMonitor = isSafariBrowser();
   const AudioContextCtor = getAudioContextCtor();
-  const audioContext = AudioContextCtor ? new AudioContextCtor({ sampleRate: 48000 }) : null;
+  const audioContext = AudioContextCtor ? new AudioContextCtor() : null;
   const audioDestination = audioContext?.createMediaStreamDestination() ?? null;
   const audioProcessor = audioContext?.createScriptProcessor(AUDIO_BUFFER_SIZE, 0, 2) ?? null;
   const audioMuteGain = audioContext?.createGain() ?? null;
-  const leftQueue: number[] = [];
-  const rightQueue: number[] = [];
+  const audioQueue = createStereoRingBuffer(MAX_AUDIO_QUEUE_LENGTH);
+  const nesSampleRate = audioContext?.sampleRate ?? 48000;
   let needsUserGesture = false;
+  let fillAudioUnderrun: (() => void) | null = null;
   const isAudioRunning = () => audioContext?.state === "running";
 
   const resumeAudio = async () => {
@@ -124,11 +180,13 @@ export async function startNesSession(file: File): Promise<NesSession> {
   if (audioProcessor && audioDestination && audioMuteGain && audioContext) {
     audioMuteGain.gain.value = useLocalAudioMonitor ? 1 : 0;
     audioProcessor.onaudioprocess = (event) => {
+      fillAudioUnderrun?.();
       const left = event.outputBuffer.getChannelData(0);
       const right = event.outputBuffer.getChannelData(1);
       for (let i = 0; i < left.length; i += 1) {
-        left[i] = leftQueue.length > 0 ? leftQueue.shift() ?? 0 : 0;
-        right[i] = rightQueue.length > 0 ? rightQueue.shift() ?? 0 : 0;
+        const sample = audioQueue.shift();
+        left[i] = sample?.[0] ?? 0;
+        right[i] = sample?.[1] ?? 0;
       }
     };
     audioProcessor.connect(audioDestination);
@@ -151,32 +209,40 @@ export async function startNesSession(file: File): Promise<NesSession> {
     audioMuteGain.gain.value = enabled ? 1 : 0;
   };
 
+  const setLocalMonitorVolume = (volume: number) => {
+    if (!audioMuteGain) {
+      return;
+    }
+    audioMuteGain.gain.value = Math.max(0, Math.min(1, volume));
+  };
+
   const nes = new NES({
-    sampleRate: 48000,
+    sampleRate: nesSampleRate,
     onFrame: (buffer) => {
       for (let i = 0; i < frameBuffer32.length; i += 1) {
         frameBuffer32[i] = 0xff000000 | buffer[i];
       }
-      imageData.data.set(frameBuffer8);
-      context.putImageData(imageData, 0, 0);
+      renderedFrameCount += 1;
+      if (
+        renderedFrameCount === 1 ||
+        renderedFrameCount % NES_RENDER_EVERY_N_FRAMES === 0
+      ) {
+        imageData.data.set(frameBuffer8);
+        context.putImageData(imageData, 0, 0);
+      }
     },
     onAudioSample: audioProcessor
       ? (left, right) => {
-          if (leftQueue.length >= MAX_AUDIO_QUEUE_LENGTH) {
-            leftQueue.splice(0, leftQueue.length - MAX_AUDIO_QUEUE_LENGTH + 1);
-          }
-          if (rightQueue.length >= MAX_AUDIO_QUEUE_LENGTH) {
-            rightQueue.splice(0, rightQueue.length - MAX_AUDIO_QUEUE_LENGTH + 1);
-          }
-          leftQueue.push(left);
-          rightQueue.push(right);
+          audioQueue.push(left, right);
         }
       : undefined,
   });
 
   nes.loadROM(romData);
+  nes.setFramerate(NES_EMULATION_FPS);
 
   let frameTimerId: number | null = null;
+  let nextFrameAt = performance.now() + NES_FRAME_MS;
   let stopped = false;
 
   const stepFrame = () => {
@@ -187,6 +253,33 @@ export async function startNesSession(file: File): Promise<NesSession> {
       console.error("[jsnes] frame failed", error);
       stop();
     }
+  };
+
+  fillAudioUnderrun = () => {
+    if (stopped) {
+      return;
+    }
+    if (audioQueue.size() >= AUDIO_CATCH_UP_THRESHOLD) {
+      return;
+    }
+    for (let i = 0; i < AUDIO_CATCH_UP_FRAMES && audioQueue.size() < AUDIO_CATCH_UP_THRESHOLD; i += 1) {
+      stepFrame();
+    }
+  };
+
+  const scheduleNextFrame = () => {
+    if (stopped) return;
+    const now = performance.now();
+    if (now - nextFrameAt > MAX_FRAME_DRIFT_MS) {
+      nextFrameAt = now + NES_FRAME_MS;
+    }
+    const delay = Math.max(0, nextFrameAt - now);
+    frameTimerId = window.setTimeout(() => {
+      frameTimerId = null;
+      stepFrame();
+      nextFrameAt += NES_FRAME_MS;
+      scheduleNextFrame();
+    }, delay);
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -212,8 +305,7 @@ export async function startNesSession(file: File): Promise<NesSession> {
   };
 
   const reset = () => {
-    leftQueue.length = 0;
-    rightQueue.length = 0;
+    audioQueue.clear();
     releaseButton("up");
     releaseButton("down");
     releaseButton("left");
@@ -229,7 +321,7 @@ export async function startNesSession(file: File): Promise<NesSession> {
     if (stopped) return;
     stopped = true;
     if (frameTimerId !== null) {
-      window.clearInterval(frameTimerId);
+      window.clearTimeout(frameTimerId);
       frameTimerId = null;
     }
     window.removeEventListener("keydown", handleKeyDown);
@@ -240,7 +332,7 @@ export async function startNesSession(file: File): Promise<NesSession> {
     void audioContext?.close().catch(() => {});
   };
 
-  frameTimerId = window.setInterval(stepFrame, NES_FRAME_MS);
+  scheduleNextFrame();
   window.addEventListener("keydown", handleKeyDown);
   window.addEventListener("keyup", handleKeyUp);
 
@@ -251,6 +343,7 @@ export async function startNesSession(file: File): Promise<NesSession> {
     needsUserGesture,
     resumeAudio,
     setLocalMonitorEnabled,
+    setLocalMonitorVolume,
     pressButton,
     releaseButton,
     reset,

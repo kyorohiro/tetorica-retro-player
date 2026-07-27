@@ -517,6 +517,13 @@ export function usePixiVideoPlayer(
 
   useEffect(() => {
     const auxAudioStream = options?.auxAudioStream ?? null;
+    if (isNativeModePreferred) {
+      if (!mediaRef.current) {
+        disconnectMediaInput();
+      }
+      return;
+    }
+
     if (!auxAudioStream) {
       if (!mediaRef.current) {
         disconnectMediaInput();
@@ -554,6 +561,7 @@ export function usePixiVideoPlayer(
     connectMediaStream,
     debugAudio,
     disconnectMediaInput,
+    isNativeModePreferred,
     mediaRef,
     setEngineIsPlaying,
     setNeedsUserPlay,

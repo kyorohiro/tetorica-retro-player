@@ -6,6 +6,7 @@ import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { isNesRomFile, startNesSession } from "./builtin-content/nes-session";
+import { getNativePlaybackMode } from "../retro-player/hooks/persistedRetroSettings";
 import {
   type PresetConfig,
   loadStartupPreset,
@@ -352,6 +353,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       clearPlaylistSession();
       previewSource.clearPreview();
       currentPlayingPathRef.current = null;
+      const shouldUseNativePlayback = getNativePlaybackMode();
       const launchToken = nesLaunchTokenRef.current + 1;
       nesLaunchTokenRef.current = launchToken;
       void startNesSession(file).then((session) => {
@@ -361,15 +363,16 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         }
         nesCleanupRef.current = session.stop;
         nesResumeAudioRef.current = session.resumeAudio;
-        session.setLocalMonitorEnabled(false);
+        session.setLocalMonitorEnabled(shouldUseNativePlayback);
         setNesCanvas(session.canvas);
-        setNesAudioStream(session.audioStream);
+        setNesAudioStream(shouldUseNativePlayback ? null : session.audioStream);
         setNesDisplayName(file.name);
         setNesGameControls({
           kind: "nes",
           pressButton: session.pressButton,
           releaseButton: session.releaseButton,
           reset: session.reset,
+          setVolume: session.setLocalMonitorVolume,
         });
         setAutoStartState(session.needsUserGesture ? "blocked" : "done");
       }).catch((error) => {

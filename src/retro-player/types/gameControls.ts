@@ -13,4 +13,5 @@ export type RetroGameControls = {
   pressButton: (button: NesControlButton) => void;
   releaseButton: (button: NesControlButton) => void;
   reset: () => void;
+  setVolume?: (volume: number) => void;
 };
