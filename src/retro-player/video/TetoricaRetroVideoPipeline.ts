@@ -271,6 +271,11 @@ uniform sampler2D uTexture;
 uniform vec2 uTargetSize;
 uniform float uBlurCells;
 
+float luma(vec3 color)
+{
+  return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
 void main(void)
 {
   vec2 targetSize = max(uTargetSize, vec2(1.0));
@@ -292,7 +297,26 @@ void main(void)
   vec3 cross = (right + left + down + up) * 0.25;
   vec3 diagonal = (downRight + downLeft + upRight + upLeft) * 0.25;
   vec3 lowFreq = center * 0.12 + cross * 0.50 + diagonal * 0.38;
-  vec3 color = mix(center, lowFreq, blurMix);
+  float centerLuma = luma(center);
+  float rightLuma = luma(right);
+  float leftLuma = luma(left);
+  float downLuma = luma(down);
+  float upLuma = luma(up);
+  float edgeStrength = max(
+    abs(rightLuma - leftLuma),
+    abs(downLuma - upLuma)
+  );
+  float edgeMask = smoothstep(0.05, 0.18, edgeStrength);
+  float flatBlurMix = blurMix * (1.0 - edgeMask);
+
+  float lowFreqLuma = luma(lowFreq);
+  vec3 centerChroma = center - vec3(centerLuma);
+  vec3 lowFreqChroma = lowFreq - vec3(lowFreqLuma);
+  float finalLuma = mix(centerLuma, lowFreqLuma, flatBlurMix * 0.12);
+  vec3 finalChroma = mix(centerChroma, lowFreqChroma, flatBlurMix * 0.82);
+  vec3 color = vec3(finalLuma) + finalChroma;
+  color = mix(color, center, edgeMask * (0.82 + blurMix * 0.18));
+  color = clamp(color, 0.0, 1.0);
   finalColor = vec4(color, 1.0);
 }
 `;
