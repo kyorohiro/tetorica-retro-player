@@ -368,6 +368,9 @@ void main(void)
   color = applyToonShading(color, uToonSteps);
 
   bool isNeon = uPaletteMode > 8.5 && uPaletteMode < 9.5;
+  float edge = computeSourceEdge(pixelatedUv, texel);
+  float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
+  bool appliedEdgeBeforeGlow = false;
 
   if (isNeon) {
     color = applyNeonLinePalette(pixelatedUv, texel, max(uColorLevels, 2.0), uMonoTint);
@@ -387,6 +390,15 @@ void main(void)
   } else {
     color = applyPaletteMode(color);
 
+    if (edgeBoost > 0.001) {
+      float edgeLuminance = dot(color, vec3(0.299, 0.587, 0.114));
+      float low = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, edgeLuminance));
+      float high = max(low + 0.02, uAnimeEdgeHigh);
+      float edgeMix = smoothstep(low, high, edge) * min(edgeBoost, 1.0);
+      color = mix(color, vec3(0.0), clamp(edgeMix, 0.0, 1.0));
+      appliedEdgeBeforeGlow = true;
+    }
+
     if (uGlowStrength > 0.001) {
       vec3 glow = vec3(0.0);
       glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb) * 0.34;
@@ -397,16 +409,36 @@ void main(void)
       glow += applyPaletteMode(texture(uTexture, clamp(pixelatedUv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb) * 0.10;
 
       float brightness = max(max(color.r, color.g), color.b);
-      float glowMask = smoothstep(0.45, 1.0, brightness);
-      color += glow * glowMask * uGlowStrength;
+      float glowLuma = dot(glow, vec3(0.299, 0.587, 0.114));
+      float glowSat = max(max(glow.r, glow.g), glow.b) - min(min(glow.r, glow.g), glow.b);
+      vec3 glowChroma = glow - vec3(glowLuma);
+      float centerGlowMask = smoothstep(0.28, 0.88, brightness);
+      float neighborGlowMask = smoothstep(0.12, 0.64, glowLuma);
+      float edgeGlowMask = smoothstep(0.06, 0.24, edge);
+      float darkReceiverMask =
+        smoothstep(0.12, 0.82, 1.0 - brightness) *
+        smoothstep(0.08, 0.26, edge) *
+        smoothstep(0.10, 0.68, glowLuma);
+      float glowMask = clamp(
+        max(
+          max(centerGlowMask * 0.72, neighborGlowMask),
+          max(edgeGlowMask * 0.92, darkReceiverMask * 1.28)
+        ),
+        0.0,
+        1.0
+      );
+      float brightClamp = 1.0 - smoothstep(0.72, 1.0, brightness) * 0.55;
+      float receiverBoost = 1.0 + darkReceiverMask * 0.42;
+      vec3 coloredGlow =
+        vec3(glowLuma) * (0.26 + (1.0 - brightClamp) * 0.06) +
+        glowChroma * (1.02 + smoothstep(0.03, 0.22, glowSat) * 0.46);
+      color += coloredGlow * glowMask * uGlowStrength * (0.6 + brightness * 0.06) * brightClamp * receiverBoost;
     }
   }
 
   color = clamp(color, 0.0, 1.0);
 
-  float edgeBoost = clamp(uEdgeBoost, 0.0, 1.5);
-  if (edgeBoost > 0.001) {
-    float edge = computeSourceEdge(pixelatedUv, texel);
+  if (edgeBoost > 0.001 && !appliedEdgeBeforeGlow) {
     float edgeLuminance = dot(color, vec3(0.299, 0.587, 0.114));
     float low = mix(uAnimeEdgeLow * 0.35, uAnimeEdgeLow, smoothstep(0.25, 0.65, edgeLuminance));
     float high = max(low + 0.02, uAnimeEdgeHigh);

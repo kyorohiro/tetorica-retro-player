@@ -302,20 +302,27 @@ void main(void)
   float leftLuma = luma(left);
   float downLuma = luma(down);
   float upLuma = luma(up);
-  float edgeStrength = max(
-    abs(rightLuma - leftLuma),
-    abs(downLuma - upLuma)
+  float horizontalEdge = abs(rightLuma - leftLuma);
+  float verticalEdge = abs(downLuma - upLuma);
+  float diagonalEdge = max(
+    abs(luma(downRight) - luma(upLeft)),
+    abs(luma(downLeft) - luma(upRight))
   );
-  float edgeMask = smoothstep(0.05, 0.18, edgeStrength);
+  float localContrast = max(
+    max(abs(centerLuma - rightLuma), abs(centerLuma - leftLuma)),
+    max(abs(centerLuma - downLuma), abs(centerLuma - upLuma))
+  );
+  float edgeStrength = max(max(horizontalEdge, verticalEdge), max(diagonalEdge * 0.92, localContrast * 0.9));
+  float edgeMask = smoothstep(0.03, 0.11, edgeStrength);
   float flatBlurMix = blurMix * (1.0 - edgeMask);
 
   float lowFreqLuma = luma(lowFreq);
   vec3 centerChroma = center - vec3(centerLuma);
   vec3 lowFreqChroma = lowFreq - vec3(lowFreqLuma);
-  float finalLuma = mix(centerLuma, lowFreqLuma, flatBlurMix * 0.12);
-  vec3 finalChroma = mix(centerChroma, lowFreqChroma, flatBlurMix * 0.82);
+  float finalLuma = mix(centerLuma, lowFreqLuma, flatBlurMix * 0.035);
+  vec3 finalChroma = mix(centerChroma, lowFreqChroma, flatBlurMix * 0.62);
   vec3 color = vec3(finalLuma) + finalChroma;
-  color = mix(color, center, edgeMask * (0.82 + blurMix * 0.18));
+  color = mix(color, center, edgeMask * (0.9 + blurMix * 0.1));
   color = clamp(color, 0.0, 1.0);
   finalColor = vec4(color, 1.0);
 }

@@ -78,10 +78,18 @@ vec3 applyScreenFaceGlow(vec3 color)
   vec3 floorGlow = vec3(0.22, 0.19, 0.15) * faceGlow * amount;
   vec3 lifted = max(color, floorGlow);
   float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float saturation = max(max(color.r, color.g), color.b) - min(min(color.r, color.g), color.b);
   float hazeMask =
     faceGlow *
     (0.45 + smoothstep(0.02, 0.55, luma) * 0.90);
-  vec3 hazeGlow = vec3(0.34, 0.32, 0.29) * hazeMask * amount * 0.72;
+  vec3 glowTint = mix(vec3(luma), color, 0.32 + smoothstep(0.03, 0.28, saturation) * 0.4);
+  float brightClamp = 1.0 - smoothstep(0.74, 1.0, luma) * 0.52;
+  vec3 hazeGlow =
+    mix(vec3(0.34, 0.32, 0.29), glowTint, 0.58) *
+    hazeMask *
+    amount *
+    0.54 *
+    brightClamp;
 
   return lifted + hazeGlow;
 }

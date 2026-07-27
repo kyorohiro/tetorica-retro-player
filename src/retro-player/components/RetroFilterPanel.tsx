@@ -966,7 +966,7 @@ export function RetroFilterPanel({
               <input
                 type="range"
                 min="0"
-                max="0.5"
+                max="10.5"
                 step="0.01"
                 value={glowStrength}
                 onChange={(ev) => onSetGlowStrength(Number(ev.currentTarget.value))}
