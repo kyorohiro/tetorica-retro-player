@@ -23,6 +23,11 @@ uniform float uNeonSaturation;
 uniform float uNeonDetail;
 uniform float uGlowStrength;
 uniform float uColoredGlowEnabled;
+uniform float uCompositeEnabled;
+uniform float uCompositeAmount;
+uniform float uCompositeChromaBlur;
+uniform float uCompositeChromaDelay;
+uniform float uCompositeNoise;
 
 float bayer4x4(vec2 pos)
 {
@@ -215,6 +220,79 @@ vec3 adjustSaturation(vec3 color, float saturation)
   return mix(vec3(luminance), color, saturation);
 }
 
+vec3 rgbToYiq(vec3 color)
+{
+  return vec3(
+    dot(color, vec3(0.299, 0.587, 0.114)),
+    dot(color, vec3(0.596, -0.275, -0.321)),
+    dot(color, vec3(0.212, -0.523, 0.311))
+  );
+}
+
+vec3 yiqToRgb(vec3 yiq)
+{
+  return vec3(
+    yiq.x + 0.956 * yiq.y + 0.621 * yiq.z,
+    yiq.x - 0.272 * yiq.y - 0.647 * yiq.z,
+    yiq.x - 1.106 * yiq.y + 1.703 * yiq.z
+  );
+}
+
+float hash12(vec2 p)
+{
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+vec3 applyCompositeNtsc(vec2 cell, vec3 centerColor)
+{
+  if (uCompositeEnabled < 0.5 || uCompositeAmount <= 0.001) {
+    return centerColor;
+  }
+
+  vec3 centerYiq = rgbToYiq(centerColor);
+  vec3 left1Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(-1.0, 0.0)));
+  vec3 right1Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(1.0, 0.0)));
+  vec3 left2Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(-2.0, 0.0)));
+  vec3 right2Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(2.0, 0.0)));
+  vec3 left3Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(-3.0, 0.0)));
+  vec3 right3Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(3.0, 0.0)));
+
+  float blur = clamp(uCompositeChromaBlur, 0.0, 1.0);
+  float delay = clamp(uCompositeChromaDelay, -1.0, 1.0);
+  float amount = clamp(uCompositeAmount, 0.0, 1.0);
+
+  vec2 preferredDir = delay >= 0.0 ? vec2(1.0, 0.0) : vec2(-1.0, 0.0);
+  vec3 delayNearYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir));
+  vec3 delayFarYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 2.0));
+  vec3 delayFartherYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 3.0));
+  vec2 chromaCenter = centerYiq.yz;
+  vec2 chromaBlurred =
+    chromaCenter * (1.0 - blur * 1.15) +
+    (left1Yiq.yz + right1Yiq.yz) * (0.32 * blur) +
+    (left2Yiq.yz + right2Yiq.yz) * (0.16 * blur) +
+    (left3Yiq.yz + right3Yiq.yz) * (0.08 * blur);
+  vec2 delayedChroma = mix(chromaBlurred, delayNearYiq.yz, abs(delay) * 0.95);
+  delayedChroma = mix(delayedChroma, delayFarYiq.yz, abs(delay) * 0.55);
+  delayedChroma = mix(delayedChroma, delayFartherYiq.yz, abs(delay) * 0.28);
+
+  float chromaNoise = (hash12(cell + vec2(centerYiq.x, delayedChroma.x) * 97.0) - 0.5)
+    * 0.14 * clamp(uCompositeNoise, 0.0, 1.0);
+  delayedChroma += vec2(chromaNoise, -chromaNoise * 0.85);
+
+  float lumaLeak = 0.18 * amount;
+  float compositeLuma =
+    centerYiq.x * (1.0 - lumaLeak) +
+    (left1Yiq.x + right1Yiq.x) * (0.36 * lumaLeak) +
+    (left2Yiq.x + right2Yiq.x) * (0.14 * lumaLeak);
+
+  vec3 compositeRgb = yiqToRgb(vec3(compositeLuma, delayedChroma));
+  vec3 bleedRgb = yiqToRgb(vec3(centerYiq.x, delayedChroma));
+  vec3 pushedRgb = mix(compositeRgb, bleedRgb, 0.42 + blur * 0.2);
+  return clamp(mix(centerColor, pushedRgb, amount * 0.95), 0.0, 1.0);
+}
+
 vec3 nearestColorAnime(vec3 color)
 {
   vec3 hsv = rgb2hsv(color);
@@ -351,6 +429,7 @@ void main(void)
     float b = sampleSourceColorAtCell(cell + vec2(-uRgbConvergenceOffset, 0.0)).b;
     sourceColor = vec3(r, center.g, b);
   }
+  sourceColor = applyCompositeNtsc(cell, sourceColor);
   vec3 leftSharp = sampleSourceColorAtCell(cell + vec2(-1.0, 0.0));
   vec3 rightSharp = sampleSourceColorAtCell(cell + vec2(1.0, 0.0));
   vec3 color = applyHorizontalSharpness(sourceColor, leftSharp, rightSharp);

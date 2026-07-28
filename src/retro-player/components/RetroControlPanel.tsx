@@ -373,6 +373,12 @@ export function RetroControlPanel({
               phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
               phosphorDotGlowColorStrength={filterState.phosphorDotGlowColorStrength}
               coloredGlowEnabled={filterState.coloredGlowEnabled}
+              postCurvatureEnabled={filterState.postCurvatureEnabled}
+              compositeEnabled={filterState.compositeEnabled}
+              compositeAmount={filterState.compositeAmount}
+              compositeChromaBlur={filterState.compositeChromaBlur}
+              compositeChromaDelay={filterState.compositeChromaDelay}
+              compositeNoise={filterState.compositeNoise}
               beamDarkCutoff={filterState.beamDarkCutoff}
               beamHorizontalSpread={filterState.beamHorizontalSpread}
               beamStripeStrength={filterState.beamStripeStrength}
@@ -428,6 +434,12 @@ export function RetroControlPanel({
               onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
               onSetPhosphorDotGlowColorStrength={filterState.setPhosphorDotGlowColorStrength}
               onSetColoredGlowEnabled={filterState.setColoredGlowEnabled}
+              onSetPostCurvatureEnabled={filterState.setPostCurvatureEnabled}
+              onSetCompositeEnabled={filterState.setCompositeEnabled}
+              onSetCompositeAmount={filterState.setCompositeAmount}
+              onSetCompositeChromaBlur={filterState.setCompositeChromaBlur}
+              onSetCompositeChromaDelay={filterState.setCompositeChromaDelay}
+              onSetCompositeNoise={filterState.setCompositeNoise}
               onSetBeamDarkCutoff={filterState.setBeamDarkCutoff}
               onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
               onSetBeamStripeStrength={filterState.setBeamStripeStrength}

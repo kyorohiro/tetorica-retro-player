@@ -57,6 +57,12 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotGrainStrength: number;
   phosphorDotGlowColorStrength: number;
   coloredGlowEnabled: boolean;
+  postCurvatureEnabled: boolean;
+  compositeEnabled: boolean;
+  compositeAmount: number;
+  compositeChromaBlur: number;
+  compositeChromaDelay: number;
+  compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
@@ -125,6 +131,12 @@ const doesPresetMatchState = (
     (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
     (preset.phosphorDotGlowColorStrength ?? 0) === state.phosphorDotGlowColorStrength &&
     (preset.coloredGlowEnabled ?? false) === state.coloredGlowEnabled &&
+    (preset.postCurvatureEnabled ?? false) === state.postCurvatureEnabled &&
+    (preset.compositeEnabled ?? false) === state.compositeEnabled &&
+    (preset.compositeAmount ?? 0) === state.compositeAmount &&
+    (preset.compositeChromaBlur ?? 0) === state.compositeChromaBlur &&
+    (preset.compositeChromaDelay ?? 0) === state.compositeChromaDelay &&
+    (preset.compositeNoise ?? 0) === state.compositeNoise &&
     (preset.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff) === state.beamDarkCutoff &&
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
@@ -236,6 +248,18 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotGlowColorStrength ?? (DEFAULT_PRESET.phosphorDotGlowColorStrength ?? 0),
     coloredGlowEnabled:
       initialState.coloredGlowEnabled ?? (DEFAULT_PRESET.coloredGlowEnabled ?? false),
+    postCurvatureEnabled:
+      initialState.postCurvatureEnabled ?? (DEFAULT_PRESET.postCurvatureEnabled ?? false),
+    compositeEnabled:
+      initialState.compositeEnabled ?? (DEFAULT_PRESET.compositeEnabled ?? false),
+    compositeAmount:
+      initialState.compositeAmount ?? (DEFAULT_PRESET.compositeAmount ?? 0),
+    compositeChromaBlur:
+      initialState.compositeChromaBlur ?? (DEFAULT_PRESET.compositeChromaBlur ?? 0),
+    compositeChromaDelay:
+      initialState.compositeChromaDelay ?? (DEFAULT_PRESET.compositeChromaDelay ?? 0),
+    compositeNoise:
+      initialState.compositeNoise ?? (DEFAULT_PRESET.compositeNoise ?? 0),
     beamDarkCutoff:
       initialState.beamDarkCutoff ?? (DEFAULT_PRESET.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff),
     beamHorizontalSpread:
@@ -525,6 +549,54 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPostCurvatureEnabled = (postCurvatureEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.postCurvatureEnabled === postCurvatureEnabled
+        ? current
+        : { ...current, postCurvatureEnabled }
+    ));
+  };
+
+  const setCompositeEnabled = (compositeEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeEnabled === compositeEnabled ? current : { ...current, compositeEnabled }
+    ));
+  };
+
+  const setCompositeAmount = (compositeAmount: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeAmount === compositeAmount ? current : { ...current, compositeAmount }
+    ));
+  };
+
+  const setCompositeChromaBlur = (compositeChromaBlur: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeChromaBlur === compositeChromaBlur
+        ? current
+        : { ...current, compositeChromaBlur }
+    ));
+  };
+
+  const setCompositeChromaDelay = (compositeChromaDelay: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeChromaDelay === compositeChromaDelay
+        ? current
+        : { ...current, compositeChromaDelay }
+    ));
+  };
+
+  const setCompositeNoise = (compositeNoise: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeNoise === compositeNoise ? current : { ...current, compositeNoise }
+    ));
+  };
+
   const setBeamDarkCutoff = (beamDarkCutoff: number) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -676,6 +748,12 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
       phosphorDotGlowColorStrength: presetSettings.phosphorDotGlowColorStrength ?? 0,
       coloredGlowEnabled: presetSettings.coloredGlowEnabled ?? false,
+      postCurvatureEnabled: presetSettings.postCurvatureEnabled ?? false,
+      compositeEnabled: presetSettings.compositeEnabled ?? false,
+      compositeAmount: presetSettings.compositeAmount ?? 0,
+      compositeChromaBlur: presetSettings.compositeChromaBlur ?? 0,
+      compositeChromaDelay: presetSettings.compositeChromaDelay ?? 0,
+      compositeNoise: presetSettings.compositeNoise ?? 0,
       beamDarkCutoff: presetSettings.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
@@ -763,6 +841,12 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotGrainStrength,
     setPhosphorDotGlowColorStrength,
     setColoredGlowEnabled,
+    setPostCurvatureEnabled,
+    setCompositeEnabled,
+    setCompositeAmount,
+    setCompositeChromaBlur,
+    setCompositeChromaDelay,
+    setCompositeNoise,
     setBeamDarkCutoff,
     setBeamHorizontalSpread,
     setBeamStripeStrength,
