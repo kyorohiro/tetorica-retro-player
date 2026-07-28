@@ -559,11 +559,15 @@ export function RetroPlayer({
     const dims = player.sourceDimensions;
     if (!dims?.width || !dims?.height) return;
 
+    const { width: nextWidth, height: nextHeight } = clampAutoTargetSize(dims.width, dims.height);
     const sourceKey = `${src ?? "stream"}:${stream?.id ?? ""}:${kind}:${dims.width}x${dims.height}`;
-    if (autoTargetSizeAppliedKeyRef.current === sourceKey) return;
+    const alreadyAppliedToThisSource = autoTargetSizeAppliedKeyRef.current === sourceKey;
+    const targetAlreadyMatchesAutoSize =
+      nextWidth === filterState.targetWidth && nextHeight === filterState.targetHeight;
+
+    if (alreadyAppliedToThisSource && targetAlreadyMatchesAutoSize) return;
     autoTargetSizeAppliedKeyRef.current = sourceKey;
 
-    const { width: nextWidth, height: nextHeight } = clampAutoTargetSize(dims.width, dims.height);
     if (nextWidth !== filterState.targetWidth) {
       filterState.setTargetWidth(nextWidth);
     }

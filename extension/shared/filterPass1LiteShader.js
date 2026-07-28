@@ -265,15 +265,22 @@ vec3 applyCompositeNtsc(vec2 cell, vec3 centerColor)
   float delay = clamp(uCompositeChromaDelay, -1.0, 1.0);
   float amount = clamp(uCompositeAmount, 0.0, 1.0);
   float frame = floor(uTime * 60.0);
-  float linePhase = sin((cell.y + frame * 0.31) * 0.173);
-  float chromaJitter = hash12(cell + vec2(frame, frame * 0.37)) - 0.5;
-  delay = clamp(delay + chromaJitter * 0.12 * amount, -1.0, 1.0);
-  blur = clamp(blur + linePhase * 0.025 * amount, 0.0, 1.0);
+  float frameMed = floor(uTime * 19.0);
+  float frameSlow = floor(uTime * 7.0);
+  float linePhase = hash12(vec2(cell.y * 0.73 + 19.0, frame * 0.19 + frameSlow * 0.61)) - 0.5;
+  float lineDrift = hash12(vec2(cell.y * 1.91 + 7.0, frameSlow + 41.0)) - 0.5;
+  float lineBurst = hash12(vec2(cell.y * 3.17 + 3.0, frameMed + 113.0)) - 0.5;
+  float chromaJitter = hash12(cell + vec2(frame * 0.618, frameMed * 1.731)) - 0.5;
+  float jitterBurst = hash12(cell.yx + vec2(frameMed * 0.37, frameSlow * 2.13)) - 0.5;
+  delay = clamp(delay + (chromaJitter * 0.1 + jitterBurst * 0.06) * amount, -1.0, 1.0);
+  blur = clamp(blur + (linePhase * 0.032 + lineDrift * 0.022 + lineBurst * 0.018) * amount, 0.0, 1.0);
 
   vec2 preferredDir = delay >= 0.0 ? vec2(1.0, 0.0) : vec2(-1.0, 0.0);
   vec3 delayNearYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir));
   vec3 delayFarYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 2.0));
   vec3 delayFartherYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 3.0));
+  vec3 ghostNearYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 4.0));
+  vec3 ghostFarYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 6.0));
   vec2 chromaCenter = centerYiq.yz;
   vec2 chromaBlurred =
     chromaCenter * (1.0 - blur * 1.15) +
@@ -290,15 +297,36 @@ vec3 applyCompositeNtsc(vec2 cell, vec3 centerColor)
     * 0.14 * clamp(uCompositeNoise, 0.0, 1.0);
   delayedChroma += vec2(chromaNoise, -chromaNoise * 0.85);
 
+  float lumaEdge = abs(right1Yiq.x - left1Yiq.x) + abs(right2Yiq.x - left2Yiq.x) * 0.5;
+  float chromaCross = smoothstep(0.04, 0.32, lumaEdge) * (0.04 + blur * 0.1) * amount;
+  float subcarrierFlip = hash12(vec2(cell.y * 2.0 + mod(cell.x, 4.0), frameMed + 211.0)) > 0.5 ? 1.0 : -1.0;
+  vec2 crawlTint = vec2(
+    hash12(cell + vec2(frame * 0.23, 17.0)),
+    hash12(cell.yx + vec2(frame * 0.17, 53.0))
+  ) - 0.5;
+  crawlTint *= chromaCross * vec2(1.0, 0.85) * subcarrierFlip;
+  delayedChroma += crawlTint;
+
   float lumaLeak = 0.18 * amount;
   float compositeLuma =
     centerYiq.x * (1.0 - lumaLeak) +
     (left1Yiq.x + right1Yiq.x) * (0.36 * lumaLeak) +
     (left2Yiq.x + right2Yiq.x) * (0.14 * lumaLeak);
+  float chromaMagnitude = length(delayedChroma);
+  compositeLuma +=
+    (hash12(cell + vec2(frame * 0.19, chromaMagnitude * 23.0)) - 0.5) *
+    smoothstep(0.08, 0.45, chromaMagnitude) *
+    0.035 *
+    amount;
 
   vec3 compositeRgb = yiqToRgb(vec3(compositeLuma, delayedChroma));
   vec3 bleedRgb = yiqToRgb(vec3(centerYiq.x, delayedChroma));
+  float ghostStrength = amount * (0.035 + clamp(uCompositeNoise, 0.0, 1.0) * 0.08 + abs(delay) * 0.03);
+  vec3 ghostRgb =
+    yiqToRgb(vec3(ghostNearYiq.x, ghostNearYiq.yz)) * 0.7 +
+    yiqToRgb(vec3(ghostFarYiq.x, ghostFarYiq.yz)) * 0.3;
   vec3 pushedRgb = mix(compositeRgb, bleedRgb, 0.42 + blur * 0.2);
+  pushedRgb += ghostRgb * ghostStrength;
   return clamp(mix(centerColor, pushedRgb, amount * 0.95), 0.0, 1.0);
 }
 
