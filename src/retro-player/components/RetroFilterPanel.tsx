@@ -99,7 +99,6 @@ type RetroFilterPanelProps = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  phosphorDotGlowColorStrength: number;
   coloredGlowEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
@@ -160,7 +159,6 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
-  onSetPhosphorDotGlowColorStrength: (value: number) => void;
   onSetColoredGlowEnabled: (value: boolean) => void;
   onSetCompositeEnabled: (value: boolean) => void;
   onSetCompositeAmount: (value: number) => void;
@@ -223,7 +221,6 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
-  phosphorDotGlowColorStrength,
   coloredGlowEnabled,
   compositeEnabled,
   compositeAmount,
@@ -281,7 +278,6 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
-  onSetPhosphorDotGlowColorStrength,
   onSetColoredGlowEnabled,
   onSetCompositeEnabled,
   onSetCompositeAmount,
@@ -1289,22 +1285,6 @@ export function RetroFilterPanel({
                 </span>
               ) : null}
             </label>
-            <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
-              <span className="text-[11px] leading-tight text-[#12141c]">
-                CRT GlowColor bar: {phosphorDotGlowColorStrength <= 0 ? "off" : phosphorDotGlowColorStrength.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={phosphorDotGlowColorStrength}
-                onChange={(ev) => {
-                  onSetPhosphorDotGlowColorStrength(Number(ev.currentTarget.value));
-                }}
-                className="mt-1 w-full"
-              />
-            </label>
           </div>
         </div>
 
@@ -1674,41 +1654,6 @@ export function RetroFilterPanel({
 
           {isBeamCrossModeActive && (
             <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
-              <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
-                <span
-                  className={[
-                    "text-[11px] leading-tight",
-                    phosphorDotInternalScale >= 3
-                      ? "font-semibold text-red-600"
-                      : "text-[#12141c]",
-                  ].join(" ")}
-                >
-                  Beam internal res: {Number.isInteger(phosphorDotInternalScale) ? phosphorDotInternalScale : phosphorDotInternalScale.toFixed(1)}x
-                </span>
-                <span className="mt-1 block text-[10px] leading-4 text-[#7a7268]">
-                  Beam Cross also uses this internal resolution. Higher values can make the beam pattern denser and cleaner.
-                </span>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <span className="text-[9px] text-[#7a7268]">1</span>
-                  <input
-                    type="range"
-                    min="1"
-                    max="4"
-                    step="0.1"
-                    list="phosphor-dot-internal-res-ticks"
-                    value={phosphorDotInternalScale}
-                    onChange={(ev) => {
-                      onSetPhosphorDotInternalScale(Number(ev.currentTarget.value));
-                    }}
-                    className={[
-                      "w-full",
-                      phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-sky-600",
-                    ].join(" ")}
-                  />
-                  <span className="text-[9px] text-[#7a7268]">4</span>
-                </div>
-              </label>
-
               <label className="block">
                 <span className="text-[#12141c]">
                   <InfoTip

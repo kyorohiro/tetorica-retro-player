@@ -52,7 +52,6 @@ export type RetroVideoFilterState = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  phosphorDotGlowColorStrength: number;
   coloredGlowEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
@@ -175,7 +174,6 @@ type Pass2UniformLocations = {
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uPhosphorDotGrainStrength: WebGLUniformLocation | null;
-  uPhosphorDotGlowColorStrength: WebGLUniformLocation | null;
   uBeamDarkCutoff: WebGLUniformLocation | null;
   uBeamHorizontalSpread: WebGLUniformLocation | null;
   uBeamStripeStrength: WebGLUniformLocation | null;
@@ -523,8 +521,12 @@ const getPhosphorDotViewportLimitedSize = (
     return { width, height };
   }
 
-  const baseMinCellPixels = Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
-  const minCellPixels = Math.max(1.0, baseMinCellPixels / Math.max(internalScale, 1));
+  const isBeamMode = isBeamCrossModeEnabled(filterState);
+  const baseMinCellPixels = isBeamMode
+    ? 1.1
+    : Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
+  const effectiveInternalScale = isBeamMode ? 1 : Math.max(internalScale, 1);
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
   const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
   const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
   const scale = Math.min(
@@ -547,6 +549,8 @@ export const getEffectiveRetroTargetSize = (
   visibleHeight?: number,
 ) => {
   const internalScale = getPhosphorDotInternalScale(filterState);
+  const isBeamMode = isBeamCrossModeEnabled(filterState);
+  const effectiveResolutionScale = isBeamMode ? 1 : internalScale;
   const requestedWidth = Math.max(filterState.targetWidth, 1);
   const requestedHeight = Math.max(filterState.targetHeight, 1);
   const aspectCorrected = filterState.matchTargetAspect
@@ -560,13 +564,13 @@ export const getEffectiveRetroTargetSize = (
       width: requestedWidth,
       height: requestedHeight,
     };
-  const scaledWidth = aspectCorrected.width * internalScale;
-  const scaledHeight = aspectCorrected.height * internalScale;
+  const scaledWidth = aspectCorrected.width * effectiveResolutionScale;
+  const scaledHeight = aspectCorrected.height * effectiveResolutionScale;
   const viewportLimited = getPhosphorDotViewportLimitedSize(
     scaledWidth,
     scaledHeight,
     filterState,
-    internalScale,
+    effectiveResolutionScale,
     visibleWidth,
     visibleHeight,
   );
@@ -1381,7 +1385,6 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
       uPhosphorDotGrainStrength: gl.getUniformLocation(program, "uPhosphorDotGrainStrength"),
-      uPhosphorDotGlowColorStrength: gl.getUniformLocation(program, "uPhosphorDotGlowColorStrength"),
       uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
       uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
       uBeamStripeStrength: gl.getUniformLocation(program, "uBeamStripeStrength"),
@@ -1937,7 +1940,6 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotGrainStrength, filterState.phosphorDotGrainStrength);
-    gl.uniform1f(this.pass2Locs.uPhosphorDotGlowColorStrength, filterState.phosphorDotGlowColorStrength);
     gl.uniform1f(this.pass2Locs.uBeamDarkCutoff, filterState.beamDarkCutoff);
     gl.uniform1f(this.pass2Locs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
     gl.uniform1f(this.pass2Locs.uBeamStripeStrength, filterState.beamStripeStrength);

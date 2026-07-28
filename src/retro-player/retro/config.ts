@@ -94,7 +94,6 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
-  phosphorDotGlowColorStrength?: number;
   coloredGlowEnabled?: boolean;
   postCurvatureEnabled?: boolean;
   compositeEnabled?: boolean;
@@ -500,7 +499,6 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: false,
     phosphorDotGrainStrength: 0.11892071150027211,
-    phosphorDotGlowColorStrength: 0,
     coloredGlowEnabled: true,
     postCurvatureEnabled: false,
     compositeEnabled: true,
