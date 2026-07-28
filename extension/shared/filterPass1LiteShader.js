@@ -29,6 +29,7 @@ uniform float uCompositeAmount;
 uniform float uCompositeChromaBlur;
 uniform float uCompositeChromaDelay;
 uniform float uCompositeNoise;
+uniform float uTime;
 
 float bayer4x4(vec2 pos)
 {
@@ -263,6 +264,11 @@ vec3 applyCompositeNtsc(vec2 cell, vec3 centerColor)
   float blur = clamp(uCompositeChromaBlur, 0.0, 1.0);
   float delay = clamp(uCompositeChromaDelay, -1.0, 1.0);
   float amount = clamp(uCompositeAmount, 0.0, 1.0);
+  float frame = floor(uTime * 60.0);
+  float linePhase = sin((cell.y + frame * 0.31) * 0.173);
+  float chromaJitter = hash12(cell + vec2(frame, frame * 0.37)) - 0.5;
+  delay = clamp(delay + chromaJitter * 0.12 * amount, -1.0, 1.0);
+  blur = clamp(blur + linePhase * 0.025 * amount, 0.0, 1.0);
 
   vec2 preferredDir = delay >= 0.0 ? vec2(1.0, 0.0) : vec2(-1.0, 0.0);
   vec3 delayNearYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir));
@@ -278,7 +284,9 @@ vec3 applyCompositeNtsc(vec2 cell, vec3 centerColor)
   delayedChroma = mix(delayedChroma, delayFarYiq.yz, abs(delay) * 0.55);
   delayedChroma = mix(delayedChroma, delayFartherYiq.yz, abs(delay) * 0.28);
 
-  float chromaNoise = (hash12(cell + vec2(centerYiq.x, delayedChroma.x) * 97.0) - 0.5)
+  float chromaNoise = (hash12(
+    cell + vec2(centerYiq.x, delayedChroma.x) * 97.0 + vec2(frame * 0.11, frame * 0.07)
+  ) - 0.5)
     * 0.14 * clamp(uCompositeNoise, 0.0, 1.0);
   delayedChroma += vec2(chromaNoise, -chromaNoise * 0.85);
 
