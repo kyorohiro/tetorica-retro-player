@@ -431,11 +431,9 @@ export const isBeamCrossModeEnabled = (filterState: RetroVideoFilterState) =>
 
 const shouldUsePostCurvaturePass = (
   filterState: RetroVideoFilterState,
-  isBeamVariant: boolean,
 ) =>
   filterState.postCurvatureEnabled &&
-  filterState.curvature > 0.0001 &&
-  !isBeamVariant;
+  filterState.curvature > 0.0001;
 
 const getEffectivePreCurvature = (filterState: RetroVideoFilterState) =>
   filterState.postCurvatureEnabled ? 0 : filterState.curvature;
@@ -1579,7 +1577,7 @@ export class TetoricaRetroVideoPipeline {
       // Pass 2: FBO → screen/FBO (CRT effects: curvature, scanlines, phosphor dots, vignette)
       const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
       const isBeamFullVariant = this.windowsLiteVariantKey?.includes(":beam_full") ?? false;
-      const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState, isBeamVariant);
+      const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState);
       if (usePostCurvaturePass) {
         this.ensurePostCurvatureFbo(w, h);
       }
@@ -1647,6 +1645,8 @@ export class TetoricaRetroVideoPipeline {
           gl.viewport(0, 0, w, h);
         }
       }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, usePostCurvaturePass ? this.postCurvatureFbo : null);
+      gl.viewport(0, 0, w, h);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
       const pass2TextureFilter =
