@@ -137,6 +137,7 @@ type Pass1UniformLocations = {
   uCompositeChromaBlur: WebGLUniformLocation | null;
   uCompositeChromaDelay: WebGLUniformLocation | null;
   uCompositeNoise: WebGLUniformLocation | null;
+  uTime: WebGLUniformLocation | null;
 };
 
 type Pass2UniformLocations = {
@@ -1343,6 +1344,7 @@ export class TetoricaRetroVideoPipeline {
       uCompositeChromaBlur: gl.getUniformLocation(program, "uCompositeChromaBlur"),
       uCompositeChromaDelay: gl.getUniformLocation(program, "uCompositeChromaDelay"),
       uCompositeNoise: gl.getUniformLocation(program, "uCompositeNoise"),
+      uTime: gl.getUniformLocation(program, "uTime"),
     };
   }
 
@@ -1563,6 +1565,7 @@ export class TetoricaRetroVideoPipeline {
       const w = gl.drawingBufferWidth;
       const h = gl.drawingBufferHeight;
       const sourceSize = getRetroVideoSourceSize(source);
+      const timeSec = this.advanceAnimationClock();
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
       this.ensureFbo(w, h);
@@ -1571,7 +1574,7 @@ export class TetoricaRetroVideoPipeline {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(this.filterPass1Program);
-      this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height);
+      this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height, timeSec);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       // Pass 2: FBO → screen/FBO (CRT effects: curvature, scanlines, phosphor dots, vignette)
@@ -1671,6 +1674,7 @@ export class TetoricaRetroVideoPipeline {
         filterState,
         sourceSize.width,
         sourceSize.height,
+        timeSec,
       );
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -1811,6 +1815,7 @@ export class TetoricaRetroVideoPipeline {
     filterState: RetroVideoFilterState,
     sourceWidth: number | undefined,
     sourceHeight: number | undefined,
+    timeSec: number,
   ) {
     if (!this.pass1Locs || !this.filterPass1Program) return;
     const { gl } = this;
@@ -1857,12 +1862,14 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass1Locs.uCompositeChromaBlur, filterState.compositeChromaBlur);
     gl.uniform1f(this.pass1Locs.uCompositeChromaDelay, filterState.compositeChromaDelay);
     gl.uniform1f(this.pass1Locs.uCompositeNoise, filterState.compositeNoise);
+    gl.uniform1f(this.pass1Locs.uTime, timeSec);
   }
 
   private applyPass2Uniforms(
     filterState: RetroVideoFilterState,
     sourceWidth: number | undefined,
     sourceHeight: number | undefined,
+    timeSec: number,
   ) {
     if (!this.pass2Locs || !this.filterPass2Program) return;
     const { gl } = this;
@@ -1946,7 +1953,6 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uBeamWhiteBloom, filterState.beamWhiteBloom);
     gl.uniform1f(this.pass2Locs.uBeamWarmBloom, filterState.beamWarmBloom);
     gl.uniform1f(this.pass2Locs.uScreenFaceGlow, filterState.screenFaceGlow);
-    const timeSec = this.advanceAnimationClock();
     gl.uniform1f(this.pass2Locs.uFocusStrength, filterState.focusStrength);
     gl.uniform2f(this.pass2Locs.uFocusSize, filterState.focusWidth, filterState.focusHeight);
     gl.uniform2f(this.pass2Locs.uFocusCenter, filterState.focusCenterX, filterState.focusCenterY);
