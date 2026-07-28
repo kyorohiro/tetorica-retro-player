@@ -43,7 +43,7 @@ export type PersistedRetroFilterSettings = {
   basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: 1 | 2 | 3;
+  phosphorDotInternalScale: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;

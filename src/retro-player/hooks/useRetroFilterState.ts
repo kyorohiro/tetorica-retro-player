@@ -3,6 +3,7 @@ import {
   DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
+  normalizePhosphorDotInternalScale,
   normalizePhosphorDotShape,
   type MonoTintMode,
   type PaletteMode,
@@ -49,7 +50,7 @@ export type RetroFilterInitialState = Partial<{
   basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: 1 | 2 | 3;
+  phosphorDotInternalScale: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -123,7 +124,7 @@ const doesPresetMatchState = (
     (preset.basicSaturation ?? 1) === state.basicSaturation &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     normalizePhosphorDotShape(preset.phosphorDotShape ?? "circle") === state.phosphorDotShape &&
-    (preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
+    normalizePhosphorDotInternalScale(preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
@@ -232,8 +233,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       normalizePhosphorDotShape(
         initialState.phosphorDotShape ?? (DEFAULT_PRESET.phosphorDotShape ?? "circle"),
       ),
-    phosphorDotInternalScale:
+    phosphorDotInternalScale: normalizePhosphorDotInternalScale(
       initialState.phosphorDotInternalScale ?? (DEFAULT_PRESET.phosphorDotInternalScale ?? 1),
+    ),
     phosphorDotBrightCore:
       initialState.phosphorDotBrightCore ?? (DEFAULT_PRESET.phosphorDotBrightCore ?? false),
     phosphorDotCellFill:
@@ -489,10 +491,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
-  const setPhosphorDotInternalScale = (phosphorDotInternalScale: 1 | 2 | 3) => {
+  const setPhosphorDotInternalScale = (phosphorDotInternalScale: number) => {
+    const normalized = normalizePhosphorDotInternalScale(phosphorDotInternalScale);
     markPresetAsCustom();
     setSettings((current) => (
-      current.phosphorDotInternalScale === phosphorDotInternalScale ? current : { ...current, phosphorDotInternalScale }
+      current.phosphorDotInternalScale === normalized ? current : { ...current, phosphorDotInternalScale: normalized }
     ));
   };
 
@@ -740,7 +743,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       basicSaturation: presetSettings.basicSaturation ?? 1,
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotShape: normalizePhosphorDotShape(presetSettings.phosphorDotShape ?? "circle"),
-      phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? 1,
+      phosphorDotInternalScale: normalizePhosphorDotInternalScale(
+        presetSettings.phosphorDotInternalScale ?? 1,
+      ),
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,

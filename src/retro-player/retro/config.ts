@@ -39,6 +39,15 @@ export const normalizePhosphorDotShape = (
   return "circle";
 };
 
+export const normalizePhosphorDotInternalScale = (value: number | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+
+  const scale = value;
+  return Math.max(1, Math.min(4, Math.round(scale * 10) / 10));
+};
+
 export const MONO_TINTS: Record<
   MonoTintMode,
   { label: string; rgb: [number, number, number] }
@@ -79,7 +88,7 @@ export type RetroPresetDefinition = {
   basicSaturation?: number;
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
-  phosphorDotInternalScale?: 1 | 2 | 3;
+  phosphorDotInternalScale?: number;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
@@ -461,37 +470,57 @@ export const RETRO_PRESETS = {
     label: "Phosphor Dot Lite",
     featured: true,
     autoTargetSize: true,
-    width: 320,
-    height: 180,
-    colors: 32,
-    dither: 0.65,
-    smoothStrength: 0.65,
-    basicContrast: 1.08,
+    samplingMode: "nearest",
+    width: 640,
+    height: 360,
+    colors: 256,
+    dither: 0,
+    smoothStrength: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    basicContrast: 1.2,
+    basicSaturation: 1,
     palette: "free",
-    curvature: 0.02,
+    curvature: 0.03,
     scanline: 0.0,
-    scanline2: 0.00,
-    vignette: 0.00,
-    glow: 0.02,
+    scanline2: 0.0,
+    scanlineBrightnessFade: 0.6,
+    vignette: 0.0,
+    glow: 0.15,
     phosphor: 0.0,
-    spotMask: 0.22,
-    bulbRadius: 0.38,
-    blackFloor: 0.002,
-    screenFaceGlow: 0.28,
-    beamWarmBloom: 0.28,
-    phosphorDotShape: "heart",  
-    phosphorDotLightBalance: 0.66,
-    phosphorDotInternalScale: 2,
+    spotMask: 0.651,
+    bulbRadius: 0.116,
+    blackFloor: 0,
+    outputBrightness: 0.83,
+    phosphorDotLightBalance: 0.65,
+    phosphorDotShape: "heart",
+    phosphorDotInternalScale: 1.4,
     phosphorDotBrightCore: true,
-    phosphorDotCellFill: 0.28,
+    phosphorDotCellFill: 0.132,
     phosphorDotFlatDisc: false,
-    phosphorDotNeighborBlend: true,
-    phosphorDotGrainStrength: 0.12,
+    phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0.11892071150027211,
+    phosphorDotGlowColorStrength: 0,
+    coloredGlowEnabled: true,
+    postCurvatureEnabled: false,
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.73,
+    compositeChromaDelay: 0.24,
+    compositeNoise: 0.49,
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 1,
+    beamStripeStrength: 1,
+    beamWhiteBloom: 1,
+    beamWarmBloom: 0,
+    screenFaceGlow: 0.07,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    outputBrightness: 1.13,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
   },
   phosphorDot: {
     label: "Phosphor Dot",

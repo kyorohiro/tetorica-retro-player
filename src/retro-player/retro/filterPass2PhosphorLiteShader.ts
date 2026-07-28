@@ -498,7 +498,7 @@ void main(void)
     vec3 bleedColor = rightColor * 0.34 + leftColor * 0.34 + downColor * 0.16 + upColor * 0.16;
     phosphorColor += bleedColor * bleedMask * uSpotMaskStrength * (0.06 + phosphorBrightness * 0.1);
 
-    float internalScaleMix = smoothstep(0.5, 1.0, uPhosphorDotInternalScale);
+    float internalScaleMix = clamp((uPhosphorDotInternalScale - 1.0) / 3.0, 0.0, 1.0);
     float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
     float aspectCompensation = sqrt(pixelAspect);
     vec2 cellUv = fract(curvedUv * uTargetSize) - 0.5;

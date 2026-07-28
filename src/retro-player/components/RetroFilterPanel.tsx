@@ -93,7 +93,7 @@ type RetroFilterPanelProps = {
   basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: 1 | 2 | 3;
+  phosphorDotInternalScale: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -154,7 +154,7 @@ type RetroFilterPanelProps = {
   onSetBasicSaturation: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
-  onSetPhosphorDotInternalScale: (value: 1 | 2 | 3) => void;
+  onSetPhosphorDotInternalScale: (value: number) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
@@ -1473,31 +1473,32 @@ export function RetroFilterPanel({
                     : "text-[#12141c]",
                 ].join(" ")}
               >
-                Internal res: {phosphorDotInternalScale}x
+                Internal res: {Number.isInteger(phosphorDotInternalScale) ? phosphorDotInternalScale : phosphorDotInternalScale.toFixed(1)}x
               </span>
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="text-[9px] text-[#7a7268]">1</span>
                 <input
                   type="range"
                   min="1"
-                  max="3"
-                  step="1"
+                  max="4"
+                  step="0.1"
                   list="phosphor-dot-internal-res-ticks"
                   value={phosphorDotInternalScale}
                   onChange={(ev) => {
-                    onSetPhosphorDotInternalScale(Number(ev.currentTarget.value) as 1 | 2 | 3);
+                    onSetPhosphorDotInternalScale(Number(ev.currentTarget.value));
                   }}
                   className={[
                     "w-full",
                     phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-emerald-600",
                   ].join(" ")}
                 />
-                <span className="text-[9px] text-[#7a7268]">3</span>
+                <span className="text-[9px] text-[#7a7268]">4</span>
               </div>
               <datalist id="phosphor-dot-internal-res-ticks">
                 <option value="1" label="1" />
                 <option value="2" label="2" />
                 <option value="3" label="3" />
+                <option value="4" label="4" />
               </datalist>
             </label>
           </div>
@@ -1682,7 +1683,7 @@ export function RetroFilterPanel({
                       : "text-[#12141c]",
                   ].join(" ")}
                 >
-                  Beam internal res: {phosphorDotInternalScale}x
+                  Beam internal res: {Number.isInteger(phosphorDotInternalScale) ? phosphorDotInternalScale : phosphorDotInternalScale.toFixed(1)}x
                 </span>
                 <span className="mt-1 block text-[10px] leading-4 text-[#7a7268]">
                   Beam Cross also uses this internal resolution. Higher values can make the beam pattern denser and cleaner.
@@ -1692,19 +1693,19 @@ export function RetroFilterPanel({
                   <input
                     type="range"
                     min="1"
-                    max="3"
-                    step="1"
+                    max="4"
+                    step="0.1"
                     list="phosphor-dot-internal-res-ticks"
                     value={phosphorDotInternalScale}
                     onChange={(ev) => {
-                      onSetPhosphorDotInternalScale(Number(ev.currentTarget.value) as 1 | 2 | 3);
+                      onSetPhosphorDotInternalScale(Number(ev.currentTarget.value));
                     }}
                     className={[
                       "w-full",
                       phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-sky-600",
                     ].join(" ")}
                   />
-                  <span className="text-[9px] text-[#7a7268]">3</span>
+                  <span className="text-[9px] text-[#7a7268]">4</span>
                 </div>
               </label>
 
