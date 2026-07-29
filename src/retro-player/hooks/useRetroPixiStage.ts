@@ -29,6 +29,11 @@ const getPreferredOutputScale = () => {
 };
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
+type FilterBufferCap = {
+  width: number;
+  height: number;
+  maxPixelCount?: number;
+};
 
 export type CanvasStageApp = {
   canvas: HTMLCanvasElement;
@@ -56,7 +61,7 @@ const resolveFilterBufferCap = (
   mode: "auto" | "on" | "off",
   previewKind: PreviewKind,
   filterState: RetroVideoFilterState,
-) => {
+): FilterBufferCap | null => {
   if (mode === "off") {
     return null;
   }
@@ -79,9 +84,10 @@ const resolveFilterBufferCap = (
   }
 
   if (isBeamCrossModeEnabled(filterState)) {
+    // 候補 640x480, 960x720
     return {
-      width: 640,
-      height: 480,
+      width: 960,
+      height: 720,
     };
   }
 
@@ -90,6 +96,28 @@ const resolveFilterBufferCap = (
     height: 720,
   };
 };
+
+const getCapScaleDownFactor = (
+  width: number,
+  height: number,
+  cap: FilterBufferCap | null,
+) => {
+  if (!cap) {
+    return 1;
+  }
+
+  const widthFactor = rawClampDiv(width, cap.width);
+  const heightFactor = rawClampDiv(height, cap.height);
+  const areaFactor =
+    typeof cap.maxPixelCount === "number" && cap.maxPixelCount > 0
+      ? Math.sqrt((Math.max(width, 1) * Math.max(height, 1)) / cap.maxPixelCount)
+      : 1;
+
+  return Math.max(1, widthFactor, heightFactor, areaFactor);
+};
+
+const rawClampDiv = (value: number, limit: number) =>
+  limit > 0 ? Math.max(value, 1) / limit : 1;
 
 export function useRetroPixiStage({
   filterState,
@@ -436,19 +464,21 @@ export function useRetroPixiStage({
       previewKindRef.current,
       currentFilterState as RetroVideoFilterState,
     );
-    const filterCapFactor = filterBufferCap
-      ? Math.max(
-        rawNextWidth / filterBufferCap.width,
-        rawNextHeight / filterBufferCap.height,
-        1,
-      )
-      : 1;
+    app.pipeline.setFilterBufferCap(filterBufferCap);
+    const filterCapFactor = getCapScaleDownFactor(
+      rawNextWidth,
+      rawNextHeight,
+      filterBufferCap,
+    );
     const totalScaleDownFactor = Math.max(
       overLimitFactor,
       filterCapFactor,
     );
+    app.pipeline.setFilterViewportScale(totalScaleDownFactor);
     const nextWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
     const nextHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
+    const didApplyFilterCap = filterCapFactor > 1.0001;
+    const didApplyAnyCap = totalScaleDownFactor > 1.0001;
     const nextLeft = Math.round(viewRect.x);
     const nextTop = Math.round(viewRect.y);
     const nextLayoutKey = [
@@ -462,6 +492,36 @@ export function useRetroPixiStage({
       currentFilterState.isFilterEnabled ? 1 : 0,
       shouldUseLogicalBufferUpscale ? 1 : 0,
     ].join(":");
+
+    if (didApplyAnyCap || maximizePerformanceMode !== "off") {
+      debugVideo("renderCap:layout", {
+        mode: maximizePerformanceMode,
+        previewKind: previewKindRef.current,
+        styleWidth,
+        styleHeight,
+        sourceWidth,
+        sourceHeight,
+        effectiveTargetWidth,
+        effectiveTargetHeight,
+        displayBufferWidth,
+        displayBufferHeight,
+        logicalBufferWidth,
+        logicalBufferHeight,
+        rawNextWidth,
+        rawNextHeight,
+        overLimitFactor,
+        filterCapFactor,
+        totalScaleDownFactor,
+        nextWidth,
+        nextHeight,
+        didApplyFilterCap,
+        didApplyAnyCap,
+        filterBufferCap,
+        isFilterEnabled: currentFilterState.isFilterEnabled,
+        isBeamMode: isBeamCrossModeEnabled(currentFilterState as RetroVideoFilterState),
+        isPhosphorDotMode: isPhosphorDotModeEnabled(currentFilterState as RetroVideoFilterState),
+      });
+    }
 
     if (appliedLayoutKeyRef.current === nextLayoutKey) {
       return;

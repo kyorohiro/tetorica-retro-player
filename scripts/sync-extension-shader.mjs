@@ -3,6 +3,7 @@ import path from "node:path";
 
 const SHADER_FILES = [
   "filterPass1LiteShader.ts",
+  "filterPass1LiteSimpleShader.ts",
   "filterPass2LiteShader.ts",
   "filterPass2BeamLiteShader.ts",
   "filterPass1Pc98LiteShader.ts",

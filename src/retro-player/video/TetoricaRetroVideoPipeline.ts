@@ -208,6 +208,12 @@ type PostCurvatureUniformLocations = {
   uCurvature: WebGLUniformLocation | null;
 };
 
+type FilterBufferCap = {
+  width: number;
+  height: number;
+  maxPixelCount?: number;
+};
+
 type BeamKernelUniformLocations = {
   uSourceTexture: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
@@ -759,6 +765,7 @@ export class TetoricaRetroVideoPipeline {
 
   private outputEnabled = true;
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
+  private filterViewportScale = 1;
 
   private startedAt = nowMs();
   private animationTimeSec = 0;
@@ -1461,6 +1468,34 @@ export class TetoricaRetroVideoPipeline {
     this.presentationSamplingMode = mode;
   }
 
+  setFilterBufferCap(cap: FilterBufferCap | null) {
+    void cap;
+  }
+
+  setFilterViewportScale(scale: number) {
+    this.filterViewportScale = Number.isFinite(scale) && scale > 0
+      ? Math.max(1, scale)
+      : 1;
+  }
+
+  private getEffectiveViewportFloorSize() {
+    const canvasElement = isHtmlCanvasElement(this.gl.canvas) ? this.gl.canvas : null;
+    const viewportFloorSize = getViewportFloorSize(
+      canvasElement,
+      Math.max(this.gl.drawingBufferWidth, 1),
+      Math.max(this.gl.drawingBufferHeight, 1),
+    );
+
+    if (this.filterViewportScale <= 1.0001) {
+      return viewportFloorSize;
+    }
+
+    return {
+      width: Math.max(1, Math.floor(viewportFloorSize.width / this.filterViewportScale)),
+      height: Math.max(1, Math.floor(viewportFloorSize.height / this.filterViewportScale)),
+    };
+  }
+
   private syncTextureSamplingFilter(nextFilter: number) {
     if (this.textureSamplingFilter === nextFilter) {
       return;
@@ -1796,13 +1831,7 @@ export class TetoricaRetroVideoPipeline {
     sourceWidth: number | undefined,
     sourceHeight: number | undefined,
   ): Pass2Sizing {
-    const { gl } = this;
-    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const viewportFloorSize = getViewportFloorSize(
-      canvasElement,
-      Math.max(gl.drawingBufferWidth, 1),
-      Math.max(gl.drawingBufferHeight, 1),
-    );
+    const viewportFloorSize = this.getEffectiveViewportFloorSize();
     const visibleWidth = viewportFloorSize.width;
     const visibleHeight = viewportFloorSize.height;
     const {
@@ -1844,12 +1873,7 @@ export class TetoricaRetroVideoPipeline {
   ) {
     if (!this.pass1Locs || !this.filterPass1Program) return;
     const { gl } = this;
-    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const viewportFloorSize = getViewportFloorSize(
-      canvasElement,
-      Math.max(gl.drawingBufferWidth, 1),
-      Math.max(gl.drawingBufferHeight, 1),
-    );
+    const viewportFloorSize = this.getEffectiveViewportFloorSize();
     const visibleWidth = viewportFloorSize.width;
     const visibleHeight = viewportFloorSize.height;
     const {
