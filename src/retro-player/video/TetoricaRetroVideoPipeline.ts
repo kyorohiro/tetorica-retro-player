@@ -6,7 +6,8 @@ import {
   type PhosphorDotShape,
   type TargetSamplingMode,
 } from "../retro/config.ts";
-import { FILTER_FRAGMENT_PASS1_LITE } from "../retro/filterPass1LiteShader.ts";
+import { FILTER_FRAGMENT_PASS1_LITE as FILTER_FRAGMENT_PASS1_LITE_COMPOSITE } from "../retro/filterPass1LiteShader.ts";
+import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
@@ -325,7 +326,7 @@ const QUAD_VERTICES = new Float32Array([
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
-type WindowsLitePass1Variant = "basic" | "pc98";
+type WindowsLitePass1Variant = "basic" | "basic_composite" | "pc98" | "pc98_composite";
 type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
@@ -335,13 +336,21 @@ type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Varia
 // time a user switches to a variant mid-playback (e.g. enabling phosphor).
 const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
   "basic:basic",
+  "basic_composite:basic",
   "basic:beam_simple",
+  "basic_composite:beam_simple",
   "basic:beam_full",
+  "basic_composite:beam_full",
   "basic:phosphor",
+  "basic_composite:phosphor",
   "pc98:basic",
+  "pc98_composite:basic",
   "pc98:beam_simple",
+  "pc98_composite:beam_simple",
   "pc98:beam_full",
+  "pc98_composite:beam_full",
   "pc98:phosphor",
+  "pc98_composite:phosphor",
 ];
 
 const isPc98PaletteMode = (mode: PaletteMode) =>
@@ -357,11 +366,23 @@ const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
   filterState.rgbConvergenceOffset <= 0.0001 &&
   getSamplingModeValue(filterState.samplingMode) < 0.5;
 
+const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
+  filterState.compositeEnabled &&
+  filterState.compositeAmount > 0.001;
+
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,
 ): WindowsLiteVariantKey => {
   const pass1: WindowsLitePass1Variant =
-    filterState && isPc98PaletteMode(filterState.paletteMode) ? "pc98" : "basic";
+    filterState
+      ? isPc98PaletteMode(filterState.paletteMode)
+        ? isCompositeNtscEnabled(filterState)
+          ? "pc98_composite"
+          : "pc98"
+        : isCompositeNtscEnabled(filterState)
+          ? "basic_composite"
+          : "basic"
+      : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
     return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
   }
@@ -1018,7 +1039,11 @@ export class TetoricaRetroVideoPipeline {
       pass1:
         pass1Variant === "pc98"
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
-          : FILTER_FRAGMENT_PASS1_LITE,
+          : pass1Variant === "pc98_composite"
+            ? FILTER_FRAGMENT_PASS1_PC98_LITE
+            : pass1Variant === "basic_composite"
+              ? FILTER_FRAGMENT_PASS1_LITE_COMPOSITE
+              : FILTER_FRAGMENT_PASS1_LITE_SIMPLE,
       pass2:
         pass2Variant === "beam_simple"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
@@ -1252,13 +1277,13 @@ export class TetoricaRetroVideoPipeline {
       true,
     );
 
-    requestAnimationFrame(async () => {
+    window.setTimeout(async () => {
       pipeline.queueWindowsLiteVariant(initialFilterState);
       if (pipeline.windowsLiteCompilePromise) {
         await pipeline.windowsLiteCompilePromise;
       }
       onFilterReady?.();
-    });
+    }, 0);
 
     return pipeline;
   }

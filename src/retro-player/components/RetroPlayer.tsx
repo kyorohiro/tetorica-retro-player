@@ -427,6 +427,17 @@ export function RetroPlayer({
     async (presetKey: RetroPresetKey) => {
       const selectedPreset: RetroPresetDefinition = RETRO_PRESETS[presetKey];
       const isBeamPreset = selectedPreset.phosphorDotShape === "beam";
+      const presetVariantOverrides = {
+        paletteMode: selectedPreset.palette,
+        phosphorDotShape: selectedPreset.phosphorDotShape ?? "circle",
+        phosphorStrength: selectedPreset.phosphor,
+        spotMaskStrength: selectedPreset.spotMask,
+        compositeEnabled: selectedPreset.compositeEnabled ?? false,
+        compositeAmount: selectedPreset.compositeAmount ?? 0,
+      };
+      const isCompositePreset =
+        (selectedPreset.compositeEnabled ?? false) &&
+        (selectedPreset.compositeAmount ?? 0) > 0.001;
       if (isWindowsRuntime() && isBeamPreset && !player.isCrtBeamPrepared({
         paletteMode: selectedPreset.palette,
         phosphorDotShape: "beam",
@@ -449,7 +460,31 @@ export function RetroPlayer({
           phosphorDotShape: "beam",
           phosphorStrength: selectedPreset.phosphor,
           spotMaskStrength: selectedPreset.spotMask,
+          compositeEnabled: selectedPreset.compositeEnabled ?? false,
+          compositeAmount: selectedPreset.compositeAmount ?? 0,
         });
+      } else if (
+        isWindowsRuntime() &&
+        isCompositePreset &&
+        !player.isFilterVariantPrepared(presetVariantOverrides)
+      ) {
+        const confirmed = await confirmDialog({
+          title: locale === "ja" ? `${selectedPreset.label} の準備` : `Prepare ${selectedPreset.label}`,
+          body: locale === "ja"
+            ? `${selectedPreset.label} は Windows で準備に時間がかかることがあります。続行しますか？`
+            : `${selectedPreset.label} may take a while to prepare on Windows. Continue?`,
+          okText: locale === "ja" ? "準備する" : "Prepare",
+          cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+        });
+        if (!confirmed) {
+          return;
+        }
+        await player.prepareFilterVariantWithLabel(
+          locale === "ja"
+            ? `${selectedPreset.label} を準備中...`
+            : `Preparing ${selectedPreset.label}...`,
+          presetVariantOverrides,
+        );
       }
 
       filterState.applyPreset(presetKey);
@@ -481,7 +516,9 @@ export function RetroPlayer({
       filterState.setTargetWidth,
       locale,
       player.isCrtBeamPrepared,
+      player.isFilterVariantPrepared,
       player.prepareCrtBeam,
+      player.prepareFilterVariantWithLabel,
       player.sourceDimensions,
       player.isAudioFxEnabled,
       player.toggleAudioFx,
