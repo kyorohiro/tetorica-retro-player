@@ -580,15 +580,6 @@ export function usePixiVideoPlayer(
     isFilterEnabled: true,
   }), [effectiveFilterState]);
 
-  const isCrtBeamPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
-    return hasPreparedFilterVariant(
-      buildVariantPreparationState({
-        phosphorDotShape: "beam",
-        ...overrides,
-      }),
-    );
-  }, [buildVariantPreparationState, hasPreparedFilterVariant]);
-
   const isFilterVariantPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
     return hasPreparedFilterVariant(buildVariantPreparationState(overrides));
   }, [buildVariantPreparationState, hasPreparedFilterVariant]);
@@ -604,16 +595,6 @@ export function usePixiVideoPlayer(
       finishLoading();
     }
   }, [beginLoading, buildVariantPreparationState, finishLoading, prepareFilterVariant]);
-
-  const prepareCrtBeam = useCallback(async (overrides?: Partial<RetroVideoFilterState>) => {
-    await prepareFilterVariantWithLabel(
-      "Preparing CRT Beam...",
-      {
-        phosphorDotShape: "beam",
-        ...overrides,
-      },
-    );
-  }, [prepareFilterVariantWithLabel]);
 
   const recoverAudioOutput = async (reason: string) => {
     const context = await ensureAudioContextWithRecovery(reason);
@@ -1868,9 +1849,7 @@ export function usePixiVideoPlayer(
     startRecording,
     stopRecording,
     ensureAudioContext,
-    isCrtBeamPrepared,
     isFilterVariantPrepared,
-    prepareCrtBeam,
     prepareFilterVariantWithLabel,
     resetRenderer,
     refreshLayout,

@@ -134,6 +134,7 @@ export type RetroPreviewViewProps = {
   src?: string;
   kind: "video" | "image" | "audio";
   player: RetroPreviewPlayerSlice;
+  interactionLocked?: boolean;
   // These two affect usePixiVideoPlayer args so they live in RetroPlayer,
   // but their toggle buttons live here.
   isHighResolution: boolean;
@@ -171,6 +172,7 @@ export function RetroPreviewView({
   src: _src,
   kind: _kind,
   player,
+  interactionLocked = false,
   isHighResolution,
   renderResolutionPreset,
   isFitWidthEnabled,
@@ -1344,6 +1346,7 @@ export function RetroPreviewView({
               <RetroPreviewToolbar
                 locale={locale}
                 player={player}
+                interactionLocked={interactionLocked}
                 isHighResolution={isHighResolution}
                 renderResolutionPreset={renderResolutionPreset}
                 isFitWidthEnabled={isFitWidthEnabled}
@@ -1402,6 +1405,7 @@ export function RetroPreviewView({
             <RetroPreviewToolbar
               locale={locale}
               player={player}
+              interactionLocked={interactionLocked}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
@@ -1459,6 +1463,7 @@ export function RetroPreviewView({
             <RetroPreviewToolbar
               locale={locale}
               player={player}
+              interactionLocked={interactionLocked}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
@@ -1516,6 +1521,7 @@ export function RetroPreviewView({
           <RetroPreviewToolbar
             locale={locale}
             player={player}
+            interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -1571,6 +1577,7 @@ export function RetroPreviewView({
           <RetroPreviewToolbar
             locale={locale}
             player={player}
+            interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -1626,11 +1633,12 @@ export function RetroPreviewView({
       {isFitWidthEnabled && !isPreviewMaximized && (
         <div className="flex items-center justify-end gap-2 pt-2 pr-0">
           <RetroPreviewToolbar
-          locale={locale}
-          player={player}
-          isHighResolution={isHighResolution}
-          renderResolutionPreset={renderResolutionPreset}
-          isFitWidthEnabled={isFitWidthEnabled}
+            locale={locale}
+            player={player}
+            interactionLocked={interactionLocked}
+            isHighResolution={isHighResolution}
+            renderResolutionPreset={renderResolutionPreset}
+            isFitWidthEnabled={isFitWidthEnabled}
             isPinnedPreview={isPinnedPreview}
             isPreviewMaximized={isPreviewMaximized}
             brightness={brightness}

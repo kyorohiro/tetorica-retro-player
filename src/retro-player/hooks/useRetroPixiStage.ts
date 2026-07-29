@@ -17,7 +17,7 @@ import {
   type RetroVideoFilterState,
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
-import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
+import { isTauriRuntime } from "../platform/runtime";
 
 const TAURI_HIDDEN_TICK_MS = 250;
 const getPreferredOutputScale = () => {
@@ -52,30 +52,7 @@ type UseRetroPixiStageParams = {
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
 
-const resolveMaximizedBufferCap = (
-  mode: "auto" | "on" | "off",
-  previewKind: PreviewKind,
-) => {
-  if (mode === "off") {
-    return null;
-  }
-
-  if (mode === "auto") {
-    if (!isWindowsRuntime()) {
-      return null;
-    }
-    if (previewKind !== "video" && previewKind !== "capture") {
-      return null;
-    }
-  }
-
-  return {
-    width: 640,
-    height: 480,
-  };
-};
-
-const resolveWindowsFilterBufferCap = (
+const resolveFilterBufferCap = (
   mode: "auto" | "on" | "off",
   previewKind: PreviewKind,
   filterState: RetroVideoFilterState,
@@ -91,9 +68,6 @@ const resolveWindowsFilterBufferCap = (
   }
 
   if (mode === "auto") {
-    if (!isWindowsRuntime()) {
-      return null;
-    }
     const isBeamMode = isBeamCrossModeEnabled(filterState);
     const isPhosphorMode =
       filterState.spotMaskStrength > 0.001 ||
@@ -457,32 +431,21 @@ export function useRetroPixiStage({
       rawNextHeight / maxTextureSize,
       1,
     );
-    const maximizeBufferCap = isPreviewMaximized
-      ? resolveMaximizedBufferCap(maximizePerformanceMode, previewKindRef.current)
-      : null;
-    const windowsFilterBufferCap = resolveWindowsFilterBufferCap(
+    const filterBufferCap = resolveFilterBufferCap(
       maximizePerformanceMode,
       previewKindRef.current,
       currentFilterState as RetroVideoFilterState,
     );
-    const maximizeCapFactor = maximizeBufferCap
+    const filterCapFactor = filterBufferCap
       ? Math.max(
-        rawNextWidth / maximizeBufferCap.width,
-        rawNextHeight / maximizeBufferCap.height,
-        1,
-      )
-      : 1;
-    const windowsFilterCapFactor = windowsFilterBufferCap
-      ? Math.max(
-        rawNextWidth / windowsFilterBufferCap.width,
-        rawNextHeight / windowsFilterBufferCap.height,
+        rawNextWidth / filterBufferCap.width,
+        rawNextHeight / filterBufferCap.height,
         1,
       )
       : 1;
     const totalScaleDownFactor = Math.max(
       overLimitFactor,
-      maximizeCapFactor,
-      windowsFilterCapFactor,
+      filterCapFactor,
     );
     const nextWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
     const nextHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));

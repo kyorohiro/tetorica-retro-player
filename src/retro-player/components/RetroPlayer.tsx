@@ -24,9 +24,12 @@ import {
 import { saveLocalePreference } from "../../i18n";
 import type { PresetFileData } from "../hooks/presetFile";
 import {
+  buildRetroPresetVariantPreparation,
   RETRO_PRESETS,
+  resolveRetroPresetRenderMode,
   type RetroPresetDefinition,
   type RetroPresetKey,
+  type RetroPresetVariantPreparation,
 } from "../retro/config";
 import type { RetroPreviewLayoutState } from "../previewLayoutState";
 import type { RetroGameControls } from "../types/gameControls";
@@ -205,6 +208,7 @@ export function RetroPlayer({
   const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
   const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
   const [showClockOverlay, setShowClockOverlay] = React.useState(false);
+  const [isPreparingFullPreset, setIsPreparingFullPreset] = React.useState(false);
   const refreshLayoutFrameRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -298,6 +302,17 @@ export function RetroPlayer({
     player.seekTo(0);
     void player.playVideoWithAudio();
   }, [onForceReplay, player]);
+
+  const runWithFullPresetLock = React.useCallback(async (
+    task: () => Promise<void>,
+  ) => {
+    setIsPreparingFullPreset(true);
+    try {
+      await task();
+    } finally {
+      setIsPreparingFullPreset(false);
+    }
+  }, []);
 
   const scheduleRefreshLayout = React.useCallback(() => {
     if (refreshLayoutFrameRef.current !== null) return;
@@ -423,68 +438,72 @@ export function RetroPlayer({
     [],
   );
 
+  const prepareFullModeVariant = React.useCallback(async (request: {
+    title: string;
+    label: string;
+    variantOverrides: RetroPresetVariantPreparation;
+  }) => {
+    const { title, label, variantOverrides } = request;
+
+    if (isPreparingFullPreset) {
+      return false;
+    }
+
+    if (!isWindowsRuntime()) {
+      return true;
+    }
+
+    if (player.isFilterVariantPrepared(variantOverrides)) {
+      return true;
+    }
+
+    const confirmed = await confirmDialog({
+      title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,
+      body: locale === "ja"
+        ? `${title} は Full mode のため、Windows では準備に時間がかかることがあります。続行しますか？`
+        : `${title} uses full mode and may take a while to prepare on Windows. Continue?`,
+      okText: locale === "ja" ? "準備する" : "Prepare",
+      cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+    });
+    if (!confirmed) {
+      return false;
+    }
+
+    await runWithFullPresetLock(async () => {
+      await player.prepareFilterVariantWithLabel(
+        locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
+        variantOverrides,
+      );
+    });
+    return true;
+  }, [
+    confirmDialog,
+    isPreparingFullPreset,
+    locale,
+    player.isFilterVariantPrepared,
+    player.prepareFilterVariantWithLabel,
+    runWithFullPresetLock,
+  ]);
+
   const applyPresetWithAspect = React.useCallback(
     async (presetKey: RetroPresetKey) => {
+      if (isPreparingFullPreset) {
+        return;
+      }
+
       const selectedPreset: RetroPresetDefinition = RETRO_PRESETS[presetKey];
-      const isBeamPreset = selectedPreset.phosphorDotShape === "beam";
-      const presetVariantOverrides = {
-        paletteMode: selectedPreset.palette,
-        phosphorDotShape: selectedPreset.phosphorDotShape ?? "circle",
-        phosphorStrength: selectedPreset.phosphor,
-        spotMaskStrength: selectedPreset.spotMask,
-        compositeEnabled: selectedPreset.compositeEnabled ?? false,
-        compositeAmount: selectedPreset.compositeAmount ?? 0,
-      };
-      const isCompositePreset =
-        (selectedPreset.compositeEnabled ?? false) &&
-        (selectedPreset.compositeAmount ?? 0) > 0.001;
-      if (isWindowsRuntime() && isBeamPreset && !player.isCrtBeamPrepared({
-        paletteMode: selectedPreset.palette,
-        phosphorDotShape: "beam",
-        phosphorStrength: selectedPreset.phosphor,
-        spotMaskStrength: selectedPreset.spotMask,
-      })) {
-        const confirmed = await confirmDialog({
-          title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
-          body: locale === "ja"
-            ? "CRT Beam は Windows で準備に時間がかかることがあります。続行しますか？"
-            : "CRT Beam may take a while to prepare on Windows. Continue?",
-          okText: locale === "ja" ? "準備する" : "Prepare",
-          cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+      const presetVariantOverrides = buildRetroPresetVariantPreparation(selectedPreset);
+      const presetRenderMode = resolveRetroPresetRenderMode(selectedPreset);
+
+      if (presetRenderMode === "full") {
+        const prepared = await prepareFullModeVariant({
+          title: selectedPreset.label,
+          label: selectedPreset.label,
+          variantOverrides: presetVariantOverrides,
         });
-        if (!confirmed) {
+        if (!prepared) {
           return;
         }
-        await player.prepareCrtBeam({
-          paletteMode: selectedPreset.palette,
-          phosphorDotShape: "beam",
-          phosphorStrength: selectedPreset.phosphor,
-          spotMaskStrength: selectedPreset.spotMask,
-          compositeEnabled: selectedPreset.compositeEnabled ?? false,
-          compositeAmount: selectedPreset.compositeAmount ?? 0,
-        });
-      } else if (
-        isWindowsRuntime() &&
-        isCompositePreset &&
-        !player.isFilterVariantPrepared(presetVariantOverrides)
-      ) {
-        const confirmed = await confirmDialog({
-          title: locale === "ja" ? `${selectedPreset.label} の準備` : `Prepare ${selectedPreset.label}`,
-          body: locale === "ja"
-            ? `${selectedPreset.label} は Windows で準備に時間がかかることがあります。続行しますか？`
-            : `${selectedPreset.label} may take a while to prepare on Windows. Continue?`,
-          okText: locale === "ja" ? "準備する" : "Prepare",
-          cancelText: locale === "ja" ? "キャンセル" : "Cancel",
-        });
-        if (!confirmed) {
-          return;
-        }
-        await player.prepareFilterVariantWithLabel(
-          locale === "ja"
-            ? `${selectedPreset.label} を準備中...`
-            : `Preparing ${selectedPreset.label}...`,
-          presetVariantOverrides,
-        );
       }
 
       filterState.applyPreset(presetKey);
@@ -510,58 +529,52 @@ export function RetroPlayer({
       filterState.setTargetHeight(nextHeight);
     },
     [
-      confirmDialog,
+      buildRetroPresetVariantPreparation,
       filterState.applyPreset,
       filterState.setTargetHeight,
       filterState.setTargetWidth,
-      locale,
-      player.isCrtBeamPrepared,
-      player.isFilterVariantPrepared,
-      player.prepareCrtBeam,
-      player.prepareFilterVariantWithLabel,
+      isPreparingFullPreset,
       player.sourceDimensions,
       player.isAudioFxEnabled,
       player.toggleAudioFx,
       computePhosphorDotDimensions,
+      prepareFullModeVariant,
     ],
   );
 
   const handleRequestEnableBeamCross = React.useCallback(async () => {
-    if (isWindowsRuntime() && !player.isCrtBeamPrepared({
+    if (isPreparingFullPreset) {
+      return;
+    }
+
+    const beamVariantOverrides = {
       paletteMode: filterState.paletteMode,
-      phosphorDotShape: "beam",
+      phosphorDotShape: "beam" as const,
       phosphorStrength: filterState.phosphorStrength,
       spotMaskStrength: filterState.spotMaskStrength,
-    })) {
-      const confirmed = await confirmDialog({
-        title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
-        body: locale === "ja"
-          ? "CRT Beam は Windows で準備に時間がかかることがあります。続行しますか？"
-          : "CRT Beam may take a while to prepare on Windows. Continue?",
-        okText: locale === "ja" ? "準備する" : "Prepare",
-        cancelText: locale === "ja" ? "キャンセル" : "Cancel",
-      });
-      if (!confirmed) {
-        return;
-      }
-      await player.prepareCrtBeam({
-        paletteMode: filterState.paletteMode,
-        phosphorDotShape: "beam",
-        phosphorStrength: filterState.phosphorStrength,
-        spotMaskStrength: filterState.spotMaskStrength,
-      });
+      compositeEnabled: filterState.compositeEnabled,
+      compositeAmount: filterState.compositeAmount,
+    };
+
+    const prepared = await prepareFullModeVariant({
+      title: "CRT Beam",
+      label: "CRT Beam",
+      variantOverrides: beamVariantOverrides,
+    });
+    if (!prepared) {
+      return;
     }
 
     filterState.setPhosphorDotShape("beam");
   }, [
-    confirmDialog,
+    filterState.compositeAmount,
+    filterState.compositeEnabled,
     filterState.paletteMode,
     filterState.phosphorStrength,
     filterState.setPhosphorDotShape,
     filterState.spotMaskStrength,
-    locale,
-    player.isCrtBeamPrepared,
-    player.prepareCrtBeam,
+    isPreparingFullPreset,
+    prepareFullModeVariant,
   ]);
 
   // Catch the cases the click-time correction above misses: the preset was
@@ -735,6 +748,7 @@ export function RetroPlayer({
             src={src}
             kind={kind}
             player={player}
+            interactionLocked={isPreparingFullPreset}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -769,6 +783,7 @@ export function RetroPlayer({
             locale={locale}
             player={player}
             filterState={filterState}
+            interactionLocked={isPreparingFullPreset}
             controlPanelMode={controlPanelMode}
             gameControls={gameControls}
             onControlPanelModeChange={setControlPanelMode}
@@ -805,6 +820,7 @@ export function RetroPlayer({
     locale,
     player,
     filterState,
+    interactionLocked: isPreparingFullPreset,
     onControlPanelModeChange: setControlPanelMode,
     onApplyPreset: applyPresetWithAspect,
     onSetTargetWidth: handleSetTargetWidth,
@@ -860,6 +876,7 @@ export function RetroPlayer({
               src={src}
               kind={kind}
               player={player}
+              interactionLocked={isPreparingFullPreset}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}

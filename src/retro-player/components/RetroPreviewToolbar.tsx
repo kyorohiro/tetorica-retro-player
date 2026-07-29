@@ -126,6 +126,7 @@ type RetroPreviewToolbarPlayerSlice = {
 type RetroPreviewToolbarProps = {
   locale: RetroPlayerLocale;
   player: RetroPreviewToolbarPlayerSlice;
+  interactionLocked?: boolean;
   isHighResolution: boolean;
   renderResolutionPreset: 1 | 2;
   isFitWidthEnabled: boolean;
@@ -171,6 +172,7 @@ type RetroPreviewToolbarProps = {
 export function RetroPreviewToolbar({
   locale,
   player,
+  interactionLocked = false,
   isHighResolution,
   renderResolutionPreset,
   isFitWidthEnabled,
@@ -475,6 +477,7 @@ export function RetroPreviewToolbar({
     "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90";
   const pillButtonClass =
     "inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium transition backdrop-blur-sm";
+  const topLevelItemClass = interactionLocked ? "pointer-events-none opacity-60" : "";
 
   const renderTooltip = (key: string, text: string, widthClass = "w-44") => (
     <div
@@ -492,7 +495,10 @@ export function RetroPreviewToolbar({
 
   return (
     <>
-      <div className="relative">
+      <div
+        aria-disabled={interactionLocked}
+        className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <button
           ref={(node) => {
             moreButtonRef.current = node;
@@ -945,7 +951,10 @@ export function RetroPreviewToolbar({
       </div>
 
       {player.canRecord && !isNarrow && (
-        <div className="relative">
+        <div
+          aria-disabled={interactionLocked}
+          className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+        >
           <button
             type="button"
             aria-label={player.isRecording ? "Stop recording" : "Start recording"}
@@ -971,7 +980,10 @@ export function RetroPreviewToolbar({
         </div>
       )}
 
-      <div className="relative">
+      <div
+        aria-disabled={interactionLocked}
+        className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <button
           type="button"
           aria-label={player.isPoweredOn ? "Power off" : "Power on"}
@@ -992,7 +1004,10 @@ export function RetroPreviewToolbar({
         {renderTooltip("power", player.isPoweredOn ? tooltipText.powerOff : tooltipText.powerOn)}
       </div>
 
-      <div className="relative">
+      <div
+        aria-disabled={interactionLocked}
+        className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <button
           ref={presetPopover.anchorRef}
           type="button"
@@ -1054,7 +1069,10 @@ export function RetroPreviewToolbar({
       </div>
 
       {isBrightnessInlineVisible && (
-        <div className="relative flex items-center">
+        <div
+          aria-disabled={interactionLocked}
+          className={["relative flex items-center", topLevelItemClass].filter(Boolean).join(" ")}
+        >
           <button
             type="button"
             aria-label="Decrease brightness"
@@ -1102,7 +1120,10 @@ export function RetroPreviewToolbar({
         </div>
       )}
 
-      <div className="flex items-center">
+      <div
+        aria-disabled={interactionLocked}
+        className={["flex items-center", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <div className="relative">
           <button
             ref={avPopover.anchorRef}

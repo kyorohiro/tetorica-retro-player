@@ -118,6 +118,17 @@ export type RetroPresetDefinition = {
   featured?: boolean;
 };
 
+export type RetroPresetRenderMode = "lite" | "full";
+
+export type RetroPresetVariantPreparation = {
+  paletteMode: PaletteMode;
+  phosphorDotShape: PhosphorDotShape;
+  phosphorStrength: number;
+  spotMaskStrength: number;
+  compositeEnabled: boolean;
+  compositeAmount: number;
+};
+
 export const RETRO_PRESETS = {
   none: {
     label: "None",
@@ -863,6 +874,30 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 // filter state, saved-settings fallback, etc.) resolves through this key.
 export const defaultPresetId: RetroPresetKey = "phosphorDot";
 // デフォルト候補: "phosphorDot";//"tetorica";
+
+export const buildRetroPresetVariantPreparation = (
+  preset: RetroPresetDefinition,
+): RetroPresetVariantPreparation => ({
+  paletteMode: preset.palette,
+  phosphorDotShape: preset.phosphorDotShape ?? "circle",
+  phosphorStrength: preset.phosphor,
+  spotMaskStrength: preset.spotMask,
+  compositeEnabled: preset.compositeEnabled ?? false,
+  compositeAmount: preset.compositeAmount ?? 0,
+});
+
+export const resolveRetroPresetRenderMode = (
+  preset: RetroPresetDefinition,
+): RetroPresetRenderMode => {
+  if (preset === RETRO_PRESETS.phosphorDot || preset === RETRO_PRESETS.phosphorDotSmooth) {
+    return "lite";
+  }
+
+  const variant = buildRetroPresetVariantPreparation(preset);
+  const isBeamMode = variant.phosphorDotShape === "beam";
+  const hasComposite = variant.compositeEnabled && variant.compositeAmount > 0.001;
+  return isBeamMode || hasComposite ? "full" : "lite";
+};
 
 // Grouping used by the preset picker UI. "none" is intentionally excluded —
 // it's rendered outside the category boxes as a plain "no filter" option.

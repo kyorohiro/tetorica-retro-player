@@ -93,8 +93,6 @@ export type RetroControlPlayerSlice = {
   toggleNoise: () => void;
   togglePlayback: () => Promise<void>;
   playVideoWithAudio: () => Promise<void>;
-  isCrtBeamPrepared: (overrides?: Record<string, unknown>) => boolean;
-  prepareCrtBeam: (overrides?: Record<string, unknown>) => Promise<void>;
   analyserRef?: React.RefObject<AnalyserNode | null>;
 };
 
@@ -102,6 +100,7 @@ export type RetroControlPanelProps = {
   locale: RetroPlayerLocale;
   player: RetroControlPlayerSlice;
   filterState: RetroFilterState;
+  interactionLocked?: boolean;
   controlPanelMode: "playback" | "audio-settings" | "video-settings";
   gameControls?: RetroGameControls | null;
   onControlPanelModeChange: (
@@ -159,6 +158,7 @@ export function RetroControlPanel({
   locale,
   player,
   filterState,
+  interactionLocked = false,
   controlPanelMode,
   gameControls,
   onControlPanelModeChange,
@@ -207,7 +207,13 @@ export function RetroControlPanel({
         : null;
 
   return (
-    <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
+    <div
+      aria-disabled={interactionLocked}
+      className={[
+        "rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]",
+        interactionLocked ? "pointer-events-none opacity-60" : "",
+      ].join(" ").trim()}
+    >
       {statusBanner && (
         <p className={statusBanner.className}>{statusBanner.message}</p>
       )}
