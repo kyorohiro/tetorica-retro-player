@@ -224,7 +224,7 @@ export function RetroPreviewToolbar({
     onNativeAudioSuppressionOverrideChange(null);
     onPreferNativeHlsOverrideChange(null);
   };
-  const isMaximizeRenderCapAutoEnabled =
+  const isRenderCapAutoEnabled =
     player.previewKind === "video" || player.previewKind === "capture";
   const tooltipText =
     locale === "ja"
@@ -245,9 +245,9 @@ export function RetroPreviewToolbar({
           alarmArmed: "Alarm: 時刻を待っています。",
           qsv: "Use hardware encode when available",
           qsvDescription: "Windows は QSV、macOS は VideoToolbox を優先します",
-          maximizeRenderCap: "Maximize render cap",
+          maximizeRenderCap: "Render cap",
           maximizeRenderCapDescription:
-            "最大化中だけ内部描画サイズを抑えて、低性能PCでのカクつきを減らします。",
+            "重いフィルター使用時の内部描画サイズを抑えて、低性能PCでのカクつきを減らします。",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "同時実行数の上限。変更は再生切替後に安定し、再起動後も保持されます。",
           enabled: "有効",
@@ -270,9 +270,9 @@ export function RetroPreviewToolbar({
           alarmArmed: "Alarm: armed and waiting for the selected time.",
           qsv: "Use hardware encode when available",
           qsvDescription: "Prefers QSV on Windows and VideoToolbox on macOS",
-          maximizeRenderCap: "Maximize render cap",
+          maximizeRenderCap: "Render cap",
           maximizeRenderCapDescription:
-            "While maximized, limit the internal render size to reduce stutter on lower-end PCs.",
+            "Limit internal render size for heavier filters to reduce stutter on lower-end PCs.",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "Maximum concurrent ffmpeg HLS jobs. Persisted and safe to apply on the next playback cycle.",
           enabled: "On",
@@ -700,7 +700,7 @@ export function RetroPreviewToolbar({
                     <div>{tooltipText.maximizeRenderCap}</div>
                     <div className="text-[9px] text-slate-500">
                       {maximizePerformanceMode === "auto"
-                        ? `Auto now: ${isMaximizeRenderCapAutoEnabled ? "On" : "Off"}`
+                        ? `Auto now: ${isRenderCapAutoEnabled ? "On" : "Off"}`
                         : `Override: ${maximizePerformanceMode === "on" ? "On" : "Off"}`}
                     </div>
                     <div className="mt-1 text-[9px] leading-[1.45] text-slate-500">
@@ -710,7 +710,7 @@ export function RetroPreviewToolbar({
                   <div className="grid grid-cols-3 gap-1">
                     {[
                       {
-                        label: isMaximizeRenderCapAutoEnabled ? "Preset On" : "Preset Off",
+                        label: isRenderCapAutoEnabled ? "Preset On" : "Preset Off",
                         value: "auto",
                       },
                       { label: "On", value: "on" },
