@@ -39,6 +39,7 @@ export type RetroVideoFilterState = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  lcdCrosstalkStrength: number;
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
@@ -56,6 +57,7 @@ export type RetroVideoFilterState = {
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
+  phosphorDotSizeResponse: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -105,6 +107,9 @@ function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   }
   if (shape === "beam") {
     return 2;
+  }
+  if (shape === "square") {
+    return 3;
   }
   return 0;
 }
@@ -163,6 +168,7 @@ type Pass2UniformLocations = {
   uScanline2Strength: WebGLUniformLocation | null;
   uScanlineBrightnessFade: WebGLUniformLocation | null;
   uVignetteStrength: WebGLUniformLocation | null;
+  uLcdCrosstalkStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
   uHorizontalSharpness: WebGLUniformLocation | null;
   uRgbConvergenceOffset: WebGLUniformLocation | null;
@@ -179,6 +185,7 @@ type Pass2UniformLocations = {
   uPhosphorDotMode: WebGLUniformLocation | null;
   uPhosphorDotShape: WebGLUniformLocation | null;
   uPhosphorDotInternalScale: WebGLUniformLocation | null;
+  uPhosphorDotSizeResponse: WebGLUniformLocation | null;
   uPhosphorDotBrightCore: WebGLUniformLocation | null;
   uPhosphorDotCellFill: WebGLUniformLocation | null;
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
@@ -1481,6 +1488,7 @@ export class TetoricaRetroVideoPipeline {
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
       uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
       uVignetteStrength: gl.getUniformLocation(program, "uVignetteStrength"),
+      uLcdCrosstalkStrength: gl.getUniformLocation(program, "uLcdCrosstalkStrength"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
       uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
       uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
@@ -1497,6 +1505,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
       uPhosphorDotShape: gl.getUniformLocation(program, "uPhosphorDotShape"),
       uPhosphorDotInternalScale: gl.getUniformLocation(program, "uPhosphorDotInternalScale"),
+      uPhosphorDotSizeResponse: gl.getUniformLocation(program, "uPhosphorDotSizeResponse"),
       uPhosphorDotBrightCore: gl.getUniformLocation(program, "uPhosphorDotBrightCore"),
       uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
@@ -2076,6 +2085,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
     gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);
     gl.uniform1f(this.pass2Locs.uVignetteStrength, filterState.vignetteStrength);
+    gl.uniform1f(this.pass2Locs.uLcdCrosstalkStrength, filterState.lcdCrosstalkStrength);
     gl.uniform1f(this.pass2Locs.uGlowStrength, filterState.glowStrength);
     gl.uniform1f(this.pass2Locs.uHorizontalSharpness, filterState.horizontalSharpness);
     gl.uniform1f(this.pass2Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
@@ -2104,6 +2114,10 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(
       this.pass2Locs.uPhosphorDotInternalScale,
       Math.min(4, Math.max(1, filterState.phosphorDotInternalScale)),
+    );
+    gl.uniform1f(
+      this.pass2Locs.uPhosphorDotSizeResponse,
+      Math.min(2, Math.max(0, filterState.phosphorDotSizeResponse)),
     );
     gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);

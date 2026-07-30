@@ -31,6 +31,7 @@ uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotShape;
 uniform float uPhosphorDotInternalScale;
+uniform float uPhosphorDotSizeResponse;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
@@ -142,27 +143,50 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float dist = length(dotUv);
   float lit = smoothstep(0.01, 0.28, perceivedLight);
   float gate = smoothstep(0.0, 0.12, perceivedLight);
-  float radiusBias = pow(brightness, 0.7);
+  float sizeResponse = clamp(uPhosphorDotSizeResponse, 0.0, 2.0);
+  float fixedRadiusBias = 0.72;
+  float currentRadiusBias = pow(brightness, 0.7);
+  float strongRadiusBias = pow(brightness, 0.45);
+  float radiusBias =
+    sizeResponse <= 1.0
+      ? mix(fixedRadiusBias, currentRadiusBias, sizeResponse)
+      : mix(currentRadiusBias, strongRadiusBias, sizeResponse - 1.0);
   float highlightBloom = smoothstep(0.68, 1.0, brightness);
+  float fixedGeometryBrightness = 0.72;
+  float strongGeometryBrightness = pow(brightness, 0.45);
+  float geometryBrightness =
+    sizeResponse <= 1.0
+      ? mix(fixedGeometryBrightness, brightness, sizeResponse)
+      : mix(brightness, strongGeometryBrightness, sizeResponse - 1.0);
+  float strongGeometryHighlight = smoothstep(0.5, 1.0, brightness);
+  float geometryHighlight =
+    sizeResponse <= 1.0
+      ? mix(0.0, highlightBloom, sizeResponse)
+      : mix(highlightBloom, strongGeometryHighlight, sizeResponse - 1.0);
   float cellFillMix = smoothstep(0.2, 0.5, uPhosphorDotCellFill);
   float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
   bool useBrightCore = uPhosphorDotBrightCore > 0.5;
   float brightCoreMix = (useBrightCore ? 1.0 : 0.0) * (1.0 - cellFillMix) * (1.0 - flatDiscMode);
   float brightCoreCompensation = mix(1.0, 1.2 + brightness * 0.18 + highlightBloom * 0.08, brightCoreMix);
-  float brightCoreRadiusBoost = mix(1.0, 1.85 + highlightBloom * 0.35, brightCoreMix);
-  float brightCoreHaloBoost = mix(1.0, 2.1 + highlightBloom * 0.45, brightCoreMix);
+  float brightCoreRadiusBoost = mix(1.0, 1.85 + geometryHighlight * 0.35, brightCoreMix);
+  float brightCoreHaloBoost = mix(1.0, 2.1 + geometryHighlight * 0.45, brightCoreMix);
   float radiusJitter = 1.0 + cellJitter * 0.045;
   float emissionJitter = 1.0 + cellJitter * 0.035;
   float dotRadius = mix(
     uBulbRadius * (useBrightCore ? 0.14 : 0.19),
-    uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + highlightBloom * (useBrightCore ? 0.24 : 0.12)),
+    uBulbRadius * ((useBrightCore ? 0.64 : 0.82) + geometryHighlight * (useBrightCore ? 0.24 : 0.12)),
     radiusBias
   ) * radiusJitter * brightCoreRadiusBoost;
-  float innerCoreRadius = dotRadius * (useBrightCore ? mix(0.28, 0.42, brightness) : mix(0.44, 0.58, brightness));
+  float innerCoreRadius = dotRadius * (
+    useBrightCore
+      ? mix(0.28, 0.42, geometryBrightness)
+      : mix(0.44, 0.58, geometryBrightness)
+  );
   float haloRadius =
     dotRadius +
-    mix(0.028, 0.12 + highlightBloom * 0.08, brightness) * brightCoreHaloBoost;
-  bool useBeamShape = uPhosphorDotShape > 1.5;
+    mix(0.028, 0.12 + geometryHighlight * 0.08, geometryBrightness) * brightCoreHaloBoost;
+  bool useBeamShape = uPhosphorDotShape > 1.5 && uPhosphorDotShape < 2.5;
+  bool useSquareShape = uPhosphorDotShape > 2.5;
   bool useHeartShape = uPhosphorDotShape > 0.5 && uPhosphorDotShape < 1.5;
   if (useBeamShape) {
     float beamAmount = max(amount, 0.68);
@@ -256,6 +280,106 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       (0.18 + highlightBloom * 0.28) *
       getWarmBloomAmount();
     return beamColor * beamLightLevel;
+  }
+
+  if (useSquareShape) {
+    vec2 squareUv = dotUv / max(dotRadius, 0.0001);
+    vec2 squareCoreUv = dotUv / max(innerCoreRadius, 0.0001);
+    vec2 squareHaloUv = dotUv / max(haloRadius, 0.0001);
+    float cornerRound = mix(0.18, 0.08, flatDiscMode);
+    float squareEdge = 0.045 + geometryHighlight * 0.012;
+    float squareField = max(abs(squareUv.x), abs(squareUv.y));
+    float squareCoreField = max(abs(squareCoreUv.x), abs(squareCoreUv.y));
+    float squareHaloField = max(abs(squareHaloUv.x), abs(squareHaloUv.y));
+    float squareCornerMask =
+      1.0 -
+      smoothstep(
+        1.0 - cornerRound,
+        1.0 + cornerRound,
+        length(max(abs(squareUv) - vec2(1.0 - cornerRound), 0.0))
+      );
+    float squareCoreCornerMask =
+      1.0 -
+      smoothstep(
+        1.0 - cornerRound,
+        1.0 + cornerRound,
+        length(max(abs(squareCoreUv) - vec2(1.0 - cornerRound), 0.0))
+      );
+    float squareHaloCornerMask =
+      1.0 -
+      smoothstep(
+        1.04 - cornerRound,
+        1.16 + cornerRound,
+        length(max(abs(squareHaloUv) - vec2(1.0 - cornerRound), 0.0))
+      );
+    float innerCore =
+      (1.0 - smoothstep(1.0 - squareEdge * 1.3, 1.0 + squareEdge * 1.3, squareCoreField)) *
+      squareCoreCornerMask;
+    float bulb =
+      (1.0 - smoothstep(1.0 - squareEdge, 1.0 + squareEdge, squareField)) *
+      squareCornerMask;
+    float flatDisc =
+      (1.0 - smoothstep(1.0 - squareEdge * 0.7, 1.0 + squareEdge * 0.7, squareField)) *
+      squareCornerMask;
+    float halo =
+      (1.0 - smoothstep(1.0 - squareEdge * 3.0, 1.0 + squareEdge * 3.6, squareHaloField)) *
+      squareHaloCornerMask;
+    float gridRim =
+      smoothstep(0.76, 0.98, max(abs(squareUv.x), abs(squareUv.y))) *
+      squareCornerMask;
+    float bodyGlow = bulb * mix(
+      0.24 + brightness * 0.28,
+      0.24 + brightness * 0.28,
+      brightCoreMix
+    );
+    float emission =
+      gate *
+      lit *
+      amount *
+      (
+        innerCore * mix(
+          0.82 + brightness * 0.52 + highlightBloom * 0.14,
+          1.06 + brightness * 0.78 + highlightBloom * 0.22,
+          brightCoreMix
+        ) +
+        bodyGlow +
+        bulb * mix(
+          0.18 + brightness * 0.24,
+          0.2 + brightness * 0.28,
+          brightCoreMix
+        ) +
+        gridRim * (0.08 + brightness * 0.1) +
+        halo * halo * (0.03 + brightness * 0.055 + highlightBloom * 0.08)
+      ) *
+      brightCoreCompensation *
+      emissionJitter;
+    float floorLight =
+      gate *
+      lit *
+      amount *
+      (uBlackFloor * (0.58 + halo * 0.42 + gridRim * 0.35)) *
+      (1.0 + cellJitter * 0.02);
+    float cellFill =
+      gate *
+      lit *
+      amount *
+      uPhosphorDotCellFill *
+      (0.34 + brightness * 0.2) *
+      squareCornerMask;
+    float flatDiscFill =
+      gate *
+      lit *
+      amount *
+      flatDisc *
+      (0.72 + brightness * 0.14);
+    float brightCoreCellClamp = mix(1.0, 0.16, brightCoreMix);
+    float brightCoreFloorClamp = mix(1.0, 0.24, brightCoreMix);
+    vec3 dotCoreColor = color * emission;
+    dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.45, cellFillMix) * brightCoreCellClamp;
+    vec3 discCoreColor = color * flatDiscFill;
+    vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+    dotColor += color * floorLight * brightCoreFloorClamp;
+    return dotColor * lightLevel;
   }
 
   if (useHeartShape) {

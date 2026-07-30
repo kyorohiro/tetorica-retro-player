@@ -29,6 +29,7 @@ export type PersistedRetroFilterSettings = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  lcdCrosstalkStrength: number;
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
@@ -46,6 +47,7 @@ export type PersistedRetroFilterSettings = {
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
+  phosphorDotSizeResponse: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -176,6 +178,10 @@ const normalizePersistedRetroSettings = (
           filter.vblankSimulationMode === "mild" || filter.vblankSimulationMode === "strong"
             ? filter.vblankSimulationMode
             : "off",
+        lcdCrosstalkStrength:
+          typeof filter.lcdCrosstalkStrength === "number" && Number.isFinite(filter.lcdCrosstalkStrength)
+            ? filter.lcdCrosstalkStrength
+            : 0,
       }
       : filter,
     audio: audio

@@ -11,7 +11,7 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
-export type PhosphorDotShape = "circle" | "heart" | "beam";
+export type PhosphorDotShape = "circle" | "heart" | "beam" | "square";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 export type TargetSamplingMode =
   | "nearest"
@@ -37,6 +37,9 @@ export const normalizePhosphorDotShape = (
   if (shape === "beam") {
     return "beam";
   }
+  if (shape === "square") {
+    return "square";
+  }
   return "circle";
 };
 
@@ -47,6 +50,14 @@ export const normalizePhosphorDotInternalScale = (value: number | undefined) => 
 
   const scale = value;
   return Math.max(1, Math.min(4, Math.round(scale * 10) / 10));
+};
+
+export const normalizePhosphorDotSizeResponse = (value: number | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(2, Math.round(value * 10) / 10));
 };
 
 export const MONO_TINTS: Record<
@@ -64,6 +75,7 @@ export type RetroPresetDefinition = {
   autoTargetSize?: boolean;
   samplingMode?: TargetSamplingMode;
   vblankSimulationMode?: VBlankSimulationMode;
+  renderModeOverride?: RetroPresetRenderMode;
   width: number;
   height: number;
   colors: number;
@@ -74,6 +86,7 @@ export type RetroPresetDefinition = {
   scanline2: number;
   vignette: number;
   glow: number;
+  lcdCrosstalkStrength?: number;
   horizontalSharpness?: number;
   rgbConvergenceOffset?: number;
   smoothStrength?: number;
@@ -91,6 +104,7 @@ export type RetroPresetDefinition = {
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
   phosphorDotInternalScale?: number;
+  phosphorDotSizeResponse?: number;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
@@ -201,11 +215,35 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
   },
+  gbLite: {
+    label: "GB Lite",
+    featured: true,
+    width: 160,
+    height: 144,
+    colors: 4,
+    dither: 0.34,
+    palette: "mono",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.015,
+    glow: 0.0,
+    lcdCrosstalkStrength: 0.0,
+    phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
+    monoTint: "green",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
   gb: {
     label: "GB",
     featured: true,
-    width: 200, //GB is 160, // 160 or 144
-    height: 180,// GB is 144,
+    renderModeOverride: "full",
+    width: 160,
+    height: 144,
     colors: 4,
     dither: 0.08,
     palette: "mono",
@@ -214,10 +252,22 @@ export const RETRO_PRESETS = {
     scanline2: 0.0,
     vignette: 0.015,
     glow: 0.0,
+    lcdCrosstalkStrength: 1.0,
     phosphor: 0.0,
-    spotMask: 0.0,
-    bulbRadius: 0.3,
-    blackFloor: 0.008,
+    spotMask: 0.706,
+    bulbRadius: 0.5,
+    blackFloor: 0.075,
+    outputBrightness: 1.18,
+    phosphorDotShape: "square",
+    phosphorDotInternalScale: 1,
+    phosphorDotSizeResponse: 0.1,
+    phosphorDotCellFill: 0.5,
+    phosphorDotLightBalance: 1.28,
+    phosphorDotBrightCore: false,
+    phosphorDotFlatDisc: true,
+    phosphorDotNeighborBlend: true,
+    phosphorDotGrainStrength: 0.13195079107728944,
+    screenFaceGlow: 0.2,
     monoTint: "green",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -891,6 +941,10 @@ export const buildRetroPresetVariantPreparation = (
 export const resolveRetroPresetRenderMode = (
   preset: RetroPresetDefinition,
 ): RetroPresetRenderMode => {
+  if (preset.renderModeOverride) {
+    return preset.renderModeOverride;
+  }
+
   if (preset === RETRO_PRESETS.phosphorDot || preset === RETRO_PRESETS.phosphorDotSmooth) {
     return "lite";
   }
@@ -939,6 +993,7 @@ export const RETRO_PRESET_CATEGORY_ORDER: RetroPresetCategory[] = [
 export const RETRO_PRESET_CATEGORIES = {
   chunky: "classic",
   arcade: "classic",
+  gbLite: "classic",
   gb: "classic",
   gba: "classic",
   pc98_512: "classic",
