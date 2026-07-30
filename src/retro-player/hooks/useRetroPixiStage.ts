@@ -17,7 +17,7 @@ import {
   type RetroVideoFilterState,
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
-import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
+import { isTauriRuntime } from "../platform/runtime";
 
 const TAURI_HIDDEN_TICK_MS = 250;
 const getPreferredOutputScale = () => {
@@ -29,6 +29,11 @@ const getPreferredOutputScale = () => {
 };
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
+type FilterBufferCap = {
+  width: number;
+  height: number;
+  maxPixelCount?: number;
+};
 
 export type CanvasStageApp = {
   canvas: HTMLCanvasElement;
@@ -52,34 +57,11 @@ type UseRetroPixiStageParams = {
   debugVideo: (label: string, payload?: Record<string, unknown>) => void;
 };
 
-const resolveMaximizedBufferCap = (
-  mode: "auto" | "on" | "off",
-  previewKind: PreviewKind,
-) => {
-  if (mode === "off") {
-    return null;
-  }
-
-  if (mode === "auto") {
-    if (!isWindowsRuntime()) {
-      return null;
-    }
-    if (previewKind !== "video" && previewKind !== "capture") {
-      return null;
-    }
-  }
-
-  return {
-    width: 640,
-    height: 480,
-  };
-};
-
-const resolveWindowsFilterBufferCap = (
+const resolveFilterBufferCap = (
   mode: "auto" | "on" | "off",
   previewKind: PreviewKind,
   filterState: RetroVideoFilterState,
-) => {
+): FilterBufferCap | null => {
   if (mode === "off") {
     return null;
   }
@@ -91,9 +73,6 @@ const resolveWindowsFilterBufferCap = (
   }
 
   if (mode === "auto") {
-    if (!isWindowsRuntime()) {
-      return null;
-    }
     const isBeamMode = isBeamCrossModeEnabled(filterState);
     const isPhosphorMode =
       filterState.spotMaskStrength > 0.001 ||
@@ -105,9 +84,10 @@ const resolveWindowsFilterBufferCap = (
   }
 
   if (isBeamCrossModeEnabled(filterState)) {
+    // 候補 640x480, 960x720
     return {
-      width: 640,
-      height: 480,
+      width: 960,
+      height: 720,
     };
   }
 
@@ -116,6 +96,28 @@ const resolveWindowsFilterBufferCap = (
     height: 720,
   };
 };
+
+const getCapScaleDownFactor = (
+  width: number,
+  height: number,
+  cap: FilterBufferCap | null,
+) => {
+  if (!cap) {
+    return 1;
+  }
+
+  const widthFactor = rawClampDiv(width, cap.width);
+  const heightFactor = rawClampDiv(height, cap.height);
+  const areaFactor =
+    typeof cap.maxPixelCount === "number" && cap.maxPixelCount > 0
+      ? Math.sqrt((Math.max(width, 1) * Math.max(height, 1)) / cap.maxPixelCount)
+      : 1;
+
+  return Math.max(1, widthFactor, heightFactor, areaFactor);
+};
+
+const rawClampDiv = (value: number, limit: number) =>
+  limit > 0 ? Math.max(value, 1) / limit : 1;
 
 export function useRetroPixiStage({
   filterState,
@@ -457,35 +459,26 @@ export function useRetroPixiStage({
       rawNextHeight / maxTextureSize,
       1,
     );
-    const maximizeBufferCap = isPreviewMaximized
-      ? resolveMaximizedBufferCap(maximizePerformanceMode, previewKindRef.current)
-      : null;
-    const windowsFilterBufferCap = resolveWindowsFilterBufferCap(
+    const filterBufferCap = resolveFilterBufferCap(
       maximizePerformanceMode,
       previewKindRef.current,
       currentFilterState as RetroVideoFilterState,
     );
-    const maximizeCapFactor = maximizeBufferCap
-      ? Math.max(
-        rawNextWidth / maximizeBufferCap.width,
-        rawNextHeight / maximizeBufferCap.height,
-        1,
-      )
-      : 1;
-    const windowsFilterCapFactor = windowsFilterBufferCap
-      ? Math.max(
-        rawNextWidth / windowsFilterBufferCap.width,
-        rawNextHeight / windowsFilterBufferCap.height,
-        1,
-      )
-      : 1;
+    app.pipeline.setFilterBufferCap(filterBufferCap);
+    const filterCapFactor = getCapScaleDownFactor(
+      rawNextWidth,
+      rawNextHeight,
+      filterBufferCap,
+    );
     const totalScaleDownFactor = Math.max(
       overLimitFactor,
-      maximizeCapFactor,
-      windowsFilterCapFactor,
+      filterCapFactor,
     );
+    app.pipeline.setFilterViewportScale(totalScaleDownFactor);
     const nextWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
     const nextHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
+    const didApplyFilterCap = filterCapFactor > 1.0001;
+    const didApplyAnyCap = totalScaleDownFactor > 1.0001;
     const nextLeft = Math.round(viewRect.x);
     const nextTop = Math.round(viewRect.y);
     const nextLayoutKey = [
@@ -499,6 +492,36 @@ export function useRetroPixiStage({
       currentFilterState.isFilterEnabled ? 1 : 0,
       shouldUseLogicalBufferUpscale ? 1 : 0,
     ].join(":");
+
+    if (didApplyAnyCap || maximizePerformanceMode !== "off") {
+      debugVideo("renderCap:layout", {
+        mode: maximizePerformanceMode,
+        previewKind: previewKindRef.current,
+        styleWidth,
+        styleHeight,
+        sourceWidth,
+        sourceHeight,
+        effectiveTargetWidth,
+        effectiveTargetHeight,
+        displayBufferWidth,
+        displayBufferHeight,
+        logicalBufferWidth,
+        logicalBufferHeight,
+        rawNextWidth,
+        rawNextHeight,
+        overLimitFactor,
+        filterCapFactor,
+        totalScaleDownFactor,
+        nextWidth,
+        nextHeight,
+        didApplyFilterCap,
+        didApplyAnyCap,
+        filterBufferCap,
+        isFilterEnabled: currentFilterState.isFilterEnabled,
+        isBeamMode: isBeamCrossModeEnabled(currentFilterState as RetroVideoFilterState),
+        isPhosphorDotMode: isPhosphorDotModeEnabled(currentFilterState as RetroVideoFilterState),
+      });
+    }
 
     if (appliedLayoutKeyRef.current === nextLayoutKey) {
       return;

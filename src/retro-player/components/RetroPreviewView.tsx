@@ -26,6 +26,10 @@ import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
 import type { RetroGameControls } from "../types/gameControls";
 import { AudioSpectrum } from "./AudioSpectrum";
 
+const FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY =
+  "tetorica-retro-player.full-mode-confirmed.persisted";
+const FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY =
+  "tetorica-retro-player.full-mode-confirmed.session";
 // Casio-digital-watch style clock overlay — toggled by long-pressing the
 // playback Speed button.
 function DigitalClockOverlay() {
@@ -116,6 +120,7 @@ export type RetroPreviewPlayerSlice = {
   powerOn: () => void;
   powerOff: () => void;
   resetRenderer: () => Promise<void>;
+  clearFullVariantConfirmations?: () => void;
   playVideoWithAudio: () => Promise<void>;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<string | null>;
@@ -134,6 +139,7 @@ export type RetroPreviewViewProps = {
   src?: string;
   kind: "video" | "image" | "audio";
   player: RetroPreviewPlayerSlice;
+  interactionLocked?: boolean;
   // These two affect usePixiVideoPlayer args so they live in RetroPlayer,
   // but their toggle buttons live here.
   isHighResolution: boolean;
@@ -171,6 +177,7 @@ export function RetroPreviewView({
   src: _src,
   kind: _kind,
   player,
+  interactionLocked = false,
   isHighResolution,
   renderResolutionPreset,
   isFitWidthEnabled,
@@ -990,6 +997,13 @@ export function RetroPreviewView({
             },
       );
       if (!confirmed) return;
+      player.clearFullVariantConfirmations?.();
+      try {
+        window.sessionStorage.removeItem(FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY);
+        window.localStorage.removeItem(FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY);
+      } catch {
+        // Ignore storage errors and continue with renderer reset.
+      }
       await player.resetRenderer();
     })();
   }, [confirmDialog, locale, player]);
@@ -1344,6 +1358,7 @@ export function RetroPreviewView({
               <RetroPreviewToolbar
                 locale={locale}
                 player={player}
+                interactionLocked={interactionLocked}
                 isHighResolution={isHighResolution}
                 renderResolutionPreset={renderResolutionPreset}
                 isFitWidthEnabled={isFitWidthEnabled}
@@ -1402,6 +1417,7 @@ export function RetroPreviewView({
             <RetroPreviewToolbar
               locale={locale}
               player={player}
+              interactionLocked={interactionLocked}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
@@ -1459,6 +1475,7 @@ export function RetroPreviewView({
             <RetroPreviewToolbar
               locale={locale}
               player={player}
+              interactionLocked={interactionLocked}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}
@@ -1516,6 +1533,7 @@ export function RetroPreviewView({
           <RetroPreviewToolbar
             locale={locale}
             player={player}
+            interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -1571,6 +1589,7 @@ export function RetroPreviewView({
           <RetroPreviewToolbar
             locale={locale}
             player={player}
+            interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -1626,11 +1645,12 @@ export function RetroPreviewView({
       {isFitWidthEnabled && !isPreviewMaximized && (
         <div className="flex items-center justify-end gap-2 pt-2 pr-0">
           <RetroPreviewToolbar
-          locale={locale}
-          player={player}
-          isHighResolution={isHighResolution}
-          renderResolutionPreset={renderResolutionPreset}
-          isFitWidthEnabled={isFitWidthEnabled}
+            locale={locale}
+            player={player}
+            interactionLocked={interactionLocked}
+            isHighResolution={isHighResolution}
+            renderResolutionPreset={renderResolutionPreset}
+            isFitWidthEnabled={isFitWidthEnabled}
             isPinnedPreview={isPinnedPreview}
             isPreviewMaximized={isPreviewMaximized}
             brightness={brightness}

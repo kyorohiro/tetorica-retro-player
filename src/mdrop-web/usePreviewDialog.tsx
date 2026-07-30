@@ -465,6 +465,14 @@ function PreviewDialog({
                     </div>
                 )}
                 <PreviewPage
+                    key={[
+                        file.id,
+                        file.path,
+                        requestSequence,
+                        isRetro ? "retro" : "native",
+                        useHls ? "hls" : "direct",
+                        forcedKind ?? "auto",
+                    ].join(":")}
                     file={file}
                     requestSequence={requestSequence}
                     isRetro={isRetro}

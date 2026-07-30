@@ -1,4 +1,4 @@
-export const FILTER_FRAGMENT_PASS1_LITE = `#version 300 es
+export const FILTER_FRAGMENT_PASS1_LITE_SIMPLE = `#version 300 es
 precision mediump float;
 
 in vec2 vTextureCoord;
@@ -23,12 +23,6 @@ uniform float uNeonSaturation;
 uniform float uNeonDetail;
 uniform float uGlowStrength;
 uniform float uColoredGlowEnabled;
-uniform float uCompositeEnabled;
-uniform float uCompositeAmount;
-uniform float uCompositeChromaBlur;
-uniform float uCompositeChromaDelay;
-uniform float uCompositeNoise;
-uniform float uTime;
 
 float bayer4x4(vec2 pos)
 {
@@ -132,19 +126,6 @@ vec3 sampleSourceColorAtCell(vec2 cell)
   return mix(center, blurred, clamp(uSmoothStrength, 0.0, 1.0));
 }
 
-vec3 sampleConvergedColor(vec2 uv, vec2 texel)
-{
-  if (uRgbConvergenceOffset <= 0.0001) {
-    return texture(uTexture, uv).rgb;
-  }
-
-  vec2 offset = vec2(texel.x * uRgbConvergenceOffset, 0.0);
-  float r = texture(uTexture, clamp(uv + offset, vec2(0.0), vec2(1.0))).r;
-  float g = texture(uTexture, uv).g;
-  float b = texture(uTexture, clamp(uv - offset, vec2(0.0), vec2(1.0))).b;
-  return vec3(r, g, b);
-}
-
 vec3 applyHorizontalSharpness(vec3 center, vec3 left, vec3 right)
 {
   float amount = clamp(uHorizontalSharpness - 1.0, -1.0, 1.0);
@@ -221,114 +202,6 @@ vec3 adjustSaturation(vec3 color, float saturation)
   return mix(vec3(luminance), color, saturation);
 }
 
-vec3 rgbToYiq(vec3 color)
-{
-  return vec3(
-    dot(color, vec3(0.299, 0.587, 0.114)),
-    dot(color, vec3(0.596, -0.275, -0.321)),
-    dot(color, vec3(0.212, -0.523, 0.311))
-  );
-}
-
-vec3 yiqToRgb(vec3 yiq)
-{
-  return vec3(
-    yiq.x + 0.956 * yiq.y + 0.621 * yiq.z,
-    yiq.x - 0.272 * yiq.y - 0.647 * yiq.z,
-    yiq.x - 1.106 * yiq.y + 1.703 * yiq.z
-  );
-}
-
-float hash12(vec2 p)
-{
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-vec3 applyCompositeNtsc(vec2 cell, vec3 centerColor)
-{
-  if (uCompositeEnabled < 0.5 || uCompositeAmount <= 0.001) {
-    return centerColor;
-  }
-
-  vec3 centerYiq = rgbToYiq(centerColor);
-  vec3 left1Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(-1.0, 0.0)));
-  vec3 right1Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(1.0, 0.0)));
-  vec3 left2Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(-2.0, 0.0)));
-  vec3 right2Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(2.0, 0.0)));
-  vec3 left3Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(-3.0, 0.0)));
-  vec3 right3Yiq = rgbToYiq(sampleSourceColorAtCell(cell + vec2(3.0, 0.0)));
-
-  float blur = clamp(uCompositeChromaBlur, 0.0, 1.0);
-  float delay = clamp(uCompositeChromaDelay, -1.0, 1.0);
-  float amount = clamp(uCompositeAmount, 0.0, 1.0);
-  float frame = floor(uTime * 60.0);
-  float frameMed = floor(uTime * 19.0);
-  float frameSlow = floor(uTime * 7.0);
-  float linePhase = hash12(vec2(cell.y * 0.73 + 19.0, frame * 0.19 + frameSlow * 0.61)) - 0.5;
-  float lineDrift = hash12(vec2(cell.y * 1.91 + 7.0, frameSlow + 41.0)) - 0.5;
-  float lineBurst = hash12(vec2(cell.y * 3.17 + 3.0, frameMed + 113.0)) - 0.5;
-  float chromaJitter = hash12(cell + vec2(frame * 0.618, frameMed * 1.731)) - 0.5;
-  float jitterBurst = hash12(cell.yx + vec2(frameMed * 0.37, frameSlow * 2.13)) - 0.5;
-  delay = clamp(delay + (chromaJitter * 0.1 + jitterBurst * 0.06) * amount, -1.0, 1.0);
-  blur = clamp(blur + (linePhase * 0.032 + lineDrift * 0.022 + lineBurst * 0.018) * amount, 0.0, 1.0);
-
-  vec2 preferredDir = delay >= 0.0 ? vec2(1.0, 0.0) : vec2(-1.0, 0.0);
-  vec3 delayNearYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir));
-  vec3 delayFarYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 2.0));
-  vec3 delayFartherYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 3.0));
-  vec3 ghostNearYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 4.0));
-  vec3 ghostFarYiq = rgbToYiq(sampleSourceColorAtCell(cell + preferredDir * 6.0));
-  vec2 chromaCenter = centerYiq.yz;
-  vec2 chromaBlurred =
-    chromaCenter * (1.0 - blur * 1.15) +
-    (left1Yiq.yz + right1Yiq.yz) * (0.32 * blur) +
-    (left2Yiq.yz + right2Yiq.yz) * (0.16 * blur) +
-    (left3Yiq.yz + right3Yiq.yz) * (0.08 * blur);
-  vec2 delayedChroma = mix(chromaBlurred, delayNearYiq.yz, abs(delay) * 0.95);
-  delayedChroma = mix(delayedChroma, delayFarYiq.yz, abs(delay) * 0.55);
-  delayedChroma = mix(delayedChroma, delayFartherYiq.yz, abs(delay) * 0.28);
-
-  float chromaNoise = (hash12(
-    cell + vec2(centerYiq.x, delayedChroma.x) * 97.0 + vec2(frame * 0.11, frame * 0.07)
-  ) - 0.5)
-    * 0.14 * clamp(uCompositeNoise, 0.0, 1.0);
-  delayedChroma += vec2(chromaNoise, -chromaNoise * 0.85);
-
-  float lumaEdge = abs(right1Yiq.x - left1Yiq.x) + abs(right2Yiq.x - left2Yiq.x) * 0.5;
-  float chromaCross = smoothstep(0.04, 0.32, lumaEdge) * (0.04 + blur * 0.1) * amount;
-  float subcarrierFlip = hash12(vec2(cell.y * 2.0 + mod(cell.x, 4.0), frameMed + 211.0)) > 0.5 ? 1.0 : -1.0;
-  vec2 crawlTint = vec2(
-    hash12(cell + vec2(frame * 0.23, 17.0)),
-    hash12(cell.yx + vec2(frame * 0.17, 53.0))
-  ) - 0.5;
-  crawlTint *= chromaCross * vec2(1.0, 0.85) * subcarrierFlip;
-  delayedChroma += crawlTint;
-
-  float lumaLeak = 0.18 * amount;
-  float compositeLuma =
-    centerYiq.x * (1.0 - lumaLeak) +
-    (left1Yiq.x + right1Yiq.x) * (0.36 * lumaLeak) +
-    (left2Yiq.x + right2Yiq.x) * (0.14 * lumaLeak);
-  float chromaMagnitude = length(delayedChroma);
-  compositeLuma +=
-    (hash12(cell + vec2(frame * 0.19, chromaMagnitude * 23.0)) - 0.5) *
-    smoothstep(0.08, 0.45, chromaMagnitude) *
-    0.035 *
-    amount;
-
-  vec3 compositeRgb = yiqToRgb(vec3(compositeLuma, delayedChroma));
-  vec3 bleedRgb = yiqToRgb(vec3(centerYiq.x, delayedChroma));
-  float ghostStrength = amount * (0.035 + clamp(uCompositeNoise, 0.0, 1.0) * 0.08 + abs(delay) * 0.03);
-  vec3 ghostRgb =
-    yiqToRgb(vec3(ghostNearYiq.x, ghostNearYiq.yz)) * 0.7 +
-    yiqToRgb(vec3(ghostFarYiq.x, ghostFarYiq.yz)) * 0.3;
-  vec3 pushedRgb = mix(compositeRgb, bleedRgb, 0.42 + blur * 0.2);
-  pushedRgb += ghostRgb * ghostStrength;
-  return clamp(mix(centerColor, pushedRgb, amount * 0.95), 0.0, 1.0);
-}
-
 vec3 nearestColorAnime(vec3 color)
 {
   vec3 hsv = rgb2hsv(color);
@@ -352,9 +225,6 @@ vec3 nearestColorAnime(vec3 color)
   return hsv2rgb(vec3(hQ, sQ, vQ));
 }
 
-// Palette quantization for all modes except neon (mode 9), which uses its own
-// edge-based tint instead of quantizing a sampled color. Shared between the
-// center pixel and the raw neighbor samples used by the glow pass below.
 vec3 applyPaletteMode(vec3 color)
 {
   if (uPaletteMode > 7.5 && uPaletteMode < 8.5) {
@@ -465,7 +335,6 @@ void main(void)
     float b = sampleSourceColorAtCell(cell + vec2(-uRgbConvergenceOffset, 0.0)).b;
     sourceColor = vec3(r, center.g, b);
   }
-  sourceColor = applyCompositeNtsc(cell, sourceColor);
   vec3 leftSharp = sampleSourceColorAtCell(cell + vec2(-1.0, 0.0));
   vec3 rightSharp = sampleSourceColorAtCell(cell + vec2(1.0, 0.0));
   vec3 color = applyHorizontalSharpness(sourceColor, leftSharp, rightSharp);

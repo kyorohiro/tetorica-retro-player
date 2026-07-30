@@ -228,6 +228,65 @@ const ProgressDialog: React.FC<{
     );
 };
 
+type SimpleConfirmDialogOptions = {
+    title: string;
+    body: React.ReactNode;
+    okText?: string;
+    cancelText?: string;
+    persistCheckboxLabel?: string;
+    persistCheckboxDefaultChecked?: boolean;
+    onConfirmPersistChange?: (checked: boolean) => void;
+};
+
+const SimpleConfirmDialog: React.FC<{
+    opts: SimpleConfirmDialogOptions;
+    onConfirm: () => void;
+    onCancel: () => void;
+}> = ({ opts, onConfirm, onCancel }) => {
+    const [persistChecked, setPersistChecked] = React.useState(
+        opts.persistCheckboxDefaultChecked ?? false,
+    );
+
+    return (
+        <div className="safe-dialog-card w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl">
+            <h2 className="text-lg font-semibold mb-3 text-slate-300">{opts.title}</h2>
+            <div className="text-xs text-slate-300">{opts.body}</div>
+
+            {opts.persistCheckboxLabel && (
+                <label className="mt-4 flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                        type="checkbox"
+                        checked={persistChecked}
+                        onChange={(event) => setPersistChecked(event.currentTarget.checked)}
+                        className="h-4 w-4 accent-emerald-500"
+                    />
+                    <span>{opts.persistCheckboxLabel}</span>
+                </label>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2 text-sm">
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="px-3 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800  text-slate-300"
+                >
+                    {opts.cancelText ?? "キャンセル"}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        opts.onConfirmPersistChange?.(persistChecked);
+                        onConfirm();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500  text-slate-300"
+                >
+                    {opts.okText ?? "OK"}
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 // ----------------------
 // 選択肢ダイアログ
@@ -608,32 +667,19 @@ export function useDialog() {
         body: React.ReactNode;
         okText?: string;
         cancelText?: string;
+        persistCheckboxLabel?: string;
+        persistCheckboxDefaultChecked?: boolean;
+        onConfirmPersistChange?: (checked: boolean) => void;
     };
 
     const showConfirmDialog = useCallback(
         (opts: SimpleDialogOptions): Promise<boolean | null> => {
             return showDialog<boolean>(({ resolve, close }) => (
-                <div className="safe-dialog-card w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl">
-                    <h2 className="text-lg font-semibold mb-3 text-slate-300">{opts.title}</h2>
-                    <div className="text-xs text-slate-300">{opts.body}</div>
-
-                    <div className="mt-4 flex justify-end gap-2 text-sm">
-                        <button
-                            type="button"
-                            onClick={close}
-                            className="px-3 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800  text-slate-300"
-                        >
-                            {opts.cancelText ?? "キャンセル"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => resolve(true)}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500  text-slate-300"
-                        >
-                            {opts.okText ?? "OK"}
-                        </button>
-                    </div>
-                </div>
+                <SimpleConfirmDialog
+                    opts={opts}
+                    onConfirm={() => resolve(true)}
+                    onCancel={close}
+                />
             ));
         },
         [showDialog]

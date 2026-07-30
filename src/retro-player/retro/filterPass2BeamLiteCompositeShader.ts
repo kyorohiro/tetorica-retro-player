@@ -178,11 +178,21 @@ void sampleBeamStripeMasks(vec2 uv, vec2 sourceSize, out vec3 stripeMask, out ve
 
 float getBeamStripeResolve(vec2 sourceSize) {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
-  vec2 visibleSize = max(uDisplaySize, vec2(1.0));
+  vec2 visibleSize = max(min(uDisplaySize, uOutputSize), vec2(1.0));
   float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
   float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
   return clamp(smoothstep(1.0, 1.45, subpixelPixels), 0.0, 1.0);
+}
+
+vec3 sampleBeamMergedMask(vec2 uv, vec2 sourceSize, float sigmaX, float sigmaY) {
+  vec2 safeSourceSize = max(sourceSize, vec2(1.0));
+  vec2 cellCoord = uv * safeSourceSize;
+  vec2 local = fract(cellCoord);
+  float dx = (local.x - 0.5) / max(sigmaX, 0.0001);
+  float dy = (local.y - 0.5) / max(sigmaY, 0.0001);
+  float mask = clamp(exp(-(dx * dx + dy * dy)), 0.0, 1.0);
+  return vec3(mask);
 }
 
 void main(void) {
@@ -207,8 +217,18 @@ void main(void) {
   float stripeResolve = getBeamStripeResolve(sourceSize);
   float mergedStripeMaskScalar = dot(stripeMask, vec3(1.0 / 3.0));
   float mergedBleedMaskScalar = dot(stripeBleedMask, vec3(1.0 / 3.0));
-  stripeMask = mix(vec3(mergedStripeMaskScalar), stripeMask, stripeResolve);
-  stripeBleedMask = mix(vec3(mergedBleedMaskScalar), stripeBleedMask, stripeResolve);
+  vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.48, 0.56);
+  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.74, 1.08);
+  stripeMask = mix(
+    mergedStripeMask * mergedStripeMaskScalar,
+    stripeMask,
+    stripeResolve
+  );
+  stripeBleedMask = mix(
+    mergedBleedMask * mergedBleedMaskScalar,
+    stripeBleedMask,
+    stripeResolve
+  );
   float effectiveStripeStrength = getBeamStripeStrength() * mix(0.42, 1.0, stripeResolve);
   float lightMask = smoothstep(BEAM_LIGHTMASK_LOW, BEAM_LIGHTMASK_HIGH, beamLuma);
   vec3 beamField = beamColor * (BEAM_FIELD_BASE + lightMask * BEAM_FIELD_LIGHT_GAIN);

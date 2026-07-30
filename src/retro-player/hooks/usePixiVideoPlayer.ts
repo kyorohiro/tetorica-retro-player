@@ -580,24 +580,17 @@ export function usePixiVideoPlayer(
     isFilterEnabled: true,
   }), [effectiveFilterState]);
 
-  const isCrtBeamPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
-    return hasPreparedFilterVariant(
-      buildVariantPreparationState({
-        phosphorDotShape: "beam",
-        ...overrides,
-      }),
-    );
+  const isFilterVariantPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
+    return hasPreparedFilterVariant(buildVariantPreparationState(overrides));
   }, [buildVariantPreparationState, hasPreparedFilterVariant]);
 
-  const prepareCrtBeam = useCallback(async (overrides?: Partial<RetroVideoFilterState>) => {
-    beginLoading("Preparing CRT Beam...");
+  const prepareFilterVariantWithLabel = useCallback(async (
+    label: string,
+    overrides?: Partial<RetroVideoFilterState>,
+  ) => {
+    beginLoading(label);
     try {
-      await prepareFilterVariant(
-        buildVariantPreparationState({
-          phosphorDotShape: "beam",
-          ...overrides,
-        }),
-      );
+      await prepareFilterVariant(buildVariantPreparationState(overrides));
     } finally {
       finishLoading();
     }
@@ -1586,13 +1579,20 @@ export function usePixiVideoPlayer(
   ]);
 
   useEffect(() => {
+    const visualKind = previewKind ?? options?.requestedKind ?? null;
     const visualShaderPending =
       !shouldUseNativeVisualSurface &&
       effectiveFilterState.isFilterEnabled &&
-      (previewKind === "video" || previewKind === "capture" || previewKind === "image") &&
+      (visualKind === "video" || visualKind === "capture" || visualKind === "image") &&
       !isFilterReady;
 
     if (visualShaderPending) {
+      setLoadingLabel((current) => {
+        const nextLabel =
+          visualKind === "image" ? "Preparing shader preview..." : "Preparing video shader...";
+        return current === nextLabel ? current : nextLabel;
+      });
+      setIsLoading(true);
       return;
     }
 
@@ -1614,6 +1614,7 @@ export function usePixiVideoPlayer(
     isFilterReady,
     isPlaying,
     needsUserPlay,
+    options?.requestedKind,
     previewError,
     previewKind,
     shouldUseNativeVisualSurface,
@@ -1848,8 +1849,8 @@ export function usePixiVideoPlayer(
     startRecording,
     stopRecording,
     ensureAudioContext,
-    isCrtBeamPrepared,
-    prepareCrtBeam,
+    isFilterVariantPrepared,
+    prepareFilterVariantWithLabel,
     resetRenderer,
     refreshLayout,
     toggleAudioFx: () => {

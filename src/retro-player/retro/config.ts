@@ -39,6 +39,15 @@ export const normalizePhosphorDotShape = (
   return "circle";
 };
 
+export const normalizePhosphorDotInternalScale = (value: number | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+
+  const scale = value;
+  return Math.max(1, Math.min(4, Math.round(scale * 10) / 10));
+};
+
 export const MONO_TINTS: Record<
   MonoTintMode,
   { label: string; rgb: [number, number, number] }
@@ -79,14 +88,19 @@ export type RetroPresetDefinition = {
   basicSaturation?: number;
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
-  phosphorDotInternalScale?: 1 | 2 | 3;
+  phosphorDotInternalScale?: number;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
-  phosphorDotGlowColorStrength?: number;
   coloredGlowEnabled?: boolean;
+  postCurvatureEnabled?: boolean;
+  compositeEnabled?: boolean;
+  compositeAmount?: number;
+  compositeChromaBlur?: number;
+  compositeChromaDelay?: number;
+  compositeNoise?: number;
   beamDarkCutoff?: number;
   beamHorizontalSpread?: number;
   beamStripeStrength?: number;
@@ -102,6 +116,17 @@ export type RetroPresetDefinition = {
   focusWidth?: number;
   focusHeight?: number;
   featured?: boolean;
+};
+
+export type RetroPresetRenderMode = "lite" | "full";
+
+export type RetroPresetVariantPreparation = {
+  paletteMode: PaletteMode;
+  phosphorDotShape: PhosphorDotShape;
+  phosphorStrength: number;
+  spotMaskStrength: number;
+  compositeEnabled: boolean;
+  compositeAmount: number;
 };
 
 export const RETRO_PRESETS = {
@@ -455,37 +480,56 @@ export const RETRO_PRESETS = {
     label: "Phosphor Dot Lite",
     featured: true,
     autoTargetSize: true,
-    width: 320,
-    height: 180,
-    colors: 32,
-    dither: 0.65,
-    smoothStrength: 0.65,
-    basicContrast: 1.08,
+    samplingMode: "nearest",
+    width: 640,
+    height: 360,
+    colors: 256,
+    dither: 0,
+    smoothStrength: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    basicContrast: 1.2,
+    basicSaturation: 1,
     palette: "free",
-    curvature: 0.02,
+    curvature: 0.03,
     scanline: 0.0,
-    scanline2: 0.00,
-    vignette: 0.00,
-    glow: 0.02,
+    scanline2: 0.0,
+    scanlineBrightnessFade: 0.6,
+    vignette: 0.0,
+    glow: 0.15,
     phosphor: 0.0,
-    spotMask: 0.22,
-    bulbRadius: 0.38,
-    blackFloor: 0.002,
-    screenFaceGlow: 0.28,
-    beamWarmBloom: 0.28,
-    phosphorDotShape: "heart",  
-    phosphorDotLightBalance: 0.66,
-    phosphorDotInternalScale: 2,
+    spotMask: 0.651,
+    bulbRadius: 0.116,
+    blackFloor: 0,
+    outputBrightness: 0.83,
+    phosphorDotLightBalance: 0.65,
+    phosphorDotShape: "heart",
+    phosphorDotInternalScale: 1.4,
     phosphorDotBrightCore: true,
-    phosphorDotCellFill: 0.28,
+    phosphorDotCellFill: 0.132,
     phosphorDotFlatDisc: false,
-    phosphorDotNeighborBlend: true,
-    phosphorDotGrainStrength: 0.12,
+    phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0.11892071150027211,
+    coloredGlowEnabled: true,
+    postCurvatureEnabled: false,
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.73,
+    compositeChromaDelay: 0.24,
+    compositeNoise: 0.49,
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 1,
+    beamStripeStrength: 1,
+    beamWhiteBloom: 1,
+    beamWarmBloom: 0,
+    screenFaceGlow: 0.07,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
     neonDetail: 1.0,
-    outputBrightness: 1.13,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
   },
   phosphorDot: {
     label: "Phosphor Dot",
@@ -518,6 +562,11 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
     phosphorDotGrainStrength: 0.12,
+    compositeEnabled: false,
+    compositeAmount: 0,
+    compositeChromaBlur: 0,
+    compositeChromaDelay: 0,
+    compositeNoise: 0,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -556,6 +605,11 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
     phosphorDotGrainStrength: 0.12,
+    compositeEnabled: false,
+    compositeAmount: 0,
+    compositeChromaBlur: 0,
+    compositeChromaDelay: 0,
+    compositeNoise: 0,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -595,6 +649,64 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
     outputBrightness: 1.0,
+  },
+  crtBeamNtsc: {
+    label: "CRT Beam NTSC",
+    autoTargetSize: true,
+    samplingMode: "nearest",
+    width: 1480,
+    height: 1080,
+    colors: 32,
+    dither: 0.35,
+    smoothStrength: 0.0,
+    palette: "free",
+    curvature: 0.03,
+    scanline: 0.0,
+    scanline2: 0.01,
+    scanlineBrightnessFade: 0.67,
+    vignette: 0.3,
+    glow: 0.42,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    toonSteps: 0,
+    edgeBoost: 0,
+    animeEdgeLow: 0.08,
+    animeEdgeHigh: 0.55,
+    phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.5,
+    blackFloor: 0.001,
+    outputBrightness: 1.35,
+    basicContrast: 1.03,
+    basicSaturation: 1.46,
+    phosphorDotLightBalance: 1,
+    phosphorDotShape: "beam",
+    phosphorDotInternalScale: 2,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0,
+    phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0,
+    coloredGlowEnabled: true,
+    postCurvatureEnabled: false,
+    compositeEnabled: true,
+    compositeAmount: 1,
+    compositeChromaBlur: 0.61,
+    compositeChromaDelay: 0.11,
+    compositeNoise: 0.88,
+    beamDarkCutoff: 0,
+    beamHorizontalSpread: 0.5,
+    beamStripeStrength: 0.7,
+    beamWhiteBloom: 1.06,
+    beamWarmBloom: 0.4,
+    screenFaceGlow: 0.17,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
   },
   crtOnly: {
     label: "CRT Only",
@@ -763,6 +875,47 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 export const defaultPresetId: RetroPresetKey = "phosphorDot";
 // デフォルト候補: "phosphorDot";//"tetorica";
 
+export const buildRetroPresetVariantPreparation = (
+  preset: RetroPresetDefinition,
+): RetroPresetVariantPreparation => ({
+  paletteMode: preset.palette,
+  phosphorDotShape: preset.phosphorDotShape ?? "circle",
+  phosphorStrength: preset.phosphor,
+  spotMaskStrength: preset.spotMask,
+  compositeEnabled: preset.compositeEnabled ?? false,
+  compositeAmount: preset.compositeAmount ?? 0,
+});
+
+export const resolveRetroPresetRenderMode = (
+  preset: RetroPresetDefinition,
+): RetroPresetRenderMode => {
+  if (preset === RETRO_PRESETS.phosphorDot || preset === RETRO_PRESETS.phosphorDotSmooth) {
+    return "lite";
+  }
+
+  const samplingMode = preset.samplingMode ?? "nearest";
+  if (samplingMode !== "nearest") {
+    return "full";
+  }
+
+  if (preset.palette === "pc98_tile" || preset.palette === "pc98_512_sat") {
+    return "full";
+  }
+
+  const variant = buildRetroPresetVariantPreparation(preset);
+  const isBeamMode = variant.phosphorDotShape === "beam";
+  const hasComposite = variant.compositeEnabled && variant.compositeAmount > 0.001;
+  return isBeamMode || hasComposite ? "full" : "lite";
+};
+
+export const resolveRetroVariantPreparationRenderMode = (
+  variant: RetroPresetVariantPreparation,
+): RetroPresetRenderMode => {
+  const isBeamMode = variant.phosphorDotShape === "beam";
+  const hasComposite = variant.compositeEnabled && variant.compositeAmount > 0.001;
+  return isBeamMode || hasComposite ? "full" : "lite";
+};
+
 // Grouping used by the preset picker UI. "none" is intentionally excluded —
 // it's rendered outside the category boxes as a plain "no filter" option.
 export type RetroPresetCategory = "classic" | "lcd" | "crt" | "other";
@@ -800,6 +953,7 @@ export const RETRO_PRESET_CATEGORIES = {
   phosphorDot: "crt",
   phosphorDotSmooth: "crt",
   crtBeam: "crt",
+  crtBeamNtsc: "crt",
   crtOnly: "crt",
   crtEdge: "crt",
   warmBokeh: "crt",

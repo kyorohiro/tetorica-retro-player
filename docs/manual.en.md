@@ -139,6 +139,8 @@ Open it via the "Video" tab at the bottom. Long-pressing this tab also toggles t
 
 Everything here is a slider or checkbox that reflects into the preview in real time. Start from a preset, then fine-tune from there.
 
+As a rule of thumb, **LCD-leaning settings** are the practical baseline for everyday use: lighter, clearer, and easier to read. **CRT-leaning settings** prioritize atmosphere and may be heavier depending on the machine. In particular, `CRT Beam`, strong `Curvature`, and dense `Phosphor Dot` settings are best treated as high-end-PC options.
+
 ---
 
 ## 7. Audio Settings Panel

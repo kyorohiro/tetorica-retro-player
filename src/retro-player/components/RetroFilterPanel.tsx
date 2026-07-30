@@ -71,6 +71,7 @@ type RetroFilterPanelProps = {
   locale: RetroPlayerLocale;
   colorLevels: number;
   curvature: number;
+  postCurvatureEnabled: boolean;
   ditherStrength: number;
   glowStrength: number;
   horizontalSharpness: number;
@@ -92,14 +93,18 @@ type RetroFilterPanelProps = {
   basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: 1 | 2 | 3;
+  phosphorDotInternalScale: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  phosphorDotGlowColorStrength: number;
   coloredGlowEnabled: boolean;
+  compositeEnabled: boolean;
+  compositeAmount: number;
+  compositeChromaBlur: number;
+  compositeChromaDelay: number;
+  compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
@@ -127,6 +132,7 @@ type RetroFilterPanelProps = {
   onSetIsFilterEnabled: (value: boolean) => void;
   onSetColorLevels: (value: number) => void;
   onSetCurvature: (value: number) => void;
+  onSetPostCurvatureEnabled: (value: boolean) => void;
   onSetDitherStrength: (value: number) => void;
   onSetGlowStrength: (value: number) => void;
   onSetHorizontalSharpness: (value: number) => void;
@@ -147,14 +153,18 @@ type RetroFilterPanelProps = {
   onSetBasicSaturation: (value: number) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
-  onSetPhosphorDotInternalScale: (value: 1 | 2 | 3) => void;
+  onSetPhosphorDotInternalScale: (value: number) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
-  onSetPhosphorDotGlowColorStrength: (value: number) => void;
   onSetColoredGlowEnabled: (value: boolean) => void;
+  onSetCompositeEnabled: (value: boolean) => void;
+  onSetCompositeAmount: (value: number) => void;
+  onSetCompositeChromaBlur: (value: number) => void;
+  onSetCompositeChromaDelay: (value: number) => void;
+  onSetCompositeNoise: (value: number) => void;
   onSetBeamDarkCutoff: (value: number) => void;
   onSetBeamHorizontalSpread: (value: number) => void;
   onSetBeamStripeStrength: (value: number) => void;
@@ -165,6 +175,7 @@ type RetroFilterPanelProps = {
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
   onRequestEnableBeamCross?: () => void | Promise<void>;
+  onRequestEnableComposite?: () => void | Promise<void>;
   onSetNeonBoost: (value: number) => void;
   onSetNeonSaturation: (value: number) => void;
   onSetNeonDetail: (value: number) => void;
@@ -183,6 +194,7 @@ export function RetroFilterPanel({
   locale,
   colorLevels,
   curvature,
+  postCurvatureEnabled,
   ditherStrength,
   glowStrength,
   horizontalSharpness,
@@ -210,8 +222,12 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
-  phosphorDotGlowColorStrength,
   coloredGlowEnabled,
+  compositeEnabled,
+  compositeAmount,
+  compositeChromaBlur,
+  compositeChromaDelay,
+  compositeNoise,
   beamDarkCutoff,
   beamHorizontalSpread,
   beamStripeStrength,
@@ -236,6 +252,7 @@ export function RetroFilterPanel({
   onSetIsFilterEnabled,
   onSetColorLevels,
   onSetCurvature,
+  onSetPostCurvatureEnabled,
   onSetDitherStrength,
   onSetGlowStrength,
   onSetHorizontalSharpness,
@@ -262,8 +279,12 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
-  onSetPhosphorDotGlowColorStrength,
   onSetColoredGlowEnabled,
+  onSetCompositeEnabled,
+  onSetCompositeAmount,
+  onSetCompositeChromaBlur,
+  onSetCompositeChromaDelay,
+  onSetCompositeNoise,
   onSetBeamDarkCutoff,
   onSetBeamHorizontalSpread,
   onSetBeamStripeStrength,
@@ -274,6 +295,7 @@ export function RetroFilterPanel({
   onSetScanlineStrength,
   onSetScanline2Strength,
   onRequestEnableBeamCross,
+  onRequestEnableComposite,
   onSetNeonBoost,
   onSetNeonSaturation,
   onSetNeonDetail,
@@ -296,6 +318,8 @@ export function RetroFilterPanel({
           helpSuffix: "のヘルプ",
           curvature:
             "古い CRT の湾曲ガラスのように、画面を内側へたわませます。値を上げるほど端の反りが強くなります。",
+          postCurvature:
+            "off では phosphor や mask を曲げながら描画し、on では一度描き終えた映像を最後に曲げます。on の方がモアレを減らしやすい代わりに、CRT の粒感は少し均されます。",
           bayerDither:
             "4x4 のドットパターンを加えて減色の見え方をなじませます。値を上げるほど格子感とザラつきが強くなります。",
           scanline:
@@ -308,6 +332,14 @@ export function RetroFilterPanel({
             "画面の外周を暗くします。値を上げるほど中央に視線が集まり、レトロな額縁感も強くなります。",
           glow:
             "明るい部分のまわりに柔らかな光のにじみを足します。値を上げるほどハイライトが広がって熱っぽく見えます。",
+          compositeAmount:
+            "信号経路側でのコンポジット風の崩れ方を混ぜます。上げるほど色にじみや色ズレが前に出ます。",
+          compositeChromaBlur:
+            "色差だけを横方向へにじませます。上げるほど輪郭は残したまま色が横へ広がります。",
+          compositeChromaDelay:
+            "色成分だけを左右へ少し遅らせます。0 で無効、正負でにじむ向きが変わります。",
+          compositeNoise:
+            "色成分へ細かなアナログ風ノイズを足します。強くするとコンポジット信号のざわつきが出ます。",
           horizontalSharpness:
             "横方向の輪郭の硬さです。1.00 が中立で、下げると少しにじみ、上げると横線や文字のエッジが立ちます。",
           rgbConvergenceOffset:
@@ -377,6 +409,8 @@ export function RetroFilterPanel({
           helpSuffix: " help",
           curvature:
             "Bends the picture inward to mimic the curved glass of an old CRT. Higher values make the screen edges bow more.",
+          postCurvature:
+            "Off bends the phosphor or mask structure while drawing. On bends the already-rendered image at the very end. The latter usually reduces moire, but it also smooths some CRT texture away.",
           bayerDither:
             "Adds a 4x4 dot pattern to smooth reduced colors. Higher values make the image feel more grid-like and gritty.",
           scanline:
@@ -389,6 +423,14 @@ export function RetroFilterPanel({
             "Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.",
           glow:
             "Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look.",
+          compositeAmount:
+            "Blends in a composite-video style signal path before the CRT surface stage. Higher values push color bleed and analog instability forward.",
+          compositeChromaBlur:
+            "Blurs only the chroma sideways. Raise it to spread color horizontally while keeping most luminance detail intact.",
+          compositeChromaDelay:
+            "Offsets chroma slightly left or right relative to luma. Zero disables it; positive and negative values change the smear direction.",
+          compositeNoise:
+            "Adds small analog-style noise into the chroma path. Stronger values make the composite signal feel dirtier and less stable.",
           horizontalSharpness:
             "Controls edge firmness across the horizontal axis. 1.00 is neutral; lower values soften sideways detail, higher values make text and vertical edges snap harder.",
           rgbConvergenceOffset:
@@ -791,6 +833,16 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-[11px] leading-4 text-[#5b564f]">
+              <div className="font-medium uppercase tracking-[0.12em] text-[#7a7268]">
+                LCD / Base
+              </div>
+              <div className="mt-1">
+                {locale === "ja"
+                  ? "普段使い・可読性重視の調整です。Brightness / Contrast / Saturation / Smooth / Sharpness をここで詰めます。"
+                  : "Everyday readability-oriented tuning. Use Brightness, Contrast, Saturation, Smooth, and Sharpness here first."}
+              </div>
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -954,11 +1006,119 @@ export function RetroFilterPanel({
           </div>
         )}
 
+        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 px-3 py-3">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
+            Composite / NTSC
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (!compositeEnabled && onRequestEnableComposite) {
+                  void onRequestEnableComposite();
+                  return;
+                }
+                onSetCompositeEnabled(!compositeEnabled);
+              }}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                compositeEnabled
+                  ? "border-cyan-600/60 bg-cyan-500/15 text-[#003f4c] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Composite / NTSC
+            </button>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Composite amount: ${compositeAmount.toFixed(2)}`}
+                  text={helpText.compositeAmount}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={compositeAmount}
+                onChange={(ev) => onSetCompositeAmount(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Chroma blur: ${compositeChromaBlur.toFixed(2)}`}
+                  text={helpText.compositeChromaBlur}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={compositeChromaBlur}
+                onChange={(ev) => onSetCompositeChromaBlur(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Chroma delay: ${compositeChromaDelay.toFixed(2)}`}
+                  text={helpText.compositeChromaDelay}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.01"
+                value={compositeChromaDelay}
+                onChange={(ev) => onSetCompositeChromaDelay(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Composite noise: ${compositeNoise.toFixed(2)}`}
+                  text={helpText.compositeNoise}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={compositeNoise}
+                onChange={(ev) => onSetCompositeNoise(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
           <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7a7268]">
             CRT / LCD
           </div>
           <div className="flex flex-col gap-3">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] leading-4 text-[#5b564f]">
+              <div className="font-medium uppercase tracking-[0.12em] text-[#7a7268]">
+                CRT / Surface
+              </div>
+              <div className="mt-1">
+                {locale === "ja"
+                  ? "雰囲気重視の調整です。Glow / Curvature / Scanline / Phosphor など、CRTらしさをここで加えます。"
+                  : "Atmosphere-oriented tuning. Add CRT character here with Glow, Curvature, Scanlines, Phosphor, and related surface effects."}
+              </div>
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -1025,6 +1185,19 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <button
+              type="button"
+              onClick={() => onSetPostCurvatureEnabled(!postCurvatureEnabled)}
+              title={helpText.postCurvature}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                postCurvatureEnabled
+                  ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              {postCurvatureEnabled ? "Curvature after mask" : "Curvature before mask"}
+            </button>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -1119,22 +1292,6 @@ export function RetroFilterPanel({
                   Phosphor Dot mode ではこの項目は通常 CRT の triad 用です。
                 </span>
               ) : null}
-            </label>
-            <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
-              <span className="text-[11px] leading-tight text-[#12141c]">
-                CRT GlowColor bar: {phosphorDotGlowColorStrength <= 0 ? "off" : phosphorDotGlowColorStrength.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={phosphorDotGlowColorStrength}
-                onChange={(ev) => {
-                  onSetPhosphorDotGlowColorStrength(Number(ev.currentTarget.value));
-                }}
-                className="mt-1 w-full"
-              />
             </label>
           </div>
         </div>
@@ -1304,31 +1461,32 @@ export function RetroFilterPanel({
                     : "text-[#12141c]",
                 ].join(" ")}
               >
-                Internal res: {phosphorDotInternalScale}x
+                Internal res: {Number.isInteger(phosphorDotInternalScale) ? phosphorDotInternalScale : phosphorDotInternalScale.toFixed(1)}x
               </span>
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="text-[9px] text-[#7a7268]">1</span>
                 <input
                   type="range"
                   min="1"
-                  max="3"
-                  step="1"
+                  max="4"
+                  step="0.1"
                   list="phosphor-dot-internal-res-ticks"
                   value={phosphorDotInternalScale}
                   onChange={(ev) => {
-                    onSetPhosphorDotInternalScale(Number(ev.currentTarget.value) as 1 | 2 | 3);
+                    onSetPhosphorDotInternalScale(Number(ev.currentTarget.value));
                   }}
                   className={[
                     "w-full",
                     phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-emerald-600",
                   ].join(" ")}
                 />
-                <span className="text-[9px] text-[#7a7268]">3</span>
+                <span className="text-[9px] text-[#7a7268]">4</span>
               </div>
               <datalist id="phosphor-dot-internal-res-ticks">
                 <option value="1" label="1" />
                 <option value="2" label="2" />
                 <option value="3" label="3" />
+                <option value="4" label="4" />
               </datalist>
             </label>
           </div>
@@ -1504,41 +1662,6 @@ export function RetroFilterPanel({
 
           {isBeamCrossModeActive && (
             <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-3">
-              <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
-                <span
-                  className={[
-                    "text-[11px] leading-tight",
-                    phosphorDotInternalScale >= 3
-                      ? "font-semibold text-red-600"
-                      : "text-[#12141c]",
-                  ].join(" ")}
-                >
-                  Beam internal res: {phosphorDotInternalScale}x
-                </span>
-                <span className="mt-1 block text-[10px] leading-4 text-[#7a7268]">
-                  Beam Cross also uses this internal resolution. Higher values can make the beam pattern denser and cleaner.
-                </span>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <span className="text-[9px] text-[#7a7268]">1</span>
-                  <input
-                    type="range"
-                    min="1"
-                    max="3"
-                    step="1"
-                    list="phosphor-dot-internal-res-ticks"
-                    value={phosphorDotInternalScale}
-                    onChange={(ev) => {
-                      onSetPhosphorDotInternalScale(Number(ev.currentTarget.value) as 1 | 2 | 3);
-                    }}
-                    className={[
-                      "w-full",
-                      phosphorDotInternalScale >= 3 ? "accent-red-600" : "accent-sky-600",
-                    ].join(" ")}
-                  />
-                  <span className="text-[9px] text-[#7a7268]">3</span>
-                </div>
-              </label>
-
               <label className="block">
                 <span className="text-[#12141c]">
                   <InfoTip

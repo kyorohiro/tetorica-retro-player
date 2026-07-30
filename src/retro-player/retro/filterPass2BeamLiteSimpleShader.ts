@@ -203,7 +203,7 @@ void sampleBeamStripeMasks(
 float getBeamStripeResolve(vec2 sourceSize)
 {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
-  vec2 visibleSize = max(uDisplaySize, vec2(1.0));
+  vec2 visibleSize = max(min(uDisplaySize, uOutputSize), vec2(1.0));
   float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
   float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
@@ -451,8 +451,18 @@ void main(void)
   float stripeResolve = getBeamStripeResolve(sourceSize);
   float mergedStripeMaskScalar = dot(stripeMask, vec3(1.0 / 3.0));
   float mergedBleedMaskScalar = dot(stripeBleedMask, vec3(1.0 / 3.0));
-  stripeMask = mix(vec3(mergedStripeMaskScalar), stripeMask, stripeResolve);
-  stripeBleedMask = mix(vec3(mergedBleedMaskScalar), stripeBleedMask, stripeResolve);
+  vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.48, 0.56);
+  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.74, 1.08);
+  stripeMask = mix(
+    mergedStripeMask * mergedStripeMaskScalar,
+    stripeMask,
+    stripeResolve
+  );
+  stripeBleedMask = mix(
+    mergedBleedMask * mergedBleedMaskScalar,
+    stripeBleedMask,
+    stripeResolve
+  );
   float effectiveStripeStrength = getBeamStripeStrength() * mix(0.42, 1.0, stripeResolve);
 
   float lightMask = smoothstep(0.025, 0.23, beamLuma);

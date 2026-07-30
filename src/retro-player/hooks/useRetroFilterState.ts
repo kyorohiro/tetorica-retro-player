@@ -3,6 +3,7 @@ import {
   DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
+  normalizePhosphorDotInternalScale,
   normalizePhosphorDotShape,
   type MonoTintMode,
   type PaletteMode,
@@ -49,14 +50,19 @@ export type RetroFilterInitialState = Partial<{
   basicSaturation: number;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
-  phosphorDotInternalScale: 1 | 2 | 3;
+  phosphorDotInternalScale: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
-  phosphorDotGlowColorStrength: number;
   coloredGlowEnabled: boolean;
+  postCurvatureEnabled: boolean;
+  compositeEnabled: boolean;
+  compositeAmount: number;
+  compositeChromaBlur: number;
+  compositeChromaDelay: number;
+  compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
   beamStripeStrength: number;
@@ -117,14 +123,19 @@ const doesPresetMatchState = (
     (preset.basicSaturation ?? 1) === state.basicSaturation &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     normalizePhosphorDotShape(preset.phosphorDotShape ?? "circle") === state.phosphorDotShape &&
-    (preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
+    normalizePhosphorDotInternalScale(preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
     (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
-    (preset.phosphorDotGlowColorStrength ?? 0) === state.phosphorDotGlowColorStrength &&
     (preset.coloredGlowEnabled ?? false) === state.coloredGlowEnabled &&
+    (preset.postCurvatureEnabled ?? false) === state.postCurvatureEnabled &&
+    (preset.compositeEnabled ?? false) === state.compositeEnabled &&
+    (preset.compositeAmount ?? 0) === state.compositeAmount &&
+    (preset.compositeChromaBlur ?? 0) === state.compositeChromaBlur &&
+    (preset.compositeChromaDelay ?? 0) === state.compositeChromaDelay &&
+    (preset.compositeNoise ?? 0) === state.compositeNoise &&
     (preset.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff) === state.beamDarkCutoff &&
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
@@ -220,8 +231,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       normalizePhosphorDotShape(
         initialState.phosphorDotShape ?? (DEFAULT_PRESET.phosphorDotShape ?? "circle"),
       ),
-    phosphorDotInternalScale:
+    phosphorDotInternalScale: normalizePhosphorDotInternalScale(
       initialState.phosphorDotInternalScale ?? (DEFAULT_PRESET.phosphorDotInternalScale ?? 1),
+    ),
     phosphorDotBrightCore:
       initialState.phosphorDotBrightCore ?? (DEFAULT_PRESET.phosphorDotBrightCore ?? false),
     phosphorDotCellFill:
@@ -232,10 +244,20 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     phosphorDotGrainStrength:
       initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
-    phosphorDotGlowColorStrength:
-      initialState.phosphorDotGlowColorStrength ?? (DEFAULT_PRESET.phosphorDotGlowColorStrength ?? 0),
     coloredGlowEnabled:
       initialState.coloredGlowEnabled ?? (DEFAULT_PRESET.coloredGlowEnabled ?? false),
+    postCurvatureEnabled:
+      initialState.postCurvatureEnabled ?? (DEFAULT_PRESET.postCurvatureEnabled ?? false),
+    compositeEnabled:
+      initialState.compositeEnabled ?? (DEFAULT_PRESET.compositeEnabled ?? false),
+    compositeAmount:
+      initialState.compositeAmount ?? (DEFAULT_PRESET.compositeAmount ?? 0),
+    compositeChromaBlur:
+      initialState.compositeChromaBlur ?? (DEFAULT_PRESET.compositeChromaBlur ?? 0),
+    compositeChromaDelay:
+      initialState.compositeChromaDelay ?? (DEFAULT_PRESET.compositeChromaDelay ?? 0),
+    compositeNoise:
+      initialState.compositeNoise ?? (DEFAULT_PRESET.compositeNoise ?? 0),
     beamDarkCutoff:
       initialState.beamDarkCutoff ?? (DEFAULT_PRESET.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff),
     beamHorizontalSpread:
@@ -465,10 +487,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
-  const setPhosphorDotInternalScale = (phosphorDotInternalScale: 1 | 2 | 3) => {
+  const setPhosphorDotInternalScale = (phosphorDotInternalScale: number) => {
+    const normalized = normalizePhosphorDotInternalScale(phosphorDotInternalScale);
     markPresetAsCustom();
     setSettings((current) => (
-      current.phosphorDotInternalScale === phosphorDotInternalScale ? current : { ...current, phosphorDotInternalScale }
+      current.phosphorDotInternalScale === normalized ? current : { ...current, phosphorDotInternalScale: normalized }
     ));
   };
 
@@ -508,20 +531,58 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
-  const setPhosphorDotGlowColorStrength = (value: number) => {
-    const phosphorDotGlowColorStrength = Math.max(0, value);
-    markPresetAsCustom();
-    setSettings((current) => (
-      current.phosphorDotGlowColorStrength === phosphorDotGlowColorStrength
-        ? current
-        : { ...current, phosphorDotGlowColorStrength }
-    ));
-  };
-
   const setColoredGlowEnabled = (coloredGlowEnabled: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
       current.coloredGlowEnabled === coloredGlowEnabled ? current : { ...current, coloredGlowEnabled }
+    ));
+  };
+
+  const setPostCurvatureEnabled = (postCurvatureEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.postCurvatureEnabled === postCurvatureEnabled
+        ? current
+        : { ...current, postCurvatureEnabled }
+    ));
+  };
+
+  const setCompositeEnabled = (compositeEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeEnabled === compositeEnabled ? current : { ...current, compositeEnabled }
+    ));
+  };
+
+  const setCompositeAmount = (compositeAmount: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeAmount === compositeAmount ? current : { ...current, compositeAmount }
+    ));
+  };
+
+  const setCompositeChromaBlur = (compositeChromaBlur: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeChromaBlur === compositeChromaBlur
+        ? current
+        : { ...current, compositeChromaBlur }
+    ));
+  };
+
+  const setCompositeChromaDelay = (compositeChromaDelay: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeChromaDelay === compositeChromaDelay
+        ? current
+        : { ...current, compositeChromaDelay }
+    ));
+  };
+
+  const setCompositeNoise = (compositeNoise: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.compositeNoise === compositeNoise ? current : { ...current, compositeNoise }
     ));
   };
 
@@ -668,14 +729,21 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       basicSaturation: presetSettings.basicSaturation ?? 1,
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotShape: normalizePhosphorDotShape(presetSettings.phosphorDotShape ?? "circle"),
-      phosphorDotInternalScale: presetSettings.phosphorDotInternalScale ?? 1,
+      phosphorDotInternalScale: normalizePhosphorDotInternalScale(
+        presetSettings.phosphorDotInternalScale ?? 1,
+      ),
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
-      phosphorDotGlowColorStrength: presetSettings.phosphorDotGlowColorStrength ?? 0,
       coloredGlowEnabled: presetSettings.coloredGlowEnabled ?? false,
+      postCurvatureEnabled: presetSettings.postCurvatureEnabled ?? false,
+      compositeEnabled: presetSettings.compositeEnabled ?? false,
+      compositeAmount: presetSettings.compositeAmount ?? 0,
+      compositeChromaBlur: presetSettings.compositeChromaBlur ?? 0,
+      compositeChromaDelay: presetSettings.compositeChromaDelay ?? 0,
+      compositeNoise: presetSettings.compositeNoise ?? 0,
       beamDarkCutoff: presetSettings.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
@@ -761,8 +829,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
     setPhosphorDotGrainStrength,
-    setPhosphorDotGlowColorStrength,
     setColoredGlowEnabled,
+    setPostCurvatureEnabled,
+    setCompositeEnabled,
+    setCompositeAmount,
+    setCompositeChromaBlur,
+    setCompositeChromaDelay,
+    setCompositeNoise,
     setBeamDarkCutoff,
     setBeamHorizontalSpread,
     setBeamStripeStrength,

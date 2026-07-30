@@ -1,6 +1,6 @@
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
-import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
+import { isTauriRuntime } from "../platform/runtime";
 import { isHlsUrl } from "../media/RetroMediaSource";
 import {
   useRetroFilterState,
@@ -24,9 +24,13 @@ import {
 import { saveLocalePreference } from "../../i18n";
 import type { PresetFileData } from "../hooks/presetFile";
 import {
+  buildRetroPresetVariantPreparation,
   RETRO_PRESETS,
+  resolveRetroPresetRenderMode,
+  resolveRetroVariantPreparationRenderMode,
   type RetroPresetDefinition,
   type RetroPresetKey,
+  type RetroPresetVariantPreparation,
 } from "../retro/config";
 import type { RetroPreviewLayoutState } from "../previewLayoutState";
 import type { RetroGameControls } from "../types/gameControls";
@@ -39,6 +43,67 @@ import { useDialog } from "../../useDialog";
 const clampRenderResolutionPreset = (value: number): 1 | 2 => {
   if (value >= 2) return 2;
   return 1;
+};
+
+const FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY =
+  "tetorica-retro-player.full-mode-confirmed.session";
+const FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY =
+  "tetorica-retro-player.full-mode-confirmed.persisted";
+
+const readStoredBoolean = (storage: Storage, key: string): boolean => {
+  try {
+    return storage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeStoredBoolean = (storage: Storage, key: string, value: boolean): void => {
+  try {
+    if (value) {
+      storage.setItem(key, "1");
+    } else {
+      storage.removeItem(key);
+    }
+  } catch {
+    // Ignore storage errors and keep runtime behavior.
+  }
+};
+
+const readSessionFullModeConfirmed = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return readStoredBoolean(window.sessionStorage, FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY);
+};
+
+const readPersistedFullModeConfirmed = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return readStoredBoolean(window.localStorage, FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY);
+};
+
+const writeSessionFullModeConfirmed = (value: boolean): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeStoredBoolean(window.sessionStorage, FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY, value);
+};
+
+const writePersistedFullModeConfirmed = (value: boolean): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeStoredBoolean(window.localStorage, FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY, value);
+};
+
+const clearStoredFullModeConfirmed = (): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeSessionFullModeConfirmed(false);
+  writePersistedFullModeConfirmed(false);
 };
 
 const resolveRenderResolutionPreset = (
@@ -205,6 +270,7 @@ export function RetroPlayer({
   const [isPinnedInPreview, setIsPinnedInPreview] = React.useState(false);
   const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
   const [showClockOverlay, setShowClockOverlay] = React.useState(false);
+  const [isPreparingFullPreset, setIsPreparingFullPreset] = React.useState(false);
   const refreshLayoutFrameRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -299,6 +365,17 @@ export function RetroPlayer({
     void player.playVideoWithAudio();
   }, [onForceReplay, player]);
 
+  const runWithFullPresetLock = React.useCallback(async (
+    task: () => Promise<void>,
+  ) => {
+    setIsPreparingFullPreset(true);
+    try {
+      await task();
+    } finally {
+      setIsPreparingFullPreset(false);
+    }
+  }, []);
+
   const scheduleRefreshLayout = React.useCallback(() => {
     if (refreshLayoutFrameRef.current !== null) return;
     refreshLayoutFrameRef.current = window.requestAnimationFrame(() => {
@@ -314,9 +391,23 @@ export function RetroPlayer({
   // the user edits width/height manually or switches to another preset.
   const phosphorDotAspectActiveRef = React.useRef(false);
   const autoTargetSizeAppliedKeyRef = React.useRef<string | null>(null);
+  const fullModeConfirmedRef = React.useRef(
+    readPersistedFullModeConfirmed() || readSessionFullModeConfirmed(),
+  );
+  const persistentFullModeConfirmedRef = React.useRef(
+    readPersistedFullModeConfirmed(),
+  );
+
+  const clearFullVariantConfirmations = React.useCallback(() => {
+    fullModeConfirmedRef.current = false;
+    persistentFullModeConfirmedRef.current = false;
+    clearStoredFullModeConfirmed();
+  }, []);
 
   React.useEffect(() => {
-    const isPhosphorDotSelected = filterState.selectedPreset === "phosphorDot";
+    const isPhosphorDotSelected =
+      filterState.selectedPreset === "phosphorDot" ||
+      filterState.selectedPreset === "phosphorDotSmooth";
     phosphorDotAspectActiveRef.current = isPhosphorDotSelected;
     if (isPhosphorDotSelected) {
       autoTargetSizeAppliedKeyRef.current = null;
@@ -423,33 +514,85 @@ export function RetroPlayer({
     [],
   );
 
+  const prepareFullModeVariant = React.useCallback(async (request: {
+    title: string;
+    label: string;
+    variantOverrides: RetroPresetVariantPreparation;
+  }) => {
+    const { title, label, variantOverrides } = request;
+
+    if (isPreparingFullPreset) {
+      return false;
+    }
+
+    if (resolveRetroVariantPreparationRenderMode(variantOverrides) !== "full") {
+      return true;
+    }
+
+    if (!fullModeConfirmedRef.current) {
+      let persistForFuture = false;
+      const confirmed = await confirmDialog({
+        title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,
+        body: locale === "ja"
+          ? `${title} は Full mode のため、準備が完了するまで少し時間がかかることがあります。続行しますか？`
+          : `${title} uses full mode and may take a moment to prepare. Continue?`,
+        okText: locale === "ja" ? "準備する" : "Prepare",
+        cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+        persistCheckboxLabel: locale === "ja" ? "次回から表示しない" : "Don't show this again",
+        onConfirmPersistChange: (checked: boolean) => {
+          persistForFuture = checked;
+        },
+      });
+      if (!confirmed) {
+        return false;
+      }
+      fullModeConfirmedRef.current = true;
+      writeSessionFullModeConfirmed(true);
+      if (persistForFuture) {
+        persistentFullModeConfirmedRef.current = true;
+        writePersistedFullModeConfirmed(true);
+      }
+    }
+
+    if (player.isFilterVariantPrepared(variantOverrides)) {
+      return true;
+    }
+
+    await runWithFullPresetLock(async () => {
+      await player.prepareFilterVariantWithLabel(
+        locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
+        variantOverrides,
+      );
+    });
+    return true;
+  }, [
+    confirmDialog,
+    isPreparingFullPreset,
+    locale,
+    player.isFilterVariantPrepared,
+    player.prepareFilterVariantWithLabel,
+    runWithFullPresetLock,
+  ]);
+
   const applyPresetWithAspect = React.useCallback(
     async (presetKey: RetroPresetKey) => {
+      if (isPreparingFullPreset) {
+        return;
+      }
+
       const selectedPreset: RetroPresetDefinition = RETRO_PRESETS[presetKey];
-      const isBeamPreset = selectedPreset.phosphorDotShape === "beam";
-      if (isWindowsRuntime() && isBeamPreset && !player.isCrtBeamPrepared({
-        paletteMode: selectedPreset.palette,
-        phosphorDotShape: "beam",
-        phosphorStrength: selectedPreset.phosphor,
-        spotMaskStrength: selectedPreset.spotMask,
-      })) {
-        const confirmed = await confirmDialog({
-          title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
-          body: locale === "ja"
-            ? "CRT Beam は Windows で準備に時間がかかることがあります。続行しますか？"
-            : "CRT Beam may take a while to prepare on Windows. Continue?",
-          okText: locale === "ja" ? "準備する" : "Prepare",
-          cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+      const presetVariantOverrides = buildRetroPresetVariantPreparation(selectedPreset);
+      const presetRenderMode = resolveRetroPresetRenderMode(selectedPreset);
+
+      if (presetRenderMode === "full") {
+        const prepared = await prepareFullModeVariant({
+          title: selectedPreset.label,
+          label: selectedPreset.label,
+          variantOverrides: presetVariantOverrides,
         });
-        if (!confirmed) {
+        if (!prepared) {
           return;
         }
-        await player.prepareCrtBeam({
-          paletteMode: selectedPreset.palette,
-          phosphorDotShape: "beam",
-          phosphorStrength: selectedPreset.phosphor,
-          spotMaskStrength: selectedPreset.spotMask,
-        });
       }
 
       filterState.applyPreset(presetKey);
@@ -475,56 +618,88 @@ export function RetroPlayer({
       filterState.setTargetHeight(nextHeight);
     },
     [
-      confirmDialog,
+      buildRetroPresetVariantPreparation,
       filterState.applyPreset,
       filterState.setTargetHeight,
       filterState.setTargetWidth,
-      locale,
-      player.isCrtBeamPrepared,
-      player.prepareCrtBeam,
+      isPreparingFullPreset,
       player.sourceDimensions,
       player.isAudioFxEnabled,
       player.toggleAudioFx,
       computePhosphorDotDimensions,
+      prepareFullModeVariant,
     ],
   );
 
   const handleRequestEnableBeamCross = React.useCallback(async () => {
-    if (isWindowsRuntime() && !player.isCrtBeamPrepared({
+    if (isPreparingFullPreset) {
+      return;
+    }
+
+    const beamVariantOverrides = {
       paletteMode: filterState.paletteMode,
-      phosphorDotShape: "beam",
+      phosphorDotShape: "beam" as const,
       phosphorStrength: filterState.phosphorStrength,
       spotMaskStrength: filterState.spotMaskStrength,
-    })) {
-      const confirmed = await confirmDialog({
-        title: locale === "ja" ? "CRT Beam の準備" : "Prepare CRT Beam",
-        body: locale === "ja"
-          ? "CRT Beam は Windows で準備に時間がかかることがあります。続行しますか？"
-          : "CRT Beam may take a while to prepare on Windows. Continue?",
-        okText: locale === "ja" ? "準備する" : "Prepare",
-        cancelText: locale === "ja" ? "キャンセル" : "Cancel",
-      });
-      if (!confirmed) {
-        return;
-      }
-      await player.prepareCrtBeam({
-        paletteMode: filterState.paletteMode,
-        phosphorDotShape: "beam",
-        phosphorStrength: filterState.phosphorStrength,
-        spotMaskStrength: filterState.spotMaskStrength,
-      });
+      compositeEnabled: filterState.compositeEnabled,
+      compositeAmount: filterState.compositeAmount,
+    };
+
+    const prepared = await prepareFullModeVariant({
+      title: "CRT Beam",
+      label: "CRT Beam",
+      variantOverrides: beamVariantOverrides,
+    });
+    if (!prepared) {
+      return;
     }
 
     filterState.setPhosphorDotShape("beam");
   }, [
-    confirmDialog,
+    filterState.compositeAmount,
+    filterState.compositeEnabled,
     filterState.paletteMode,
     filterState.phosphorStrength,
     filterState.setPhosphorDotShape,
     filterState.spotMaskStrength,
-    locale,
-    player.isCrtBeamPrepared,
-    player.prepareCrtBeam,
+    isPreparingFullPreset,
+    prepareFullModeVariant,
+  ]);
+
+  const handleRequestEnableComposite = React.useCallback(async () => {
+    if (isPreparingFullPreset || filterState.compositeEnabled) {
+      return;
+    }
+
+    const compositeVariantOverrides = {
+      paletteMode: filterState.paletteMode,
+      phosphorDotShape: filterState.phosphorDotShape,
+      phosphorStrength: filterState.phosphorStrength,
+      spotMaskStrength: filterState.spotMaskStrength,
+      compositeEnabled: true,
+      compositeAmount: Math.max(filterState.compositeAmount, 0.01),
+    };
+
+    const prepared = await prepareFullModeVariant({
+      title: "Composite / NTSC",
+      label: "Composite / NTSC",
+      variantOverrides: compositeVariantOverrides,
+    });
+    if (!prepared) {
+      return;
+    }
+
+    filterState.setCompositeEnabled(true);
+  }, [
+    filterState.compositeAmount,
+    filterState.compositeEnabled,
+    filterState.paletteMode,
+    filterState.phosphorDotShape,
+    filterState.phosphorStrength,
+    filterState.setCompositeEnabled,
+    filterState.spotMaskStrength,
+    isPreparingFullPreset,
+    prepareFullModeVariant,
   ]);
 
   // Catch the cases the click-time correction above misses: the preset was
@@ -556,14 +731,27 @@ export function RetroPlayer({
       return;
     }
 
+    // phosphorDot / phosphorDotSmooth own target width/height themselves.
+    // Letting autoTargetSize write here as well causes a visible feedback loop
+    // where source-size clamping and phosphor-dot aspect correction keep
+    // overwriting each other every render.
+    if (phosphorDotAspectActiveRef.current) {
+      autoTargetSizeAppliedKeyRef.current = null;
+      return;
+    }
+
     const dims = player.sourceDimensions;
     if (!dims?.width || !dims?.height) return;
 
+    const { width: nextWidth, height: nextHeight } = clampAutoTargetSize(dims.width, dims.height);
     const sourceKey = `${src ?? "stream"}:${stream?.id ?? ""}:${kind}:${dims.width}x${dims.height}`;
-    if (autoTargetSizeAppliedKeyRef.current === sourceKey) return;
+    const alreadyAppliedToThisSource = autoTargetSizeAppliedKeyRef.current === sourceKey;
+    const targetAlreadyMatchesAutoSize =
+      nextWidth === filterState.targetWidth && nextHeight === filterState.targetHeight;
+
+    if (alreadyAppliedToThisSource && targetAlreadyMatchesAutoSize) return;
     autoTargetSizeAppliedKeyRef.current = sourceKey;
 
-    const { width: nextWidth, height: nextHeight } = clampAutoTargetSize(dims.width, dims.height);
     if (nextWidth !== filterState.targetWidth) {
       filterState.setTargetWidth(nextWidth);
     }
@@ -694,6 +882,7 @@ export function RetroPlayer({
             src={src}
             kind={kind}
             player={player}
+            interactionLocked={isPreparingFullPreset}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -728,6 +917,7 @@ export function RetroPlayer({
             locale={locale}
             player={player}
             filterState={filterState}
+            interactionLocked={isPreparingFullPreset}
             controlPanelMode={controlPanelMode}
             gameControls={gameControls}
             onControlPanelModeChange={setControlPanelMode}
@@ -742,6 +932,7 @@ export function RetroPlayer({
             onToggleNativePlaybackMode={handleToggleNativePlaybackMode}
             isAudioFxUnavailable={isAudioFxUnavailable}
             onRequestEnableBeamCross={handleRequestEnableBeamCross}
+            onRequestEnableComposite={handleRequestEnableComposite}
           />
         </div>
       </section>
@@ -764,6 +955,7 @@ export function RetroPlayer({
     locale,
     player,
     filterState,
+    interactionLocked: isPreparingFullPreset,
     onControlPanelModeChange: setControlPanelMode,
     onApplyPreset: applyPresetWithAspect,
     onSetTargetWidth: handleSetTargetWidth,
@@ -787,6 +979,8 @@ export function RetroPlayer({
     onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
     isAudioFxUnavailable,
     onRequestEnableBeamCross: handleRequestEnableBeamCross,
+    onRequestEnableComposite: handleRequestEnableComposite,
+    clearFullVariantConfirmations,
   } as const;
 
   const controlPanel = layoutMode === "settings"
@@ -819,6 +1013,7 @@ export function RetroPlayer({
               src={src}
               kind={kind}
               player={player}
+              interactionLocked={isPreparingFullPreset}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}

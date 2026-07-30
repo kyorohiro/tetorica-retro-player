@@ -93,8 +93,6 @@ export type RetroControlPlayerSlice = {
   toggleNoise: () => void;
   togglePlayback: () => Promise<void>;
   playVideoWithAudio: () => Promise<void>;
-  isCrtBeamPrepared: (overrides?: Record<string, unknown>) => boolean;
-  prepareCrtBeam: (overrides?: Record<string, unknown>) => Promise<void>;
   analyserRef?: React.RefObject<AnalyserNode | null>;
 };
 
@@ -102,6 +100,7 @@ export type RetroControlPanelProps = {
   locale: RetroPlayerLocale;
   player: RetroControlPlayerSlice;
   filterState: RetroFilterState;
+  interactionLocked?: boolean;
   controlPanelMode: "playback" | "audio-settings" | "video-settings";
   gameControls?: RetroGameControls | null;
   onControlPanelModeChange: (
@@ -128,6 +127,7 @@ export type RetroControlPanelProps = {
   onToggleNativePlaybackMode?: () => void;
   isAudioFxUnavailable?: boolean;
   onRequestEnableBeamCross?: () => void | Promise<void>;
+  onRequestEnableComposite?: () => void | Promise<void>;
 };
 
 const controlsFallback = (
@@ -159,6 +159,7 @@ export function RetroControlPanel({
   locale,
   player,
   filterState,
+  interactionLocked = false,
   controlPanelMode,
   gameControls,
   onControlPanelModeChange,
@@ -183,6 +184,7 @@ export function RetroControlPanel({
   onToggleNativePlaybackMode,
   isAudioFxUnavailable,
   onRequestEnableBeamCross,
+  onRequestEnableComposite,
 }: RetroControlPanelProps) {
   const canRetryPlayback = player.previewStatus?.kind === "retryable";
   const stableHasPlayableRef = React.useRef(player.hasPlayableMedia || canRetryPlayback);
@@ -207,7 +209,13 @@ export function RetroControlPanel({
         : null;
 
   return (
-    <div className="rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]">
+    <div
+      aria-disabled={interactionLocked}
+      className={[
+        "rounded-2xl border border-[#cac0b2] bg-[#eae6df] p-3 text-xs text-[#2c2418]",
+        interactionLocked ? "pointer-events-none opacity-60" : "",
+      ].join(" ").trim()}
+    >
       {statusBanner && (
         <p className={statusBanner.className}>{statusBanner.message}</p>
       )}
@@ -371,8 +379,13 @@ export function RetroControlPanel({
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
               phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
               phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
-              phosphorDotGlowColorStrength={filterState.phosphorDotGlowColorStrength}
               coloredGlowEnabled={filterState.coloredGlowEnabled}
+              postCurvatureEnabled={filterState.postCurvatureEnabled}
+              compositeEnabled={filterState.compositeEnabled}
+              compositeAmount={filterState.compositeAmount}
+              compositeChromaBlur={filterState.compositeChromaBlur}
+              compositeChromaDelay={filterState.compositeChromaDelay}
+              compositeNoise={filterState.compositeNoise}
               beamDarkCutoff={filterState.beamDarkCutoff}
               beamHorizontalSpread={filterState.beamHorizontalSpread}
               beamStripeStrength={filterState.beamStripeStrength}
@@ -426,8 +439,13 @@ export function RetroControlPanel({
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
               onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
               onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
-              onSetPhosphorDotGlowColorStrength={filterState.setPhosphorDotGlowColorStrength}
               onSetColoredGlowEnabled={filterState.setColoredGlowEnabled}
+              onSetPostCurvatureEnabled={filterState.setPostCurvatureEnabled}
+              onSetCompositeEnabled={filterState.setCompositeEnabled}
+              onSetCompositeAmount={filterState.setCompositeAmount}
+              onSetCompositeChromaBlur={filterState.setCompositeChromaBlur}
+              onSetCompositeChromaDelay={filterState.setCompositeChromaDelay}
+              onSetCompositeNoise={filterState.setCompositeNoise}
               onSetBeamDarkCutoff={filterState.setBeamDarkCutoff}
               onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
               onSetBeamStripeStrength={filterState.setBeamStripeStrength}
@@ -447,6 +465,7 @@ export function RetroControlPanel({
               onSetFocusWidth={filterState.setFocusWidth}
               onSetFocusHeight={filterState.setFocusHeight}
               onRequestEnableBeamCross={onRequestEnableBeamCross}
+              onRequestEnableComposite={onRequestEnableComposite}
             />
           </React.Suspense>
         </div>

@@ -73,7 +73,7 @@ vec2 curveUv(vec2 uv, float strength) {
 
 float getBeamEnergyCompensation(vec2 sourceSize) {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
-  vec2 visibleSize = max(uDisplaySize, vec2(1.0));
+  vec2 visibleSize = max(min(uDisplaySize, uBeamSourceSize), vec2(1.0));
   float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
   float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float pixelsPerCell = sqrt(max(pixelsPerCellX * pixelsPerCellY, 0.0001));

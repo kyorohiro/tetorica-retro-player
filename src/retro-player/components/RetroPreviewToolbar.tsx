@@ -126,6 +126,7 @@ type RetroPreviewToolbarPlayerSlice = {
 type RetroPreviewToolbarProps = {
   locale: RetroPlayerLocale;
   player: RetroPreviewToolbarPlayerSlice;
+  interactionLocked?: boolean;
   isHighResolution: boolean;
   renderResolutionPreset: 1 | 2;
   isFitWidthEnabled: boolean;
@@ -171,6 +172,7 @@ type RetroPreviewToolbarProps = {
 export function RetroPreviewToolbar({
   locale,
   player,
+  interactionLocked = false,
   isHighResolution,
   renderResolutionPreset,
   isFitWidthEnabled,
@@ -222,7 +224,7 @@ export function RetroPreviewToolbar({
     onNativeAudioSuppressionOverrideChange(null);
     onPreferNativeHlsOverrideChange(null);
   };
-  const isMaximizeRenderCapAutoEnabled =
+  const isRenderCapAutoEnabled =
     player.previewKind === "video" || player.previewKind === "capture";
   const tooltipText =
     locale === "ja"
@@ -243,9 +245,9 @@ export function RetroPreviewToolbar({
           alarmArmed: "Alarm: 時刻を待っています。",
           qsv: "Use hardware encode when available",
           qsvDescription: "Windows は QSV、macOS は VideoToolbox を優先します",
-          maximizeRenderCap: "Maximize render cap",
+          maximizeRenderCap: "Render cap",
           maximizeRenderCapDescription:
-            "最大化中だけ内部描画サイズを抑えて、低性能PCでのカクつきを減らします。",
+            "重いフィルター使用時の内部描画サイズを抑えて、低性能PCでのカクつきを減らします。",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "同時実行数の上限。変更は再生切替後に安定し、再起動後も保持されます。",
           enabled: "有効",
@@ -268,9 +270,9 @@ export function RetroPreviewToolbar({
           alarmArmed: "Alarm: armed and waiting for the selected time.",
           qsv: "Use hardware encode when available",
           qsvDescription: "Prefers QSV on Windows and VideoToolbox on macOS",
-          maximizeRenderCap: "Maximize render cap",
+          maximizeRenderCap: "Render cap",
           maximizeRenderCapDescription:
-            "While maximized, limit the internal render size to reduce stutter on lower-end PCs.",
+            "Limit internal render size for heavier filters to reduce stutter on lower-end PCs.",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "Maximum concurrent ffmpeg HLS jobs. Persisted and safe to apply on the next playback cycle.",
           enabled: "On",
@@ -475,6 +477,7 @@ export function RetroPreviewToolbar({
     "border-slate-500/70 bg-slate-900/78 text-slate-200 hover:bg-slate-800/90";
   const pillButtonClass =
     "inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium transition backdrop-blur-sm";
+  const topLevelItemClass = interactionLocked ? "pointer-events-none opacity-60" : "";
 
   const renderTooltip = (key: string, text: string, widthClass = "w-44") => (
     <div
@@ -492,7 +495,10 @@ export function RetroPreviewToolbar({
 
   return (
     <>
-      <div className="relative">
+      <div
+        aria-disabled={interactionLocked}
+        className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <button
           ref={(node) => {
             moreButtonRef.current = node;
@@ -694,7 +700,7 @@ export function RetroPreviewToolbar({
                     <div>{tooltipText.maximizeRenderCap}</div>
                     <div className="text-[9px] text-slate-500">
                       {maximizePerformanceMode === "auto"
-                        ? `Auto now: ${isMaximizeRenderCapAutoEnabled ? "On" : "Off"}`
+                        ? `Auto now: ${isRenderCapAutoEnabled ? "On" : "Off"}`
                         : `Override: ${maximizePerformanceMode === "on" ? "On" : "Off"}`}
                     </div>
                     <div className="mt-1 text-[9px] leading-[1.45] text-slate-500">
@@ -704,7 +710,7 @@ export function RetroPreviewToolbar({
                   <div className="grid grid-cols-3 gap-1">
                     {[
                       {
-                        label: isMaximizeRenderCapAutoEnabled ? "Preset On" : "Preset Off",
+                        label: isRenderCapAutoEnabled ? "Preset On" : "Preset Off",
                         value: "auto",
                       },
                       { label: "On", value: "on" },
@@ -945,7 +951,10 @@ export function RetroPreviewToolbar({
       </div>
 
       {player.canRecord && !isNarrow && (
-        <div className="relative">
+        <div
+          aria-disabled={interactionLocked}
+          className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+        >
           <button
             type="button"
             aria-label={player.isRecording ? "Stop recording" : "Start recording"}
@@ -971,7 +980,10 @@ export function RetroPreviewToolbar({
         </div>
       )}
 
-      <div className="relative">
+      <div
+        aria-disabled={interactionLocked}
+        className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <button
           type="button"
           aria-label={player.isPoweredOn ? "Power off" : "Power on"}
@@ -992,7 +1004,10 @@ export function RetroPreviewToolbar({
         {renderTooltip("power", player.isPoweredOn ? tooltipText.powerOff : tooltipText.powerOn)}
       </div>
 
-      <div className="relative">
+      <div
+        aria-disabled={interactionLocked}
+        className={["relative", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <button
           ref={presetPopover.anchorRef}
           type="button"
@@ -1054,7 +1069,10 @@ export function RetroPreviewToolbar({
       </div>
 
       {isBrightnessInlineVisible && (
-        <div className="relative flex items-center">
+        <div
+          aria-disabled={interactionLocked}
+          className={["relative flex items-center", topLevelItemClass].filter(Boolean).join(" ")}
+        >
           <button
             type="button"
             aria-label="Decrease brightness"
@@ -1102,7 +1120,10 @@ export function RetroPreviewToolbar({
         </div>
       )}
 
-      <div className="flex items-center">
+      <div
+        aria-disabled={interactionLocked}
+        className={["flex items-center", topLevelItemClass].filter(Boolean).join(" ")}
+      >
         <div className="relative">
           <button
             ref={avPopover.anchorRef}
