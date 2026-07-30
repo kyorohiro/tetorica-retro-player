@@ -11,6 +11,7 @@ import {
   type RetroPresetDefinition,
   type RetroPresetKey,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config";
 import {
   loadPersistedRetroSettings,
@@ -24,6 +25,7 @@ export type RetroFilterInitialState = Partial<{
   targetHeight: number;
   autoTargetSize: boolean;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -99,6 +101,7 @@ const doesPresetMatchState = (
       )) &&
     (preset.autoTargetSize ?? false) === state.autoTargetSize &&
     (preset.samplingMode ?? "nearest") === state.samplingMode &&
+    (preset.vblankSimulationMode ?? "off") === state.vblankSimulationMode &&
     preset.colors === state.colorLevels &&
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
@@ -201,6 +204,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
     autoTargetSize: initialState.autoTargetSize ?? (DEFAULT_PRESET.autoTargetSize ?? false),
     samplingMode: initialState.samplingMode ?? (DEFAULT_PRESET.samplingMode ?? "nearest"),
+    vblankSimulationMode: initialState.vblankSimulationMode ?? (DEFAULT_PRESET.vblankSimulationMode ?? "off"),
     matchTargetAspect: initialState.matchTargetAspect ?? true,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
@@ -341,6 +345,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       current.samplingMode === samplingMode
         ? current
         : { ...current, samplingMode }
+    ));
+  }, [markPresetAsCustom]);
+
+  const setVBlankSimulationMode = useCallback((vblankSimulationMode: VBlankSimulationMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.vblankSimulationMode === vblankSimulationMode
+        ? current
+        : { ...current, vblankSimulationMode }
     ));
   }, [markPresetAsCustom]);
 
@@ -705,6 +718,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       targetHeight: presetSettings.height,
       autoTargetSize: presetSettings.autoTargetSize ?? false,
       samplingMode: presetSettings.samplingMode ?? "nearest",
+      vblankSimulationMode: presetSettings.vblankSimulationMode ?? "off",
       colorLevels: presetSettings.colors,
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
@@ -797,6 +811,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setTargetHeight,
     setAutoTargetSize,
     setSamplingMode,
+    setVBlankSimulationMode,
     setMatchTargetAspect,
     setColorLevels,
     setDitherStrength,

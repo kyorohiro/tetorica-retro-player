@@ -23,6 +23,7 @@ const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   autoTargetSize: DEFAULT_PRESET.autoTargetSize ?? false,
   samplingMode: DEFAULT_PRESET.samplingMode ?? "nearest",
+  vblankSimulationMode: DEFAULT_PRESET.vblankSimulationMode ?? "off",
   targetWidth: DEFAULT_PRESET.width,
   targetHeight: DEFAULT_PRESET.height,
   matchTargetAspect: true,

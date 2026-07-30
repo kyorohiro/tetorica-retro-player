@@ -11,6 +11,7 @@ import {
   type RetroPresetDefinition,
   type RetroPresetKey,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -123,6 +124,7 @@ type RetroFilterPanelProps = {
   targetWidth: number;
   autoTargetSize: boolean;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
   vignetteStrength: number;
   focusStrength: number;
@@ -183,6 +185,7 @@ type RetroFilterPanelProps = {
   onSetTargetWidth: (value: number) => void;
   onSetAutoTargetSize: (value: boolean) => void;
   onSetSamplingMode: (value: TargetSamplingMode) => void;
+  onSetVBlankSimulationMode: (value: VBlankSimulationMode) => void;
   onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
   onSetFocusStrength: (value: number) => void;
@@ -246,6 +249,7 @@ export function RetroFilterPanel({
   targetWidth,
   autoTargetSize,
   samplingMode,
+  vblankSimulationMode,
   matchTargetAspect,
   vignetteStrength,
   onApplyPreset,
@@ -303,6 +307,7 @@ export function RetroFilterPanel({
   onSetTargetWidth,
   onSetAutoTargetSize,
   onSetSamplingMode,
+  onSetVBlankSimulationMode,
   onSetMatchTargetAspect,
   onSetVignetteStrength,
 }: RetroFilterPanelProps) {
@@ -326,6 +331,8 @@ export function RetroFilterPanel({
             "古い表示のような横方向の暗い帯を加えます。値を上げるほど線の隙間が目立ちます。",
           scanline2:
             "さらに細かい第2のライン感を加えます。より密な CRT の縞感が欲しいときに使います。",
+          vblankSimulation:
+            "描画更新を間引いて、VBlank 的な更新の区切りを疑似的に作ります。Mild は 2 フレームに 1 回、Strong は 3 フレームに 1 回だけ描き直します。",
           scanlineBrightFade:
             "明るい部分では scanline を薄くします。値を上げると暗部は縞を保ちつつ、明部は自然に発光して見えます。",
           vignette:
@@ -417,6 +424,8 @@ export function RetroFilterPanel({
             "Adds broad horizontal dark bands like an old display. Higher values make the line gaps more obvious.",
           scanline2:
             "Adds a finer second layer of line texture. Useful when you want a denser CRT stripe feel.",
+          vblankSimulation:
+            "Skips some redraws to mimic a VBlank-like update cadence. Mild redraws every 2nd frame, Strong redraws every 3rd frame.",
           scanlineBrightFade:
             "Makes scanlines fade out in bright areas. Higher values keep dark parts striped while bright parts look more naturally emissive.",
           vignette:
@@ -1234,6 +1243,39 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <div className="rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] p-2">
+              <div className="text-[#12141c]">
+                <InfoTip
+                  label={`VBlank simulation: ${vblankSimulationMode}`}
+                  text={helpText.vblankSimulation}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {([
+                  { label: "Off", value: "off" },
+                  { label: "Mild", value: "mild" },
+                  { label: "Strong", value: "strong" },
+                ] as const).map((option) => {
+                  const isActive = vblankSimulationMode === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => onSetVBlankSimulationMode(option.value)}
+                      className={[
+                        "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight",
+                        isActive
+                          ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                          : "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]",
+                      ].join(" ")}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip

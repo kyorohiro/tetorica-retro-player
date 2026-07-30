@@ -18,6 +18,7 @@ export type TargetSamplingMode =
   | "average_fast_4"
   | "average_fast_8"
   | "average";
+export type VBlankSimulationMode = "off" | "mild" | "strong";
 
 export const DEFAULT_BEAM_CROSS_SETTINGS = {
   beamDarkCutoff: 0.04,
@@ -62,6 +63,7 @@ export type RetroPresetDefinition = {
   label: string;
   autoTargetSize?: boolean;
   samplingMode?: TargetSamplingMode;
+  vblankSimulationMode?: VBlankSimulationMode;
   width: number;
   height: number;
   colors: number;

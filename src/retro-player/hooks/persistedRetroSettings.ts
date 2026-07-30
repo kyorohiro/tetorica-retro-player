@@ -5,6 +5,7 @@ import {
   type PaletteMode,
   type PhosphorDotShape,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config";
 import { isWindowsRuntime } from "../platform/runtime";
 
@@ -15,6 +16,7 @@ const STORAGE_VERSION = 1;
 export type PersistedRetroFilterSettings = {
   autoTargetSize: boolean;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode: VBlankSimulationMode;
   targetWidth: number;
   targetHeight: number;
   matchTargetAspect: boolean;
@@ -170,6 +172,10 @@ const normalizePersistedRetroSettings = (
           filter.samplingMode === "average"
             ? "average_fast_8"
             : (filter.samplingMode ?? "nearest"),
+        vblankSimulationMode:
+          filter.vblankSimulationMode === "mild" || filter.vblankSimulationMode === "strong"
+            ? filter.vblankSimulationMode
+            : "off",
       }
       : filter,
     audio: audio

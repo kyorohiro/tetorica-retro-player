@@ -6,6 +6,7 @@ import {
   type PhosphorDotShape,
   type RetroPresetKey,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE as FILTER_FRAGMENT_PASS1_LITE_COMPOSITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpleShader.ts";
@@ -26,6 +27,7 @@ export type RetroVideoFilterState = {
   targetWidth: number;
   targetHeight: number;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode?: VBlankSimulationMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -397,6 +399,12 @@ const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
 
 const shouldBypassShaderVariantCache = (filterState: RetroVideoFilterState | null) =>
   filterState?.shaderCompileCacheBusterEnabled === true;
+
+const getVBlankFrameInterval = (mode: VBlankSimulationMode | undefined): number => {
+  if (mode === "mild") return 2;
+  if (mode === "strong") return 3;
+  return 1;
+};
 
 const isExactSelectedPreset = (
   filterState: RetroVideoFilterState,
@@ -815,6 +823,10 @@ export class TetoricaRetroVideoPipeline {
   private windowsLitePrewarmStarted = false;
   private isDisposed = false;
   private compileSourceNonce = 0;
+  private lastRenderedFilterState: RetroVideoFilterState | null = null;
+  private lastRenderedSource: RetroVideoSource | null = null;
+  private lastRenderedBufferWidth = 0;
+  private lastRenderedBufferHeight = 0;
 
   // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
@@ -1633,6 +1645,10 @@ export class TetoricaRetroVideoPipeline {
     return false;
   }
 
+  private canReusePreviousFrame(source: RetroVideoSource): boolean {
+    return !isHtmlImageElement(source);
+  }
+
   render() {
     const { gl } = this;
     if (gl.isContextLost()) {
@@ -1660,6 +1676,20 @@ export class TetoricaRetroVideoPipeline {
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.clearColor(0.01, 0.02, 0.01, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      this.renderCount++;
+      return;
+    }
+
+    const vblankInterval = getVBlankFrameInterval(filterState.vblankSimulationMode);
+    const shouldHoldPreviousFrame =
+      vblankInterval > 1 &&
+      this.canReusePreviousFrame(source) &&
+      this.lastRenderedFilterState === filterState &&
+      this.lastRenderedSource === source &&
+      this.lastRenderedBufferWidth === gl.drawingBufferWidth &&
+      this.lastRenderedBufferHeight === gl.drawingBufferHeight &&
+      this.renderCount % vblankInterval !== 0;
+    if (shouldHoldPreviousFrame) {
       this.renderCount++;
       return;
     }
@@ -1847,6 +1877,10 @@ export class TetoricaRetroVideoPipeline {
       TetoricaRetroVideoPipeline.showDebug(info);
     }
     this.renderCount++;
+    this.lastRenderedFilterState = filterState;
+    this.lastRenderedSource = source;
+    this.lastRenderedBufferWidth = gl.drawingBufferWidth;
+    this.lastRenderedBufferHeight = gl.drawingBufferHeight;
 
     if (!usingFilter) {
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -1888,6 +1922,10 @@ export class TetoricaRetroVideoPipeline {
     if (this.postCurvatureTexture) gl.deleteTexture(this.postCurvatureTexture);
     this.currentSource = null;
     this.currentFilterState = null;
+    this.lastRenderedFilterState = null;
+    this.lastRenderedSource = null;
+    this.lastRenderedBufferWidth = 0;
+    this.lastRenderedBufferHeight = 0;
     this.lastUploadedImageSource = null;
     this.lastUploadedVideoSource = null;
     this.lastUploadedVideoTime = Number.NaN;
