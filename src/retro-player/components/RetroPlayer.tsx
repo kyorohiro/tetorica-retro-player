@@ -45,6 +45,67 @@ const clampRenderResolutionPreset = (value: number): 1 | 2 => {
   return 1;
 };
 
+const FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY =
+  "tetorica-retro-player.full-mode-confirmed.session";
+const FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY =
+  "tetorica-retro-player.full-mode-confirmed.persisted";
+
+const readStoredBoolean = (storage: Storage, key: string): boolean => {
+  try {
+    return storage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeStoredBoolean = (storage: Storage, key: string, value: boolean): void => {
+  try {
+    if (value) {
+      storage.setItem(key, "1");
+    } else {
+      storage.removeItem(key);
+    }
+  } catch {
+    // Ignore storage errors and keep runtime behavior.
+  }
+};
+
+const readSessionFullModeConfirmed = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return readStoredBoolean(window.sessionStorage, FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY);
+};
+
+const readPersistedFullModeConfirmed = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return readStoredBoolean(window.localStorage, FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY);
+};
+
+const writeSessionFullModeConfirmed = (value: boolean): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeStoredBoolean(window.sessionStorage, FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY, value);
+};
+
+const writePersistedFullModeConfirmed = (value: boolean): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeStoredBoolean(window.localStorage, FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY, value);
+};
+
+const clearStoredFullModeConfirmed = (): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeSessionFullModeConfirmed(false);
+  writePersistedFullModeConfirmed(false);
+};
+
 const resolveRenderResolutionPreset = (
   ui: PersistedRetroUiSettings | undefined,
 ): 1 | 2 => {
@@ -330,6 +391,18 @@ export function RetroPlayer({
   // the user edits width/height manually or switches to another preset.
   const phosphorDotAspectActiveRef = React.useRef(false);
   const autoTargetSizeAppliedKeyRef = React.useRef<string | null>(null);
+  const fullModeConfirmedRef = React.useRef(
+    readPersistedFullModeConfirmed() || readSessionFullModeConfirmed(),
+  );
+  const persistentFullModeConfirmedRef = React.useRef(
+    readPersistedFullModeConfirmed(),
+  );
+
+  const clearFullVariantConfirmations = React.useCallback(() => {
+    fullModeConfirmedRef.current = false;
+    persistentFullModeConfirmedRef.current = false;
+    clearStoredFullModeConfirmed();
+  }, []);
 
   React.useEffect(() => {
     const isPhosphorDotSelected =
@@ -456,16 +529,29 @@ export function RetroPlayer({
       return true;
     }
 
-    const confirmed = await confirmDialog({
-      title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,
-      body: locale === "ja"
-        ? `${title} は Full mode のため、準備が完了するまで少し時間がかかることがあります。続行しますか？`
-        : `${title} uses full mode and may take a moment to prepare. Continue?`,
-      okText: locale === "ja" ? "準備する" : "Prepare",
-      cancelText: locale === "ja" ? "キャンセル" : "Cancel",
-    });
-    if (!confirmed) {
-      return false;
+    if (!fullModeConfirmedRef.current) {
+      let persistForFuture = false;
+      const confirmed = await confirmDialog({
+        title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,
+        body: locale === "ja"
+          ? `${title} は Full mode のため、準備が完了するまで少し時間がかかることがあります。続行しますか？`
+          : `${title} uses full mode and may take a moment to prepare. Continue?`,
+        okText: locale === "ja" ? "準備する" : "Prepare",
+        cancelText: locale === "ja" ? "キャンセル" : "Cancel",
+        persistCheckboxLabel: locale === "ja" ? "次回から表示しない" : "Don't show this again",
+        onConfirmPersistChange: (checked) => {
+          persistForFuture = checked;
+        },
+      });
+      if (!confirmed) {
+        return false;
+      }
+      fullModeConfirmedRef.current = true;
+      writeSessionFullModeConfirmed(true);
+      if (persistForFuture) {
+        persistentFullModeConfirmedRef.current = true;
+        writePersistedFullModeConfirmed(true);
+      }
     }
 
     if (player.isFilterVariantPrepared(variantOverrides)) {
@@ -847,6 +933,7 @@ export function RetroPlayer({
             isAudioFxUnavailable={isAudioFxUnavailable}
             onRequestEnableBeamCross={handleRequestEnableBeamCross}
             onRequestEnableComposite={handleRequestEnableComposite}
+            clearFullVariantConfirmations={clearFullVariantConfirmations}
           />
         </div>
       </section>
@@ -894,6 +981,7 @@ export function RetroPlayer({
     isAudioFxUnavailable,
     onRequestEnableBeamCross: handleRequestEnableBeamCross,
     onRequestEnableComposite: handleRequestEnableComposite,
+    clearFullVariantConfirmations,
   } as const;
 
   const controlPanel = layoutMode === "settings"
