@@ -294,6 +294,15 @@ export function PreviewPage({
                     }
                 >
                     <RetroPlayer
+                        key={[
+                            file.id,
+                            file.path,
+                            requestSequence,
+                            resolvedKind,
+                            isRetro ? "retro" : "native",
+                            useHls ? "hls" : "direct",
+                            src,
+                        ].join(":")}
                         src={src}
                         kind={resolvedKind}
                         displayName={file.path}

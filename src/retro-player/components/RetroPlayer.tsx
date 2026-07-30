@@ -27,6 +27,7 @@ import {
   buildRetroPresetVariantPreparation,
   RETRO_PRESETS,
   resolveRetroPresetRenderMode,
+  resolveRetroVariantPreparationRenderMode,
   type RetroPresetDefinition,
   type RetroPresetKey,
   type RetroPresetVariantPreparation,
@@ -331,7 +332,9 @@ export function RetroPlayer({
   const autoTargetSizeAppliedKeyRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    const isPhosphorDotSelected = filterState.selectedPreset === "phosphorDot";
+    const isPhosphorDotSelected =
+      filterState.selectedPreset === "phosphorDot" ||
+      filterState.selectedPreset === "phosphorDotSmooth";
     phosphorDotAspectActiveRef.current = isPhosphorDotSelected;
     if (isPhosphorDotSelected) {
       autoTargetSizeAppliedKeyRef.current = null;
@@ -449,24 +452,24 @@ export function RetroPlayer({
       return false;
     }
 
-    if (!isWindowsRuntime()) {
-      return true;
-    }
-
-    if (player.isFilterVariantPrepared(variantOverrides)) {
+    if (resolveRetroVariantPreparationRenderMode(variantOverrides) !== "full") {
       return true;
     }
 
     const confirmed = await confirmDialog({
       title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,
       body: locale === "ja"
-        ? `${title} は Full mode のため、Windows では準備に時間がかかることがあります。続行しますか？`
-        : `${title} uses full mode and may take a while to prepare on Windows. Continue?`,
+        ? `${title} は Full mode のため、準備が完了するまで少し時間がかかることがあります。続行しますか？`
+        : `${title} uses full mode and may take a moment to prepare. Continue?`,
       okText: locale === "ja" ? "準備する" : "Prepare",
       cancelText: locale === "ja" ? "キャンセル" : "Cancel",
     });
     if (!confirmed) {
       return false;
+    }
+
+    if (player.isFilterVariantPrepared(variantOverrides)) {
+      return true;
     }
 
     await runWithFullPresetLock(async () => {
@@ -577,6 +580,42 @@ export function RetroPlayer({
     prepareFullModeVariant,
   ]);
 
+  const handleRequestEnableComposite = React.useCallback(async () => {
+    if (isPreparingFullPreset || filterState.compositeEnabled) {
+      return;
+    }
+
+    const compositeVariantOverrides = {
+      paletteMode: filterState.paletteMode,
+      phosphorDotShape: filterState.phosphorDotShape,
+      phosphorStrength: filterState.phosphorStrength,
+      spotMaskStrength: filterState.spotMaskStrength,
+      compositeEnabled: true,
+      compositeAmount: Math.max(filterState.compositeAmount, 0.01),
+    };
+
+    const prepared = await prepareFullModeVariant({
+      title: "Composite / NTSC",
+      label: "Composite / NTSC",
+      variantOverrides: compositeVariantOverrides,
+    });
+    if (!prepared) {
+      return;
+    }
+
+    filterState.setCompositeEnabled(true);
+  }, [
+    filterState.compositeAmount,
+    filterState.compositeEnabled,
+    filterState.paletteMode,
+    filterState.phosphorDotShape,
+    filterState.phosphorStrength,
+    filterState.setCompositeEnabled,
+    filterState.spotMaskStrength,
+    isPreparingFullPreset,
+    prepareFullModeVariant,
+  ]);
+
   // Catch the cases the click-time correction above misses: the preset was
   // applied before a source was loaded, or a new source loads afterward.
   React.useEffect(() => {
@@ -602,6 +641,15 @@ export function RetroPlayer({
 
   React.useEffect(() => {
     if (!filterState.autoTargetSize) {
+      autoTargetSizeAppliedKeyRef.current = null;
+      return;
+    }
+
+    // phosphorDot / phosphorDotSmooth own target width/height themselves.
+    // Letting autoTargetSize write here as well causes a visible feedback loop
+    // where source-size clamping and phosphor-dot aspect correction keep
+    // overwriting each other every render.
+    if (phosphorDotAspectActiveRef.current) {
       autoTargetSizeAppliedKeyRef.current = null;
       return;
     }
@@ -798,6 +846,7 @@ export function RetroPlayer({
             onToggleNativePlaybackMode={handleToggleNativePlaybackMode}
             isAudioFxUnavailable={isAudioFxUnavailable}
             onRequestEnableBeamCross={handleRequestEnableBeamCross}
+            onRequestEnableComposite={handleRequestEnableComposite}
           />
         </div>
       </section>
@@ -844,6 +893,7 @@ export function RetroPlayer({
     onToggleNativePlaybackMode: handleToggleNativePlaybackMode,
     isAudioFxUnavailable,
     onRequestEnableBeamCross: handleRequestEnableBeamCross,
+    onRequestEnableComposite: handleRequestEnableComposite,
   } as const;
 
   const controlPanel = layoutMode === "settings"

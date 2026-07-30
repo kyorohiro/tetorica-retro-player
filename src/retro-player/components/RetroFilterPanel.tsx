@@ -175,6 +175,7 @@ type RetroFilterPanelProps = {
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
   onRequestEnableBeamCross?: () => void | Promise<void>;
+  onRequestEnableComposite?: () => void | Promise<void>;
   onSetNeonBoost: (value: number) => void;
   onSetNeonSaturation: (value: number) => void;
   onSetNeonDetail: (value: number) => void;
@@ -294,6 +295,7 @@ export function RetroFilterPanel({
   onSetScanlineStrength,
   onSetScanline2Strength,
   onRequestEnableBeamCross,
+  onRequestEnableComposite,
   onSetNeonBoost,
   onSetNeonSaturation,
   onSetNeonDetail,
@@ -1011,7 +1013,13 @@ export function RetroFilterPanel({
           <div className="flex flex-col gap-3">
             <button
               type="button"
-              onClick={() => onSetCompositeEnabled(!compositeEnabled)}
+              onClick={() => {
+                if (!compositeEnabled && onRequestEnableComposite) {
+                  void onRequestEnableComposite();
+                  return;
+                }
+                onSetCompositeEnabled(!compositeEnabled);
+              }}
               className={[
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
                 compositeEnabled

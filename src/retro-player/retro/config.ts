@@ -899,6 +899,14 @@ export const resolveRetroPresetRenderMode = (
   return isBeamMode || hasComposite ? "full" : "lite";
 };
 
+export const resolveRetroVariantPreparationRenderMode = (
+  variant: RetroPresetVariantPreparation,
+): RetroPresetRenderMode => {
+  const isBeamMode = variant.phosphorDotShape === "beam";
+  const hasComposite = variant.compositeEnabled && variant.compositeAmount > 0.001;
+  return isBeamMode || hasComposite ? "full" : "lite";
+};
+
 // Grouping used by the preset picker UI. "none" is intentionally excluded —
 // it's rendered outside the category boxes as a plain "no filter" option.
 export type RetroPresetCategory = "classic" | "lcd" | "crt" | "other";
