@@ -4,6 +4,7 @@ import {
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
+  type RetroPresetKey,
   type TargetSamplingMode,
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE as FILTER_FRAGMENT_PASS1_LITE_COMPOSITE } from "../retro/filterPass1LiteShader.ts";
@@ -11,6 +12,7 @@ import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpl
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "../retro/filterPass1LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT } from "../retro/filterPass2BeamLiteCrtShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
@@ -18,6 +20,7 @@ import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc9
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
 
 export type RetroVideoFilterState = {
+  selectedPreset?: RetroPresetKey | null;
   autoTargetSize: boolean;
   targetWidth: number;
   targetHeight: number;
@@ -341,7 +344,7 @@ type WindowsLitePass1Variant =
   | "pc98_nearest"
   | "pc98"
   | "pc98_composite";
-type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full";
+type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full" | "beam_crt";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
 // Only 4 combinations exist. Compiling each at most once (cached) and
@@ -355,6 +358,7 @@ const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
   "basic_composite:beam_simple",
   "basic:beam_full",
   "basic_composite:beam_full",
+  "basic_nearest:beam_crt",
   "basic:phosphor",
   "basic_composite:phosphor",
   "pc98:basic",
@@ -390,6 +394,11 @@ const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
   filterState.compositeAmount > 0.001;
 
+const isExactSelectedPreset = (
+  filterState: RetroVideoFilterState,
+  presetKey: RetroPresetKey,
+) => filterState.selectedPreset === presetKey;
+
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,
 ): WindowsLiteVariantKey => {
@@ -409,6 +418,9 @@ const getWindowsLiteVariantKey = (
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
+    if (isExactSelectedPreset(filterState, "crtBeam")) {
+      return "basic_nearest:beam_crt";
+    }
     return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
   }
   const pass2: WindowsLitePass2Variant =
@@ -1077,6 +1089,8 @@ export class TetoricaRetroVideoPipeline {
       pass2:
         pass2Variant === "beam_simple"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
+          : pass2Variant === "beam_crt"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT
           : pass2Variant === "beam_full"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE
           : pass2Variant === "phosphor"
@@ -1131,6 +1145,7 @@ export class TetoricaRetroVideoPipeline {
       throw new Error("Pipeline was disposed before shader compile started.");
     }
 
+    const compileStartTime = nowMs();
     const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
     const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
     const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
@@ -1151,6 +1166,9 @@ export class TetoricaRetroVideoPipeline {
         ? { pass1: pass1Program, pass2: pass2Program, beamKernel: beamKernelProgram }
         : { pass1: pass1Program, pass2: pass2Program };
       this.windowsLiteProgramCache.set(variantKey, entry);
+      TetoricaRetroVideoPipeline.showDebug(
+        `filter: Windows lite variant ${variantKey} compiled in ${(nowMs() - compileStartTime).toFixed(1)}ms`,
+      );
       return entry;
     } catch (error) {
       this.gl.deleteProgram(pass1Program);
