@@ -893,6 +893,15 @@ export const resolveRetroPresetRenderMode = (
     return "lite";
   }
 
+  const samplingMode = preset.samplingMode ?? "nearest";
+  if (samplingMode !== "nearest") {
+    return "full";
+  }
+
+  if (preset.palette === "pc98_tile" || preset.palette === "pc98_512_sat") {
+    return "full";
+  }
+
   const variant = buildRetroPresetVariantPreparation(preset);
   const isBeamMode = variant.phosphorDotShape === "beam";
   const hasComposite = variant.compositeEnabled && variant.compositeAmount > 0.001;

@@ -8,11 +8,13 @@ import {
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE as FILTER_FRAGMENT_PASS1_LITE_COMPOSITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpleShader.ts";
+import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "../retro/filterPass1LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
+import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc98LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
 
 export type RetroVideoFilterState = {
@@ -332,7 +334,13 @@ const QUAD_VERTICES = new Float32Array([
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
-type WindowsLitePass1Variant = "basic" | "basic_composite" | "pc98" | "pc98_composite";
+type WindowsLitePass1Variant =
+  | "basic_nearest"
+  | "basic"
+  | "basic_composite"
+  | "pc98_nearest"
+  | "pc98"
+  | "pc98_composite";
 type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
@@ -366,11 +374,17 @@ const isPc98PaletteMode = (mode: PaletteMode) =>
   mode === "pc98_512_sat" ||
   mode === "pc98_4096";
 
+const isHeavyPc98PaletteMode = (mode: PaletteMode) =>
+  mode === "pc98_tile" || mode === "pc98_512_sat";
+
+const isNearestSamplingMode = (filterState: RetroVideoFilterState) =>
+  getSamplingModeValue(filterState.samplingMode) < 0.5;
+
 const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
   isBeamCrossModeEnabled(filterState) &&
   filterState.smoothStrength <= 0.001 &&
   filterState.rgbConvergenceOffset <= 0.0001 &&
-  getSamplingModeValue(filterState.samplingMode) < 0.5;
+  isNearestSamplingMode(filterState);
 
 const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
@@ -384,9 +398,14 @@ const getWindowsLiteVariantKey = (
       ? isPc98PaletteMode(filterState.paletteMode)
         ? isCompositeNtscEnabled(filterState)
           ? "pc98_composite"
+          : isNearestSamplingMode(filterState) &&
+              !isHeavyPc98PaletteMode(filterState.paletteMode)
+            ? "pc98_nearest"
           : "pc98"
         : isCompositeNtscEnabled(filterState)
           ? "basic_composite"
+          : isNearestSamplingMode(filterState)
+            ? "basic_nearest"
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
@@ -1044,13 +1063,17 @@ export class TetoricaRetroVideoPipeline {
 
     return {
       pass1:
-        pass1Variant === "pc98"
+        pass1Variant === "pc98_nearest"
+          ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
+          : pass1Variant === "pc98"
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
           : pass1Variant === "pc98_composite"
             ? FILTER_FRAGMENT_PASS1_PC98_LITE
             : pass1Variant === "basic_composite"
               ? FILTER_FRAGMENT_PASS1_LITE_COMPOSITE
-              : FILTER_FRAGMENT_PASS1_LITE_SIMPLE,
+              : pass1Variant === "basic_nearest"
+                ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
+                : FILTER_FRAGMENT_PASS1_LITE_SIMPLE,
       pass2:
         pass2Variant === "beam_simple"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE

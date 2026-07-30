@@ -5,6 +5,9 @@ export type ConfirmDialogOptions = {
   body?: string;
   okText?: string;
   cancelText?: string;
+  persistCheckboxLabel?: string;
+  persistCheckboxDefaultChecked?: boolean;
+  onConfirmPersistChange?: (checked: boolean) => void;
 };
 
 export type ConfirmDialogFn = (

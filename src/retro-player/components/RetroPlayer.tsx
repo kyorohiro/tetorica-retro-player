@@ -1,6 +1,6 @@
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
-import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
+import { isTauriRuntime } from "../platform/runtime";
 import { isHlsUrl } from "../media/RetroMediaSource";
 import {
   useRetroFilterState,
@@ -539,7 +539,7 @@ export function RetroPlayer({
         okText: locale === "ja" ? "準備する" : "Prepare",
         cancelText: locale === "ja" ? "キャンセル" : "Cancel",
         persistCheckboxLabel: locale === "ja" ? "次回から表示しない" : "Don't show this again",
-        onConfirmPersistChange: (checked) => {
+        onConfirmPersistChange: (checked: boolean) => {
           persistForFuture = checked;
         },
       });
@@ -933,7 +933,6 @@ export function RetroPlayer({
             isAudioFxUnavailable={isAudioFxUnavailable}
             onRequestEnableBeamCross={handleRequestEnableBeamCross}
             onRequestEnableComposite={handleRequestEnableComposite}
-            clearFullVariantConfirmations={clearFullVariantConfirmations}
           />
         </div>
       </section>
