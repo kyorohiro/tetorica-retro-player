@@ -21,6 +21,7 @@ import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2Phospho
 
 export type RetroVideoFilterState = {
   selectedPreset?: RetroPresetKey | null;
+  shaderCompileCacheBusterEnabled?: boolean;
   autoTargetSize: boolean;
   targetWidth: number;
   targetHeight: number;
@@ -393,6 +394,9 @@ const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
 const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
   filterState.compositeAmount > 0.001;
+
+const shouldBypassShaderVariantCache = (filterState: RetroVideoFilterState | null) =>
+  filterState?.shaderCompileCacheBusterEnabled === true;
 
 const isExactSelectedPreset = (
   filterState: RetroVideoFilterState,
@@ -810,6 +814,7 @@ export class TetoricaRetroVideoPipeline {
   >();
   private windowsLitePrewarmStarted = false;
   private isDisposed = false;
+  private compileSourceNonce = 0;
 
   // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
@@ -1099,13 +1104,20 @@ export class TetoricaRetroVideoPipeline {
     };
   }
 
+  private appendShaderCompileBuster(source: string): string {
+    this.compileSourceNonce += 1;
+    return `${source}\n// shader-compile-buster:${this.compileSourceNonce}:${nowMs().toFixed(3)}`;
+  }
+
   private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
     if (!this.windowsLiteMode || this.isDisposed) {
       return;
     }
 
     const nextVariantKey = getWindowsLiteVariantKey(filterState);
-    const cached = this.windowsLiteProgramCache.get(nextVariantKey);
+    const cached = shouldBypassShaderVariantCache(filterState)
+      ? undefined
+      : this.windowsLiteProgramCache.get(nextVariantKey);
     if (cached) {
       this.setFilterPrograms(cached.pass1, cached.pass2, cached.beamKernel);
       this.windowsLiteVariantKey = nextVariantKey;
@@ -1139,7 +1151,8 @@ export class TetoricaRetroVideoPipeline {
   private async compileWindowsLiteVariant(
     variantKey: WindowsLiteVariantKey,
   ): Promise<{ pass1: WebGLProgram; pass2: WebGLProgram; beamKernel?: WebGLProgram }> {
-    const cached = this.windowsLiteProgramCache.get(variantKey);
+    const bypassCache = shouldBypassShaderVariantCache(this.currentFilterState);
+    const cached = bypassCache ? undefined : this.windowsLiteProgramCache.get(variantKey);
     if (cached) return cached;
     if (this.isDisposed || this.gl.isContextLost()) {
       throw new Error("Pipeline was disposed before shader compile started.");
@@ -1147,10 +1160,24 @@ export class TetoricaRetroVideoPipeline {
 
     const compileStartTime = nowMs();
     const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
-    const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
-    const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
+    const pass1Program = submitProgram(
+      this.gl,
+      VERTEX_SHADER_SOURCE,
+      bypassCache ? this.appendShaderCompileBuster(pass1) : pass1,
+    );
+    const pass2Program = submitProgram(
+      this.gl,
+      VERTEX_SHADER_SOURCE,
+      bypassCache ? this.appendShaderCompileBuster(pass2) : pass2,
+    );
     const beamKernelProgram = variantKey.endsWith(":beam_full")
-      ? submitProgram(this.gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL)
+      ? submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        bypassCache
+          ? this.appendShaderCompileBuster(FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL)
+          : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL,
+      )
       : null;
 
     try {
@@ -1165,7 +1192,9 @@ export class TetoricaRetroVideoPipeline {
       const entry = beamKernelProgram
         ? { pass1: pass1Program, pass2: pass2Program, beamKernel: beamKernelProgram }
         : { pass1: pass1Program, pass2: pass2Program };
-      this.windowsLiteProgramCache.set(variantKey, entry);
+      if (!bypassCache) {
+        this.windowsLiteProgramCache.set(variantKey, entry);
+      }
       TetoricaRetroVideoPipeline.showDebug(
         `filter: Windows lite variant ${variantKey} compiled in ${(nowMs() - compileStartTime).toFixed(1)}ms`,
       );
@@ -1281,6 +1310,9 @@ export class TetoricaRetroVideoPipeline {
   // sets windowsLitePendingVariantKey and takes over on the next turn through
   // the worker loop, so cache growth never outranks active interaction.
   private async prewarmRemainingWindowsLiteVariants() {
+    if (shouldBypassShaderVariantCache(this.currentFilterState)) {
+      return;
+    }
     for (const variantKey of ALL_WINDOWS_LITE_VARIANT_KEYS) {
       if (this.isDisposed || this.gl.isContextLost()) return;
       if (this.windowsLitePendingVariantKey) return;
@@ -1488,6 +1520,9 @@ export class TetoricaRetroVideoPipeline {
   hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
     if (!this.windowsLiteMode) {
       return true;
+    }
+    if (shouldBypassShaderVariantCache(filterState)) {
+      return false;
     }
 
     return this.windowsLiteProgramCache.has(getWindowsLiteVariantKey(filterState));

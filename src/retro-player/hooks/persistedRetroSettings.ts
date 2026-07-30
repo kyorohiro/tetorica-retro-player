@@ -117,6 +117,7 @@ export type PersistedRetroUiSettings = {
   isHighResolution: boolean;
   renderResolutionPreset?: number;
   maximizePerformanceMode?: "auto" | "on" | "off";
+  shaderCompileCacheBusterEnabled?: boolean;
   brightness: number;
   flipH: boolean;
   flipV: boolean;
@@ -188,6 +189,7 @@ const normalizePersistedRetroSettings = (
           settings.ui.maximizePerformanceMode === "off"
             ? settings.ui.maximizePerformanceMode
             : "auto",
+        shaderCompileCacheBusterEnabled: settings.ui.shaderCompileCacheBusterEnabled === true,
       }
       : settings.ui,
   };

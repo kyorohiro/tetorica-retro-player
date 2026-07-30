@@ -257,6 +257,9 @@ export function RetroPlayer({
   const [maximizePerformanceMode, setMaximizePerformanceMode] = React.useState<"auto" | "on" | "off">(
     persistedUiSettings?.maximizePerformanceMode ?? "auto",
   );
+  const [shaderCompileCacheBusterEnabled, setShaderCompileCacheBusterEnabled] = React.useState(
+    persistedUiSettings?.shaderCompileCacheBusterEnabled === true,
+  );
   const isHighResolution = renderResolutionPreset > 1;
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(
     () => previewLayoutState?.isFitWidthEnabled ?? false,
@@ -325,6 +328,7 @@ export function RetroPlayer({
       preferNativeVideoSurface: nativePlaybackMode,
       isPreviewMaximized: isPreviewMaximizedForRenderer,
       maximizePerformanceMode,
+      shaderCompileCacheBusterEnabled,
       locale,
       requestedKind: kind,
       requestedIndex: displayIndex,
@@ -341,6 +345,7 @@ export function RetroPlayer({
     filterState.resetSettings();
     player.resetAudioSettings();
     setRenderResolutionPreset(1);
+    setShaderCompileCacheBusterEnabled(false);
   }, [filterState, player]);
 
   const handleImportSettings = React.useCallback((data: PresetFileData) => {
@@ -897,6 +902,8 @@ export function RetroPlayer({
             onPreviewLayoutStateChange={onPreviewLayoutStateChange}
             maximizePerformanceMode={maximizePerformanceMode}
             onMaximizePerformanceModeChange={setMaximizePerformanceMode}
+            shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
+            onShaderCompileCacheBusterEnabledChange={setShaderCompileCacheBusterEnabled}
             analyserRef={player.analyserRef}
             showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}
@@ -1029,6 +1036,8 @@ export function RetroPlayer({
               onPreviewLayoutStateChange={onPreviewLayoutStateChange}
               maximizePerformanceMode={maximizePerformanceMode}
               onMaximizePerformanceModeChange={setMaximizePerformanceMode}
+              shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
+              onShaderCompileCacheBusterEnabledChange={setShaderCompileCacheBusterEnabled}
               analyserRef={player.analyserRef}
               showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}
