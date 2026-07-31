@@ -24,7 +24,8 @@ import {
   type RetroAudioPresetKey,
   type RetroAudioSettings,
 } from "../audio/preset";
-import { resolvePlaybackProfileDefaults } from "../platform/runtime";
+import type { GraphicsBackendMode } from "../platform/graphicsBackend";
+import { isTauriRuntime, isWindowsRuntime, resolvePlaybackProfileDefaults } from "../platform/runtime";
 import { RETRO_PRESETS, type RetroPresetKey } from "../retro/config";
 import type { RetroAlarmStatus } from "../hooks/useRetroAlarm";
 import { useAnchoredPopover } from "../hooks/useAnchoredPopover";
@@ -162,6 +163,10 @@ type RetroPreviewToolbarProps = {
   onMaximizePerformanceModeChange: (nextValue: "auto" | "on" | "off") => void;
   shaderCompileCacheBusterEnabled: boolean;
   onShaderCompileCacheBusterEnabledChange: (nextValue: boolean) => void;
+  graphicsBackendMode: GraphicsBackendMode;
+  onGraphicsBackendModeChange: (nextValue: GraphicsBackendMode) => void;
+  graphicsBackendRestartPending: boolean;
+  onRestartApplication: () => void;
   onLatencyHintChange: (hint: AudioContextLatencyCategory) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
@@ -210,6 +215,10 @@ export function RetroPreviewToolbar({
   onMaximizePerformanceModeChange,
   shaderCompileCacheBusterEnabled,
   onShaderCompileCacheBusterEnabledChange,
+  graphicsBackendMode,
+  onGraphicsBackendModeChange,
+  graphicsBackendRestartPending,
+  onRestartApplication,
   onLatencyHintChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
@@ -230,6 +239,7 @@ export function RetroPreviewToolbar({
   };
   const isRenderCapAutoEnabled =
     player.previewKind === "video" || player.previewKind === "capture";
+  const showGraphicsBackendOption = isTauriRuntime() && isWindowsRuntime();
   const tooltipText =
     locale === "ja"
       ? {
@@ -255,6 +265,11 @@ export function RetroPreviewToolbar({
           shaderCompileBuster: "DevOption: shader ID",
           shaderCompileBusterDescription:
             "コンパイル確認用です。On にすると shader 識別子を毎回変えて、compile cache の再利用を抑えます。",
+          graphicsBackend: "DevOption: graphics backend",
+          graphicsBackendDescription:
+            "Windows の WebView2 描画 backend を切り替える実験設定です。Desktop OpenGL は ANGLE の DirectX 経路を避けたい時の比較用です。",
+          graphicsBackendRestart: "変更はアプリ再起動後に反映されます。",
+          restartNow: "Restart now",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "同時実行数の上限。変更は再生切替後に安定し、再起動後も保持されます。",
           enabled: "有効",
@@ -283,6 +298,11 @@ export function RetroPreviewToolbar({
           shaderCompileBuster: "DevOption: shader ID",
           shaderCompileBusterDescription:
             "For compile debugging. When On, shader identifiers change every compile to reduce compile cache reuse.",
+          graphicsBackend: "DevOption: graphics backend",
+          graphicsBackendDescription:
+            "Experimental Windows WebView2 rendering backend override. Desktop OpenGL is mainly for comparing against ANGLE's DirectX path.",
+          graphicsBackendRestart: "Changes take effect after app restart.",
+          restartNow: "Restart now",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "Maximum concurrent ffmpeg HLS jobs. Persisted and safe to apply on the next playback cycle.",
           enabled: "On",
@@ -784,6 +804,60 @@ export function RetroPreviewToolbar({
                   </div>
                 </div>
               </div>
+              {showGraphicsBackendOption && (
+                <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-[10px] text-slate-300">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div>{tooltipText.graphicsBackend}</div>
+                      <div className="text-[9px] text-slate-500">
+                        {graphicsBackendMode === "desktop-opengl"
+                          ? "Override: Desktop OpenGL"
+                          : "Override: Default"}
+                      </div>
+                      <div className="mt-1 text-[9px] leading-[1.45] text-slate-500">
+                        {tooltipText.graphicsBackendDescription}
+                      </div>
+                      <div className="mt-1 text-[9px] leading-[1.45] text-amber-300/90">
+                        {graphicsBackendRestartPending
+                          ? `${tooltipText.graphicsBackendRestart} ${tooltipText.restartNow}`
+                          : tooltipText.graphicsBackendRestart}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-2 gap-1">
+                        {[
+                          { label: "Default", value: "default" as const },
+                          { label: "Desktop OpenGL", value: "desktop-opengl" as const },
+                        ].map((option) => {
+                          const isActive = graphicsBackendMode === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => { onGraphicsBackendModeChange(option.value); }}
+                              className={[
+                                "rounded border px-1.5 py-1 text-[9px] transition",
+                                isActive
+                                  ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                                  : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                              ].join(" ")}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onRestartApplication}
+                        className="rounded border border-amber-300/70 bg-amber-400/12 px-2 py-1 text-[9px] text-amber-100 transition hover:bg-amber-300/20"
+                      >
+                        {tooltipText.restartNow}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">

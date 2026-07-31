@@ -90,6 +90,7 @@ const DEFAULT_UI_SETTINGS: PersistedRetroUiSettings = {
   isPreviewMaximized: false,
   isHighResolution: false,
   renderResolutionPreset: 1,
+  graphicsBackendMode: "default",
   brightness: 1.0,
   flipH: false,
   flipV: false,

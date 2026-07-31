@@ -16,6 +16,7 @@ import {
 } from "../hooks/persistedRetroSettings";
 import { useRetroAlarm } from "../hooks/useRetroAlarm";
 import { isHlsUrl } from "../media/RetroMediaSource";
+import type { GraphicsBackendMode } from "../platform/graphicsBackend";
 import { isTauriRuntime } from "../platform/runtime";
 import {
   areRetroPreviewLayoutStatesEqual,
@@ -165,6 +166,10 @@ export type RetroPreviewViewProps = {
   onMaximizePerformanceModeChange: (value: "auto" | "on" | "off") => void;
   shaderCompileCacheBusterEnabled: boolean;
   onShaderCompileCacheBusterEnabledChange: (value: boolean) => void;
+  graphicsBackendMode: GraphicsBackendMode;
+  onGraphicsBackendModeChange: (value: GraphicsBackendMode) => void;
+  graphicsBackendRestartPending: boolean;
+  onRestartApplication: () => void;
   analyserRef?: React.RefObject<AnalyserNode | null>;
   showVideoSpectrum?: boolean;
   showClockOverlay?: boolean;
@@ -202,6 +207,10 @@ export function RetroPreviewView({
   onMaximizePerformanceModeChange,
   shaderCompileCacheBusterEnabled,
   onShaderCompileCacheBusterEnabledChange,
+  graphicsBackendMode,
+  onGraphicsBackendModeChange,
+  graphicsBackendRestartPending,
+  onRestartApplication,
   analyserRef,
   showVideoSpectrum,
   showClockOverlay,
@@ -412,6 +421,7 @@ export function RetroPreviewView({
         renderResolutionPreset,
         maximizePerformanceMode,
         shaderCompileCacheBusterEnabled,
+        graphicsBackendMode,
         brightness,
         flipH,
         flipV,
@@ -429,6 +439,7 @@ export function RetroPreviewView({
     maximizePerformanceMode,
     renderResolutionPreset,
     shaderCompileCacheBusterEnabled,
+    graphicsBackendMode,
   ]);
 
   React.useEffect(() => {
@@ -1407,6 +1418,10 @@ export function RetroPreviewView({
                 onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
                 shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
                 onShaderCompileCacheBusterEnabledChange={onShaderCompileCacheBusterEnabledChange}
+                graphicsBackendMode={graphicsBackendMode}
+                onGraphicsBackendModeChange={onGraphicsBackendModeChange}
+                graphicsBackendRestartPending={graphicsBackendRestartPending}
+                onRestartApplication={onRestartApplication}
                 ffmpegUseQsv={ffmpegUseQsv}
                 onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
                 ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1468,6 +1483,10 @@ export function RetroPreviewView({
               onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
               shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
               onShaderCompileCacheBusterEnabledChange={onShaderCompileCacheBusterEnabledChange}
+              graphicsBackendMode={graphicsBackendMode}
+              onGraphicsBackendModeChange={onGraphicsBackendModeChange}
+              graphicsBackendRestartPending={graphicsBackendRestartPending}
+              onRestartApplication={onRestartApplication}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1528,6 +1547,10 @@ export function RetroPreviewView({
               onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
               shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
               onShaderCompileCacheBusterEnabledChange={onShaderCompileCacheBusterEnabledChange}
+              graphicsBackendMode={graphicsBackendMode}
+              onGraphicsBackendModeChange={onGraphicsBackendModeChange}
+              graphicsBackendRestartPending={graphicsBackendRestartPending}
+              onRestartApplication={onRestartApplication}
               ffmpegUseQsv={ffmpegUseQsv}
               onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
               ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1588,6 +1611,10 @@ export function RetroPreviewView({
             onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
             shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
             onShaderCompileCacheBusterEnabledChange={onShaderCompileCacheBusterEnabledChange}
+            graphicsBackendMode={graphicsBackendMode}
+            onGraphicsBackendModeChange={onGraphicsBackendModeChange}
+            graphicsBackendRestartPending={graphicsBackendRestartPending}
+            onRestartApplication={onRestartApplication}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1646,6 +1673,10 @@ export function RetroPreviewView({
             onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
             shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
             onShaderCompileCacheBusterEnabledChange={onShaderCompileCacheBusterEnabledChange}
+            graphicsBackendMode={graphicsBackendMode}
+            onGraphicsBackendModeChange={onGraphicsBackendModeChange}
+            graphicsBackendRestartPending={graphicsBackendRestartPending}
+            onRestartApplication={onRestartApplication}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}
@@ -1706,6 +1737,10 @@ export function RetroPreviewView({
             onMaximizePerformanceModeChange={onMaximizePerformanceModeChange}
             shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
             onShaderCompileCacheBusterEnabledChange={onShaderCompileCacheBusterEnabledChange}
+            graphicsBackendMode={graphicsBackendMode}
+            onGraphicsBackendModeChange={onGraphicsBackendModeChange}
+            graphicsBackendRestartPending={graphicsBackendRestartPending}
+            onRestartApplication={onRestartApplication}
             ffmpegUseQsv={ffmpegUseQsv}
             onToggleFfmpegUseQsv={onToggleFfmpegUseQsv}
             ffmpegMaxConcurrentHlsSessions={ffmpegMaxConcurrentHlsSessions}

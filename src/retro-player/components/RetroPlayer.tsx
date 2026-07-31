@@ -1,6 +1,13 @@
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
-import { isTauriRuntime } from "../platform/runtime";
+import {
+  DEFAULT_GRAPHICS_BACKEND_MODE,
+  getGraphicsBackendMode,
+  restartApplication,
+  setGraphicsBackendMode,
+  type GraphicsBackendMode,
+} from "../platform/graphicsBackend";
+import { isTauriRuntime, isWindowsRuntime } from "../platform/runtime";
 import { isHlsUrl } from "../media/RetroMediaSource";
 import {
   useRetroFilterState,
@@ -260,6 +267,10 @@ export function RetroPlayer({
   const [shaderCompileCacheBusterEnabled, setShaderCompileCacheBusterEnabled] = React.useState(
     persistedUiSettings?.shaderCompileCacheBusterEnabled === true,
   );
+  const [graphicsBackendMode, setGraphicsBackendModeState] = React.useState<GraphicsBackendMode>(
+    persistedUiSettings?.graphicsBackendMode ?? DEFAULT_GRAPHICS_BACKEND_MODE,
+  );
+  const [graphicsBackendRestartPending, setGraphicsBackendRestartPending] = React.useState(false);
   const isHighResolution = renderResolutionPreset > 1;
   const [isFitWidthEnabled, setIsFitWidthEnabled] = React.useState(
     () => previewLayoutState?.isFitWidthEnabled ?? false,
@@ -283,6 +294,27 @@ export function RetroPlayer({
   React.useEffect(() => {
     void syncFfmpegMaxConcurrentHlsSessions(startupMaxConcurrentHlsSessions);
   }, [startupMaxConcurrentHlsSessions, syncFfmpegMaxConcurrentHlsSessions]);
+
+  React.useEffect(() => {
+    if (!isTauriRuntime() || !isWindowsRuntime()) {
+      return;
+    }
+    let cancelled = false;
+    void getGraphicsBackendMode()
+      .then((mode) => {
+        if (cancelled) {
+          return;
+        }
+        setGraphicsBackendModeState((current) => (current === mode ? current : mode));
+        setGraphicsBackendRestartPending(false);
+      })
+      .catch((error) => {
+        console.warn("[retro-player] failed to load graphics backend mode", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (typeof previewLayoutState?.isFitWidthEnabled === "boolean") {
@@ -346,17 +378,59 @@ export function RetroPlayer({
     player.resetAudioSettings();
     setRenderResolutionPreset(1);
     setShaderCompileCacheBusterEnabled(false);
+    setGraphicsBackendModeState(DEFAULT_GRAPHICS_BACKEND_MODE);
+    setGraphicsBackendRestartPending(false);
+    if (isTauriRuntime() && isWindowsRuntime()) {
+      void setGraphicsBackendMode(DEFAULT_GRAPHICS_BACKEND_MODE).catch((error) => {
+        console.warn("[retro-player] failed to reset graphics backend mode", error);
+      });
+    }
   }, [filterState, player]);
 
   const handleImportSettings = React.useCallback((data: PresetFileData) => {
     filterState.applyAllFilterSettings(data.filter);
     player.applyAudioSettings(data.audio);
     setRenderResolutionPreset(resolveRenderResolutionPreset(data.ui));
+    const importedGraphicsBackendMode = data.ui.graphicsBackendMode ?? DEFAULT_GRAPHICS_BACKEND_MODE;
+    setGraphicsBackendModeState(importedGraphicsBackendMode);
+    setGraphicsBackendRestartPending(false);
+    if (isTauriRuntime() && isWindowsRuntime()) {
+      void setGraphicsBackendMode(importedGraphicsBackendMode)
+        .then(() => {
+          setGraphicsBackendRestartPending(true);
+        })
+        .catch((error) => {
+          console.warn("[retro-player] failed to import graphics backend mode", error);
+        });
+    }
     saveLocalePreference(data.locale);
   }, [filterState, player]);
 
   const handleToggleHighResolution = React.useCallback(() => {
     setRenderResolutionPreset((current) => (current > 1 ? 1 : 2));
+  }, []);
+
+  const handleGraphicsBackendModeChange = React.useCallback((nextMode: GraphicsBackendMode) => {
+    setGraphicsBackendModeState(nextMode);
+    if (!isTauriRuntime() || !isWindowsRuntime()) {
+      return;
+    }
+    void setGraphicsBackendMode(nextMode)
+      .then(() => {
+        setGraphicsBackendRestartPending(true);
+      })
+      .catch((error) => {
+        console.warn("[retro-player] failed to save graphics backend mode", error);
+      });
+  }, []);
+
+  const handleRestartApplication = React.useCallback(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    void restartApplication().catch((error) => {
+      console.warn("[retro-player] failed to restart application", error);
+    });
   }, []);
 
   // Long-press play/pause: let the caller do a full resource reset (e.g.
@@ -904,6 +978,10 @@ export function RetroPlayer({
             onMaximizePerformanceModeChange={setMaximizePerformanceMode}
             shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
             onShaderCompileCacheBusterEnabledChange={setShaderCompileCacheBusterEnabled}
+            graphicsBackendMode={graphicsBackendMode}
+            onGraphicsBackendModeChange={handleGraphicsBackendModeChange}
+            graphicsBackendRestartPending={graphicsBackendRestartPending}
+            onRestartApplication={handleRestartApplication}
             analyserRef={player.analyserRef}
             showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}
@@ -1038,6 +1116,10 @@ export function RetroPlayer({
               onMaximizePerformanceModeChange={setMaximizePerformanceMode}
               shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
               onShaderCompileCacheBusterEnabledChange={setShaderCompileCacheBusterEnabled}
+              graphicsBackendMode={graphicsBackendMode}
+              onGraphicsBackendModeChange={handleGraphicsBackendModeChange}
+              graphicsBackendRestartPending={graphicsBackendRestartPending}
+              onRestartApplication={handleRestartApplication}
               analyserRef={player.analyserRef}
               showVideoSpectrum={showVideoSpectrum}
             showClockOverlay={showClockOverlay}

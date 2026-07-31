@@ -608,7 +608,7 @@ export const RETRO_PRESETS = {
     screenFaceGlow: 0.22,
     beamWarmBloom: 0.22,
     phosphorDotLightBalance: 0.22,
-    phosphorDotInternalScale: 2,
+    phosphorDotInternalScale: 2.4,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.12,
     phosphorDotFlatDisc: true,

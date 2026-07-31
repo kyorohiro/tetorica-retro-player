@@ -122,6 +122,7 @@ export type PersistedRetroUiSettings = {
   renderResolutionPreset?: number;
   maximizePerformanceMode?: "auto" | "on" | "off";
   shaderCompileCacheBusterEnabled?: boolean;
+  graphicsBackendMode?: "default" | "desktop-opengl";
   brightness: number;
   flipH: boolean;
   flipV: boolean;
@@ -202,6 +203,10 @@ const normalizePersistedRetroSettings = (
             ? settings.ui.maximizePerformanceMode
             : "auto",
         shaderCompileCacheBusterEnabled: settings.ui.shaderCompileCacheBusterEnabled === true,
+        graphicsBackendMode:
+          settings.ui.graphicsBackendMode === "desktop-opengl"
+            ? "desktop-opengl"
+            : "default",
       }
       : settings.ui,
   };
