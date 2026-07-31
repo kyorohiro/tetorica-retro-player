@@ -266,7 +266,7 @@ export const RETRO_PRESETS = {
     phosphorDotBrightCore: false,
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
-    phosphorDotGrainStrength: 0.13195079107728944,
+    phosphorDotGrainStrength: 0.05,
     screenFaceGlow: 0.2,
     monoTint: "green",
     neonBoost: 1.0,

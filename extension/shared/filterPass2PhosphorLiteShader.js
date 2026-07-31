@@ -13,6 +13,7 @@ uniform float uScanlineStrength;
 uniform float uScanline2Strength;
 uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
+uniform float uLcdCrosstalkStrength;
 uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
 uniform float uBulbRadius;
@@ -115,6 +116,48 @@ vec3 applyScreenFaceGlow(vec3 color)
   vec3 hazeGlow = vec3(0.34, 0.32, 0.29) * hazeMask * amount * 0.72;
 
   return lifted + hazeGlow;
+}
+
+vec3 applyLcdCrosstalk(vec3 color, vec2 cell, vec2 targetSize)
+{
+  float strength = clamp(uLcdCrosstalkStrength, 0.0, 2.0);
+  if (strength <= 0.001) {
+    return color;
+  }
+
+  vec2 safeTargetSize = max(targetSize, vec2(1.0));
+  vec3 accum = vec3(0.0);
+  float total = 0.0;
+
+  for (int i = 1; i <= 6; i++) {
+    float offset = float(i);
+    float downWeight = exp(-offset / 2.4);
+    float upWeight = exp(-offset / 1.8) * 0.35;
+    float leftWeight = exp(-offset / 1.2) * 0.18;
+
+    vec2 downUv = clamp((cell + vec2(0.5, 0.5 - offset)) / safeTargetSize, vec2(0.0), vec2(1.0));
+    vec2 upUv = clamp((cell + vec2(0.5, 0.5 + offset)) / safeTargetSize, vec2(0.0), vec2(1.0));
+    vec2 leftUv = clamp((cell + vec2(0.5 - offset, 0.5)) / safeTargetSize, vec2(0.0), vec2(1.0));
+
+    vec3 downColor = texture(uPass1Texture, downUv).rgb;
+    vec3 upColor = texture(uPass1Texture, upUv).rgb;
+    vec3 leftColor = texture(uPass1Texture, leftUv).rgb;
+
+    accum += downColor * downColor * downWeight;
+    accum += upColor * upColor * upWeight;
+    accum += leftColor * leftColor * leftWeight;
+    total += downWeight + upWeight + leftWeight;
+  }
+
+  if (total <= 0.0001) {
+    return color;
+  }
+
+  vec3 contamination = sqrt(max(accum / total, vec3(0.0)));
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float midtoneMask = smoothstep(0.06, 0.32, luma) * (1.0 - smoothstep(0.55, 0.92, luma));
+  float effect = strength * 0.18 * midtoneMask;
+  return max(color - contamination * effect, vec3(0.0));
 }
 
 vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
@@ -561,6 +604,7 @@ void main(void)
   vec2 cell = floor(curvedUv * uTargetSize);
   vec2 pixelatedUv = clamp((cell + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
   vec4 color = texture(uPass1Texture, pixelatedUv);
+  color.rgb = applyLcdCrosstalk(color.rgb, cell, uTargetSize);
 
   if (uFocusStrength > 0.001) {
     vec2 focusScale = max(uFocusSize, vec2(0.001));
