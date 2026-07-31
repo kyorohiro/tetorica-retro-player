@@ -264,7 +264,7 @@ export function RetroPreviewToolbar({
             "重いフィルター使用時の内部描画サイズを抑えて、低性能PCでのカクつきを減らします。",
           shaderCompileBuster: "DevOption: shader ID",
           shaderCompileBusterDescription:
-            "コンパイル確認用です。On にすると shader 識別子を毎回変えて、compile cache の再利用を抑えます。",
+            "コンパイル確認用です。On にすると shader 識別子を毎回変えて、compile cache の再利用を抑えます。反映は次回起動時です。",
           graphicsBackend: "DevOption: graphics backend",
           graphicsBackendDescription:
             "Windows の WebView2 描画 backend を切り替える実験設定です。Desktop OpenGL は ANGLE の DirectX 経路を避けたい時の比較用です。",
@@ -297,7 +297,7 @@ export function RetroPreviewToolbar({
             "Limit internal render size for heavier filters to reduce stutter on lower-end PCs.",
           shaderCompileBuster: "DevOption: shader ID",
           shaderCompileBusterDescription:
-            "For compile debugging. When On, shader identifiers change every compile to reduce compile cache reuse.",
+            "For compile debugging. When On, shader identifiers change every compile to reduce compile cache reuse. Takes effect on next launch.",
           graphicsBackend: "DevOption: graphics backend",
           graphicsBackendDescription:
             "Experimental Windows WebView2 rendering backend override. Desktop OpenGL is mainly for comparing against ANGLE's DirectX path.",

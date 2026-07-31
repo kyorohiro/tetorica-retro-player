@@ -21,6 +21,7 @@ import {
   setFfmpegUseQsv,
   setFfmpegMaxConcurrentHlsSessions,
   loadPersistedRetroSettings,
+  savePersistedRetroUiSettings,
   setNativePlaybackMode,
   type PersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
@@ -33,7 +34,6 @@ import type { PresetFileData } from "../hooks/presetFile";
 import {
   buildRetroPresetVariantPreparation,
   RETRO_PRESETS,
-  resolveRetroPresetRenderMode,
   resolveRetroVariantPreparationRenderMode,
   type RetroPresetDefinition,
   type RetroPresetKey,
@@ -264,8 +264,9 @@ export function RetroPlayer({
   const [maximizePerformanceMode, setMaximizePerformanceMode] = React.useState<"auto" | "on" | "off">(
     persistedUiSettings?.maximizePerformanceMode ?? "auto",
   );
+  const startupShaderCompileCacheBusterEnabled = React.useRef(false).current;
   const [shaderCompileCacheBusterEnabled, setShaderCompileCacheBusterEnabled] = React.useState(
-    persistedUiSettings?.shaderCompileCacheBusterEnabled === true,
+    startupShaderCompileCacheBusterEnabled,
   );
   const [graphicsBackendMode, setGraphicsBackendModeState] = React.useState<GraphicsBackendMode>(
     persistedUiSettings?.graphicsBackendMode ?? DEFAULT_GRAPHICS_BACKEND_MODE,
@@ -294,6 +295,17 @@ export function RetroPlayer({
   React.useEffect(() => {
     void syncFfmpegMaxConcurrentHlsSessions(startupMaxConcurrentHlsSessions);
   }, [startupMaxConcurrentHlsSessions, syncFfmpegMaxConcurrentHlsSessions]);
+
+  React.useEffect(() => {
+    if (persistedUiSettings?.shaderCompileCacheBusterEnabled !== true) {
+      return;
+    }
+
+    savePersistedRetroUiSettings({
+      ...persistedUiSettings,
+      shaderCompileCacheBusterEnabled: false,
+    });
+  }, [persistedUiSettings]);
 
   React.useEffect(() => {
     if (!isTauriRuntime() || !isWindowsRuntime()) {
@@ -360,7 +372,7 @@ export function RetroPlayer({
       preferNativeVideoSurface: nativePlaybackMode,
       isPreviewMaximized: isPreviewMaximizedForRenderer,
       maximizePerformanceMode,
-      shaderCompileCacheBusterEnabled,
+      shaderCompileCacheBusterEnabled: startupShaderCompileCacheBusterEnabled,
       locale,
       requestedKind: kind,
       requestedIndex: displayIndex,
@@ -593,7 +605,7 @@ export function RetroPlayer({
     [],
   );
 
-  const prepareFullModeVariant = React.useCallback(async (request: {
+  const prepareVariantIfNeeded = React.useCallback(async (request: {
     title: string;
     label: string;
     variantOverrides: RetroPresetVariantPreparation;
@@ -604,11 +616,13 @@ export function RetroPlayer({
       return false;
     }
 
-    if (resolveRetroVariantPreparationRenderMode(variantOverrides) !== "full") {
+    if (player.isFilterVariantPrepared(variantOverrides)) {
       return true;
     }
 
-    if (!fullModeConfirmedRef.current) {
+    const renderMode = resolveRetroVariantPreparationRenderMode(variantOverrides);
+
+    if (renderMode === "full" && !fullModeConfirmedRef.current) {
       let persistForFuture = false;
       const confirmed = await confirmDialog({
         title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,
@@ -631,10 +645,6 @@ export function RetroPlayer({
         persistentFullModeConfirmedRef.current = true;
         writePersistedFullModeConfirmed(true);
       }
-    }
-
-    if (player.isFilterVariantPrepared(variantOverrides)) {
-      return true;
     }
 
     await runWithFullPresetLock(async () => {
@@ -661,17 +671,13 @@ export function RetroPlayer({
 
       const selectedPreset: RetroPresetDefinition = RETRO_PRESETS[presetKey];
       const presetVariantOverrides = buildRetroPresetVariantPreparation(selectedPreset);
-      const presetRenderMode = resolveRetroPresetRenderMode(selectedPreset);
-
-      if (presetRenderMode === "full") {
-        const prepared = await prepareFullModeVariant({
-          title: selectedPreset.label,
-          label: selectedPreset.label,
-          variantOverrides: presetVariantOverrides,
-        });
-        if (!prepared) {
-          return;
-        }
+      const prepared = await prepareVariantIfNeeded({
+        title: selectedPreset.label,
+        label: selectedPreset.label,
+        variantOverrides: presetVariantOverrides,
+      });
+      if (!prepared) {
+        return;
       }
 
       filterState.applyPreset(presetKey);
@@ -706,7 +712,7 @@ export function RetroPlayer({
       player.isAudioFxEnabled,
       player.toggleAudioFx,
       computePhosphorDotDimensions,
-      prepareFullModeVariant,
+      prepareVariantIfNeeded,
     ],
   );
 
@@ -724,7 +730,7 @@ export function RetroPlayer({
       compositeAmount: filterState.compositeAmount,
     };
 
-    const prepared = await prepareFullModeVariant({
+    const prepared = await prepareVariantIfNeeded({
       title: "CRT Beam",
       label: "CRT Beam",
       variantOverrides: beamVariantOverrides,
@@ -742,7 +748,7 @@ export function RetroPlayer({
     filterState.setPhosphorDotShape,
     filterState.spotMaskStrength,
     isPreparingFullPreset,
-    prepareFullModeVariant,
+    prepareVariantIfNeeded,
   ]);
 
   const handleRequestEnableComposite = React.useCallback(async () => {
@@ -759,7 +765,7 @@ export function RetroPlayer({
       compositeAmount: Math.max(filterState.compositeAmount, 0.01),
     };
 
-    const prepared = await prepareFullModeVariant({
+    const prepared = await prepareVariantIfNeeded({
       title: "Composite / NTSC",
       label: "Composite / NTSC",
       variantOverrides: compositeVariantOverrides,
@@ -778,7 +784,7 @@ export function RetroPlayer({
     filterState.setCompositeEnabled,
     filterState.spotMaskStrength,
     isPreparingFullPreset,
-    prepareFullModeVariant,
+    prepareVariantIfNeeded,
   ]);
 
   // Catch the cases the click-time correction above misses: the preset was

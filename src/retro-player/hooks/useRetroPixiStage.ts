@@ -169,6 +169,7 @@ export function useRetroPixiStage({
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
   const destroyPixiRef = useRef<() => void>(() => {});
   const appliedLayoutKeyRef = useRef<string | null>(null);
+  const appliedShaderCompileCacheBusterEnabledRef = useRef(shaderCompileCacheBusterEnabled);
   // Populated once the WebGL2 context exists (see initPixi below). Backing
   // buffer size feeds straight into the pipeline's FBO textures, so at 3x/4x
   // render resolution on a large preview this is the only thing standing
@@ -181,9 +182,8 @@ export function useRetroPixiStage({
   const buildPipelineFilterState = useCallback(
     (): RetroVideoFilterState => ({
       ...(filterStateRef.current as RetroVideoFilterState),
-      shaderCompileCacheBusterEnabled,
     }),
-    [shaderCompileCacheBusterEnabled],
+    [],
   );
 
   const updateViewportRect = useCallback((
@@ -624,6 +624,7 @@ export function useRetroPixiStage({
       filterReadyPromiseRef.current = new Promise<void>((resolve) => {
         resolveFilterReadyRef.current = resolve;
       });
+      appliedShaderCompileCacheBusterEnabledRef.current = shaderCompileCacheBusterEnabled;
       const onFilterReady = () => {
         setIsFilterReady(true);
         resolveFilterReadyRef.current?.();
@@ -634,6 +635,9 @@ export function useRetroPixiStage({
       const pipeline = await TetoricaRetroVideoPipeline.create(
         gl,
         buildPipelineFilterState(),
+        {
+          shaderCompileCacheBusterEnabled: appliedShaderCompileCacheBusterEnabledRef.current,
+        },
         onFilterReady,
       );
       const app: CanvasStageApp = {
@@ -696,6 +700,7 @@ export function useRetroPixiStage({
     effectiveRenderResolutionScale,
     isPoweredOn,
     refreshLayout,
+    shaderCompileCacheBusterEnabled,
     startTicker,
     stopTicker,
   ]);
