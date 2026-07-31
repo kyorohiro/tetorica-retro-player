@@ -5,6 +5,7 @@ import {
   type PaletteMode,
   type PhosphorDotShape,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config";
 import { isWindowsRuntime } from "../platform/runtime";
 
@@ -15,6 +16,7 @@ const STORAGE_VERSION = 1;
 export type PersistedRetroFilterSettings = {
   autoTargetSize: boolean;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode: VBlankSimulationMode;
   targetWidth: number;
   targetHeight: number;
   matchTargetAspect: boolean;
@@ -27,6 +29,7 @@ export type PersistedRetroFilterSettings = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  lcdCrosstalkStrength: number;
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
@@ -44,6 +47,7 @@ export type PersistedRetroFilterSettings = {
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
+  phosphorDotSizeResponse: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -117,6 +121,7 @@ export type PersistedRetroUiSettings = {
   isHighResolution: boolean;
   renderResolutionPreset?: number;
   maximizePerformanceMode?: "auto" | "on" | "off";
+  shaderCompileCacheBusterEnabled?: boolean;
   brightness: number;
   flipH: boolean;
   flipV: boolean;
@@ -169,6 +174,14 @@ const normalizePersistedRetroSettings = (
           filter.samplingMode === "average"
             ? "average_fast_8"
             : (filter.samplingMode ?? "nearest"),
+        vblankSimulationMode:
+          filter.vblankSimulationMode === "mild" || filter.vblankSimulationMode === "strong"
+            ? filter.vblankSimulationMode
+            : "off",
+        lcdCrosstalkStrength:
+          typeof filter.lcdCrosstalkStrength === "number" && Number.isFinite(filter.lcdCrosstalkStrength)
+            ? filter.lcdCrosstalkStrength
+            : 0,
       }
       : filter,
     audio: audio
@@ -188,6 +201,7 @@ const normalizePersistedRetroSettings = (
           settings.ui.maximizePerformanceMode === "off"
             ? settings.ui.maximizePerformanceMode
             : "auto",
+        shaderCompileCacheBusterEnabled: settings.ui.shaderCompileCacheBusterEnabled === true,
       }
       : settings.ui,
   };

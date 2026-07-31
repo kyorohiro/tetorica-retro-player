@@ -11,13 +11,14 @@ export type PaletteMode =
   | "neon"
   | "anime";
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
-export type PhosphorDotShape = "circle" | "heart" | "beam";
+export type PhosphorDotShape = "circle" | "heart" | "beam" | "square";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 export type TargetSamplingMode =
   | "nearest"
   | "average_fast_4"
   | "average_fast_8"
   | "average";
+export type VBlankSimulationMode = "off" | "mild" | "strong";
 
 export const DEFAULT_BEAM_CROSS_SETTINGS = {
   beamDarkCutoff: 0.04,
@@ -36,6 +37,9 @@ export const normalizePhosphorDotShape = (
   if (shape === "beam") {
     return "beam";
   }
+  if (shape === "square") {
+    return "square";
+  }
   return "circle";
 };
 
@@ -46,6 +50,14 @@ export const normalizePhosphorDotInternalScale = (value: number | undefined) => 
 
   const scale = value;
   return Math.max(1, Math.min(4, Math.round(scale * 10) / 10));
+};
+
+export const normalizePhosphorDotSizeResponse = (value: number | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(2, Math.round(value * 10) / 10));
 };
 
 export const MONO_TINTS: Record<
@@ -62,6 +74,8 @@ export type RetroPresetDefinition = {
   label: string;
   autoTargetSize?: boolean;
   samplingMode?: TargetSamplingMode;
+  vblankSimulationMode?: VBlankSimulationMode;
+  renderModeOverride?: RetroPresetRenderMode;
   width: number;
   height: number;
   colors: number;
@@ -72,6 +86,7 @@ export type RetroPresetDefinition = {
   scanline2: number;
   vignette: number;
   glow: number;
+  lcdCrosstalkStrength?: number;
   horizontalSharpness?: number;
   rgbConvergenceOffset?: number;
   smoothStrength?: number;
@@ -89,6 +104,7 @@ export type RetroPresetDefinition = {
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
   phosphorDotInternalScale?: number;
+  phosphorDotSizeResponse?: number;
   phosphorDotBrightCore?: boolean;
   phosphorDotCellFill?: number;
   phosphorDotFlatDisc?: boolean;
@@ -199,11 +215,35 @@ export const RETRO_PRESETS = {
     neonSaturation: 1.0,
     neonDetail: 1.0,
   },
+  gbLite: {
+    label: "GB Lite",
+    featured: true,
+    width: 160,
+    height: 144,
+    colors: 4,
+    dither: 0.34,
+    palette: "mono",
+    curvature: 0.0,
+    scanline: 0.0,
+    scanline2: 0.0,
+    vignette: 0.015,
+    glow: 0.0,
+    lcdCrosstalkStrength: 0.0,
+    phosphor: 0.0,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
+    monoTint: "green",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+  },
   gb: {
     label: "GB",
     featured: true,
-    width: 200, //GB is 160, // 160 or 144
-    height: 180,// GB is 144,
+    renderModeOverride: "full",
+    width: 160,
+    height: 144,
     colors: 4,
     dither: 0.08,
     palette: "mono",
@@ -211,11 +251,23 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.0,
     vignette: 0.015,
-    glow: 0.0,
+    glow: 0.48,
+    lcdCrosstalkStrength: 1.0,
     phosphor: 0.0,
-    spotMask: 0.0,
-    bulbRadius: 0.3,
-    blackFloor: 0.008,
+    spotMask: 0.33,
+    bulbRadius: 0.5,
+    blackFloor: 0.075,
+    outputBrightness: 1.18,
+    phosphorDotShape: "square",
+    phosphorDotInternalScale: 1,
+    phosphorDotSizeResponse: 0.1,
+    phosphorDotCellFill: 0.5,
+    phosphorDotLightBalance: 1.28,
+    phosphorDotBrightCore: false,
+    phosphorDotFlatDisc: true,
+    phosphorDotNeighborBlend: true,
+    phosphorDotGrainStrength: 0.05,
+    screenFaceGlow: 0.2,
     monoTint: "green",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -708,6 +760,62 @@ export const RETRO_PRESETS = {
     focusWidth: 0.24,
     focusHeight: 0.16,
   },
+  crtNtsc: {
+    label: "CRT NTSC",
+    featured: true,
+    autoTargetSize: false,
+    samplingMode: "nearest",
+    width: 640,
+    height: 480,
+    colors: 32,
+    dither: 0.8,
+    smoothStrength: 1,
+    horizontalSharpness: 2,
+    rgbConvergenceOffset: 1.47,
+    basicContrast: 1.27,
+    basicSaturation: 1,
+    palette: "free",
+    curvature: 0.03,
+    scanline: 0.0,
+    scanline2: 0.03,
+    scanlineBrightnessFade: 0.92,
+    vignette: 0.48,
+    glow: 0.04,
+    phosphor: 0.48,
+    spotMask: 0.0,
+    bulbRadius: 0.3,
+    blackFloor: 0.008,
+    outputBrightness: 1,
+    phosphorDotLightBalance: 1,
+    phosphorDotShape: "circle",
+    phosphorDotInternalScale: 1,
+    phosphorDotSizeResponse: 1,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0,
+    phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0,
+    coloredGlowEnabled: false,
+    postCurvatureEnabled: false,
+    compositeEnabled: true,
+    compositeAmount: 0.95,
+    compositeChromaBlur: 0.82,
+    compositeChromaDelay: 0.76,
+    compositeNoise: 0.96,
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 1,
+    beamStripeStrength: 1,
+    beamWhiteBloom: 1,
+    beamWarmBloom: 0.32,
+    screenFaceGlow: 0.24,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
+  },
   crtOnly: {
     label: "CRT Only",
     width: 1280,
@@ -889,6 +997,10 @@ export const buildRetroPresetVariantPreparation = (
 export const resolveRetroPresetRenderMode = (
   preset: RetroPresetDefinition,
 ): RetroPresetRenderMode => {
+  if (preset.renderModeOverride) {
+    return preset.renderModeOverride;
+  }
+
   if (preset === RETRO_PRESETS.phosphorDot || preset === RETRO_PRESETS.phosphorDotSmooth) {
     return "lite";
   }
@@ -937,6 +1049,7 @@ export const RETRO_PRESET_CATEGORY_ORDER: RetroPresetCategory[] = [
 export const RETRO_PRESET_CATEGORIES = {
   chunky: "classic",
   arcade: "classic",
+  gbLite: "classic",
   gb: "classic",
   gba: "classic",
   pc98_512: "classic",
@@ -954,6 +1067,7 @@ export const RETRO_PRESET_CATEGORIES = {
   phosphorDotSmooth: "crt",
   crtBeam: "crt",
   crtBeamNtsc: "crt",
+  crtNtsc: "crt",
   crtOnly: "crt",
   crtEdge: "crt",
   warmBokeh: "crt",

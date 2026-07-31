@@ -4,13 +4,16 @@ import {
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
+  type RetroPresetKey,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config.ts";
 import { FILTER_FRAGMENT_PASS1_LITE as FILTER_FRAGMENT_PASS1_LITE_COMPOSITE } from "../retro/filterPass1LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "../retro/filterPass1LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT } from "../retro/filterPass2BeamLiteCrtShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
@@ -18,10 +21,13 @@ import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc9
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
 
 export type RetroVideoFilterState = {
+  selectedPreset?: RetroPresetKey | null;
+  shaderCompileCacheBusterEnabled?: boolean;
   autoTargetSize: boolean;
   targetWidth: number;
   targetHeight: number;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode?: VBlankSimulationMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -33,6 +39,7 @@ export type RetroVideoFilterState = {
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  lcdCrosstalkStrength: number;
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
@@ -50,6 +57,7 @@ export type RetroVideoFilterState = {
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
+  phosphorDotSizeResponse: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -99,6 +107,9 @@ function getPhosphorDotShapeValue(shape: PhosphorDotShape): number {
   }
   if (shape === "beam") {
     return 2;
+  }
+  if (shape === "square") {
+    return 3;
   }
   return 0;
 }
@@ -157,6 +168,7 @@ type Pass2UniformLocations = {
   uScanline2Strength: WebGLUniformLocation | null;
   uScanlineBrightnessFade: WebGLUniformLocation | null;
   uVignetteStrength: WebGLUniformLocation | null;
+  uLcdCrosstalkStrength: WebGLUniformLocation | null;
   uGlowStrength: WebGLUniformLocation | null;
   uHorizontalSharpness: WebGLUniformLocation | null;
   uRgbConvergenceOffset: WebGLUniformLocation | null;
@@ -173,6 +185,7 @@ type Pass2UniformLocations = {
   uPhosphorDotMode: WebGLUniformLocation | null;
   uPhosphorDotShape: WebGLUniformLocation | null;
   uPhosphorDotInternalScale: WebGLUniformLocation | null;
+  uPhosphorDotSizeResponse: WebGLUniformLocation | null;
   uPhosphorDotBrightCore: WebGLUniformLocation | null;
   uPhosphorDotCellFill: WebGLUniformLocation | null;
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
@@ -341,7 +354,7 @@ type WindowsLitePass1Variant =
   | "pc98_nearest"
   | "pc98"
   | "pc98_composite";
-type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full";
+type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full" | "beam_crt";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
 // Only 4 combinations exist. Compiling each at most once (cached) and
@@ -355,6 +368,7 @@ const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
   "basic_composite:beam_simple",
   "basic:beam_full",
   "basic_composite:beam_full",
+  "basic_nearest:beam_crt",
   "basic:phosphor",
   "basic_composite:phosphor",
   "pc98:basic",
@@ -390,6 +404,20 @@ const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
   filterState.compositeAmount > 0.001;
 
+const shouldBypassShaderVariantCache = (filterState: RetroVideoFilterState | null) =>
+  filterState?.shaderCompileCacheBusterEnabled === true;
+
+const getVBlankFrameInterval = (mode: VBlankSimulationMode | undefined): number => {
+  if (mode === "mild") return 2;
+  if (mode === "strong") return 3;
+  return 1;
+};
+
+const isExactSelectedPreset = (
+  filterState: RetroVideoFilterState,
+  presetKey: RetroPresetKey,
+) => filterState.selectedPreset === presetKey;
+
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,
 ): WindowsLiteVariantKey => {
@@ -409,6 +437,9 @@ const getWindowsLiteVariantKey = (
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
+    if (isExactSelectedPreset(filterState, "crtBeam")) {
+      return "basic_nearest:beam_crt";
+    }
     return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
   }
   const pass2: WindowsLitePass2Variant =
@@ -798,6 +829,11 @@ export class TetoricaRetroVideoPipeline {
   >();
   private windowsLitePrewarmStarted = false;
   private isDisposed = false;
+  private compileSourceNonce = 0;
+  private lastRenderedFilterState: RetroVideoFilterState | null = null;
+  private lastRenderedSource: RetroVideoSource | null = null;
+  private lastRenderedBufferWidth = 0;
+  private lastRenderedBufferHeight = 0;
 
   // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
@@ -1077,6 +1113,8 @@ export class TetoricaRetroVideoPipeline {
       pass2:
         pass2Variant === "beam_simple"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
+          : pass2Variant === "beam_crt"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT
           : pass2Variant === "beam_full"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE
           : pass2Variant === "phosphor"
@@ -1085,13 +1123,20 @@ export class TetoricaRetroVideoPipeline {
     };
   }
 
+  private appendShaderCompileBuster(source: string): string {
+    this.compileSourceNonce += 1;
+    return `${source}\n// shader-compile-buster:${this.compileSourceNonce}:${nowMs().toFixed(3)}`;
+  }
+
   private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
     if (!this.windowsLiteMode || this.isDisposed) {
       return;
     }
 
     const nextVariantKey = getWindowsLiteVariantKey(filterState);
-    const cached = this.windowsLiteProgramCache.get(nextVariantKey);
+    const cached = shouldBypassShaderVariantCache(filterState)
+      ? undefined
+      : this.windowsLiteProgramCache.get(nextVariantKey);
     if (cached) {
       this.setFilterPrograms(cached.pass1, cached.pass2, cached.beamKernel);
       this.windowsLiteVariantKey = nextVariantKey;
@@ -1125,17 +1170,33 @@ export class TetoricaRetroVideoPipeline {
   private async compileWindowsLiteVariant(
     variantKey: WindowsLiteVariantKey,
   ): Promise<{ pass1: WebGLProgram; pass2: WebGLProgram; beamKernel?: WebGLProgram }> {
-    const cached = this.windowsLiteProgramCache.get(variantKey);
+    const bypassCache = shouldBypassShaderVariantCache(this.currentFilterState);
+    const cached = bypassCache ? undefined : this.windowsLiteProgramCache.get(variantKey);
     if (cached) return cached;
     if (this.isDisposed || this.gl.isContextLost()) {
       throw new Error("Pipeline was disposed before shader compile started.");
     }
 
+    const compileStartTime = nowMs();
     const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
-    const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1);
-    const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2);
+    const pass1Program = submitProgram(
+      this.gl,
+      VERTEX_SHADER_SOURCE,
+      bypassCache ? this.appendShaderCompileBuster(pass1) : pass1,
+    );
+    const pass2Program = submitProgram(
+      this.gl,
+      VERTEX_SHADER_SOURCE,
+      bypassCache ? this.appendShaderCompileBuster(pass2) : pass2,
+    );
     const beamKernelProgram = variantKey.endsWith(":beam_full")
-      ? submitProgram(this.gl, VERTEX_SHADER_SOURCE, FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL)
+      ? submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        bypassCache
+          ? this.appendShaderCompileBuster(FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL)
+          : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL,
+      )
       : null;
 
     try {
@@ -1150,7 +1211,12 @@ export class TetoricaRetroVideoPipeline {
       const entry = beamKernelProgram
         ? { pass1: pass1Program, pass2: pass2Program, beamKernel: beamKernelProgram }
         : { pass1: pass1Program, pass2: pass2Program };
-      this.windowsLiteProgramCache.set(variantKey, entry);
+      if (!bypassCache) {
+        this.windowsLiteProgramCache.set(variantKey, entry);
+      }
+      TetoricaRetroVideoPipeline.showDebug(
+        `filter: Windows lite variant ${variantKey} compiled in ${(nowMs() - compileStartTime).toFixed(1)}ms`,
+      );
       return entry;
     } catch (error) {
       this.gl.deleteProgram(pass1Program);
@@ -1263,6 +1329,9 @@ export class TetoricaRetroVideoPipeline {
   // sets windowsLitePendingVariantKey and takes over on the next turn through
   // the worker loop, so cache growth never outranks active interaction.
   private async prewarmRemainingWindowsLiteVariants() {
+    if (shouldBypassShaderVariantCache(this.currentFilterState)) {
+      return;
+    }
     for (const variantKey of ALL_WINDOWS_LITE_VARIANT_KEYS) {
       if (this.isDisposed || this.gl.isContextLost()) return;
       if (this.windowsLitePendingVariantKey) return;
@@ -1419,6 +1488,7 @@ export class TetoricaRetroVideoPipeline {
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
       uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
       uVignetteStrength: gl.getUniformLocation(program, "uVignetteStrength"),
+      uLcdCrosstalkStrength: gl.getUniformLocation(program, "uLcdCrosstalkStrength"),
       uGlowStrength: gl.getUniformLocation(program, "uGlowStrength"),
       uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
       uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
@@ -1435,6 +1505,7 @@ export class TetoricaRetroVideoPipeline {
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
       uPhosphorDotShape: gl.getUniformLocation(program, "uPhosphorDotShape"),
       uPhosphorDotInternalScale: gl.getUniformLocation(program, "uPhosphorDotInternalScale"),
+      uPhosphorDotSizeResponse: gl.getUniformLocation(program, "uPhosphorDotSizeResponse"),
       uPhosphorDotBrightCore: gl.getUniformLocation(program, "uPhosphorDotBrightCore"),
       uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
@@ -1470,6 +1541,9 @@ export class TetoricaRetroVideoPipeline {
   hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
     if (!this.windowsLiteMode) {
       return true;
+    }
+    if (shouldBypassShaderVariantCache(filterState)) {
+      return false;
     }
 
     return this.windowsLiteProgramCache.has(getWindowsLiteVariantKey(filterState));
@@ -1580,6 +1654,10 @@ export class TetoricaRetroVideoPipeline {
     return false;
   }
 
+  private canReusePreviousFrame(source: RetroVideoSource): boolean {
+    return !isHtmlImageElement(source);
+  }
+
   render() {
     const { gl } = this;
     if (gl.isContextLost()) {
@@ -1607,6 +1685,20 @@ export class TetoricaRetroVideoPipeline {
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.clearColor(0.01, 0.02, 0.01, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      this.renderCount++;
+      return;
+    }
+
+    const vblankInterval = getVBlankFrameInterval(filterState.vblankSimulationMode);
+    const shouldHoldPreviousFrame =
+      vblankInterval > 1 &&
+      this.canReusePreviousFrame(source) &&
+      this.lastRenderedFilterState === filterState &&
+      this.lastRenderedSource === source &&
+      this.lastRenderedBufferWidth === gl.drawingBufferWidth &&
+      this.lastRenderedBufferHeight === gl.drawingBufferHeight &&
+      this.renderCount % vblankInterval !== 0;
+    if (shouldHoldPreviousFrame) {
       this.renderCount++;
       return;
     }
@@ -1794,6 +1886,10 @@ export class TetoricaRetroVideoPipeline {
       TetoricaRetroVideoPipeline.showDebug(info);
     }
     this.renderCount++;
+    this.lastRenderedFilterState = filterState;
+    this.lastRenderedSource = source;
+    this.lastRenderedBufferWidth = gl.drawingBufferWidth;
+    this.lastRenderedBufferHeight = gl.drawingBufferHeight;
 
     if (!usingFilter) {
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -1835,6 +1931,10 @@ export class TetoricaRetroVideoPipeline {
     if (this.postCurvatureTexture) gl.deleteTexture(this.postCurvatureTexture);
     this.currentSource = null;
     this.currentFilterState = null;
+    this.lastRenderedFilterState = null;
+    this.lastRenderedSource = null;
+    this.lastRenderedBufferWidth = 0;
+    this.lastRenderedBufferHeight = 0;
     this.lastUploadedImageSource = null;
     this.lastUploadedVideoSource = null;
     this.lastUploadedVideoTime = Number.NaN;
@@ -1985,6 +2085,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
     gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);
     gl.uniform1f(this.pass2Locs.uVignetteStrength, filterState.vignetteStrength);
+    gl.uniform1f(this.pass2Locs.uLcdCrosstalkStrength, filterState.lcdCrosstalkStrength);
     gl.uniform1f(this.pass2Locs.uGlowStrength, filterState.glowStrength);
     gl.uniform1f(this.pass2Locs.uHorizontalSharpness, filterState.horizontalSharpness);
     gl.uniform1f(this.pass2Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
@@ -2013,6 +2114,10 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(
       this.pass2Locs.uPhosphorDotInternalScale,
       Math.min(4, Math.max(1, filterState.phosphorDotInternalScale)),
+    );
+    gl.uniform1f(
+      this.pass2Locs.uPhosphorDotSizeResponse,
+      Math.min(2, Math.max(0, filterState.phosphorDotSizeResponse)),
     );
     gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);

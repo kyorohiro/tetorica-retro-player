@@ -160,6 +160,8 @@ type RetroPreviewToolbarProps = {
   onPreferNativeHlsOverrideChange: (nextValue: boolean | null) => void;
   maximizePerformanceMode: "auto" | "on" | "off";
   onMaximizePerformanceModeChange: (nextValue: "auto" | "on" | "off") => void;
+  shaderCompileCacheBusterEnabled: boolean;
+  onShaderCompileCacheBusterEnabledChange: (nextValue: boolean) => void;
   onLatencyHintChange: (hint: AudioContextLatencyCategory) => void;
   ffmpegUseQsv: boolean;
   onToggleFfmpegUseQsv: () => void;
@@ -206,6 +208,8 @@ export function RetroPreviewToolbar({
   onPreferNativeHlsOverrideChange,
   maximizePerformanceMode,
   onMaximizePerformanceModeChange,
+  shaderCompileCacheBusterEnabled,
+  onShaderCompileCacheBusterEnabledChange,
   onLatencyHintChange,
   ffmpegUseQsv,
   onToggleFfmpegUseQsv,
@@ -248,6 +252,9 @@ export function RetroPreviewToolbar({
           maximizeRenderCap: "Render cap",
           maximizeRenderCapDescription:
             "重いフィルター使用時の内部描画サイズを抑えて、低性能PCでのカクつきを減らします。",
+          shaderCompileBuster: "DevOption: shader ID",
+          shaderCompileBusterDescription:
+            "コンパイル確認用です。On にすると shader 識別子を毎回変えて、compile cache の再利用を抑えます。",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "同時実行数の上限。変更は再生切替後に安定し、再起動後も保持されます。",
           enabled: "有効",
@@ -273,6 +280,9 @@ export function RetroPreviewToolbar({
           maximizeRenderCap: "Render cap",
           maximizeRenderCapDescription:
             "Limit internal render size for heavier filters to reduce stutter on lower-end PCs.",
+          shaderCompileBuster: "DevOption: shader ID",
+          shaderCompileBusterDescription:
+            "For compile debugging. When On, shader identifiers change every compile to reduce compile cache reuse.",
           hlsSlots: "HLS ffmpeg slots",
           hlsSlotsDescription: "Maximum concurrent ffmpeg HLS jobs. Persisted and safe to apply on the next playback cycle.",
           enabled: "On",
@@ -724,6 +734,42 @@ export function RetroPreviewToolbar({
                           onClick={() => {
                             onMaximizePerformanceModeChange(option.value as "auto" | "on" | "off");
                           }}
+                          className={[
+                            "rounded border px-1.5 py-1 text-[9px] transition",
+                            isActive
+                              ? "border-cyan-300/70 bg-cyan-400/18 text-cyan-50"
+                              : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                          ].join(" ")}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-[10px] text-slate-300">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div>{tooltipText.shaderCompileBuster}</div>
+                    <div className="text-[9px] text-slate-500">
+                      {shaderCompileCacheBusterEnabled ? "Override: On" : "Override: Off"}
+                    </div>
+                    <div className="mt-1 text-[9px] leading-[1.45] text-slate-500">
+                      {tooltipText.shaderCompileBusterDescription}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {[
+                      { label: "On", value: true },
+                      { label: "Off", value: false },
+                    ].map((option) => {
+                      const isActive = shaderCompileCacheBusterEnabled === option.value;
+                      return (
+                        <button
+                          key={option.label}
+                          type="button"
+                          onClick={() => { onShaderCompileCacheBusterEnabledChange(option.value); }}
                           className={[
                             "rounded border px-1.5 py-1 text-[9px] transition",
                             isActive

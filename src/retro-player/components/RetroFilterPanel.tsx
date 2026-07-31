@@ -11,6 +11,7 @@ import {
   type RetroPresetDefinition,
   type RetroPresetKey,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -94,6 +95,7 @@ type RetroFilterPanelProps = {
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
+  phosphorDotSizeResponse: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -114,6 +116,7 @@ type RetroFilterPanelProps = {
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
+  lcdCrosstalkStrength: number;
   neonBoost: number;
   neonSaturation: number;
   neonDetail: number;
@@ -123,6 +126,7 @@ type RetroFilterPanelProps = {
   targetWidth: number;
   autoTargetSize: boolean;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
   vignetteStrength: number;
   focusStrength: number;
@@ -135,6 +139,7 @@ type RetroFilterPanelProps = {
   onSetPostCurvatureEnabled: (value: boolean) => void;
   onSetDitherStrength: (value: number) => void;
   onSetGlowStrength: (value: number) => void;
+  onSetLcdCrosstalkStrength: (value: number) => void;
   onSetHorizontalSharpness: (value: number) => void;
   onSetRgbConvergenceOffset: (value: number) => void;
   onSetSmoothStrength: (value: number) => void;
@@ -154,6 +159,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
   onSetPhosphorDotInternalScale: (value: number) => void;
+  onSetPhosphorDotSizeResponse: (value: number) => void;
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
@@ -183,6 +189,7 @@ type RetroFilterPanelProps = {
   onSetTargetWidth: (value: number) => void;
   onSetAutoTargetSize: (value: boolean) => void;
   onSetSamplingMode: (value: TargetSamplingMode) => void;
+  onSetVBlankSimulationMode: (value: VBlankSimulationMode) => void;
   onSetMatchTargetAspect: (value: boolean) => void;
   onSetVignetteStrength: (value: number) => void;
   onSetFocusStrength: (value: number) => void;
@@ -217,6 +224,7 @@ export function RetroFilterPanel({
   phosphorDotLightBalance,
   phosphorDotShape,
   phosphorDotInternalScale,
+  phosphorDotSizeResponse,
   phosphorDotBrightCore,
   phosphorDotCellFill,
   phosphorDotFlatDisc,
@@ -237,6 +245,7 @@ export function RetroFilterPanel({
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
+  lcdCrosstalkStrength,
   neonBoost,
   neonSaturation,
   neonDetail,
@@ -246,6 +255,7 @@ export function RetroFilterPanel({
   targetWidth,
   autoTargetSize,
   samplingMode,
+  vblankSimulationMode,
   matchTargetAspect,
   vignetteStrength,
   onApplyPreset,
@@ -255,6 +265,7 @@ export function RetroFilterPanel({
   onSetPostCurvatureEnabled,
   onSetDitherStrength,
   onSetGlowStrength,
+  onSetLcdCrosstalkStrength,
   onSetHorizontalSharpness,
   onSetRgbConvergenceOffset,
   onSetSmoothStrength,
@@ -274,6 +285,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotLightBalance,
   onSetPhosphorDotShape,
   onSetPhosphorDotInternalScale,
+  onSetPhosphorDotSizeResponse,
   onSetPhosphorDotBrightCore,
   onSetPhosphorDotCellFill,
   onSetPhosphorDotFlatDisc,
@@ -303,6 +315,7 @@ export function RetroFilterPanel({
   onSetTargetWidth,
   onSetAutoTargetSize,
   onSetSamplingMode,
+  onSetVBlankSimulationMode,
   onSetMatchTargetAspect,
   onSetVignetteStrength,
 }: RetroFilterPanelProps) {
@@ -326,12 +339,16 @@ export function RetroFilterPanel({
             "古い表示のような横方向の暗い帯を加えます。値を上げるほど線の隙間が目立ちます。",
           scanline2:
             "さらに細かい第2のライン感を加えます。より密な CRT の縞感が欲しいときに使います。",
+          vblankSimulation:
+            "描画更新を間引いて、VBlank 的な更新の区切りを疑似的に作ります。Mild は 2 フレームに 1 回、Strong は 3 フレームに 1 回だけ描き直します。",
           scanlineBrightFade:
             "明るい部分では scanline を薄くします。値を上げると暗部は縞を保ちつつ、明部は自然に発光して見えます。",
           vignette:
             "画面の外周を暗くします。値を上げるほど中央に視線が集まり、レトロな額縁感も強くなります。",
           glow:
             "明るい部分のまわりに柔らかな光のにじみを足します。値を上げるほどハイライトが広がって熱っぽく見えます。",
+          lcdCrosstalk:
+            "古いパッシブマトリクス LCD の列方向クロストークを疑似的に加えます。上げるほど濃い塊の下や横へ薄い帯が伸びやすくなります。",
           compositeAmount:
             "信号経路側でのコンポジット風の崩れ方を混ぜます。上げるほど色にじみや色ズレが前に出ます。",
           compositeChromaBlur:
@@ -356,6 +373,8 @@ export function RetroFilterPanel({
             "Phosphor Dot のセル形状を有効にします。値を上げるほどドット構造と CRT 風マスクがはっきり見えます。",
           cellFill:
             "各 phosphor セル内部に均一なベース光を加えます。上げるとセル全体が明るくなり、下げると黒が残りやすくなります。",
+          sizeResponse:
+            "明るさに応じて phosphor セルの大きさがどのくらい変化するかです。0 でサイズ固定、1 で現在の標準、2 でさらに強く明暗差に反応します。",
           bulbRadius:
             "各 phosphor セル内で光るバルブの大きさを決めます。下げるほど明るい芯が小さくなり、周囲の黒が増えます。",
           blackFloor:
@@ -417,12 +436,16 @@ export function RetroFilterPanel({
             "Adds broad horizontal dark bands like an old display. Higher values make the line gaps more obvious.",
           scanline2:
             "Adds a finer second layer of line texture. Useful when you want a denser CRT stripe feel.",
+          vblankSimulation:
+            "Skips some redraws to mimic a VBlank-like update cadence. Mild redraws every 2nd frame, Strong redraws every 3rd frame.",
           scanlineBrightFade:
             "Makes scanlines fade out in bright areas. Higher values keep dark parts striped while bright parts look more naturally emissive.",
           vignette:
             "Darkens the outer edges of the screen. Higher values pull more attention toward the center and can be exaggerated for a stronger retro frame.",
           glow:
             "Adds a soft light bloom around bright areas. Higher values make highlights spread and feel hotter, even beyond the usual subtle CRT look.",
+          lcdCrosstalk:
+            "Adds a passive-matrix LCD style column crosstalk simulation. Higher values make faint bands extend below and beside darker blocks.",
           compositeAmount:
             "Blends in a composite-video style signal path before the CRT surface stage. Higher values push color bleed and analog instability forward.",
           compositeChromaBlur:
@@ -447,6 +470,8 @@ export function RetroFilterPanel({
             "Enables the phosphor-dot cell shaping itself. Higher values make the dot structure and CRT-style masking more visible.",
           cellFill:
             "Adds a more uniform base fill inside each phosphor cell. Raise it to make the whole cell brighter; lower it to keep more black visible.",
+          sizeResponse:
+            "Controls how much each phosphor cell changes size with brightness. 0 keeps the cell size fixed, 1 matches the current default behavior, and 2 reacts even more strongly.",
           bulbRadius:
             "Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it.",
           blackFloor:
@@ -1137,6 +1162,24 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`LCD crosstalk: ${lcdCrosstalkStrength.toFixed(1)}`}
+                  text={helpText.lcdCrosstalk}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={lcdCrosstalkStrength}
+                onChange={(ev) => onSetLcdCrosstalkStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
             <button
               type="button"
               onClick={() => onSetColoredGlowEnabled(!coloredGlowEnabled)}
@@ -1234,6 +1277,39 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <div className="rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] p-2">
+              <div className="text-[#12141c]">
+                <InfoTip
+                  label={`VBlank simulation: ${vblankSimulationMode}`}
+                  text={helpText.vblankSimulation}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {([
+                  { label: "Off", value: "off" },
+                  { label: "Mild", value: "mild" },
+                  { label: "Strong", value: "strong" },
+                ] as const).map((option) => {
+                  const isActive = vblankSimulationMode === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => onSetVBlankSimulationMode(option.value)}
+                      className={[
+                        "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight",
+                        isActive
+                          ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                          : "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]",
+                      ].join(" ")}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -1378,7 +1454,7 @@ export function RetroFilterPanel({
           </div>
 
           <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-2 text-[11px] leading-5 text-[#5f5649]">
-            Dot phosphor は Circle / Heart の発光セルを使う phosphor 系モードです。
+            Dot phosphor は Circle / Square / Heart の発光セルを使う phosphor 系モードです。
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1395,6 +1471,20 @@ export function RetroFilterPanel({
                   ].join(" ")}
                 >
                   Dot shape: Circle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotShape("square");
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotShape === "square"
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Dot shape: Square
                 </button>
                 <button
                   type="button"
@@ -1553,6 +1643,27 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
+                label={`Size response: ${phosphorDotSizeResponse.toFixed(1)}`}
+                text={helpText.sizeResponse}
+                helpSuffix={helpText.helpSuffix}
+              />
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={phosphorDotSizeResponse}
+              onChange={(ev) => {
+                onSetPhosphorDotSizeResponse(Number(ev.currentTarget.value));
+              }}
+              className="mt-2 w-full"
+            />
+          </label>
+
+          <label className="mt-3 block">
+            <span className="text-[#12141c]">
+              <InfoTip
                 label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
                 text={helpText.bulbRadius}
                 helpSuffix={helpText.helpSuffix}
@@ -1561,7 +1672,7 @@ export function RetroFilterPanel({
             <input
               type="range"
               min="0.001"
-              max="0.5"
+              max="1.0"
               step="0.001"
               value={bulbRadius}
               onChange={(ev) => {

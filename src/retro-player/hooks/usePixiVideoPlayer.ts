@@ -93,6 +93,7 @@ export function usePixiVideoPlayer(
     preferNativeVideoSurface?: boolean;
     isPreviewMaximized?: boolean;
     maximizePerformanceMode?: "auto" | "on" | "off";
+    shaderCompileCacheBusterEnabled?: boolean;
     locale?: RetroPlayerLocale;
     requestedKind?: "video" | "audio" | "image";
     requestedIndex?: number | null;
@@ -288,6 +289,7 @@ export function usePixiVideoPlayer(
     renderResolutionScale,
     isPreviewMaximized: options?.isPreviewMaximized ?? false,
     maximizePerformanceMode: options?.maximizePerformanceMode ?? "auto",
+    shaderCompileCacheBusterEnabled: options?.shaderCompileCacheBusterEnabled ?? false,
     isPoweredOn,
     isPlayingRef,
     isRecordingRef,

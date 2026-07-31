@@ -23,6 +23,7 @@ const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   autoTargetSize: DEFAULT_PRESET.autoTargetSize ?? false,
   samplingMode: DEFAULT_PRESET.samplingMode ?? "nearest",
+  vblankSimulationMode: DEFAULT_PRESET.vblankSimulationMode ?? "off",
   targetWidth: DEFAULT_PRESET.width,
   targetHeight: DEFAULT_PRESET.height,
   matchTargetAspect: true,
@@ -35,6 +36,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   scanlineBrightnessFade: 0.6,
   vignetteStrength: DEFAULT_PRESET.vignette,
   glowStrength: DEFAULT_PRESET.glow,
+  lcdCrosstalkStrength: DEFAULT_PRESET.lcdCrosstalkStrength ?? 0,
   horizontalSharpness: DEFAULT_PRESET.horizontalSharpness ?? 1,
   rgbConvergenceOffset: DEFAULT_PRESET.rgbConvergenceOffset ?? 0,
   smoothStrength: DEFAULT_PRESET.smoothStrength ?? 0,
@@ -52,6 +54,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   phosphorDotLightBalance: 1,
   phosphorDotShape: "circle",
   phosphorDotInternalScale: 1,
+  phosphorDotSizeResponse: 1,
   phosphorDotBrightCore: false,
   phosphorDotCellFill: 0,
   phosphorDotFlatDisc: false,

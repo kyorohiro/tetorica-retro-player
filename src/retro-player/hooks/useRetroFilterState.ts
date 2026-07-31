@@ -4,6 +4,7 @@ import {
   RETRO_PRESETS,
   defaultPresetId,
   normalizePhosphorDotInternalScale,
+  normalizePhosphorDotSizeResponse,
   normalizePhosphorDotShape,
   type MonoTintMode,
   type PaletteMode,
@@ -11,6 +12,7 @@ import {
   type RetroPresetDefinition,
   type RetroPresetKey,
   type TargetSamplingMode,
+  type VBlankSimulationMode,
 } from "../retro/config";
 import {
   loadPersistedRetroSettings,
@@ -24,6 +26,7 @@ export type RetroFilterInitialState = Partial<{
   targetHeight: number;
   autoTargetSize: boolean;
   samplingMode: TargetSamplingMode;
+  vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
   colorLevels: number;
   ditherStrength: number;
@@ -34,6 +37,7 @@ export type RetroFilterInitialState = Partial<{
   scanlineBrightnessFade: number;
   vignetteStrength: number;
   glowStrength: number;
+  lcdCrosstalkStrength: number;
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
@@ -51,6 +55,7 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
+  phosphorDotSizeResponse: number;
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
@@ -99,6 +104,7 @@ const doesPresetMatchState = (
       )) &&
     (preset.autoTargetSize ?? false) === state.autoTargetSize &&
     (preset.samplingMode ?? "nearest") === state.samplingMode &&
+    (preset.vblankSimulationMode ?? "off") === state.vblankSimulationMode &&
     preset.colors === state.colorLevels &&
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
@@ -107,6 +113,7 @@ const doesPresetMatchState = (
     preset.scanline2 === state.scanline2Strength &&
     preset.vignette === state.vignetteStrength &&
     preset.glow === state.glowStrength &&
+    (preset.lcdCrosstalkStrength ?? 0) === state.lcdCrosstalkStrength &&
     (preset.horizontalSharpness ?? 1) === state.horizontalSharpness &&
     (preset.rgbConvergenceOffset ?? 0) === state.rgbConvergenceOffset &&
     (preset.smoothStrength ?? 0) === state.smoothStrength &&
@@ -124,6 +131,7 @@ const doesPresetMatchState = (
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     normalizePhosphorDotShape(preset.phosphorDotShape ?? "circle") === state.phosphorDotShape &&
     normalizePhosphorDotInternalScale(preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
+    normalizePhosphorDotSizeResponse(preset.phosphorDotSizeResponse ?? 1) === state.phosphorDotSizeResponse &&
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
@@ -201,6 +209,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
     autoTargetSize: initialState.autoTargetSize ?? (DEFAULT_PRESET.autoTargetSize ?? false),
     samplingMode: initialState.samplingMode ?? (DEFAULT_PRESET.samplingMode ?? "nearest"),
+    vblankSimulationMode: initialState.vblankSimulationMode ?? (DEFAULT_PRESET.vblankSimulationMode ?? "off"),
     matchTargetAspect: initialState.matchTargetAspect ?? true,
     colorLevels: initialState.colorLevels ?? DEFAULT_PRESET.colors,
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
@@ -211,6 +220,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
     vignetteStrength: initialState.vignetteStrength ?? DEFAULT_PRESET.vignette,
     glowStrength: initialState.glowStrength ?? DEFAULT_PRESET.glow,
+    lcdCrosstalkStrength: initialState.lcdCrosstalkStrength ?? (DEFAULT_PRESET.lcdCrosstalkStrength ?? 0),
     horizontalSharpness: initialState.horizontalSharpness ?? (DEFAULT_PRESET.horizontalSharpness ?? 1),
     rgbConvergenceOffset: initialState.rgbConvergenceOffset ?? (DEFAULT_PRESET.rgbConvergenceOffset ?? 0),
     smoothStrength: initialState.smoothStrength ?? (DEFAULT_PRESET.smoothStrength ?? 0),
@@ -233,6 +243,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       ),
     phosphorDotInternalScale: normalizePhosphorDotInternalScale(
       initialState.phosphorDotInternalScale ?? (DEFAULT_PRESET.phosphorDotInternalScale ?? 1),
+    ),
+    phosphorDotSizeResponse: normalizePhosphorDotSizeResponse(
+      initialState.phosphorDotSizeResponse ?? (DEFAULT_PRESET.phosphorDotSizeResponse ?? 1),
     ),
     phosphorDotBrightCore:
       initialState.phosphorDotBrightCore ?? (DEFAULT_PRESET.phosphorDotBrightCore ?? false),
@@ -344,6 +357,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   }, [markPresetAsCustom]);
 
+  const setVBlankSimulationMode = useCallback((vblankSimulationMode: VBlankSimulationMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.vblankSimulationMode === vblankSimulationMode
+        ? current
+        : { ...current, vblankSimulationMode }
+    ));
+  }, [markPresetAsCustom]);
+
   const setColorLevels = (colorLevels: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.colorLevels === colorLevels ? current : { ...current, colorLevels }));
@@ -391,6 +413,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setGlowStrength = (glowStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.glowStrength === glowStrength ? current : { ...current, glowStrength }));
+  };
+
+  const setLcdCrosstalkStrength = (lcdCrosstalkStrength: number) => {
+    const normalized = Math.max(0, Math.min(2, Math.round(lcdCrosstalkStrength * 10) / 10));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.lcdCrosstalkStrength === normalized
+        ? current
+        : { ...current, lcdCrosstalkStrength: normalized }
+    ));
   };
 
   const setHorizontalSharpness = (horizontalSharpness: number) => {
@@ -492,6 +524,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     markPresetAsCustom();
     setSettings((current) => (
       current.phosphorDotInternalScale === normalized ? current : { ...current, phosphorDotInternalScale: normalized }
+    ));
+  };
+
+  const setPhosphorDotSizeResponse = (phosphorDotSizeResponse: number) => {
+    const normalized = normalizePhosphorDotSizeResponse(phosphorDotSizeResponse);
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotSizeResponse === normalized ? current : { ...current, phosphorDotSizeResponse: normalized }
     ));
   };
 
@@ -705,6 +745,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       targetHeight: presetSettings.height,
       autoTargetSize: presetSettings.autoTargetSize ?? false,
       samplingMode: presetSettings.samplingMode ?? "nearest",
+      vblankSimulationMode: presetSettings.vblankSimulationMode ?? "off",
       colorLevels: presetSettings.colors,
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
@@ -713,6 +754,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       scanline2Strength: presetSettings.scanline2,
       vignetteStrength: presetSettings.vignette,
       glowStrength: presetSettings.glow,
+      lcdCrosstalkStrength: presetSettings.lcdCrosstalkStrength ?? 0,
       horizontalSharpness: presetSettings.horizontalSharpness ?? 1,
       rgbConvergenceOffset: presetSettings.rgbConvergenceOffset ?? 0,
       smoothStrength: presetSettings.smoothStrength ?? 0,
@@ -731,6 +773,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotShape: normalizePhosphorDotShape(presetSettings.phosphorDotShape ?? "circle"),
       phosphorDotInternalScale: normalizePhosphorDotInternalScale(
         presetSettings.phosphorDotInternalScale ?? 1,
+      ),
+      phosphorDotSizeResponse: normalizePhosphorDotSizeResponse(
+        presetSettings.phosphorDotSizeResponse ?? 1,
       ),
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
@@ -797,6 +842,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setTargetHeight,
     setAutoTargetSize,
     setSamplingMode,
+    setVBlankSimulationMode,
     setMatchTargetAspect,
     setColorLevels,
     setDitherStrength,
@@ -807,6 +853,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setScanlineBrightnessFade,
     setVignetteStrength,
     setGlowStrength,
+    setLcdCrosstalkStrength,
     setHorizontalSharpness,
     setRgbConvergenceOffset,
     setSmoothStrength,
@@ -824,6 +871,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotLightBalance,
     setPhosphorDotShape,
     setPhosphorDotInternalScale,
+    setPhosphorDotSizeResponse,
     setPhosphorDotBrightCore,
     setPhosphorDotCellFill,
     setPhosphorDotFlatDisc,

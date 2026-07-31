@@ -374,6 +374,7 @@ export function RetroControlPanel({
               phosphorDotLightBalance={filterState.phosphorDotLightBalance}
               phosphorDotShape={filterState.phosphorDotShape}
               phosphorDotInternalScale={filterState.phosphorDotInternalScale}
+              phosphorDotSizeResponse={filterState.phosphorDotSizeResponse}
               phosphorDotBrightCore={filterState.phosphorDotBrightCore}
               phosphorDotCellFill={filterState.phosphorDotCellFill}
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
@@ -401,8 +402,10 @@ export function RetroControlPanel({
               targetWidth={filterState.targetWidth}
               autoTargetSize={filterState.autoTargetSize}
               samplingMode={filterState.samplingMode}
+              vblankSimulationMode={filterState.vblankSimulationMode}
               matchTargetAspect={filterState.matchTargetAspect}
               vignetteStrength={filterState.vignetteStrength}
+              lcdCrosstalkStrength={filterState.lcdCrosstalkStrength}
               focusStrength={filterState.focusStrength}
               focusWidth={filterState.focusWidth}
               focusHeight={filterState.focusHeight}
@@ -411,6 +414,7 @@ export function RetroControlPanel({
               onSetCurvature={filterState.setCurvature}
               onSetDitherStrength={filterState.setDitherStrength}
               onSetGlowStrength={filterState.setGlowStrength}
+              onSetLcdCrosstalkStrength={filterState.setLcdCrosstalkStrength}
               onSetHorizontalSharpness={filterState.setHorizontalSharpness}
               onSetRgbConvergenceOffset={filterState.setRgbConvergenceOffset}
               onSetSmoothStrength={filterState.setSmoothStrength}
@@ -434,6 +438,7 @@ export function RetroControlPanel({
               onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
               onSetPhosphorDotShape={filterState.setPhosphorDotShape}
               onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}
+              onSetPhosphorDotSizeResponse={filterState.setPhosphorDotSizeResponse}
               onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
               onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
@@ -459,6 +464,7 @@ export function RetroControlPanel({
               onSetTargetWidth={onSetTargetWidth}
               onSetAutoTargetSize={filterState.setAutoTargetSize}
               onSetSamplingMode={filterState.setSamplingMode}
+              onSetVBlankSimulationMode={filterState.setVBlankSimulationMode}
               onSetMatchTargetAspect={onSetMatchTargetAspect}
               onSetVignetteStrength={filterState.setVignetteStrength}
               onSetFocusStrength={filterState.setFocusStrength}

@@ -50,6 +50,7 @@ type UseRetroPixiStageParams = {
   renderResolutionScale: number;
   isPreviewMaximized: boolean;
   maximizePerformanceMode: "auto" | "on" | "off";
+  shaderCompileCacheBusterEnabled: boolean;
   isPoweredOn: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   previewKindRef: MutableRefObject<PreviewKind>;
@@ -125,6 +126,7 @@ export function useRetroPixiStage({
   renderResolutionScale,
   isPreviewMaximized,
   maximizePerformanceMode,
+  shaderCompileCacheBusterEnabled,
   isPoweredOn,
   isRecordingRef,
   isPlayingRef,
@@ -176,6 +178,14 @@ export function useRetroPixiStage({
   filterStateRef.current = filterState;
   isPoweredOnRef.current = isPoweredOn;
 
+  const buildPipelineFilterState = useCallback(
+    (): RetroVideoFilterState => ({
+      ...(filterStateRef.current as RetroVideoFilterState),
+      shaderCompileCacheBusterEnabled,
+    }),
+    [shaderCompileCacheBusterEnabled],
+  );
+
   const updateViewportRect = useCallback((
     nextValue: SetStateAction<{
       width: number;
@@ -208,9 +218,9 @@ export function useRetroPixiStage({
     if (!app) return;
     app.pipeline.setOutputEnabled(isPoweredOnRef.current);
     app.pipeline.setSource(source);
-    app.pipeline.setFilterState(filterStateRef.current as RetroVideoFilterState);
+    app.pipeline.setFilterState(buildPipelineFilterState());
     app.pipeline.render();
-  }, []);
+  }, [buildPipelineFilterState]);
 
   useLayoutEffect(() => {
     renderFrameRef.current = renderFrame;
@@ -623,7 +633,7 @@ export function useRetroPixiStage({
       };
       const pipeline = await TetoricaRetroVideoPipeline.create(
         gl,
-        filterStateRef.current as RetroVideoFilterState,
+        buildPipelineFilterState(),
         onFilterReady,
       );
       const app: CanvasStageApp = {
@@ -681,6 +691,7 @@ export function useRetroPixiStage({
       initPromiseRef.current = null;
     }
   }, [
+    buildPipelineFilterState,
     debugVideo,
     effectiveRenderResolutionScale,
     isPoweredOn,
