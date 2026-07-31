@@ -322,8 +322,8 @@ export const RETRO_PRESETS = {
   gbaLite: {
     label: "GBA Lite",
     featured: true,
-    width: 320, // GBA is 240,GBA's internal resolution is 240x160, but we scale it to 320x200 for better visibility
-    height: 200,// GBA is 160,
+    width: 240, // GBA is 240,GBA's internal resolution is 240x160, but we scale it to 320x200 for better visibility
+    height: 160,// GBA is 160,
     colors: 48,
     dither: 0.06,
     palette: "free",
@@ -1097,8 +1097,8 @@ export const RETRO_PRESET_CATEGORIES = {
   arcade: "classic",
   gbLite: "classic",
   gb: "classic",
-  gba: "classic",
   gbaLite: "classic",
+  gba: "classic",
   pc98_512: "classic",
   pc98_4096: "classic",
   pc98: "classic",
