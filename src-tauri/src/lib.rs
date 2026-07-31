@@ -1,3 +1,5 @@
+#[cfg(windows)]
+use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,6 +10,97 @@ use tetorica_mdrop_core::bonjour::{BonjourStatus, SharedBonjourContext};
 use tetorica_mdrop_core::http::{ServerStatus, SharedHttpServerContext};
 
 mod ffmpeg;
+
+const GRAPHICS_BACKEND_SETTINGS_FILE_NAME: &str = "dev-options.json";
+#[cfg(windows)]
+const APP_IDENTIFIER: &str = "net.tetorica.retro-player";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum GraphicsBackendMode {
+    Default,
+    DesktopOpenGl,
+}
+
+impl Default for GraphicsBackendMode {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl GraphicsBackendMode {
+    #[cfg(windows)]
+    fn webview2_additional_browser_args(self) -> Option<&'static str> {
+        match self {
+            Self::Default => None,
+            Self::DesktopOpenGl => Some(
+                "--use-angle=gl --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DevOptionsSettings {
+    #[serde(default)]
+    graphics_backend_mode: GraphicsBackendMode,
+}
+
+fn dev_options_settings_path_from_base(base_dir: PathBuf) -> PathBuf {
+    base_dir.join(GRAPHICS_BACKEND_SETTINGS_FILE_NAME)
+}
+
+#[cfg(windows)]
+fn startup_dev_options_settings_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let app_data = env::var_os("APPDATA")?;
+        Some(dev_options_settings_path_from_base(PathBuf::from(app_data).join(APP_IDENTIFIER)))
+    }
+}
+
+fn read_dev_options_settings_from_path(path: &PathBuf) -> DevOptionsSettings {
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(_) => return DevOptionsSettings::default(),
+    };
+
+    serde_json::from_str::<DevOptionsSettings>(&raw).unwrap_or_default()
+}
+
+#[cfg(windows)]
+fn load_startup_graphics_backend_mode() -> GraphicsBackendMode {
+    startup_dev_options_settings_path()
+        .map(|path| read_dev_options_settings_from_path(&path).graphics_backend_mode)
+        .unwrap_or_default()
+}
+
+fn read_app_graphics_backend_mode(app: &tauri::AppHandle) -> Result<GraphicsBackendMode, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    let settings_path = dev_options_settings_path_from_base(config_dir);
+    Ok(read_dev_options_settings_from_path(&settings_path).graphics_backend_mode)
+}
+
+fn write_app_graphics_backend_mode(
+    app: &tauri::AppHandle,
+    mode: GraphicsBackendMode,
+) -> Result<(), String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(&config_dir).map_err(|error| error.to_string())?;
+    let settings_path = dev_options_settings_path_from_base(config_dir);
+    let settings = DevOptionsSettings {
+        graphics_backend_mode: mode,
+    };
+    let raw = serde_json::to_string_pretty(&settings).map_err(|error| error.to_string())?;
+    fs::write(settings_path, raw).map_err(|error| error.to_string())
+}
 
 // ---------------------------------------------------------------------------
 // Existing commands
@@ -41,6 +134,25 @@ fn persist_recording_for_share(
     fs::write(&file_path, data).map_err(|error| error.to_string())?;
 
     Ok(format!("file://{}", file_path.to_string_lossy()))
+}
+
+#[tauri::command]
+fn get_graphics_backend_mode(app: tauri::AppHandle) -> Result<GraphicsBackendMode, String> {
+    read_app_graphics_backend_mode(&app)
+}
+
+#[tauri::command]
+fn set_graphics_backend_mode(
+    app: tauri::AppHandle,
+    mode: GraphicsBackendMode,
+) -> Result<(), String> {
+    write_app_graphics_backend_mode(&app, mode)
+}
+
+#[tauri::command]
+fn restart_application(app: tauri::AppHandle) -> Result<(), String> {
+    app.request_restart();
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +549,14 @@ async fn mdrop_set_ffmpeg_max_concurrent_hls_sessions(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    {
+        match load_startup_graphics_backend_mode().webview2_additional_browser_args() {
+            Some(arguments) => env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", arguments),
+            None => env::remove_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"),
+        }
+    }
+
     let mdrop_server = SharedHttpServerContext::new();
 
     let mdrop_server_for_start = mdrop_server.clone();
@@ -539,6 +659,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             persist_recording_for_share,
+            get_graphics_backend_mode,
+            set_graphics_backend_mode,
+            restart_application,
             // ffmpeg
             ffmpeg::ffmpeg_exec,
             ffmpeg::get_ffmpeg_mode,
