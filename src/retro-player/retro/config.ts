@@ -1077,6 +1077,93 @@ export const RETRO_PRESET_CATEGORIES = {
   tetorica: "other",
 } as const satisfies Record<Exclude<RetroPresetKey, "none">, RetroPresetCategory>;
 
+export type RetroPresetFamilyVariant = {
+  key: Exclude<RetroPresetKey, "none">;
+  label: string;
+};
+
+export type RetroPresetCategoryItem =
+  | {
+    type: "preset";
+    key: Exclude<RetroPresetKey, "none">;
+  }
+  | {
+    type: "family";
+    id: string;
+    label: string;
+    variants: readonly RetroPresetFamilyVariant[];
+  };
+
+export const RETRO_PRESET_CATEGORY_ITEMS: Record<
+  RetroPresetCategory,
+  readonly RetroPresetCategoryItem[]
+> = {
+  classic: [
+    { type: "preset", key: "chunky" },
+    { type: "preset", key: "arcade" },
+    { type: "preset", key: "gbLite" },
+    { type: "preset", key: "gb" },
+    { type: "preset", key: "gba" },
+    { type: "preset", key: "pc98_512" },
+    { type: "preset", key: "pc98_4096" },
+    { type: "preset", key: "pc98" },
+    { type: "preset", key: "pc98_tile" },
+    { type: "preset", key: "color32" },
+    { type: "preset", key: "color64" },
+  ],
+  lcd: [
+    { type: "preset", key: "monochrome" },
+    { type: "preset", key: "lcdIce" },
+  ],
+  crt: [
+    {
+      type: "family",
+      id: "phosphor",
+      label: "Phosphor Dot",
+      variants: [
+        { key: "phosphorDot", label: "Base" },
+        { key: "phosphorDotLite", label: "Lite" },
+        { key: "phosphorDotSmooth", label: "Smooth" },
+      ],
+    },
+    {
+      type: "family",
+      id: "beam",
+      label: "CRT Beam",
+      variants: [
+        { key: "crtBeam", label: "Beam" },
+        { key: "crtBeamNtsc", label: "NTSC" },
+      ],
+    },
+    {
+      type: "family",
+      id: "crt",
+      label: "CRT",
+      variants: [
+        { key: "crtNtsc", label: "NTSC" },
+        { key: "crtOnly", label: "Only" },
+        { key: "crtEdge", label: "Edge" },
+      ],
+    },
+    {
+      type: "family",
+      id: "mono",
+      label: "Mono",
+      variants: [
+        { key: "greenTerminal", label: "Green" },
+        { key: "amberCrt", label: "Amber" },
+      ],
+    },
+  ],
+  other: [
+    { type: "preset", key: "warmBokeh" },
+    { type: "preset", key: "neonLine" },
+    { type: "preset", key: "animeCel" },
+    { type: "preset", key: "animeToon" },
+    { type: "preset", key: "tetorica" },
+  ],
+};
+
 export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "pc98") return 1;
   if (mode === "pc98_tile") return 2;

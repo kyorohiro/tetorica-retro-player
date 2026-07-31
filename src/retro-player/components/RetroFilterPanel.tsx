@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   MONO_TINTS,
-  RETRO_PRESET_CATEGORIES,
+  RETRO_PRESET_CATEGORY_ITEMS,
   RETRO_PRESET_CATEGORY_LABELS,
   RETRO_PRESET_CATEGORY_ORDER,
   RETRO_PRESETS,
+  type RetroPresetCategoryItem,
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
@@ -322,6 +323,7 @@ export function RetroFilterPanel({
   const [localTargetWidth, setLocalTargetWidth] = useState(targetWidth);
   const [localTargetHeight, setLocalTargetHeight] = useState(targetHeight);
   const [realtimeTargetSize, setRealtimeTargetSize] = useState(false);
+  const [openPresetFamilyId, setOpenPresetFamilyId] = useState<string | null>(null);
   useEffect(() => setLocalTargetWidth(targetWidth), [targetWidth]);
   useEffect(() => setLocalTargetHeight(targetHeight), [targetHeight]);
 
@@ -546,9 +548,8 @@ export function RetroFilterPanel({
 
   const presetsByCategory = RETRO_PRESET_CATEGORY_ORDER.map((category) => ({
     category,
-    presets: Object.entries(RETRO_PRESETS).filter(
-      ([key]) => key !== "none" && RETRO_PRESET_CATEGORIES[key as keyof typeof RETRO_PRESET_CATEGORIES] === category,
-    ),
+    label: RETRO_PRESET_CATEGORY_LABELS[category],
+    items: RETRO_PRESET_CATEGORY_ITEMS[category],
   }));
 
   return (
@@ -583,31 +584,188 @@ export function RetroFilterPanel({
       </div>
 
       <div className="mt-2 space-y-2">
-        {presetsByCategory.map(({ category, presets }) => (
+        {presetsByCategory.map(({ category, label, items }) => (
           <div
             key={category}
             className="rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/50 p-2"
           >
             <p className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7a7268]">
-              {RETRO_PRESET_CATEGORY_LABELS[category]}
+              {label}
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              {presets.map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    onApplyPreset(key as RetroPresetKey);
-                  }}
-                  className={presetButtonClass(
-                    selectedPreset === key,
-                    (preset as RetroPresetDefinition).featured,
-                  )}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+            {category === "crt"
+              ? (() => {
+                  const familyItems = items.filter(
+                    (item): item is Extract<RetroPresetCategoryItem, { type: "family" }> =>
+                      item.type === "family",
+                  );
+                  const loosePresetItems = items.filter(
+                    (item): item is Extract<RetroPresetCategoryItem, { type: "preset" }> =>
+                      item.type === "preset",
+                  );
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                      {familyItems.map(({ id, label: familyLabel, variants }) => {
+                        const familyKeys = variants
+                          .map(({ key }) => key) as RetroPresetKey[];
+                        if (familyKeys.length === 0) {
+                          return null;
+                        }
+                        const selectedFamilyVariant = variants.find(
+                          ({ key }) => key === selectedPreset,
+                        ) ?? variants[0];
+                        const selectedFamilyKey = selectedFamilyVariant?.key ?? familyKeys[0];
+                        const selectedFamilyLabel = selectedFamilyVariant?.label ?? familyLabel;
+                        const familyActive = familyKeys.includes(selectedPreset as RetroPresetKey);
+                        const familyOpen = openPresetFamilyId === id;
+
+                        return (
+                          <div
+                            key={id}
+                            className="relative"
+                          >
+                            <div
+                              className={[
+                                "overflow-hidden rounded-lg border",
+                                familyActive
+                                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a]"
+                                  : "border-amber-500/30 bg-amber-500/10 text-[#12141c]",
+                              ].join(" ")}
+                            >
+                              <div className="flex min-h-10">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onApplyPreset(selectedFamilyKey);
+                                }}
+                                className={[
+                                  "flex min-w-0 flex-1 items-center px-2 py-2 text-[10px] font-semibold leading-tight sm:px-3 sm:text-[11px]",
+                                  familyActive
+                                    ? "bg-emerald-500/15 text-[#0a3a1a]"
+                                    : "border-[#ccbfae] bg-[#efe7db] text-[#574f45] hover:bg-[#e7dece]",
+                                ].join(" ")}
+                                title={`${familyLabel}: ${RETRO_PRESETS[selectedFamilyKey].label}`}
+                              >
+                                <span className="whitespace-normal break-words text-left leading-tight">{`${familyLabel} ${selectedFamilyLabel}`}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenPresetFamilyId((current) => current === id ? null : id);
+                                }}
+                                className={[
+                                  "inline-flex w-9 shrink-0 items-center justify-center border-l text-[11px] font-semibold sm:w-11",
+                                  familyActive
+                                    ? "border-emerald-600/30 bg-emerald-500/15 text-[#0a3a1a]"
+                                    : "border-[#ccbfae] bg-[#efe7db] text-[#574f45] hover:bg-[#e7dece]",
+                                ].join(" ")}
+                                aria-label={`${familyLabel} variants`}
+                                title={`${familyLabel} variants`}
+                              >
+                                {familyOpen ? "▴" : "▾"}
+                              </button>
+                            </div>
+                            </div>
+                            {familyOpen && (
+                              <div className="absolute inset-0 z-20 overflow-hidden rounded-lg border border-[#ccbfae] bg-[#f8f4ee] shadow-lg">
+                                <div
+                                  className="grid min-w-0 h-full"
+                                  style={{
+                                    gridTemplateColumns: `repeat(${Math.max(
+                                      1,
+                                      variants.length,
+                                    )}, minmax(0, 1fr))`,
+                                  }}
+                                >
+                                {variants
+                                  .map(({ key, label }, index) => {
+                                    const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
+                                    return (
+                                      <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => {
+                                          onApplyPreset(key);
+                                          setOpenPresetFamilyId(null);
+                                        }}
+                                        className={[
+                                          "min-h-10 px-1.5 py-1 text-[10px] leading-tight sm:px-2 sm:py-1.5 sm:text-[11px]",
+                                          "border-[#d3cabd]",
+                                          index > 0 ? "border-l" : "",
+                                          selectedPreset === key
+                                            ? "bg-emerald-500/14 font-semibold text-[#0a3a1a]"
+                                            : "bg-[#f8f4ee] text-[#5b5348] hover:bg-[#f0e8dc]",
+                                          preset.featured
+                                            ? selectedPreset === key
+                                              ? "bg-[repeating-linear-gradient(20deg,#05966922,#05966922_1px,transparent_1px,transparent_24px)]"
+                                              : "bg-[repeating-linear-gradient(20deg,#f59e0b16,#f59e0b16_1px,transparent_1px,transparent_24px)]"
+                                            : "",
+                                        ].join(" ")}
+                                        title={`${familyLabel}: ${preset.label}`}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      </div>
+                      {loosePresetItems.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2">
+                          {loosePresetItems.map(({ key }) => {
+                            const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => {
+                                  onApplyPreset(key);
+                                }}
+                                className={presetButtonClass(
+                                  selectedPreset === key,
+                                  preset.featured,
+                                )}
+                              >
+                                {preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              : (
+                <div className="grid grid-cols-3 gap-2">
+                  {items.map((item) => {
+                    if (item.type !== "preset") {
+                      return null;
+                    }
+                    const { key } = item;
+                    const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
+                    return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        onApplyPreset(key);
+                      }}
+                      className={presetButtonClass(
+                        selectedPreset === key,
+                        preset.featured,
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                    );
+                  })}
+                </div>
+              )}
           </div>
         ))}
       </div>
