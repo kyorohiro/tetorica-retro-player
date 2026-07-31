@@ -779,7 +779,7 @@ export const RETRO_PRESETS = {
     scanline: 0.0,
     scanline2: 0.03,
     scanlineBrightnessFade: 0.92,
-    vignette: 0.48,
+    vignette: 0.28,
     glow: 0.04,
     phosphor: 0.48,
     spotMask: 0.0,
