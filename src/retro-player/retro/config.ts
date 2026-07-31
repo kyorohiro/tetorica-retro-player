@@ -798,7 +798,7 @@ export const RETRO_PRESETS = {
     coloredGlowEnabled: false,
     postCurvatureEnabled: false,
     compositeEnabled: true,
-    compositeAmount: 0.95,
+    compositeAmount: 0.68,
     compositeChromaBlur: 0.82,
     compositeChromaDelay: 0.76,
     compositeNoise: 0.96,
