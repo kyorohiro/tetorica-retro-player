@@ -335,7 +335,8 @@ export function RetroControlPanel({
 
       {controlPanelMode === "video-settings" && (
         <div className="mt-4 border-t border-[#cac0b2] pt-4">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="sticky top-0 z-10 -mx-3 -mt-4 mb-3 border-b border-[#cac0b2] bg-[#eae6df]/95 px-3 py-3 backdrop-blur-sm">
+            <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => { onControlPanelModeChange("playback"); }}
@@ -343,6 +344,7 @@ export function RetroControlPanel({
             >
               Back to Playback
             </button>
+            </div>
           </div>
           <React.Suspense fallback={controlsFallback}>
             <RetroFilterPanel

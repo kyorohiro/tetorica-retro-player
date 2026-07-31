@@ -256,6 +256,8 @@ export function RetroPreviewView({
   const previewShellRef = React.useRef<HTMLDivElement | null>(null);
   const nativeVideoHostRef = React.useRef<HTMLDivElement | null>(null);
   const activePreviewPointerIdRef = React.useRef<number | null>(null);
+  const previewTapStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const previewTapMovedRef = React.useRef(false);
   const autoPinFrameRef = React.useRef<number | null>(null);
   const pinnedMetricsFrameRef = React.useRef<number | null>(null);
   const emittedPreviewLayoutStateRef = React.useRef<RetroPreviewLayoutState | undefined>(undefined);
@@ -1058,6 +1060,26 @@ export function RetroPreviewView({
     onPreviewPointerMove({ x, y });
   }, [onPreviewPointerMove]);
 
+  const handlePreviewSurfaceTap = React.useCallback(() => {
+    if (interactionLocked || !player.isPoweredOn) {
+      return;
+    }
+
+    const canTapTogglePlayback =
+      player.previewKind === "video" ||
+      player.previewKind === "capture" ||
+      player.previewKind === "audio";
+
+    if (!canTapTogglePlayback) {
+      return;
+    }
+
+    void player.togglePlayback();
+  }, [
+    interactionLocked,
+    player,
+  ]);
+
   const handlePreviewPointerDown = React.useCallback((
     event: React.PointerEvent<HTMLDivElement>,
   ) => {
@@ -1069,6 +1091,8 @@ export function RetroPreviewView({
       return;
     }
     activePreviewPointerIdRef.current = event.pointerId;
+    previewTapStartRef.current = { x: event.clientX, y: event.clientY };
+    previewTapMovedRef.current = false;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     updatePreviewPointer(event);
   }, [updatePreviewPointer]);
@@ -1082,7 +1106,17 @@ export function RetroPreviewView({
 
     if (event.buttons === 0 && event.pointerType !== "touch") {
       activePreviewPointerIdRef.current = null;
+      previewTapStartRef.current = null;
       return;
+    }
+
+    const tapStart = previewTapStartRef.current;
+    if (tapStart) {
+      const dx = event.clientX - tapStart.x;
+      const dy = event.clientY - tapStart.y;
+      if ((dx * dx) + (dy * dy) > 100) {
+        previewTapMovedRef.current = true;
+      }
     }
 
     updatePreviewPointer(event);
@@ -1095,11 +1129,25 @@ export function RetroPreviewView({
       return;
     }
 
+    const shouldHandleTap =
+      event.type === "pointerup" &&
+      !previewTapMovedRef.current &&
+      !(
+        (event.target as HTMLElement | null)?.closest(
+          "button, [role='button'], a, input, select, textarea",
+        )
+      );
+
     activePreviewPointerIdRef.current = null;
+    previewTapStartRef.current = null;
+    previewTapMovedRef.current = false;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-  }, []);
+    if (shouldHandleTap) {
+      handlePreviewSurfaceTap();
+    }
+  }, [handlePreviewSurfaceTap]);
 
   return (
     <div
