@@ -1079,7 +1079,7 @@ export const RETRO_PRESETS = {
     scanline2: 0.12,
     vignette: 0.48,
     glow: 0.28,
-    toonSteps: 7, // 3 or 7 are the only two values that look good; 
+    toonSteps: 5, // 3 or 7 are the only two values that look good; 
     edgeBoost: 0.3,
     animeEdgeLow: 0.08,
     animeEdgeHigh: 0.55,
