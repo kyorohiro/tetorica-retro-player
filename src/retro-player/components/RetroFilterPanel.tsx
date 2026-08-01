@@ -39,6 +39,12 @@ const grainSliderToValue = (slider: number) => {
   return GRAIN_LOG_BASE * Math.pow(2, slider / GRAIN_SLIDER_UNITS_PER_DOUBLING);
 };
 
+const safeNumber = (value: unknown, fallback = 0) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const fixedNumber = (value: unknown, digits: number, fallback = 0) =>
+  safeNumber(value, fallback).toFixed(digits);
+
 function InfoTip({
   label,
   text,
@@ -1004,7 +1010,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Bayer dither: ${ditherStrength.toFixed(2)}`}
+                  label={`Bayer dither: ${fixedNumber(ditherStrength, 2)}`}
                   text={helpText.bayerDither}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1024,7 +1030,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Warm bloom: ${beamWarmBloom.toFixed(2)}`}
+                  label={`Warm bloom: ${fixedNumber(beamWarmBloom, 2)}`}
                   text={helpText.beamWarmBloom}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1054,7 +1060,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Smooth: ${smoothStrength.toFixed(2)}`}
+                  label={`Smooth: ${fixedNumber(smoothStrength, 2)}`}
                   text={helpText.smooth}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1072,7 +1078,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Brightness: ${outputBrightness.toFixed(2)}`}
+                  label={`Brightness: ${fixedNumber(outputBrightness, 2, 1)}`}
                   text={helpText.outputBrightness}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1090,7 +1096,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Contrast: ${basicContrast.toFixed(2)}`}
+                  label={`Contrast: ${fixedNumber(basicContrast, 2, 1)}`}
                   text={helpText.basicContrast}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1108,7 +1114,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Saturation: ${basicSaturation.toFixed(2)}`}
+                  label={`Saturation: ${fixedNumber(basicSaturation, 2, 1)}`}
                   text={helpText.basicSaturation}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1126,7 +1132,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Reflective LCD base: ${reflectiveLcdBase.toFixed(2)}`}
+                  label={`Reflective LCD base: ${fixedNumber(reflectiveLcdBase, 2)}`}
                   text={helpText.reflectiveLcdBase}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1144,7 +1150,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Light-dependent tint: ${lightDependentTint.toFixed(2)}`}
+                  label={`Light-dependent tint: ${fixedNumber(lightDependentTint, 2)}`}
                   text={helpText.lightDependentTint}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1162,7 +1168,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Horizontal sharpness: ${horizontalSharpness.toFixed(2)}`}
+                  label={`Horizontal sharpness: ${fixedNumber(horizontalSharpness, 2, 1)}`}
                   text={helpText.horizontalSharpness}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1180,7 +1186,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`RGB convergence: ${rgbConvergenceOffset.toFixed(2)}`}
+                  label={`RGB convergence: ${fixedNumber(rgbConvergenceOffset, 2)}`}
                   text={helpText.rgbConvergenceOffset}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1206,7 +1212,7 @@ export function RetroFilterPanel({
             <div className="flex flex-col gap-3">
               <label className="block">
                 <span className="text-[#12141c]">
-                  Neon Boost: {neonBoost.toFixed(2)}
+                  Neon Boost: {fixedNumber(neonBoost, 2, 1)}
                 </span>
                 <input
                   type="range"
@@ -1220,7 +1226,7 @@ export function RetroFilterPanel({
               </label>
               <label className="block">
                 <span className="text-[#12141c]">
-                  Neon Saturation: {neonSaturation.toFixed(2)}
+                  Neon Saturation: {fixedNumber(neonSaturation, 2, 1)}
                 </span>
                 <input
                   type="range"
@@ -1234,7 +1240,7 @@ export function RetroFilterPanel({
               </label>
               <label className="block">
                 <span className="text-[#12141c]">
-                  Neon Detail: {neonDetail.toFixed(2)}
+                  Neon Detail: {fixedNumber(neonDetail, 2, 1)}
                 </span>
                 <input
                   type="range"
@@ -1276,7 +1282,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Composite amount: ${compositeAmount.toFixed(2)}`}
+                  label={`Composite amount: ${fixedNumber(compositeAmount, 2)}`}
                   text={helpText.compositeAmount}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1294,7 +1300,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Chroma blur: ${compositeChromaBlur.toFixed(2)}`}
+                  label={`Chroma blur: ${fixedNumber(compositeChromaBlur, 2)}`}
                   text={helpText.compositeChromaBlur}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1312,7 +1318,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Chroma delay: ${compositeChromaDelay.toFixed(2)}`}
+                  label={`Chroma delay: ${fixedNumber(compositeChromaDelay, 2)}`}
                   text={helpText.compositeChromaDelay}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1330,7 +1336,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Composite noise: ${compositeNoise.toFixed(2)}`}
+                  label={`Composite noise: ${fixedNumber(compositeNoise, 2)}`}
                   text={helpText.compositeNoise}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1366,7 +1372,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Glow: ${glowStrength.toFixed(2)}`}
+                  label={`Glow: ${fixedNumber(glowStrength, 2)}`}
                   text={helpText.glow}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1384,7 +1390,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`LCD crosstalk: ${lcdCrosstalkStrength.toFixed(1)}`}
+                  label={`LCD crosstalk: ${fixedNumber(lcdCrosstalkStrength, 1)}`}
                   text={helpText.lcdCrosstalk}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1414,7 +1420,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Screen face glow: ${screenFaceGlow.toFixed(2)}`}
+                  label={`Screen face glow: ${fixedNumber(screenFaceGlow, 2)}`}
                   text={helpText.screenFaceGlow}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1432,7 +1438,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Curvature: ${curvature.toFixed(2)}`}
+                  label={`Curvature: ${fixedNumber(curvature, 2)}`}
                   text={helpText.curvature}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1463,7 +1469,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Scanline: ${scanlineStrength.toFixed(2)}`}
+                  label={`Scanline: ${fixedNumber(scanlineStrength, 2)}`}
                   text={helpText.scanline}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1481,7 +1487,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Scanline2: ${scanline2Strength.toFixed(2)}`}
+                  label={`Scanline2: ${fixedNumber(scanline2Strength, 2)}`}
                   text={helpText.scanline2}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1532,7 +1538,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Scanline bright fade: ${scanlineBrightnessFade.toFixed(2)}`}
+                  label={`Scanline bright fade: ${fixedNumber(scanlineBrightnessFade, 2, 0.6)}`}
                   text={helpText.scanlineBrightFade}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1550,7 +1556,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Vignette: ${vignetteStrength.toFixed(2)}`}
+                  label={`Vignette: ${fixedNumber(vignetteStrength, 2)}`}
                   text={helpText.vignette}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1568,7 +1574,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Phosphor: ${phosphorStrength.toFixed(2)}`}
+                  label={`Phosphor: ${fixedNumber(phosphorStrength, 2)}`}
                   text={helpText.phosphor}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1599,7 +1605,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Toon steps: ${toonSteps.toFixed(0)}`}
+                  label={`Toon steps: ${fixedNumber(toonSteps, 0)}`}
                   text={helpText.toonSteps}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1617,7 +1623,7 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Edge boost: ${edgeBoost.toFixed(2)}`}
+                  label={`Edge boost: ${fixedNumber(edgeBoost, 2)}`}
                   text={helpText.edgeBoost}
                   helpSuffix={helpText.helpSuffix}
                 />
@@ -1636,7 +1642,7 @@ export function RetroFilterPanel({
               <>
                 <label className="block">
                   <span className="text-[#12141c]">
-                    Edge threshold low: {animeEdgeLow.toFixed(2)}
+                    Edge threshold low: {fixedNumber(animeEdgeLow, 2, 0.08)}
                   </span>
                   <input
                     type="range"
@@ -1650,7 +1656,7 @@ export function RetroFilterPanel({
                 </label>
                 <label className="block">
                   <span className="text-[#12141c]">
-                    Edge threshold high: {animeEdgeHigh.toFixed(2)}
+                    Edge threshold high: {fixedNumber(animeEdgeHigh, 2, 0.55)}
                   </span>
                   <input
                     type="range"
@@ -1770,7 +1776,7 @@ export function RetroFilterPanel({
                     : "text-[#12141c]",
                 ].join(" ")}
               >
-                Internal res: {Number.isInteger(phosphorDotInternalScale) ? phosphorDotInternalScale : phosphorDotInternalScale.toFixed(1)}x
+                Internal res: {Number.isInteger(safeNumber(phosphorDotInternalScale, 1)) ? safeNumber(phosphorDotInternalScale, 1) : fixedNumber(phosphorDotInternalScale, 1, 1)}x
               </span>
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="text-[9px] text-[#7a7268]">1</span>
@@ -1802,7 +1808,7 @@ export function RetroFilterPanel({
 
           <label className="mt-3 block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
             <span className="text-[11px] leading-tight text-[#12141c]">
-              Grain: {phosphorDotGrainStrength <= 0 ? "off" : phosphorDotGrainStrength.toFixed(2)}
+              Grain: {safeNumber(phosphorDotGrainStrength) <= 0 ? "off" : fixedNumber(phosphorDotGrainStrength, 2)}
             </span>
             <input
               type="range"
@@ -1853,7 +1859,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Spot mask: ${spotMaskStrength.toFixed(3)}`}
+                label={`Spot mask: ${fixedNumber(spotMaskStrength, 3)}`}
                 text={helpText.spotMask}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1874,7 +1880,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Cell fill: ${phosphorDotCellFill.toFixed(3)}`}
+                label={`Cell fill: ${fixedNumber(phosphorDotCellFill, 3)}`}
                 text={helpText.cellFill}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1895,7 +1901,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Size response: ${phosphorDotSizeResponse.toFixed(1)}`}
+                label={`Size response: ${fixedNumber(phosphorDotSizeResponse, 1, 1)}`}
                 text={helpText.sizeResponse}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1916,7 +1922,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Bulb radius: ${bulbRadius.toFixed(3)}`}
+                label={`Bulb radius: ${fixedNumber(bulbRadius, 3)}`}
                 text={helpText.bulbRadius}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1937,7 +1943,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Black floor: ${blackFloor.toFixed(3)}`}
+                label={`Black floor: ${fixedNumber(blackFloor, 3)}`}
                 text={helpText.blackFloor}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -1958,7 +1964,7 @@ export function RetroFilterPanel({
           <label className="mt-3 block">
             <span className="text-[#12141c]">
               <InfoTip
-                label={`Light level: ${phosphorDotLightBalance.toFixed(2)}`}
+                label={`Light level: ${fixedNumber(phosphorDotLightBalance, 2, 1)}`}
                 text={helpText.lightLevel}
                 helpSuffix={helpText.helpSuffix}
               />
@@ -2028,7 +2034,7 @@ export function RetroFilterPanel({
               <label className="block">
                 <span className="text-[#12141c]">
                   <InfoTip
-                    label={`Beam cutoff: ${beamDarkCutoff.toFixed(3)}`}
+                    label={`Beam cutoff: ${fixedNumber(beamDarkCutoff, 3, 0.04)}`}
                     text={helpText.beamDarkCutoff}
                     helpSuffix={helpText.helpSuffix}
                   />
@@ -2049,7 +2055,7 @@ export function RetroFilterPanel({
               <label className="mt-3 block">
                 <span className="text-[#12141c]">
                   <InfoTip
-                    label={`Horizontal spread: ${beamHorizontalSpread.toFixed(2)}`}
+                    label={`Horizontal spread: ${fixedNumber(beamHorizontalSpread, 2, 1)}`}
                     text={helpText.beamHorizontalSpread}
                     helpSuffix={helpText.helpSuffix}
                   />
@@ -2070,7 +2076,7 @@ export function RetroFilterPanel({
               <label className="mt-3 block">
                 <span className="text-[#12141c]">
                   <InfoTip
-                    label={`Stripe strength: ${beamStripeStrength.toFixed(2)}`}
+                    label={`Stripe strength: ${fixedNumber(beamStripeStrength, 2, 1)}`}
                     text={helpText.beamStripeStrength}
                     helpSuffix={helpText.helpSuffix}
                   />
@@ -2091,7 +2097,7 @@ export function RetroFilterPanel({
               <label className="mt-3 block">
                 <span className="text-[#12141c]">
                   <InfoTip
-                    label={`White bloom: ${beamWhiteBloom.toFixed(2)}`}
+                    label={`White bloom: ${fixedNumber(beamWhiteBloom, 2, 1)}`}
                     text={helpText.beamWhiteBloom}
                     helpSuffix={helpText.helpSuffix}
                   />
