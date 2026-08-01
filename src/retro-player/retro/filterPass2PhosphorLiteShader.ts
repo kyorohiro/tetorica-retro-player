@@ -28,6 +28,9 @@ uniform float uPhosphorDotLightBalance;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
 uniform float uBasicSaturation;
+uniform float uReflectiveLcdBase;
+uniform float uLightDependentTint;
+uniform float uGrainVisibilityMode;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotShape;
@@ -83,6 +86,38 @@ vec3 applyBasicColorControls(vec3 color)
   vec3 saturated = mix(vec3(luma), color, saturation);
   vec3 contrasted = (saturated - 0.5) * contrast + 0.5;
   return clamp(contrasted, 0.0, 1.0);
+}
+
+vec3 applyReflectiveLcdBase(vec3 color)
+{
+  float amount = clamp(uReflectiveLcdBase, 0.0, 1.0);
+  if (amount <= 0.001) {
+    return color;
+  }
+
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float brightMask = smoothstep(0.06, 0.92, luma);
+  vec3 darkPaper = vec3(0.30, 0.36, 0.22);
+  vec3 brightPaper = vec3(0.79, 0.82, 0.60);
+  vec3 baseTone = mix(darkPaper, brightPaper, smoothstep(0.0, 1.0, luma));
+  vec3 lifted = max(color, baseTone * (0.24 + luma * 0.52));
+  return mix(color, lifted, amount * brightMask);
+}
+
+vec3 applyLightDependentTint(vec3 color)
+{
+  float amount = clamp(uLightDependentTint, 0.0, 1.0);
+  if (amount <= 0.001) {
+    return color;
+  }
+
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  vec3 darkTint = vec3(0.82, 1.00, 0.78);
+  vec3 midTint = vec3(0.96, 1.00, 0.83);
+  vec3 brightTint = vec3(1.06, 1.02, 0.82);
+  vec3 tint = mix(darkTint, midTint, smoothstep(0.0, 0.55, luma));
+  tint = mix(tint, brightTint, smoothstep(0.45, 1.0, luma));
+  return clamp(color * mix(vec3(1.0), tint, amount), 0.0, 1.0);
 }
 
 float getWarmBloomAmount()
@@ -652,6 +687,9 @@ void main(void)
     ) - 0.5;
     float ditherNoise = hash13(vec3(cell + grainJitter, grainFrame)) - 0.5;
     float grainAmount = uPhosphorDotGrainStrength * uSpotMaskStrength;
+    float grainVisibility =
+      mix(1.0, smoothstep(0.08, 0.9, max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b)), step(0.5, uGrainVisibilityMode));
+    grainAmount *= grainVisibility;
     // Multiplying alone leaves the near-black gaps between dots untouched
     // (anything * 0 is still 0), so the grain only ever showed up on the lit
     // dots themselves. Adding a matching additive term makes it show
@@ -853,6 +891,8 @@ void main(void)
     float vignette = distance(vMaskCoord, vec2(0.5));
     phosphorColor *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
     phosphorColor = applyBasicColorControls(phosphorColor);
+    phosphorColor = applyReflectiveLcdBase(phosphorColor);
+    phosphorColor = applyLightDependentTint(phosphorColor);
     phosphorColor = applyScreenFaceGlow(phosphorColor);
 
     finalColor = vec4(clamp(phosphorColor * uOutputBrightness, 0.0, 1.0), 1.0);
@@ -900,6 +940,8 @@ void main(void)
   float vignette = distance(vMaskCoord, vec2(0.5));
   color.rgb *= 1.0 - smoothstep(0.2, 0.78, vignette) * uVignetteStrength;
   color.rgb = applyBasicColorControls(color.rgb);
+  color.rgb = applyReflectiveLcdBase(color.rgb);
+  color.rgb = applyLightDependentTint(color.rgb);
   color.rgb = applyScreenFaceGlow(color.rgb);
 
   finalColor = vec4(clamp(color.rgb * uOutputBrightness, 0.0, 1.0), 1.0);

@@ -3,6 +3,7 @@ import {
   DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
+  type GrainVisibilityMode,
   normalizePhosphorDotInternalScale,
   normalizePhosphorDotSizeResponse,
   normalizePhosphorDotShape,
@@ -52,6 +53,9 @@ export type RetroFilterInitialState = Partial<{
   outputBrightness: number;
   basicContrast: number;
   basicSaturation: number;
+  reflectiveLcdBase: number;
+  lightDependentTint: number;
+  grainVisibilityMode: GrainVisibilityMode;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
@@ -128,6 +132,9 @@ const doesPresetMatchState = (
     (preset.outputBrightness ?? 1) === state.outputBrightness &&
     (preset.basicContrast ?? 1) === state.basicContrast &&
     (preset.basicSaturation ?? 1) === state.basicSaturation &&
+    (preset.reflectiveLcdBase ?? 0) === state.reflectiveLcdBase &&
+    (preset.lightDependentTint ?? 0) === state.lightDependentTint &&
+    (preset.grainVisibilityMode ?? "all") === state.grainVisibilityMode &&
     (preset.phosphorDotLightBalance ?? 1) === state.phosphorDotLightBalance &&
     normalizePhosphorDotShape(preset.phosphorDotShape ?? "circle") === state.phosphorDotShape &&
     normalizePhosphorDotInternalScale(preset.phosphorDotInternalScale ?? 1) === state.phosphorDotInternalScale &&
@@ -235,6 +242,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
     basicContrast: initialState.basicContrast ?? (DEFAULT_PRESET.basicContrast ?? 1),
     basicSaturation: initialState.basicSaturation ?? (DEFAULT_PRESET.basicSaturation ?? 1),
+    reflectiveLcdBase: initialState.reflectiveLcdBase ?? (DEFAULT_PRESET.reflectiveLcdBase ?? 0),
+    lightDependentTint: initialState.lightDependentTint ?? (DEFAULT_PRESET.lightDependentTint ?? 0),
+    grainVisibilityMode: initialState.grainVisibilityMode ?? (DEFAULT_PRESET.grainVisibilityMode ?? "all"),
     phosphorDotLightBalance:
       initialState.phosphorDotLightBalance ?? (DEFAULT_PRESET.phosphorDotLightBalance ?? 1),
     phosphorDotShape:
@@ -503,6 +513,29 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => (current.basicSaturation === basicSaturation ? current : { ...current, basicSaturation }));
   };
 
+  const setReflectiveLcdBase = (reflectiveLcdBase: number) => {
+    const normalized = Math.max(0, Math.min(1, reflectiveLcdBase));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.reflectiveLcdBase === normalized ? current : { ...current, reflectiveLcdBase: normalized }
+    ));
+  };
+
+  const setLightDependentTint = (lightDependentTint: number) => {
+    const normalized = Math.max(0, Math.min(1, lightDependentTint));
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.lightDependentTint === normalized ? current : { ...current, lightDependentTint: normalized }
+    ));
+  };
+
+  const setGrainVisibilityMode = (grainVisibilityMode: GrainVisibilityMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.grainVisibilityMode === grainVisibilityMode ? current : { ...current, grainVisibilityMode }
+    ));
+  };
+
   const setPhosphorDotLightBalance = (phosphorDotLightBalance: number) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -769,6 +802,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       outputBrightness: presetSettings.outputBrightness ?? 1,
       basicContrast: presetSettings.basicContrast ?? 1,
       basicSaturation: presetSettings.basicSaturation ?? 1,
+      reflectiveLcdBase: presetSettings.reflectiveLcdBase ?? 0,
+      lightDependentTint: presetSettings.lightDependentTint ?? 0,
+      grainVisibilityMode: presetSettings.grainVisibilityMode ?? "all",
       phosphorDotLightBalance: presetSettings.phosphorDotLightBalance ?? 1,
       phosphorDotShape: normalizePhosphorDotShape(presetSettings.phosphorDotShape ?? "circle"),
       phosphorDotInternalScale: normalizePhosphorDotInternalScale(
@@ -868,6 +904,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setOutputBrightness,
     setBasicContrast,
     setBasicSaturation,
+    setReflectiveLcdBase,
+    setLightDependentTint,
+    setGrainVisibilityMode,
     setPhosphorDotLightBalance,
     setPhosphorDotShape,
     setPhosphorDotInternalScale,

@@ -373,6 +373,9 @@ export function RetroControlPanel({
               outputBrightness={filterState.outputBrightness}
               basicContrast={filterState.basicContrast}
               basicSaturation={filterState.basicSaturation}
+              reflectiveLcdBase={filterState.reflectiveLcdBase}
+              lightDependentTint={filterState.lightDependentTint}
+              grainVisibilityMode={filterState.grainVisibilityMode}
               phosphorDotLightBalance={filterState.phosphorDotLightBalance}
               phosphorDotShape={filterState.phosphorDotShape}
               phosphorDotInternalScale={filterState.phosphorDotInternalScale}
@@ -437,6 +440,9 @@ export function RetroControlPanel({
               onSetOutputBrightness={filterState.setOutputBrightness}
               onSetBasicContrast={filterState.setBasicContrast}
               onSetBasicSaturation={filterState.setBasicSaturation}
+              onSetReflectiveLcdBase={filterState.setReflectiveLcdBase}
+              onSetLightDependentTint={filterState.setLightDependentTint}
+              onSetGrainVisibilityMode={filterState.setGrainVisibilityMode}
               onSetPhosphorDotLightBalance={filterState.setPhosphorDotLightBalance}
               onSetPhosphorDotShape={filterState.setPhosphorDotShape}
               onSetPhosphorDotInternalScale={filterState.setPhosphorDotInternalScale}

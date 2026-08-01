@@ -13,6 +13,7 @@ export type PaletteMode =
 export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 export type PhosphorDotShape = "circle" | "heart" | "beam" | "square";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
+export type GrainVisibilityMode = "all" | "bright_only";
 export type TargetSamplingMode =
   | "nearest"
   | "average_fast_4"
@@ -101,6 +102,9 @@ export type RetroPresetDefinition = {
   outputBrightness?: number;
   basicContrast?: number;
   basicSaturation?: number;
+  reflectiveLcdBase?: number;
+  lightDependentTint?: number;
+  grainVisibilityMode?: GrainVisibilityMode;
   phosphorDotLightBalance?: number;
   phosphorDotShape?: PhosphorDotShape;
   phosphorDotInternalScale?: number;
@@ -266,6 +270,9 @@ export const RETRO_PRESETS = {
     outputBrightness: 1.41,
     basicContrast: 0.89,
     basicSaturation: 1.0,
+    reflectiveLcdBase: 0.24,
+    lightDependentTint: 0.34,
+    grainVisibilityMode: "bright_only",
     phosphorDotShape: "square",
     phosphorDotInternalScale: 1,
     phosphorDotSizeResponse: 0,
@@ -287,7 +294,7 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
   },
   gba: {
-    label: "GBA",
+    label: "GBM",
     featured: true,
     autoTargetSize: false,
     samplingMode: "nearest",
@@ -333,7 +340,7 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
   },
   gbaLite: {
-    label: "GBA Lite",
+    label: "GBM Lite",
     featured: true,
     width: 240, // GBA is 240,GBA's internal resolution is 240x160, but we scale it to 320x200 for better visibility
     height: 160,// GBA is 160,

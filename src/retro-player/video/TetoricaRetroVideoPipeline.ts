@@ -1,6 +1,7 @@
 import {
   MONO_TINTS,
   paletteModeToUniform,
+  type GrainVisibilityMode,
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
@@ -53,6 +54,9 @@ export type RetroVideoFilterState = {
   outputBrightness: number;
   basicContrast: number;
   basicSaturation: number;
+  reflectiveLcdBase: number;
+  lightDependentTint: number;
+  grainVisibilityMode: GrainVisibilityMode;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
@@ -126,6 +130,10 @@ function getSamplingModeValue(mode: TargetSamplingMode): number {
   return 0;
 }
 
+function getGrainVisibilityModeValue(mode: GrainVisibilityMode): number {
+  return mode === "bright_only" ? 1 : 0;
+}
+
 type Pass1UniformLocations = {
   uTargetSize: WebGLUniformLocation | null;
   uColorLevels: WebGLUniformLocation | null;
@@ -179,6 +187,9 @@ type Pass2UniformLocations = {
   uOutputBrightness: WebGLUniformLocation | null;
   uBasicContrast: WebGLUniformLocation | null;
   uBasicSaturation: WebGLUniformLocation | null;
+  uReflectiveLcdBase: WebGLUniformLocation | null;
+  uLightDependentTint: WebGLUniformLocation | null;
+  uGrainVisibilityMode: WebGLUniformLocation | null;
   uPhosphorDotLightBalance: WebGLUniformLocation | null;
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
@@ -1551,6 +1562,9 @@ export class TetoricaRetroVideoPipeline {
       uOutputBrightness: gl.getUniformLocation(program, "uOutputBrightness"),
       uBasicContrast: gl.getUniformLocation(program, "uBasicContrast"),
       uBasicSaturation: gl.getUniformLocation(program, "uBasicSaturation"),
+      uReflectiveLcdBase: gl.getUniformLocation(program, "uReflectiveLcdBase"),
+      uLightDependentTint: gl.getUniformLocation(program, "uLightDependentTint"),
+      uGrainVisibilityMode: gl.getUniformLocation(program, "uGrainVisibilityMode"),
       uPhosphorDotLightBalance: gl.getUniformLocation(program, "uPhosphorDotLightBalance"),
       uPixelAspect: gl.getUniformLocation(program, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
@@ -2149,6 +2163,12 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uOutputBrightness, filterState.outputBrightness);
     gl.uniform1f(this.pass2Locs.uBasicContrast, filterState.basicContrast);
     gl.uniform1f(this.pass2Locs.uBasicSaturation, filterState.basicSaturation);
+    gl.uniform1f(this.pass2Locs.uReflectiveLcdBase, filterState.reflectiveLcdBase);
+    gl.uniform1f(this.pass2Locs.uLightDependentTint, filterState.lightDependentTint);
+    gl.uniform1f(
+      this.pass2Locs.uGrainVisibilityMode,
+      getGrainVisibilityModeValue(filterState.grainVisibilityMode),
+    );
     gl.uniform1f(this.pass2Locs.uPhosphorDotLightBalance, filterState.phosphorDotLightBalance);
     gl.uniform1f(
       this.pass2Locs.uPixelAspect,

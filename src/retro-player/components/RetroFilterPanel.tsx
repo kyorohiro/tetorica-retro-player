@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  type GrainVisibilityMode,
   MONO_TINTS,
   RETRO_PRESET_CATEGORY_ITEMS,
   RETRO_PRESET_CATEGORY_LABELS,
@@ -93,6 +94,9 @@ type RetroFilterPanelProps = {
   outputBrightness: number;
   basicContrast: number;
   basicSaturation: number;
+  reflectiveLcdBase: number;
+  lightDependentTint: number;
+  grainVisibilityMode: GrainVisibilityMode;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
@@ -157,6 +161,9 @@ type RetroFilterPanelProps = {
   onSetOutputBrightness: (value: number) => void;
   onSetBasicContrast: (value: number) => void;
   onSetBasicSaturation: (value: number) => void;
+  onSetReflectiveLcdBase: (value: number) => void;
+  onSetLightDependentTint: (value: number) => void;
+  onSetGrainVisibilityMode: (value: GrainVisibilityMode) => void;
   onSetPhosphorDotLightBalance: (value: number) => void;
   onSetPhosphorDotShape: (value: PhosphorDotShape) => void;
   onSetPhosphorDotInternalScale: (value: number) => void;
@@ -222,6 +229,9 @@ export function RetroFilterPanel({
   outputBrightness,
   basicContrast,
   basicSaturation,
+  reflectiveLcdBase,
+  lightDependentTint,
+  grainVisibilityMode,
   phosphorDotLightBalance,
   phosphorDotShape,
   phosphorDotInternalScale,
@@ -283,6 +293,9 @@ export function RetroFilterPanel({
   onSetOutputBrightness,
   onSetBasicContrast,
   onSetBasicSaturation,
+  onSetReflectiveLcdBase,
+  onSetLightDependentTint,
+  onSetGrainVisibilityMode,
   onSetPhosphorDotLightBalance,
   onSetPhosphorDotShape,
   onSetPhosphorDotInternalScale,
@@ -417,8 +430,14 @@ export function RetroFilterPanel({
             "映像全体の明暗差を素直に広げたり弱めたりします。1.00 が標準で、下げると柔らかく、上げるとメリハリが強くなります。",
           basicSaturation:
             "映像全体の色の強さを一括で調整します。1.00 が標準で、下げると落ち着いた色、上げると鮮やかな色になります。",
+          reflectiveLcdBase:
+            "反射型 LCD の地色が、明るい部分でうっすら見える感じを足します。上げるほど、白や淡い緑の面に紙や反射板のようなベース色が乗ります。",
+          lightDependentTint:
+            "明るさに応じて色味を少し変えます。上げるほど、暗部は深い緑寄りに、明部は黄緑や紙っぽい色へ転びやすくなります。",
           closeUpNoise:
             "細かなアニメーション粒子を足して、近接撮影した CRT っぽさを出します。値を上げると効果を確認しやすくなります。",
+          grainVisibility:
+            "Grain を暗部まで出すか、明るい部分中心にするかを切り替えます。Reflective LCD 系は Bright only、CRT 系は All が自然です。",
           focus:
             "画面の周辺部をぼかして中央に焦点を合わせます。値を上げるほど周辺のぼけが強くなり、被写界深度のような効果が得られます。",
           focusWidth:
@@ -514,8 +533,14 @@ export function RetroFilterPanel({
             "Adjusts overall contrast in a straightforward way. 1.00 is neutral; lower values soften the image, while higher values add punch.",
           basicSaturation:
             "Adjusts overall color intensity across the whole image. 1.00 is neutral; lower values mute the image, higher values make it more vivid.",
+          reflectiveLcdBase:
+            "Adds a reflective-LCD style base tone that becomes easier to notice in brighter areas. Higher values make pale regions pick up more of a paper or reflector-like base color.",
+          lightDependentTint:
+            "Shifts the tint slightly with brightness. Higher values push darker areas toward deeper green while brighter areas drift toward yellow-green or paper-like tones.",
           closeUpNoise:
             "Adds fine animated grain so the screen feels less clean and more like a close-up filmed CRT. Higher values are useful for clearly previewing the effect.",
+          grainVisibility:
+            "Chooses whether grain stays visible in dark areas too, or mostly shows up in brighter areas. Bright only tends to fit reflective LCD looks, while All fits CRT-style grain better.",
           focus:
             "Blurs the periphery of the image, keeping the center sharp. Higher values increase the defocus at the edges for a depth-of-field style effect.",
           focusWidth:
@@ -1095,6 +1120,42 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={basicSaturation}
                 onChange={(ev) => onSetBasicSaturation(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Reflective LCD base: ${reflectiveLcdBase.toFixed(2)}`}
+                  text={helpText.reflectiveLcdBase}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={reflectiveLcdBase}
+                onChange={(ev) => onSetReflectiveLcdBase(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Light-dependent tint: ${lightDependentTint.toFixed(2)}`}
+                  text={helpText.lightDependentTint}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={lightDependentTint}
+                onChange={(ev) => onSetLightDependentTint(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>
@@ -1755,6 +1816,39 @@ export function RetroFilterPanel({
               className="mt-1 w-full"
             />
           </label>
+
+          <div className="mt-3 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] p-2">
+            <div className="text-[#12141c]">
+              <InfoTip
+                label={`Grain visibility: ${grainVisibilityMode === "bright_only" ? "Bright only" : "All"}`}
+                text={helpText.grainVisibility}
+                helpSuffix={helpText.helpSuffix}
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {([
+                { label: "All", value: "all" },
+                { label: "Bright only", value: "bright_only" },
+              ] as const).map((option) => {
+                const isActive = grainVisibilityMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => onSetGrainVisibilityMode(option.value)}
+                    className={[
+                      "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight",
+                      isActive
+                        ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                        : "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]",
+                    ].join(" ")}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <label className="mt-3 block">
             <span className="text-[#12141c]">

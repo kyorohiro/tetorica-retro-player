@@ -1,5 +1,6 @@
 import {
   normalizePhosphorDotShape,
+  type GrainVisibilityMode,
   type LegacyPhosphorDotShape,
   type MonoTintMode,
   type PaletteMode,
@@ -44,6 +45,9 @@ export type PersistedRetroFilterSettings = {
   outputBrightness: number;
   basicContrast: number;
   basicSaturation: number;
+  reflectiveLcdBase: number;
+  lightDependentTint: number;
+  grainVisibilityMode: GrainVisibilityMode;
   phosphorDotLightBalance: number;
   phosphorDotShape: PhosphorDotShape;
   phosphorDotInternalScale: number;
@@ -183,6 +187,18 @@ const normalizePersistedRetroSettings = (
           typeof filter.lcdCrosstalkStrength === "number" && Number.isFinite(filter.lcdCrosstalkStrength)
             ? filter.lcdCrosstalkStrength
             : 0,
+        reflectiveLcdBase:
+          typeof filter.reflectiveLcdBase === "number" && Number.isFinite(filter.reflectiveLcdBase)
+            ? filter.reflectiveLcdBase
+            : 0,
+        lightDependentTint:
+          typeof filter.lightDependentTint === "number" && Number.isFinite(filter.lightDependentTint)
+            ? filter.lightDependentTint
+            : 0,
+        grainVisibilityMode:
+          filter.grainVisibilityMode === "bright_only"
+            ? "bright_only"
+            : "all",
       }
       : filter,
     audio: audio
