@@ -1093,8 +1093,8 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
     scanlineBrightnessFade: 0.92,
   },
-  tetoricaDotPreset: {
-    label: "Tetorica Dot Preset",
+  tetoricaDot: {
+    label: "Tetorica Dot",
     featured: true,
     autoTargetSize: true,
     samplingMode: "nearest",
@@ -1316,7 +1316,7 @@ export const RETRO_PRESET_CATEGORIES = {
   animeCel: "other",
   animeToon: "other",
   tetorica: "other",
-  tetoricaDotPreset: "other",
+  tetoricaDot: "other",
 } as const satisfies Record<Exclude<RetroPresetKey, "none">, RetroPresetCategory>;
 
 export type RetroPresetFamilyVariant = {
@@ -1406,7 +1406,7 @@ export const RETRO_PRESET_CATEGORY_ITEMS: Record<
     { type: "preset", key: "animeCel" },
     { type: "preset", key: "animeToon" },
     { type: "preset", key: "tetorica" },
-    { type: "preset", key: "tetoricaDotPreset" },
+    { type: "preset", key: "tetoricaDot" },
   ],
 };
 
