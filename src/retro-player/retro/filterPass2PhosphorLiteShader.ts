@@ -402,9 +402,11 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     float halo =
       (1.0 - smoothstep(1.0 - squareEdge * 3.0, 1.0 + squareEdge * 3.6, squareHaloField)) *
       squareHaloCornerMask;
+    float flatEdgeSuppression = 1.0 - flatDiscMode;
     float gridRim =
       smoothstep(0.76, 0.98, max(abs(squareUv.x), abs(squareUv.y))) *
-      squareCornerMask;
+      squareCornerMask *
+      flatEdgeSuppression;
     float bodyGlow = bulb * mix(
       0.24 + brightness * 0.28,
       0.24 + brightness * 0.28,
@@ -444,18 +446,18 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       uPhosphorDotCellFill *
       (0.34 + brightness * 0.2) *
       squareCornerMask;
-    float flatDiscFill =
+    float flatPlateFill =
       gate *
       lit *
       amount *
-      flatDisc *
-      (0.72 + brightness * 0.14);
+      squareCornerMask *
+      (0.56 + brightness * 0.12 + flatDisc * 0.18);
     float brightCoreCellClamp = mix(1.0, 0.16, brightCoreMix);
     float brightCoreFloorClamp = mix(1.0, 0.24, brightCoreMix);
     vec3 dotCoreColor = color * emission;
     dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.45, cellFillMix) * brightCoreCellClamp;
-    vec3 discCoreColor = color * flatDiscFill;
-    vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+    vec3 flatPlateColor = color * flatPlateFill;
+    vec3 dotColor = mix(dotCoreColor, flatPlateColor, flatDiscMode);
     dotColor += color * floorLight * brightCoreFloorClamp;
     return dotColor * lightLevel;
   }
@@ -830,13 +832,17 @@ void main(void)
       );
     }
 
+    bool useSquareShape = uPhosphorDotShape > 2.5;
     float dotRadius = mix(
       uBulbRadius * (useBrightCoreLeak ? 0.14 : 0.19),
       uBulbRadius * ((useBrightCoreLeak ? 0.64 : 0.82) + highlightBloom * (useBrightCoreLeak ? 0.24 : 0.12)),
       pow(phosphorBrightness, 0.7)
     );
-    float edgeWidth = max(fwidth(dist) * mix(1.4, 2.2, flatDiscMode), 0.002);
-    float edgeBand = 1.0 - smoothstep(0.0, edgeWidth, abs(dist - dotRadius));
+    float shapeDist = useSquareShape ? max(abs(dotUv.x), abs(dotUv.y)) : dist;
+    float edgeWidth = max(fwidth(shapeDist) * mix(1.4, 2.2, flatDiscMode), 0.002);
+    float edgeBand =
+      (1.0 - smoothstep(0.0, edgeWidth, abs(shapeDist - dotRadius))) *
+      (1.0 - flatDiscMode);
     float colorDelta = length(mixedSourceColor - neighborMix);
     float edgeBlend =
       edgeBand *
