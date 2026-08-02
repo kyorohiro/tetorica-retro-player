@@ -501,13 +501,8 @@ export function useRetroPixiStage({
       : cappedHeight;
     const didApplyFilterCap = filterCapFactor > 1.0001;
     const didApplyAnyCap = totalScaleDownFactor > 1.0001;
-    const shouldKeepViewportFitOnCap = isPreviewMaximized;
-    const presentedStyleWidth = didApplyAnyCap && !shouldKeepViewportFitOnCap
-      ? Math.max(1, Math.round(styleWidth / totalScaleDownFactor))
-      : styleWidth;
-    const presentedStyleHeight = didApplyAnyCap && !shouldKeepViewportFitOnCap
-      ? Math.max(1, Math.round(styleHeight / totalScaleDownFactor))
-      : styleHeight;
+    const presentedStyleWidth = styleWidth;
+    const presentedStyleHeight = styleHeight;
     const nextLeft = Math.round(viewRect.x + (styleWidth - presentedStyleWidth) / 2);
     const nextTop = Math.round(viewRect.y + (styleHeight - presentedStyleHeight) / 2);
     const nextLayoutKey = [
@@ -551,7 +546,6 @@ export function useRetroPixiStage({
         presentedStyleHeight,
         didApplyFilterCap,
         didApplyAnyCap,
-        shouldKeepViewportFitOnCap,
         shouldFreezeCanvasSizeOnMaximize,
         windowedCanvasSize,
         filterBufferCap,
