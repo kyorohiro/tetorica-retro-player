@@ -6,7 +6,6 @@ import {
   RETRO_PRESET_CATEGORY_LABELS,
   RETRO_PRESET_CATEGORY_ORDER,
   RETRO_PRESETS,
-  type RetroPresetCategoryItem,
   type MonoTintMode,
   type PaletteMode,
   type PhosphorDotShape,
@@ -623,48 +622,38 @@ export function RetroFilterPanel({
             <p className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7a7268]">
               {label}
             </p>
-            {category === "crt"
-              ? (() => {
-                  const familyItems = items.filter(
-                    (item): item is Extract<RetroPresetCategoryItem, { type: "family" }> =>
-                      item.type === "family",
-                  );
-                  const loosePresetItems = items.filter(
-                    (item): item is Extract<RetroPresetCategoryItem, { type: "preset" }> =>
-                      item.type === "preset",
-                  );
+            {(() => {
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  {items.map((item) => {
+                    if (item.type === "family") {
+                      const { id, label: familyLabel, variants } = item;
+                      const familyKeys = variants.map(({ key }) => key) as RetroPresetKey[];
+                      if (familyKeys.length === 0) {
+                        return null;
+                      }
+                      const selectedFamilyVariant = variants.find(
+                        ({ key }) => key === selectedPreset,
+                      ) ?? variants[0];
+                      const selectedFamilyKey = selectedFamilyVariant?.key ?? familyKeys[0];
+                      const selectedFamilyLabel = selectedFamilyVariant?.label ?? familyLabel;
+                      const familyActive = familyKeys.includes(selectedPreset as RetroPresetKey);
+                      const familyOpen = openPresetFamilyId === id;
 
-                  return (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                      {familyItems.map(({ id, label: familyLabel, variants }) => {
-                        const familyKeys = variants
-                          .map(({ key }) => key) as RetroPresetKey[];
-                        if (familyKeys.length === 0) {
-                          return null;
-                        }
-                        const selectedFamilyVariant = variants.find(
-                          ({ key }) => key === selectedPreset,
-                        ) ?? variants[0];
-                        const selectedFamilyKey = selectedFamilyVariant?.key ?? familyKeys[0];
-                        const selectedFamilyLabel = selectedFamilyVariant?.label ?? familyLabel;
-                        const familyActive = familyKeys.includes(selectedPreset as RetroPresetKey);
-                        const familyOpen = openPresetFamilyId === id;
-
-                        return (
+                      return (
+                        <div
+                          key={id}
+                          className="relative"
+                        >
                           <div
-                            key={id}
-                            className="relative"
+                            className={[
+                              "overflow-hidden rounded-lg border",
+                              familyActive
+                                ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a]"
+                                : "border-amber-500/30 bg-amber-500/10 text-[#12141c]",
+                            ].join(" ")}
                           >
-                            <div
-                              className={[
-                                "overflow-hidden rounded-lg border",
-                                familyActive
-                                  ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a]"
-                                  : "border-amber-500/30 bg-amber-500/10 text-[#12141c]",
-                              ].join(" ")}
-                            >
-                              <div className="flex min-h-10">
+                            <div className="flex min-h-10">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -697,86 +686,54 @@ export function RetroFilterPanel({
                                 {familyOpen ? "▴" : "▾"}
                               </button>
                             </div>
-                            </div>
-                            {familyOpen && (
-                              <div className="absolute inset-0 z-20 overflow-hidden rounded-lg border border-[#ccbfae] bg-[#f8f4ee] shadow-lg">
-                                <div
-                                  className="grid min-w-0 h-full"
-                                  style={{
-                                    gridTemplateColumns: `repeat(${Math.max(
-                                      1,
-                                      variants.length,
-                                    )}, minmax(0, 1fr))`,
-                                  }}
-                                >
-                                {variants
-                                  .map(({ key, label }, index) => {
-                                    const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
-                                    return (
-                                      <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => {
-                                          onApplyPreset(key);
-                                          setOpenPresetFamilyId(null);
-                                        }}
-                                        className={[
-                                          "min-h-10 px-1.5 py-1 text-[10px] leading-tight sm:px-2 sm:py-1.5 sm:text-[11px]",
-                                          "border-[#d3cabd]",
-                                          index > 0 ? "border-l" : "",
-                                          selectedPreset === key
-                                            ? "bg-emerald-500/14 font-semibold text-[#0a3a1a]"
-                                            : "bg-[#f8f4ee] text-[#5b5348] hover:bg-[#f0e8dc]",
-                                          preset.featured
-                                            ? selectedPreset === key
-                                              ? "bg-[repeating-linear-gradient(20deg,#05966922,#05966922_1px,transparent_1px,transparent_24px)]"
-                                              : "bg-[repeating-linear-gradient(20deg,#f59e0b16,#f59e0b16_1px,transparent_1px,transparent_24px)]"
-                                            : "",
-                                        ].join(" ")}
-                                        title={`${familyLabel}: ${preset.label}`}
-                                      >
-                                        {label}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
                           </div>
-                        );
-                      })}
-                      </div>
-                      {loosePresetItems.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2">
-                          {loosePresetItems.map(({ key }) => {
-                            const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
-                            return (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => {
-                                  onApplyPreset(key);
+                          {familyOpen && (
+                            <div className="absolute inset-0 z-20 overflow-hidden rounded-lg border border-[#ccbfae] bg-[#f8f4ee] shadow-lg">
+                              <div
+                                className="grid min-w-0 h-full"
+                                style={{
+                                  gridTemplateColumns: `repeat(${Math.max(
+                                    1,
+                                    variants.length,
+                                  )}, minmax(0, 1fr))`,
                                 }}
-                                className={presetButtonClass(
-                                  selectedPreset === key,
-                                  preset.featured,
-                                )}
                               >
-                                {preset.label}
-                              </button>
-                            );
-                          })}
+                                {variants.map(({ key, label }, index) => {
+                                  const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
+                                  return (
+                                    <button
+                                      key={key}
+                                      type="button"
+                                      onClick={() => {
+                                        onApplyPreset(key);
+                                        setOpenPresetFamilyId(null);
+                                      }}
+                                      className={[
+                                        "min-h-10 px-1.5 py-1 text-[10px] leading-tight sm:px-2 sm:py-1.5 sm:text-[11px]",
+                                        "border-[#d3cabd]",
+                                        index > 0 ? "border-l" : "",
+                                        selectedPreset === key
+                                          ? "bg-emerald-500/14 font-semibold text-[#0a3a1a]"
+                                          : "bg-[#f8f4ee] text-[#5b5348] hover:bg-[#f0e8dc]",
+                                        preset.featured
+                                          ? selectedPreset === key
+                                            ? "bg-[repeating-linear-gradient(20deg,#05966922,#05966922_1px,transparent_1px,transparent_24px)]"
+                                            : "bg-[repeating-linear-gradient(20deg,#f59e0b16,#f59e0b16_1px,transparent_1px,transparent_24px)]"
+                                          : "",
+                                      ].join(" ")}
+                                      title={`${familyLabel}: ${preset.label}`}
+                                    >
+                                      {label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })()
-              : (
-                <div className="grid grid-cols-3 gap-2">
-                  {items.map((item) => {
-                    if (item.type !== "preset") {
-                      return null;
+                      );
                     }
+
                     const { key } = item;
                     const preset = RETRO_PRESETS[key] as RetroPresetDefinition;
                     return (
@@ -796,7 +753,8 @@ export function RetroFilterPanel({
                     );
                   })}
                 </div>
-              )}
+              );
+            })()}
           </div>
         ))}
       </div>

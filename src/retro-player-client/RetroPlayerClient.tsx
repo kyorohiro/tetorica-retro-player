@@ -115,6 +115,8 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
 
     const currentPresetConfigRef = useRef<PresetConfig>(startupPreset);
     const toneCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
+    const suppressNextBuiltinTonePlaySyncRef = useRef(false);
+    const builtinToneRestartingRef = useRef(false);
     const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
     const nesResumeAudioRef = useRef<(() => Promise<boolean>) | null>(null);
     const nesLaunchTokenRef = useRef(0);
@@ -194,6 +196,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const stopTone = useCallback(() => {
       toneCleanupRef.current?.();
       toneCleanupRef.current = null;
+      suppressNextBuiltinTonePlaySyncRef.current = false;
     }, []);
 
     const stopNesSession = useCallback(() => {
@@ -212,6 +215,13 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       stopNesSession();
       setAutoStartState('done');
     }, [stopNesSession, stopTone]);
+
+    const stopCurrentPlaybackBeforePresetStart = useCallback(() => {
+      builtinToneRestartingRef.current = true;
+      previewSource.clearPreview();
+      stopTone();
+      stopNesSession();
+    }, [previewSource, stopNesSession, stopTone]);
 
     const clearPlaylistSession = useCallback(() => {
       playlistRef.current = [];
@@ -270,21 +280,21 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const playPresetVideo = useCallback(() => {
       clearPlaylistSession();
       savePreset({ type: 'colorbars-video' });
-      stopTone();
+      stopCurrentPlaybackBeforePresetStart();
       previewSource.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
-    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
 
     const playPresetImage = useCallback(() => {
       clearPlaylistSession();
       savePreset({ type: 'colorbars-image' });
-      stopTone();
+      stopCurrentPlaybackBeforePresetStart();
       previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
-    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
 
     const playPresetLofi = useCallback(async () => {
       clearPlaylistSession();
       savePreset({ type: 'lofi' });
-      stopTone();
+      stopCurrentPlaybackBeforePresetStart();
       const [{ startLofiSession }, Tone] = await Promise.all([
         import('./builtin-content/lofi-engine'),
         import('tone'),
@@ -292,18 +302,20 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       await Tone.start().catch(() => {});
       const session = await startLofiSession();
       toneCleanupRef.current = session.dispose;
+      suppressNextBuiltinTonePlaySyncRef.current = true;
       previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
-    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
 
     const playPresetDemoSong = useCallback(async (meta: DemoSongMeta) => {
       clearPlaylistSession();
       savePreset({ type: 'demo-song', songId: meta.id });
-      stopTone();
+      stopCurrentPlaybackBeforePresetStart();
       const { startDemoSongSession } = await import('./builtin-content/demo-song-session');
       const session = await startDemoSongSession(meta);
       toneCleanupRef.current = session.dispose;
+      suppressNextBuiltinTonePlaySyncRef.current = true;
       previewSource.previewAudioStream(session.stream, meta.name);
-    }, [clearPlaylistSession, previewSource, savePreset, stopTone]);
+    }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
 
     // Restart the currently saved preset. Called from RetroPlayer's onRetry
     // (play button pressed while media is in error/ended state).
@@ -316,7 +328,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
 
       setAutoStartState('done');
       const preset = currentPresetConfigRef.current;
-      stopTone();
+      stopCurrentPlaybackBeforePresetStart();
       if (preset.type === 'lofi') {
         const [{ startLofiSession }, Tone] = await Promise.all([
           import('./builtin-content/lofi-engine'),
@@ -325,6 +337,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         await Tone.start().catch(() => {});
         const session = await startLofiSession();
         toneCleanupRef.current = session.dispose;
+        suppressNextBuiltinTonePlaySyncRef.current = true;
         previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
       } else if (preset.type === 'demo-song') {
         const [{ DEMO_SONGS }, { startDemoSongSession }] = await Promise.all([
@@ -335,6 +348,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         if (meta) {
           const session = await startDemoSongSession(meta);
           toneCleanupRef.current = session.dispose;
+          suppressNextBuiltinTonePlaySyncRef.current = true;
           previewSource.previewAudioStream(session.stream, meta.name);
         }
       } else if (preset.type === 'colorbars-video') {
@@ -344,7 +358,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       } else if (preset.type === 'url') {
         previewSource.previewPath(preset.url, preset.label);
       }
-    }, [previewSource, stopTone]);
+    }, [previewSource, stopCurrentPlaybackBeforePresetStart]);
 
     const launchNesFile = useCallback((file: File) => {
       stopTone();
@@ -668,6 +682,16 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
               if (event.source === "builtin-tone") {
                 if (isDialogActiveRef.current) {
                   syncToneTransportPlayback(false);
+                  return;
+                }
+                if (builtinToneRestartingRef.current) {
+                  if (event.playing) {
+                    builtinToneRestartingRef.current = false;
+                  }
+                  return;
+                }
+                if (event.playing && suppressNextBuiltinTonePlaySyncRef.current) {
+                  suppressNextBuiltinTonePlaySyncRef.current = false;
                   return;
                 }
                 syncToneTransportPlayback(event.playing);

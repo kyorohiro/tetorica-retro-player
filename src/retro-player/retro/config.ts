@@ -702,7 +702,7 @@ export const RETRO_PRESETS = {
     neonDetail: 1.0,
   },
   phosphorDotLite: {
-    label: "Phosphor Dot Lite",
+    label: "Phosphor Dot NTSC",
     featured: true,
     autoTargetSize: true,
     samplingMode: "nearest",
@@ -1272,7 +1272,7 @@ export type RetroPresetCategory = "classic" | "lcd" | "crt" | "other";
 
 export const RETRO_PRESET_CATEGORY_LABELS: Record<RetroPresetCategory, string> = {
   classic: "Game / Classic",
-  lcd: "LCD",
+  lcd: "Portable / LCD",
   crt: "CRT",
   other: "Other",
 };
@@ -1343,18 +1343,39 @@ export const RETRO_PRESET_CATEGORY_ITEMS: Record<
   classic: [
     { type: "preset", key: "chunky" },
     { type: "preset", key: "arcade" },
-    { type: "preset", key: "gbLite" },
-    { type: "preset", key: "gb" },
-    { type: "preset", key: "gbPlus" },
-    { type: "preset", key: "gbaLite" },
-    { type: "preset", key: "gba" },
-    { type: "preset", key: "gbm" },
-    { type: "preset", key: "pc98_512" },
-    { type: "preset", key: "pc98_4096" },
     { type: "preset", key: "pc98" },
-    { type: "preset", key: "pc98_tile" },
     { type: "preset", key: "color32" },
     { type: "preset", key: "color64" },
+    {
+      type: "family",
+      id: "gb",
+      label: "GB",
+      variants: [
+        { key: "gbLite", label: "Lite" },
+        { key: "gb", label: "Base" },
+        { key: "gbPlus", label: "+" },
+      ],
+    },
+    {
+      type: "family",
+      id: "gba",
+      label: "GBA",
+      variants: [
+        { key: "gbaLite", label: "Lite" },
+        { key: "gba", label: "Base" },
+        { key: "gbm", label: "GBM" },
+      ],
+    },
+    {
+      type: "family",
+      id: "pc98",
+      label: "PC-98",
+      variants: [
+        { key: "pc98_512", label: "512" },
+        { key: "pc98_4096", label: "4096" },
+        { key: "pc98_tile", label: "Tile" },
+      ],
+    },
   ],
   lcd: [
     { type: "preset", key: "monochrome" },
