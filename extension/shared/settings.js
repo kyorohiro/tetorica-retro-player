@@ -595,7 +595,7 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   phosphorDotLite: {
-    label: "Phosphor Dot Lite",
+    label: "Phosphor Dot Bright",
     targetWidth: 640,
     targetHeight: 360,
     colorLevels: 256,
@@ -773,11 +773,11 @@ export const PRESETS = {
     colorLevels: 32,
     ditherStrength: 0.8,
     paletteMode: 0,
-    curvature: 0.03,
+    curvature: 0.02,
     scanlineStrength: 0,
     scanline2Strength: 0.03,
     vignetteStrength: 0.28,
-    glowStrength: 0.04,
+    glowStrength: 0.02,
     smoothStrength: 1,
     phosphorStrength: 0.48,
     spotMaskStrength: 0,
@@ -927,8 +927,8 @@ export const PRESETS = {
     isNoiseEnabled: false,
     noiseLevel: 0,
   },
-  tetoricaDotPreset: {
-    label: "Tetorica Dot Preset",
+  tetoricaDot: {
+    label: "Tetorica Dot",
     targetWidth: 640,
     targetHeight: 360,
     colorLevels: 256,
