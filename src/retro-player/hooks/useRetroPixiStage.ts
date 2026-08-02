@@ -68,7 +68,7 @@ const resolveFilterBufferCap = (
   }
 
   const isRealtimeVisualPreview =
-    previewKind === "video" || previewKind === "capture";
+    previewKind === "video" || previewKind === "capture" ;// ;
   if (!isRealtimeVisualPreview || !filterState.isFilterEnabled) {
     return null;
   }
@@ -170,6 +170,7 @@ export function useRetroPixiStage({
   const destroyPixiRef = useRef<() => void>(() => {});
   const appliedLayoutKeyRef = useRef<string | null>(null);
   const appliedShaderCompileCacheBusterEnabledRef = useRef(shaderCompileCacheBusterEnabled);
+  const lastWindowedCanvasSizeRef = useRef<{ width: number; height: number } | null>(null);
   // Populated once the WebGL2 context exists (see initPixi below). Backing
   // buffer size feeds straight into the pipeline's FBO textures, so at 3x/4x
   // render resolution on a large preview this is the only thing standing
@@ -485,15 +486,35 @@ export function useRetroPixiStage({
       filterCapFactor,
     );
     app.pipeline.setFilterViewportScale(totalScaleDownFactor);
-    const nextWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
-    const nextHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
+    const cappedWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
+    const cappedHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
+    const windowedCanvasSize = lastWindowedCanvasSizeRef.current;
+    const shouldFreezeCanvasSizeOnMaximize =
+      isPreviewMaximized &&
+      totalScaleDownFactor > 1.0001 &&
+      windowedCanvasSize !== null;
+    const nextWidth = shouldFreezeCanvasSizeOnMaximize
+      ? Math.min(cappedWidth, windowedCanvasSize.width)
+      : cappedWidth;
+    const nextHeight = shouldFreezeCanvasSizeOnMaximize
+      ? Math.min(cappedHeight, windowedCanvasSize.height)
+      : cappedHeight;
     const didApplyFilterCap = filterCapFactor > 1.0001;
     const didApplyAnyCap = totalScaleDownFactor > 1.0001;
-    const nextLeft = Math.round(viewRect.x);
-    const nextTop = Math.round(viewRect.y);
+    const shouldKeepViewportFitOnCap = isPreviewMaximized;
+    const presentedStyleWidth = didApplyAnyCap && !shouldKeepViewportFitOnCap
+      ? Math.max(1, Math.round(styleWidth / totalScaleDownFactor))
+      : styleWidth;
+    const presentedStyleHeight = didApplyAnyCap && !shouldKeepViewportFitOnCap
+      ? Math.max(1, Math.round(styleHeight / totalScaleDownFactor))
+      : styleHeight;
+    const nextLeft = Math.round(viewRect.x + (styleWidth - presentedStyleWidth) / 2);
+    const nextTop = Math.round(viewRect.y + (styleHeight - presentedStyleHeight) / 2);
     const nextLayoutKey = [
       styleWidth,
       styleHeight,
+      presentedStyleWidth,
+      presentedStyleHeight,
       nextWidth,
       nextHeight,
       nextLeft,
@@ -522,10 +543,17 @@ export function useRetroPixiStage({
         overLimitFactor,
         filterCapFactor,
         totalScaleDownFactor,
+        cappedWidth,
+        cappedHeight,
         nextWidth,
         nextHeight,
+        presentedStyleWidth,
+        presentedStyleHeight,
         didApplyFilterCap,
         didApplyAnyCap,
+        shouldKeepViewportFitOnCap,
+        shouldFreezeCanvasSizeOnMaximize,
+        windowedCanvasSize,
         filterBufferCap,
         isFilterEnabled: currentFilterState.isFilterEnabled,
         isBeamMode: isBeamCrossModeEnabled(currentFilterState as RetroVideoFilterState),
@@ -538,14 +566,18 @@ export function useRetroPixiStage({
     }
     appliedLayoutKeyRef.current = nextLayoutKey;
 
+    if (!isPreviewMaximized) {
+      lastWindowedCanvasSizeRef.current = { width: nextWidth, height: nextHeight };
+    }
+
     if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
     if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
 
     app.canvas.style.position = "absolute";
     app.canvas.style.left = `${nextLeft}px`;
     app.canvas.style.top = `${nextTop}px`;
-    app.canvas.style.width = `${styleWidth}px`;
-    app.canvas.style.height = `${styleHeight}px`;
+    app.canvas.style.width = `${presentedStyleWidth}px`;
+    app.canvas.style.height = `${presentedStyleHeight}px`;
     app.canvas.style.imageRendering = isUpscalingContent ? "pixelated" : "auto";
     app.pipeline.setPresentationSamplingMode(presentationSamplingMode);
 
