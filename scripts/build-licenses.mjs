@@ -78,6 +78,14 @@ function collectRustLicenses() {
 
 const other = [
   {
+    name: "binjgb",
+    version: null,
+    license: "MIT",
+    note:
+      "Bundled as public/binjgb/binjgb.js and public/binjgb/binjgb.wasm for Game Boy ROM playback. " +
+      "Copyright (c) 2016 Ben Smith. See public/binjgb/LICENSE.",
+  },
+  {
     name: "FFmpeg",
     version: null,
     license: "GPL-3.0-or-later / LGPL-2.1-or-later (depends on build)",

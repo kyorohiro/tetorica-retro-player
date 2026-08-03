@@ -274,7 +274,7 @@ export const RETRO_PRESETS = {
     lightDependentTint: 0.34,
     grainVisibilityMode: "bright_only",
     phosphorDotShape: "square",
-    phosphorDotInternalScale: 1,
+    phosphorDotInternalScale: 2.8,
     phosphorDotSizeResponse: 0,
     phosphorDotCellFill: 0.5,
     phosphorDotLightBalance: 1.28,

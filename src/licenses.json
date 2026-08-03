@@ -1,6 +1,26 @@
 {
-  "generatedAt": "2026-07-03T02:43:41.791Z",
+  "generatedAt": "2026-08-03T18:30:12.409Z",
   "npm": [
+    {
+      "name": "@asamuzakjp/css-color",
+      "version": "5.1.11",
+      "license": "MIT"
+    },
+    {
+      "name": "@asamuzakjp/dom-selector",
+      "version": "7.1.1",
+      "license": "MIT"
+    },
+    {
+      "name": "@asamuzakjp/generational-cache",
+      "version": "1.0.1",
+      "license": "MIT"
+    },
+    {
+      "name": "@asamuzakjp/nwsapi",
+      "version": "2.3.9",
+      "license": "MIT"
+    },
     {
       "name": "@babel/code-frame",
       "version": "7.29.7",
@@ -102,6 +122,11 @@
       "license": "MIT"
     },
     {
+      "name": "@bramus/specificity",
+      "version": "2.4.2",
+      "license": "MIT"
+    },
+    {
       "name": "@buildyourwebapp/tauri-plugin-sharesheet",
       "version": "0.0.1",
       "license": "MIT or APACHE-2.0"
@@ -112,13 +137,48 @@
       "license": "MIT"
     },
     {
+      "name": "@csstools/color-helpers",
+      "version": "6.1.0",
+      "license": "MIT-0"
+    },
+    {
+      "name": "@csstools/css-calc",
+      "version": "3.2.1",
+      "license": "MIT"
+    },
+    {
+      "name": "@csstools/css-color-parser",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@csstools/css-parser-algorithms",
+      "version": "4.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@csstools/css-syntax-patches-for-csstree",
+      "version": "1.1.6",
+      "license": "MIT-0"
+    },
+    {
+      "name": "@csstools/css-tokenizer",
+      "version": "4.0.0",
+      "license": "MIT"
+    },
+    {
       "name": "@emnapi/wasi-threads",
-      "version": "1.2.2",
+      "version": "1.2.3",
       "license": "MIT"
     },
     {
       "name": "@esbuild/darwin-arm64",
-      "version": "0.27.7",
+      "version": "0.28.1",
+      "license": "MIT"
+    },
+    {
+      "name": "@exodus/bytes",
+      "version": "1.15.1",
       "license": "MIT"
     },
     {
@@ -164,6 +224,11 @@
     {
       "name": "@rollup/rollup-darwin-arm64",
       "version": "4.60.4",
+      "license": "MIT"
+    },
+    {
+      "name": "@standard-schema/spec",
+      "version": "1.1.0",
       "license": "MIT"
     },
     {
@@ -232,6 +297,16 @@
       "license": "MIT"
     },
     {
+      "name": "@types/chai",
+      "version": "5.2.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@types/deep-eql",
+      "version": "4.0.2",
+      "license": "MIT"
+    },
+    {
       "name": "@types/estree",
       "version": "1.0.8",
       "license": "MIT"
@@ -267,6 +342,41 @@
       "license": "MIT"
     },
     {
+      "name": "@vitest/expect",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@vitest/mocker",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@vitest/pretty-format",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@vitest/runner",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@vitest/snapshot",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@vitest/spy",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "@vitest/utils",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
       "name": "@xmldom/xmldom",
       "version": "0.7.13",
       "license": "MIT"
@@ -275,6 +385,11 @@
       "name": "@zip.js/zip.js",
       "version": "2.8.26",
       "license": "BSD-3-Clause"
+    },
+    {
+      "name": "assertion-error",
+      "version": "2.0.1",
+      "license": "MIT"
     },
     {
       "name": "automation-events",
@@ -287,6 +402,11 @@
       "license": "Apache-2.0"
     },
     {
+      "name": "bidi-js",
+      "version": "1.0.3",
+      "license": "MIT"
+    },
+    {
       "name": "browserslist",
       "version": "4.28.2",
       "license": "MIT"
@@ -295,6 +415,11 @@
       "name": "caniuse-lite",
       "version": "1.0.30001793",
       "license": "CC-BY-4.0"
+    },
+    {
+      "name": "chai",
+      "version": "6.2.2",
+      "license": "MIT"
     },
     {
       "name": "convert-source-map",
@@ -312,6 +437,11 @@
       "license": "MIT"
     },
     {
+      "name": "css-tree",
+      "version": "3.2.1",
+      "license": "MIT"
+    },
+    {
       "name": "csstype",
       "version": "3.2.3",
       "license": "MIT"
@@ -322,8 +452,18 @@
       "license": "ISC"
     },
     {
+      "name": "data-urls",
+      "version": "7.0.0",
+      "license": "MIT"
+    },
+    {
       "name": "debug",
       "version": "4.4.3",
+      "license": "MIT"
+    },
+    {
+      "name": "decimal.js",
+      "version": "10.6.0",
       "license": "MIT"
     },
     {
@@ -342,9 +482,19 @@
       "license": "MIT"
     },
     {
+      "name": "entities",
+      "version": "8.0.0",
+      "license": "BSD-2-Clause"
+    },
+    {
       "name": "epubjs",
       "version": "0.3.93",
       "license": "BSD-2-Clause"
+    },
+    {
+      "name": "es-module-lexer",
+      "version": "2.3.0",
+      "license": "MIT"
     },
     {
       "name": "es5-ext",
@@ -363,7 +513,7 @@
     },
     {
       "name": "esbuild",
-      "version": "0.27.7",
+      "version": "0.28.1",
       "license": "MIT"
     },
     {
@@ -377,9 +527,19 @@
       "license": "ISC"
     },
     {
+      "name": "estree-walker",
+      "version": "3.0.3",
+      "license": "MIT"
+    },
+    {
       "name": "event-emitter",
       "version": "0.3.5",
       "license": "MIT"
+    },
+    {
+      "name": "expect-type",
+      "version": "1.4.0",
+      "license": "Apache-2.0"
     },
     {
       "name": "ext",
@@ -412,6 +572,16 @@
       "license": "MIT"
     },
     {
+      "name": "hls.js",
+      "version": "1.6.16",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "html-encoding-sniffer",
+      "version": "6.0.0",
+      "license": "MIT"
+    },
+    {
       "name": "immediate",
       "version": "3.0.6",
       "license": "MIT"
@@ -420,6 +590,11 @@
       "name": "inherits",
       "version": "2.0.4",
       "license": "ISC"
+    },
+    {
+      "name": "is-potential-custom-element-name",
+      "version": "1.0.1",
+      "license": "MIT"
     },
     {
       "name": "isarray",
@@ -437,9 +612,19 @@
       "license": "MIT"
     },
     {
+      "name": "jsdom",
+      "version": "29.1.1",
+      "license": "MIT"
+    },
+    {
       "name": "jsesc",
       "version": "3.1.0",
       "license": "MIT"
+    },
+    {
+      "name": "jsnes",
+      "version": "2.1.0",
+      "license": "Apache-2.0"
     },
     {
       "name": "json5",
@@ -477,9 +662,14 @@
       "license": "MIT"
     },
     {
+      "name": "loose-envify",
+      "version": "1.4.0",
+      "license": "MIT"
+    },
+    {
       "name": "lru-cache",
-      "version": "5.1.1",
-      "license": "ISC"
+      "version": "11.5.1",
+      "license": "BlueOak-1.0.0"
     },
     {
       "name": "lucide-react",
@@ -495,6 +685,11 @@
       "name": "marks-pane",
       "version": "1.0.9",
       "license": "MIT"
+    },
+    {
+      "name": "mdn-data",
+      "version": "2.27.1",
+      "license": "CC0-1.0"
     },
     {
       "name": "ms",
@@ -522,13 +717,33 @@
       "license": "MIT"
     },
     {
+      "name": "object-assign",
+      "version": "4.1.1",
+      "license": "MIT"
+    },
+    {
+      "name": "obug",
+      "version": "2.1.3",
+      "license": "MIT"
+    },
+    {
       "name": "pako",
       "version": "1.0.11",
       "license": "(MIT AND Zlib)"
     },
     {
+      "name": "parse5",
+      "version": "8.0.1",
+      "license": "MIT"
+    },
+    {
       "name": "path-webpack",
       "version": "0.0.3",
+      "license": "MIT"
+    },
+    {
+      "name": "pathe",
+      "version": "2.0.3",
       "license": "MIT"
     },
     {
@@ -557,6 +772,16 @@
       "license": "MIT"
     },
     {
+      "name": "prop-types",
+      "version": "15.8.1",
+      "license": "MIT"
+    },
+    {
+      "name": "punycode",
+      "version": "2.3.1",
+      "license": "MIT"
+    },
+    {
       "name": "react",
       "version": "19.2.6",
       "license": "MIT"
@@ -567,8 +792,13 @@
       "license": "MIT"
     },
     {
+      "name": "react-is",
+      "version": "16.13.1",
+      "license": "MIT"
+    },
+    {
       "name": "react-reader",
-      "version": "2.0.15",
+      "version": "0.20.4",
       "license": "ISC"
     },
     {
@@ -578,12 +808,17 @@
     },
     {
       "name": "react-swipeable",
-      "version": "7.0.2",
+      "version": "6.2.2",
       "license": "MIT"
     },
     {
       "name": "readable-stream",
       "version": "2.3.8",
+      "license": "MIT"
+    },
+    {
+      "name": "require-from-string",
+      "version": "2.0.2",
       "license": "MIT"
     },
     {
@@ -595,6 +830,11 @@
       "name": "safe-buffer",
       "version": "5.1.2",
       "license": "MIT"
+    },
+    {
+      "name": "saxes",
+      "version": "6.0.0",
+      "license": "ISC"
     },
     {
       "name": "scheduler",
@@ -612,9 +852,19 @@
       "license": "MIT"
     },
     {
+      "name": "siginfo",
+      "version": "2.0.0",
+      "license": "ISC"
+    },
+    {
       "name": "source-map-js",
       "version": "1.2.1",
       "license": "BSD-3-Clause"
+    },
+    {
+      "name": "stackback",
+      "version": "0.0.2",
+      "license": "MIT"
     },
     {
       "name": "standardized-audio-context",
@@ -622,8 +872,18 @@
       "license": "MIT"
     },
     {
+      "name": "std-env",
+      "version": "4.1.0",
+      "license": "MIT"
+    },
+    {
       "name": "string_decoder",
       "version": "1.1.1",
+      "license": "MIT"
+    },
+    {
+      "name": "symbol-tree",
+      "version": "3.2.4",
       "license": "MIT"
     },
     {
@@ -637,13 +897,48 @@
       "license": "MIT"
     },
     {
+      "name": "tinybench",
+      "version": "2.9.0",
+      "license": "MIT"
+    },
+    {
+      "name": "tinyexec",
+      "version": "1.2.4",
+      "license": "MIT"
+    },
+    {
       "name": "tinyglobby",
       "version": "0.2.17",
       "license": "MIT"
     },
     {
+      "name": "tinyrainbow",
+      "version": "3.1.0",
+      "license": "MIT"
+    },
+    {
+      "name": "tldts",
+      "version": "7.4.6",
+      "license": "MIT"
+    },
+    {
+      "name": "tldts-core",
+      "version": "7.4.6",
+      "license": "MIT"
+    },
+    {
       "name": "tone",
       "version": "15.1.22",
+      "license": "MIT"
+    },
+    {
+      "name": "tough-cookie",
+      "version": "6.0.1",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "tr46",
+      "version": "6.0.0",
       "license": "MIT"
     },
     {
@@ -662,6 +957,11 @@
       "license": "Apache-2.0"
     },
     {
+      "name": "undici",
+      "version": "7.28.0",
+      "license": "MIT"
+    },
+    {
       "name": "undici-types",
       "version": "7.24.6",
       "license": "MIT"
@@ -678,7 +978,47 @@
     },
     {
       "name": "vite",
-      "version": "7.3.3",
+      "version": "7.3.6",
+      "license": "MIT"
+    },
+    {
+      "name": "vitest",
+      "version": "4.1.9",
+      "license": "MIT"
+    },
+    {
+      "name": "w3c-xmlserializer",
+      "version": "5.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "webidl-conversions",
+      "version": "8.0.1",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "whatwg-mimetype",
+      "version": "5.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "whatwg-url",
+      "version": "16.0.1",
+      "license": "MIT"
+    },
+    {
+      "name": "why-is-node-running",
+      "version": "2.3.0",
+      "license": "MIT"
+    },
+    {
+      "name": "xml-name-validator",
+      "version": "5.0.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "xmlchars",
+      "version": "2.2.0",
       "license": "MIT"
     },
     {
@@ -3595,6 +3935,12 @@
     }
   ],
   "other": [
+    {
+      "name": "binjgb",
+      "version": null,
+      "license": "MIT",
+      "note": "Bundled as public/binjgb/binjgb.js and public/binjgb/binjgb.wasm for Game Boy ROM playback. Copyright (c) 2016 Ben Smith. See public/binjgb/LICENSE."
+    },
     {
       "name": "FFmpeg",
       "version": null,
