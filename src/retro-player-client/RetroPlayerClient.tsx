@@ -5,6 +5,7 @@ import { useDialog } from "../useDialog";
 import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
 import type { DemoSongMeta } from "./builtin-content/demo-songs";
+import { isGameBoyRomFile, startGbSession } from "./builtin-content/gb-session";
 import { isNesRomFile, startNesSession } from "./builtin-content/nes-session";
 import {
   type PresetConfig,
@@ -360,7 +361,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       }
     }, [previewSource, stopCurrentPlaybackBeforePresetStart]);
 
-    const launchNesFile = useCallback((file: File) => {
+    const launchGameFile = useCallback((file: File) => {
       stopTone();
       stopNesSession();
       clearPlaylistSession();
@@ -368,7 +369,8 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       const launchToken = nesLaunchTokenRef.current + 1;
       nesLaunchTokenRef.current = launchToken;
-      void startNesSession(file).then((session) => {
+      const startSession = isNesRomFile(file) ? startNesSession : startGbSession;
+      void startSession(file).then((session) => {
         if (nesLaunchTokenRef.current !== launchToken) {
           session.stop();
           return;
@@ -387,7 +389,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         });
         setAutoStartState(session.needsUserGesture ? "blocked" : "done");
       }).catch((error) => {
-        console.error("[jsnes] failed to start", error);
+        console.error("[retro-game] failed to start", error);
       });
     }, [clearPlaylistSession, previewSource, stopNesSession, stopTone]);
 
@@ -558,24 +560,24 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       clearFilePlaylistBlobUrls();
 
       if (files.length === 0) return;
-      if (files.length === 1 && isNesRomFile(files[0])) {
+      if (files.length === 1 && (isNesRomFile(files[0]) || isGameBoyRomFile(files[0]))) {
         if (!isTauriRuntime()) {
           void showConfirmDialog({
-            title: locale === "ja" ? "NES を開始" : "Start NES",
+            title: locale === "ja" ? "ゲームを開始" : "Start Game",
             body: locale === "ja"
               ? "ブラウザ版では開始前にタップ操作が必要です。開始を押して ROM を起動します。"
-              : "Browser builds require a direct tap before starting NES playback. Press Start to launch the ROM.",
+              : "Browser builds require a direct tap before starting ROM playback. Press Start to launch the game.",
             okText: locale === "ja" ? "開始" : "Start",
             cancelText: locale === "ja" ? "キャンセル" : "Cancel",
           }).then((confirmed) => {
             if (!confirmed) {
               return;
             }
-            launchNesFile(files[0]);
+            launchGameFile(files[0]);
           });
           return;
         }
-        launchNesFile(files[0]);
+        launchGameFile(files[0]);
         return;
       }
       stopNesSession();
@@ -603,7 +605,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       previewSource.previewPath(blobUrls[0], sortedFiles[0].name);
-    }, [clearFilePlaylistBlobUrls, launchNesFile, locale, previewSource, shouldPreferDialogRetroPreview, showConfirmDialog, showDialogPreviewForBrowserFiles, stopNesSession]);
+    }, [clearFilePlaylistBlobUrls, launchGameFile, locale, previewSource, shouldPreferDialogRetroPreview, showConfirmDialog, showDialogPreviewForBrowserFiles, stopNesSession]);
 
     const rememberUrlPreset = useCallback((url: string, label: string) => {
       currentPresetConfigRef.current = { type: 'url', url, label };
