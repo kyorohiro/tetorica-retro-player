@@ -31,6 +31,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   ditherStrength: DEFAULT_PRESET.dither,
   paletteMode: DEFAULT_PRESET.palette,
   curvature: DEFAULT_PRESET.curvature,
+  scanlineEnabled: true,
   scanlineStrength: DEFAULT_PRESET.scanline,
   scanline2Strength: DEFAULT_PRESET.scanline2,
   scanlineBrightnessFade: 0.6,

@@ -92,6 +92,7 @@ type RetroFilterPanelProps = {
   isFilterEnabled: boolean;
   monoTint: MonoTintMode;
   paletteMode: PaletteMode;
+  scanlineEnabled: boolean;
   phosphorStrength: number;
   spotMaskStrength: number;
   bulbRadius: number;
@@ -159,6 +160,7 @@ type RetroFilterPanelProps = {
   onSetAnimeEdgeHigh: (value: number) => void;
   onSetMonoTint: (value: MonoTintMode) => void;
   onSetPaletteMode: (value: PaletteMode) => void;
+  onSetScanlineEnabled: (value: boolean) => void;
   onSetPhosphorStrength: (value: number) => void;
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
@@ -227,6 +229,7 @@ export function RetroFilterPanel({
   isFilterEnabled,
   monoTint,
   paletteMode,
+  scanlineEnabled,
   phosphorStrength,
   spotMaskStrength,
   bulbRadius,
@@ -291,6 +294,7 @@ export function RetroFilterPanel({
   onSetAnimeEdgeHigh,
   onSetMonoTint,
   onSetPaletteMode,
+  onSetScanlineEnabled,
   onSetPhosphorStrength,
   onSetSpotMaskStrength,
   onSetBulbRadius,
@@ -1424,6 +1428,27 @@ export function RetroFilterPanel({
             >
               {postCurvatureEnabled ? "Curvature after mask" : "Curvature before mask"}
             </button>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Scanline: ${scanlineEnabled ? "On" : "Off"}`}
+                  text={helpText.scanline}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <button
+                type="button"
+                onClick={() => onSetScanlineEnabled(!scanlineEnabled)}
+                className={[
+                  "mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-lg border px-3 py-2 text-[11px] leading-tight",
+                  scanlineEnabled
+                    ? "border-emerald-600/60 bg-emerald-500/15 font-semibold text-[#0a3a1a]"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] text-[#12141c] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                {scanlineEnabled ? "Enabled" : "Disabled"}
+              </button>
+            </label>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip

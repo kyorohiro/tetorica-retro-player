@@ -34,6 +34,7 @@ export type RetroVideoFilterState = {
   paletteMode: PaletteMode;
   curvature: number;
   postCurvatureEnabled: boolean;
+  scanlineEnabled: boolean;
   scanlineStrength: number;
   scanline2Strength: number;
   scanlineBrightnessFade: number;
@@ -171,6 +172,7 @@ type Pass2UniformLocations = {
   uDitherStrength: WebGLUniformLocation | null;
   uSamplingMode: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
+  uScanlineEnabled: WebGLUniformLocation | null;
   uScanlineStrength: WebGLUniformLocation | null;
   uScanline2Strength: WebGLUniformLocation | null;
   uScanlineBrightnessFade: WebGLUniformLocation | null;
@@ -1546,6 +1548,7 @@ export class TetoricaRetroVideoPipeline {
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
       uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
+      uScanlineEnabled: gl.getUniformLocation(program, "uScanlineEnabled"),
       uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
       uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
@@ -2147,6 +2150,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uDitherStrength, filterState.ditherStrength);
     gl.uniform1f(this.pass2Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(this.pass2Locs.uCurvature, getEffectivePreCurvature(filterState));
+    gl.uniform1f(this.pass2Locs.uScanlineEnabled, filterState.scanlineEnabled ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
     gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);

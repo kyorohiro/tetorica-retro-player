@@ -362,6 +362,7 @@ export function RetroControlPanel({
               animeEdgeHigh={filterState.animeEdgeHigh}
               isFilterEnabled={filterState.isFilterEnabled}
               monoTint={filterState.monoTint}
+              scanlineEnabled={filterState.scanlineEnabled}
               neonBoost={filterState.neonBoost}
               neonDetail={filterState.neonDetail}
               neonSaturation={filterState.neonSaturation}
@@ -429,6 +430,7 @@ export function RetroControlPanel({
               onSetAnimeEdgeHigh={filterState.setAnimeEdgeHigh}
               onSetIsFilterEnabled={filterState.setIsFilterEnabled}
               onSetMonoTint={filterState.setMonoTint}
+              onSetScanlineEnabled={filterState.setScanlineEnabled}
               onSetNeonBoost={filterState.setNeonBoost}
               onSetNeonDetail={filterState.setNeonDetail}
               onSetNeonSaturation={filterState.setNeonSaturation}

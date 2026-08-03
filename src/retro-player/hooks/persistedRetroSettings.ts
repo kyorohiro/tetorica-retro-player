@@ -25,6 +25,7 @@ export type PersistedRetroFilterSettings = {
   ditherStrength: number;
   paletteMode: PaletteMode;
   curvature: number;
+  scanlineEnabled: boolean;
   scanlineStrength: number;
   scanline2Strength: number;
   scanlineBrightnessFade: number;
@@ -174,6 +175,7 @@ const normalizePersistedRetroSettings = (
     filter: filter
       ? {
         ...filter,
+        scanlineEnabled: filter.scanlineEnabled ?? true,
         phosphorDotShape: normalizedShape,
         samplingMode:
           filter.samplingMode === "average"

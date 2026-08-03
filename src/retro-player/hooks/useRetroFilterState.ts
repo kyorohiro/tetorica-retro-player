@@ -33,6 +33,7 @@ export type RetroFilterInitialState = Partial<{
   ditherStrength: number;
   paletteMode: PaletteMode;
   curvature: number;
+  scanlineEnabled: boolean;
   scanlineStrength: number;
   scanline2Strength: number;
   scanlineBrightnessFade: number;
@@ -113,6 +114,7 @@ const doesPresetMatchState = (
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
     preset.curvature === state.curvature &&
+    state.scanlineEnabled === true &&
     preset.scanline === state.scanlineStrength &&
     preset.scanline2 === state.scanline2Strength &&
     preset.vignette === state.vignetteStrength &&
@@ -222,6 +224,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
     paletteMode: initialState.paletteMode ?? DEFAULT_PRESET.palette,
     curvature: initialState.curvature ?? DEFAULT_PRESET.curvature,
+    scanlineEnabled: initialState.scanlineEnabled ?? true,
     scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
     scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
     scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
@@ -398,6 +401,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setCurvature = (curvature: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.curvature === curvature ? current : { ...current, curvature }));
+  };
+
+  const setScanlineEnabled = (scanlineEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.scanlineEnabled === scanlineEnabled ? current : { ...current, scanlineEnabled }
+    ));
   };
 
   const setScanlineStrength = (scanlineStrength: number) => {
@@ -783,6 +793,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
       curvature: presetSettings.curvature,
+      scanlineEnabled: true,
       scanlineStrength: presetSettings.scanline,
       scanline2Strength: presetSettings.scanline2,
       vignetteStrength: presetSettings.vignette,
@@ -884,6 +895,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setDitherStrength,
     setPaletteMode,
     setCurvature,
+    setScanlineEnabled,
     setScanlineStrength,
     setScanline2Strength,
     setScanlineBrightnessFade,
