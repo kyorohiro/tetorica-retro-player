@@ -66,6 +66,7 @@ export type RetroVideoFilterState = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  preFilterDownscaleEnabled: boolean;
   coloredGlowEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
@@ -513,6 +514,9 @@ export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
 
 export const isBeamCrossModeEnabled = (filterState: RetroVideoFilterState) =>
   filterState.phosphorDotShape === "beam";
+
+const shouldUsePreFilterDownscale = (filterState: RetroVideoFilterState) =>
+  filterState.preFilterDownscaleEnabled || isBeamCrossModeEnabled(filterState);
 
 const shouldUsePostCurvaturePass = (
   filterState: RetroVideoFilterState,
@@ -1821,6 +1825,7 @@ export class TetoricaRetroVideoPipeline {
       // Pass 2: FBO → screen/FBO (CRT effects: curvature, scanlines, phosphor dots, vignette)
       const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
       const isBeamFullVariant = this.windowsLiteVariantKey?.includes(":beam_full") ?? false;
+      const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
       const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState);
       if (usePostCurvaturePass) {
         this.ensurePostCurvatureFbo(w, h);
@@ -1830,7 +1835,8 @@ export class TetoricaRetroVideoPipeline {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       let pass2SourceTexture: WebGLTexture = this.texture;
-      if (isBeamVariant) {
+      let pass2PrimaryTexture: WebGLTexture | null = this.fboTexture;
+      if (usePreFilterDownscale) {
         const {
           beamSourceWidth,
           beamSourceHeight,
@@ -1854,6 +1860,9 @@ export class TetoricaRetroVideoPipeline {
         );
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         pass2SourceTexture = this.beamSourceTexture ?? this.texture;
+        if (!isBeamVariant) {
+          pass2PrimaryTexture = this.beamSourceTexture ?? this.fboTexture;
+        }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, w, h);
 
@@ -1892,11 +1901,15 @@ export class TetoricaRetroVideoPipeline {
       gl.bindFramebuffer(gl.FRAMEBUFFER, usePostCurvaturePass ? this.postCurvatureFbo : null);
       gl.viewport(0, 0, w, h);
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
+      gl.bindTexture(gl.TEXTURE_2D, pass2PrimaryTexture);
       const pass2TextureFilter =
         isBeamVariant ? gl.LINEAR : gl.NEAREST;
-      this.syncFboTextureSamplingFilter(pass2TextureFilter);
-      if (isBeamVariant) {
+      if (pass2PrimaryTexture === this.beamSourceTexture) {
+        this.syncBeamSourceTextureSamplingFilter(pass2TextureFilter);
+      } else {
+        this.syncFboTextureSamplingFilter(pass2TextureFilter);
+      }
+      if (usePreFilterDownscale) {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
         if (pass2SourceTexture === this.beamSourceTexture) {
@@ -2035,12 +2048,13 @@ export class TetoricaRetroVideoPipeline {
       visibleHeight,
     );
     const isBeamMode = isBeamCrossModeEnabled(filterState);
+    const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
     const pass2TargetWidth = effectiveTargetWidth;
     const pass2TargetHeight = effectiveTargetHeight;
-    const beamSourceWidth = isBeamMode
+    const beamSourceWidth = usePreFilterDownscale
       ? pass2TargetWidth
       : Math.max(sourceWidth ?? pass2TargetWidth, 1);
-    const beamSourceHeight = isBeamMode
+    const beamSourceHeight = usePreFilterDownscale
       ? pass2TargetHeight
       : Math.max(sourceHeight ?? pass2TargetHeight, 1);
 

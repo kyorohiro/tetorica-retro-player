@@ -65,6 +65,7 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  preFilterDownscaleEnabled: boolean;
   coloredGlowEnabled: boolean;
   postCurvatureEnabled: boolean;
   compositeEnabled: boolean;
@@ -144,6 +145,7 @@ const doesPresetMatchState = (
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
     (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
+    (preset.preFilterDownscaleEnabled ?? false) === state.preFilterDownscaleEnabled &&
     (preset.coloredGlowEnabled ?? false) === state.coloredGlowEnabled &&
     (preset.postCurvatureEnabled ?? false) === state.postCurvatureEnabled &&
     (preset.compositeEnabled ?? false) === state.compositeEnabled &&
@@ -267,6 +269,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     phosphorDotGrainStrength:
       initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
+    preFilterDownscaleEnabled:
+      initialState.preFilterDownscaleEnabled ?? (DEFAULT_PRESET.preFilterDownscaleEnabled ?? false),
     coloredGlowEnabled:
       initialState.coloredGlowEnabled ?? (DEFAULT_PRESET.coloredGlowEnabled ?? false),
     postCurvatureEnabled:
@@ -604,6 +608,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPreFilterDownscaleEnabled = (preFilterDownscaleEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.preFilterDownscaleEnabled === preFilterDownscaleEnabled
+        ? current
+        : { ...current, preFilterDownscaleEnabled }
+    ));
+  };
+
   const setColoredGlowEnabled = (coloredGlowEnabled: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -818,6 +831,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
+      preFilterDownscaleEnabled: presetSettings.preFilterDownscaleEnabled ?? false,
       coloredGlowEnabled: presetSettings.coloredGlowEnabled ?? false,
       postCurvatureEnabled: presetSettings.postCurvatureEnabled ?? false,
       compositeEnabled: presetSettings.compositeEnabled ?? false,
@@ -916,6 +930,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotFlatDisc,
     setPhosphorDotNeighborBlend,
     setPhosphorDotGrainStrength,
+    setPreFilterDownscaleEnabled,
     setColoredGlowEnabled,
     setPostCurvatureEnabled,
     setCompositeEnabled,

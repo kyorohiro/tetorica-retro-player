@@ -385,6 +385,7 @@ export function RetroControlPanel({
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
               phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
               phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
+              preFilterDownscaleEnabled={filterState.preFilterDownscaleEnabled}
               coloredGlowEnabled={filterState.coloredGlowEnabled}
               postCurvatureEnabled={filterState.postCurvatureEnabled}
               compositeEnabled={filterState.compositeEnabled}
@@ -452,6 +453,7 @@ export function RetroControlPanel({
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
               onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
               onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
+              onSetPreFilterDownscaleEnabled={filterState.setPreFilterDownscaleEnabled}
               onSetColoredGlowEnabled={filterState.setColoredGlowEnabled}
               onSetPostCurvatureEnabled={filterState.setPostCurvatureEnabled}
               onSetCompositeEnabled={filterState.setCompositeEnabled}

@@ -57,6 +57,7 @@ export type PersistedRetroFilterSettings = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  preFilterDownscaleEnabled: boolean;
   coloredGlowEnabled: boolean;
   postCurvatureEnabled: boolean;
   compositeEnabled: boolean;
@@ -199,6 +200,7 @@ const normalizePersistedRetroSettings = (
           filter.grainVisibilityMode === "bright_only"
             ? "bright_only"
             : "all",
+        preFilterDownscaleEnabled: filter.preFilterDownscaleEnabled === true,
       }
       : filter,
     audio: audio

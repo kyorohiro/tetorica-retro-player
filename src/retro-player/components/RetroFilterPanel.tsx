@@ -111,6 +111,7 @@ type RetroFilterPanelProps = {
   phosphorDotFlatDisc: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  preFilterDownscaleEnabled: boolean;
   coloredGlowEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
@@ -178,6 +179,7 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
+  onSetPreFilterDownscaleEnabled: (value: boolean) => void;
   onSetColoredGlowEnabled: (value: boolean) => void;
   onSetCompositeEnabled: (value: boolean) => void;
   onSetCompositeAmount: (value: number) => void;
@@ -246,6 +248,7 @@ export function RetroFilterPanel({
   phosphorDotFlatDisc,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
+  preFilterDownscaleEnabled,
   coloredGlowEnabled,
   compositeEnabled,
   compositeAmount,
@@ -310,6 +313,7 @@ export function RetroFilterPanel({
   onSetPhosphorDotFlatDisc,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
+  onSetPreFilterDownscaleEnabled,
   onSetColoredGlowEnabled,
   onSetCompositeEnabled,
   onSetCompositeAmount,
@@ -934,6 +938,17 @@ export function RetroFilterPanel({
                 </button>
               ))}
             </div>
+          </label>
+          <label className="flex min-h-11 items-center justify-between rounded-lg border border-[#000000]/35 bg-[#111014]/10 px-3 py-2 text-[#12141c]">
+            <span>Pre-filter downscale</span>
+            <input
+              type="checkbox"
+              checked={preFilterDownscaleEnabled}
+              onChange={(ev) => {
+                onSetPreFilterDownscaleEnabled(ev.currentTarget.checked);
+              }}
+              className="h-5 w-5"
+            />
           </label>
         </div>
 

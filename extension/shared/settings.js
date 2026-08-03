@@ -154,7 +154,7 @@ export const PRESETS = {
     blackFloor: 0.075,
     outputBrightness: 1.41,
     phosphorDotLightBalance: 1.28,
-    phosphorDotInternalScale: 1,
+    phosphorDotInternalScale: 2.8,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0.5,
     phosphorDotFlatDisc: true,

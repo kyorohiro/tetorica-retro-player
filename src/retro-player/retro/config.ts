@@ -114,6 +114,7 @@ export type RetroPresetDefinition = {
   phosphorDotFlatDisc?: boolean;
   phosphorDotNeighborBlend?: boolean;
   phosphorDotGrainStrength?: number;
+  preFilterDownscaleEnabled?: boolean;
   coloredGlowEnabled?: boolean;
   postCurvatureEnabled?: boolean;
   compositeEnabled?: boolean;
@@ -735,6 +736,7 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: false,
     phosphorDotGrainStrength: 0.11892071150027211,
+    preFilterDownscaleEnabled: true,
     coloredGlowEnabled: true,
     postCurvatureEnabled: false,
     compositeEnabled: true,
@@ -787,6 +789,7 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
     phosphorDotGrainStrength: 0.12,
+    preFilterDownscaleEnabled: true,
     compositeEnabled: false,
     compositeAmount: 0,
     compositeChromaBlur: 0,
@@ -830,6 +833,7 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
     phosphorDotGrainStrength: 0.12,
+    preFilterDownscaleEnabled: true,
     compositeEnabled: true,
     compositeAmount: 0.85,
     compositeChromaBlur: 0.73,
@@ -862,6 +866,7 @@ export const RETRO_PRESETS = {
     screenFaceGlow: 0.33,
     phosphorDotShape: "beam",
     phosphorDotInternalScale: 2,
+    preFilterDownscaleEnabled: true,
     beamDarkCutoff: 0.04,
     beamHorizontalSpread: 1.27,
     beamStripeStrength: 0.95,
@@ -912,6 +917,7 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: false,
     phosphorDotGrainStrength: 0,
+    preFilterDownscaleEnabled: true,
     coloredGlowEnabled: true,
     postCurvatureEnabled: false,
     compositeEnabled: true,
@@ -1137,6 +1143,7 @@ export const RETRO_PRESETS = {
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
     phosphorDotGrainStrength: 0,
+    preFilterDownscaleEnabled: true,
     coloredGlowEnabled: false,
     postCurvatureEnabled: false,
     compositeEnabled: false,
