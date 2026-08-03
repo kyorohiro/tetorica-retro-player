@@ -80,6 +80,7 @@ type RetroFilterPanelProps = {
   colorLevels: number;
   curvature: number;
   postCurvatureEnabled: boolean;
+  scanlineEnabled: boolean;
   ditherStrength: number;
   glowStrength: number;
   horizontalSharpness: number;
@@ -94,6 +95,7 @@ type RetroFilterPanelProps = {
   paletteMode: PaletteMode;
   phosphorStrength: number;
   spotMaskStrength: number;
+  spotMaskGlowEnabled: boolean;
   bulbRadius: number;
   blackFloor: number;
   outputBrightness: number;
@@ -109,8 +111,11 @@ type RetroFilterPanelProps = {
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
+  phosphorDotEdgeGridEnabled: boolean;
+  phosphorDotCellSpillEnabled: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotPreserveTargetGrid: boolean;
   coloredGlowEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
@@ -146,6 +151,7 @@ type RetroFilterPanelProps = {
   onSetIsFilterEnabled: (value: boolean) => void;
   onSetColorLevels: (value: number) => void;
   onSetCurvature: (value: number) => void;
+  onSetScanlineEnabled: (value: boolean) => void;
   onSetPostCurvatureEnabled: (value: boolean) => void;
   onSetDitherStrength: (value: number) => void;
   onSetGlowStrength: (value: number) => void;
@@ -161,6 +167,7 @@ type RetroFilterPanelProps = {
   onSetPaletteMode: (value: PaletteMode) => void;
   onSetPhosphorStrength: (value: number) => void;
   onSetSpotMaskStrength: (value: number) => void;
+  onSetSpotMaskGlowEnabled: (value: boolean) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
   onSetOutputBrightness: (value: number) => void;
@@ -176,8 +183,11 @@ type RetroFilterPanelProps = {
   onSetPhosphorDotBrightCore: (value: boolean) => void;
   onSetPhosphorDotCellFill: (value: number) => void;
   onSetPhosphorDotFlatDisc: (value: boolean) => void;
+  onSetPhosphorDotEdgeGridEnabled: (value: boolean) => void;
+  onSetPhosphorDotCellSpillEnabled: (value: boolean) => void;
   onSetPhosphorDotNeighborBlend: (value: boolean) => void;
   onSetPhosphorDotGrainStrength: (value: number) => void;
+  onSetPhosphorDotPreserveTargetGrid: (value: boolean) => void;
   onSetColoredGlowEnabled: (value: boolean) => void;
   onSetCompositeEnabled: (value: boolean) => void;
   onSetCompositeAmount: (value: number) => void;
@@ -215,6 +225,7 @@ export function RetroFilterPanel({
   colorLevels,
   curvature,
   postCurvatureEnabled,
+  scanlineEnabled,
   ditherStrength,
   glowStrength,
   horizontalSharpness,
@@ -229,6 +240,7 @@ export function RetroFilterPanel({
   paletteMode,
   phosphorStrength,
   spotMaskStrength,
+  spotMaskGlowEnabled,
   bulbRadius,
   blackFloor,
   outputBrightness,
@@ -244,8 +256,11 @@ export function RetroFilterPanel({
   phosphorDotBrightCore,
   phosphorDotCellFill,
   phosphorDotFlatDisc,
+  phosphorDotEdgeGridEnabled,
+  phosphorDotCellSpillEnabled,
   phosphorDotNeighborBlend,
   phosphorDotGrainStrength,
+  phosphorDotPreserveTargetGrid,
   coloredGlowEnabled,
   compositeEnabled,
   compositeAmount,
@@ -278,6 +293,7 @@ export function RetroFilterPanel({
   onSetIsFilterEnabled,
   onSetColorLevels,
   onSetCurvature,
+  onSetScanlineEnabled,
   onSetPostCurvatureEnabled,
   onSetDitherStrength,
   onSetGlowStrength,
@@ -293,6 +309,7 @@ export function RetroFilterPanel({
   onSetPaletteMode,
   onSetPhosphorStrength,
   onSetSpotMaskStrength,
+  onSetSpotMaskGlowEnabled,
   onSetBulbRadius,
   onSetBlackFloor,
   onSetOutputBrightness,
@@ -308,8 +325,11 @@ export function RetroFilterPanel({
   onSetPhosphorDotBrightCore,
   onSetPhosphorDotCellFill,
   onSetPhosphorDotFlatDisc,
+  onSetPhosphorDotEdgeGridEnabled,
+  onSetPhosphorDotCellSpillEnabled,
   onSetPhosphorDotNeighborBlend,
   onSetPhosphorDotGrainStrength,
+  onSetPhosphorDotPreserveTargetGrid,
   onSetColoredGlowEnabled,
   onSetCompositeEnabled,
   onSetCompositeAmount,
@@ -391,6 +411,8 @@ export function RetroFilterPanel({
             "CRT 表面の発光構造のような RGB の細かな揺らぎを加えます。値を上げるほど画面テクスチャが見えやすくなります。",
           spotMask:
             "Phosphor Dot のセル形状を有効にします。値を上げるほどドット構造と CRT 風マスクがはっきり見えます。",
+          spotMaskGlow:
+            "Spot mask の周囲へにじむ光を有効にします。Off にすると周辺の漏れ光を止めて、文字や細線が潰れにくいかを確認できます。",
           cellFill:
             "各 phosphor セル内部に均一なベース光を加えます。上げるとセル全体が明るくなり、下げると黒が残りやすくなります。",
           sizeResponse:
@@ -494,6 +516,8 @@ export function RetroFilterPanel({
             "Adds subtle RGB triad variation like the glow structure of a CRT surface. Higher values make the screen texture more visible and easier to inspect.",
           spotMask:
             "Enables the phosphor-dot cell shaping itself. Higher values make the dot structure and CRT-style masking more visible.",
+          spotMaskGlow:
+            "Enables the soft glow that bleeds around each spot-mask cell. Turn it off to check whether the leak is what softens text and fine lines.",
           cellFill:
             "Adds a more uniform base fill inside each phosphor cell. Raise it to make the whole cell brighter; lower it to keep more black visible.",
           sizeResponse:
@@ -985,6 +1009,23 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <button
+              type="button"
+              onClick={() => onSetScanlineEnabled(!scanlineEnabled)}
+              title={locale === "ja"
+                ? "Scanline を完全に有効/無効にします。Off のときは強さ 0 だけでなく hidden な縞成分も含めて止めます。"
+                : "Fully enables or disables scanlines. Off removes hidden stripe contributions as well, not just the slider amount."}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                scanlineEnabled
+                  ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              {locale === "ja"
+                ? `Scanline: ${scanlineEnabled ? "On" : "Off"}`
+                : `Scanline: ${scanlineEnabled ? "On" : "Off"}`}
+            </button>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -1365,6 +1406,21 @@ export function RetroFilterPanel({
             </label>
             <button
               type="button"
+              onClick={() => onSetLcdCrosstalkStrength(lcdCrosstalkStrength > 0.001 ? 0 : 1)}
+              title={helpText.lcdCrosstalk}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                lcdCrosstalkStrength > 0.001
+                  ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              {locale === "ja"
+                ? `LCD crosstalk: ${lcdCrosstalkStrength > 0.001 ? "On" : "Off"}`
+                : `LCD crosstalk: ${lcdCrosstalkStrength > 0.001 ? "On" : "Off"}`}
+            </button>
+            <button
+              type="button"
               onClick={() => onSetColoredGlowEnabled(!coloredGlowEnabled)}
               className={[
                 "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
@@ -1714,6 +1770,34 @@ export function RetroFilterPanel({
                 <button
                   type="button"
                   onClick={() => {
+                    onSetPhosphorDotEdgeGridEnabled(!phosphorDotEdgeGridEnabled);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotEdgeGridEnabled
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Edge grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotCellSpillEnabled(!phosphorDotCellSpillEnabled);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotCellSpillEnabled
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  Cell spill
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     onSetPhosphorDotNeighborBlend(!phosphorDotNeighborBlend);
                   }}
                   className={[
@@ -1724,6 +1808,20 @@ export function RetroFilterPanel({
                   ].join(" ")}
                 >
                   Neighbor blend
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetPhosphorDotPreserveTargetGrid(!phosphorDotPreserveTargetGrid);
+                  }}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    phosphorDotPreserveTargetGrid
+                      ? "border-emerald-600/60 bg-emerald-500/15 text-[#0a3a1a] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {locale === "ja" ? "Grid 固定" : "Keep target grid"}
                 </button>
             <label className="block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
               <span
@@ -1762,6 +1860,20 @@ export function RetroFilterPanel({
                 <option value="4" label="4" />
               </datalist>
             </label>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-[#bcb4a6]/70 bg-[#f5f1ea]/60 px-3 py-2 text-[11px] leading-5 text-[#5f5649]">
+            {locale === "ja"
+              ? (
+                phosphorDotPreserveTargetGrid
+                  ? "Grid 固定: On。Internal res はセル内部の見え方だけを変え、dot grid は target w/h を超えて増やしません。"
+                  : "Grid 固定: Off。Internal res に応じて dot grid が target w/h を超えて増えることがあります。"
+              )
+              : (
+                phosphorDotPreserveTargetGrid
+                  ? "Keep target grid: On. Internal res changes cell shading detail without increasing the dot grid beyond target w/h."
+                  : "Keep target grid: Off. Internal res can increase the phosphor-dot grid beyond target w/h."
+              )}
           </div>
 
           <label className="mt-3 block min-h-10 rounded-lg border border-[#bcb4a6] bg-[#f5f1ea] px-2 py-1.5">
@@ -1834,6 +1946,21 @@ export function RetroFilterPanel({
               className="mt-2 w-full"
             />
           </label>
+          <button
+            type="button"
+            onClick={() => onSetSpotMaskGlowEnabled(!spotMaskGlowEnabled)}
+            title={helpText.spotMaskGlow}
+            className={[
+              "mt-3 min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+              spotMaskGlowEnabled
+                ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+            ].join(" ")}
+          >
+            {locale === "ja"
+              ? `Spot mask glow: ${spotMaskGlowEnabled ? "On" : "Off"}`
+              : `Spot mask glow: ${spotMaskGlowEnabled ? "On" : "Off"}`}
+          </button>
 
           <label className="mt-3 block">
             <span className="text-[#12141c]">

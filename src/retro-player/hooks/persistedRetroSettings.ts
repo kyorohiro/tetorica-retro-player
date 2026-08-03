@@ -25,6 +25,7 @@ export type PersistedRetroFilterSettings = {
   ditherStrength: number;
   paletteMode: PaletteMode;
   curvature: number;
+  scanlineEnabled: boolean;
   scanlineStrength: number;
   scanline2Strength: number;
   scanlineBrightnessFade: number;
@@ -40,6 +41,7 @@ export type PersistedRetroFilterSettings = {
   animeEdgeHigh: number;
   phosphorStrength: number;
   spotMaskStrength: number;
+  spotMaskGlowEnabled: boolean;
   bulbRadius: number;
   blackFloor: number;
   outputBrightness: number;
@@ -55,8 +57,11 @@ export type PersistedRetroFilterSettings = {
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
+  phosphorDotEdgeGridEnabled: boolean;
+  phosphorDotCellSpillEnabled: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotPreserveTargetGrid: boolean;
   coloredGlowEnabled: boolean;
   postCurvatureEnabled: boolean;
   compositeEnabled: boolean;
@@ -174,7 +179,11 @@ const normalizePersistedRetroSettings = (
     filter: filter
       ? {
         ...filter,
+        scanlineEnabled: filter.scanlineEnabled ?? true,
+        spotMaskGlowEnabled: filter.spotMaskGlowEnabled ?? true,
         phosphorDotShape: normalizedShape,
+        phosphorDotEdgeGridEnabled: filter.phosphorDotEdgeGridEnabled ?? false,
+        phosphorDotCellSpillEnabled: filter.phosphorDotCellSpillEnabled ?? true,
         samplingMode:
           filter.samplingMode === "average"
             ? "average_fast_8"
@@ -199,6 +208,10 @@ const normalizePersistedRetroSettings = (
           filter.grainVisibilityMode === "bright_only"
             ? "bright_only"
             : "all",
+        phosphorDotPreserveTargetGrid:
+          typeof filter.phosphorDotPreserveTargetGrid === "boolean"
+            ? filter.phosphorDotPreserveTargetGrid
+            : false,
       }
       : filter,
     audio: audio

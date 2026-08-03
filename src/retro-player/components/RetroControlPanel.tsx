@@ -368,6 +368,7 @@ export function RetroControlPanel({
               paletteMode={filterState.paletteMode}
               phosphorStrength={filterState.phosphorStrength}
               spotMaskStrength={filterState.spotMaskStrength}
+              spotMaskGlowEnabled={filterState.spotMaskGlowEnabled}
               bulbRadius={filterState.bulbRadius}
               blackFloor={filterState.blackFloor}
               outputBrightness={filterState.outputBrightness}
@@ -383,10 +384,14 @@ export function RetroControlPanel({
               phosphorDotBrightCore={filterState.phosphorDotBrightCore}
               phosphorDotCellFill={filterState.phosphorDotCellFill}
               phosphorDotFlatDisc={filterState.phosphorDotFlatDisc}
+              phosphorDotEdgeGridEnabled={filterState.phosphorDotEdgeGridEnabled}
+              phosphorDotCellSpillEnabled={filterState.phosphorDotCellSpillEnabled}
               phosphorDotNeighborBlend={filterState.phosphorDotNeighborBlend}
               phosphorDotGrainStrength={filterState.phosphorDotGrainStrength}
+              phosphorDotPreserveTargetGrid={filterState.phosphorDotPreserveTargetGrid}
               coloredGlowEnabled={filterState.coloredGlowEnabled}
               postCurvatureEnabled={filterState.postCurvatureEnabled}
+              scanlineEnabled={filterState.scanlineEnabled}
               compositeEnabled={filterState.compositeEnabled}
               compositeAmount={filterState.compositeAmount}
               compositeChromaBlur={filterState.compositeChromaBlur}
@@ -435,6 +440,7 @@ export function RetroControlPanel({
               onSetPaletteMode={filterState.setPaletteMode}
               onSetPhosphorStrength={filterState.setPhosphorStrength}
               onSetSpotMaskStrength={filterState.setSpotMaskStrength}
+              onSetSpotMaskGlowEnabled={filterState.setSpotMaskGlowEnabled}
               onSetBulbRadius={filterState.setBulbRadius}
               onSetBlackFloor={filterState.setBlackFloor}
               onSetOutputBrightness={filterState.setOutputBrightness}
@@ -450,10 +456,14 @@ export function RetroControlPanel({
               onSetPhosphorDotBrightCore={filterState.setPhosphorDotBrightCore}
               onSetPhosphorDotCellFill={filterState.setPhosphorDotCellFill}
               onSetPhosphorDotFlatDisc={filterState.setPhosphorDotFlatDisc}
+              onSetPhosphorDotEdgeGridEnabled={filterState.setPhosphorDotEdgeGridEnabled}
+              onSetPhosphorDotCellSpillEnabled={filterState.setPhosphorDotCellSpillEnabled}
               onSetPhosphorDotNeighborBlend={filterState.setPhosphorDotNeighborBlend}
               onSetPhosphorDotGrainStrength={filterState.setPhosphorDotGrainStrength}
+              onSetPhosphorDotPreserveTargetGrid={filterState.setPhosphorDotPreserveTargetGrid}
               onSetColoredGlowEnabled={filterState.setColoredGlowEnabled}
               onSetPostCurvatureEnabled={filterState.setPostCurvatureEnabled}
+              onSetScanlineEnabled={filterState.setScanlineEnabled}
               onSetCompositeEnabled={filterState.setCompositeEnabled}
               onSetCompositeAmount={filterState.setCompositeAmount}
               onSetCompositeChromaBlur={filterState.setCompositeChromaBlur}

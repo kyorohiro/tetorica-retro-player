@@ -9,6 +9,7 @@ out vec4 finalColor;
 uniform sampler2D uPass1Texture;
 uniform vec2 uTargetSize;
 uniform float uCurvature;
+uniform float uScanlineEnabled;
 uniform float uScanlineStrength;
 uniform float uScanline2Strength;
 uniform float uScanlineBrightnessFade;
@@ -16,6 +17,7 @@ uniform float uVignetteStrength;
 uniform float uLcdCrosstalkStrength;
 uniform float uPhosphorStrength;
 uniform float uSpotMaskStrength;
+uniform float uSpotMaskGlowEnabled;
 uniform float uBulbRadius;
 uniform float uBlackFloor;
 uniform float uFocusStrength;
@@ -35,11 +37,14 @@ uniform float uGrainVisibilityMode;
 uniform float uPixelAspect;
 uniform float uPhosphorDotMode;
 uniform float uPhosphorDotShape;
+uniform float uPhosphorDotPreserveTargetGrid;
 uniform float uPhosphorDotInternalScale;
 uniform float uPhosphorDotSizeResponse;
 uniform float uPhosphorDotBrightCore;
 uniform float uPhosphorDotCellFill;
 uniform float uPhosphorDotFlatDisc;
+uniform float uPhosphorDotEdgeGridEnabled;
+uniform float uPhosphorDotCellSpillEnabled;
 uniform float uPhosphorDotNeighborBlend;
 uniform float uPhosphorDotGrainStrength;
 
@@ -65,15 +70,58 @@ float hash13(vec3 p3)
   return fract((p3.x + p3.y) * p3.z);
 }
 
+vec2 getPhosphorPatternTargetSize(vec2 targetSize)
+{
+  float preserveGrid = step(0.5, uPhosphorDotPreserveTargetGrid);
+  float subGridScale = mix(1.0, max(1.0, uPhosphorDotInternalScale), preserveGrid);
+  return max(targetSize * subGridScale, vec2(1.0));
+}
+
+vec2 getGridCellCenterUv(vec2 cell, vec2 gridSize)
+{
+  vec2 safeGridSize = max(gridSize, vec2(1.0));
+  return clamp((cell + 0.5) / safeGridSize, vec2(0.0), vec2(1.0));
+}
+
+vec2 getSourceSampleUvFromPatternCell(vec2 patternCell, vec2 sourceTargetSize, vec2 patternTargetSize)
+{
+  vec2 safePatternTargetSize = max(patternTargetSize, vec2(1.0));
+  vec2 safeSourceTargetSize = max(sourceTargetSize, vec2(1.0));
+  vec2 sourceUv = clamp((patternCell + 0.5) / safePatternTargetSize, vec2(0.0), vec2(0.999999));
+  vec2 sourceCell = floor(sourceUv * safeSourceTargetSize);
+  return getGridCellCenterUv(sourceCell, safeSourceTargetSize);
+}
+
+float getGridPixelsPerCell(vec2 gridCoord)
+{
+  vec2 gradX = vec2(dFdx(gridCoord.x), dFdy(gridCoord.x));
+  vec2 gradY = vec2(dFdx(gridCoord.y), dFdy(gridCoord.y));
+  float pixelsPerCellX = 1.0 / max(length(gradX), 0.0001);
+  float pixelsPerCellY = 1.0 / max(length(gradY), 0.0001);
+  return min(pixelsPerCellX, pixelsPerCellY);
+}
+
+float getPhosphorPatternVisibility(vec2 curvedUv, vec2 patternTargetSize)
+{
+  float pixelsPerCell = getGridPixelsPerCell(curvedUv * patternTargetSize);
+  return smoothstep(1.45, 2.6, pixelsPerCell);
+}
+
 vec3 applySpotMask(vec3 color, vec2 curvedUv, vec2 targetSize, float amount)
 {
   if (amount <= 0.0) return color;
   float brightness = max(max(color.r, color.g), color.b);
-  vec2 cellUv = fract(curvedUv * targetSize) - 0.5;
+  vec2 patternTargetSize = getPhosphorPatternTargetSize(targetSize);
+  amount *= getPhosphorPatternVisibility(curvedUv, patternTargetSize);
+  if (amount <= 0.001) return color;
+  vec2 cellUv = fract(curvedUv * patternTargetSize) - 0.5;
   float dist = length(cellUv);
   float bulb = 1.0 - smoothstep(uBulbRadius * 0.25, uBulbRadius * 0.95 + 0.02, dist);
   float halo = 1.0 - smoothstep(uBulbRadius * 0.55, uBulbRadius * 1.2 + 0.08, dist);
-  float emission = bulb * (0.75 + brightness * 0.35) + halo * halo * (0.04 + brightness * 0.08);
+  float haloMix = step(0.5, uSpotMaskGlowEnabled);
+  float emission =
+    bulb * (0.75 + brightness * 0.35) +
+    haloMix * halo * halo * (0.04 + brightness * 0.08);
   vec3 masked = color * emission * amount;
   masked += color * (uBlackFloor * amount * (1.0 - bulb));
   return masked;
@@ -195,6 +243,148 @@ vec3 applyLcdCrosstalk(vec3 color, vec2 cell, vec2 targetSize)
   return max(color - contamination * effect, vec3(0.0));
 }
 
+vec3 applyPhosphorEdgeGrid(
+  vec3 dotColor,
+  vec2 cellUv,
+  float brightness,
+  float amount,
+  float flatDiscMode
+)
+{
+  float edgeGridMix = step(0.5, uPhosphorDotEdgeGridEnabled);
+  if (edgeGridMix <= 0.0) {
+    return dotColor;
+  }
+
+  float edgeField = max(abs(cellUv.x), abs(cellUv.y));
+  float brightMask = smoothstep(0.08, 0.9, brightness);
+  float centerCore = 1.0 - smoothstep(0.08, 0.26, length(cellUv));
+  float plateMask = 1.0 - smoothstep(0.485, 0.5, edgeField);
+  float gridLineMask = smoothstep(0.465, 0.5, edgeField);
+  float cornerBand = smoothstep(0.34, 0.68, length(cellUv * 1.41421356));
+  float basePlate =
+    brightMask *
+    amount *
+    mix(0.88, 0.72, flatDiscMode) *
+    plateMask;
+  vec3 lifted = max(dotColor, vec3(basePlate));
+  lifted = mix(lifted, dotColor, centerCore * 0.18);
+  float darkening =
+    clamp(gridLineMask * 0.12 + cornerBand * 0.04, 0.0, 0.16) *
+    brightMask *
+    mix(1.0, 0.78, flatDiscMode);
+  return lifted * (1.0 - darkening);
+}
+
+vec3 applyReflectiveLcdCell(
+  vec3 sourceColor,
+  vec2 squareUv,
+  float squareCornerMask,
+  float flatDisc,
+  float flatDiscMode,
+  float amount
+)
+{
+  float edgeGridMix = step(0.5, uPhosphorDotEdgeGridEnabled);
+  if (edgeGridMix <= 0.0) {
+    return sourceColor;
+  }
+
+  float brightness = max(max(sourceColor.r, sourceColor.g), sourceColor.b);
+  float sourceLuma = dot(sourceColor, vec3(0.299, 0.587, 0.114));
+  float litMask = smoothstep(0.08, 0.92, sourceLuma);
+  float plateMask =
+    (1.0 - smoothstep(0.47, 0.5, max(abs(squareUv.x), abs(squareUv.y)))) *
+    squareCornerMask;
+  float gridMask =
+    smoothstep(0.44, 0.5, max(abs(squareUv.x), abs(squareUv.y))) *
+    squareCornerMask;
+  float centerMask =
+    (1.0 - smoothstep(0.08, 0.28, length(squareUv))) *
+    squareCornerMask;
+
+  vec3 darkInk = vec3(0.18, 0.22, 0.16);
+  vec3 midTone = vec3(0.56, 0.62, 0.48);
+  vec3 brightPaper = vec3(0.92, 0.95, 0.80);
+  vec3 transmissiveTone = mix(darkInk, brightPaper, litMask);
+  transmissiveTone = mix(transmissiveTone, sourceColor, 0.22 + litMask * 0.14);
+
+  vec3 cellBody = mix(midTone, transmissiveTone, litMask);
+  cellBody = max(cellBody, brightPaper * litMask * (0.82 + amount * 0.08));
+  cellBody = mix(cellBody, cellBody * (1.04 + litMask * 0.05), centerMask * 0.10);
+
+  vec3 flatDiscCore = max(cellBody, brightPaper * litMask * (0.88 + flatDisc * 0.04));
+  vec3 lcdCell = mix(cellBody, flatDiscCore, flatDiscMode * 0.16);
+  lcdCell *= plateMask;
+
+  vec3 gridTint = vec3(0.72, 0.76, 0.58);
+  vec3 gridBase = mix(midTone, gridTint, litMask) * plateMask;
+  vec3 filledCell = max(lcdCell, gridBase);
+  float gridDarkness = gridMask * mix(0.06, 0.12, litMask);
+  return filledCell * (1.0 - gridDarkness);
+}
+
+vec3 applyReflectiveLcdSquareMode(vec3 sourceColor, vec2 gridUv, vec2 targetSize, float amount)
+{
+  vec2 patternTargetSize = getPhosphorPatternTargetSize(targetSize);
+  vec2 cellUv = fract(gridUv * patternTargetSize) - 0.5;
+  float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
+  float aspectCompensation = sqrt(pixelAspect);
+  vec2 dotUv = pixelAspect >= 1.0
+    ? vec2(cellUv.x, cellUv.y * aspectCompensation)
+    : vec2(cellUv.x / aspectCompensation, cellUv.y);
+
+  float brightness = max(max(sourceColor.r, sourceColor.g), sourceColor.b);
+  float radiusBias = pow(max(brightness, 0.0001), 0.7);
+  float dotRadius = mix(uBulbRadius * 0.22, uBulbRadius * 0.9, radiusBias);
+  vec2 squareUv = dotUv / max(dotRadius, 0.0001);
+  float cornerRound = mix(0.18, 0.1, smoothstep(0.5, 1.0, uPhosphorDotFlatDisc));
+  float squareCornerMask =
+    1.0 -
+    smoothstep(
+      1.0 - cornerRound,
+      1.0 + cornerRound,
+      length(max(abs(squareUv) - vec2(1.0 - cornerRound), 0.0))
+    );
+  float flatDisc =
+    (1.0 - smoothstep(0.9, 1.08, max(abs(squareUv.x), abs(squareUv.y)))) *
+    squareCornerMask;
+  float sourceLuma = dot(sourceColor, vec3(0.299, 0.587, 0.114));
+  float darkness = 1.0 - sourceLuma;
+  float apertureMask =
+    (1.0 - smoothstep(0.12, 0.44, max(abs(squareUv.x), abs(squareUv.y)))) *
+    squareCornerMask;
+  float plateMask =
+    (1.0 - smoothstep(0.46, 0.5, max(abs(squareUv.x), abs(squareUv.y)))) *
+    squareCornerMask;
+  float gridMask = smoothstep(0.46, 0.5, max(abs(squareUv.x), abs(squareUv.y)));
+
+  vec3 brightPaper = vec3(0.94, 0.92, 0.76);
+  vec3 paperShadow = vec3(0.87, 0.88, 0.72);
+  vec3 darkInk = vec3(0.18, 0.24, 0.16);
+  vec3 midInk = vec3(0.43, 0.53, 0.37);
+
+  float maskAmount = smoothstep(0.0, 0.35, amount);
+  float lightBalance = clamp(uPhosphorDotLightBalance, 0.0, 1.0);
+  float inkAmount =
+    smoothstep(0.02, 0.98, darkness) *
+    mix(0.45, 1.0, lightBalance) *
+    mix(0.35, 1.0, maskAmount);
+  vec3 paperBase = mix(brightPaper, paperShadow, gridMask * 0.22);
+  vec3 plateTone = mix(paperBase, midInk, inkAmount * 0.6);
+  vec3 coreTone = mix(plateTone, darkInk, inkAmount);
+
+  vec3 lcdColor = paperBase;
+  lcdColor = mix(lcdColor, plateTone, plateMask * inkAmount);
+  lcdColor = mix(lcdColor, coreTone, apertureMask * inkAmount);
+  lcdColor *= 1.0 - gridMask * mix(0.01, 0.05, inkAmount);
+
+  float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
+  lcdColor = mix(lcdColor, max(lcdColor, paperBase * 0.98), flatDisc * flatDiscMode * 0.08);
+
+  return lcdColor;
+}
+
 vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
 {
   if (amount <= 0.0) {
@@ -204,6 +394,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     }
   }
 
+  vec2 patternTargetSize = getPhosphorPatternTargetSize(targetSize);
   float brightness = max(max(color.r, color.g), color.b);
   float luminance = dot(color, vec3(0.299, 0.587, 0.114));
   float minChannel = min(min(color.r, color.g), color.b);
@@ -211,9 +402,9 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float chromaLift = smoothstep(0.04, 0.28, saturation) * smoothstep(0.0, 0.22, brightness);
   float lightLevel = clamp(uPhosphorDotLightBalance, 0.0, 2.0);
   float perceivedLight = max(luminance, brightness * 0.72 + chromaLift * 0.12);
-  vec2 cellIndex = floor(gridUv * targetSize);
+  vec2 cellIndex = floor(gridUv * patternTargetSize);
   float cellJitter = hash12(cellIndex + vec2(17.0, 43.0)) - 0.5;
-  vec2 cellUv = fract(gridUv * targetSize) - 0.5;
+  vec2 cellUv = fract(gridUv * patternTargetSize) - 0.5;
   float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
   float aspectCompensation = sqrt(pixelAspect);
   vec2 dotUv = pixelAspect >= 1.0
@@ -244,6 +435,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       : mix(highlightBloom, strongGeometryHighlight, sizeResponse - 1.0);
   float cellFillMix = smoothstep(0.2, 0.5, uPhosphorDotCellFill);
   float flatDiscMode = smoothstep(0.5, 1.0, uPhosphorDotFlatDisc);
+  float cellSpillMix = step(0.5, uPhosphorDotCellSpillEnabled);
   bool useBrightCore = uPhosphorDotBrightCore > 0.5;
   float brightCoreMix = (useBrightCore ? 1.0 : 0.0) * (1.0 - cellFillMix) * (1.0 - flatDiscMode);
   float brightCoreCompensation = mix(1.0, 1.2 + brightness * 0.18 + highlightBloom * 0.08, brightCoreMix);
@@ -430,7 +622,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
           brightCoreMix
         ) +
         gridRim * (0.08 + brightness * 0.1) +
-        halo * halo * (0.03 + brightness * 0.055 + highlightBloom * 0.08)
+        cellSpillMix * halo * halo * (0.03 + brightness * 0.055 + highlightBloom * 0.08)
       ) *
       brightCoreCompensation *
       emissionJitter;
@@ -438,7 +630,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       gate *
       lit *
       amount *
-      (uBlackFloor * (0.58 + halo * 0.42 + gridRim * 0.35)) *
+      (uBlackFloor * cellSpillMix * (0.58 + halo * 0.42 + gridRim * 0.35)) *
       (1.0 + cellJitter * 0.02);
     float cellFill =
       gate *
@@ -455,11 +647,24 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       (0.56 + brightness * 0.12 + flatDisc * 0.18);
     float brightCoreCellClamp = mix(1.0, 0.16, brightCoreMix);
     float brightCoreFloorClamp = mix(1.0, 0.24, brightCoreMix);
+    if (uPhosphorDotEdgeGridEnabled > 0.5) {
+      vec3 lcdCell = applyReflectiveLcdCell(
+        color,
+        squareUv,
+        squareCornerMask,
+        flatDisc,
+        flatDiscMode,
+        amount
+      );
+      lcdCell += color * floorLight * brightCoreFloorClamp * 0.14;
+      return lcdCell * lightLevel;
+    }
     vec3 dotCoreColor = color * emission;
     dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.45, cellFillMix) * brightCoreCellClamp;
-    vec3 flatPlateColor = color * flatPlateFill;
-    vec3 dotColor = mix(dotCoreColor, flatPlateColor, flatDiscMode);
+    vec3 flatPlateColor = color * flatPlateFill * flatDisc * 0.42;
+    vec3 dotColor = dotCoreColor + flatPlateColor * flatDiscMode;
     dotColor += color * floorLight * brightCoreFloorClamp;
+    dotColor = applyPhosphorEdgeGrid(dotColor, cellUv, brightness, amount, flatDiscMode);
     return dotColor * lightLevel;
   }
 
@@ -520,7 +725,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
           0.28 + brightness * 0.34,
           brightCoreMix
         ) +
-        halo * halo * (0.035 + brightness * 0.065 + highlightBloom * 0.1)
+        cellSpillMix * halo * halo * (0.035 + brightness * 0.065 + highlightBloom * 0.1)
       ) *
       brightCoreCompensation *
       emissionJitter;
@@ -528,7 +733,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
       gate *
       lit *
       amount *
-      (uBlackFloor * (0.48 + halo * 0.58)) *
+      (uBlackFloor * cellSpillMix * (0.48 + halo * 0.58)) *
       (1.0 + cellJitter * 0.025);
     float cellFill =
       gate *
@@ -546,9 +751,10 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     float brightCoreFloorClamp = mix(1.0, 0.18, brightCoreMix);
     vec3 dotCoreColor = color * emission;
     dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix) * brightCoreCellClamp;
-    vec3 discCoreColor = color * flatDiscFill;
-    vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+    vec3 discCoreColor = color * flatDiscFill * flatDisc * 0.38;
+    vec3 dotColor = dotCoreColor + discCoreColor * flatDiscMode;
     dotColor += color * floorLight * brightCoreFloorClamp;
+    dotColor = applyPhosphorEdgeGrid(dotColor, cellUv, brightness, amount, flatDiscMode);
     return dotColor * lightLevel;
   }
 
@@ -579,7 +785,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
         0.26 + brightness * 0.32,
         brightCoreMix
       ) +
-      halo * halo * (0.03 + brightness * 0.06 + highlightBloom * 0.09)
+      cellSpillMix * halo * halo * (0.03 + brightness * 0.06 + highlightBloom * 0.09)
     ) *
     brightCoreCompensation *
     emissionJitter;
@@ -587,7 +793,7 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
     gate *
     lit *
     amount *
-    (uBlackFloor * (0.48 + halo * 0.58)) *
+    (uBlackFloor * cellSpillMix * (0.48 + halo * 0.58)) *
     (1.0 + cellJitter * 0.025);
   float cellFill =
     gate *
@@ -605,9 +811,10 @@ vec3 applyPhosphorDot(vec3 color, vec2 gridUv, vec2 targetSize, float amount)
   float brightCoreFloorClamp = mix(1.0, 0.22, brightCoreMix);
   vec3 dotCoreColor = color * emission;
   dotCoreColor += color * mix(cellFill, cellFill * flatDisc * 1.75, cellFillMix) * brightCoreCellClamp;
-  vec3 discCoreColor = color * flatDiscFill;
-  vec3 dotColor = mix(dotCoreColor, discCoreColor, flatDiscMode);
+  vec3 discCoreColor = color * flatDiscFill * flatDisc * 0.34;
+  vec3 dotColor = dotCoreColor + discCoreColor * flatDiscMode;
   dotColor += color * floorLight * brightCoreFloorClamp;
+  dotColor = applyPhosphorEdgeGrid(dotColor, cellUv, brightness, amount, flatDiscMode);
   return dotColor * lightLevel;
 }
 
@@ -658,6 +865,7 @@ void main(void)
 
   if (uPhosphorDotMode > 0.5) {
     vec3 centerColor = color.rgb;
+    float cellSpillMix = step(0.5, uPhosphorDotCellSpillEnabled);
 
     vec2 rightUv = clamp((cell + vec2(1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
     vec2 leftUv  = clamp((cell + vec2(-1.0, 0.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
@@ -673,12 +881,49 @@ void main(void)
     float neighborBlendMix = smoothstep(0.5, 1.0, uPhosphorDotNeighborBlend);
     vec3 neighborMix = (rightColor + leftColor + upColor + downColor) * 0.25;
     float sourceColorDelta = length(centerColor - neighborMix);
+    vec2 patternTargetSize = getPhosphorPatternTargetSize(uTargetSize);
+    vec2 patternCell = floor(curvedUv * patternTargetSize);
+    float phosphorPatternVisibility = getPhosphorPatternVisibility(curvedUv, patternTargetSize);
+    bool useSquareShape = uPhosphorDotShape > 2.5;
+    if (phosphorPatternVisibility <= 0.001) {
+      finalColor = vec4(clamp(centerColor * uOutputBrightness, 0.0, 1.0), 1.0);
+      return;
+    }
+    if (useSquareShape && uPhosphorDotEdgeGridEnabled > 0.5) {
+      vec3 lcdColor = applyReflectiveLcdSquareMode(
+        centerColor,
+        curvedUv,
+        uTargetSize,
+        uSpotMaskStrength * phosphorPatternVisibility
+      );
+      lcdColor = applyBasicColorControls(lcdColor);
+      lcdColor = mix(
+        lcdColor,
+        applyReflectiveLcdBase(lcdColor),
+        clamp(uReflectiveLcdBase, 0.0, 1.0) * 0.18
+      );
+      lcdColor = mix(
+        lcdColor,
+        applyLightDependentTint(lcdColor),
+        clamp(uLightDependentTint, 0.0, 1.0) * 0.35
+      );
+      lcdColor = mix(
+        lcdColor,
+        applyScreenFaceGlow(lcdColor),
+        clamp(getScreenFaceGlow(), 0.0, 0.5) * 0.12
+      );
+      lcdColor = mix(centerColor, lcdColor, phosphorPatternVisibility);
+      finalColor = vec4(clamp(lcdColor * uOutputBrightness, 0.0, 1.0), 1.0);
+      return;
+    }
     float sourceBlendAmount =
       neighborBlendMix *
       (0.38 + flatDiscMode * 0.16 + smoothstep(0.04, 0.4, sourceColorDelta) * 0.28);
+    sourceBlendAmount *= phosphorPatternVisibility;
     vec3 mixedSourceColor = mix(centerColor, centerColor * 0.24 + neighborMix * 0.76, sourceBlendAmount);
 
-    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, uSpotMaskStrength);
+    float effectiveSpotMaskStrength = uSpotMaskStrength * phosphorPatternVisibility;
+    vec3 phosphorColor = applyPhosphorDot(mixedSourceColor, curvedUv, uTargetSize, effectiveSpotMaskStrength);
     if (useBrightCoreLeak) {
       phosphorColor *= 0.22;
     }
@@ -689,7 +934,7 @@ void main(void)
       fract(grainFrame * 0.56984029)
     ) - 0.5;
     float ditherNoise = hash13(vec3(cell + grainJitter, grainFrame)) - 0.5;
-    float grainAmount = uPhosphorDotGrainStrength * uSpotMaskStrength;
+    float grainAmount = uPhosphorDotGrainStrength * effectiveSpotMaskStrength;
     float grainVisibility =
       mix(1.0, smoothstep(0.08, 0.9, max(max(mixedSourceColor.r, mixedSourceColor.g), mixedSourceColor.b)), step(0.5, uGrainVisibilityMode));
     grainAmount *= grainVisibility;
@@ -704,23 +949,22 @@ void main(void)
     float bleedMask = smoothstep(0.52, 1.0, phosphorBrightness);
 
     vec3 bleedColor = rightColor * 0.34 + leftColor * 0.34 + downColor * 0.16 + upColor * 0.16;
-    phosphorColor += bleedColor * bleedMask * uSpotMaskStrength * (0.06 + phosphorBrightness * 0.1);
-
+    phosphorColor += bleedColor * bleedMask * effectiveSpotMaskStrength * cellSpillMix * (0.06 + phosphorBrightness * 0.1);
     float internalScaleMix = clamp((uPhosphorDotInternalScale - 1.0) / 3.0, 0.0, 1.0);
     float pixelAspect = clamp(uPixelAspect, 0.5, 2.0);
     float aspectCompensation = sqrt(pixelAspect);
-    vec2 cellUv = fract(curvedUv * uTargetSize) - 0.5;
+    vec2 cellUv = fract(curvedUv * patternTargetSize) - 0.5;
     vec2 dotUv = pixelAspect >= 1.0
       ? vec2(cellUv.x, cellUv.y * aspectCompensation)
       : vec2(cellUv.x / aspectCompensation, cellUv.y);
     float dist = length(dotUv);
     float highlightBloom = smoothstep(0.68, 1.0, phosphorBrightness);
     if (useBrightCoreLeak) {
-      vec2 texel = 1.0 / vec2(textureSize(uPass1Texture, 0));
+      vec2 patternStepUv = 1.0 / max(patternTargetSize, vec2(1.0));
       float leakRadius = (1.2 + phosphorBrightness * 2.2 + internalScaleMix * 0.8) * max(uBulbRadius, 0.08);
-      vec2 leakOffsetX = vec2(texel.x * leakRadius, 0.0);
-      vec2 leakOffsetY = vec2(0.0, texel.y * leakRadius);
-      vec2 leakOffsetD = vec2(texel.x, texel.y) * leakRadius * 0.82;
+      vec2 leakOffsetX = vec2(patternStepUv.x * leakRadius, 0.0);
+      vec2 leakOffsetY = vec2(0.0, patternStepUv.y * leakRadius);
+      vec2 leakOffsetD = patternStepUv * leakRadius * 0.82;
       vec3 bloomSample =
         texture(uPass1Texture, clamp(curvedUv + leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
         texture(uPass1Texture, clamp(curvedUv - leakOffsetX, vec2(0.0), vec2(1.0))).rgb * 0.18 +
@@ -731,7 +975,8 @@ void main(void)
         texture(uPass1Texture, clamp(curvedUv + vec2(-leakOffsetD.x, leakOffsetD.y), vec2(0.0), vec2(1.0))).rgb * 0.07 +
         texture(uPass1Texture, clamp(curvedUv - leakOffsetD, vec2(0.0), vec2(1.0))).rgb * 0.07;
       float leakStrength =
-        uSpotMaskStrength *
+        effectiveSpotMaskStrength *
+        cellSpillMix *
         (0.14 + phosphorBrightness * 0.24 + neighborBlendMix * 0.08 + internalScaleMix * 0.1);
       phosphorColor += bloomSample * leakStrength;
 
@@ -774,11 +1019,11 @@ void main(void)
         leftColor * leftNeighborHalo +
         downColor * downNeighborHalo +
         upColor * upNeighborHalo +
-        texture(uPass1Texture, clamp((cell + vec2(1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downRightNeighborHalo * 0.75 +
-        texture(uPass1Texture, clamp((cell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downLeftNeighborHalo * 0.75 +
-        texture(uPass1Texture, clamp((cell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upRightNeighborHalo * 0.75 +
-        texture(uPass1Texture, clamp((cell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upLeftNeighborHalo * 0.75;
-      phosphorColor += overlapHalo * uSpotMaskStrength * (0.18 + phosphorBrightness * 0.3 + strongLightLeak * 0.08);
+        texture(uPass1Texture, getSourceSampleUvFromPatternCell(patternCell + vec2(1.0, 1.0), uTargetSize, patternTargetSize)).rgb * downRightNeighborHalo * 0.75 +
+        texture(uPass1Texture, getSourceSampleUvFromPatternCell(patternCell + vec2(-1.0, 1.0), uTargetSize, patternTargetSize)).rgb * downLeftNeighborHalo * 0.75 +
+        texture(uPass1Texture, getSourceSampleUvFromPatternCell(patternCell + vec2(1.0, -1.0), uTargetSize, patternTargetSize)).rgb * upRightNeighborHalo * 0.75 +
+        texture(uPass1Texture, getSourceSampleUvFromPatternCell(patternCell + vec2(-1.0, -1.0), uTargetSize, patternTargetSize)).rgb * upLeftNeighborHalo * 0.75;
+      phosphorColor += overlapHalo * effectiveSpotMaskStrength * cellSpillMix * (0.18 + phosphorBrightness * 0.3 + strongLightLeak * 0.08);
 
       float bulbSpread = smoothstep(0.18, 0.62, uBulbRadius);
       float dotRadius = mix(
@@ -786,14 +1031,14 @@ void main(void)
         uBulbRadius * (0.64 + smoothstep(0.68, 1.0, phosphorBrightness) * 0.24),
         pow(phosphorBrightness, 0.7)
       );
-      vec2 globalCellUv = curvedUv * uTargetSize;
+      vec2 globalCellUv = curvedUv * patternTargetSize;
       vec3 emitterLeak = vec3(0.0);
       float emitterWeight = 0.0;
       for (int oy = -1; oy <= 1; oy++) {
         for (int ox = -1; ox <= 1; ox++) {
           vec2 emitterOffset = vec2(float(ox), float(oy));
-          vec2 emitterCell = cell + emitterOffset;
-          vec2 emitterSampleUv = clamp((emitterCell + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+          vec2 emitterCell = patternCell + emitterOffset;
+          vec2 emitterSampleUv = getSourceSampleUvFromPatternCell(emitterCell, uTargetSize, patternTargetSize);
           vec3 emitterColor = texture(uPass1Texture, emitterSampleUv).rgb;
           float emitterBrightness = max(max(emitterColor.r, emitterColor.g), emitterColor.b);
           float emitterRadius =
@@ -822,7 +1067,8 @@ void main(void)
         smoothstep(dotRadius * (0.24 + bulbSpread * 0.04), dotRadius * (0.76 + bulbSpread * 0.16) + 0.08, dist);
       vec3 brightCoreBody =
         circularEmitterLeak *
-        uSpotMaskStrength *
+        effectiveSpotMaskStrength *
+        cellSpillMix *
         (0.72 + phosphorBrightness * 1.02 + uBulbRadius * 0.64 + strongLightLeak * 0.14);
       brightCoreBody += mixedSourceColor * centerLeakMask * (0.28 + phosphorBrightness * 0.32);
       float bubbleField = clamp(emitterWeight * (0.28 + bulbSpread * 0.46 + strongLightLeak * 0.14), 0.0, 1.0);
@@ -833,7 +1079,6 @@ void main(void)
       );
     }
 
-    bool useSquareShape = uPhosphorDotShape > 2.5;
     float dotRadius = mix(
       uBulbRadius * (useBrightCoreLeak ? 0.14 : 0.19),
       uBulbRadius * ((useBrightCoreLeak ? 0.64 : 0.82) + highlightBloom * (useBrightCoreLeak ? 0.24 : 0.12)),
@@ -869,30 +1114,39 @@ void main(void)
         vec3(1.0, 0.82, 0.30) *
         warmBloomMask *
         getWarmBloomAmount() *
-        uSpotMaskStrength *
+        effectiveSpotMaskStrength *
         0.42;
     }
 
-    float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
-    float phosphorScanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-    phosphorColor *= 1.0 - (
-      (phosphorScanline * 0.5 + 0.5) *
-      (uScanlineStrength * 0.25 + mix(0.035, 0.12, bleedMask)) *
-      phosphorScanlineVisibility
-    );
-    float phosphorScanline2 =
-      sin((vTextureCoord.y + uTime * 0.05) * 720.0) *
-      uScanline2Strength *
-      phosphorScanlineVisibility *
-      0.45;
-    phosphorColor += vec3(phosphorScanline2);
+    if (uScanlineEnabled > 0.5) {
+      float phosphorScanlineVisibility = mix(1.0, 1.0 - phosphorBrightness, uScanlineBrightnessFade);
+      float phosphorScanline = sin(pixelatedUv.y * patternTargetSize.y * 3.14159265);
+      float phosphorScanlineAmount =
+        uScanlineStrength *
+        (0.25 + mix(0.12, 0.42, bleedMask));
+      phosphorColor *= 1.0 - (
+        (phosphorScanline * 0.5 + 0.5) *
+        phosphorScanlineAmount *
+        phosphorScanlineVisibility *
+        phosphorPatternVisibility
+      );
+      float phosphorScanline2 =
+        sin((vTextureCoord.y + uTime * 0.05) * 720.0) *
+        uScanline2Strength *
+        phosphorScanlineVisibility *
+        phosphorPatternVisibility *
+        0.45;
+      phosphorColor += vec3(phosphorScanline2);
+    }
 
     float phosphorBaseLift =
-      uSpotMaskStrength *
+      effectiveSpotMaskStrength *
+      uPhosphorDotLightBalance *
+      step(0.5, uPhosphorDotCellSpillEnabled) *
       (0.035 + uPhosphorDotCellFill * 0.22 + phosphorBrightness * 0.04);
     phosphorColor += mixedSourceColor * phosphorBaseLift * (useBrightCoreLeak ? 0.02 : 1.0);
     if (useBrightCoreLeak) {
-      phosphorColor += mixedSourceColor * uSpotMaskStrength * (0.008 + phosphorBrightness * 0.02);
+      phosphorColor += mixedSourceColor * effectiveSpotMaskStrength * (0.008 + phosphorBrightness * 0.02);
     }
 
     float vignette = distance(vMaskCoord, vec2(0.5));
@@ -901,21 +1155,24 @@ void main(void)
     phosphorColor = applyReflectiveLcdBase(phosphorColor);
     phosphorColor = applyLightDependentTint(phosphorColor);
     phosphorColor = applyScreenFaceGlow(phosphorColor);
+    phosphorColor = mix(centerColor, phosphorColor, phosphorPatternVisibility);
 
     finalColor = vec4(clamp(phosphorColor * uOutputBrightness, 0.0, 1.0), 1.0);
     return;
   }
 
   float brightness = max(max(color.r, color.g), color.b);
-  float visibility = mix(1.0, 1.0 - brightness, uScanlineBrightnessFade);
-  float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
-  color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * (uScanlineStrength + uPhosphorStrength * 0.12) * visibility);
+  if (uScanlineEnabled > 0.5) {
+    float visibility = mix(1.0, 1.0 - brightness, uScanlineBrightnessFade);
+    float scanline = sin(pixelatedUv.y * uTargetSize.y * 3.14159265);
+    color.rgb *= 1.0 - ((scanline * 0.5 + 0.5) * uScanlineStrength * visibility);
 
-  float scanline2 =
-    sin((vTextureCoord.y + uTime * 0.05) * 720.0) *
-    uScanline2Strength *
-    visibility;
-  color.rgb += vec3(scanline2);
+    float scanline2 =
+      sin((vTextureCoord.y + uTime * 0.05) * 720.0) *
+      uScanline2Strength *
+      visibility;
+    color.rgb += vec3(scanline2);
+  }
 
   if (uPhosphorStrength > 0.001) {
     float phosphorPhase = pixelatedUv.x * uTargetSize.x * 6.2831853;

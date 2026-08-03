@@ -41,6 +41,7 @@ import { useBrowserFileListDialog } from "./mdrop-web/useBrowserFileListDialog";
 import {
   getDroppedFiles,
   isAudio,
+  isGameBoyRomPath,
   isImage,
   isNesRomPath,
   isVideo,
@@ -426,7 +427,7 @@ function App() {
   }, [isMDropReadyRef]);
 
   const onInputFiles = useCallback(async (files: File[]) => {
-    if (files.length === 1 && isNesRomPath(files[0].name)) {
+    if (files.length === 1 && (isNesRomPath(files[0].name) || isGameBoyRomPath(files[0].name))) {
       retroPlayerClientRef.current?.loadFiles(files);
       return;
     }
@@ -447,7 +448,7 @@ function App() {
     options?: { useExtendedMedia?: boolean },
   ) => {
     if (paths.length === 0) return;
-    if (paths.length === 1 && isNesRomPath(paths[0])) {
+    if (paths.length === 1 && (isNesRomPath(paths[0]) || isGameBoyRomPath(paths[0]))) {
       const nesFile = await loadNesFileFromPath(paths[0]);
       retroPlayerClientRef.current?.loadFiles([nesFile]);
       return;
@@ -735,6 +736,7 @@ function App() {
           { name: "Audio", extensions: ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "wma"] },
           { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif", "heic", "heif", "bmp"] },
           { name: "NES ROM", extensions: ["nes"] },
+          { name: "Game Boy ROM", extensions: ["gb", "gbc"] },
         ],
       });
       if (!selected || Array.isArray(selected)) return;

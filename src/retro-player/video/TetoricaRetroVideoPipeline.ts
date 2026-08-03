@@ -34,6 +34,7 @@ export type RetroVideoFilterState = {
   paletteMode: PaletteMode;
   curvature: number;
   postCurvatureEnabled: boolean;
+  scanlineEnabled: boolean;
   scanlineStrength: number;
   scanline2Strength: number;
   scanlineBrightnessFade: number;
@@ -49,6 +50,7 @@ export type RetroVideoFilterState = {
   animeEdgeHigh: number;
   phosphorStrength: number;
   spotMaskStrength: number;
+  spotMaskGlowEnabled: boolean;
   bulbRadius: number;
   blackFloor: number;
   outputBrightness: number;
@@ -64,8 +66,11 @@ export type RetroVideoFilterState = {
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
+  phosphorDotEdgeGridEnabled: boolean;
+  phosphorDotCellSpillEnabled: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotPreserveTargetGrid: boolean;
   coloredGlowEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
@@ -171,6 +176,7 @@ type Pass2UniformLocations = {
   uDitherStrength: WebGLUniformLocation | null;
   uSamplingMode: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
+  uScanlineEnabled: WebGLUniformLocation | null;
   uScanlineStrength: WebGLUniformLocation | null;
   uScanline2Strength: WebGLUniformLocation | null;
   uScanlineBrightnessFade: WebGLUniformLocation | null;
@@ -182,6 +188,7 @@ type Pass2UniformLocations = {
   uSmoothStrength: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
+  uSpotMaskGlowEnabled: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
   uBlackFloor: WebGLUniformLocation | null;
   uOutputBrightness: WebGLUniformLocation | null;
@@ -194,11 +201,14 @@ type Pass2UniformLocations = {
   uPixelAspect: WebGLUniformLocation | null;
   uPhosphorDotMode: WebGLUniformLocation | null;
   uPhosphorDotShape: WebGLUniformLocation | null;
+  uPhosphorDotPreserveTargetGrid: WebGLUniformLocation | null;
   uPhosphorDotInternalScale: WebGLUniformLocation | null;
   uPhosphorDotSizeResponse: WebGLUniformLocation | null;
   uPhosphorDotBrightCore: WebGLUniformLocation | null;
   uPhosphorDotCellFill: WebGLUniformLocation | null;
   uPhosphorDotFlatDisc: WebGLUniformLocation | null;
+  uPhosphorDotEdgeGridEnabled: WebGLUniformLocation | null;
+  uPhosphorDotCellSpillEnabled: WebGLUniformLocation | null;
   uPhosphorDotNeighborBlend: WebGLUniformLocation | null;
   uPhosphorDotGrainStrength: WebGLUniformLocation | null;
   uBeamDarkCutoff: WebGLUniformLocation | null;
@@ -508,6 +518,7 @@ export const isPhosphorDotModeEnabled = (filterState: RetroVideoFilterState) =>
     filterState.phosphorDotBrightCore ||
     filterState.phosphorDotCellFill > 0.001 ||
     filterState.phosphorDotFlatDisc ||
+    filterState.phosphorDotEdgeGridEnabled ||
     filterState.phosphorDotNeighborBlend
   );
 
@@ -527,6 +538,9 @@ const getPhosphorDotInternalScale = (filterState: RetroVideoFilterState) =>
   isPhosphorDotModeEnabled(filterState) || isBeamCrossModeEnabled(filterState)
     ? Math.min(4, Math.max(1, filterState.phosphorDotInternalScale))
     : 1;
+
+const shouldPreserveTargetGrid = (filterState: RetroVideoFilterState) =>
+  filterState.phosphorDotPreserveTargetGrid && isPhosphorDotModeEnabled(filterState);
 
 const getAspectCorrectedSize = (
   requestedWidth: number,
@@ -608,7 +622,8 @@ const getPhosphorDotViewportLimitedSize = (
   const baseMinCellPixels = isBeamMode
     ? 1.1
     : Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
-  const effectiveInternalScale = isBeamMode ? 1 : Math.max(internalScale, 1);
+  const effectiveInternalScale =
+    isBeamMode || shouldPreserveTargetGrid(filterState) ? 1 : Math.max(internalScale, 1);
   const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
   const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
   const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
@@ -633,7 +648,8 @@ export const getEffectiveRetroTargetSize = (
 ) => {
   const internalScale = getPhosphorDotInternalScale(filterState);
   const isBeamMode = isBeamCrossModeEnabled(filterState);
-  const effectiveResolutionScale = isBeamMode ? 1 : internalScale;
+  const effectiveResolutionScale =
+    isBeamMode || shouldPreserveTargetGrid(filterState) ? 1 : internalScale;
   const requestedWidth = Math.max(filterState.targetWidth, 1);
   const requestedHeight = Math.max(filterState.targetHeight, 1);
   const aspectCorrected = filterState.matchTargetAspect
@@ -716,8 +732,8 @@ function logShaderCompileInfo(message: string) {
   console.info(`INF : COMPILE SHADER : ${message}`);
 }
 
-function logShaderCompileWarn(message: string) {
-  console.warn(`WARN : DUPLICATE COMPILE SHADER : ${message}`);
+function logShaderCompileRetryInfo(message: string) {
+  console.info(`INF : RECOMPILE SHADER : ${message}`);
 }
 
 // Wait for both programs to finish compiling, then verify link status.
@@ -1160,7 +1176,7 @@ export class TetoricaRetroVideoPipeline {
 
   private logProgramCompile(key: string) {
     if (this.programCompileHistory.has(key)) {
-      logShaderCompileWarn(key);
+      logShaderCompileRetryInfo(key);
       return;
     }
     this.programCompileHistory.add(key);
@@ -1215,7 +1231,9 @@ export class TetoricaRetroVideoPipeline {
     if (cached) return cached;
     const inflight = this.windowsLiteVariantCompileInflight.get(variantKey);
     if (inflight) {
-      logShaderCompileWarn(`variant:${variantKey}`);
+      TetoricaRetroVideoPipeline.showDebug(
+        `filter: reusing in-flight Windows lite variant ${variantKey}`,
+      );
       return inflight;
     }
     if (this.isDisposed || this.gl.isContextLost()) {
@@ -1546,6 +1564,7 @@ export class TetoricaRetroVideoPipeline {
       uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
       uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
+      uScanlineEnabled: gl.getUniformLocation(program, "uScanlineEnabled"),
       uScanlineStrength: gl.getUniformLocation(program, "uScanlineStrength"),
       uScanline2Strength: gl.getUniformLocation(program, "uScanline2Strength"),
       uScanlineBrightnessFade: gl.getUniformLocation(program, "uScanlineBrightnessFade"),
@@ -1557,6 +1576,7 @@ export class TetoricaRetroVideoPipeline {
       uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
       uPhosphorStrength: gl.getUniformLocation(program, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(program, "uSpotMaskStrength"),
+      uSpotMaskGlowEnabled: gl.getUniformLocation(program, "uSpotMaskGlowEnabled"),
       uBulbRadius: gl.getUniformLocation(program, "uBulbRadius"),
       uBlackFloor: gl.getUniformLocation(program, "uBlackFloor"),
       uOutputBrightness: gl.getUniformLocation(program, "uOutputBrightness"),
@@ -1569,11 +1589,14 @@ export class TetoricaRetroVideoPipeline {
       uPixelAspect: gl.getUniformLocation(program, "uPixelAspect"),
       uPhosphorDotMode: gl.getUniformLocation(program, "uPhosphorDotMode"),
       uPhosphorDotShape: gl.getUniformLocation(program, "uPhosphorDotShape"),
+      uPhosphorDotPreserveTargetGrid: gl.getUniformLocation(program, "uPhosphorDotPreserveTargetGrid"),
       uPhosphorDotInternalScale: gl.getUniformLocation(program, "uPhosphorDotInternalScale"),
       uPhosphorDotSizeResponse: gl.getUniformLocation(program, "uPhosphorDotSizeResponse"),
       uPhosphorDotBrightCore: gl.getUniformLocation(program, "uPhosphorDotBrightCore"),
       uPhosphorDotCellFill: gl.getUniformLocation(program, "uPhosphorDotCellFill"),
       uPhosphorDotFlatDisc: gl.getUniformLocation(program, "uPhosphorDotFlatDisc"),
+      uPhosphorDotEdgeGridEnabled: gl.getUniformLocation(program, "uPhosphorDotEdgeGridEnabled"),
+      uPhosphorDotCellSpillEnabled: gl.getUniformLocation(program, "uPhosphorDotCellSpillEnabled"),
       uPhosphorDotNeighborBlend: gl.getUniformLocation(program, "uPhosphorDotNeighborBlend"),
       uPhosphorDotGrainStrength: gl.getUniformLocation(program, "uPhosphorDotGrainStrength"),
       uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
@@ -2147,6 +2170,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uDitherStrength, filterState.ditherStrength);
     gl.uniform1f(this.pass2Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(this.pass2Locs.uCurvature, getEffectivePreCurvature(filterState));
+    gl.uniform1f(this.pass2Locs.uScanlineEnabled, filterState.scanlineEnabled ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(this.pass2Locs.uScanline2Strength, filterState.scanline2Strength);
     gl.uniform1f(this.pass2Locs.uScanlineBrightnessFade, filterState.scanlineBrightnessFade);
@@ -2158,6 +2182,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uSmoothStrength, filterState.smoothStrength);
     gl.uniform1f(this.pass2Locs.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(this.pass2Locs.uSpotMaskStrength, filterState.spotMaskStrength);
+    gl.uniform1f(this.pass2Locs.uSpotMaskGlowEnabled, filterState.spotMaskGlowEnabled ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uBulbRadius, filterState.bulbRadius);
     gl.uniform1f(this.pass2Locs.uBlackFloor, filterState.blackFloor);
     gl.uniform1f(this.pass2Locs.uOutputBrightness, filterState.outputBrightness);
@@ -2184,6 +2209,10 @@ export class TetoricaRetroVideoPipeline {
       getPhosphorDotShapeValue(filterState.phosphorDotShape),
     );
     gl.uniform1f(
+      this.pass2Locs.uPhosphorDotPreserveTargetGrid,
+      filterState.phosphorDotPreserveTargetGrid ? 1 : 0,
+    );
+    gl.uniform1f(
       this.pass2Locs.uPhosphorDotInternalScale,
       Math.min(4, Math.max(1, filterState.phosphorDotInternalScale)),
     );
@@ -2194,6 +2223,8 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass2Locs.uPhosphorDotBrightCore, filterState.phosphorDotBrightCore ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotCellFill, filterState.phosphorDotCellFill);
     gl.uniform1f(this.pass2Locs.uPhosphorDotFlatDisc, filterState.phosphorDotFlatDisc ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotEdgeGridEnabled, filterState.phosphorDotEdgeGridEnabled ? 1 : 0);
+    gl.uniform1f(this.pass2Locs.uPhosphorDotCellSpillEnabled, filterState.phosphorDotCellSpillEnabled ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotNeighborBlend, filterState.phosphorDotNeighborBlend ? 1 : 0);
     gl.uniform1f(this.pass2Locs.uPhosphorDotGrainStrength, filterState.phosphorDotGrainStrength);
     gl.uniform1f(this.pass2Locs.uBeamDarkCutoff, filterState.beamDarkCutoff);

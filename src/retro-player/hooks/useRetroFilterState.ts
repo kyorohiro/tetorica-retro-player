@@ -33,6 +33,7 @@ export type RetroFilterInitialState = Partial<{
   ditherStrength: number;
   paletteMode: PaletteMode;
   curvature: number;
+  scanlineEnabled: boolean;
   scanlineStrength: number;
   scanline2Strength: number;
   scanlineBrightnessFade: number;
@@ -48,6 +49,7 @@ export type RetroFilterInitialState = Partial<{
   animeEdgeHigh: number;
   phosphorStrength: number;
   spotMaskStrength: number;
+  spotMaskGlowEnabled: boolean;
   bulbRadius: number;
   blackFloor: number;
   outputBrightness: number;
@@ -63,8 +65,11 @@ export type RetroFilterInitialState = Partial<{
   phosphorDotBrightCore: boolean;
   phosphorDotCellFill: number;
   phosphorDotFlatDisc: boolean;
+  phosphorDotEdgeGridEnabled: boolean;
+  phosphorDotCellSpillEnabled: boolean;
   phosphorDotNeighborBlend: boolean;
   phosphorDotGrainStrength: number;
+  phosphorDotPreserveTargetGrid: boolean;
   coloredGlowEnabled: boolean;
   postCurvatureEnabled: boolean;
   compositeEnabled: boolean;
@@ -113,6 +118,7 @@ const doesPresetMatchState = (
     preset.dither === state.ditherStrength &&
     preset.palette === state.paletteMode &&
     preset.curvature === state.curvature &&
+    state.scanlineEnabled === true &&
     preset.scanline === state.scanlineStrength &&
     preset.scanline2 === state.scanline2Strength &&
     preset.vignette === state.vignetteStrength &&
@@ -127,6 +133,7 @@ const doesPresetMatchState = (
     (preset.animeEdgeHigh ?? 0.55) === state.animeEdgeHigh &&
     preset.phosphor === state.phosphorStrength &&
     preset.spotMask === state.spotMaskStrength &&
+    state.spotMaskGlowEnabled === true &&
     preset.bulbRadius === state.bulbRadius &&
     preset.blackFloor === state.blackFloor &&
     (preset.outputBrightness ?? 1) === state.outputBrightness &&
@@ -142,8 +149,11 @@ const doesPresetMatchState = (
     (preset.phosphorDotBrightCore ?? false) === state.phosphorDotBrightCore &&
     (preset.phosphorDotCellFill ?? 0) === state.phosphorDotCellFill &&
     (preset.phosphorDotFlatDisc ?? false) === state.phosphorDotFlatDisc &&
+    (preset.phosphorDotEdgeGridEnabled ?? false) === state.phosphorDotEdgeGridEnabled &&
+    state.phosphorDotCellSpillEnabled === true &&
     (preset.phosphorDotNeighborBlend ?? false) === state.phosphorDotNeighborBlend &&
     (preset.phosphorDotGrainStrength ?? 0) === state.phosphorDotGrainStrength &&
+    state.phosphorDotPreserveTargetGrid === false &&
     (preset.coloredGlowEnabled ?? false) === state.coloredGlowEnabled &&
     (preset.postCurvatureEnabled ?? false) === state.postCurvatureEnabled &&
     (preset.compositeEnabled ?? false) === state.compositeEnabled &&
@@ -222,6 +232,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ditherStrength: initialState.ditherStrength ?? DEFAULT_PRESET.dither,
     paletteMode: initialState.paletteMode ?? DEFAULT_PRESET.palette,
     curvature: initialState.curvature ?? DEFAULT_PRESET.curvature,
+    scanlineEnabled: initialState.scanlineEnabled ?? true,
     scanlineStrength: initialState.scanlineStrength ?? DEFAULT_PRESET.scanline,
     scanline2Strength: initialState.scanline2Strength ?? DEFAULT_PRESET.scanline2,
     scanlineBrightnessFade: initialState.scanlineBrightnessFade ?? 0.6,
@@ -237,6 +248,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     animeEdgeHigh: initialState.animeEdgeHigh ?? (DEFAULT_PRESET.animeEdgeHigh ?? 0.55),
     phosphorStrength: initialState.phosphorStrength ?? DEFAULT_PRESET.phosphor,
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
+    spotMaskGlowEnabled: initialState.spotMaskGlowEnabled ?? true,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
     blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
     outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
@@ -263,10 +275,16 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.phosphorDotCellFill ?? (DEFAULT_PRESET.phosphorDotCellFill ?? 0),
     phosphorDotFlatDisc:
       initialState.phosphorDotFlatDisc ?? (DEFAULT_PRESET.phosphorDotFlatDisc ?? false),
+    phosphorDotEdgeGridEnabled:
+      initialState.phosphorDotEdgeGridEnabled ?? (DEFAULT_PRESET.phosphorDotEdgeGridEnabled ?? false),
+    phosphorDotCellSpillEnabled:
+      initialState.phosphorDotCellSpillEnabled ?? true,
     phosphorDotNeighborBlend:
       initialState.phosphorDotNeighborBlend ?? (DEFAULT_PRESET.phosphorDotNeighborBlend ?? false),
     phosphorDotGrainStrength:
       initialState.phosphorDotGrainStrength ?? (DEFAULT_PRESET.phosphorDotGrainStrength ?? 0),
+    phosphorDotPreserveTargetGrid:
+      initialState.phosphorDotPreserveTargetGrid ?? false,
     coloredGlowEnabled:
       initialState.coloredGlowEnabled ?? (DEFAULT_PRESET.coloredGlowEnabled ?? false),
     postCurvatureEnabled:
@@ -400,6 +418,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSettings((current) => (current.curvature === curvature ? current : { ...current, curvature }));
   };
 
+  const setScanlineEnabled = (scanlineEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (current.scanlineEnabled === scanlineEnabled ? current : { ...current, scanlineEnabled }));
+  };
+
   const setScanlineStrength = (scanlineStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.scanlineStrength === scanlineStrength ? current : { ...current, scanlineStrength }));
@@ -486,6 +509,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setSpotMaskStrength = (spotMaskStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.spotMaskStrength === spotMaskStrength ? current : { ...current, spotMaskStrength }));
+  };
+
+  const setSpotMaskGlowEnabled = (spotMaskGlowEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.spotMaskGlowEnabled === spotMaskGlowEnabled
+        ? current
+        : { ...current, spotMaskGlowEnabled }
+    ));
   };
 
   const setBulbRadius = (bulbRadius: number) => {
@@ -589,6 +621,24 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setPhosphorDotEdgeGridEnabled = (phosphorDotEdgeGridEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotEdgeGridEnabled === phosphorDotEdgeGridEnabled
+        ? current
+        : { ...current, phosphorDotEdgeGridEnabled }
+    ));
+  };
+
+  const setPhosphorDotCellSpillEnabled = (phosphorDotCellSpillEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotCellSpillEnabled === phosphorDotCellSpillEnabled
+        ? current
+        : { ...current, phosphorDotCellSpillEnabled }
+    ));
+  };
+
   const setPhosphorDotNeighborBlend = (phosphorDotNeighborBlend: boolean) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -601,6 +651,15 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     markPresetAsCustom();
     setSettings((current) => (
       current.phosphorDotGrainStrength === phosphorDotGrainStrength ? current : { ...current, phosphorDotGrainStrength }
+    ));
+  };
+
+  const setPhosphorDotPreserveTargetGrid = (phosphorDotPreserveTargetGrid: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.phosphorDotPreserveTargetGrid === phosphorDotPreserveTargetGrid
+        ? current
+        : { ...current, phosphorDotPreserveTargetGrid }
     ));
   };
 
@@ -783,6 +842,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       ditherStrength: presetSettings.dither,
       paletteMode: presetSettings.palette,
       curvature: presetSettings.curvature,
+      scanlineEnabled: true,
       scanlineStrength: presetSettings.scanline,
       scanline2Strength: presetSettings.scanline2,
       vignetteStrength: presetSettings.vignette,
@@ -797,6 +857,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       animeEdgeHigh: presetSettings.animeEdgeHigh ?? 0.55,
       phosphorStrength: presetSettings.phosphor,
       spotMaskStrength: presetSettings.spotMask,
+      spotMaskGlowEnabled: true,
       bulbRadius: presetSettings.bulbRadius,
       blackFloor: presetSettings.blackFloor,
       outputBrightness: presetSettings.outputBrightness ?? 1,
@@ -816,8 +877,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       phosphorDotBrightCore: presetSettings.phosphorDotBrightCore ?? false,
       phosphorDotCellFill: presetSettings.phosphorDotCellFill ?? 0,
       phosphorDotFlatDisc: presetSettings.phosphorDotFlatDisc ?? false,
+      phosphorDotEdgeGridEnabled: presetSettings.phosphorDotEdgeGridEnabled ?? false,
+      phosphorDotCellSpillEnabled: true,
       phosphorDotNeighborBlend: presetSettings.phosphorDotNeighborBlend ?? false,
       phosphorDotGrainStrength: presetSettings.phosphorDotGrainStrength ?? 0,
+      phosphorDotPreserveTargetGrid: false,
       coloredGlowEnabled: presetSettings.coloredGlowEnabled ?? false,
       postCurvatureEnabled: presetSettings.postCurvatureEnabled ?? false,
       compositeEnabled: presetSettings.compositeEnabled ?? false,
@@ -884,6 +948,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setDitherStrength,
     setPaletteMode,
     setCurvature,
+    setScanlineEnabled,
     setScanlineStrength,
     setScanline2Strength,
     setScanlineBrightnessFade,
@@ -899,6 +964,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setAnimeEdgeHigh,
     setPhosphorStrength,
     setSpotMaskStrength,
+    setSpotMaskGlowEnabled,
     setBulbRadius,
     setBlackFloor,
     setOutputBrightness,
@@ -914,8 +980,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setPhosphorDotBrightCore,
     setPhosphorDotCellFill,
     setPhosphorDotFlatDisc,
+    setPhosphorDotEdgeGridEnabled,
+    setPhosphorDotCellSpillEnabled,
     setPhosphorDotNeighborBlend,
     setPhosphorDotGrainStrength,
+    setPhosphorDotPreserveTargetGrid,
     setColoredGlowEnabled,
     setPostCurvatureEnabled,
     setCompositeEnabled,
