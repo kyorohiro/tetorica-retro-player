@@ -28,7 +28,7 @@ export const supportedExtensions = [
     "sh", "py", "java", "c", "cpp", "h",
 
     // ROM
-    "nes",
+    "nes", "gb", "gbc",
 ];
 export const mimeFromPath = (path: string): string => {
     const lower = path.toLowerCase();
@@ -76,11 +76,13 @@ export const mimeFromPath = (path: string): string => {
     if (/\.(epub)$/i.test(lower)) return "application/epub+zip";
     if (/\.(zip|cbz)$/i.test(lower)) return "application/zip";
     if (/\.(nes)$/i.test(lower)) return "application/x-nes-rom";
+    if (/\.(gb|gbc)$/i.test(lower)) return "application/x-gameboy-rom";
 
     return "application/octet-stream";
 };
 
 export const isNesRomPath = (path: string) => /\.(nes)$/i.test(path);
+export const isGameBoyRomPath = (path: string) => /\.(gb|gbc)$/i.test(path);
 
 export const isImage = (path: string) =>
     mimeFromPath(path).startsWith("image/");
