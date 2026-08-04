@@ -1289,7 +1289,7 @@ export function RetroPreviewView({
               />
             )}
             {!player.isPoweredOn && (
-              <div className="absolute z-100 inset-0 flex items-center justify-center bg-black/72">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/72">
                 <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
                   <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
                     Power Off
@@ -1299,7 +1299,7 @@ export function RetroPreviewView({
               </div>
             )}
             {shouldShowImagePageOverlay && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/46">
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-slate-950/46">
                 <div className="w-[min(84%,30rem)] rounded-2xl border border-slate-700 bg-slate-950 px-6 py-5 text-center text-slate-100">
                   <p className="break-words text-[min(3.4vw,0.95rem)] font-medium leading-snug text-slate-200">
                     {loadingPageLabel}
@@ -1324,7 +1324,7 @@ export function RetroPreviewView({
             )}
             {showLoadingOverlay && !player.needsUserPlay && !player.previewError && !isImagePreviewRequested && (
               <div
-                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/72"
+                className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-slate-950/72"
               >
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
                   <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
@@ -1338,7 +1338,7 @@ export function RetroPreviewView({
               </div>
             )}
             {player.needsUserPlay && !player.isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/46">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/46">
                 <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
                   {isStartingPlay ? (
                     <>
@@ -1374,7 +1374,7 @@ export function RetroPreviewView({
               </div>
             )}
             {showRetryOverlay && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/52">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/52">
                 <div className="w-[min(92%,30rem)] rounded-2xl border border-rose-500/25 bg-slate-900/94 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
                   {isStartingPlay ? (
                     <>
@@ -1408,7 +1408,7 @@ export function RetroPreviewView({
               </div>
             )}
             {player.isBuffering && player.isPlaying && !player.isLoading && !player.needsUserPlay && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                 <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 px-4 py-3 text-center text-xs text-slate-300 backdrop-blur-sm">
                   <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-slate-500 border-t-sky-400" />
                   Buffering…

@@ -610,8 +610,10 @@ const getPhosphorDotViewportLimitedSize = (
   }
 
   const isBeamMode = isBeamCrossModeEnabled(filterState);
+  const beamCapFloor = isCapActive ? 1.6 : 1.2;
+  const beamBloomFloor = filterState.beamWhiteBloom * 0.6;
   const baseMinCellPixels = isBeamMode
-    ? Math.max(isCapActive ? 1.6 : 1.2, filterState.beamWhiteBloom * 0.6)
+    ? Math.max(beamCapFloor, beamBloomFloor)
     : Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
   const effectiveInternalScale = isBeamMode ? 1 : Math.max(internalScale, 1);
   const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
@@ -622,6 +624,42 @@ const getPhosphorDotViewportLimitedSize = (
     maxWidth / Math.max(width, 1),
     maxHeight / Math.max(height, 1),
   );
+
+  if (isBeamMode && isRetroVideoDebugEnabled()) {
+    const debugKey = [
+      isCapActive ? 1 : 0,
+      filterState.beamWhiteBloom.toFixed(4),
+      beamBloomFloor.toFixed(4),
+      beamCapFloor.toFixed(4),
+      baseMinCellPixels.toFixed(4),
+      minCellPixels.toFixed(4),
+      visibleWidth,
+      visibleHeight,
+      width,
+      height,
+      maxWidth,
+      maxHeight,
+      scale.toFixed(4),
+    ].join(":");
+    if (debugKey !== lastBeamViewportLimitDebugKey) {
+      lastBeamViewportLimitDebugKey = debugKey;
+      console.info("[retro-player beam viewport limit]", {
+        isCapActive,
+        beamWhiteBloom: filterState.beamWhiteBloom,
+        beamBloomFloor,
+        beamCapFloor,
+        baseMinCellPixels,
+        minCellPixels,
+        visibleWidth,
+        visibleHeight,
+        requestedWidth: width,
+        requestedHeight: height,
+        maxWidth,
+        maxHeight,
+        scale,
+      });
+    }
+  }
 
   return {
     width: Math.max(1, Math.round(width * scale)),
@@ -685,6 +723,15 @@ const getParallelShaderCompileExtension = (gl: WebGL2RenderingContext) =>
     gl.getExtension("WEBGL_parallel_shader_compile") ??
     gl.getExtension("KHR_parallel_shader_compile")
   ) as KHRParallelShaderCompile | null;
+
+const isRetroVideoDebugEnabled = () =>
+  typeof window !== "undefined" &&
+  (
+    import.meta.env.DEV ||
+    Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
+  );
+
+let lastBeamViewportLimitDebugKey = "";
 
 // Submit shader compilation and linking without blocking on status checks.
 // Caller must await completion before calling gl.getProgramParameter(LINK_STATUS).
