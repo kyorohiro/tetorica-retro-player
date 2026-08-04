@@ -382,6 +382,11 @@ export function useRetroPixiStage({
   } | null>(null);
   const [isRendererReady, setIsRendererReady] = useState(false);
   const [isFilterReady, setIsFilterReady] = useState(false);
+  const [renderCapHintState, setRenderCapHintState] = useState<{
+    isCapEnabled: boolean;
+  }>({
+    isCapEnabled: false,
+  });
   const viewportRect = viewportRectRef.current;
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
   const destroyPixiRef = useRef<() => void>(() => {});
@@ -747,6 +752,15 @@ export function useRetroPixiStage({
         isPhosphorDotMode: isPhosphorDotModeEnabled(currentFilterState as RetroVideoFilterState),
       });
     }
+
+    setRenderCapHintState((current) => {
+      const next = {
+        isCapEnabled: filterBufferCap !== null,
+      };
+      return current.isCapEnabled === next.isCapEnabled
+        ? current
+        : next;
+    });
 
     if (appliedLayoutKeyRef.current === nextLayoutKey) {
       return;
@@ -1140,6 +1154,7 @@ export function useRetroPixiStage({
     filterRef,
     isRendererReady,
     isFilterReady,
+    renderCapHintState,
     viewportRect,
     setViewportRect: updateViewportRect,
     applyFilterState,

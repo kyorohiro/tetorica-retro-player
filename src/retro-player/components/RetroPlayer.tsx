@@ -264,6 +264,8 @@ export function RetroPlayer({
   const [maximizePerformanceMode, setMaximizePerformanceMode] = React.useState<"auto" | "on" | "off">(
     persistedUiSettings?.maximizePerformanceMode ?? "auto",
   );
+  const [maximizePerformanceModeSessionOverride, setMaximizePerformanceModeSessionOverride] =
+    React.useState<"off" | null>(null);
   const startupShaderCompileCacheBusterEnabled = React.useRef(false).current;
   const [shaderCompileCacheBusterEnabled, setShaderCompileCacheBusterEnabled] = React.useState(
     startupShaderCompileCacheBusterEnabled,
@@ -355,6 +357,8 @@ export function RetroPlayer({
 
     filterState.setFocusCenter(point.x, point.y);
   }, [filterState]);
+  const effectiveMaximizePerformanceMode =
+    maximizePerformanceModeSessionOverride ?? maximizePerformanceMode;
   const renderResolutionScale = renderResolutionPreset;
   const player = usePixiVideoPlayer(
     filterState,
@@ -371,7 +375,7 @@ export function RetroPlayer({
       playbackSource,
       preferNativeVideoSurface: nativePlaybackMode,
       isPreviewMaximized: isPreviewMaximizedForRenderer,
-      maximizePerformanceMode,
+      maximizePerformanceMode: effectiveMaximizePerformanceMode,
       shaderCompileCacheBusterEnabled: startupShaderCompileCacheBusterEnabled,
       locale,
       requestedKind: kind,
@@ -420,6 +424,15 @@ export function RetroPlayer({
 
   const handleToggleHighResolution = React.useCallback(() => {
     setRenderResolutionPreset((current) => (current > 1 ? 1 : 2));
+  }, []);
+
+  const handleMaximizePerformanceModeChange = React.useCallback((nextValue: "auto" | "on" | "off") => {
+    setMaximizePerformanceMode(nextValue);
+    setMaximizePerformanceModeSessionOverride(null);
+  }, []);
+
+  const handleTemporarilyDisableRenderCap = React.useCallback(() => {
+    setMaximizePerformanceModeSessionOverride("off");
   }, []);
 
   const handleGraphicsBackendModeChange = React.useCallback((nextMode: GraphicsBackendMode) => {
@@ -981,7 +994,8 @@ export function RetroPlayer({
             previewLayoutState={previewLayoutState}
             onPreviewLayoutStateChange={onPreviewLayoutStateChange}
             maximizePerformanceMode={maximizePerformanceMode}
-            onMaximizePerformanceModeChange={setMaximizePerformanceMode}
+            onMaximizePerformanceModeChange={handleMaximizePerformanceModeChange}
+            onTemporarilyDisableRenderCap={handleTemporarilyDisableRenderCap}
             shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
             onShaderCompileCacheBusterEnabledChange={setShaderCompileCacheBusterEnabled}
             graphicsBackendMode={graphicsBackendMode}
@@ -1119,7 +1133,8 @@ export function RetroPlayer({
               previewLayoutState={previewLayoutState}
               onPreviewLayoutStateChange={onPreviewLayoutStateChange}
               maximizePerformanceMode={maximizePerformanceMode}
-              onMaximizePerformanceModeChange={setMaximizePerformanceMode}
+              onMaximizePerformanceModeChange={handleMaximizePerformanceModeChange}
+              onTemporarilyDisableRenderCap={handleTemporarilyDisableRenderCap}
               shaderCompileCacheBusterEnabled={shaderCompileCacheBusterEnabled}
               onShaderCompileCacheBusterEnabledChange={setShaderCompileCacheBusterEnabled}
               graphicsBackendMode={graphicsBackendMode}

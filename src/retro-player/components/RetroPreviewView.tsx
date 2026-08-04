@@ -86,6 +86,9 @@ export type RetroPreviewPlayerSlice = {
   previewError: string;
   previewStatus: RetroPreviewStatus;
   isRendererReady: boolean;
+  renderCapHintState: {
+    isCapEnabled: boolean;
+  };
   sourceDimensions: { width: number; height: number } | null;
   viewportRect: { width: number; height: number; x: number; y: number } | null;
   audioOptimizationMode: RetroAudioSettings["audioOptimizationMode"];
@@ -164,6 +167,7 @@ export type RetroPreviewViewProps = {
   onPreviewLayoutStateChange?: (state: RetroPreviewLayoutState) => void;
   maximizePerformanceMode: "auto" | "on" | "off";
   onMaximizePerformanceModeChange: (value: "auto" | "on" | "off") => void;
+  onTemporarilyDisableRenderCap: () => void;
   shaderCompileCacheBusterEnabled: boolean;
   onShaderCompileCacheBusterEnabledChange: (value: boolean) => void;
   graphicsBackendMode: GraphicsBackendMode;
@@ -205,6 +209,7 @@ export function RetroPreviewView({
   onPreviewLayoutStateChange,
   maximizePerformanceMode,
   onMaximizePerformanceModeChange,
+  onTemporarilyDisableRenderCap,
   shaderCompileCacheBusterEnabled,
   onShaderCompileCacheBusterEnabledChange,
   graphicsBackendMode,
@@ -1249,9 +1254,20 @@ export function RetroPreviewView({
             onPointerUp={handlePreviewPointerEnd}
             onPointerCancel={handlePreviewPointerEnd}
             >
+            {player.renderCapHintState.isCapEnabled && (
+              <div className="absolute bottom-2 right-2 z-0">
+                <button
+                  type="button"
+                  onClick={onTemporarilyDisableRenderCap}
+                  className="inline-flex items-center justify-center rounded-full border border-amber-300/45 bg-slate-950/82 px-3 py-1.5 text-[11px] font-medium text-amber-100 shadow-md backdrop-blur-sm transition hover:bg-slate-900"
+                >
+                  {locale === "ja" ? "画質優先" : "Quality priority"}
+                </button>
+              </div>
+            )}
             <div
               ref={player.canvasHostRef}
-              className="pointer-events-none relative h-full w-full touch-manipulation"
+              className="pointer-events-none relative z-10 h-full w-full touch-manipulation"
               style={{
                 opacity:
                   shouldKeepNativeVisualVisible
@@ -1265,7 +1281,7 @@ export function RetroPreviewView({
             {shouldKeepNativeVisualVisible && (
               <div
                 ref={nativeVideoHostRef}
-                className="absolute inset-0 overflow-hidden rounded-xl bg-black"
+                className="absolute inset-0 z-10 overflow-hidden rounded-xl bg-black"
                 style={{
                   opacity: shouldKeepNativeVisualVisible ? 1 : 0,
                   transition: `opacity ${hasShownOnceRef.current ? "0.15s" : "0.4s"} ease`,
