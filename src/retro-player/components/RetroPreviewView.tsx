@@ -1416,7 +1416,7 @@ export function RetroPreviewView({
               </div>
             )}
             {player.hasAudioOnly && (
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-700 px-4">
+              <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-700 px-4">
                 {analyserRef && (
                   <AudioSpectrum analyserRef={analyserRef} className="w-4/5 rounded bg-slate-900/60" />
                 )}
@@ -1426,7 +1426,7 @@ export function RetroPreviewView({
               </div>
             )}
             {!player.hasAudioOnly && analyserRef && showVideoSpectrum && (
-              <div className="pointer-events-none absolute bottom-1 left-1 right-1 z-10">
+              <div className="pointer-events-none absolute bottom-1 left-1 right-1 z-20">
                 <AudioSpectrum analyserRef={analyserRef} className="w-full rounded bg-black/50" />
               </div>
             )}
