@@ -28,11 +28,55 @@ const getPreferredOutputScale = () => {
   return Math.max(1, Math.min(2, Math.round(window.devicePixelRatio || 1)));
 };
 
+const snapCssToDevicePixel = (value: number) => {
+  if (typeof window === "undefined") {
+    return Math.round(value);
+  }
+
+  const dpr = Math.max(window.devicePixelRatio || 1, 1);
+  return Math.round(value * dpr) / dpr;
+};
+
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type FilterBufferCap = {
   width: number;
   height: number;
   maxPixelCount?: number;
+};
+
+type BufferSizingInput = {
+  styleWidth: number;
+  styleHeight: number;
+  effectiveTargetWidth: number;
+  effectiveTargetHeight: number;
+  effectiveRenderResolutionScale: number;
+  isFilterEnabled: boolean;
+  shouldUseLogicalBufferUpscale: boolean;
+};
+
+type BufferSizingResult = {
+  displayBufferWidth: number;
+  displayBufferHeight: number;
+  logicalBufferWidth: number;
+  logicalBufferHeight: number;
+  rawNextWidth: number;
+  rawNextHeight: number;
+};
+
+type ResolvedCanvasSizing = BufferSizingResult & {
+  overLimitFactor: number;
+  filterCapFactor: number;
+  totalScaleDownFactor: number;
+  cappedWidth: number;
+  cappedHeight: number;
+  nextWidth: number;
+  nextHeight: number;
+  capSafeStyleWidth: number;
+  capSafeStyleHeight: number;
+  presentedStyleWidth: number;
+  presentedStyleHeight: number;
+  didApplyFilterCap: boolean;
+  didApplyAnyCap: boolean;
 };
 
 export type CanvasStageApp = {
@@ -85,7 +129,6 @@ const resolveFilterBufferCap = (
   }
 
   if (isBeamCrossModeEnabled(filterState)) {
-    // 候補 640x480, 960x720
     return {
       width: 960,
       height: 720,
@@ -120,6 +163,179 @@ const getCapScaleDownFactor = (
 const rawClampDiv = (value: number, limit: number) =>
   limit > 0 ? Math.max(value, 1) / limit : 1;
 
+const resolveBufferSizing = ({
+  styleWidth,
+  styleHeight,
+  effectiveTargetWidth,
+  effectiveTargetHeight,
+  effectiveRenderResolutionScale,
+  isFilterEnabled,
+  shouldUseLogicalBufferUpscale,
+}: BufferSizingInput): BufferSizingResult => {
+  const safeScale = Math.max(1, effectiveRenderResolutionScale);
+  const displayBufferWidth = Math.max(1, Math.round(styleWidth * safeScale));
+  const displayBufferHeight = Math.max(1, Math.round(styleHeight * safeScale));
+  const logicalBufferWidth = Math.max(
+    1,
+    Math.round(Math.max(1, effectiveTargetWidth) * safeScale),
+  );
+  const logicalBufferHeight = Math.max(
+    1,
+    Math.round(Math.max(1, effectiveTargetHeight) * safeScale),
+  );
+  const rawNextWidth = isFilterEnabled
+    ? (
+      shouldUseLogicalBufferUpscale
+        ? Math.max(displayBufferWidth, logicalBufferWidth)
+        : displayBufferWidth
+    )
+    : displayBufferWidth;
+  const rawNextHeight = isFilterEnabled
+    ? (
+      shouldUseLogicalBufferUpscale
+        ? Math.max(displayBufferHeight, logicalBufferHeight)
+        : displayBufferHeight
+    )
+    : displayBufferHeight;
+
+  return {
+    displayBufferWidth,
+    displayBufferHeight,
+    logicalBufferWidth,
+    logicalBufferHeight,
+    rawNextWidth,
+    rawNextHeight,
+  };
+};
+
+const resolvePresentedStyleSize = ({
+  styleWidth,
+  styleHeight,
+  nextWidth,
+  nextHeight,
+  effectiveRenderResolutionScale,
+  didApplyAnyCap,
+}: {
+  styleWidth: number;
+  styleHeight: number;
+  nextWidth: number;
+  nextHeight: number;
+  effectiveRenderResolutionScale: number;
+  didApplyAnyCap: boolean;
+}) => {
+  const safeScale = Math.max(1, effectiveRenderResolutionScale);
+  const maxScaleFromWidth = styleWidth / Math.max(nextWidth, 1);
+  const maxScaleFromHeight = styleHeight / Math.max(nextHeight, 1);
+  const capSafeCssScale = Math.min(
+    1 / safeScale,
+    maxScaleFromWidth,
+    maxScaleFromHeight,
+  );
+  const capSafeStyleWidth = Math.max(1, Math.floor(nextWidth * capSafeCssScale));
+  const capSafeStyleHeight = Math.max(1, Math.floor(nextHeight * capSafeCssScale));
+
+  return {
+    capSafeStyleWidth,
+    capSafeStyleHeight,
+    presentedStyleWidth: didApplyAnyCap
+      ? Math.min(styleWidth, capSafeStyleWidth)
+      : styleWidth,
+    presentedStyleHeight: didApplyAnyCap
+      ? Math.min(styleHeight, capSafeStyleHeight)
+      : styleHeight,
+  };
+};
+
+const resolveCanvasSizing = ({
+  styleWidth,
+  styleHeight,
+  effectiveTargetWidth,
+  effectiveTargetHeight,
+  effectiveRenderResolutionScale,
+  isFilterEnabled,
+  shouldUseLogicalBufferUpscale,
+  maxTextureSize,
+  filterBufferCap,
+}: BufferSizingInput & {
+  maxTextureSize: number;
+  filterBufferCap: FilterBufferCap | null;
+}): ResolvedCanvasSizing => {
+  let workingStyleWidth = styleWidth;
+  let workingStyleHeight = styleHeight;
+  let resolved: ResolvedCanvasSizing | null = null;
+
+  for (let i = 0; i < 3; i += 1) {
+    const bufferSizing = resolveBufferSizing({
+      styleWidth: workingStyleWidth,
+      styleHeight: workingStyleHeight,
+      effectiveTargetWidth,
+      effectiveTargetHeight,
+      effectiveRenderResolutionScale,
+      isFilterEnabled,
+      shouldUseLogicalBufferUpscale,
+    });
+    const overLimitFactor = Math.max(
+      bufferSizing.rawNextWidth / maxTextureSize,
+      bufferSizing.rawNextHeight / maxTextureSize,
+      1,
+    );
+    const filterCapFactor = getCapScaleDownFactor(
+      bufferSizing.rawNextWidth,
+      bufferSizing.rawNextHeight,
+      filterBufferCap,
+    );
+    const totalScaleDownFactor = Math.max(overLimitFactor, filterCapFactor);
+    const cappedWidth = Math.max(
+      1,
+      Math.floor(bufferSizing.rawNextWidth / totalScaleDownFactor),
+    );
+    const cappedHeight = Math.max(
+      1,
+      Math.floor(bufferSizing.rawNextHeight / totalScaleDownFactor),
+    );
+    const nextWidth = cappedWidth;
+    const nextHeight = cappedHeight;
+    const didApplyAnyCap = totalScaleDownFactor > 1.0001;
+    const presented = resolvePresentedStyleSize({
+      styleWidth: workingStyleWidth,
+      styleHeight: workingStyleHeight,
+      nextWidth,
+      nextHeight,
+      effectiveRenderResolutionScale,
+      didApplyAnyCap,
+    });
+
+    resolved = {
+      ...bufferSizing,
+      overLimitFactor,
+      filterCapFactor,
+      totalScaleDownFactor,
+      cappedWidth,
+      cappedHeight,
+      nextWidth,
+      nextHeight,
+      capSafeStyleWidth: presented.capSafeStyleWidth,
+      capSafeStyleHeight: presented.capSafeStyleHeight,
+      presentedStyleWidth: presented.presentedStyleWidth,
+      presentedStyleHeight: presented.presentedStyleHeight,
+      didApplyFilterCap: filterCapFactor > 1.0001,
+      didApplyAnyCap,
+    };
+
+    if (
+      presented.presentedStyleWidth === workingStyleWidth &&
+      presented.presentedStyleHeight === workingStyleHeight
+    ) {
+      break;
+    }
+
+    workingStyleWidth = presented.presentedStyleWidth;
+    workingStyleHeight = presented.presentedStyleHeight;
+  }
+
+  return resolved as ResolvedCanvasSizing;
+};
+
 export function useRetroPixiStage({
   filterState,
   fitMode,
@@ -153,6 +369,7 @@ export function useRetroPixiStage({
   const isTickerRunningRef = useRef(false);
   const layoutFrameRef = useRef<number | null>(null);
   const resizeValidationFrameRef = useRef<number | null>(null);
+  const canvasPresentationValidationFrameRef = useRef<number | null>(null);
   const observedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pendingObservedHostSizeRef = useRef<{ width: number; height: number } | null>(null);
   const filterReadyPromiseRef = useRef<Promise<void> | null>(null);
@@ -415,6 +632,15 @@ export function useRetroPixiStage({
       styleWidth > sourceWidth + 0.5 || styleHeight > sourceHeight + 0.5;
     const presentationSamplingMode: RetroPresentationSamplingMode =
       isUpscalingContent ? "crisp" : "smooth";
+    const shouldUseLogicalBufferUpscale =
+      isPhosphorDotModeEnabled(currentFilterState) ||
+      isBeamCrossModeEnabled(currentFilterState);
+    const filterBufferCap = resolveFilterBufferCap(
+      maximizePerformanceMode,
+      previewKindRef.current,
+      currentFilterState as RetroVideoFilterState,
+    );
+    const isFilterBufferCapEnabled = filterBufferCap !== null;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
@@ -424,92 +650,54 @@ export function useRetroPixiStage({
       previewSourceSize?.height,
       styleWidth,
       styleHeight,
-    );
-
-    const displayBufferWidth = Math.max(
-      1,
-      Math.round(styleWidth * Math.max(1, effectiveRenderResolutionScale)),
-    );
-    const displayBufferHeight = Math.max(
-      1,
-      Math.round(styleHeight * Math.max(1, effectiveRenderResolutionScale)),
-    );
-    const logicalBufferWidth = Math.max(
-      1,
-      Math.round(Math.max(1, effectiveTargetWidth) * Math.max(1, effectiveRenderResolutionScale)),
-    );
-    const logicalBufferHeight = Math.max(
-      1,
-      Math.round(Math.max(1, effectiveTargetHeight) * Math.max(1, effectiveRenderResolutionScale)),
-    );
-    const shouldUseLogicalBufferUpscale =
-      isPhosphorDotModeEnabled(currentFilterState) ||
-      isBeamCrossModeEnabled(currentFilterState);
-    const rawNextWidth = currentFilterState.isFilterEnabled
-      ? (
-        shouldUseLogicalBufferUpscale
-          ? Math.max(displayBufferWidth, logicalBufferWidth)
-          : displayBufferWidth
-      )
-      : displayBufferWidth;
-    const rawNextHeight = currentFilterState.isFilterEnabled
-      ? (
-        shouldUseLogicalBufferUpscale
-          ? Math.max(displayBufferHeight, logicalBufferHeight)
-          : displayBufferHeight
-      )
-      : displayBufferHeight;
-
-    // The backing buffer becomes the pipeline's FBO texture size 1:1, so it
-    // must not exceed what the GPU actually supports (3x/4x render
-    // resolution on a large preview can get there fast). Scale both axes
-    // down together to keep the aspect ratio intact.
-    const maxTextureSize = maxTextureSizeRef.current;
-    const overLimitFactor = Math.max(
-      rawNextWidth / maxTextureSize,
-      rawNextHeight / maxTextureSize,
-      1,
-    );
-    const filterBufferCap = resolveFilterBufferCap(
-      maximizePerformanceMode,
-      previewKindRef.current,
-      currentFilterState as RetroVideoFilterState,
+      isFilterBufferCapEnabled,
     );
     app.pipeline.setFilterBufferCap(filterBufferCap);
-    const filterCapFactor = getCapScaleDownFactor(
+    const {
+      displayBufferWidth,
+      displayBufferHeight,
+      logicalBufferWidth,
+      logicalBufferHeight,
       rawNextWidth,
       rawNextHeight,
-      filterBufferCap,
-    );
-    const totalScaleDownFactor = Math.max(
       overLimitFactor,
       filterCapFactor,
-    );
+      totalScaleDownFactor,
+      cappedWidth,
+      cappedHeight,
+      nextWidth,
+      nextHeight,
+      capSafeStyleWidth,
+      capSafeStyleHeight,
+      presentedStyleWidth,
+      presentedStyleHeight,
+      didApplyFilterCap,
+      didApplyAnyCap,
+    } = resolveCanvasSizing({
+      styleWidth,
+      styleHeight,
+      effectiveTargetWidth,
+      effectiveTargetHeight,
+      effectiveRenderResolutionScale,
+      isFilterEnabled: currentFilterState.isFilterEnabled,
+      shouldUseLogicalBufferUpscale,
+      maxTextureSize: maxTextureSizeRef.current,
+      filterBufferCap,
+    });
     app.pipeline.setFilterViewportScale(totalScaleDownFactor);
-    const cappedWidth = Math.max(1, Math.floor(rawNextWidth / totalScaleDownFactor));
-    const cappedHeight = Math.max(1, Math.floor(rawNextHeight / totalScaleDownFactor));
-    const windowedCanvasSize = lastWindowedCanvasSizeRef.current;
-    const shouldFreezeCanvasSizeOnMaximize =
-      isPreviewMaximized &&
-      totalScaleDownFactor > 1.0001 &&
-      windowedCanvasSize !== null;
-    const nextWidth = shouldFreezeCanvasSizeOnMaximize
-      ? Math.min(cappedWidth, windowedCanvasSize.width)
-      : cappedWidth;
-    const nextHeight = shouldFreezeCanvasSizeOnMaximize
-      ? Math.min(cappedHeight, windowedCanvasSize.height)
-      : cappedHeight;
-    const didApplyFilterCap = filterCapFactor > 1.0001;
-    const didApplyAnyCap = totalScaleDownFactor > 1.0001;
-    const presentedStyleWidth = styleWidth;
-    const presentedStyleHeight = styleHeight;
-    const nextLeft = Math.round(viewRect.x + (styleWidth - presentedStyleWidth) / 2);
-    const nextTop = Math.round(viewRect.y + (styleHeight - presentedStyleHeight) / 2);
+    const snappedPresentedStyleWidth = snapCssToDevicePixel(presentedStyleWidth);
+    const snappedPresentedStyleHeight = snapCssToDevicePixel(presentedStyleHeight);
+    const nextLeft = snapCssToDevicePixel(
+      viewRect.x + (styleWidth - snappedPresentedStyleWidth) / 2,
+    );
+    const nextTop = snapCssToDevicePixel(
+      viewRect.y + (styleHeight - snappedPresentedStyleHeight) / 2,
+    );
     const nextLayoutKey = [
       styleWidth,
       styleHeight,
-      presentedStyleWidth,
-      presentedStyleHeight,
+      snappedPresentedStyleWidth,
+      snappedPresentedStyleHeight,
       nextWidth,
       nextHeight,
       nextLeft,
@@ -523,6 +711,11 @@ export function useRetroPixiStage({
       debugVideo("renderCap:layout", {
         mode: maximizePerformanceMode,
         previewKind: previewKindRef.current,
+        devicePixelRatio:
+          typeof window === "undefined"
+            ? 1
+            : window.devicePixelRatio || 1,
+        effectiveRenderResolutionScale,
         styleWidth,
         styleHeight,
         sourceWidth,
@@ -542,12 +735,12 @@ export function useRetroPixiStage({
         cappedHeight,
         nextWidth,
         nextHeight,
-        presentedStyleWidth,
-        presentedStyleHeight,
+        capSafeStyleWidth,
+        capSafeStyleHeight,
+        presentedStyleWidth: snappedPresentedStyleWidth,
+        presentedStyleHeight: snappedPresentedStyleHeight,
         didApplyFilterCap,
         didApplyAnyCap,
-        shouldFreezeCanvasSizeOnMaximize,
-        windowedCanvasSize,
         filterBufferCap,
         isFilterEnabled: currentFilterState.isFilterEnabled,
         isBeamMode: isBeamCrossModeEnabled(currentFilterState as RetroVideoFilterState),
@@ -570,10 +763,33 @@ export function useRetroPixiStage({
     app.canvas.style.position = "absolute";
     app.canvas.style.left = `${nextLeft}px`;
     app.canvas.style.top = `${nextTop}px`;
-    app.canvas.style.width = `${presentedStyleWidth}px`;
-    app.canvas.style.height = `${presentedStyleHeight}px`;
+    app.canvas.style.width = `${snappedPresentedStyleWidth}px`;
+    app.canvas.style.height = `${snappedPresentedStyleHeight}px`;
     app.canvas.style.imageRendering = isUpscalingContent ? "pixelated" : "auto";
     app.pipeline.setPresentationSamplingMode(presentationSamplingMode);
+    app.pipeline.setDisplaySizeOverride({
+      width: snappedPresentedStyleWidth,
+      height: snappedPresentedStyleHeight,
+    });
+
+    if (canvasPresentationValidationFrameRef.current !== null) {
+      window.cancelAnimationFrame(canvasPresentationValidationFrameRef.current);
+    }
+    canvasPresentationValidationFrameRef.current = window.requestAnimationFrame(() => {
+      canvasPresentationValidationFrameRef.current = null;
+      const measuredWidth = Math.max(1, Math.round(app.canvas.clientWidth));
+      const measuredHeight = Math.max(1, Math.round(app.canvas.clientHeight));
+      if (
+        measuredWidth !== Math.round(snappedPresentedStyleWidth) ||
+        measuredHeight !== Math.round(snappedPresentedStyleHeight)
+      ) {
+        app.pipeline.setDisplaySizeOverride({
+          width: measuredWidth,
+          height: measuredHeight,
+        });
+        renderFrameRef.current();
+      }
+    });
 
     renderFrame();
   }, [
@@ -762,6 +978,10 @@ export function useRetroPixiStage({
       window.cancelAnimationFrame(layoutFrameRef.current);
       layoutFrameRef.current = null;
     }
+    if (canvasPresentationValidationFrameRef.current !== null) {
+      window.cancelAnimationFrame(canvasPresentationValidationFrameRef.current);
+      canvasPresentationValidationFrameRef.current = null;
+    }
 
     const app = appRef.current;
     if (app) {
@@ -885,6 +1105,10 @@ export function useRetroPixiStage({
           window.cancelAnimationFrame(resizeValidationFrameRef.current);
           resizeValidationFrameRef.current = null;
         }
+        if (canvasPresentationValidationFrameRef.current !== null) {
+          window.cancelAnimationFrame(canvasPresentationValidationFrameRef.current);
+          canvasPresentationValidationFrameRef.current = null;
+        }
         observer.disconnect();
       };
     }
@@ -898,6 +1122,10 @@ export function useRetroPixiStage({
       if (resizeValidationFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeValidationFrameRef.current);
         resizeValidationFrameRef.current = null;
+      }
+      if (canvasPresentationValidationFrameRef.current !== null) {
+        window.cancelAnimationFrame(canvasPresentationValidationFrameRef.current);
+        canvasPresentationValidationFrameRef.current = null;
       }
       window.removeEventListener("resize", handleResize);
     };

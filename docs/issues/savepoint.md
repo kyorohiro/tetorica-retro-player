@@ -1,89 +1,136 @@
 # Savepoint
 
-Last updated: 2026-07-30
+Last updated: 2026-08-04
 
 ## For You
 
-- 今の主目的は、Windows での Retro shader compile 待ち時間を減らしつつ、挙動差を追いやすくすることです。
-- `CRT Beam` は試験的に専用 variant を入れてあります。
-- `More settings` の `Render cap` の下に `DevOption: shader ID` を追加しました。
-- `DevOption: shader ID`
-  - Default は `Off`
-  - `On` にすると compile 確認用に shader 識別子を毎回変えます
-  - 目的は Chrome / GPU の shader compile 再利用の影響を見えやすくすることです
-- いま確認したいこと
-  - Windows で `CRT Beam` を初回適用した時の compile 時間
-  - `DevOption: shader ID = Off` と `On` で差が出るか
-  - `CRT Beam` 専用 variant が体感上軽くなるか
+- 今の主目的は、`Render cap` が `ON` の時に出る phosphor / beam 系のモアレを減らしつつ、`pin / fit width / normal / maximize` で表示差が出ないようにすることです。
+- 大きな前進はありました。
+  - `pin / fit width / normal / maximize` ごとの表示差はかなり消えた
+  - `CAP` 絡みの大きなモアレはかなり減った
+- ただし完全には終わっていません。
+  - `Fit Width` と `Maximize` ではまだモアレが少し残ることがある
+- 時間優先の暫定として、beam の最小セルサイズを `CAP 設定 ON` の時だけ強める案を入れました。
+  - `Math.max(isCapEnabled ? 1.6 : 1.2, filterState.beamWhiteBloom * 0.6)`
+  - これは根本解決ではなく、急ぎの逃がしです
 
 ## For Codex
 
 ### Current Goal
 
-- Reduce Windows shader compile stalls, especially around Lite/Full transitions and `CRT Beam`.
-- Keep UX and debugging behavior predictable across environments.
+- `Render cap` が有効な時の phosphor / beam モアレを抑える
+- そのうえで `pin / fit width / normal / maximize` の見た目差をなくす
+- 条件分岐を増やしすぎず、計算経路をなるべく一本化する
 
-### What Was Implemented
+### What Was Actually Broken
 
-- Added a shared shader composer for nearest-only pass1 variants.
-  - `src/retro-player/retro/filterShaderComposer.ts`
-  - `filterPass1LiteNearestShader.ts`
-  - `filterPass1Pc98LiteNearestShader.ts`
-- Added lighter Windows Lite pass1 variants for nearest/basic and nearest/pc98.
-- Added an experimental dedicated Windows Lite `CRT Beam` pass2 variant.
-  - `src/retro-player/retro/filterPass2BeamLiteCrtShader.ts`
-  - Variant key: `basic_nearest:beam_crt`
-  - Selected when `selectedPreset === "crtBeam"`
-- Added compile timing debug log in Windows Lite variant compilation.
-  - Log format:
-    - `filter: Windows lite variant <variant> compiled in <ms>ms`
-- Added a new DevOption to help debug browser/GPU shader compile cache reuse.
-  - UI label: `DevOption: shader ID`
-  - Default: `Off`
-  - Persisted in UI settings as `shaderCompileCacheBusterEnabled`
-  - When enabled:
-    - Windows Lite shader variant cache is bypassed
-    - fragment shader source gets a unique trailing comment each compile
-    - prewarm is skipped
-    - `hasPreparedFilterStateVariant()` returns `false`
+- 問題の本丸は `CAP` そのものではなく、`CAP` 時に使われるサイズ情報が経路ごとに少しずれていたこと
+- 特にずれていたもの
+  - CSS の実表示サイズ
+  - shader に渡す `uDisplaySize`
+  - viewport / visible size
+  - `getEffectiveRetroTargetSize(...)` が見るサイズ
+- このズレがあると、`pin` では綺麗なのに `normal` や `maximize` でモアレや横線が出る
+
+### What Helped
+
+#### 1. CAP 後の表示サイズに収束させるようにした
+
+- `src/retro-player/hooks/useRetroPixiStage.ts`
+- `resolveCanvasSizing(...)` を追加
+- `cap 判定 -> 実際の表示サイズ -> その表示サイズで再計算` を最大 3 回まわして収束させるようにした
+- これで
+  - 最初は `CAP対象`
+  - でも実際には少し縮小され、その縮小後サイズなら `CAP不要`
+  の自己矛盾が減った
+
+#### 2. CSS 表示サイズと shader の表示サイズを揃えた
+
+- `src/retro-player/hooks/useRetroPixiStage.ts`
+  - `snapCssToDevicePixel(...)` を追加
+  - `left/top/width/height` を `devicePixelRatio` 格子に寄せる
+- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+  - `displaySizeOverride` を追加
+  - `uDisplaySize` が `canvas.clientWidth/clientHeight` 直読みではなく、stage 側で確定したサイズを見るようにした
+
+#### 3. 実測後に 1 回再反映するようにした
+
+- `src/retro-player/hooks/useRetroPixiStage.ts`
+- style 適用後、次フレームで `app.canvas.clientWidth/clientHeight` を測り直し
+- もし意図したサイズと違っていたら、その実測値を `displaySizeOverride` に再反映して再描画
+- これで `devtools 上は同じサイズに見えるのに線が出る` 問題がかなり減った
+
+#### 4. viewport / target 計算も同じ表示サイズを見るようにした
+
+- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+- `getEffectiveViewportFloorSize()` も `displaySizeOverride` ベースにした
+- これで `uDisplaySize` だけでなく `getEffectiveRetroTargetSize(...)` に入る visible size も統一された
+
+#### 5. maximize 専用の古い freeze 経路を外した
+
+- `src/retro-player/hooks/useRetroPixiStage.ts`
+- `windowedCanvasSize` を使う maximize 専用 freeze を削除
+- `pin / fit width / normal / maximize` を同じ cap ロジックに寄せた
+
+### What Did Not Work / Avoid
+
+#### 1. CAP を避けるために cap 値そのものを大きくする
+
+- 例:
+  - beam cap を `960x720` から `1280x720` にする
+- これは現象が出にくくなるだけで、根本原因の追跡を邪魔する
+- ユーザーから「そこを変えないで」と明示あり
+
+#### 2. mode ごとに条件分岐を足してモアレを抑える
+
+- 例:
+  - `Fit Width / Maximize` の時だけ別計算
+  - `CAP active` の時だけ target 密度をさらに弱める guard
+- ユーザーから「条件を増やすと問題が解決しないからやめて」と明示あり
+- 今後も原則避ける
+
+#### 3. `isCapActive` を後段だけで使う
+
+- `Math.max(isCapActive ? 1.6 : 1.2, ...)` は、一部経路でしか同じ条件にならずズレる
+- 実際に
+  - `1.6 / 1.6` だとモアレが出ない
+  - `1.6 / 1.2` だとモアレが出る
+  という確認があった
+- 理由:
+  - stage 側の `getEffectiveRetroTargetSize(...)`
+  - pipeline 側の `getEffectiveRetroTargetSize(...)`
+  で条件が揃わないと破綻する
+
+### Current Temporary Behavior
+
+- いまは時間優先の暫定として、`CAP 設定 ON` を条件に beam の `baseMinCellPixels` を変える形にしている
+- 場所:
+  - `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+  - `getPhosphorDotViewportLimitedSize(...)`
+  - `getEffectiveRetroTargetSize(...)`
+  - `setFilterBufferCap(...)`
+- 重要:
+  - `CAP active` ではなく `CAP setting ON` を使っている
+  - stage 側と pipeline 側の両方で同じ条件になるように揃えた
 
 ### Files Touched Recently
 
-- `src/retro-player/components/RetroPlayer.tsx`
-- `src/retro-player/components/RetroPreviewView.tsx`
-- `src/retro-player/components/RetroPreviewToolbar.tsx`
-- `src/retro-player/hooks/persistedRetroSettings.ts`
-- `src/retro-player/hooks/usePixiVideoPlayer.ts`
 - `src/retro-player/hooks/useRetroPixiStage.ts`
 - `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
-- `src/retro-player/retro/filterPass2BeamLiteCrtShader.ts`
-- `src/retro-player/retro/filterShaderComposer.ts`
 
 ### Validation Status
 
-- `npm test` passed
-- `npm run build:web` passed
+- `npm run build -- --mode development` passed
 
-### Important Behavior Notes
+### Most Important Takeaways
 
-- This DevOption does not truly clear Chrome/GPU internal shader caches.
-- It only makes reuse less likely by changing shader source identifiers and by bypassing the app-side variant cache.
-- Good enough for comparative debugging, not a guaranteed full cold compile.
+- モアレの主因は `CAP` の有無より、`CAP 時に見るサイズが経路ごとにずれていたこと`
+- `pin / fit width / normal / maximize` の表示差は、表示サイズ情報の統一でかなり消せた
+- 条件分岐を増やすより、同じ値を全経路で使う方が効いた
+- `CAP setting ON` を使う暫定はありだが、根本解決ではない
 
 ### Likely Next Steps
 
-1. Measure Windows compile time for `CRT Beam` with:
-   - `DevOption: shader ID = Off`
-   - `DevOption: shader ID = On`
-2. Decide whether `CRT Beam NTSC` should get a similar dedicated variant.
-3. If the experiment helps, move further toward:
-   - preset-aware shader builders
-   - feature-based compose instead of per-preset duplication
-
-### Known Open Area
-
-- Manual parameter changes such as sampling/palette changes may still not all route through the same prepare dialog path as presets.
-- If that becomes the next priority, inspect:
-  - `src/retro-player/components/RetroPlayer.tsx`
-  - `src/retro-player/components/RetroControlPanel.tsx`
-  - `src/retro-player/components/RetroFilterPanel.tsx`
+1. `CAP setting ON` による暫定がどこまで許容できるか確認する
+2. 本当に根本から直すなら、`getEffectiveRetroTargetSize(...)` を呼ぶ経路をさらに整理して、`CAP前提の target 計算` を 1 箇所に寄せる
+3. beam / phosphor の「見た目密度」と「buffer size 制限」を別概念として整理する

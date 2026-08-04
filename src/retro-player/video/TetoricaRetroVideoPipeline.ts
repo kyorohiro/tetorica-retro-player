@@ -597,6 +597,7 @@ const getPhosphorDotViewportLimitedSize = (
   internalScale: number,
   visibleWidth?: number,
   visibleHeight?: number,
+  isCapActive = false,
 ) => {
   if (
     (!isPhosphorDotModeEnabled(filterState) && !isBeamCrossModeEnabled(filterState)) ||
@@ -610,7 +611,7 @@ const getPhosphorDotViewportLimitedSize = (
 
   const isBeamMode = isBeamCrossModeEnabled(filterState);
   const baseMinCellPixels = isBeamMode
-    ? Math.max(1.2, filterState.beamWhiteBloom * 0.6)// Cap ありなら 1.2 とかだとモアレは出なくなる
+    ? Math.max(isCapActive ? 1.6 : 1.2, filterState.beamWhiteBloom * 0.6)
     : Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
   const effectiveInternalScale = isBeamMode ? 1 : Math.max(internalScale, 1);
   const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
@@ -634,6 +635,7 @@ export const getEffectiveRetroTargetSize = (
   sourceHeight?: number,
   visibleWidth?: number,
   visibleHeight?: number,
+  isCapActive = false,
 ) => {
   const internalScale = getPhosphorDotInternalScale(filterState);
   const isBeamMode = isBeamCrossModeEnabled(filterState);
@@ -660,6 +662,7 @@ export const getEffectiveRetroTargetSize = (
     effectiveResolutionScale,
     visibleWidth,
     visibleHeight,
+    isCapActive,
   );
 
   return {
@@ -835,6 +838,8 @@ export class TetoricaRetroVideoPipeline {
   private outputEnabled = true;
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
   private filterViewportScale = 1;
+  private isFilterBufferCapEnabled = false;
+  private displaySizeOverride: { width: number; height: number } | null = null;
 
   private startedAt = nowMs();
   private animationTimeSec = 0;
@@ -1636,7 +1641,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   setFilterBufferCap(cap: FilterBufferCap | null) {
-    void cap;
+    this.isFilterBufferCapEnabled = cap !== null;
   }
 
   setFilterViewportScale(scale: number) {
@@ -1645,13 +1650,41 @@ export class TetoricaRetroVideoPipeline {
       : 1;
   }
 
-  private getEffectiveViewportFloorSize() {
+  setDisplaySizeOverride(size: { width: number; height: number } | null) {
+    if (!size) {
+      this.displaySizeOverride = null;
+      return;
+    }
+
+    this.displaySizeOverride = {
+      width: Math.max(1, size.width),
+      height: Math.max(1, size.height),
+    };
+  }
+
+  private getEffectiveDisplaySize() {
+    if (this.displaySizeOverride) {
+      return this.displaySizeOverride;
+    }
+
     const canvasElement = isHtmlCanvasElement(this.gl.canvas) ? this.gl.canvas : null;
-    const viewportFloorSize = getViewportFloorSize(
-      canvasElement,
-      Math.max(this.gl.drawingBufferWidth, 1),
-      Math.max(this.gl.drawingBufferHeight, 1),
-    );
+    return {
+      width: Math.max(canvasElement?.clientWidth ?? this.gl.drawingBufferWidth, 1),
+      height: Math.max(canvasElement?.clientHeight ?? this.gl.drawingBufferHeight, 1),
+    };
+  }
+
+  private getEffectiveViewportFloorSize() {
+    const viewportFloorSize = this.displaySizeOverride
+      ? {
+          width: Math.max(1, Math.floor(this.displaySizeOverride.width)),
+          height: Math.max(1, Math.floor(this.displaySizeOverride.height)),
+        }
+      : getViewportFloorSize(
+          isHtmlCanvasElement(this.gl.canvas) ? this.gl.canvas : null,
+          Math.max(this.gl.drawingBufferWidth, 1),
+          Math.max(this.gl.drawingBufferHeight, 1),
+        );
 
     if (this.filterViewportScale <= 1.0001) {
       return viewportFloorSize;
@@ -1878,11 +1911,9 @@ export class TetoricaRetroVideoPipeline {
           } else {
             this.syncTextureSamplingFilter(gl.LINEAR);
           }
-          const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-          const displayWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-          const displayHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+          const displaySize = this.getEffectiveDisplaySize();
           gl.uniform2f(this.beamKernelLocs.uBeamSourceSize, Math.max(beamSourceWidth, 1), Math.max(beamSourceHeight, 1));
-          gl.uniform2f(this.beamKernelLocs.uDisplaySize, displayWidth, displayHeight);
+          gl.uniform2f(this.beamKernelLocs.uDisplaySize, displaySize.width, displaySize.height);
           gl.uniform1f(this.beamKernelLocs.uColorLevels, Math.max(filterState.colorLevels, 2));
           gl.uniform1f(this.beamKernelLocs.uDitherStrength, filterState.ditherStrength);
           gl.uniform1f(this.beamKernelLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
@@ -2046,6 +2077,7 @@ export class TetoricaRetroVideoPipeline {
       sourceHeight,
       visibleWidth,
       visibleHeight,
+      this.isFilterBufferCapEnabled,
     );
     const isBeamMode = isBeamCrossModeEnabled(filterState);
     const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
@@ -2088,6 +2120,7 @@ export class TetoricaRetroVideoPipeline {
       sourceHeight,
       visibleWidth,
       visibleHeight,
+      this.isFilterBufferCapEnabled,
     );
 
     gl.useProgram(this.filterPass1Program);
@@ -2138,9 +2171,7 @@ export class TetoricaRetroVideoPipeline {
     );
 
     gl.useProgram(this.filterPass2Program);
-    const canvasElement = isHtmlCanvasElement(gl.canvas) ? gl.canvas : null;
-    const displayWidth = Math.max(canvasElement?.clientWidth ?? gl.drawingBufferWidth, 1);
-    const displayHeight = Math.max(canvasElement?.clientHeight ?? gl.drawingBufferHeight, 1);
+    const displaySize = this.getEffectiveDisplaySize();
     gl.uniform2f(this.pass2Locs.uTargetSize, pass2TargetWidth, pass2TargetHeight);
     gl.uniform2f(
       this.pass2Locs.uOutputSize,
@@ -2149,8 +2180,8 @@ export class TetoricaRetroVideoPipeline {
     );
     gl.uniform2f(
       this.pass2Locs.uDisplaySize,
-      displayWidth,
-      displayHeight,
+      displaySize.width,
+      displaySize.height,
     );
     gl.uniform2f(
       this.pass2Locs.uBeamSourceSize,
