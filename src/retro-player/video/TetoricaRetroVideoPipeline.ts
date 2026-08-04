@@ -610,7 +610,7 @@ const getPhosphorDotViewportLimitedSize = (
 
   const isBeamMode = isBeamCrossModeEnabled(filterState);
   const baseMinCellPixels = isBeamMode
-    ? 1.1
+    ? Math.max(1.2, filterState.beamWhiteBloom * 0.6)// Cap ありなら 1.2 とかだとモアレは出なくなる
     : Math.max(1.1, 2.15 + filterState.bulbRadius * 1.15);
   const effectiveInternalScale = isBeamMode ? 1 : Math.max(internalScale, 1);
   const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);

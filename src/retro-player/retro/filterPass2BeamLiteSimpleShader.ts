@@ -241,7 +241,7 @@ float getBeamStripeResolve(vec2 sourceSize)
   float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
   float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
   float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
-  return clamp(smoothstep(1.0, 1.45, subpixelPixels), 0.0, 1.0);
+  return clamp(smoothstep(3.0, 4.5, subpixelPixels), 0.0, 1.0);
 }
 
 vec3 sampleBeamMergedMask(
