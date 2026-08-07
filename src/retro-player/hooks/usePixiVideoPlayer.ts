@@ -575,6 +575,16 @@ export function usePixiVideoPlayer(
     setLoadingLabel("");
   };
 
+  const waitForLoadingPaint = useCallback(async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  }, []);
+
   const buildVariantPreparationState = useCallback((
     overrides?: Partial<RetroVideoFilterState>,
   ): RetroVideoFilterState => ({
@@ -593,11 +603,18 @@ export function usePixiVideoPlayer(
   ) => {
     beginLoading(label);
     try {
+      await waitForLoadingPaint();
       await prepareFilterVariant(buildVariantPreparationState(overrides));
     } finally {
       finishLoading();
     }
-  }, [beginLoading, buildVariantPreparationState, finishLoading, prepareFilterVariant]);
+  }, [
+    beginLoading,
+    buildVariantPreparationState,
+    finishLoading,
+    prepareFilterVariant,
+    waitForLoadingPaint,
+  ]);
 
   const recoverAudioOutput = async (reason: string) => {
     const context = await ensureAudioContextWithRecovery(reason);
@@ -823,6 +840,49 @@ export function usePixiVideoPlayer(
     stopDisplayCapture,
     syncVideoState,
   } = media;
+
+  const runWithRenderPaused = useCallback(async <T,>(task: () => Promise<T>): Promise<T> => {
+    const mediaWasPlaying = Boolean(
+      mediaRef.current &&
+      !mediaRef.current.paused &&
+      !mediaRef.current.ended,
+    );
+    const shouldResumeTicker = Boolean(isPoweredOn && appRef.current);
+
+    appRef.current?.ticker.stop();
+
+    if (mediaWasPlaying && mediaRef.current) {
+      playbackIntentRef.current = "pause";
+      mediaRef.current.pause();
+      setIsBuffering(false);
+      syncVideoState();
+    }
+
+    try {
+      return await task();
+    } finally {
+      refreshLayout();
+      safeRender();
+
+      if (shouldResumeTicker) {
+        appRef.current?.ticker.start();
+      }
+
+      if (mediaWasPlaying) {
+        playbackIntentRef.current = "play";
+        void playVideoWithAudio();
+      } else {
+        syncVideoState();
+      }
+    }
+  }, [
+    appRef,
+    isPoweredOn,
+    playVideoWithAudio,
+    refreshLayout,
+    safeRender,
+    syncVideoState,
+  ]);
 
   useEffect(() => {
     onEndedRef.current = options?.onEnded;
@@ -1867,6 +1927,7 @@ export function usePixiVideoPlayer(
     ensureAudioContext,
     isFilterVariantPrepared,
     prepareFilterVariantWithLabel,
+    runWithRenderPaused,
     resetRenderer,
     refreshLayout,
     toggleAudioFx: () => {

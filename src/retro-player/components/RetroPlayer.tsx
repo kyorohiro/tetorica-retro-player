@@ -651,10 +651,12 @@ export function RetroPlayer({
     }
 
     await runWithFullPresetLock(async () => {
-      await player.prepareFilterVariantWithLabel(
-        locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
-        variantOverrides,
-      );
+      await player.runWithRenderPaused(async () => {
+        await player.prepareFilterVariantWithLabel(
+          locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
+          variantOverrides,
+        );
+      });
     });
     return true;
   }, [

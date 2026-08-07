@@ -767,10 +767,16 @@ function submitProgram(
 }
 
 function logShaderCompileInfo(message: string) {
+  if (!isRetroVideoDebugEnabled()) {
+    return;
+  }
   console.info(`INF : COMPILE SHADER : ${message}`);
 }
 
 function logShaderCompileWarn(message: string) {
+  if (!isRetroVideoDebugEnabled()) {
+    return;
+  }
   console.warn(`WARN : DUPLICATE COMPILE SHADER : ${message}`);
 }
 
@@ -783,6 +789,7 @@ async function waitAndVerifyPrograms(
   programs: WebGLProgram[],
 ): Promise<void> {
   const ext = getParallelShaderCompileExtension(gl);
+  const PARALLEL_COMPILE_MAX_WAIT_MS = 8000;
 
   if (ext) {
     await new Promise<void>((resolve) => {
@@ -800,6 +807,13 @@ async function waitAndVerifyPrograms(
         }
 
         const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (now - startedAt >= PARALLEL_COMPILE_MAX_WAIT_MS) {
+          console.warn(
+            `WARN : shader compile poll timeout after ${Math.round(now - startedAt)}ms; forcing link-status verification`,
+          );
+          resolve();
+          return;
+        }
         if (now - startedAt < RAF_POLL_WINDOW_MS) {
           requestAnimationFrame(poll);
           return;

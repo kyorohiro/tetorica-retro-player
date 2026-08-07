@@ -646,7 +646,7 @@ export function RetroFilterPanel({
 
                       return (
                         <div
-                          key={id}
+                          key={`family:${id}`}
                           className="relative"
                         >
                           <div
