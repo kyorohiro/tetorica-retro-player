@@ -741,6 +741,7 @@ export function RetroPreviewView({
     player.previewName || "",
     player.requestedIndex,
   );
+  const isCompileLoadingLabel = player.loadingLabel === "Compiling shader...";
   const shouldShowImagePageOverlay =
     isImagePreviewRequested &&
     !player.needsUserPlay &&
@@ -754,6 +755,10 @@ export function RetroPreviewView({
       delayedImageOverlayPendingRef.current = false;
       if (!player.isLoading) {
         setShowLoadingOverlay(false);
+        return;
+      }
+      if (isCompileLoadingLabel) {
+        setShowLoadingOverlay(true);
         return;
       }
       setShowLoadingOverlay(false);
@@ -815,8 +820,10 @@ export function RetroPreviewView({
     delayedImageOverlayPendingRef.current = false;
     setShowLoadingOverlay(false);
   }, [
+    isCompileLoadingLabel,
     isImagePreviewRequested,
     player.isLoading,
+    player.loadingLabel,
     player.pageTurnToken,
   ]);
 

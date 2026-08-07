@@ -369,30 +369,6 @@ type WindowsLitePass1Variant =
 type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full" | "beam_crt";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
-// Only 4 combinations exist. Compiling each at most once (cached) and
-// pre-warming the rest in the background avoids a multi-hundred-ms shader
-// recompile stall (see docs/issues/windows-lite-shader-parity.md) the first
-// time a user switches to a variant mid-playback (e.g. enabling phosphor).
-const ALL_WINDOWS_LITE_VARIANT_KEYS: WindowsLiteVariantKey[] = [
-  "basic:basic",
-  "basic_composite:basic",
-  "basic:beam_simple",
-  "basic_composite:beam_simple",
-  "basic:beam_full",
-  "basic_composite:beam_full",
-  "basic_nearest:beam_crt",
-  "basic:phosphor",
-  "basic_composite:phosphor",
-  "pc98:basic",
-  "pc98_composite:basic",
-  "pc98:beam_simple",
-  "pc98_composite:beam_simple",
-  "pc98:beam_full",
-  "pc98_composite:beam_full",
-  "pc98:phosphor",
-  "pc98_composite:phosphor",
-];
-
 const isPc98PaletteMode = (mode: PaletteMode) =>
   mode === "pc98" ||
   mode === "pc98_tile" ||
@@ -463,6 +439,30 @@ const getWindowsLiteVariantKey = (
 
   return `${pass1}:${pass2}`;
 };
+
+const getInitialWindowsLiteCompileFilterState = (
+  filterState: RetroVideoFilterState | null,
+): RetroVideoFilterState | null => {
+  if (!filterState) {
+    return filterState;
+  }
+
+  // Avoid blocking startup on the dedicated crtBeam shader. We can boot with
+  // the simpler beam route first, then let the regular state machine promote
+  // to the exact requested variant after the first frame.
+  if (filterState.selectedPreset === "crtBeam") {
+    return {
+      ...filterState,
+      selectedPreset: null,
+    };
+  }
+
+  return filterState;
+};
+
+const shouldQueueWindowsLiteVariant = (
+  filterState: RetroVideoFilterState | null,
+) => filterState?.isFilterEnabled === true;
 
 const isHtmlVideoElement = (value: unknown): value is HTMLVideoElement =>
   typeof HTMLVideoElement !== "undefined" && value instanceof HTMLVideoElement;
@@ -1248,6 +1248,11 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
+    if (!shouldQueueWindowsLiteVariant(filterState)) {
+      this.windowsLitePendingVariantKey = null;
+      return;
+    }
+
     const nextVariantKey = getWindowsLiteVariantKey(filterState);
     if (nextVariantKey === this.windowsLiteVariantKey) {
       if (this.windowsLitePendingVariantKey === nextVariantKey) {
@@ -1391,10 +1396,7 @@ export class TetoricaRetroVideoPipeline {
         this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
       ) {
         this.startWindowsLiteForegroundCompile();
-        return;
       }
-
-      this.maybeStartWindowsLitePrewarm();
     });
   }
 
@@ -1437,64 +1439,6 @@ export class TetoricaRetroVideoPipeline {
     }
   }
 
-  private maybeStartWindowsLitePrewarm() {
-    if (
-      this.isDisposed ||
-      !this.windowsLitePrewarmStarted ||
-      this.windowsLiteCompilePromise ||
-      this.windowsLitePendingVariantKey ||
-      this.gl.isContextLost()
-    ) {
-      return;
-    }
-
-    const hasRemainingVariants = ALL_WINDOWS_LITE_VARIANT_KEYS.some(
-      (variantKey) => !this.windowsLiteProgramCache.has(variantKey),
-    );
-    if (!hasRemainingVariants) {
-      return;
-    }
-
-    this.windowsLiteCompilePromise = this.prewarmRemainingWindowsLiteVariants().finally(() => {
-      this.windowsLiteCompilePromise = null;
-      if (this.isDisposed) return;
-
-      if (
-        this.windowsLitePendingVariantKey &&
-        this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
-      ) {
-        this.startWindowsLiteForegroundCompile();
-        return;
-      }
-
-      this.maybeStartWindowsLitePrewarm();
-    });
-  }
-
-  // Prewarm only while the pipeline is idle. A real user-triggered switch
-  // sets windowsLitePendingVariantKey and takes over on the next turn through
-  // the worker loop, so cache growth never outranks active interaction.
-  private async prewarmRemainingWindowsLiteVariants() {
-    if (this.shaderCompileCacheBusterEnabled) {
-      return;
-    }
-    for (const variantKey of ALL_WINDOWS_LITE_VARIANT_KEYS) {
-      if (this.isDisposed || this.gl.isContextLost()) return;
-      if (this.windowsLitePendingVariantKey) return;
-      if (this.windowsLiteProgramCache.has(variantKey)) continue;
-
-      await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
-      if (this.isDisposed || this.gl.isContextLost()) return;
-      if (this.windowsLitePendingVariantKey) return;
-
-      try {
-        await this.compileWindowsLiteVariant(variantKey);
-      } catch {
-        // Best-effort prewarm; a real switch to this variant will retry.
-      }
-    }
-  }
-
   // onFilterReady is called after the background filter compilation finishes.
   static async create(
     gl: WebGL2RenderingContext,
@@ -1503,6 +1447,7 @@ export class TetoricaRetroVideoPipeline {
       shaderCompileCacheBusterEnabled?: boolean;
     },
     onFilterReady?: () => void,
+    onCompileStateChange?: (state: { active: boolean; label?: string }) => void,
   ): Promise<TetoricaRetroVideoPipeline> {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     logShaderCompileInfo("base:passthrough");
@@ -1528,12 +1473,30 @@ export class TetoricaRetroVideoPipeline {
       true,
       options?.shaderCompileCacheBusterEnabled === true,
     );
+    const initialCompileFilterState = getInitialWindowsLiteCompileFilterState(initialFilterState);
 
     window.setTimeout(async () => {
-      pipeline.queueWindowsLiteVariant(initialFilterState);
+      if (!shouldQueueWindowsLiteVariant(initialCompileFilterState)) {
+        onFilterReady?.();
+        return;
+      }
+      onCompileStateChange?.({
+        active: true,
+        label: "Compiling shader...",
+      });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+      pipeline.queueWindowsLiteVariant(initialCompileFilterState);
       if (pipeline.windowsLiteCompilePromise) {
         await pipeline.windowsLiteCompilePromise;
       }
+      onCompileStateChange?.({
+        active: false,
+      });
       onFilterReady?.();
     }, 0);
 

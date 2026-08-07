@@ -722,7 +722,7 @@ export function RetroPlayer({
   );
 
   const handleRequestEnableBeamCross = React.useCallback(async () => {
-    if (isPreparingFullPreset) {
+    if (isPreparingFullPreset || filterState.phosphorDotShape === "beam") {
       return;
     }
 
@@ -750,6 +750,7 @@ export function RetroPlayer({
     filterState.compositeEnabled,
     filterState.paletteMode,
     filterState.phosphorStrength,
+    filterState.phosphorDotShape,
     filterState.setPhosphorDotShape,
     filterState.spotMaskStrength,
     isPreparingFullPreset,
