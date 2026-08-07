@@ -649,6 +649,18 @@ export function usePixiVideoPlayer(
   };
 
   const powerOn = () => {
+    const visualKind = previewKindRef.current;
+    const shouldShowShaderPreparing =
+      !shouldUseNativeVisualSurface &&
+      effectiveFilterState.isFilterEnabled &&
+      (visualKind === "video" || visualKind === "capture" || visualKind === "image");
+
+    if (shouldShowShaderPreparing) {
+      beginLoading(
+        visualKind === "image" ? "Preparing shader preview..." : "Preparing video shader...",
+      );
+    }
+
     setIsPoweredOn(true);
     appRef.current?.ticker.start();
 

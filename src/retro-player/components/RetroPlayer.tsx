@@ -21,7 +21,6 @@ import {
   setFfmpegUseQsv,
   setFfmpegMaxConcurrentHlsSessions,
   loadPersistedRetroSettings,
-  savePersistedRetroUiSettings,
   setNativePlaybackMode,
   type PersistedRetroUiSettings,
 } from "../hooks/persistedRetroSettings";
@@ -266,7 +265,9 @@ export function RetroPlayer({
   );
   const [maximizePerformanceModeSessionOverride, setMaximizePerformanceModeSessionOverride] =
     React.useState<"off" | null>(null);
-  const startupShaderCompileCacheBusterEnabled = React.useRef(false).current;
+  const startupShaderCompileCacheBusterEnabled = React.useRef(
+    persistedUiSettings?.shaderCompileCacheBusterEnabled === true,
+  ).current;
   const [shaderCompileCacheBusterEnabled, setShaderCompileCacheBusterEnabled] = React.useState(
     startupShaderCompileCacheBusterEnabled,
   );
@@ -297,17 +298,6 @@ export function RetroPlayer({
   React.useEffect(() => {
     void syncFfmpegMaxConcurrentHlsSessions(startupMaxConcurrentHlsSessions);
   }, [startupMaxConcurrentHlsSessions, syncFfmpegMaxConcurrentHlsSessions]);
-
-  React.useEffect(() => {
-    if (persistedUiSettings?.shaderCompileCacheBusterEnabled !== true) {
-      return;
-    }
-
-    savePersistedRetroUiSettings({
-      ...persistedUiSettings,
-      shaderCompileCacheBusterEnabled: false,
-    });
-  }, [persistedUiSettings]);
 
   React.useEffect(() => {
     if (!isTauriRuntime() || !isWindowsRuntime()) {
@@ -937,6 +927,10 @@ export function RetroPlayer({
     renderResolutionScale,
     scheduleRefreshLayout,
   ]);
+
+  React.useEffect(() => {
+    scheduleRefreshLayout();
+  }, [effectiveMaximizePerformanceMode, scheduleRefreshLayout]);
 
   React.useEffect(() => {
     return () => {

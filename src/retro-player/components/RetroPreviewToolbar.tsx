@@ -806,7 +806,7 @@ export function RetroPreviewToolbar({
               </div>
               {showGraphicsBackendOption && (
                 <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-[10px] text-slate-300">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div>{tooltipText.graphicsBackend}</div>
                       <div className="text-[9px] text-slate-500">
@@ -819,11 +819,11 @@ export function RetroPreviewToolbar({
                       </div>
                       <div className="mt-1 text-[9px] leading-[1.45] text-amber-300/90">
                         {graphicsBackendRestartPending
-                          ? `${tooltipText.graphicsBackendRestart} ${tooltipText.restartNow}`
+                          ? tooltipText.graphicsBackendRestart
                           : tooltipText.graphicsBackendRestart}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="min-w-0">
                       <div className="grid grid-cols-2 gap-1">
                         {[
                           { label: "Default", value: "default" as const },
@@ -847,13 +847,17 @@ export function RetroPreviewToolbar({
                           );
                         })}
                       </div>
-                      <button
-                        type="button"
-                        onClick={onRestartApplication}
-                        className="rounded border border-amber-300/70 bg-amber-400/12 px-2 py-1 text-[9px] text-amber-100 transition hover:bg-amber-300/20"
-                      >
-                        {tooltipText.restartNow}
-                      </button>
+                      {graphicsBackendRestartPending && (
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={onRestartApplication}
+                            className="rounded border border-amber-300/70 bg-amber-400/12 px-2 py-1 text-[9px] text-amber-100 transition hover:bg-amber-300/20"
+                          >
+                            {tooltipText.restartNow}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
