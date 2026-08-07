@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import {
   Bell,
 } from "lucide-react";
@@ -79,6 +80,7 @@ export type RetroPreviewPlayerSlice = {
   requestedIndex: number | null;
   isPoweredOn: boolean;
   isLoading: boolean;
+  isShaderCompiling: boolean;
   isBuffering: boolean;
   loadingLabel: string;
   needsUserPlay: boolean;
@@ -144,6 +146,7 @@ export type RetroPreviewViewProps = {
   kind: "video" | "image" | "audio";
   player: RetroPreviewPlayerSlice;
   interactionLocked?: boolean;
+  interactionLockLabel?: string;
   // These two affect usePixiVideoPlayer args so they live in RetroPlayer,
   // but their toggle buttons live here.
   isHighResolution: boolean;
@@ -189,6 +192,7 @@ export function RetroPreviewView({
   kind: _kind,
   player,
   interactionLocked = false,
+  interactionLockLabel = "",
   isHighResolution,
   renderResolutionPreset,
   isFitWidthEnabled,
@@ -741,29 +745,28 @@ export function RetroPreviewView({
     player.previewName || "",
     player.requestedIndex,
   );
-  const isCompileLoadingLabel = player.loadingLabel === "Compiling shader...";
+  const isCompileLoadingLabel =
+    player.isShaderCompiling || player.loadingLabel === "Compiling shader...";
   const shouldShowImagePageOverlay =
     isImagePreviewRequested &&
     !player.needsUserPlay &&
     !player.previewError &&
     showLoadingOverlay;
+  const shouldShowGlobalCompileOverlay =
+    !isImagePreviewRequested &&
+    !player.needsUserPlay &&
+    !player.previewError &&
+    player.isLoading;
+  const shouldShowInteractionLockOverlay =
+    interactionLocked && Boolean(interactionLockLabel);
 
   React.useEffect(() => {
     if (!isImagePreviewRequested) {
       requestedImagePageTurnTokenRef.current = player.pageTurnToken;
       displayedImagePageTurnTokenRef.current = player.pageTurnToken;
       delayedImageOverlayPendingRef.current = false;
-      if (!player.isLoading) {
-        setShowLoadingOverlay(false);
-        return;
-      }
-      if (isCompileLoadingLabel) {
-        setShowLoadingOverlay(true);
-        return;
-      }
-      setShowLoadingOverlay(false);
-      const timer = window.setTimeout(() => setShowLoadingOverlay(true), 350);
-      return () => window.clearTimeout(timer);
+      setShowLoadingOverlay(player.isLoading);
+      return;
     }
 
     const previousRequestedToken = requestedImagePageTurnTokenRef.current;
@@ -1329,21 +1332,6 @@ export function RetroPreviewView({
                 </div>
               </div>
             )}
-            {showLoadingOverlay && !player.needsUserPlay && !player.previewError && !isImagePreviewRequested && (
-              <div
-                className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-slate-950/72"
-              >
-                <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
-                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
-                  <p className="font-medium">
-                    {player.loadingLabel || "Loading preview..."}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Please wait while the preview is prepared.
-                  </p>
-                </div>
-              </div>
-            )}
             {player.needsUserPlay && !player.isLoading && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/46">
                 <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
@@ -1377,8 +1365,36 @@ export function RetroPreviewView({
                       </button>
                     </>
                   )}
-                </div>
-              </div>
+        </div>
+        {shouldShowGlobalCompileOverlay && typeof document !== "undefined" && createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[450] flex items-center justify-center bg-slate-950/72">
+            <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
+              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
+              <p className="font-medium">
+                {player.loadingLabel || "Loading preview..."}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Please wait while the preview is prepared.
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )}
+        {shouldShowInteractionLockOverlay && typeof document !== "undefined" && createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[460] flex items-center justify-center bg-slate-950/72">
+            <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
+              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
+              <p className="font-medium">
+                {interactionLockLabel}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Please wait while the shader is prepared.
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )}
+      </div>
             )}
             {showRetryOverlay && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/52">

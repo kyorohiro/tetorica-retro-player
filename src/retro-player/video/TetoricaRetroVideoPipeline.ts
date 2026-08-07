@@ -442,23 +442,7 @@ const getWindowsLiteVariantKey = (
 
 const getInitialWindowsLiteCompileFilterState = (
   filterState: RetroVideoFilterState | null,
-): RetroVideoFilterState | null => {
-  if (!filterState) {
-    return filterState;
-  }
-
-  // Avoid blocking startup on the dedicated crtBeam shader. We can boot with
-  // the simpler beam route first, then let the regular state machine promote
-  // to the exact requested variant after the first frame.
-  if (filterState.selectedPreset === "crtBeam") {
-    return {
-      ...filterState,
-      selectedPreset: null,
-    };
-  }
-
-  return filterState;
-};
+): RetroVideoFilterState | null => filterState;
 
 const shouldQueueWindowsLiteVariant = (
   filterState: RetroVideoFilterState | null,
@@ -860,10 +844,10 @@ export class TetoricaRetroVideoPipeline {
   private filterPass2Program: WebGLProgram | null = null;
 
   private readonly passthroughProgram: WebGLProgram;
-  private readonly beamDownscaleProgram: WebGLProgram;
-  private readonly postCurvatureProgram: WebGLProgram;
-  private readonly beamDownscaleLocs: BeamDownscaleUniformLocations;
-  private readonly postCurvatureLocs: PostCurvatureUniformLocations;
+  private beamDownscaleProgram: WebGLProgram | null = null;
+  private postCurvatureProgram: WebGLProgram | null = null;
+  private beamDownscaleLocs: BeamDownscaleUniformLocations | null = null;
+  private postCurvatureLocs: PostCurvatureUniformLocations | null = null;
   private beamKernelProgram: WebGLProgram | null = null;
   private beamKernelLocs: BeamKernelUniformLocations | null = null;
 
@@ -913,6 +897,9 @@ export class TetoricaRetroVideoPipeline {
   private windowsLiteVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLitePendingVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLiteCompilePromise: Promise<void> | null = null;
+  private windowsLiteCompileScheduled = false;
+  private supportProgramCompilePromise: Promise<void> | null = null;
+  private supportProgramCompileScheduled = false;
   private readonly windowsLiteProgramCache = new Map<
     WindowsLiteVariantKey,
     { pass1: WebGLProgram; pass2: WebGLProgram; beamKernel?: WebGLProgram }
@@ -1280,7 +1267,100 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
-    this.startWindowsLiteForegroundCompile();
+    this.scheduleWindowsLiteForegroundCompile();
+  }
+
+  private scheduleWindowsLiteForegroundCompile() {
+    if (
+      this.isDisposed ||
+      this.windowsLiteCompilePromise ||
+      this.windowsLiteCompileScheduled ||
+      !this.windowsLitePendingVariantKey ||
+      this.windowsLitePendingVariantKey === this.windowsLiteVariantKey
+    ) {
+      return;
+    }
+
+    this.windowsLiteCompileScheduled = true;
+    window.setTimeout(() => {
+      if (this.isDisposed) {
+        this.windowsLiteCompileScheduled = false;
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.windowsLiteCompileScheduled = false;
+          this.startWindowsLiteForegroundCompile();
+        });
+      });
+    }, 0);
+  }
+
+  private async compileSupportProgramsForCurrentState() {
+    const filterState = this.currentFilterState;
+    if (!filterState || this.isDisposed || this.gl.isContextLost()) {
+      return;
+    }
+
+    if (shouldUsePreFilterDownscale(filterState) && (!this.beamDownscaleProgram || !this.beamDownscaleLocs)) {
+      await this.ensureBeamDownscaleProgram();
+    }
+
+    if (shouldUsePostCurvaturePass(filterState) && (!this.postCurvatureProgram || !this.postCurvatureLocs)) {
+      await this.ensurePostCurvatureProgram();
+    }
+  }
+
+  private scheduleSupportProgramCompile() {
+    if (
+      this.isDisposed ||
+      this.supportProgramCompilePromise ||
+      this.supportProgramCompileScheduled
+    ) {
+      return;
+    }
+
+    this.supportProgramCompileScheduled = true;
+    window.setTimeout(() => {
+      if (this.isDisposed) {
+        this.supportProgramCompileScheduled = false;
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        this.supportProgramCompileScheduled = false;
+        this.supportProgramCompilePromise = this.compileSupportProgramsForCurrentState()
+          .catch((error) => {
+            console.warn("[retro-player] support shader compile failed", error);
+          })
+          .finally(() => {
+            this.supportProgramCompilePromise = null;
+            if (!this.isDisposed && this.currentFilterState) {
+              this.queueSupportProgramsForFilterState(this.currentFilterState);
+            }
+          });
+      });
+    }, 0);
+  }
+
+  private queueSupportProgramsForFilterState(filterState: RetroVideoFilterState | null) {
+    if (!filterState || this.isDisposed) {
+      return;
+    }
+
+    const needsBeamDownscale =
+      shouldUsePreFilterDownscale(filterState) &&
+      (!this.beamDownscaleProgram || !this.beamDownscaleLocs);
+    const needsPostCurvature =
+      shouldUsePostCurvaturePass(filterState) &&
+      (!this.postCurvatureProgram || !this.postCurvatureLocs);
+
+    if (!needsBeamDownscale && !needsPostCurvature) {
+      return;
+    }
+
+    this.scheduleSupportProgramCompile();
   }
 
   // Compiles a variant at most once; subsequent requests for the same
@@ -1336,22 +1416,26 @@ export class TetoricaRetroVideoPipeline {
 
       this.logProgramCompile(`variant:${variantKey}:pass1`);
       const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1Source);
-      this.logProgramCompile(`variant:${variantKey}:pass2`);
-      const pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2Source);
-      const beamKernelProgram = beamKernelSource
-        ? (this.logProgramCompile(`variant:${variantKey}:beamKernel`),
-          submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamKernelSource))
-        : null;
+      let pass2Program: WebGLProgram | null = null;
+      let beamKernelProgram: WebGLProgram | null = null;
 
       try {
-        await waitAndVerifyPrograms(
-          this.gl,
-          beamKernelProgram
-            ? [pass1Program, pass2Program, beamKernelProgram]
-            : [pass1Program, pass2Program],
-        );
+        await waitAndVerifyPrograms(this.gl, [pass1Program]);
+        this.logProgramCompile(`variant:${variantKey}:pass2`);
+        pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2Source);
+        await waitAndVerifyPrograms(this.gl, [pass2Program]);
+        beamKernelProgram = beamKernelSource
+          ? (this.logProgramCompile(`variant:${variantKey}:beamKernel`),
+            submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamKernelSource))
+          : null;
+        if (beamKernelProgram) {
+          await waitAndVerifyPrograms(this.gl, [beamKernelProgram]);
+        }
         if (this.isDisposed || this.gl.isContextLost()) {
           throw new Error("Pipeline was disposed during shader compile.");
+        }
+        if (!pass2Program) {
+          throw new Error("Pass 2 program did not compile.");
         }
 
         const entry = beamKernelProgram
@@ -1395,7 +1479,7 @@ export class TetoricaRetroVideoPipeline {
         this.windowsLitePendingVariantKey &&
         this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
       ) {
-        this.startWindowsLiteForegroundCompile();
+        this.scheduleWindowsLiteForegroundCompile();
       }
     });
   }
@@ -1452,24 +1536,10 @@ export class TetoricaRetroVideoPipeline {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     logShaderCompileInfo("base:passthrough");
     const passthroughProgram = submitProgram(gl, VERTEX_SHADER_SOURCE, PASS_THROUGH_FRAGMENT);
-    logShaderCompileInfo("base:beamDownscale");
-    const beamDownscaleProgram = submitProgram(
-      gl,
-      VERTEX_SHADER_SOURCE,
-      BEAM_SOURCE_DOWNSCALE_FRAGMENT,
-    );
-    logShaderCompileInfo("base:postCurvature");
-    const postCurvatureProgram = submitProgram(
-      gl,
-      VERTEX_SHADER_SOURCE,
-      POST_CURVATURE_FRAGMENT,
-    );
-    await waitAndVerifyPrograms(gl, [passthroughProgram, beamDownscaleProgram, postCurvatureProgram]);
+    await waitAndVerifyPrograms(gl, [passthroughProgram]);
     const pipeline = new TetoricaRetroVideoPipeline(
       gl,
       passthroughProgram,
-      beamDownscaleProgram,
-      postCurvatureProgram,
       true,
       options?.shaderCompileCacheBusterEnabled === true,
     );
@@ -1506,15 +1576,11 @@ export class TetoricaRetroVideoPipeline {
   constructor(
     gl: WebGL2RenderingContext,
     passthroughProgram: WebGLProgram,
-    beamDownscaleProgram: WebGLProgram,
-    postCurvatureProgram: WebGLProgram,
     windowsLiteMode = false,
     shaderCompileCacheBusterEnabled = false,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
-    this.beamDownscaleProgram = beamDownscaleProgram;
-    this.postCurvatureProgram = postCurvatureProgram;
     this.windowsLiteMode = windowsLiteMode;
     this.shaderCompileCacheBusterEnabled = shaderCompileCacheBusterEnabled;
 
@@ -1545,18 +1611,48 @@ export class TetoricaRetroVideoPipeline {
 
     gl.useProgram(this.passthroughProgram);
     gl.uniform1i(gl.getUniformLocation(this.passthroughProgram, "uTexture"), 0);
-    gl.useProgram(this.beamDownscaleProgram);
-    gl.uniform1i(gl.getUniformLocation(this.beamDownscaleProgram, "uTexture"), 0);
-    gl.useProgram(this.postCurvatureProgram);
-    gl.uniform1i(gl.getUniformLocation(this.postCurvatureProgram, "uTexture"), 0);
+  }
+
+  private async ensureBeamDownscaleProgram() {
+    if (this.beamDownscaleProgram && this.beamDownscaleLocs) {
+      return;
+    }
+
+    logShaderCompileInfo("base:beamDownscale");
+    const program = submitProgram(
+      this.gl,
+      VERTEX_SHADER_SOURCE,
+      BEAM_SOURCE_DOWNSCALE_FRAGMENT,
+    );
+    await waitAndVerifyPrograms(this.gl, [program]);
+    this.beamDownscaleProgram = program;
+    this.gl.useProgram(program);
+    this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
     this.beamDownscaleLocs = {
-      uTexture: gl.getUniformLocation(this.beamDownscaleProgram, "uTexture"),
-      uSourceSize: gl.getUniformLocation(this.beamDownscaleProgram, "uSourceSize"),
-      uTargetSize: gl.getUniformLocation(this.beamDownscaleProgram, "uTargetSize"),
+      uTexture: this.gl.getUniformLocation(program, "uTexture"),
+      uSourceSize: this.gl.getUniformLocation(program, "uSourceSize"),
+      uTargetSize: this.gl.getUniformLocation(program, "uTargetSize"),
     };
+  }
+
+  private async ensurePostCurvatureProgram() {
+    if (this.postCurvatureProgram && this.postCurvatureLocs) {
+      return;
+    }
+
+    logShaderCompileInfo("base:postCurvature");
+    const program = submitProgram(
+      this.gl,
+      VERTEX_SHADER_SOURCE,
+      POST_CURVATURE_FRAGMENT,
+    );
+    await waitAndVerifyPrograms(this.gl, [program]);
+    this.postCurvatureProgram = program;
+    this.gl.useProgram(program);
+    this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
     this.postCurvatureLocs = {
-      uTexture: gl.getUniformLocation(this.postCurvatureProgram, "uTexture"),
-      uCurvature: gl.getUniformLocation(this.postCurvatureProgram, "uCurvature"),
+      uTexture: this.gl.getUniformLocation(program, "uTexture"),
+      uCurvature: this.gl.getUniformLocation(program, "uCurvature"),
     };
   }
 
@@ -1660,6 +1756,7 @@ export class TetoricaRetroVideoPipeline {
     }
 
     this.currentFilterState = filterState;
+    this.queueSupportProgramsForFilterState(filterState);
     this.queueWindowsLiteVariant(filterState);
   }
 
@@ -1907,16 +2004,22 @@ export class TetoricaRetroVideoPipeline {
       const isBeamFullVariant = this.windowsLiteVariantKey?.includes(":beam_full") ?? false;
       const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
       const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState);
-      if (usePostCurvaturePass) {
+      const canUsePreFilterDownscale =
+        usePreFilterDownscale &&
+        Boolean(this.beamDownscaleProgram && this.beamDownscaleLocs);
+      const canUsePostCurvaturePass =
+        usePostCurvaturePass &&
+        Boolean(this.postCurvatureProgram && this.postCurvatureLocs);
+      if (canUsePostCurvaturePass) {
         this.ensurePostCurvatureFbo(w, h);
       }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, usePostCurvaturePass ? this.postCurvatureFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, canUsePostCurvaturePass ? this.postCurvatureFbo : null);
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       let pass2SourceTexture: WebGLTexture = this.texture;
       let pass2PrimaryTexture: WebGLTexture | null = this.fboTexture;
-      if (usePreFilterDownscale) {
+      if (canUsePreFilterDownscale && this.beamDownscaleProgram && this.beamDownscaleLocs) {
         const {
           beamSourceWidth,
           beamSourceHeight,
@@ -1976,7 +2079,7 @@ export class TetoricaRetroVideoPipeline {
           gl.viewport(0, 0, w, h);
         }
       }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, usePostCurvaturePass ? this.postCurvatureFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, canUsePostCurvaturePass ? this.postCurvatureFbo : null);
       gl.viewport(0, 0, w, h);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, pass2PrimaryTexture);
@@ -1987,7 +2090,7 @@ export class TetoricaRetroVideoPipeline {
       } else {
         this.syncFboTextureSamplingFilter(pass2TextureFilter);
       }
-      if (usePreFilterDownscale) {
+      if (canUsePreFilterDownscale) {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
         if (pass2SourceTexture === this.beamSourceTexture) {
@@ -2010,7 +2113,7 @@ export class TetoricaRetroVideoPipeline {
       );
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-      if (usePostCurvaturePass && this.postCurvatureTexture) {
+      if (canUsePostCurvaturePass && this.postCurvatureTexture && this.postCurvatureProgram && this.postCurvatureLocs) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, w, h);
         gl.clearColor(0, 0, 0, 1);
@@ -2076,8 +2179,8 @@ export class TetoricaRetroVideoPipeline {
       if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
     }
     gl.deleteProgram(this.passthroughProgram);
-    gl.deleteProgram(this.beamDownscaleProgram);
-    gl.deleteProgram(this.postCurvatureProgram);
+    if (this.beamDownscaleProgram) gl.deleteProgram(this.beamDownscaleProgram);
+    if (this.postCurvatureProgram) gl.deleteProgram(this.postCurvatureProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
     if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);

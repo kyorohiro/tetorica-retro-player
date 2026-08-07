@@ -7,6 +7,7 @@ import React, {
     useState,
     type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useLongPress } from "./retro-player/hooks/useLongPress";
 
 export const DIALOG_STACK_ACTIVE_EVENT = "tetorica-dialog-stack-active";
@@ -75,14 +76,14 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
                 //    );
                 //})}
             }
-            {
+            {typeof document !== "undefined" && createPortal(
                 stack.map((item, index) => {
                     const isTop = index === stack.length - 1;
                     return (
                         <div
                             key={item.id}
                             className={[
-                                "safe-dialog-overlay fixed inset-0 z-50 overflow-hidden bg-black/60",
+                                "safe-dialog-overlay fixed inset-0 z-[400] overflow-hidden bg-black/60",
                                 isTop ? "block" : "hidden",
                             ].join(" ")}
                         >
@@ -91,8 +92,9 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
                             </div>
                         </div>
                     );
-                })
-            }
+                }),
+                document.body,
+            )}
         </DialogContext.Provider>
     );
 };

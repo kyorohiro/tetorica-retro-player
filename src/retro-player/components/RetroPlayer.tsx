@@ -289,6 +289,7 @@ export function RetroPlayer({
   const [showVideoSpectrum, setShowVideoSpectrum] = React.useState(false);
   const [showClockOverlay, setShowClockOverlay] = React.useState(false);
   const [isPreparingFullPreset, setIsPreparingFullPreset] = React.useState(false);
+  const [preparingOverlayLabel, setPreparingOverlayLabel] = React.useState("");
   const refreshLayoutFrameRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -461,12 +462,15 @@ export function RetroPlayer({
 
   const runWithFullPresetLock = React.useCallback(async (
     task: () => Promise<void>,
+    label?: string,
   ) => {
+    setPreparingOverlayLabel(label ?? "");
     setIsPreparingFullPreset(true);
     try {
       await task();
     } finally {
       setIsPreparingFullPreset(false);
+      setPreparingOverlayLabel("");
     }
   }, []);
 
@@ -657,7 +661,7 @@ export function RetroPlayer({
           variantOverrides,
         );
       });
-    });
+    }, locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`);
     return true;
   }, [
     confirmDialog,
@@ -978,6 +982,7 @@ export function RetroPlayer({
             kind={kind}
             player={player}
             interactionLocked={isPreparingFullPreset}
+            interactionLockLabel={preparingOverlayLabel}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
             isFitWidthEnabled={isFitWidthEnabled}
@@ -1116,6 +1121,7 @@ export function RetroPlayer({
               kind={kind}
               player={player}
               interactionLocked={isPreparingFullPreset}
+              interactionLockLabel={preparingOverlayLabel}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
               isFitWidthEnabled={isFitWidthEnabled}

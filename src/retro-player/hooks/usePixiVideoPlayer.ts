@@ -1841,6 +1841,7 @@ export function usePixiVideoPlayer(
     preferNativeHlsOverride,
     loadingLabel,
     isLoading,
+    isShaderCompiling,
     isBuffering,
     needsUserPlay,
     isPlaying,
