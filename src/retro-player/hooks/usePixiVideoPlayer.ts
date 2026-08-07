@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -18,8 +19,10 @@ import {
 } from "../media/RetroAudioRouting";
 import type { RetroPlayerLocale } from "../types";
 import type { RetroVideoFilterState } from "../video/TetoricaRetroVideoPipeline";
+import { hideShaderBusyOverlay, showShaderBusyOverlay } from "../ui/shaderBusyOverlay";
 
 let retroPlayerInstanceSeed = 0;
+const SHADER_BUSY_OVERLAY_DELAY_MS = 350;
 
 
 const isRetroPlayerDebugEnabled = () =>
@@ -28,6 +31,18 @@ const isRetroPlayerDebugEnabled = () =>
     import.meta.env.DEV ||
     Boolean((window as typeof window & { __RETRO_PLAYER_DEBUG__?: boolean }).__RETRO_PLAYER_DEBUG__)
   );
+
+const isShaderBusyLabel = (label: string) => {
+  const normalized = label.trim().toLowerCase();
+  return (
+    normalized.includes("shader") ||
+    normalized.includes("compile") ||
+    normalized.includes("link") ||
+    label.includes("シェーダー") ||
+    label.includes("コンパイル") ||
+    label.includes("リンク")
+  );
+};
 
 const hasAudibleMediaTrack = (
   media: HTMLMediaElement | null,
@@ -174,6 +189,8 @@ export function usePixiVideoPlayer(
   const [pageTurnDirection, setPageTurnDirection] = useState<RetroPageTurnDirection>(null);
   const [pageTurnToken, setPageTurnToken] = useState(0);
   const pageTurnResetTimerRef = useRef<number | null>(null);
+  const shaderBusyOverlayTimerRef = useRef<number | null>(null);
+  const shaderBusyOverlayVisibleRef = useRef(false);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -568,13 +585,17 @@ export function usePixiVideoPlayer(
   ]);
 
   const beginLoading = (label: string) => {
-    setLoadingLabel(label);
-    setIsLoading(true);
+    flushSync(() => {
+      setLoadingLabel(label);
+      setIsLoading(true);
+    });
   };
 
   const finishLoading = () => {
-    setIsLoading(false);
-    setLoadingLabel("");
+    flushSync(() => {
+      setIsLoading(false);
+      setLoadingLabel("");
+    });
   };
 
   const waitForLoadingPaint = useCallback(async () => {
@@ -597,6 +618,25 @@ export function usePixiVideoPlayer(
     ...overrides,
     isFilterEnabled: true,
   }), [effectiveFilterState]);
+
+  const currentVariantPreparationState = useMemo(
+    () => buildVariantPreparationState(),
+    [buildVariantPreparationState],
+  );
+
+  const currentVariantPreparationKey = useMemo(() => JSON.stringify({
+    paletteMode: currentVariantPreparationState.paletteMode,
+    samplingMode: currentVariantPreparationState.samplingMode,
+    phosphorDotShape: currentVariantPreparationState.phosphorDotShape,
+    phosphorStrength: currentVariantPreparationState.phosphorStrength,
+    spotMaskStrength: currentVariantPreparationState.spotMaskStrength,
+    compositeEnabled: currentVariantPreparationState.compositeEnabled,
+    compositeAmount: currentVariantPreparationState.compositeAmount,
+    selectedPreset: currentVariantPreparationState.selectedPreset,
+    preFilterDownscaleEnabled: currentVariantPreparationState.preFilterDownscaleEnabled,
+    postCurvatureEnabled: currentVariantPreparationState.postCurvatureEnabled,
+    curvature: currentVariantPreparationState.curvature,
+  }), [currentVariantPreparationState]);
 
   const isFilterVariantPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
     return hasPreparedFilterVariant(buildVariantPreparationState(overrides));
@@ -889,6 +929,65 @@ export function usePixiVideoPlayer(
     syncVideoState,
   ]);
 
+  const genericVariantPrepareInFlightRef = useRef(false);
+  const genericVariantPreparedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const visualKind = previewKind ?? options?.requestedKind ?? null;
+    const shouldAutoPrepareVariant =
+      !shouldUseNativeVisualSurface &&
+      effectiveFilterState.isFilterEnabled &&
+      isRendererReady &&
+      isFilterReady &&
+      (visualKind === "video" || visualKind === "capture" || visualKind === "image");
+
+    if (!shouldAutoPrepareVariant) {
+      return;
+    }
+
+    if (hasPreparedFilterVariant(currentVariantPreparationState)) {
+      genericVariantPreparedKeyRef.current = currentVariantPreparationKey;
+      return;
+    }
+
+    if (genericVariantPrepareInFlightRef.current) {
+      return;
+    }
+
+    if (genericVariantPreparedKeyRef.current === currentVariantPreparationKey) {
+      return;
+    }
+
+    genericVariantPrepareInFlightRef.current = true;
+    genericVariantPreparedKeyRef.current = currentVariantPreparationKey;
+    const label = options?.locale === "ja"
+      ? "シェーダーを準備中..."
+      : "Preparing shader...";
+
+    void (async () => {
+      try {
+        await runWithRenderPaused(async () => {
+          await prepareFilterVariantWithLabel(label);
+        });
+      } finally {
+        genericVariantPrepareInFlightRef.current = false;
+      }
+    })();
+  }, [
+    currentVariantPreparationKey,
+    currentVariantPreparationState,
+    effectiveFilterState.isFilterEnabled,
+    hasPreparedFilterVariant,
+    isFilterReady,
+    isRendererReady,
+    options?.locale,
+    options?.requestedKind,
+    prepareFilterVariantWithLabel,
+    previewKind,
+    runWithRenderPaused,
+    shouldUseNativeVisualSurface,
+  ]);
+
   useEffect(() => {
     onEndedRef.current = options?.onEnded;
   }, [options?.onEnded]);
@@ -927,6 +1026,12 @@ export function usePixiVideoPlayer(
 
   useEffect(() => {
     return () => {
+      if (shaderBusyOverlayTimerRef.current !== null) {
+        window.clearTimeout(shaderBusyOverlayTimerRef.current);
+        shaderBusyOverlayTimerRef.current = null;
+      }
+      hideShaderBusyOverlay();
+      shaderBusyOverlayVisibleRef.current = false;
       if (pageTurnResetTimerRef.current !== null) {
         window.clearTimeout(pageTurnResetTimerRef.current);
       }
@@ -1668,9 +1773,11 @@ export function usePixiVideoPlayer(
 
     if (visualShaderPending) {
       setLoadingLabel((current) => {
-        const nextLabel = visualKind === "image"
-          ? "Preparing shader preview..."
-          : "Preparing video shader...";
+        const nextLabel = isShaderCompiling
+          ? (shaderCompileLabel || "Compiling shader...")
+          : visualKind === "image"
+            ? "Preparing shader preview..."
+            : "Preparing video shader...";
         return current === nextLabel ? current : nextLabel;
       });
       setIsLoading(true);
@@ -1700,6 +1807,46 @@ export function usePixiVideoPlayer(
     previewKind,
     shouldUseNativeVisualSurface,
     isShaderCompiling,
+    shaderCompileLabel,
+  ]);
+
+  useLayoutEffect(() => {
+    const nextShaderBusyLabel = isShaderCompiling
+      ? (shaderCompileLabel || "Compiling shader...")
+      : (isLoading && isShaderBusyLabel(loadingLabel) ? loadingLabel : "");
+
+    if (shaderBusyOverlayTimerRef.current !== null) {
+      window.clearTimeout(shaderBusyOverlayTimerRef.current);
+      shaderBusyOverlayTimerRef.current = null;
+    }
+
+    if (!nextShaderBusyLabel) {
+      hideShaderBusyOverlay();
+      shaderBusyOverlayVisibleRef.current = false;
+      return;
+    }
+
+    if (shaderBusyOverlayVisibleRef.current) {
+      showShaderBusyOverlay(nextShaderBusyLabel);
+      return;
+    }
+
+    shaderBusyOverlayTimerRef.current = window.setTimeout(() => {
+      shaderBusyOverlayTimerRef.current = null;
+      showShaderBusyOverlay(nextShaderBusyLabel);
+      shaderBusyOverlayVisibleRef.current = true;
+    }, SHADER_BUSY_OVERLAY_DELAY_MS);
+
+    return () => {
+      if (shaderBusyOverlayTimerRef.current !== null) {
+        window.clearTimeout(shaderBusyOverlayTimerRef.current);
+        shaderBusyOverlayTimerRef.current = null;
+      }
+    };
+  }, [
+    isLoading,
+    isShaderCompiling,
+    loadingLabel,
     shaderCompileLabel,
   ]);
 

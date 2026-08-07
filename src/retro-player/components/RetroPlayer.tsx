@@ -1,4 +1,5 @@
 import React from "react";
+import { flushSync } from "react-dom";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
 import {
   DEFAULT_GRAPHICS_BACKEND_MODE,
@@ -462,15 +463,25 @@ export function RetroPlayer({
 
   const runWithFullPresetLock = React.useCallback(async (
     task: () => Promise<void>,
-    label?: string,
+    _label?: string,
   ) => {
-    setPreparingOverlayLabel(label ?? "");
-    setIsPreparingFullPreset(true);
+    flushSync(() => {
+      setPreparingOverlayLabel("");
+      setIsPreparingFullPreset(true);
+    });
     try {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
       await task();
     } finally {
-      setIsPreparingFullPreset(false);
-      setPreparingOverlayLabel("");
+      flushSync(() => {
+        setIsPreparingFullPreset(false);
+        setPreparingOverlayLabel("");
+      });
     }
   }, []);
 

@@ -1209,11 +1209,10 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private appendShaderCompileBuster(source: string): string {
-    this.compileSourceNonce += 1;
     const stableTag =
       this.shaderCompileBusterTag ??
       `${this.startedAt.toFixed(3)}:${this.compileSourceNonce}`;
-    return `${source}\n// shader-compile-buster:${stableTag}:${this.compileSourceNonce}`;
+    return `${source}\n// shader-compile-buster:${stableTag}`;
   }
 
   private refreshShaderCompileBusterTag() {
@@ -1795,11 +1794,19 @@ export class TetoricaRetroVideoPipeline {
   }
 
   async prepareFilterStateVariant(filterState: RetroVideoFilterState) {
-    if (!this.windowsLiteMode) {
-      return;
-    }
+    const previousFilterState = this.currentFilterState;
+    this.currentFilterState = filterState;
 
-    await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
+    try {
+      await this.compileSupportProgramsForCurrentState();
+      if (!this.windowsLiteMode) {
+        return;
+      }
+
+      await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
+    } finally {
+      this.currentFilterState = previousFilterState;
+    }
   }
 
   setOutputEnabled(enabled: boolean) {

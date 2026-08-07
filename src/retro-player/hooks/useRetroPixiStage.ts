@@ -7,6 +7,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
+import { flushSync } from "react-dom";
 import {
   type RetroPresentationSamplingMode,
   TetoricaRetroVideoPipeline,
@@ -878,7 +879,11 @@ export function useRetroPixiStage({
 
       // onFilterReady fires after background filter compilation.
       // appRef.current is set below, so by the time the callback fires it's available.
-      setIsFilterReady(false);
+      flushSync(() => {
+        setIsFilterReady(false);
+        setIsShaderCompiling(true);
+        setShaderCompileLabel("Compiling shader...");
+      });
       filterReadyPromiseRef.current = new Promise<void>((resolve) => {
         resolveFilterReadyRef.current = resolve;
       });
@@ -892,6 +897,16 @@ export function useRetroPixiStage({
         renderFrameRef.current();
         startTicker();
       };
+      const handleCompileStateChange = (state: { active: boolean; label?: string }) => {
+        setIsShaderCompiling(state.active);
+        setShaderCompileLabel(state.active ? (state.label ?? "Compiling shader...") : "");
+      };
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
       const pipeline = await TetoricaRetroVideoPipeline.create(
         gl,
         buildPipelineFilterState(),
@@ -899,6 +914,7 @@ export function useRetroPixiStage({
           shaderCompileCacheBusterEnabled: appliedShaderCompileCacheBusterEnabledRef.current,
         },
         onFilterReady,
+        handleCompileStateChange,
       );
       const app: CanvasStageApp = {
         canvas,
