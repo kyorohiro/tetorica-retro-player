@@ -628,8 +628,11 @@ export function RetroPlayer({
     }
 
     const renderMode = resolveRetroVariantPreparationRenderMode(variantOverrides);
+    const isBeamVariant = variantOverrides.phosphorDotShape === "beam";
+    const isCompositeVariant =
+      variantOverrides.compositeEnabled && variantOverrides.compositeAmount > 0.001;
 
-    if (renderMode === "full" && !fullModeConfirmedRef.current) {
+    if (renderMode === "full" && !isBeamVariant && !isCompositeVariant && !fullModeConfirmedRef.current) {
       let persistForFuture = false;
       const confirmed = await confirmDialog({
         title: locale === "ja" ? `${title} の準備` : `Prepare ${title}`,

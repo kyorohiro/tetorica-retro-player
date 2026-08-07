@@ -307,6 +307,7 @@ export function usePixiVideoPlayer(
     isRendererReady,
     isFilterReady,
     isShaderCompiling,
+    shaderCompileLabel,
     renderCapHintState,
     viewportRect,
     setViewportRect,
@@ -1667,11 +1668,9 @@ export function usePixiVideoPlayer(
 
     if (visualShaderPending) {
       setLoadingLabel((current) => {
-        const nextLabel = isShaderCompiling
-          ? "Compiling shader..."
-          : visualKind === "image"
-            ? "Preparing shader preview..."
-            : "Preparing video shader...";
+        const nextLabel = visualKind === "image"
+          ? "Preparing shader preview..."
+          : "Preparing video shader...";
         return current === nextLabel ? current : nextLabel;
       });
       setIsLoading(true);
@@ -1701,6 +1700,7 @@ export function usePixiVideoPlayer(
     previewKind,
     shouldUseNativeVisualSurface,
     isShaderCompiling,
+    shaderCompileLabel,
   ]);
 
   useEffect(() => {

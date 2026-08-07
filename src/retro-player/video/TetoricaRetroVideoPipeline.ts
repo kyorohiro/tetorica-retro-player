@@ -722,21 +722,24 @@ const isRetroVideoDebugEnabled = () =>
 
 let lastBeamViewportLimitDebugKey = "";
 
-// Submit shader compilation and linking without blocking on status checks.
-// Caller must await completion before calling gl.getProgramParameter(LINK_STATUS).
-function submitProgram(
+type SubmittedProgram = {
+  program: WebGLProgram;
+  vertexShader: WebGLShader;
+  fragmentShader: WebGLShader;
+};
+
+function waitForBrowserPaint(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+function beginProgramCompile(
   gl: WebGL2RenderingContext,
-  vertexSource: string,
-  fragmentSource: string,
-): WebGLProgram {
+): SubmittedProgram {
   const vert = gl.createShader(gl.VERTEX_SHADER);
   const frag = gl.createShader(gl.FRAGMENT_SHADER);
   if (!vert || !frag) throw new Error("Failed to create shader.");
-
-  gl.shaderSource(vert, vertexSource);
-  gl.shaderSource(frag, fragmentSource);
-  gl.compileShader(vert);
-  gl.compileShader(frag);
 
   const program = gl.createProgram();
   if (!program) {
@@ -748,11 +751,43 @@ function submitProgram(
   gl.attachShader(program, vert);
   gl.attachShader(program, frag);
   gl.bindAttribLocation(program, 0, "aPosition");
-  gl.linkProgram(program);
-  gl.deleteShader(vert);
-  gl.deleteShader(frag);
 
-  return program;
+  return {
+    program,
+    vertexShader: vert,
+    fragmentShader: frag,
+  };
+}
+
+function submitProgram(
+  gl: WebGL2RenderingContext,
+  vertexSource: string,
+  fragmentSource: string,
+): WebGLProgram {
+  const submitted = beginProgramCompile(gl);
+
+  try {
+    gl.shaderSource(submitted.vertexShader, vertexSource);
+    gl.shaderSource(submitted.fragmentShader, fragmentSource);
+    gl.compileShader(submitted.vertexShader);
+    gl.compileShader(submitted.fragmentShader);
+    return finishProgramLink(gl, submitted);
+  } catch (error) {
+    gl.deleteProgram(submitted.program);
+    gl.deleteShader(submitted.vertexShader);
+    gl.deleteShader(submitted.fragmentShader);
+    throw error;
+  }
+}
+
+function finishProgramLink(
+  gl: WebGL2RenderingContext,
+  submitted: SubmittedProgram,
+): WebGLProgram {
+  gl.linkProgram(submitted.program);
+  gl.deleteShader(submitted.vertexShader);
+  gl.deleteShader(submitted.fragmentShader);
+  return submitted.program;
 }
 
 function logShaderCompileInfo(message: string) {
@@ -777,45 +812,9 @@ async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
   programs: WebGLProgram[],
 ): Promise<void> {
-  const ext = getParallelShaderCompileExtension(gl);
-  const PARALLEL_COMPILE_MAX_WAIT_MS = 8000;
-
-  if (ext) {
-    await new Promise<void>((resolve) => {
-      const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-      const RAF_POLL_WINDOW_MS = 300;
-      const SLOW_POLL_INTERVAL_MS = 150;
-
-      const poll = () => {
-        const allDone = programs.every(
-          (p) => gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR) as boolean,
-        );
-        if (allDone) {
-          resolve();
-          return;
-        }
-
-        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-        if (now - startedAt >= PARALLEL_COMPILE_MAX_WAIT_MS) {
-          console.warn(
-            `WARN : shader compile poll timeout after ${Math.round(now - startedAt)}ms; forcing link-status verification`,
-          );
-          resolve();
-          return;
-        }
-        if (now - startedAt < RAF_POLL_WINDOW_MS) {
-          requestAnimationFrame(poll);
-          return;
-        }
-
-        window.setTimeout(poll, SLOW_POLL_INTERVAL_MS);
-      };
-      requestAnimationFrame(poll);
-    });
-  } else {
-    // Yield at least one frame so React can paint before blocking on link status.
-    await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
-  }
+  void getParallelShaderCompileExtension;
+  // Let the browser paint once before the synchronous LINK_STATUS readback.
+  await waitForBrowserPaint();
 
   for (const program of programs) {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -909,6 +908,7 @@ export class TetoricaRetroVideoPipeline {
   private compileSourceNonce = 0;
   private shaderCompileBusterTag: string | null = null;
   private readonly shaderCompileCacheBusterEnabled: boolean;
+  private readonly onCompileStateChange?: (state: { active: boolean; label?: string }) => void;
   private readonly windowsLiteVariantCompileInflight = new Map<
     WindowsLiteVariantKey,
     Promise<{ pass1: WebGLProgram; pass2: WebGLProgram; beamKernel?: WebGLProgram }>
@@ -1336,6 +1336,9 @@ export class TetoricaRetroVideoPipeline {
           })
           .finally(() => {
             this.supportProgramCompilePromise = null;
+            if (!this.windowsLiteCompilePromise) {
+              this.onCompileStateChange?.({ active: false });
+            }
             if (!this.isDisposed && this.currentFilterState) {
               this.queueSupportProgramsForFilterState(this.currentFilterState);
             }
@@ -1414,21 +1417,25 @@ export class TetoricaRetroVideoPipeline {
           : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
         : null;
 
+      this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / pass 1)...` });
       this.logProgramCompile(`variant:${variantKey}:pass1`);
       const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1Source);
       let pass2Program: WebGLProgram | null = null;
       let beamKernelProgram: WebGLProgram | null = null;
 
       try {
+        this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / pass 1)...` });
         await waitAndVerifyPrograms(this.gl, [pass1Program]);
+        this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / pass 2)...` });
         this.logProgramCompile(`variant:${variantKey}:pass2`);
         pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2Source);
+        this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / pass 2)...` });
         await waitAndVerifyPrograms(this.gl, [pass2Program]);
-        beamKernelProgram = beamKernelSource
-          ? (this.logProgramCompile(`variant:${variantKey}:beamKernel`),
-            submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamKernelSource))
-          : null;
-        if (beamKernelProgram) {
+        if (beamKernelSource) {
+          this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / beam kernel)...` });
+          this.logProgramCompile(`variant:${variantKey}:beamKernel`);
+          beamKernelProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamKernelSource);
+          this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / beam kernel)...` });
           await waitAndVerifyPrograms(this.gl, [beamKernelProgram]);
         }
         if (this.isDisposed || this.gl.isContextLost()) {
@@ -1507,6 +1514,9 @@ export class TetoricaRetroVideoPipeline {
         this.setFilterPrograms(pass1, pass2, beamKernel);
         this.windowsLiteVariantKey = variantKey;
         this.windowsLitePendingVariantKey = null;
+        if (!this.supportProgramCompilePromise) {
+          this.onCompileStateChange?.({ active: false });
+        }
         TetoricaRetroVideoPipeline.showDebug(`filter: Windows lite variant ${variantKey} LOADED`);
 
         if (!this.windowsLitePrewarmStarted) {
@@ -1518,6 +1528,9 @@ export class TetoricaRetroVideoPipeline {
           `filter: Windows lite variant ${variantKey} failed, keeping previous programs (${message})`,
         );
         this.windowsLitePendingVariantKey = null;
+        if (!this.supportProgramCompilePromise) {
+          this.onCompileStateChange?.({ active: false });
+        }
         return;
       }
     }
@@ -1542,6 +1555,7 @@ export class TetoricaRetroVideoPipeline {
       passthroughProgram,
       true,
       options?.shaderCompileCacheBusterEnabled === true,
+      onCompileStateChange,
     );
     const initialCompileFilterState = getInitialWindowsLiteCompileFilterState(initialFilterState);
 
@@ -1550,24 +1564,30 @@ export class TetoricaRetroVideoPipeline {
         onFilterReady?.();
         return;
       }
-      onCompileStateChange?.({
-        active: true,
-        label: "Compiling shader...",
-      });
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
-      pipeline.queueWindowsLiteVariant(initialCompileFilterState);
-      if (pipeline.windowsLiteCompilePromise) {
-        await pipeline.windowsLiteCompilePromise;
+      try {
+        pipeline.currentFilterState = initialCompileFilterState;
+        if (
+          pipeline.shaderCompileCacheBusterEnabled &&
+          pipeline.shaderCompileBusterTag === null
+        ) {
+          pipeline.refreshShaderCompileBusterTag();
+        }
+        const initialVariantKey = getWindowsLiteVariantKey(initialCompileFilterState);
+        const { pass1, pass2, beamKernel } = await pipeline.compileWindowsLiteVariant(initialVariantKey);
+        if (pipeline.isDisposed || pipeline.gl.isContextLost()) {
+          return;
+        }
+        pipeline.setFilterPrograms(pass1, pass2, beamKernel);
+        pipeline.windowsLiteVariantKey = initialVariantKey;
+        pipeline.windowsLitePendingVariantKey = null;
+        pipeline.queueSupportProgramsForFilterState(initialCompileFilterState);
+        onCompileStateChange?.({ active: false });
+        onFilterReady?.();
+      } catch (error) {
+        onCompileStateChange?.({ active: false });
+        console.warn("[retro-player] initial shader compile failed", error);
+        onFilterReady?.();
       }
-      onCompileStateChange?.({
-        active: false,
-      });
-      onFilterReady?.();
     }, 0);
 
     return pipeline;
@@ -1578,11 +1598,13 @@ export class TetoricaRetroVideoPipeline {
     passthroughProgram: WebGLProgram,
     windowsLiteMode = false,
     shaderCompileCacheBusterEnabled = false,
+    onCompileStateChange?: (state: { active: boolean; label?: string }) => void,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
     this.windowsLiteMode = windowsLiteMode;
     this.shaderCompileCacheBusterEnabled = shaderCompileCacheBusterEnabled;
+    this.onCompileStateChange = onCompileStateChange;
 
     const vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -1618,12 +1640,14 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
+    this.onCompileStateChange?.({ active: true, label: "Compiling shader (beam downscale)..." });
     logShaderCompileInfo("base:beamDownscale");
     const program = submitProgram(
       this.gl,
       VERTEX_SHADER_SOURCE,
       BEAM_SOURCE_DOWNSCALE_FRAGMENT,
     );
+    this.onCompileStateChange?.({ active: true, label: "Linking shader (beam downscale)..." });
     await waitAndVerifyPrograms(this.gl, [program]);
     this.beamDownscaleProgram = program;
     this.gl.useProgram(program);
@@ -1640,12 +1664,14 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
+    this.onCompileStateChange?.({ active: true, label: "Compiling shader (post curvature)..." });
     logShaderCompileInfo("base:postCurvature");
     const program = submitProgram(
       this.gl,
       VERTEX_SHADER_SOURCE,
       POST_CURVATURE_FRAGMENT,
     );
+    this.onCompileStateChange?.({ active: true, label: "Linking shader (post curvature)..." });
     await waitAndVerifyPrograms(this.gl, [program]);
     this.postCurvatureProgram = program;
     this.gl.useProgram(program);
