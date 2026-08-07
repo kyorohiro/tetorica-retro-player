@@ -921,6 +921,7 @@ export class TetoricaRetroVideoPipeline {
     WindowsLiteVariantKey,
     Promise<{ pass1: WebGLProgram; pass2: WebGLProgram; beamKernel?: WebGLProgram }>
   >();
+  private windowsLiteCompileSerialPromise: Promise<void> = Promise.resolve();
   private readonly programCompileHistory = new Set<string>();
   private lastRenderedFilterState: RetroVideoFilterState | null = null;
   private lastRenderedSource: RetroVideoSource | null = null;
@@ -1292,7 +1293,23 @@ export class TetoricaRetroVideoPipeline {
       throw new Error("Pipeline was disposed before shader compile started.");
     }
 
+    const waitForCompileTurn = this.windowsLiteCompileSerialPromise.catch(() => {});
+    let releaseCompileTurn!: () => void;
+    this.windowsLiteCompileSerialPromise = new Promise<void>((resolve) => {
+      releaseCompileTurn = resolve;
+    });
+
     const compilePromise = (async () => {
+      await waitForCompileTurn;
+
+      const cachedAfterWait = this.windowsLiteProgramCache.get(variantKey);
+      if (cachedAfterWait) {
+        return cachedAfterWait;
+      }
+      if (this.isDisposed || this.gl.isContextLost()) {
+        throw new Error("Pipeline was disposed before shader compile started.");
+      }
+
       const compileStartTime = nowMs();
       const { pass1, pass2 } = this.getWindowsLiteShaderSources(variantKey);
       const pass1Source = this.shaderCompileCacheBusterEnabled
@@ -1341,6 +1358,7 @@ export class TetoricaRetroVideoPipeline {
         if (beamKernelProgram) this.gl.deleteProgram(beamKernelProgram);
         throw error;
       } finally {
+        releaseCompileTurn();
         this.windowsLiteVariantCompileInflight.delete(variantKey);
       }
     })();
