@@ -20,6 +20,7 @@ import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2Beam
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc98LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "../retro/filterPass2PhosphorLiteShader.ts";
+import { isWindowsRuntime } from "../platform/runtime.ts";
 
 export type RetroVideoFilterState = {
   selectedPreset?: RetroPresetKey | null;
@@ -720,8 +721,12 @@ type KHRParallelShaderCompile = {
 
 const getParallelShaderCompileExtension = (gl: WebGL2RenderingContext) =>
   (
-    gl.getExtension("WEBGL_parallel_shader_compile") ??
-    gl.getExtension("KHR_parallel_shader_compile")
+    isWindowsRuntime()
+      ? null
+      : (
+        gl.getExtension("WEBGL_parallel_shader_compile") ??
+        gl.getExtension("KHR_parallel_shader_compile")
+      )
   ) as KHRParallelShaderCompile | null;
 
 const isRetroVideoDebugEnabled = () =>
