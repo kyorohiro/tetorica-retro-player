@@ -16,6 +16,7 @@ import { FILTER_FRAGMENT_PASS_COMPOSITE_MID } from "../retro/filterPassComposite
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_FINAL } from "../retro/filterPass2BeamLiteCrtFinalShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
@@ -1571,10 +1572,13 @@ export class TetoricaRetroVideoPipeline {
           ? this.appendShaderCompileBuster(compositeMid)
           : compositeMid
         : null;
-      const beamKernelSource = (variantKey.endsWith(":beam_full") || variantKey.endsWith(":beam_crt"))
+      const beamKernelBaseSource = variantKey.endsWith(":beam_crt")
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
+        : (variantKey.endsWith(":beam_full") ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL : null);
+      const beamKernelSource = beamKernelBaseSource
         ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL)
-          : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+          ? this.appendShaderCompileBuster(beamKernelBaseSource)
+          : beamKernelBaseSource
         : null;
 
       await this.updateCompileState(`Compiling shader (${variantKey} / pass 1)...`);

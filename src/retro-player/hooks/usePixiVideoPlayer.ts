@@ -2028,6 +2028,7 @@ export function usePixiVideoPlayer(
     loadingLabel,
     isLoading,
     isShaderCompiling,
+    shaderCompileLabel,
     isBuffering,
     needsUserPlay,
     isPlaying,
