@@ -1,5 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 
+let lastPointerShortPressAt = 0;
+const GHOST_CLICK_SUPPRESSION_MS = 750;
+
 export function useLongPress(
   onLongPress: () => void,
   onShortPress: () => void,
@@ -61,6 +64,9 @@ export function useLongPress(
     clearHold();
     if (shouldTriggerShortPress) {
       shortPressHandledRef.current = true;
+      lastPointerShortPressAt = Date.now();
+      e.preventDefault();
+      e.stopPropagation();
       onShortPress();
     }
   }, [clearHold, onShortPress, releasePointer]);
@@ -83,6 +89,12 @@ export function useLongPress(
 
   const onClick = useCallback(
     (e: React.MouseEvent) => {
+      if (Date.now() - lastPointerShortPressAt < GHOST_CLICK_SUPPRESSION_MS) {
+        shortPressHandledRef.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (longPressedRef.current) {
         longPressedRef.current = false;
         shortPressHandledRef.current = false;

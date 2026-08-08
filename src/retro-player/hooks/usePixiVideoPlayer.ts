@@ -25,7 +25,6 @@ import {
 import {
   hideShaderBusyOverlay,
   showShaderBusyOverlay,
-  waitForShaderBusyOverlayPaint,
 } from "../ui/shaderBusyOverlay";
 
 let retroPlayerInstanceSeed = 0;
@@ -661,7 +660,6 @@ export function usePixiVideoPlayer(
       beginLoading(label);
       showShaderBusyOverlay(label, "Preparing filter state...");
       try {
-        await waitForShaderBusyOverlayPaint();
         await existingPrepare.promise;
       } finally {
         hideShaderBusyOverlay();
@@ -674,7 +672,6 @@ export function usePixiVideoPlayer(
       beginLoading(label);
       showShaderBusyOverlay(label, "Preparing filter state...");
       try {
-        await waitForShaderBusyOverlayPaint();
         await prepareFilterVariant(nextFilterState);
       } finally {
         hideShaderBusyOverlay();
