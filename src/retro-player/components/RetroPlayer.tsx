@@ -1,5 +1,4 @@
 import React from "react";
-import { flushSync } from "react-dom";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
 import {
   DEFAULT_GRAPHICS_BACKEND_MODE,
@@ -465,23 +464,13 @@ export function RetroPlayer({
     task: () => Promise<void>,
     _label?: string,
   ) => {
-    flushSync(() => {
-      setPreparingOverlayLabel("");
-      setIsPreparingFullPreset(true);
-    });
+    setPreparingOverlayLabel("");
+    setIsPreparingFullPreset(true);
     try {
-      await new Promise<void>((resolve) => {
-        window.requestAnimationFrame(() => resolve());
-      });
-      await new Promise<void>((resolve) => {
-        window.requestAnimationFrame(() => resolve());
-      });
       await task();
     } finally {
-      flushSync(() => {
-        setIsPreparingFullPreset(false);
-        setPreparingOverlayLabel("");
-      });
+      setIsPreparingFullPreset(false);
+      setPreparingOverlayLabel("");
     }
   }, []);
 
@@ -669,12 +658,10 @@ export function RetroPlayer({
     }
 
     await runWithFullPresetLock(async () => {
-      await player.runWithRenderPaused(async () => {
-        await player.prepareFilterVariantWithLabel(
-          locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
-          variantOverrides,
-        );
-      });
+      await player.prepareFilterVariantWithLabel(
+        locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
+        variantOverrides,
+      );
     }, locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`);
     return true;
   }, [

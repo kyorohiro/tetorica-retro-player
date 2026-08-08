@@ -7,7 +7,6 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
-import { flushSync } from "react-dom";
 import {
   type RetroPresentationSamplingMode,
   TetoricaRetroVideoPipeline,
@@ -19,6 +18,11 @@ import {
 } from "../video/TetoricaRetroVideoPipeline";
 import type { RetroFilterState } from "./useRetroFilterState";
 import { isTauriRuntime } from "../platform/runtime";
+import {
+  hideShaderBusyOverlay,
+  showShaderBusyOverlay,
+  waitForShaderBusyOverlayPaint,
+} from "../ui/shaderBusyOverlay";
 
 const TAURI_HIDDEN_TICK_MS = 250;
 const getPreferredOutputScale = () => {
@@ -879,16 +883,17 @@ export function useRetroPixiStage({
 
       // onFilterReady fires after background filter compilation.
       // appRef.current is set below, so by the time the callback fires it's available.
-      flushSync(() => {
-        setIsFilterReady(false);
-        setIsShaderCompiling(true);
-        setShaderCompileLabel("Compiling shader...");
-      });
+      setIsFilterReady(false);
+      setIsShaderCompiling(true);
+      setShaderCompileLabel("Compiling shader...");
+      showShaderBusyOverlay("Compiling shader...", "Shader preparation in progress.");
+      await waitForShaderBusyOverlayPaint();
       filterReadyPromiseRef.current = new Promise<void>((resolve) => {
         resolveFilterReadyRef.current = resolve;
       });
       appliedShaderCompileCacheBusterEnabledRef.current = shaderCompileCacheBusterEnabled;
       const onFilterReady = () => {
+        hideShaderBusyOverlay();
         setIsShaderCompiling(false);
         setShaderCompileLabel("");
         setIsFilterReady(true);
@@ -898,15 +903,17 @@ export function useRetroPixiStage({
         startTicker();
       };
       const handleCompileStateChange = (state: { active: boolean; label?: string }) => {
+        if (state.active) {
+          showShaderBusyOverlay(
+            state.label ?? "Compiling shader...",
+            "Shader preparation in progress.",
+          );
+        } else {
+          hideShaderBusyOverlay();
+        }
         setIsShaderCompiling(state.active);
         setShaderCompileLabel(state.active ? (state.label ?? "Compiling shader...") : "");
       };
-      await new Promise<void>((resolve) => {
-        window.requestAnimationFrame(() => resolve());
-      });
-      await new Promise<void>((resolve) => {
-        window.requestAnimationFrame(() => resolve());
-      });
       const pipeline = await TetoricaRetroVideoPipeline.create(
         gl,
         buildPipelineFilterState(),

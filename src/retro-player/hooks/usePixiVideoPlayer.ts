@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -18,8 +17,16 @@ import {
   resolveRecordingAudioSourceOrder,
 } from "../media/RetroAudioRouting";
 import type { RetroPlayerLocale } from "../types";
-import type { RetroVideoFilterState } from "../video/TetoricaRetroVideoPipeline";
-import { hideShaderBusyOverlay, showShaderBusyOverlay } from "../ui/shaderBusyOverlay";
+import {
+  isBeamCrossModeEnabled,
+  isPhosphorDotModeEnabled,
+  type RetroVideoFilterState,
+} from "../video/TetoricaRetroVideoPipeline";
+import {
+  hideShaderBusyOverlay,
+  showShaderBusyOverlay,
+  waitForShaderBusyOverlayPaint,
+} from "../ui/shaderBusyOverlay";
 
 let retroPlayerInstanceSeed = 0;
 const SHADER_BUSY_OVERLAY_DELAY_MS = 350;
@@ -43,6 +50,25 @@ const isShaderBusyLabel = (label: string) => {
     label.includes("リンク")
   );
 };
+
+const getVariantPreparationKey = (filterState: RetroVideoFilterState) => JSON.stringify({
+  paletteMode: filterState.paletteMode,
+  samplingMode: filterState.samplingMode,
+  isBeamMode: isBeamCrossModeEnabled(filterState),
+  isBeamCrtPreset:
+    filterState.phosphorDotShape === "beam" &&
+    filterState.selectedPreset === "crtBeam",
+  hasPhosphorPass:
+    filterState.phosphorStrength > 0.001 ||
+    filterState.spotMaskStrength > 0.001 ||
+    isPhosphorDotModeEnabled(filterState),
+  usesPreFilterDownscale:
+    filterState.preFilterDownscaleEnabled || isBeamCrossModeEnabled(filterState),
+  usesPostCurvature:
+    filterState.postCurvatureEnabled && filterState.curvature > 0.0001,
+  compositeEnabled:
+    filterState.compositeEnabled && filterState.compositeAmount > 0.001,
+});
 
 const hasAudibleMediaTrack = (
   media: HTMLMediaElement | null,
@@ -191,6 +217,10 @@ export function usePixiVideoPlayer(
   const pageTurnResetTimerRef = useRef<number | null>(null);
   const shaderBusyOverlayTimerRef = useRef<number | null>(null);
   const shaderBusyOverlayVisibleRef = useRef(false);
+  const variantPrepareInFlightRef = useRef<{
+    key: string;
+    promise: Promise<void>;
+  } | null>(null);
 
   const debugVideo = (label: string, payload?: Record<string, unknown>) => {
     if (!isRetroPlayerDebugEnabled()) {
@@ -585,31 +615,14 @@ export function usePixiVideoPlayer(
   ]);
 
   const beginLoading = (label: string) => {
-    flushSync(() => {
-      setLoadingLabel(label);
-      setIsLoading(true);
-    });
+    setLoadingLabel(label);
+    setIsLoading(true);
   };
 
   const finishLoading = () => {
-    flushSync(() => {
-      setIsLoading(false);
-      setLoadingLabel("");
-    });
+    setIsLoading(false);
+    setLoadingLabel("");
   };
-
-  const waitForLoadingPaint = useCallback(async () => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    await new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => resolve());
-    });
-    await new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => resolve());
-    });
-  }, []);
 
   const buildVariantPreparationState = useCallback((
     overrides?: Partial<RetroVideoFilterState>,
@@ -624,19 +637,10 @@ export function usePixiVideoPlayer(
     [buildVariantPreparationState],
   );
 
-  const currentVariantPreparationKey = useMemo(() => JSON.stringify({
-    paletteMode: currentVariantPreparationState.paletteMode,
-    samplingMode: currentVariantPreparationState.samplingMode,
-    phosphorDotShape: currentVariantPreparationState.phosphorDotShape,
-    phosphorStrength: currentVariantPreparationState.phosphorStrength,
-    spotMaskStrength: currentVariantPreparationState.spotMaskStrength,
-    compositeEnabled: currentVariantPreparationState.compositeEnabled,
-    compositeAmount: currentVariantPreparationState.compositeAmount,
-    selectedPreset: currentVariantPreparationState.selectedPreset,
-    preFilterDownscaleEnabled: currentVariantPreparationState.preFilterDownscaleEnabled,
-    postCurvatureEnabled: currentVariantPreparationState.postCurvatureEnabled,
-    curvature: currentVariantPreparationState.curvature,
-  }), [currentVariantPreparationState]);
+  const currentVariantPreparationKey = useMemo(
+    () => getVariantPreparationKey(currentVariantPreparationState),
+    [currentVariantPreparationState],
+  );
 
   const isFilterVariantPrepared = useCallback((overrides?: Partial<RetroVideoFilterState>) => {
     return hasPreparedFilterVariant(buildVariantPreparationState(overrides));
@@ -646,19 +650,49 @@ export function usePixiVideoPlayer(
     label: string,
     overrides?: Partial<RetroVideoFilterState>,
   ) => {
-    beginLoading(label);
+    const nextFilterState = buildVariantPreparationState(overrides);
+    const nextKey = getVariantPreparationKey(nextFilterState);
+    if (hasPreparedFilterVariant(nextFilterState)) {
+      return;
+    }
+
+    const existingPrepare = variantPrepareInFlightRef.current;
+    if (existingPrepare?.key === nextKey) {
+      await existingPrepare.promise;
+      return;
+    }
+
+    const preparePromise = (async () => {
+      beginLoading(label);
+      showShaderBusyOverlay(label, "Preparing filter state...");
+      try {
+        await waitForShaderBusyOverlayPaint();
+        await prepareFilterVariant(nextFilterState);
+      } finally {
+        hideShaderBusyOverlay();
+        finishLoading();
+      }
+    })();
+
+    variantPrepareInFlightRef.current = {
+      key: nextKey,
+      promise: preparePromise,
+    };
+
     try {
-      await waitForLoadingPaint();
-      await prepareFilterVariant(buildVariantPreparationState(overrides));
+      await preparePromise;
     } finally {
-      finishLoading();
+      if (variantPrepareInFlightRef.current?.key === nextKey) {
+        variantPrepareInFlightRef.current = null;
+      }
     }
   }, [
     beginLoading,
+    hasPreparedFilterVariant,
     buildVariantPreparationState,
     finishLoading,
     prepareFilterVariant,
-    waitForLoadingPaint,
+    variantPrepareInFlightRef,
   ]);
 
   const recoverAudioOutput = async (reason: string) => {
@@ -966,9 +1000,7 @@ export function usePixiVideoPlayer(
 
     void (async () => {
       try {
-        await runWithRenderPaused(async () => {
-          await prepareFilterVariantWithLabel(label);
-        });
+        await prepareFilterVariantWithLabel(label);
       } finally {
         genericVariantPrepareInFlightRef.current = false;
       }
@@ -984,7 +1016,6 @@ export function usePixiVideoPlayer(
     options?.requestedKind,
     prepareFilterVariantWithLabel,
     previewKind,
-    runWithRenderPaused,
     shouldUseNativeVisualSurface,
   ]);
 

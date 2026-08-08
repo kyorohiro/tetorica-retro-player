@@ -728,12 +728,6 @@ type SubmittedProgram = {
   fragmentShader: WebGLShader;
 };
 
-function waitForBrowserPaint(): Promise<void> {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => resolve());
-  });
-}
-
 function beginProgramCompile(
   gl: WebGL2RenderingContext,
 ): SubmittedProgram {
@@ -804,17 +798,15 @@ function logShaderCompileWarn(message: string) {
   console.warn(`WARN : DUPLICATE COMPILE SHADER : ${message}`);
 }
 
-// Wait for both programs to finish compiling, then verify link status.
-// Uses WEBGL_parallel_shader_compile for non-blocking polling when available.
-// Without the extension, yields via setTimeout so the UI can breathe, but the
-// final gl.getProgramParameter(LINK_STATUS) call is still synchronous on the GPU.
+// Verify link status after submitProgram() has already compiled and linked.
+// The LINK_STATUS readback itself can still block, but we no longer insert an
+// extra RAF here because the shader-busy overlay is now shown via direct DOM
+// writes before compilation starts.
 async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
   programs: WebGLProgram[],
 ): Promise<void> {
   void getParallelShaderCompileExtension;
-  // Let the browser paint once before the synchronous LINK_STATUS readback.
-  await waitForBrowserPaint();
 
   for (const program of programs) {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -899,6 +891,7 @@ export class TetoricaRetroVideoPipeline {
   private windowsLiteCompileScheduled = false;
   private supportProgramCompilePromise: Promise<void> | null = null;
   private supportProgramCompileScheduled = false;
+  private pendingSupportProgramFilterState: RetroVideoFilterState | null = null;
   private readonly windowsLiteProgramCache = new Map<
     WindowsLiteVariantKey,
     { pass1: WebGLProgram; pass2: WebGLProgram; beamKernel?: WebGLProgram }
@@ -1296,8 +1289,7 @@ export class TetoricaRetroVideoPipeline {
     }, 0);
   }
 
-  private async compileSupportProgramsForCurrentState() {
-    const filterState = this.currentFilterState;
+  private async compileSupportProgramsForFilterState(filterState: RetroVideoFilterState | null) {
     if (!filterState || this.isDisposed || this.gl.isContextLost()) {
       return;
     }
@@ -1329,7 +1321,9 @@ export class TetoricaRetroVideoPipeline {
 
       requestAnimationFrame(() => {
         this.supportProgramCompileScheduled = false;
-        this.supportProgramCompilePromise = this.compileSupportProgramsForCurrentState()
+        const pendingFilterState = this.pendingSupportProgramFilterState;
+        this.pendingSupportProgramFilterState = null;
+        this.supportProgramCompilePromise = this.compileSupportProgramsForFilterState(pendingFilterState)
           .catch((error) => {
             console.warn("[retro-player] support shader compile failed", error);
           })
@@ -1362,6 +1356,7 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
+    this.pendingSupportProgramFilterState = filterState;
     this.scheduleSupportProgramCompile();
   }
 
@@ -1785,7 +1780,19 @@ export class TetoricaRetroVideoPipeline {
     this.queueWindowsLiteVariant(filterState);
   }
 
+  private hasPreparedSupportProgramsForFilterState(filterState: RetroVideoFilterState) {
+    const needsBeamDownscale = shouldUsePreFilterDownscale(filterState);
+    const needsPostCurvature = shouldUsePostCurvaturePass(filterState);
+    const hasBeamDownscale = !needsBeamDownscale || (!!this.beamDownscaleProgram && !!this.beamDownscaleLocs);
+    const hasPostCurvature = !needsPostCurvature || (!!this.postCurvatureProgram && !!this.postCurvatureLocs);
+    return hasBeamDownscale && hasPostCurvature;
+  }
+
   hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
+    if (!this.hasPreparedSupportProgramsForFilterState(filterState)) {
+      return false;
+    }
+
     if (!this.windowsLiteMode) {
       return true;
     }
@@ -1794,18 +1801,18 @@ export class TetoricaRetroVideoPipeline {
   }
 
   async prepareFilterStateVariant(filterState: RetroVideoFilterState) {
-    const previousFilterState = this.currentFilterState;
-    this.currentFilterState = filterState;
-
     try {
-      await this.compileSupportProgramsForCurrentState();
+      await this.compileSupportProgramsForFilterState(filterState);
       if (!this.windowsLiteMode) {
+        this.onCompileStateChange?.({ active: false });
         return;
       }
 
       await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
-    } finally {
-      this.currentFilterState = previousFilterState;
+      this.onCompileStateChange?.({ active: false });
+    } catch (error) {
+      this.onCompileStateChange?.({ active: false });
+      throw error;
     }
   }
 
