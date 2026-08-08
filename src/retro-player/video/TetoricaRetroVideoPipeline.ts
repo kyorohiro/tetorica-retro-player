@@ -1560,6 +1560,18 @@ export class TetoricaRetroVideoPipeline {
     logShaderCompileInfo(key);
   }
 
+  private reserveCompileTurn() {
+    const waitForCompileTurn = this.windowsLiteCompileSerialPromise.catch(() => {});
+    let releaseCompileTurn!: () => void;
+    this.windowsLiteCompileSerialPromise = new Promise<void>((resolve) => {
+      releaseCompileTurn = resolve;
+    });
+    return {
+      waitForCompileTurn,
+      releaseCompileTurn,
+    };
+  }
+
   private async updateCompileState(label: string) {
     this.onCompileStateChange?.({ active: true, label });
     await waitForCompileStatusPaint();
@@ -1752,11 +1764,7 @@ export class TetoricaRetroVideoPipeline {
       throw new Error("Pipeline was disposed before shader compile started.");
     }
 
-    const waitForCompileTurn = this.windowsLiteCompileSerialPromise.catch(() => {});
-    let releaseCompileTurn!: () => void;
-    this.windowsLiteCompileSerialPromise = new Promise<void>((resolve) => {
-      releaseCompileTurn = resolve;
-    });
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
 
     const compilePromise = (async () => {
       await waitForCompileTurn;
@@ -2056,23 +2064,30 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
-    await this.updateCompileState("Compiling shader (beam downscale)...");
-    logShaderCompileInfo("base:beamDownscale");
-    const program = submitProgram(
-      this.gl,
-      VERTEX_SHADER_SOURCE,
-      BEAM_SOURCE_DOWNSCALE_FRAGMENT,
-    );
-    await this.updateCompileState("Linking shader (beam downscale)...");
-    await waitAndVerifyPrograms(this.gl, [program]);
-    this.beamDownscaleProgram = program;
-    this.gl.useProgram(program);
-    this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
-    this.beamDownscaleLocs = {
-      uTexture: this.gl.getUniformLocation(program, "uTexture"),
-      uSourceSize: this.gl.getUniformLocation(program, "uSourceSize"),
-      uTargetSize: this.gl.getUniformLocation(program, "uTargetSize"),
-    };
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
+    await waitForCompileTurn;
+
+    try {
+      await this.updateCompileState("Compiling shader (beam downscale)...");
+      logShaderCompileInfo("base:beamDownscale");
+      const program = submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        BEAM_SOURCE_DOWNSCALE_FRAGMENT,
+      );
+      await this.updateCompileState("Linking shader (beam downscale)...");
+      await waitAndVerifyPrograms(this.gl, [program]);
+      this.beamDownscaleProgram = program;
+      this.gl.useProgram(program);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
+      this.beamDownscaleLocs = {
+        uTexture: this.gl.getUniformLocation(program, "uTexture"),
+        uSourceSize: this.gl.getUniformLocation(program, "uSourceSize"),
+        uTargetSize: this.gl.getUniformLocation(program, "uTargetSize"),
+      };
+    } finally {
+      releaseCompileTurn();
+    }
   }
 
   private async ensurePostCurvatureProgram() {
@@ -2080,22 +2095,29 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
-    await this.updateCompileState("Compiling shader (post curvature)...");
-    logShaderCompileInfo("base:postCurvature");
-    const program = submitProgram(
-      this.gl,
-      VERTEX_SHADER_SOURCE,
-      POST_CURVATURE_FRAGMENT,
-    );
-    await this.updateCompileState("Linking shader (post curvature)...");
-    await waitAndVerifyPrograms(this.gl, [program]);
-    this.postCurvatureProgram = program;
-    this.gl.useProgram(program);
-    this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
-    this.postCurvatureLocs = {
-      uTexture: this.gl.getUniformLocation(program, "uTexture"),
-      uCurvature: this.gl.getUniformLocation(program, "uCurvature"),
-    };
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
+    await waitForCompileTurn;
+
+    try {
+      await this.updateCompileState("Compiling shader (post curvature)...");
+      logShaderCompileInfo("base:postCurvature");
+      const program = submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        POST_CURVATURE_FRAGMENT,
+      );
+      await this.updateCompileState("Linking shader (post curvature)...");
+      await waitAndVerifyPrograms(this.gl, [program]);
+      this.postCurvatureProgram = program;
+      this.gl.useProgram(program);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
+      this.postCurvatureLocs = {
+        uTexture: this.gl.getUniformLocation(program, "uTexture"),
+        uCurvature: this.gl.getUniformLocation(program, "uCurvature"),
+      };
+    } finally {
+      releaseCompileTurn();
+    }
   }
 
   private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
