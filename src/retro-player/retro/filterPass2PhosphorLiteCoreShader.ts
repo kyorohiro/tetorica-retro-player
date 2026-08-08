@@ -591,6 +591,103 @@ void main(void)
         uSpotMaskStrength *
         (0.14 + phosphorBrightness * 0.24 + neighborBlendMix * 0.08 + internalScaleMix * 0.1);
       phosphorColor += bloomSample * leakStrength;
+
+      float strongLightLeak = smoothstep(0.72, 1.0, phosphorBrightness) * smoothstep(0.42, 0.92, uBulbRadius);
+      float overlapRadius = 1.04 + uBulbRadius * 4.2 + phosphorBrightness * 0.64 + strongLightLeak * 0.22;
+      vec2 rightNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x - 1.0, cellUv.y * aspectCompensation)
+        : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y);
+      vec2 leftNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x + 1.0, cellUv.y * aspectCompensation)
+        : vec2((cellUv.x + 1.0) / aspectCompensation, cellUv.y);
+      vec2 downNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x, (cellUv.y - 1.0) * aspectCompensation)
+        : vec2(cellUv.x / aspectCompensation, cellUv.y - 1.0);
+      vec2 upNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x, (cellUv.y + 1.0) * aspectCompensation)
+        : vec2(cellUv.x / aspectCompensation, cellUv.y + 1.0);
+      vec2 downRightNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x - 1.0, (cellUv.y - 1.0) * aspectCompensation)
+        : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y - 1.0);
+      vec2 downLeftNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x + 1.0, (cellUv.y - 1.0) * aspectCompensation)
+        : vec2((cellUv.x + 1.0) / aspectCompensation, cellUv.y - 1.0);
+      vec2 upRightNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x - 1.0, (cellUv.y + 1.0) * aspectCompensation)
+        : vec2((cellUv.x - 1.0) / aspectCompensation, cellUv.y + 1.0);
+      vec2 upLeftNeighborUv = pixelAspect >= 1.0
+        ? vec2(cellUv.x + 1.0, (cellUv.y + 1.0) * aspectCompensation)
+        : vec2((cellUv.x + 1.0) / aspectCompensation, cellUv.y + 1.0);
+      float rightNeighborHalo = exp(-pow(length(rightNeighborUv) / overlapRadius, 2.0));
+      float leftNeighborHalo = exp(-pow(length(leftNeighborUv) / overlapRadius, 2.0));
+      float downNeighborHalo = exp(-pow(length(downNeighborUv) / overlapRadius, 2.0));
+      float upNeighborHalo = exp(-pow(length(upNeighborUv) / overlapRadius, 2.0));
+      float downRightNeighborHalo = exp(-pow(length(downRightNeighborUv) / overlapRadius, 2.0));
+      float downLeftNeighborHalo = exp(-pow(length(downLeftNeighborUv) / overlapRadius, 2.0));
+      float upRightNeighborHalo = exp(-pow(length(upRightNeighborUv) / overlapRadius, 2.0));
+      float upLeftNeighborHalo = exp(-pow(length(upLeftNeighborUv) / overlapRadius, 2.0));
+      vec3 overlapHalo =
+        rightColor * rightNeighborHalo +
+        leftColor * leftNeighborHalo +
+        downColor * downNeighborHalo +
+        upColor * upNeighborHalo +
+        texture(uPass1Texture, clamp((cell + vec2(1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downRightNeighborHalo * 0.75 +
+        texture(uPass1Texture, clamp((cell + vec2(-1.0, 1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * downLeftNeighborHalo * 0.75 +
+        texture(uPass1Texture, clamp((cell + vec2(1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upRightNeighborHalo * 0.75 +
+        texture(uPass1Texture, clamp((cell + vec2(-1.0, -1.0) + 0.5) / uTargetSize, vec2(0.0), vec2(1.0))).rgb * upLeftNeighborHalo * 0.75;
+      phosphorColor += overlapHalo * uSpotMaskStrength * (0.18 + phosphorBrightness * 0.3 + strongLightLeak * 0.08);
+
+      float bulbSpread = smoothstep(0.18, 0.62, uBulbRadius);
+      float leakDotRadius = mix(
+        uBulbRadius * 0.14,
+        uBulbRadius * (0.64 + smoothstep(0.68, 1.0, phosphorBrightness) * 0.24),
+        pow(phosphorBrightness, 0.7)
+      );
+      vec2 globalCellUv = curvedUv * uTargetSize;
+      vec3 emitterLeak = vec3(0.0);
+      float emitterWeight = 0.0;
+      for (int oy = -1; oy <= 1; oy++) {
+        for (int ox = -1; ox <= 1; ox++) {
+          vec2 emitterOffset = vec2(float(ox), float(oy));
+          vec2 emitterCell = cell + emitterOffset;
+          vec2 emitterSampleUv = clamp((emitterCell + 0.5) / uTargetSize, vec2(0.0), vec2(1.0));
+          vec3 emitterColor = texture(uPass1Texture, emitterSampleUv).rgb;
+          float emitterBrightness = max(max(emitterColor.r, emitterColor.g), emitterColor.b);
+          float emitterRadius =
+            0.28 +
+            uBulbRadius * 1.62 +
+            emitterBrightness * (1.0 + uBulbRadius * 0.78) +
+            highlightBloom * 0.24 +
+            strongLightLeak * 0.24;
+          vec2 emitterUv = globalCellUv - (emitterCell + 0.5);
+          emitterUv = pixelAspect >= 1.0
+            ? vec2(emitterUv.x, emitterUv.y * aspectCompensation)
+            : vec2(emitterUv.x / aspectCompensation, emitterUv.y);
+          float emitterDist = length(emitterUv);
+          float emitterGlow =
+            exp(-pow(emitterDist / max(emitterRadius, 0.0001), 2.0)) *
+            (1.0 - smoothstep(emitterRadius * 1.08, emitterRadius * 1.9, emitterDist));
+          float axialWeight = (ox == 0 || oy == 0) ? 1.0 : 0.78;
+          float weight = emitterGlow * axialWeight * smoothstep(0.16, 1.0, emitterBrightness);
+          emitterLeak += emitterColor * weight;
+          emitterWeight += weight;
+        }
+      }
+      vec3 circularEmitterLeak = emitterLeak / max(emitterWeight, 0.0001);
+      float centerLeakMask =
+        1.0 -
+        smoothstep(leakDotRadius * (0.24 + bulbSpread * 0.04), leakDotRadius * (0.76 + bulbSpread * 0.16) + 0.08, dist);
+      vec3 brightCoreBody =
+        circularEmitterLeak *
+        uSpotMaskStrength *
+        (0.72 + phosphorBrightness * 1.02 + uBulbRadius * 0.64 + strongLightLeak * 0.14);
+      brightCoreBody += mixedSourceColor * centerLeakMask * (0.28 + phosphorBrightness * 0.32);
+      float bubbleField = clamp(emitterWeight * (0.28 + bulbSpread * 0.46 + strongLightLeak * 0.14), 0.0, 1.0);
+      phosphorColor = mix(
+        phosphorColor,
+        max(phosphorColor, brightCoreBody),
+        clamp(bubbleField * (0.36 + bulbSpread * 0.34 + strongLightLeak * 0.12), 0.0, 1.0)
+      );
     }
 
     bool useSquareShape = uPhosphorDotShape > 2.5;

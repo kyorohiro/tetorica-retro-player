@@ -1,136 +1,193 @@
 # Savepoint
 
-Last updated: 2026-08-04
+Last updated: 2026-08-08
 
 ## For You
 
-- 今の主目的は、`Render cap` が `ON` の時に出る phosphor / beam 系のモアレを減らしつつ、`pin / fit width / normal / maximize` で表示差が出ないようにすることです。
-- 大きな前進はありました。
-  - `pin / fit width / normal / maximize` ごとの表示差はかなり消えた
-  - `CAP` 絡みの大きなモアレはかなり減った
-- ただし完全には終わっていません。
-  - `Fit Width` と `Maximize` ではまだモアレが少し残ることがある
-- 時間優先の暫定として、beam の最小セルサイズを `CAP 設定 ON` の時だけ強める案を入れました。
-  - `Math.max(isCapEnabled ? 1.6 : 1.2, filterState.beamWhiteBloom * 0.6)`
-  - これは根本解決ではなく、急ぎの逃がしです
+- 今日は主に 2 系統進みました。
+  - shader compile / linking の重さと見え方の整理
+  - `PIN / Fit Width / More` など toolbar ボタンの誤操作対策
+- `beam` と `phosphor dot` は、重い shader を少しずつ物理分割する方向で進めています。
+- `PIN` ボタンが `通常 -> PIN -> 通常` とすぐ戻る問題は、共通の long-press / short-press 処理に手を入れて対策済みです。
 
 ## For Codex
 
 ### Current Goal
 
-- `Render cap` が有効な時の phosphor / beam モアレを抑える
-- そのうえで `pin / fit width / normal / maximize` の見た目差をなくす
-- 条件分岐を増やしすぎず、計算経路をなるべく一本化する
+- `CRT Beam NTSC` / `phosphor dot` の compile / linking まわりをさらに軽くする
+- compile 中表示をちゃんと見えるように保つ
+- toolbar の long-press 系ボタンの誤タップ・二重発火を抑える
 
-### What Was Actually Broken
+## Shader Related
 
-- 問題の本丸は `CAP` そのものではなく、`CAP` 時に使われるサイズ情報が経路ごとに少しずれていたこと
-- 特にずれていたもの
-  - CSS の実表示サイズ
-  - shader に渡す `uDisplaySize`
-  - viewport / visible size
-  - `getEffectiveRetroTargetSize(...)` が見るサイズ
-- このズレがあると、`pin` では綺麗なのに `normal` や `maximize` でモアレや横線が出る
+### What Was Done
 
-### What Helped
+#### 1. `basic_composite` / `pc98_composite` を中間 pass 化
 
-#### 1. CAP 後の表示サイズに収束させるようにした
-
-- `src/retro-player/hooks/useRetroPixiStage.ts`
-- `resolveCanvasSizing(...)` を追加
-- `cap 判定 -> 実際の表示サイズ -> その表示サイズで再計算` を最大 3 回まわして収束させるようにした
-- これで
-  - 最初は `CAP対象`
-  - でも実際には少し縮小され、その縮小後サイズなら `CAP不要`
-  の自己矛盾が減った
-
-#### 2. CSS 表示サイズと shader の表示サイズを揃えた
-
-- `src/retro-player/hooks/useRetroPixiStage.ts`
-  - `snapCssToDevicePixel(...)` を追加
-  - `left/top/width/height` を `devicePixelRatio` 格子に寄せる
+- `pass1 -> composite mid -> pass2`
+- 追加:
+  - `src/retro-player/retro/filterPass1LiteBaseShader.ts`
+  - `src/retro-player/retro/filterPassCompositeMidShader.ts`
 - `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
-  - `displaySizeOverride` を追加
-  - `uDisplaySize` が `canvas.clientWidth/clientHeight` 直読みではなく、stage 側で確定したサイズを見るようにした
+  - `compositeMidProgram`
+  - `compositeMidFbo`
+  - compile cache / render path / dispose 対応済み
 
-#### 3. 実測後に 1 回再反映するようにした
+#### 2. `beam_crt` を 3 段化
 
-- `src/retro-player/hooks/useRetroPixiStage.ts`
-- style 適用後、次フレームで `app.canvas.clientWidth/clientHeight` を測り直し
-- もし意図したサイズと違っていたら、その実測値を `displaySizeOverride` に再反映して再描画
-- これで `devtools 上は同じサイズに見えるのに線が出る` 問題がかなり減った
+- いまの構成:
+  - `pass1 -> beam kernel -> beam compose -> pass2(post)`
+- 追加:
+  - `src/retro-player/retro/filterPass2BeamLiteCrtKernelShader.ts`
+  - `src/retro-player/retro/filterPass2BeamLiteCrtComposeShader.ts`
+  - `src/retro-player/retro/filterPass2BeamLiteCrtPostShader.ts`
+- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+  - `beamKernelProgram`
+  - `beamComposeProgram`
+  - `beamKernelFbo`
+  - `beamComposeFbo`
+  - compile cache / render path / dispose 対応済み
 
-#### 4. viewport / target 計算も同じ表示サイズを見るようにした
+#### 3. `phosphor dot` を 2 段化
+
+- いまの構成:
+  - `pass1 -> phosphor core -> pass2(post)`
+- 追加:
+  - `src/retro-player/retro/filterPass2PhosphorLiteCoreShader.ts`
+- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+  - `phosphorCoreProgram`
+  - `phosphorCoreFbo`
+  - `phosphorCore` の compile cache / render path / dispose 対応済み
+- 現状の `pass2(post)` は `FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST` を流用
+  - scanline / vignette / basic color / reflective / face glow を担当
+
+#### 4. compile 表示の改善
+
+- `src/retro-player/components/RetroPreviewView.tsx`
+  - compile 中は preparing overlay ではなく `shaderCompileLabel` を表示するようにした
+- `src/retro-player/hooks/usePixiVideoPlayer.ts`
+  - `shaderCompileLabel` を player に返す
+  - `isShaderCompiling` 中は busy overlay を遅延なしで即表示
+  - `prepareFilterVariantWithLabel(...)` の `waitForShaderBusyOverlayPaint()` を外した
+- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+  - `updateCompileState(...)` で compile / link ラベルを出す
+  - support shader (`beam downscale`, `post curvature`) も同じ経路でラベル更新
+
+#### 5. compile の直列化
 
 - `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
-- `getEffectiveViewportFloorSize()` も `displaySizeOverride` ベースにした
-- これで `uDisplaySize` だけでなく `getEffectiveRetroTargetSize(...)` に入る visible size も統一された
+  - `reserveCompileTurn()` を追加
+  - variant compile だけでなく support shader compile も同じ直列 turn に載せた
+- 目的:
+  - `Linking shader (beam downscale)...` が前の compile 待ちを背負って見える状態を減らす
 
-#### 5. maximize 専用の古い freeze 経路を外した
+### What We Learned
 
-- `src/retro-player/hooks/useRetroPixiStage.ts`
-- `windowedCanvasSize` を使う maximize 専用 freeze を削除
-- `pin / fit width / normal / maximize` を同じ cap ロジックに寄せた
+- `beam downscale` shader 自体は小さい
+- それでも `Linking shader (beam downscale)...` が重く見えるのは、`LINK_STATUS` readback がドライバ待ちを背負う可能性が高い
+- `CRT Beam NTSC` の `Preparing...` が長いのは、shader compile そのものより前に
+  - full preset lock
+  - overlay 表示
+  - renderer init / prepare route
+  - support compile scheduling
+  が重なって見えていた
 
-### What Did Not Work / Avoid
+### What Still Looks Incomplete
 
-#### 1. CAP を避けるために cap 値そのものを大きくする
+#### 1. `CRT Beam NTSC` の `Preparing...`
 
-- 例:
-  - beam cap を `960x720` から `1280x720` にする
-- これは現象が出にくくなるだけで、根本原因の追跡を邪魔する
-- ユーザーから「そこを変えないで」と明示あり
+- 少しは短くしたが、まだ compile 前に長く感じる可能性あり
+- 次に見る場所:
+  - `src/retro-player/components/RetroPlayer.tsx`
+    - `prepareVariantIfNeeded(...)`
+    - `runWithFullPresetLock(...)`
+  - `src/retro-player/hooks/useRetroPixiStage.ts`
+    - `prepareFilterVariant(...)`
+    - `initPixi()`
 
-#### 2. mode ごとに条件分岐を足してモアレを抑える
+#### 2. `beam downscale` / `post curvature` が本当に遅いのかの切り分け
 
-- 例:
-  - `Fit Width / Maximize` の時だけ別計算
-  - `CAP active` の時だけ target 密度をさらに弱める guard
-- ユーザーから「条件を増やすと問題が解決しないからやめて」と明示あり
-- 今後も原則避ける
+- 今は直列化まで入れた段階
+- まだ重いなら、support compile の前後に計測ログを入れて
+  - compile submit が重いのか
+  - `waitAndVerifyPrograms()` が重いのか
+  を切り分ける
 
-#### 3. `isCapActive` を後段だけで使う
+#### 3. `phosphor dot` の体感改善確認
 
-- `Math.max(isCapActive ? 1.6 : 1.2, ...)` は、一部経路でしか同じ条件にならずズレる
-- 実際に
-  - `1.6 / 1.6` だとモアレが出ない
-  - `1.6 / 1.2` だとモアレが出る
-  という確認があった
-- 理由:
-  - stage 側の `getEffectiveRetroTargetSize(...)`
-  - pipeline 側の `getEffectiveRetroTargetSize(...)`
-  で条件が揃わないと破綻する
+- コード上は 2 段化済み
+- まだ実機で
+  - `Compiling shader (... / phosphor core)...`
+  - `Linking shader (... / phosphor core)...`
+  の待ち方がどう変わったか確認していない
 
-### Current Temporary Behavior
+## LongPress Related
 
-- いまは時間優先の暫定として、`CAP 設定 ON` を条件に beam の `baseMinCellPixels` を変える形にしている
-- 場所:
-  - `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
-  - `getPhosphorDotViewportLimitedSize(...)`
-  - `getEffectiveRetroTargetSize(...)`
-  - `setFilterBufferCap(...)`
-- 重要:
-  - `CAP active` ではなく `CAP setting ON` を使っている
-  - stage 側と pipeline 側の両方で同じ条件になるように揃えた
+### What Was Broken
 
-### Files Touched Recently
+- `PIN` ボタンを 1 回タップしても
+  - `通常 -> PIN -> 通常`
+  のようにすぐ戻ることがあった
+- ユーザーの推測どおり、tap 後にレイアウトが変わったあと、後続の `click` が別位置で拾われるような ghost click / 二重発火の可能性が高かった
+- 同じ `useLongPress` を使う
+  - `PIN`
+  - `Fit Width`
+  - `More`
+  - `Hi-res`
+  - `Power`
+  などでも同系統の問題が起こりうる
 
-- `src/retro-player/hooks/useRetroPixiStage.ts`
+### What Was Done
+
+- `src/retro-player/hooks/useLongPress.ts`
+  - pointer short press 確定時に
+    - `preventDefault()`
+    - `stopPropagation()`
+  - `lastPointerShortPressAt` を追加
+  - `750ms` 以内の後続 `click` は ghost click とみなして無視
+
+### What To Verify Next
+
+- `PIN`
+- `Fit Width`
+- `More`
+- `Hi-res`
+- `Power`
+
+で
+
+- 短押しが 1 回だけ反応するか
+- 長押し popover が壊れていないか
+- desktop mouse / touch の両方で問題ないか
+
+## Files Touched Recently
+
 - `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
+- `src/retro-player/hooks/usePixiVideoPlayer.ts`
+- `src/retro-player/hooks/useLongPress.ts`
+- `src/retro-player/retro/filterPass2PhosphorLiteCoreShader.ts`
+- `src/retro-player/retro/filterPass2BeamLiteCrtComposeShader.ts`
+- `src/retro-player/retro/filterPass2BeamLiteCrtPostShader.ts`
+- `src/retro-player/retro/filterPass2BeamLiteCrtKernelShader.ts`
+- `src/retro-player/retro/filterPassCompositeMidShader.ts`
+- `src/retro-player/retro/filterPass1LiteBaseShader.ts`
+- `src/retro-player/components/RetroPreviewView.tsx`
 
-### Validation Status
+## Validation Status
 
-- `npm run build -- --mode development` passed
+- `npm run build -- --mode development` passed after each main step
 
-### Most Important Takeaways
+## Recommended Next Steps
 
-- モアレの主因は `CAP` の有無より、`CAP 時に見るサイズが経路ごとにずれていたこと`
-- `pin / fit width / normal / maximize` の表示差は、表示サイズ情報の統一でかなり消せた
-- 条件分岐を増やすより、同じ値を全経路で使う方が効いた
-- `CAP setting ON` を使う暫定はありだが、根本解決ではない
-
-### Likely Next Steps
-
-1. `CAP setting ON` による暫定がどこまで許容できるか確認する
-2. 本当に根本から直すなら、`getEffectiveRetroTargetSize(...)` を呼ぶ経路をさらに整理して、`CAP前提の target 計算` を 1 箇所に寄せる
-3. beam / phosphor の「見た目密度」と「buffer size 制限」を別概念として整理する
+1. 実機で `CRT Beam NTSC` を押して
+   - `Preparing...`
+   - `Compiling shader (...)...`
+   - `Linking shader (...)...`
+   のどこが長いか再確認する
+2. `phosphor dot` の compile 待ちが本当に軽くなったか確認する
+3. `PIN / Fit Width / More` のチャタリングが止まったか確認する
+4. まだ `Preparing...` が長いなら
+   - `prepareVariantIfNeeded(...)`
+   - `prepareFilterVariant(...)`
+   - `initPixi()`
+   に時間計測ログを足してボトルネックを切る
