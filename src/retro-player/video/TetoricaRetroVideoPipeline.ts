@@ -371,6 +371,16 @@ const QUAD_VERTICES = new Float32Array([
 const nowMs = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
+const waitForCompileStatusPaint = async () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    window.setTimeout(() => resolve(), 16);
+  });
+};
+
 type WindowsLitePass1Variant =
   | "basic_nearest"
   | "basic"
@@ -1346,6 +1356,11 @@ export class TetoricaRetroVideoPipeline {
     logShaderCompileInfo(key);
   }
 
+  private async updateCompileState(label: string) {
+    this.onCompileStateChange?.({ active: true, label });
+    await waitForCompileStatusPaint();
+  }
+
   private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
     if (!this.windowsLiteMode || this.isDisposed) {
       return;
@@ -1562,7 +1577,7 @@ export class TetoricaRetroVideoPipeline {
           : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
         : null;
 
-      this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / pass 1)...` });
+      await this.updateCompileState(`Compiling shader (${variantKey} / pass 1)...`);
       this.logProgramCompile(`variant:${variantKey}:pass1`);
       const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1Source);
       let compositeMidProgram: WebGLProgram | null = null;
@@ -1570,25 +1585,25 @@ export class TetoricaRetroVideoPipeline {
       let beamKernelProgram: WebGLProgram | null = null;
 
       try {
-        this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / pass 1)...` });
+        await this.updateCompileState(`Linking shader (${variantKey} / pass 1)...`);
         await waitAndVerifyPrograms(this.gl, [pass1Program]);
         if (compositeMidSource) {
-          this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / composite mid)...` });
+          await this.updateCompileState(`Compiling shader (${variantKey} / composite mid)...`);
           this.logProgramCompile(`variant:${variantKey}:compositeMid`);
           compositeMidProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, compositeMidSource);
-          this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / composite mid)...` });
+          await this.updateCompileState(`Linking shader (${variantKey} / composite mid)...`);
           await waitAndVerifyPrograms(this.gl, [compositeMidProgram]);
         }
-        this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / pass 2)...` });
+        await this.updateCompileState(`Compiling shader (${variantKey} / pass 2)...`);
         this.logProgramCompile(`variant:${variantKey}:pass2`);
         pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2Source);
-        this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / pass 2)...` });
+        await this.updateCompileState(`Linking shader (${variantKey} / pass 2)...`);
         await waitAndVerifyPrograms(this.gl, [pass2Program]);
         if (beamKernelSource) {
-          this.onCompileStateChange?.({ active: true, label: `Compiling shader (${variantKey} / beam kernel)...` });
+          await this.updateCompileState(`Compiling shader (${variantKey} / beam kernel)...`);
           this.logProgramCompile(`variant:${variantKey}:beamKernel`);
           beamKernelProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamKernelSource);
-          this.onCompileStateChange?.({ active: true, label: `Linking shader (${variantKey} / beam kernel)...` });
+          await this.updateCompileState(`Linking shader (${variantKey} / beam kernel)...`);
           await waitAndVerifyPrograms(this.gl, [beamKernelProgram]);
         }
         if (this.isDisposed || this.gl.isContextLost()) {

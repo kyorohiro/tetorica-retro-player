@@ -101,6 +101,7 @@ export type RetroPreviewPlayerSlice = {
   isPoweredOn: boolean;
   isLoading: boolean;
   isShaderCompiling: boolean;
+  shaderCompileLabel: string;
   isBuffering: boolean;
   loadingLabel: string;
   needsUserPlay: boolean;
@@ -778,7 +779,9 @@ export function RetroPreviewView({
     !player.previewError &&
     player.isLoading;
   const shouldShowInteractionLockOverlay =
-    interactionLocked && Boolean(interactionLockLabel);
+    interactionLocked &&
+    !player.isShaderCompiling &&
+    Boolean(interactionLockLabel);
 
   React.useEffect(() => {
     if (!isImagePreviewRequested) {
@@ -1393,7 +1396,9 @@ export function RetroPreviewView({
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
                   <LoadingRingIndicator />
                   <p className="font-medium">
-                    {player.loadingLabel || "Loading preview..."}
+                    {player.isShaderCompiling
+                      ? (player.shaderCompileLabel || "Compiling shader...")
+                      : (player.loadingLabel || "Loading preview...")}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     Please wait while the preview is prepared.
