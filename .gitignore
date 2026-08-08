@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 
 target
+src-tauri/binaries/_ffmpeg-aarch64-apple-darwin
