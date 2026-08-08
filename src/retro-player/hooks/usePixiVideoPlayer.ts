@@ -1870,6 +1870,12 @@ export function usePixiVideoPlayer(
       return;
     }
 
+    if (isShaderCompiling) {
+      showShaderBusyOverlay(nextShaderBusyLabel);
+      shaderBusyOverlayVisibleRef.current = true;
+      return;
+    }
+
     shaderBusyOverlayTimerRef.current = window.setTimeout(() => {
       shaderBusyOverlayTimerRef.current = null;
       showShaderBusyOverlay(nextShaderBusyLabel);
