@@ -680,7 +680,7 @@ export function RetroPlayer({
       }
 
       const selectedPreset: RetroPresetDefinition = RETRO_PRESETS[presetKey];
-      const presetVariantOverrides = buildRetroPresetVariantPreparation(selectedPreset);
+      const presetVariantOverrides = buildRetroPresetVariantPreparation(presetKey, selectedPreset);
       const prepared = await prepareVariantIfNeeded({
         title: selectedPreset.label,
         label: selectedPreset.label,
@@ -732,10 +732,15 @@ export function RetroPlayer({
     }
 
     const beamVariantOverrides = {
+      selectedPreset: filterState.selectedPreset,
       paletteMode: filterState.paletteMode,
+      samplingMode: filterState.samplingMode,
+      curvature: filterState.curvature,
+      postCurvatureEnabled: filterState.postCurvatureEnabled,
       phosphorDotShape: "beam" as const,
       phosphorStrength: filterState.phosphorStrength,
       spotMaskStrength: filterState.spotMaskStrength,
+      preFilterDownscaleEnabled: filterState.preFilterDownscaleEnabled,
       compositeEnabled: filterState.compositeEnabled,
       compositeAmount: filterState.compositeAmount,
     };
@@ -768,10 +773,15 @@ export function RetroPlayer({
     }
 
     const compositeVariantOverrides = {
+      selectedPreset: filterState.selectedPreset,
       paletteMode: filterState.paletteMode,
+      samplingMode: filterState.samplingMode,
+      curvature: filterState.curvature,
+      postCurvatureEnabled: filterState.postCurvatureEnabled,
       phosphorDotShape: filterState.phosphorDotShape,
       phosphorStrength: filterState.phosphorStrength,
       spotMaskStrength: filterState.spotMaskStrength,
+      preFilterDownscaleEnabled: filterState.preFilterDownscaleEnabled,
       compositeEnabled: true,
       compositeAmount: Math.max(filterState.compositeAmount, 0.01),
     };

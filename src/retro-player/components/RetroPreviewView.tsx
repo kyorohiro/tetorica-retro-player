@@ -28,6 +28,26 @@ import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
 import type { RetroGameControls } from "../types/gameControls";
 import { AudioSpectrum } from "./AudioSpectrum";
 
+function LoadingRingIndicator({
+  size = "md",
+  tone = "emerald",
+}: {
+  size?: "sm" | "md";
+  tone?: "emerald" | "slate";
+}) {
+  const frameClass = size === "sm" ? "h-5 w-5" : "h-8 w-8";
+  const ringClass =
+    tone === "slate"
+      ? "border-slate-500 border-t-transparent"
+      : "border-emerald-400 border-t-transparent";
+
+  return (
+    <div className={`relative mx-auto mb-3 ${frameClass} animate-spin`} aria-hidden="true">
+      <div className={`h-full w-full rounded-full border-2 ${ringClass}`} />
+    </div>
+  );
+}
+
 const FULL_MODE_CONFIRMED_PERSISTENT_STORAGE_KEY =
   "tetorica-retro-player.full-mode-confirmed.persisted";
 const FULL_MODE_CONFIRMED_SESSION_STORAGE_KEY =
@@ -1337,7 +1357,7 @@ export function RetroPreviewView({
                 <div className="w-[min(92%,28rem)] rounded-2xl border border-emerald-500/25 bg-slate-900/92 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
                   {isStartingPlay ? (
                     <>
-                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                      <LoadingRingIndicator />
                       <p className="text-sm text-slate-400">Starting playback…</p>
                     </>
                   ) : (
@@ -1365,43 +1385,43 @@ export function RetroPreviewView({
                       </button>
                     </>
                   )}
-        </div>
-        {shouldShowGlobalCompileOverlay && typeof document !== "undefined" && createPortal(
-          <div className="pointer-events-none fixed inset-0 z-[450] flex items-center justify-center bg-slate-950/72">
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
-              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
-              <p className="font-medium">
-                {player.loadingLabel || "Loading preview..."}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Please wait while the preview is prepared.
-              </p>
-            </div>
-          </div>,
-          document.body,
-        )}
-        {shouldShowInteractionLockOverlay && typeof document !== "undefined" && createPortal(
-          <div className="pointer-events-none fixed inset-0 z-[460] flex items-center justify-center bg-slate-950/72">
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
-              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#cac0b2] border-t-[#111014]" />
-              <p className="font-medium">
-                {interactionLockLabel}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Please wait while the shader is prepared.
-              </p>
-            </div>
-          </div>,
-          document.body,
-        )}
-      </div>
+                </div>
+              </div>
+            )}
+            {shouldShowGlobalCompileOverlay && typeof document !== "undefined" && createPortal(
+              <div className="pointer-events-none fixed inset-0 z-[450] flex items-center justify-center bg-slate-950/72">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
+                  <LoadingRingIndicator />
+                  <p className="font-medium">
+                    {player.loadingLabel || "Loading preview..."}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Please wait while the preview is prepared.
+                  </p>
+                </div>
+              </div>,
+              document.body,
+            )}
+            {shouldShowInteractionLockOverlay && typeof document !== "undefined" && createPortal(
+              <div className="pointer-events-none fixed inset-0 z-[460] flex items-center justify-center bg-slate-950/72">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/90 px-5 py-4 text-center text-sm text-slate-200 shadow-lg">
+                  <LoadingRingIndicator />
+                  <p className="font-medium">
+                    {interactionLockLabel}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Please wait while the shader is prepared.
+                  </p>
+                </div>
+              </div>,
+              document.body,
             )}
             {showRetryOverlay && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/52">
                 <div className="w-[min(92%,30rem)] rounded-2xl border border-rose-500/25 bg-slate-900/94 px-6 py-5 text-center text-slate-200 shadow-lg backdrop-blur-sm">
                   {isStartingPlay ? (
                     <>
-                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                      <LoadingRingIndicator />
                       <p className="text-sm text-slate-400">Retrying playback…</p>
                     </>
                   ) : (
@@ -1433,7 +1453,7 @@ export function RetroPreviewView({
             {player.isBuffering && player.isPlaying && !player.isLoading && !player.needsUserPlay && (
               <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                 <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 px-4 py-3 text-center text-xs text-slate-300 backdrop-blur-sm">
-                  <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-slate-500 border-t-sky-400" />
+                  <LoadingRingIndicator size="sm" tone="slate" />
                   Buffering…
                 </div>
               </div>

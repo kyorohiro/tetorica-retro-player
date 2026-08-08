@@ -142,10 +142,15 @@ export type RetroPresetDefinition = {
 export type RetroPresetRenderMode = "lite" | "full";
 
 export type RetroPresetVariantPreparation = {
+  selectedPreset?: RetroPresetKey | null;
   paletteMode: PaletteMode;
+  samplingMode: TargetSamplingMode;
+  curvature: number;
+  postCurvatureEnabled: boolean;
   phosphorDotShape: PhosphorDotShape;
   phosphorStrength: number;
   spotMaskStrength: number;
+  preFilterDownscaleEnabled: boolean;
   compositeEnabled: boolean;
   compositeAmount: number;
 };
@@ -1229,12 +1234,18 @@ export const defaultPresetId: RetroPresetKey = "phosphorDot";
 // デフォルト候補: "phosphorDot";//"tetorica";
 
 export const buildRetroPresetVariantPreparation = (
+  presetKey: RetroPresetKey,
   preset: RetroPresetDefinition,
 ): RetroPresetVariantPreparation => ({
+  selectedPreset: presetKey,
   paletteMode: preset.palette,
+  samplingMode: preset.samplingMode ?? "nearest",
+  curvature: preset.curvature,
+  postCurvatureEnabled: preset.postCurvatureEnabled ?? false,
   phosphorDotShape: preset.phosphorDotShape ?? "circle",
   phosphorStrength: preset.phosphor,
   spotMaskStrength: preset.spotMask,
+  preFilterDownscaleEnabled: preset.preFilterDownscaleEnabled ?? false,
   compositeEnabled: preset.compositeEnabled ?? false,
   compositeAmount: preset.compositeAmount ?? 0,
 });
@@ -1259,7 +1270,7 @@ export const resolveRetroPresetRenderMode = (
     return "full";
   }
 
-  const variant = buildRetroPresetVariantPreparation(preset);
+  const variant = buildRetroPresetVariantPreparation("none", preset);
   const isBeamMode = variant.phosphorDotShape === "beam";
   const hasComposite = variant.compositeEnabled && variant.compositeAmount > 0.001;
   return isBeamMode || hasComposite ? "full" : "lite";

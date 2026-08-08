@@ -658,7 +658,15 @@ export function usePixiVideoPlayer(
 
     const existingPrepare = variantPrepareInFlightRef.current;
     if (existingPrepare?.key === nextKey) {
-      await existingPrepare.promise;
+      beginLoading(label);
+      showShaderBusyOverlay(label, "Preparing filter state...");
+      try {
+        await waitForShaderBusyOverlayPaint();
+        await existingPrepare.promise;
+      } finally {
+        hideShaderBusyOverlay();
+        finishLoading();
+      }
       return;
     }
 

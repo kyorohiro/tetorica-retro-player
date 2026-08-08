@@ -42,8 +42,9 @@ const ensureShaderBusyOverlay = () => {
   spinner.style.width = "30px";
   spinner.style.height = "30px";
   spinner.style.borderRadius = "9999px";
-  spinner.style.border = "2px solid #cac0b2";
-  spinner.style.borderTopColor = "#111014";
+  spinner.style.background = "conic-gradient(from 0deg, transparent 0deg 18deg, #34d399 18deg 360deg)";
+  spinner.style.webkitMask = "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))";
+  spinner.style.mask = "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))";
   spinner.style.willChange = "transform";
   spinner.style.transform = "translateZ(0)";
   spinner.style.animation = "retro-player-shader-busy-spin 0.9s linear infinite";
@@ -134,6 +135,6 @@ export const waitForShaderBusyOverlayPaint = async () => {
   }
 
   await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
+    window.setTimeout(() => resolve(), 32);
   });
 };
