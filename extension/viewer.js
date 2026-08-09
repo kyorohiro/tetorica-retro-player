@@ -504,7 +504,7 @@ function drawFrame() {
       gl.clearColor(0.01, 0.02, 0.01, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
-    if (beamKernelProgram && beamKernelUniformLocations && beamComposeProgram && beamComposeUniformLocations) {
+    if (beamKernelProgram && beamKernelUniformLocations) {
       ensureBeamKernelFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.bindFramebuffer(gl.FRAMEBUFFER, beamKernelFbo);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -515,20 +515,21 @@ function drawFrame() {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, beamSourcePrimaryTexture);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-      ensureBeamComposeFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, beamComposeFbo);
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.clearColor(0, 0, 0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.useProgram(beamComposeProgram);
-      applyBeamComposeSettings(limitedSize);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, beamSourcePrimaryTexture);
-      gl.activeTexture(gl.TEXTURE2);
-      gl.bindTexture(gl.TEXTURE_2D, beamKernelTexture);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-      pass2PrimaryTexture = beamComposeTexture;
+      if (beamComposeProgram && beamComposeUniformLocations) {
+        ensureBeamComposeFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, beamComposeFbo);
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(beamComposeProgram);
+        applyBeamComposeSettings(limitedSize);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, beamSourcePrimaryTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, beamKernelTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        pass2PrimaryTexture = beamComposeTexture;
+      }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.clearColor(0.01, 0.02, 0.01, 1);

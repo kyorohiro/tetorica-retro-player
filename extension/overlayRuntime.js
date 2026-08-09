@@ -1202,9 +1202,7 @@ function createOverlay(settings) {
 
         if (
           surface.renderer.beamKernelProgram &&
-          surface.renderer.beamKernelUniformLocations &&
-          surface.renderer.beamComposeProgram &&
-          surface.renderer.beamComposeUniformLocations
+          surface.renderer.beamKernelUniformLocations
         ) {
           ensureBeamKernelFramebuffer(surface.gl, surface.renderer, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
           surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.beamKernelFbo);
@@ -1216,20 +1214,24 @@ function createOverlay(settings) {
           surface.gl.activeTexture(surface.gl.TEXTURE1);
           surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
           surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
-
-          ensureBeamComposeFramebuffer(surface.gl, surface.renderer, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
-          surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.beamComposeFbo);
-          surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
-          surface.gl.clearColor(0, 0, 0, 1);
-          surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
-          surface.gl.useProgram(surface.renderer.beamComposeProgram);
-          applyBeamComposeSettings(surface.gl, surface.renderer, limitedSize, currentSettings);
-          surface.gl.activeTexture(surface.gl.TEXTURE1);
-          surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
-          surface.gl.activeTexture(surface.gl.TEXTURE2);
-          surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
-          surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
-          pass2PrimaryTexture = surface.renderer.beamComposeTexture;
+          if (
+            surface.renderer.beamComposeProgram &&
+            surface.renderer.beamComposeUniformLocations
+          ) {
+            ensureBeamComposeFramebuffer(surface.gl, surface.renderer, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+            surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.beamComposeFbo);
+            surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+            surface.gl.clearColor(0, 0, 0, 1);
+            surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
+            surface.gl.useProgram(surface.renderer.beamComposeProgram);
+            applyBeamComposeSettings(surface.gl, surface.renderer, limitedSize, currentSettings);
+            surface.gl.activeTexture(surface.gl.TEXTURE1);
+            surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
+            surface.gl.activeTexture(surface.gl.TEXTURE2);
+            surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
+            surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+            pass2PrimaryTexture = surface.renderer.beamComposeTexture;
+          }
         }
 
         surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, null);
@@ -2985,11 +2987,11 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     webgl.useProgram(prog2);
     webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
     const sourceTextureLocation = webgl.getUniformLocation(prog2, "uSourceTexture");
-    if (sourceTextureLocation) {
+    if (sourceTextureLocation != null) {
       webgl.uniform1i(sourceTextureLocation, 1);
     }
     const beamKernelTextureLocation = webgl.getUniformLocation(prog2, "uBeamKernelTexture");
-    if (beamKernelTextureLocation) {
+    if (beamKernelTextureLocation != null) {
       webgl.uniform1i(beamKernelTextureLocation, 2);
     }
     renderer.uniformLocations = {

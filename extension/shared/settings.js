@@ -1127,12 +1127,30 @@ export const DEFAULT_SETTINGS = {
   scanlineBrightnessFade: 0.6,
   vignetteStrength: 0.11,
   glowStrength: 0.1,
+  horizontalSharpness: 0.0,
+  rgbConvergenceOffset: 0.0,
   phosphorStrength: 0.05,
   spotMaskStrength: 0.0,
   phosphorDotMode: false,
   phosphorDotShape: "circle",
   bulbRadius: 0.22,
   blackFloor: 0.01,
+  basicContrast: 1.0,
+  basicSaturation: 1.0,
+  reflectiveLcdBase: 0.0,
+  lightDependentTint: 0.0,
+  grainVisibilityMode: false,
+  beamDarkCutoff: 0.0,
+  beamHorizontalSpread: 0.5,
+  beamStripeStrength: 0.0,
+  beamWhiteBloom: 1.0,
+  beamWarmBloom: 0.0,
+  screenFaceGlow: 0.0,
+  focusStrength: 0.0,
+  focusSizeX: 0.35,
+  focusSizeY: 0.2,
+  focusCenterX: 0.5,
+  focusCenterY: 0.5,
   lumaAmount: 1.0,
   lumaLow: 0.0,
   lumaHigh: 1.0,
@@ -1144,10 +1162,12 @@ export const DEFAULT_SETTINGS = {
   outputBrightness: 1.0,
   phosphorDotLightBalance: 1.0,
   phosphorDotInternalScale: 1,
+  phosphorDotSizeResponse: 1.0,
   phosphorDotBrightCore: false,
   phosphorDotCellFill: 0.0,
   phosphorDotFlatDisc: false,
   phosphorDotNeighborBlend: false,
+  phosphorDotGrainStrength: 0.0,
   closeUpNoiseStrength: 0.0,
   smoothStrength: 0.0,
   toonSteps: 0,
@@ -1158,6 +1178,7 @@ export const DEFAULT_SETTINGS = {
   neonSaturation: 1.0,
   neonDetail: 1.0,
   colorLevels: 32,
+  preFilterDownscaleEnabled: false,
   overlayTargetCount: 1,
   overlayVideo: true,
   overlayImage: true,
@@ -1294,6 +1315,14 @@ export function normalizeSettings(candidate) {
       typeof candidate?.glowStrength === "number"
         ? clamp(candidate.glowStrength, 0, 0.5)
         : basePresetSettings.glowStrength,
+    horizontalSharpness:
+      typeof candidate?.horizontalSharpness === "number"
+        ? clamp(candidate.horizontalSharpness, 0, 2)
+        : basePresetSettings.horizontalSharpness ?? DEFAULT_SETTINGS.horizontalSharpness,
+    rgbConvergenceOffset:
+      typeof candidate?.rgbConvergenceOffset === "number"
+        ? clamp(candidate.rgbConvergenceOffset, 0, 1)
+        : basePresetSettings.rgbConvergenceOffset ?? DEFAULT_SETTINGS.rgbConvergenceOffset,
     phosphorStrength:
       typeof candidate?.phosphorStrength === "number"
         ? clamp(candidate.phosphorStrength, 0, 0.5)
@@ -1318,6 +1347,74 @@ export function normalizeSettings(candidate) {
       typeof candidate?.blackFloor === "number"
         ? clamp(candidate.blackFloor, 0, 0.5)
         : basePresetSettings.blackFloor ?? DEFAULT_SETTINGS.blackFloor,
+    basicContrast:
+      typeof candidate?.basicContrast === "number"
+        ? clamp(candidate.basicContrast, 0, 2)
+        : basePresetSettings.basicContrast ?? DEFAULT_SETTINGS.basicContrast,
+    basicSaturation:
+      typeof candidate?.basicSaturation === "number"
+        ? clamp(candidate.basicSaturation, 0, 2)
+        : basePresetSettings.basicSaturation ?? DEFAULT_SETTINGS.basicSaturation,
+    reflectiveLcdBase:
+      typeof candidate?.reflectiveLcdBase === "number"
+        ? clamp(candidate.reflectiveLcdBase, 0, 1)
+        : basePresetSettings.reflectiveLcdBase ?? DEFAULT_SETTINGS.reflectiveLcdBase,
+    lightDependentTint:
+      typeof candidate?.lightDependentTint === "number"
+        ? clamp(candidate.lightDependentTint, 0, 1)
+        : basePresetSettings.lightDependentTint ?? DEFAULT_SETTINGS.lightDependentTint,
+    grainVisibilityMode:
+      typeof candidate?.grainVisibilityMode === "boolean"
+        ? candidate.grainVisibilityMode
+        : basePresetSettings.grainVisibilityMode ?? DEFAULT_SETTINGS.grainVisibilityMode,
+    beamDarkCutoff:
+      typeof candidate?.beamDarkCutoff === "number"
+        ? clamp(candidate.beamDarkCutoff, 0, 0.15)
+        : basePresetSettings.beamDarkCutoff ?? DEFAULT_SETTINGS.beamDarkCutoff,
+    beamHorizontalSpread:
+      typeof candidate?.beamHorizontalSpread === "number"
+        ? clamp(candidate.beamHorizontalSpread, 0.5, 2)
+        : basePresetSettings.beamHorizontalSpread ?? DEFAULT_SETTINGS.beamHorizontalSpread,
+    beamStripeStrength:
+      typeof candidate?.beamStripeStrength === "number"
+        ? clamp(candidate.beamStripeStrength, 0, 2)
+        : basePresetSettings.beamStripeStrength ?? DEFAULT_SETTINGS.beamStripeStrength,
+    beamWhiteBloom:
+      typeof candidate?.beamWhiteBloom === "number"
+        ? clamp(candidate.beamWhiteBloom, 0, 2)
+        : basePresetSettings.beamWhiteBloom ?? DEFAULT_SETTINGS.beamWhiteBloom,
+    beamWarmBloom:
+      typeof candidate?.beamWarmBloom === "number"
+        ? clamp(candidate.beamWarmBloom, 0, 1.5)
+        : basePresetSettings.beamWarmBloom ?? DEFAULT_SETTINGS.beamWarmBloom,
+    screenFaceGlow:
+      typeof candidate?.screenFaceGlow === "number"
+        ? clamp(candidate.screenFaceGlow, 0, 0.5)
+        : basePresetSettings.screenFaceGlow ?? DEFAULT_SETTINGS.screenFaceGlow,
+    focusStrength:
+      typeof candidate?.focusStrength === "number"
+        ? clamp(candidate.focusStrength, 0, 1)
+        : basePresetSettings.focusStrength ?? DEFAULT_SETTINGS.focusStrength,
+    focusSizeX:
+      typeof candidate?.focusSizeX === "number"
+        ? clamp(candidate.focusSizeX, 0, 1)
+        : typeof candidate?.focusWidth === "number"
+          ? clamp(candidate.focusWidth, 0, 1)
+          : basePresetSettings.focusSizeX ?? basePresetSettings.focusWidth ?? DEFAULT_SETTINGS.focusSizeX,
+    focusSizeY:
+      typeof candidate?.focusSizeY === "number"
+        ? clamp(candidate.focusSizeY, 0, 1)
+        : typeof candidate?.focusHeight === "number"
+          ? clamp(candidate.focusHeight, 0, 1)
+          : basePresetSettings.focusSizeY ?? basePresetSettings.focusHeight ?? DEFAULT_SETTINGS.focusSizeY,
+    focusCenterX:
+      typeof candidate?.focusCenterX === "number"
+        ? clamp(candidate.focusCenterX, 0, 1)
+        : basePresetSettings.focusCenterX ?? DEFAULT_SETTINGS.focusCenterX,
+    focusCenterY:
+      typeof candidate?.focusCenterY === "number"
+        ? clamp(candidate.focusCenterY, 0, 1)
+        : basePresetSettings.focusCenterY ?? DEFAULT_SETTINGS.focusCenterY,
     lumaAmount:
       typeof candidate?.lumaAmount === "number"
         ? clamp(candidate.lumaAmount, 0, 2)
@@ -1363,6 +1460,10 @@ export function normalizeSettings(candidate) {
         candidate?.phosphorDotInternalScale,
         basePresetSettings.phosphorDotInternalScale ?? DEFAULT_SETTINGS.phosphorDotInternalScale,
       ),
+    phosphorDotSizeResponse:
+      typeof candidate?.phosphorDotSizeResponse === "number"
+        ? clamp(candidate.phosphorDotSizeResponse, 0, 2)
+        : basePresetSettings.phosphorDotSizeResponse ?? DEFAULT_SETTINGS.phosphorDotSizeResponse,
     phosphorDotBrightCore:
       typeof candidate?.phosphorDotBrightCore === "boolean"
         ? candidate.phosphorDotBrightCore
@@ -1379,6 +1480,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.phosphorDotNeighborBlend === "boolean"
         ? candidate.phosphorDotNeighborBlend
         : basePresetSettings.phosphorDotNeighborBlend ?? DEFAULT_SETTINGS.phosphorDotNeighborBlend,
+    phosphorDotGrainStrength:
+      typeof candidate?.phosphorDotGrainStrength === "number"
+        ? clamp(candidate.phosphorDotGrainStrength, 0, 1)
+        : basePresetSettings.phosphorDotGrainStrength ?? DEFAULT_SETTINGS.phosphorDotGrainStrength,
     closeUpNoiseStrength:
       typeof candidate?.closeUpNoiseStrength === "number"
         ? clamp(candidate.closeUpNoiseStrength, 0, 2)
@@ -1416,6 +1521,10 @@ export function normalizeSettings(candidate) {
         ? clamp(candidate.neonDetail, 0, 2)
         : basePresetSettings.neonDetail ?? DEFAULT_SETTINGS.neonDetail,
     colorLevels: resolvedColorLevels,
+    preFilterDownscaleEnabled:
+      typeof candidate?.preFilterDownscaleEnabled === "boolean"
+        ? candidate.preFilterDownscaleEnabled
+        : basePresetSettings.preFilterDownscaleEnabled ?? DEFAULT_SETTINGS.preFilterDownscaleEnabled,
     overlayTargetCount:
       typeof candidate?.overlayTargetCount === "number"
         ? clamp(
@@ -1557,6 +1666,14 @@ export function applyPresetToSettings(presetKey) {
         : DEFAULT_SETTINGS.scanlineBrightnessFade,
     vignetteStrength: preset.vignetteStrength,
     glowStrength: preset.glowStrength,
+    horizontalSharpness:
+      typeof preset.horizontalSharpness === "number"
+        ? preset.horizontalSharpness
+        : DEFAULT_SETTINGS.horizontalSharpness,
+    rgbConvergenceOffset:
+      typeof preset.rgbConvergenceOffset === "number"
+        ? preset.rgbConvergenceOffset
+        : DEFAULT_SETTINGS.rgbConvergenceOffset,
     phosphorStrength: preset.phosphorStrength,
     spotMaskStrength:
       typeof preset.spotMaskStrength === "number"
@@ -1578,6 +1695,74 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.blackFloor === "number"
         ? preset.blackFloor
         : DEFAULT_SETTINGS.blackFloor,
+    basicContrast:
+      typeof preset.basicContrast === "number"
+        ? preset.basicContrast
+        : DEFAULT_SETTINGS.basicContrast,
+    basicSaturation:
+      typeof preset.basicSaturation === "number"
+        ? preset.basicSaturation
+        : DEFAULT_SETTINGS.basicSaturation,
+    reflectiveLcdBase:
+      typeof preset.reflectiveLcdBase === "number"
+        ? preset.reflectiveLcdBase
+        : DEFAULT_SETTINGS.reflectiveLcdBase,
+    lightDependentTint:
+      typeof preset.lightDependentTint === "number"
+        ? preset.lightDependentTint
+        : DEFAULT_SETTINGS.lightDependentTint,
+    grainVisibilityMode:
+      typeof preset.grainVisibilityMode === "boolean"
+        ? preset.grainVisibilityMode
+        : DEFAULT_SETTINGS.grainVisibilityMode,
+    beamDarkCutoff:
+      typeof preset.beamDarkCutoff === "number"
+        ? preset.beamDarkCutoff
+        : DEFAULT_SETTINGS.beamDarkCutoff,
+    beamHorizontalSpread:
+      typeof preset.beamHorizontalSpread === "number"
+        ? preset.beamHorizontalSpread
+        : DEFAULT_SETTINGS.beamHorizontalSpread,
+    beamStripeStrength:
+      typeof preset.beamStripeStrength === "number"
+        ? preset.beamStripeStrength
+        : DEFAULT_SETTINGS.beamStripeStrength,
+    beamWhiteBloom:
+      typeof preset.beamWhiteBloom === "number"
+        ? preset.beamWhiteBloom
+        : DEFAULT_SETTINGS.beamWhiteBloom,
+    beamWarmBloom:
+      typeof preset.beamWarmBloom === "number"
+        ? preset.beamWarmBloom
+        : DEFAULT_SETTINGS.beamWarmBloom,
+    screenFaceGlow:
+      typeof preset.screenFaceGlow === "number"
+        ? preset.screenFaceGlow
+        : DEFAULT_SETTINGS.screenFaceGlow,
+    focusStrength:
+      typeof preset.focusStrength === "number"
+        ? preset.focusStrength
+        : DEFAULT_SETTINGS.focusStrength,
+    focusSizeX:
+      typeof preset.focusSizeX === "number"
+        ? preset.focusSizeX
+        : typeof preset.focusWidth === "number"
+          ? preset.focusWidth
+          : DEFAULT_SETTINGS.focusSizeX,
+    focusSizeY:
+      typeof preset.focusSizeY === "number"
+        ? preset.focusSizeY
+        : typeof preset.focusHeight === "number"
+          ? preset.focusHeight
+          : DEFAULT_SETTINGS.focusSizeY,
+    focusCenterX:
+      typeof preset.focusCenterX === "number"
+        ? preset.focusCenterX
+        : DEFAULT_SETTINGS.focusCenterX,
+    focusCenterY:
+      typeof preset.focusCenterY === "number"
+        ? preset.focusCenterY
+        : DEFAULT_SETTINGS.focusCenterY,
     lumaAmount:
       typeof preset.lumaAmount === "number"
         ? preset.lumaAmount
@@ -1623,6 +1808,10 @@ export function applyPresetToSettings(presetKey) {
         preset.phosphorDotInternalScale,
         DEFAULT_SETTINGS.phosphorDotInternalScale,
       ),
+    phosphorDotSizeResponse:
+      typeof preset.phosphorDotSizeResponse === "number"
+        ? preset.phosphorDotSizeResponse
+        : DEFAULT_SETTINGS.phosphorDotSizeResponse,
     phosphorDotBrightCore:
       typeof preset.phosphorDotBrightCore === "boolean"
         ? preset.phosphorDotBrightCore
@@ -1639,6 +1828,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.phosphorDotNeighborBlend === "boolean"
         ? preset.phosphorDotNeighborBlend
         : DEFAULT_SETTINGS.phosphorDotNeighborBlend,
+    phosphorDotGrainStrength:
+      typeof preset.phosphorDotGrainStrength === "number"
+        ? preset.phosphorDotGrainStrength
+        : DEFAULT_SETTINGS.phosphorDotGrainStrength,
     monoTint: preset.monoTint,
     neonBoost:
       typeof preset.neonBoost === "number"
@@ -1652,6 +1845,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.neonDetail === "number"
         ? preset.neonDetail
         : DEFAULT_SETTINGS.neonDetail,
+    preFilterDownscaleEnabled:
+      typeof preset.preFilterDownscaleEnabled === "boolean"
+        ? preset.preFilterDownscaleEnabled
+        : DEFAULT_SETTINGS.preFilterDownscaleEnabled,
     closeUpNoiseStrength:
       typeof preset.closeUpNoiseStrength === "number"
         ? preset.closeUpNoiseStrength
