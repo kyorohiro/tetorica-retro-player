@@ -1,7 +1,18 @@
 import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
+import { FILTER_FRAGMENT_PASS1_LITE_BASE } from "./shared/filterPass1LiteBaseShader.js";
+import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "./shared/filterPass1LiteNearestShader.js";
+import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "./shared/filterPass1LiteSimpleShader.js";
 import { FILTER_FRAGMENT_PASS2_LITE } from "./shared/filterPass2LiteShader.js";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "./shared/filterPass2BeamLiteShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "./shared/filterPass2BeamLiteCompositeShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "./shared/filterPass2BeamLiteKernelShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "./shared/filterPass2BeamLiteSimpleShader.js";
+import { FILTER_FRAGMENT_BEAM_SOURCE_DOWNSCALE } from "./shared/filterBeamSourceDownscaleShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "./shared/filterPass2BeamLiteCrtKernelShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE } from "./shared/filterPass2BeamLiteCrtComposeShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "./shared/filterPass2BeamLiteCrtPostShader.js";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "./shared/filterPass1Pc98LiteShader.js";
+import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "./shared/filterPass1Pc98LiteNearestShader.js";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "./shared/filterPass2PhosphorLiteShader.js";
 import {
   CUSTOM_PRESET_KEY,
@@ -56,6 +67,24 @@ let mediaSourceNode = null;
 let audioEngine = null;
 let uniformLocations = null;
 let pass1UniformLocations = null;
+let beamKernelProgram = null;
+let beamComposeProgram = null;
+let beamDownscaleProgram = null;
+let beamKernelUniformLocations = null;
+let beamComposeUniformLocations = null;
+let beamDownscaleUniformLocations = null;
+let beamSourceFbo = null;
+let beamSourceTexture = null;
+let beamSourceFboWidth = 0;
+let beamSourceFboHeight = 0;
+let beamKernelFbo = null;
+let beamKernelTexture = null;
+let beamKernelFboWidth = 0;
+let beamKernelFboHeight = 0;
+let beamComposeFbo = null;
+let beamComposeTexture = null;
+let beamComposeFboWidth = 0;
+let beamComposeFboHeight = 0;
 let startedAt = performance.now();
 let currentSettings = { ...DEFAULT_SETTINGS };
 let currentSession = null;
@@ -99,19 +128,69 @@ function isPhosphorDotModeEnabled(settings) {
     );
 }
 
-function getWindowsLiteShaderSources(settings) {
+function shouldUsePreFilterDownscale(settings) {
+  return !!settings.preFilterDownscaleEnabled || isBeamCrossModeEnabled(settings);
+}
+
+function getWindowsLiteVariantKey(settings) {
   const pass1 = isPc98PaletteMode(settings.paletteMode)
-    ? FILTER_FRAGMENT_PASS1_PC98_LITE
-    : FILTER_FRAGMENT_PASS1_LITE;
-  const pass2 = isBeamCrossModeEnabled(settings)
-    ? FILTER_FRAGMENT_PASS2_BEAM_LITE
-    :
-    settings.phosphorStrength > 0.001
-    || settings.spotMaskStrength > 0.001
-    || isPhosphorDotModeEnabled(settings)
-      ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
-      : FILTER_FRAGMENT_PASS2_LITE;
-  return { pass1, pass2 };
+    ? "pc98"
+    : settings.presetKey === "crtBeam"
+      ? "basic_nearest"
+      : "basic";
+
+  if (isBeamCrossModeEnabled(settings)) {
+    if (settings.presetKey === "crtBeam") {
+      return "basic_nearest:beam_crt";
+    }
+    return `${pass1}:beam_full`;
+  }
+
+  const pass2 =
+    settings.phosphorStrength > 0.001 ||
+    settings.spotMaskStrength > 0.001 ||
+    isPhosphorDotModeEnabled(settings)
+      ? "phosphor"
+      : "basic";
+
+  return `${pass1}:${pass2}`;
+}
+
+function getWindowsLiteShaderSources(settings) {
+  const variantKey = getWindowsLiteVariantKey(settings);
+  const [pass1Variant, pass2Variant] = variantKey.split(":");
+  const pass1 =
+    pass1Variant === "pc98_nearest"
+      ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
+      : pass1Variant === "pc98"
+        ? FILTER_FRAGMENT_PASS1_PC98_LITE
+        : pass1Variant === "basic_nearest"
+          ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
+          : pass1Variant === "basic"
+            ? FILTER_FRAGMENT_PASS1_LITE_BASE
+            : FILTER_FRAGMENT_PASS1_LITE_SIMPLE;
+  const pass2 =
+    pass2Variant === "beam_simple"
+      ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
+      : pass2Variant === "beam_crt"
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
+        : pass2Variant === "beam_full"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE
+          : pass2Variant === "phosphor"
+            ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
+            : FILTER_FRAGMENT_PASS2_LITE;
+  return {
+    pass1,
+    pass2,
+    beamDownscale: shouldUsePreFilterDownscale(settings) ? FILTER_FRAGMENT_BEAM_SOURCE_DOWNSCALE : null,
+    beamKernel:
+      pass2Variant === "beam_crt"
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
+        : pass2Variant === "beam_full"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+          : null,
+    beamCompose: pass2Variant === "beam_crt" ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE : null,
+  };
 }
 
 function logViewerAudioRecovery(label, payload = {}, level = "info") {
@@ -386,6 +465,8 @@ function drawFrame() {
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
   if (program && uniformLocations && pass1Program && pass1UniformLocations) {
+    applyPass1Settings();
+    applyPass2Settings();
     ensureFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -399,12 +480,71 @@ function drawFrame() {
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.clearColor(0.01, 0.02, 0.01, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
+    const limitedSize = getPhosphorDotLimitedTargetSize(currentSettings, getDisplaySize().width, getDisplaySize().height);
+    const timeSec = (performance.now() - startedAt) / 1000;
+    let pass2PrimaryTexture = fboTexture;
+    let beamSourcePrimaryTexture = texture;
+    if (beamDownscaleProgram && beamDownscaleUniformLocations) {
+      ensureBeamSourceFramebuffer(limitedSize.w, limitedSize.h);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, beamSourceFbo);
+      gl.viewport(0, 0, limitedSize.w, limitedSize.h);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(beamDownscaleProgram);
+      gl.uniform2f(beamDownscaleUniformLocations.uSourceSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
+      gl.uniform2f(beamDownscaleUniformLocations.uTargetSize, Math.max(limitedSize.w, 1), Math.max(limitedSize.h, 1));
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, fboTexture);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      beamSourcePrimaryTexture = beamSourceTexture;
+      pass2PrimaryTexture = beamSourceTexture;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0.01, 0.02, 0.01, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    if (beamKernelProgram && beamKernelUniformLocations && beamComposeProgram && beamComposeUniformLocations) {
+      ensureBeamKernelFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, beamKernelFbo);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(beamKernelProgram);
+      applyBeamKernelSettings(limitedSize);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, beamSourcePrimaryTexture);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      ensureBeamComposeFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, beamComposeFbo);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(beamComposeProgram);
+      applyBeamComposeSettings(limitedSize);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, beamSourcePrimaryTexture);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, beamKernelTexture);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      pass2PrimaryTexture = beamComposeTexture;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0.01, 0.02, 0.01, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+
     gl.useProgram(program);
-    gl.uniform1f(uniformLocations.uTime, (performance.now() - startedAt) / 1000);
+    gl.uniform1f(uniformLocations.uTime, timeSec);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, fboTexture);
+    gl.bindTexture(gl.TEXTURE_2D, pass2PrimaryTexture);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindTexture(gl.TEXTURE_2D, beamSourcePrimaryTexture);
+    if (beamKernelTexture) {
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, beamKernelTexture);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.activeTexture(gl.TEXTURE0);
   } else {
@@ -649,13 +789,7 @@ function getSessionAspectRatio() {
     return null;
   }
 
-  const viewportAspect =
-    currentSession.sourceViewportWidth / currentSession.sourceViewportHeight;
-  const widthAdjustedAspect = currentSession?.sourceOuterWidth
-    ? currentSession.sourceOuterWidth / currentSession.sourceViewportHeight
-    : null;
-
-  return Math.max(viewportAspect, widthAdjustedAspect ?? 0);
+  return currentSession.sourceViewportWidth / currentSession.sourceViewportHeight;
 }
 
 function updateCanvasAspectRatio() {
@@ -813,6 +947,62 @@ function applyPass2Settings() {
   );
   gl.uniform1f(uniformLocations.uPhosphorDotGrainStrength, currentSettings.phosphorDotGrainStrength ?? 0);
   gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, currentSettings.closeUpNoiseStrength);
+}
+
+function applyBeamKernelSettings(limitedSize) {
+  if (!gl || !beamKernelProgram || !beamKernelUniformLocations) return;
+  const displaySize = getDisplaySize();
+  gl.useProgram(beamKernelProgram);
+  gl.uniform2f(beamKernelUniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
+  gl.uniform2f(beamKernelUniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  gl.uniform1f(beamKernelUniformLocations.uColorLevels, Math.max(currentSettings.colorLevels, 2));
+  gl.uniform1f(beamKernelUniformLocations.uDitherStrength, currentSettings.ditherStrength);
+  gl.uniform1f(beamKernelUniformLocations.uSamplingMode, 0);
+  gl.uniform1f(beamKernelUniformLocations.uHorizontalSharpness, currentSettings.horizontalSharpness ?? 0);
+  gl.uniform1f(beamKernelUniformLocations.uRgbConvergenceOffset, currentSettings.rgbConvergenceOffset ?? 0);
+  gl.uniform1f(beamKernelUniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
+  gl.uniform1f(beamKernelUniformLocations.uCurvature, currentSettings.curvature ?? 0);
+  gl.uniform1f(beamKernelUniformLocations.uBeamDarkCutoff, currentSettings.beamDarkCutoff ?? 0);
+  gl.uniform1f(beamKernelUniformLocations.uBeamHorizontalSpread, currentSettings.beamHorizontalSpread ?? 0.5);
+  gl.uniform1f(beamKernelUniformLocations.uBeamWhiteBloom, currentSettings.beamWhiteBloom ?? 1);
+}
+
+function applyBeamComposeSettings(limitedSize) {
+  if (!gl || !beamComposeProgram || !beamComposeUniformLocations) return;
+  const displaySize = getDisplaySize();
+  gl.useProgram(beamComposeProgram);
+  gl.uniform2f(beamComposeUniformLocations.uTargetSize, Math.max(currentSettings.targetWidth, 1), Math.max(currentSettings.targetHeight, 1));
+  gl.uniform2f(beamComposeUniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
+  gl.uniform2f(beamComposeUniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  gl.uniform2f(beamComposeUniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
+  gl.uniform1f(beamComposeUniformLocations.uSamplingMode, 0);
+  gl.uniform1f(beamComposeUniformLocations.uRgbConvergenceOffset, currentSettings.rgbConvergenceOffset ?? 0);
+  gl.uniform1f(beamComposeUniformLocations.uCurvature, currentSettings.curvature ?? 0);
+  gl.uniform1f(beamComposeUniformLocations.uBeamStripeStrength, currentSettings.beamStripeStrength ?? 0);
+  gl.uniform1f(beamComposeUniformLocations.uBeamWhiteBloom, currentSettings.beamWhiteBloom ?? 1);
+  gl.uniform1f(beamComposeUniformLocations.uBeamWarmBloom, currentSettings.beamWarmBloom ?? 0);
+}
+
+function ensureBeamSourceFramebuffer(width, height) {
+  if (!gl) return;
+  if (beamSourceFbo && beamSourceTexture && beamSourceFboWidth === width && beamSourceFboHeight === height) {
+    return;
+  }
+  if (beamSourceFbo) gl.deleteFramebuffer(beamSourceFbo);
+  if (beamSourceTexture) gl.deleteTexture(beamSourceTexture);
+  beamSourceTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, beamSourceTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  beamSourceFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, beamSourceFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, beamSourceTexture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  beamSourceFboWidth = width;
+  beamSourceFboHeight = height;
 }
 
 function updateAudioNodes() {
@@ -1047,6 +1237,37 @@ function setupRenderer(webgl) {
 }
 
 async function finalizeFilterProgram(webgl, prog1, prog2) {
+  const shaderSources = getWindowsLiteShaderSources(currentSettings);
+  const beamDownscaleFrag = shaderSources.beamDownscale
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamDownscale)
+    : null;
+  const beamKernelFrag = shaderSources.beamKernel
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamKernel)
+    : null;
+  const beamComposeFrag = shaderSources.beamCompose
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamCompose)
+    : null;
+  const beamDownscaleProg = beamDownscaleFrag ? webgl.createProgram() : null;
+  const beamKernelProg = beamKernelFrag ? webgl.createProgram() : null;
+  const beamComposeProg = beamComposeFrag ? webgl.createProgram() : null;
+  if ((beamDownscaleFrag && !beamDownscaleProg) || (beamKernelFrag && !beamKernelProg) || (beamComposeFrag && !beamComposeProg)) {
+    throw new Error("Failed to create viewer beam programs.");
+  }
+  if (beamDownscaleProg && beamDownscaleFrag) {
+    webgl.attachShader(beamDownscaleProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
+    webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
+    webgl.linkProgram(beamDownscaleProg);
+  }
+  if (beamKernelProg && beamKernelFrag) {
+    webgl.attachShader(beamKernelProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
+    webgl.attachShader(beamKernelProg, beamKernelFrag);
+    webgl.linkProgram(beamKernelProg);
+  }
+  if (beamComposeProg && beamComposeFrag) {
+    webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
+    webgl.attachShader(beamComposeProg, beamComposeFrag);
+    webgl.linkProgram(beamComposeProg);
+  }
   const ext =
     webgl.getExtension("WEBGL_parallel_shader_compile")
     || webgl.getExtension("KHR_parallel_shader_compile");
@@ -1056,7 +1277,10 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
       const poll = () => {
         const ready1 = webgl.getProgramParameter(prog1, ext.COMPLETION_STATUS_KHR);
         const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
-        if (ready1 && ready2) {
+        const ready3 = beamDownscaleProg ? webgl.getProgramParameter(beamDownscaleProg, ext.COMPLETION_STATUS_KHR) : true;
+        const ready4 = beamKernelProg ? webgl.getProgramParameter(beamKernelProg, ext.COMPLETION_STATUS_KHR) : true;
+        const ready5 = beamComposeProg ? webgl.getProgramParameter(beamComposeProg, ext.COMPLETION_STATUS_KHR) : true;
+        if (ready1 && ready2 && ready3 && ready4 && ready5) {
           resolve();
           return;
         }
@@ -1079,6 +1303,18 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
   if (!webgl.getProgramParameter(prog2, webgl.LINK_STATUS)) {
     const message = webgl.getProgramInfoLog(prog2) || "Unknown pass2 program link error.";
     console.error("[viewer] Filter shader link failed:", message);
+    return;
+  }
+  if (beamDownscaleProg && !webgl.getProgramParameter(beamDownscaleProg, webgl.LINK_STATUS)) {
+    console.error("[viewer] Beam downscale shader link failed:", webgl.getProgramInfoLog(beamDownscaleProg) || "unknown");
+    return;
+  }
+  if (beamKernelProg && !webgl.getProgramParameter(beamKernelProg, webgl.LINK_STATUS)) {
+    console.error("[viewer] Beam kernel shader link failed:", webgl.getProgramInfoLog(beamKernelProg) || "unknown");
+    return;
+  }
+  if (beamComposeProg && !webgl.getProgramParameter(beamComposeProg, webgl.LINK_STATUS)) {
+    console.error("[viewer] Beam compose shader link failed:", webgl.getProgramInfoLog(beamComposeProg) || "unknown");
     return;
   }
 
@@ -1104,6 +1340,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
   webgl.useProgram(prog2);
   webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
   webgl.uniform1i(webgl.getUniformLocation(prog2, "uSourceTexture"), 1);
+  webgl.uniform1i(webgl.getUniformLocation(prog2, "uBeamKernelTexture"), 2);
   uniformLocations = {
     uTargetSize: webgl.getUniformLocation(prog2, "uTargetSize"),
     uOutputSize: webgl.getUniformLocation(prog2, "uOutputSize"),
@@ -1166,7 +1403,107 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
 
   pass1Program = prog1;
   program = prog2;
+  beamDownscaleProgram = beamDownscaleProg;
+  beamKernelProgram = beamKernelProg;
+  beamComposeProgram = beamComposeProg;
+  if (beamDownscaleProg) {
+    webgl.useProgram(beamDownscaleProg);
+    webgl.uniform1i(webgl.getUniformLocation(beamDownscaleProg, "uTexture"), 0);
+    beamDownscaleUniformLocations = {
+      uTexture: webgl.getUniformLocation(beamDownscaleProg, "uTexture"),
+      uSourceSize: webgl.getUniformLocation(beamDownscaleProg, "uSourceSize"),
+      uTargetSize: webgl.getUniformLocation(beamDownscaleProg, "uTargetSize"),
+    };
+  } else {
+    beamDownscaleUniformLocations = null;
+  }
+  if (beamKernelProg) {
+    webgl.useProgram(beamKernelProg);
+    webgl.uniform1i(webgl.getUniformLocation(beamKernelProg, "uSourceTexture"), 1);
+    beamKernelUniformLocations = {
+      uSourceTexture: webgl.getUniformLocation(beamKernelProg, "uSourceTexture"),
+      uBeamSourceSize: webgl.getUniformLocation(beamKernelProg, "uBeamSourceSize"),
+      uDisplaySize: webgl.getUniformLocation(beamKernelProg, "uDisplaySize"),
+      uColorLevels: webgl.getUniformLocation(beamKernelProg, "uColorLevels"),
+      uDitherStrength: webgl.getUniformLocation(beamKernelProg, "uDitherStrength"),
+      uSamplingMode: webgl.getUniformLocation(beamKernelProg, "uSamplingMode"),
+      uHorizontalSharpness: webgl.getUniformLocation(beamKernelProg, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: webgl.getUniformLocation(beamKernelProg, "uRgbConvergenceOffset"),
+      uSmoothStrength: webgl.getUniformLocation(beamKernelProg, "uSmoothStrength"),
+      uCurvature: webgl.getUniformLocation(beamKernelProg, "uCurvature"),
+      uBeamDarkCutoff: webgl.getUniformLocation(beamKernelProg, "uBeamDarkCutoff"),
+      uBeamHorizontalSpread: webgl.getUniformLocation(beamKernelProg, "uBeamHorizontalSpread"),
+      uBeamWhiteBloom: webgl.getUniformLocation(beamKernelProg, "uBeamWhiteBloom"),
+    };
+  } else {
+    beamKernelUniformLocations = null;
+  }
+  if (beamComposeProg) {
+    webgl.useProgram(beamComposeProg);
+    webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uSourceTexture"), 1);
+    webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"), 2);
+    beamComposeUniformLocations = {
+      uSourceTexture: webgl.getUniformLocation(beamComposeProg, "uSourceTexture"),
+      uBeamKernelTexture: webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"),
+      uTargetSize: webgl.getUniformLocation(beamComposeProg, "uTargetSize"),
+      uOutputSize: webgl.getUniformLocation(beamComposeProg, "uOutputSize"),
+      uDisplaySize: webgl.getUniformLocation(beamComposeProg, "uDisplaySize"),
+      uBeamSourceSize: webgl.getUniformLocation(beamComposeProg, "uBeamSourceSize"),
+      uSamplingMode: webgl.getUniformLocation(beamComposeProg, "uSamplingMode"),
+      uRgbConvergenceOffset: webgl.getUniformLocation(beamComposeProg, "uRgbConvergenceOffset"),
+      uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
+      uBeamStripeStrength: webgl.getUniformLocation(beamComposeProg, "uBeamStripeStrength"),
+      uBeamWhiteBloom: webgl.getUniformLocation(beamComposeProg, "uBeamWhiteBloom"),
+      uBeamWarmBloom: webgl.getUniformLocation(beamComposeProg, "uBeamWarmBloom"),
+    };
+  } else {
+    beamComposeUniformLocations = null;
+  }
   applyCurrentSettings();
+}
+
+function ensureBeamKernelFramebuffer(width, height) {
+  if (!gl) return;
+  if (beamKernelFbo && beamKernelTexture && beamKernelFboWidth === width && beamKernelFboHeight === height) {
+    return;
+  }
+  if (beamKernelFbo) gl.deleteFramebuffer(beamKernelFbo);
+  if (beamKernelTexture) gl.deleteTexture(beamKernelTexture);
+  beamKernelTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, beamKernelTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  beamKernelFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, beamKernelFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, beamKernelTexture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  beamKernelFboWidth = width;
+  beamKernelFboHeight = height;
+}
+
+function ensureBeamComposeFramebuffer(width, height) {
+  if (!gl) return;
+  if (beamComposeFbo && beamComposeTexture && beamComposeFboWidth === width && beamComposeFboHeight === height) {
+    return;
+  }
+  if (beamComposeFbo) gl.deleteFramebuffer(beamComposeFbo);
+  if (beamComposeTexture) gl.deleteTexture(beamComposeTexture);
+  beamComposeTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, beamComposeTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  beamComposeFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, beamComposeFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, beamComposeTexture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  beamComposeFboWidth = width;
+  beamComposeFboHeight = height;
 }
 
 function ensureFramebuffer(width, height) {

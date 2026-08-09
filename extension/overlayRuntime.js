@@ -61,32 +61,16 @@ const isPc98PaletteMode = (mode) =>
   || mode === "pc98_512_sat"
   || mode === "pc98_4096";
 
-function isBeamCrossModeEnabled(settings) {
-  return settings.phosphorDotShape === "beam";
-}
-
-function isPhosphorDotModeEnabled(settings) {
-  return settings.phosphorDotShape !== "beam" &&
-    (settings.spotMaskStrength ?? 0) > 0.001 &&
-    (
-      (settings.phosphorDotInternalScale ?? 1) > 1 ||
-      !!settings.phosphorDotBrightCore ||
-      (settings.phosphorDotCellFill ?? 0) > 0.001 ||
-      !!settings.phosphorDotFlatDisc ||
-      !!settings.phosphorDotNeighborBlend
-    );
-}
-
 function getWindowsLiteShaderSources(settings) {
   const pass1 = isPc98PaletteMode(settings.paletteMode)
     ? FILTER_FRAGMENT_PASS1_PC98_LITE
     : FILTER_FRAGMENT_PASS1_LITE;
-  const pass2 = isBeamCrossModeEnabled(settings)
+  const pass2 = settings.phosphorDotShape === "beam"
     ? FILTER_FRAGMENT_PASS2_BEAM_LITE
     :
     settings.phosphorStrength > 0.001
     || settings.spotMaskStrength > 0.001
-    || isPhosphorDotModeEnabled(settings)
+    || settings.phosphorDotMode
       ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
       : FILTER_FRAGMENT_PASS2_LITE;
   return { pass1, pass2 };
@@ -827,8 +811,12 @@ function createOverlay(settings) {
     if (!inside) {
       if (surface._spotlightActive) {
         surface._spotlightActive = false;
-        surface.canvas.style.maskImage = "";
-        surface.canvas.style.webkitMaskImage = "";
+        surface.canvas.style.removeProperty("mask-image");
+        surface.canvas.style.removeProperty("-webkit-mask-image");
+        surface.canvas.style.removeProperty("mask-repeat");
+        surface.canvas.style.removeProperty("-webkit-mask-repeat");
+        surface.canvas.style.removeProperty("mask-mode");
+        surface.canvas.style.removeProperty("-webkit-mask-size");
       }
       return;
     }
@@ -840,8 +828,12 @@ function createOverlay(settings) {
       surface._spotlightActive = true;
       surface._spotlightKey = key;
       const mask = `radial-gradient(circle at ${localX}px ${localY}px, transparent 60px, rgba(0,0,0,0.6) 90px, black 120px)`;
-      surface.canvas.style.maskImage = mask;
-      surface.canvas.style.webkitMaskImage = mask;
+      surface.canvas.style.setProperty("mask-image", mask, "important");
+      surface.canvas.style.setProperty("-webkit-mask-image", mask, "important");
+      surface.canvas.style.setProperty("mask-repeat", "no-repeat", "important");
+      surface.canvas.style.setProperty("-webkit-mask-repeat", "no-repeat", "important");
+      surface.canvas.style.setProperty("mask-mode", "alpha", "important");
+      surface.canvas.style.setProperty("-webkit-mask-size", "100% 100%", "important");
     }
   }
 
@@ -933,8 +925,9 @@ function createOverlay(settings) {
       const bLevel = BRIGHTNESS_PRESETS[brightnessIdx];
       surface.canvas.style.filter = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${bLevel})` : "";
       surfaces.push(surface);
-      if (document.body) {
-        document.body.append(surface.canvas, surface.failureOverlay);
+      const overlayHost = document.documentElement ?? document.body;
+      if (overlayHost) {
+        overlayHost.append(surface.canvas, surface.failureOverlay);
       }
     }
 
@@ -968,7 +961,7 @@ function createOverlay(settings) {
 
     if (targetElement instanceof HTMLVideoElement && targetElement.mediaKeys != null) {
       surface.updateTarget(null);
-      surface.canvas.style.display = "none";
+      surface.canvas.style.setProperty("display", "none", "important");
       surface.showFailureOverlay(rect, "Protected video cannot be filtered in Chrome");
       return;
     }
@@ -993,7 +986,7 @@ function createOverlay(settings) {
           surface.ensureProxyVideo(targetElement);
           surface._proxyStuckSince = 0;
         }
-        surface.canvas.style.display = "none";
+        surface.canvas.style.setProperty("display", "none", "important");
         surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
         return;
       }
@@ -1003,13 +996,13 @@ function createOverlay(settings) {
     }
 
     if (!drawableSource) {
-      surface.canvas.style.display = "none";
+      surface.canvas.style.setProperty("display", "none", "important");
       surface.hideFailureOverlay();
       return;
     }
 
     if (rejectedElements.has(targetElement)) {
-      surface.canvas.style.display = "none";
+      surface.canvas.style.setProperty("display", "none", "important");
       surface.showFailureOverlay(rect);
       return;
     }
@@ -1018,12 +1011,12 @@ function createOverlay(settings) {
       surface.didTargetChange || frameCount % getFrameIntervalForPriority(priorityIndex) === 0;
 
     if (!shouldRenderNow) {
-      surface.canvas.style.display = "block";
+      surface.canvas.style.setProperty("display", "block", "important");
       surface.hideFailureOverlay();
       return;
     }
 
-    surface.canvas.style.display = "block";
+    surface.canvas.style.setProperty("display", "block", "important");
     surface.hideFailureOverlay();
 
     if (!surface.gl || !surface.renderer) {
@@ -1033,7 +1026,7 @@ function createOverlay(settings) {
       } catch (error) {
         if (error instanceof DOMException && error.name === "SecurityError") {
           rejectedElements.add(targetElement);
-          surface.canvas.style.display = "none";
+          surface.canvas.style.setProperty("display", "none", "important");
           surface.showFailureOverlay(rect);
           return;
         }
@@ -1065,7 +1058,7 @@ function createOverlay(settings) {
         surface.didTargetChange = false;
         if (uploadMs > 50) {
           rejectedElements.add(targetElement);
-          surface.canvas.style.display = "none";
+          surface.canvas.style.setProperty("display", "none", "important");
           surface.showFailureOverlay(rect);
           return;
         }
@@ -1108,7 +1101,7 @@ function createOverlay(settings) {
     } catch (error) {
       if (error instanceof DOMException && error.name === "SecurityError") {
         rejectedElements.add(targetElement);
-        surface.canvas.style.display = "none";
+        surface.canvas.style.setProperty("display", "none", "important");
         surface.showFailureOverlay(rect);
         return;
       }
@@ -1123,7 +1116,7 @@ function createOverlay(settings) {
       } catch (fallbackError) {
         if (fallbackError instanceof DOMException && fallbackError.name === "SecurityError") {
           rejectedElements.add(targetElement);
-          surface.canvas.style.display = "none";
+          surface.canvas.style.setProperty("display", "none", "important");
           surface.showFailureOverlay(rect);
           return;
         }
@@ -1313,6 +1306,10 @@ function createOverlay(settings) {
         surface.targetElement.style.transformOrigin = "center";
         surface.targetElement.style.transform = t;
       }
+      surface.canvas.style.setProperty("transform-origin", "center", "important");
+      surface.canvas.style.setProperty("transform", t || "none", "important");
+      surface.failureOverlay.style.setProperty("transform-origin", "center", "important");
+      surface.failureOverlay.style.setProperty("transform", t || "none", "important");
     }
     if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
       lastHoveredDRMVideo.style.transformOrigin = "center";
@@ -1763,38 +1760,43 @@ function getFrameIntervalForPriority(priorityIndex) {
 
 function createOverlaySurface(index, onReady, initialSettings) {
   const canvas = document.createElement("canvas");
-  canvas.style.position = "fixed";
-  canvas.style.left = "0";
-  canvas.style.top = "0";
-  canvas.style.zIndex = String(2147483500 - index * 2);
-  canvas.style.pointerEvents = "none";
+  canvas.style.setProperty("all", "initial", "important");
+  canvas.style.setProperty("position", "fixed", "important");
+  canvas.style.setProperty("left", "0", "important");
+  canvas.style.setProperty("top", "0", "important");
+  canvas.style.setProperty("z-index", String(2147483500 - index * 2), "important");
+  canvas.style.setProperty("pointer-events", "none", "important");
   canvas.style.display = "none";
-  canvas.style.transformOrigin = "top left";
-  canvas.style.willChange = "mask-image";
-  canvas.style.background = "transparent";
-  canvas.style.border = "0";
-  canvas.style.margin = "0";
-  canvas.style.padding = "0";
-  canvas.style.maxWidth = "none";
-  canvas.style.maxHeight = "none";
-  canvas.style.boxShadow = "none";
-  canvas.style.objectFit = "fill";
+  canvas.style.setProperty("transform-origin", "top left", "important");
+  canvas.style.setProperty("will-change", "mask-image", "important");
+  canvas.style.setProperty("background", "transparent", "important");
+  canvas.style.setProperty("border", "0", "important");
+  canvas.style.setProperty("margin", "0", "important");
+  canvas.style.setProperty("padding", "0", "important");
+  canvas.style.setProperty("max-width", "none", "important");
+  canvas.style.setProperty("max-height", "none", "important");
+  canvas.style.setProperty("box-shadow", "none", "important");
+  canvas.style.setProperty("object-fit", "fill", "important");
   canvas.dataset.tetoricaOverlay = "true";
 
   const failureOverlay = document.createElement("div");
-  failureOverlay.style.position = "fixed";
-  failureOverlay.style.left = "0";
-  failureOverlay.style.top = "0";
-  failureOverlay.style.zIndex = String(2147483501 - index * 2);
-  failureOverlay.style.pointerEvents = "none";
+  failureOverlay.style.setProperty("all", "initial", "important");
+  failureOverlay.style.setProperty("position", "fixed", "important");
+  failureOverlay.style.setProperty("left", "0", "important");
+  failureOverlay.style.setProperty("top", "0", "important");
+  failureOverlay.style.setProperty("z-index", String(2147483501 - index * 2), "important");
+  failureOverlay.style.setProperty("pointer-events", "none", "important");
   failureOverlay.style.display = "none";
-  failureOverlay.style.alignItems = "center";
-  failureOverlay.style.justifyContent = "center";
-  failureOverlay.style.border = "1px solid rgba(255, 219, 138, 0.45)";
-  failureOverlay.style.background =
-    "linear-gradient(180deg, rgba(18, 12, 6, 0.10), rgba(18, 12, 6, 0.30))";
-  failureOverlay.style.boxShadow = "inset 0 0 0 1px rgba(255, 246, 214, 0.12)";
-  failureOverlay.style.backdropFilter = "blur(1px)";
+  failureOverlay.style.setProperty("align-items", "center", "important");
+  failureOverlay.style.setProperty("justify-content", "center", "important");
+  failureOverlay.style.setProperty("border", "1px solid rgba(255, 219, 138, 0.45)", "important");
+  failureOverlay.style.setProperty(
+    "background",
+    "linear-gradient(180deg, rgba(18, 12, 6, 0.10), rgba(18, 12, 6, 0.30))",
+    "important",
+  );
+  failureOverlay.style.setProperty("box-shadow", "inset 0 0 0 1px rgba(255, 246, 214, 0.12)", "important");
+  failureOverlay.style.setProperty("backdrop-filter", "blur(1px)", "important");
 
   const failureOverlayLabel = document.createElement("div");
   failureOverlayLabel.textContent = "Cross-origin image";
@@ -1900,10 +1902,10 @@ function createOverlaySurface(index, onReady, initialSettings) {
       }
 
       this.lastRectKey = rectKey;
-      canvas.style.left = `${rect.left}px`;
-      canvas.style.top = `${rect.top}px`;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      canvas.style.setProperty("left", `${rect.left}px`, "important");
+      canvas.style.setProperty("top", `${rect.top}px`, "important");
+      canvas.style.setProperty("width", `${rect.width}px`, "important");
+      canvas.style.setProperty("height", `${rect.height}px`, "important");
 
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
@@ -2055,23 +2057,23 @@ function createOverlaySurface(index, onReady, initialSettings) {
       this.renderer?.cancel?.();
       this.renderer = null;
       this.gl = null;
-      canvas.style.background = "transparent";
+      canvas.style.setProperty("background", "transparent", "important");
     },
     showFailureOverlay(rect, message = null) {
       if (message) {
         this.setFailureMessage(message);
       }
-      failureOverlay.style.display = "flex";
-      failureOverlay.style.left = `${rect.left}px`;
-      failureOverlay.style.top = `${rect.top}px`;
-      failureOverlay.style.width = `${rect.width}px`;
-      failureOverlay.style.height = `${rect.height}px`;
+      failureOverlay.style.setProperty("display", "flex", "important");
+      failureOverlay.style.setProperty("left", `${rect.left}px`, "important");
+      failureOverlay.style.setProperty("top", `${rect.top}px`, "important");
+      failureOverlay.style.setProperty("width", `${rect.width}px`, "important");
+      failureOverlay.style.setProperty("height", `${rect.height}px`, "important");
     },
     hideFailureOverlay() {
-      failureOverlay.style.display = "none";
+      failureOverlay.style.setProperty("display", "none", "important");
     },
     hide() {
-      canvas.style.display = "none";
+      canvas.style.setProperty("display", "none", "important");
       this.hideFailureOverlay();
     },
   };
@@ -2281,22 +2283,15 @@ function getRecordingMimeType() {
 }
 
 function getPhosphorDotLimitedTargetSize(gl, settings, visibleWidth, visibleHeight) {
-  const isBeamMode = isBeamCrossModeEnabled(settings);
-  const isDotMode = isPhosphorDotModeEnabled(settings);
-  if ((!isBeamMode && !isDotMode) || !visibleWidth || !visibleHeight) {
+  if (!settings.phosphorDotMode || !visibleWidth || !visibleHeight) {
     return { w: settings.targetWidth, h: settings.targetHeight };
   }
   const bulbRadius = settings.bulbRadius ?? 0.22;
-  const beamCapFloor = 1.2;
-  const beamBloomFloor = (settings.beamWhiteBloom ?? 1) * 0.6;
-  const baseMinCellPixels = isBeamMode
-    ? Math.max(beamCapFloor, beamBloomFloor)
-    : Math.max(1.1, 2.15 + bulbRadius * 1.15);
-  const internalScale = Math.min(4, Math.max(1, Number(settings.phosphorDotInternalScale ?? 1)));
-  const effectiveInternalScale = isBeamMode ? 1 : internalScale;
-  const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
-  const scaledW = settings.targetWidth * effectiveInternalScale;
-  const scaledH = settings.targetHeight * effectiveInternalScale;
+  const baseMinCellPixels = Math.max(1.1, 2.15 + bulbRadius * 1.15);
+  const internalScale = settings.phosphorDotInternalScale ? 2 : 1;
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / internalScale);
+  const scaledW = settings.targetWidth * internalScale;
+  const scaledH = settings.targetHeight * internalScale;
   const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
   const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
   const scale = Math.min(
@@ -2343,70 +2338,80 @@ function applySettings(gl, renderer, settings) {
 
   if (!renderer.program || !renderer.uniformLocations) return;
   const uniformLocations = renderer.uniformLocations;
+  const set1f = (location, value) => {
+    if (location != null) {
+      gl.uniform1f(location, value);
+    }
+  };
+  const set2f = (location, x, y) => {
+    if (location != null) {
+      gl.uniform2f(location, x, y);
+    }
+  };
   gl.useProgram(renderer.program);
-  gl.uniform2f(uniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
-  gl.uniform2f(uniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
-  gl.uniform2f(uniformLocations.uDisplaySize, displaySize.width, displaySize.height);
-  gl.uniform2f(uniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
-  gl.uniform1f(uniformLocations.uColorLevels, settings.colorLevels);
-  gl.uniform1f(uniformLocations.uDitherStrength, settings.ditherStrength);
-  gl.uniform1f(uniformLocations.uSamplingMode, 0);
-  gl.uniform1f(uniformLocations.uCurvature, settings.curvature);
-  gl.uniform1f(uniformLocations.uScanlineStrength, settings.scanlineStrength);
-  gl.uniform1f(uniformLocations.uScanline2Strength, settings.scanline2Strength);
-  gl.uniform1f(uniformLocations.uScanlineBrightnessFade, settings.scanlineBrightnessFade);
-  gl.uniform1f(uniformLocations.uVignetteStrength, settings.vignetteStrength);
-  gl.uniform1f(uniformLocations.uLcdCrosstalkStrength, settings.lcdCrosstalkStrength ?? 0);
-  gl.uniform1f(uniformLocations.uGlowStrength, settings.glowStrength);
-  gl.uniform1f(uniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
-  gl.uniform1f(uniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
-  gl.uniform1f(uniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
-  gl.uniform1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
-  gl.uniform1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
-  gl.uniform1f(uniformLocations.uBulbRadius, settings.bulbRadius ?? 0.22);
-  gl.uniform1f(uniformLocations.uBlackFloor, settings.blackFloor ?? 0.01);
-  gl.uniform1f(uniformLocations.uBasicContrast, settings.basicContrast ?? 1);
-  gl.uniform1f(uniformLocations.uBasicSaturation, settings.basicSaturation ?? 1);
-  gl.uniform1f(uniformLocations.uReflectiveLcdBase, settings.reflectiveLcdBase ?? 0);
-  gl.uniform1f(uniformLocations.uLightDependentTint, settings.lightDependentTint ?? 0);
-  gl.uniform1f(uniformLocations.uGrainVisibilityMode, settings.grainVisibilityMode ? 1 : 0);
-  gl.uniform1f(uniformLocations.uBeamDarkCutoff, settings.beamDarkCutoff ?? 0);
-  gl.uniform1f(uniformLocations.uBeamHorizontalSpread, settings.beamHorizontalSpread ?? 0.5);
-  gl.uniform1f(uniformLocations.uBeamStripeStrength, settings.beamStripeStrength ?? 0);
-  gl.uniform1f(uniformLocations.uBeamWhiteBloom, settings.beamWhiteBloom ?? 1);
-  gl.uniform1f(uniformLocations.uBeamWarmBloom, settings.beamWarmBloom ?? 0);
-  gl.uniform1f(uniformLocations.uScreenFaceGlow, settings.screenFaceGlow ?? 0);
-  gl.uniform1f(uniformLocations.uFocusStrength, settings.focusStrength ?? 0);
-  gl.uniform2f(uniformLocations.uFocusSize, settings.focusSizeX ?? 0.35, settings.focusSizeY ?? 0.2);
-  gl.uniform2f(uniformLocations.uFocusCenter, settings.focusCenterX ?? 0.5, settings.focusCenterY ?? 0.5);
-  gl.uniform1f(uniformLocations.uLumaAmount, settings.lumaAmount ?? 1);
-  gl.uniform1f(uniformLocations.uLumaLow, settings.lumaLow ?? 0);
-  gl.uniform1f(uniformLocations.uLumaHigh, settings.lumaHigh ?? 1);
-  gl.uniform1f(uniformLocations.uLumaKnee, settings.lumaKnee ?? 0.2);
-  gl.uniform1f(uniformLocations.uSaturationAmount, settings.saturationAmount ?? 1);
-  gl.uniform1f(uniformLocations.uSaturationLow, settings.saturationLow ?? 0);
-  gl.uniform1f(uniformLocations.uSaturationHigh, settings.saturationHigh ?? 1);
-  gl.uniform1f(uniformLocations.uSaturationKnee, settings.saturationKnee ?? 0.2);
-  gl.uniform1f(uniformLocations.uOutputBrightness, settings.outputBrightness ?? 1);
-  gl.uniform1f(uniformLocations.uPhosphorDotLightBalance, settings.phosphorDotLightBalance ?? 1);
-  gl.uniform1f(
+  set2f(uniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
+  set2f(uniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
+  set2f(uniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  set2f(uniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
+  set1f(uniformLocations.uColorLevels, settings.colorLevels);
+  set1f(uniformLocations.uDitherStrength, settings.ditherStrength);
+  set1f(uniformLocations.uSamplingMode, 0);
+  set1f(uniformLocations.uCurvature, settings.curvature);
+  set1f(uniformLocations.uScanlineStrength, settings.scanlineStrength);
+  set1f(uniformLocations.uScanline2Strength, settings.scanline2Strength);
+  set1f(uniformLocations.uScanlineBrightnessFade, settings.scanlineBrightnessFade);
+  set1f(uniformLocations.uVignetteStrength, settings.vignetteStrength);
+  set1f(uniformLocations.uLcdCrosstalkStrength, settings.lcdCrosstalkStrength ?? 0);
+  set1f(uniformLocations.uGlowStrength, settings.glowStrength);
+  set1f(uniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
+  set1f(uniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
+  set1f(uniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
+  set1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
+  set1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
+  set1f(uniformLocations.uBulbRadius, settings.bulbRadius ?? 0.22);
+  set1f(uniformLocations.uBlackFloor, settings.blackFloor ?? 0.01);
+  set1f(uniformLocations.uFocusStrength, settings.focusStrength ?? 0);
+  set2f(uniformLocations.uFocusSize, settings.focusSizeX ?? 0.35, settings.focusSizeY ?? 0.2);
+  set2f(uniformLocations.uFocusCenter, settings.focusCenterX ?? 0.5, settings.focusCenterY ?? 0.5);
+  set1f(uniformLocations.uBasicContrast, settings.basicContrast ?? 1);
+  set1f(uniformLocations.uBasicSaturation, settings.basicSaturation ?? 1);
+  set1f(uniformLocations.uReflectiveLcdBase, settings.reflectiveLcdBase ?? 0);
+  set1f(uniformLocations.uLightDependentTint, settings.lightDependentTint ?? 0);
+  set1f(uniformLocations.uGrainVisibilityMode, settings.grainVisibilityMode ? 1 : 0);
+  set1f(uniformLocations.uBeamDarkCutoff, settings.beamDarkCutoff ?? 0);
+  set1f(uniformLocations.uBeamHorizontalSpread, settings.beamHorizontalSpread ?? 0.5);
+  set1f(uniformLocations.uBeamStripeStrength, settings.beamStripeStrength ?? 0);
+  set1f(uniformLocations.uBeamWhiteBloom, settings.beamWhiteBloom ?? 1);
+  set1f(uniformLocations.uBeamWarmBloom, settings.beamWarmBloom ?? 0);
+  set1f(uniformLocations.uScreenFaceGlow, settings.screenFaceGlow ?? 0);
+  set1f(uniformLocations.uLumaAmount, settings.lumaAmount ?? 1);
+  set1f(uniformLocations.uLumaLow, settings.lumaLow ?? 0);
+  set1f(uniformLocations.uLumaHigh, settings.lumaHigh ?? 1);
+  set1f(uniformLocations.uLumaKnee, settings.lumaKnee ?? 0.2);
+  set1f(uniformLocations.uSaturationAmount, settings.saturationAmount ?? 1);
+  set1f(uniformLocations.uSaturationLow, settings.saturationLow ?? 0);
+  set1f(uniformLocations.uSaturationHigh, settings.saturationHigh ?? 1);
+  set1f(uniformLocations.uSaturationKnee, settings.saturationKnee ?? 0.2);
+  set1f(uniformLocations.uOutputBrightness, settings.outputBrightness ?? 1);
+  set1f(uniformLocations.uPhosphorDotLightBalance, settings.phosphorDotLightBalance ?? 1);
+  set1f(
     uniformLocations.uPixelAspect,
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(settings.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(settings.targetWidth, 1)),
   );
-  gl.uniform1f(uniformLocations.uPhosphorDotMode, isPhosphorDotModeEnabled(settings) ? 1 : 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotShape, phosphorDotShapeToUniform(settings.phosphorDotShape));
-  gl.uniform1f(
+  set1f(uniformLocations.uPhosphorDotMode, settings.phosphorDotMode ? 1 : 0);
+  set1f(uniformLocations.uPhosphorDotShape, phosphorDotShapeToUniform(settings.phosphorDotShape));
+  set1f(
     uniformLocations.uPhosphorDotInternalScale,
     Math.min(4, Math.max(1, Number(settings.phosphorDotInternalScale ?? 1))),
   );
-  gl.uniform1f(uniformLocations.uPhosphorDotSizeResponse, settings.phosphorDotSizeResponse ?? 1);
-  gl.uniform1f(uniformLocations.uPhosphorDotBrightCore, settings.phosphorDotBrightCore ? 1 : 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotCellFill, settings.phosphorDotCellFill ?? 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotFlatDisc, settings.phosphorDotFlatDisc ? 1 : 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotNeighborBlend, settings.phosphorDotNeighborBlend ? 1 : 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotGrainStrength, settings.phosphorDotGrainStrength ?? 0);
-  gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, settings.closeUpNoiseStrength);
+  set1f(uniformLocations.uPhosphorDotSizeResponse, settings.phosphorDotSizeResponse ?? 1);
+  set1f(uniformLocations.uPhosphorDotBrightCore, settings.phosphorDotBrightCore ? 1 : 0);
+  set1f(uniformLocations.uPhosphorDotCellFill, settings.phosphorDotCellFill ?? 0);
+  set1f(uniformLocations.uPhosphorDotFlatDisc, settings.phosphorDotFlatDisc ? 1 : 0);
+  set1f(uniformLocations.uPhosphorDotNeighborBlend, settings.phosphorDotNeighborBlend ? 1 : 0);
+  set1f(uniformLocations.uPhosphorDotGrainStrength, settings.phosphorDotGrainStrength ?? 0);
+  set1f(uniformLocations.uCloseUpNoiseStrength, settings.closeUpNoiseStrength);
 }
 
 function applyFlipUniforms(gl, renderer, flipH, flipV) {
@@ -2637,7 +2642,10 @@ function setupRenderer(webgl, onReady, initialSettings) {
 
     webgl.useProgram(prog2);
     webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
-    webgl.uniform1i(webgl.getUniformLocation(prog2, "uSourceTexture"), 1);
+    const sourceTextureLocation = webgl.getUniformLocation(prog2, "uSourceTexture");
+    if (sourceTextureLocation) {
+      webgl.uniform1i(sourceTextureLocation, 1);
+    }
     renderer.uniformLocations = {
       uTargetSize: webgl.getUniformLocation(prog2, "uTargetSize"),
       uOutputSize: webgl.getUniformLocation(prog2, "uOutputSize"),

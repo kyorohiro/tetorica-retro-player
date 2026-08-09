@@ -762,7 +762,7 @@ export const PRESETS = {
     spotMaskStrength: 0.3,
     bulbRadius: 0.5,
     blackFloor: 0.001,
-    outputBrightness: 1,
+    outputBrightness: 1.22,
     screenFaceGlow: 0.33,
     phosphorDotShape: "beam",
     phosphorDotInternalScale: 2,

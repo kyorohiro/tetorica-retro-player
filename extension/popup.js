@@ -499,26 +499,9 @@ async function loadOverlayState() {
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!activeTab?.id) return;
   currentTabId = activeTab.id;
-
-  // Query actual page state as source of truth.
-  try {
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId: currentTabId },
-      args: [chrome.runtime.getURL("overlayRuntime.js")],
-      func: async (moduleUrl) => {
-        const runtime = await import(moduleUrl);
-        return runtime.isRetroOverlayActive();
-      },
-    });
-    const isOn = !!result?.result;
-    setOverlayButtonState(isOn);
-    await saveOverlayState(isOn);
-  } catch {
-    // Page may not be injectable (e.g. chrome:// URLs) — fall back to stored state.
-    const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
-    const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
-    setOverlayButtonState(!!activeTabs[currentTabId]);
-  }
+  const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
+  const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
+  setOverlayButtonState(!!activeTabs[currentTabId]);
 }
 
 function setOverlayButtonState(isOn) {
