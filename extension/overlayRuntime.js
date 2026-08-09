@@ -407,6 +407,16 @@ function createOverlay(settings) {
   const BRIGHTNESS_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 2.0];
   const BRIGHTNESS_DEFAULT_IDX = 5; // 1.0
   let brightnessIdx = BRIGHTNESS_DEFAULT_IDX;
+
+  function applyOverlayOpacityToSurface(surface) {
+    surface.canvas.style.setProperty("opacity", String(overlayOpacity), "important");
+  }
+
+  function applyOverlayBrightnessToSurface(surface) {
+    const level = BRIGHTNESS_PRESETS[brightnessIdx];
+    const filterValue = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${level})` : "";
+    surface.canvas.style.setProperty("filter", filterValue, "important");
+  }
   let loopSecs = 10;
   let loopActive = false;
   let panelOpen = false;
@@ -554,7 +564,7 @@ function createOverlay(settings) {
     const idx = OPACITY_PRESETS.findIndex((v) => Math.abs(v - overlayOpacity) < 0.01);
     overlayOpacity = OPACITY_PRESETS[(idx + 1) % OPACITY_PRESETS.length];
     for (const surface of surfaces) {
-      surface.canvas.style.opacity = String(overlayOpacity);
+      applyOverlayOpacityToSurface(surface);
     }
     updateOpacityButton();
   });
@@ -679,7 +689,7 @@ function createOverlay(settings) {
   });
 
   function start() {
-    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, loopGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup, fallbackFrame);
+    document.body.append(recordButton, opacityButton, speedGroup, brightnessGroup, flipGroup, audioFxButton, moreButton, expandedPanel, frameGroup, fallbackFrame);
     updateOpacityButton();
     updateAudioFxButton();
     attachSettingsSync();
@@ -708,7 +718,6 @@ function createOverlay(settings) {
     clearLoop();
     destroyOverlayAudio();
     if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
-      lastHoveredDRMVideo.style.filter = "";
       lastHoveredDRMVideo.style.transform = "";
       lastHoveredDRMVideo.style.transformOrigin = "";
       lastHoveredDRMVideo = null;
@@ -921,9 +930,8 @@ function createOverlay(settings) {
         applySettings(surface.gl, renderer, currentSettings);
         applyFlipUniforms(surface.gl, renderer, flipH, flipV);
       }, currentSettings);
-      surface.canvas.style.opacity = String(overlayOpacity);
-      const bLevel = BRIGHTNESS_PRESETS[brightnessIdx];
-      surface.canvas.style.filter = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${bLevel})` : "";
+      applyOverlayOpacityToSurface(surface);
+      applyOverlayBrightnessToSurface(surface);
       surfaces.push(surface);
       const overlayHost = document.documentElement ?? document.body;
       if (overlayHost) {
@@ -1461,16 +1469,8 @@ function createOverlay(settings) {
   }
 
   function syncBrightnessFilter() {
-    const level = BRIGHTNESS_PRESETS[brightnessIdx];
-    const filterValue = brightnessIdx !== BRIGHTNESS_DEFAULT_IDX ? `brightness(${level})` : "";
     for (const surface of surfaces) {
-      surface.canvas.style.filter = filterValue;
-      if (surface.targetElement instanceof HTMLVideoElement) {
-        surface.targetElement.style.filter = filterValue;
-      }
-    }
-    if (lastHoveredDRMVideo instanceof HTMLVideoElement) {
-      lastHoveredDRMVideo.style.filter = filterValue;
+      applyOverlayBrightnessToSurface(surface);
     }
   }
 
@@ -1589,7 +1589,7 @@ function createOverlay(settings) {
     const frameW = frameGroup.offsetWidth || 54;
 
     if (!isNarrow) {
-      // Wide: [‹›] [−s+] [−b+] [⋯] (loop/flip in panel only)
+      // Wide: [‹›] [−s+] [−b+] [⋯] (flip in panel only)
       const brightnessW = brightnessGroup.offsetWidth || 92;
       const brightnessLeft = moreLeft - gap - brightnessW;
       brightnessGroup.style.left = `${brightnessLeft}px`;
@@ -1611,12 +1611,11 @@ function createOverlay(settings) {
     // Panel
     if (panelOpen) {
       const panelItems = isNarrow
-        ? [speedGroup, brightnessGroup, loopGroup, flipGroup]
-        : [loopGroup, flipGroup];
+        ? [speedGroup, brightnessGroup, flipGroup]
+        : [flipGroup];
       const contentW = Math.max(
         speedGroup.offsetWidth || 92,
         brightnessGroup.offsetWidth || 92,
-        loopGroup.offsetWidth || 80,
         flipGroup.offsetWidth || 54,
       );
       const panelW = contentW + padding * 2;
@@ -1853,7 +1852,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
     _spotlightKey: "",
     destroy() {
       if (this.targetElement instanceof HTMLVideoElement) {
-        this.targetElement.style.filter = "";
         this.targetElement.style.transform = "";
         this.targetElement.style.transformOrigin = "";
       }
@@ -1871,7 +1869,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
       }
 
       if (this.targetElement instanceof HTMLVideoElement) {
-        this.targetElement.style.filter = "";
         this.targetElement.style.transform = "";
         this.targetElement.style.transformOrigin = "";
       }
