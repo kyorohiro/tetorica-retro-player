@@ -235,10 +235,12 @@ async function startCaptureForActiveTab() {
   currentSession = {
     streamId,
     sourceTabId: activeTab.id,
+    sourceUrl: activeTab.url ?? null,
     sourceViewportWidth: sourceViewport?.width ?? null,
     sourceViewportHeight: sourceViewport?.height ?? null,
     sourceOuterWidth: sourceViewport?.outerWidth ?? null,
     sourceOuterHeight: sourceViewport?.outerHeight ?? null,
+    sourceHasProtectedVideo: sourceViewport?.hasProtectedVideo ?? null,
     createdAt: Date.now(),
   };
   chrome.storage.session.set({ [SESSION_CACHE_KEY]: currentSession }).catch(() => {});
@@ -263,6 +265,8 @@ async function getTabViewportSize(tabId) {
         height: Math.round(window.innerHeight),
         outerWidth: Math.round(window.outerWidth),
         outerHeight: Math.round(window.outerHeight),
+        hasProtectedVideo: [...document.querySelectorAll("video")]
+          .some((element) => element instanceof HTMLVideoElement && element.mediaKeys != null),
       }),
     });
 

@@ -61,16 +61,32 @@ const isPc98PaletteMode = (mode) =>
   || mode === "pc98_512_sat"
   || mode === "pc98_4096";
 
+function isBeamCrossModeEnabled(settings) {
+  return settings.phosphorDotShape === "beam";
+}
+
+function isPhosphorDotModeEnabled(settings) {
+  return settings.phosphorDotShape !== "beam" &&
+    (settings.spotMaskStrength ?? 0) > 0.001 &&
+    (
+      (settings.phosphorDotInternalScale ?? 1) > 1 ||
+      !!settings.phosphorDotBrightCore ||
+      (settings.phosphorDotCellFill ?? 0) > 0.001 ||
+      !!settings.phosphorDotFlatDisc ||
+      !!settings.phosphorDotNeighborBlend
+    );
+}
+
 function getWindowsLiteShaderSources(settings) {
   const pass1 = isPc98PaletteMode(settings.paletteMode)
     ? FILTER_FRAGMENT_PASS1_PC98_LITE
     : FILTER_FRAGMENT_PASS1_LITE;
-  const pass2 = settings.phosphorDotShape === "beam"
+  const pass2 = isBeamCrossModeEnabled(settings)
     ? FILTER_FRAGMENT_PASS2_BEAM_LITE
     :
     settings.phosphorStrength > 0.001
     || settings.spotMaskStrength > 0.001
-    || settings.phosphorDotMode
+    || isPhosphorDotModeEnabled(settings)
       ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
       : FILTER_FRAGMENT_PASS2_LITE;
   return { pass1, pass2 };
@@ -950,6 +966,13 @@ function createOverlay(settings) {
       return;
     }
 
+    if (targetElement instanceof HTMLVideoElement && targetElement.mediaKeys != null) {
+      surface.updateTarget(null);
+      surface.canvas.style.display = "none";
+      surface.showFailureOverlay(rect, "Protected video cannot be filtered in Chrome");
+      return;
+    }
+
     if (rect.width < 2 || rect.height < 2) {
       surface.updateTarget(null);
       surface.hide();
@@ -980,7 +1003,7 @@ function createOverlay(settings) {
     }
 
     if (!drawableSource) {
-      surface.canvas.style.display = "block";
+      surface.canvas.style.display = "none";
       surface.hideFailureOverlay();
       return;
     }
@@ -1074,7 +1097,10 @@ function createOverlay(settings) {
         );
         surface.gl.activeTexture(surface.gl.TEXTURE0);
         surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.fboTexture);
+        surface.gl.activeTexture(surface.gl.TEXTURE1);
+        surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+        surface.gl.activeTexture(surface.gl.TEXTURE0);
       } else {
         surface.gl.useProgram(surface.renderer.program);
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
@@ -1745,6 +1771,14 @@ function createOverlaySurface(index, onReady, initialSettings) {
   canvas.style.display = "none";
   canvas.style.transformOrigin = "top left";
   canvas.style.willChange = "mask-image";
+  canvas.style.background = "transparent";
+  canvas.style.border = "0";
+  canvas.style.margin = "0";
+  canvas.style.padding = "0";
+  canvas.style.maxWidth = "none";
+  canvas.style.maxHeight = "none";
+  canvas.style.boxShadow = "none";
+  canvas.style.objectFit = "fill";
   canvas.dataset.tetoricaOverlay = "true";
 
   const failureOverlay = document.createElement("div");
@@ -2246,18 +2280,25 @@ function getRecordingMimeType() {
   return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
-function getPhosphorDotLimitedTargetSize(gl, settings) {
-  if (!settings.phosphorDotMode) {
+function getPhosphorDotLimitedTargetSize(gl, settings, visibleWidth, visibleHeight) {
+  const isBeamMode = isBeamCrossModeEnabled(settings);
+  const isDotMode = isPhosphorDotModeEnabled(settings);
+  if ((!isBeamMode && !isDotMode) || !visibleWidth || !visibleHeight) {
     return { w: settings.targetWidth, h: settings.targetHeight };
   }
   const bulbRadius = settings.bulbRadius ?? 0.22;
-  const baseMinCellPixels = Math.max(1.1, 2.15 + bulbRadius * 1.15);
-  const internalScale = settings.phosphorDotInternalScale ? 2 : 1;
-  const minCellPixels = Math.max(1.0, baseMinCellPixels / internalScale);
-  const scaledW = settings.targetWidth * internalScale;
-  const scaledH = settings.targetHeight * internalScale;
-  const maxWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / minCellPixels));
-  const maxHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / minCellPixels));
+  const beamCapFloor = 1.2;
+  const beamBloomFloor = (settings.beamWhiteBloom ?? 1) * 0.6;
+  const baseMinCellPixels = isBeamMode
+    ? Math.max(beamCapFloor, beamBloomFloor)
+    : Math.max(1.1, 2.15 + bulbRadius * 1.15);
+  const internalScale = Math.min(4, Math.max(1, Number(settings.phosphorDotInternalScale ?? 1)));
+  const effectiveInternalScale = isBeamMode ? 1 : internalScale;
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
+  const scaledW = settings.targetWidth * effectiveInternalScale;
+  const scaledH = settings.targetHeight * effectiveInternalScale;
+  const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
+  const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
   const scale = Math.min(
     1,
     maxWidth / Math.max(scaledW, 1),
@@ -2271,7 +2312,17 @@ function getPhosphorDotLimitedTargetSize(gl, settings) {
 
 function applySettings(gl, renderer, settings) {
   if (!renderer) return;
-  const limitedSize = getPhosphorDotLimitedTargetSize(gl, settings);
+  const dpr = window.devicePixelRatio || 1;
+  const displaySize = {
+    width: Math.max(1, Math.round((renderer.canvas?.clientWidth || gl.drawingBufferWidth || 1) * dpr)),
+    height: Math.max(1, Math.round((renderer.canvas?.clientHeight || gl.drawingBufferHeight || 1) * dpr)),
+  };
+  const limitedSize = getPhosphorDotLimitedTargetSize(
+    gl,
+    settings,
+    displaySize.width,
+    displaySize.height,
+  );
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
     gl.uniform2f(renderer.pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
@@ -2294,16 +2345,40 @@ function applySettings(gl, renderer, settings) {
   const uniformLocations = renderer.uniformLocations;
   gl.useProgram(renderer.program);
   gl.uniform2f(uniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
+  gl.uniform2f(uniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
+  gl.uniform2f(uniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  gl.uniform2f(uniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
+  gl.uniform1f(uniformLocations.uColorLevels, settings.colorLevels);
+  gl.uniform1f(uniformLocations.uDitherStrength, settings.ditherStrength);
+  gl.uniform1f(uniformLocations.uSamplingMode, 0);
   gl.uniform1f(uniformLocations.uCurvature, settings.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, settings.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, settings.scanline2Strength);
   gl.uniform1f(uniformLocations.uScanlineBrightnessFade, settings.scanlineBrightnessFade);
   gl.uniform1f(uniformLocations.uVignetteStrength, settings.vignetteStrength);
+  gl.uniform1f(uniformLocations.uLcdCrosstalkStrength, settings.lcdCrosstalkStrength ?? 0);
   gl.uniform1f(uniformLocations.uGlowStrength, settings.glowStrength);
+  gl.uniform1f(uniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
+  gl.uniform1f(uniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
+  gl.uniform1f(uniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
   gl.uniform1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
   gl.uniform1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
   gl.uniform1f(uniformLocations.uBulbRadius, settings.bulbRadius ?? 0.22);
   gl.uniform1f(uniformLocations.uBlackFloor, settings.blackFloor ?? 0.01);
+  gl.uniform1f(uniformLocations.uBasicContrast, settings.basicContrast ?? 1);
+  gl.uniform1f(uniformLocations.uBasicSaturation, settings.basicSaturation ?? 1);
+  gl.uniform1f(uniformLocations.uReflectiveLcdBase, settings.reflectiveLcdBase ?? 0);
+  gl.uniform1f(uniformLocations.uLightDependentTint, settings.lightDependentTint ?? 0);
+  gl.uniform1f(uniformLocations.uGrainVisibilityMode, settings.grainVisibilityMode ? 1 : 0);
+  gl.uniform1f(uniformLocations.uBeamDarkCutoff, settings.beamDarkCutoff ?? 0);
+  gl.uniform1f(uniformLocations.uBeamHorizontalSpread, settings.beamHorizontalSpread ?? 0.5);
+  gl.uniform1f(uniformLocations.uBeamStripeStrength, settings.beamStripeStrength ?? 0);
+  gl.uniform1f(uniformLocations.uBeamWhiteBloom, settings.beamWhiteBloom ?? 1);
+  gl.uniform1f(uniformLocations.uBeamWarmBloom, settings.beamWarmBloom ?? 0);
+  gl.uniform1f(uniformLocations.uScreenFaceGlow, settings.screenFaceGlow ?? 0);
+  gl.uniform1f(uniformLocations.uFocusStrength, settings.focusStrength ?? 0);
+  gl.uniform2f(uniformLocations.uFocusSize, settings.focusSizeX ?? 0.35, settings.focusSizeY ?? 0.2);
+  gl.uniform2f(uniformLocations.uFocusCenter, settings.focusCenterX ?? 0.5, settings.focusCenterY ?? 0.5);
   gl.uniform1f(uniformLocations.uLumaAmount, settings.lumaAmount ?? 1);
   gl.uniform1f(uniformLocations.uLumaLow, settings.lumaLow ?? 0);
   gl.uniform1f(uniformLocations.uLumaHigh, settings.lumaHigh ?? 1);
@@ -2319,12 +2394,18 @@ function applySettings(gl, renderer, settings) {
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(settings.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(settings.targetWidth, 1)),
   );
-  gl.uniform1f(uniformLocations.uPhosphorDotMode, settings.phosphorDotMode ? 1 : 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotInternalScale, settings.phosphorDotInternalScale ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotMode, isPhosphorDotModeEnabled(settings) ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotShape, phosphorDotShapeToUniform(settings.phosphorDotShape));
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotInternalScale,
+    Math.min(4, Math.max(1, Number(settings.phosphorDotInternalScale ?? 1))),
+  );
+  gl.uniform1f(uniformLocations.uPhosphorDotSizeResponse, settings.phosphorDotSizeResponse ?? 1);
   gl.uniform1f(uniformLocations.uPhosphorDotBrightCore, settings.phosphorDotBrightCore ? 1 : 0);
   gl.uniform1f(uniformLocations.uPhosphorDotCellFill, settings.phosphorDotCellFill ?? 0);
   gl.uniform1f(uniformLocations.uPhosphorDotFlatDisc, settings.phosphorDotFlatDisc ? 1 : 0);
   gl.uniform1f(uniformLocations.uPhosphorDotNeighborBlend, settings.phosphorDotNeighborBlend ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotGrainStrength, settings.phosphorDotGrainStrength ?? 0);
   gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, settings.closeUpNoiseStrength);
 }
 
@@ -2368,6 +2449,13 @@ function paletteModeToUniform(mode) {
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
   if (mode === "anime") return 10;
+  return 0;
+}
+
+function phosphorDotShapeToUniform(shape) {
+  if (shape === "heart") return 1;
+  if (shape === "beam") return 2;
+  if (shape === "square") return 3;
   return 0;
 }
 
@@ -2549,18 +2637,43 @@ function setupRenderer(webgl, onReady, initialSettings) {
 
     webgl.useProgram(prog2);
     webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
+    webgl.uniform1i(webgl.getUniformLocation(prog2, "uSourceTexture"), 1);
     renderer.uniformLocations = {
       uTargetSize: webgl.getUniformLocation(prog2, "uTargetSize"),
+      uOutputSize: webgl.getUniformLocation(prog2, "uOutputSize"),
+      uDisplaySize: webgl.getUniformLocation(prog2, "uDisplaySize"),
+      uBeamSourceSize: webgl.getUniformLocation(prog2, "uBeamSourceSize"),
+      uColorLevels: webgl.getUniformLocation(prog2, "uColorLevels"),
+      uDitherStrength: webgl.getUniformLocation(prog2, "uDitherStrength"),
+      uSamplingMode: webgl.getUniformLocation(prog2, "uSamplingMode"),
       uCurvature: webgl.getUniformLocation(prog2, "uCurvature"),
       uScanlineStrength: webgl.getUniformLocation(prog2, "uScanlineStrength"),
       uScanline2Strength: webgl.getUniformLocation(prog2, "uScanline2Strength"),
       uScanlineBrightnessFade: webgl.getUniformLocation(prog2, "uScanlineBrightnessFade"),
       uVignetteStrength: webgl.getUniformLocation(prog2, "uVignetteStrength"),
+      uLcdCrosstalkStrength: webgl.getUniformLocation(prog2, "uLcdCrosstalkStrength"),
       uGlowStrength: webgl.getUniformLocation(prog2, "uGlowStrength"),
+      uHorizontalSharpness: webgl.getUniformLocation(prog2, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: webgl.getUniformLocation(prog2, "uRgbConvergenceOffset"),
+      uSmoothStrength: webgl.getUniformLocation(prog2, "uSmoothStrength"),
       uPhosphorStrength: webgl.getUniformLocation(prog2, "uPhosphorStrength"),
       uSpotMaskStrength: webgl.getUniformLocation(prog2, "uSpotMaskStrength"),
       uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
       uBlackFloor: webgl.getUniformLocation(prog2, "uBlackFloor"),
+      uFocusStrength: webgl.getUniformLocation(prog2, "uFocusStrength"),
+      uFocusSize: webgl.getUniformLocation(prog2, "uFocusSize"),
+      uFocusCenter: webgl.getUniformLocation(prog2, "uFocusCenter"),
+      uBasicContrast: webgl.getUniformLocation(prog2, "uBasicContrast"),
+      uBasicSaturation: webgl.getUniformLocation(prog2, "uBasicSaturation"),
+      uReflectiveLcdBase: webgl.getUniformLocation(prog2, "uReflectiveLcdBase"),
+      uLightDependentTint: webgl.getUniformLocation(prog2, "uLightDependentTint"),
+      uGrainVisibilityMode: webgl.getUniformLocation(prog2, "uGrainVisibilityMode"),
+      uBeamDarkCutoff: webgl.getUniformLocation(prog2, "uBeamDarkCutoff"),
+      uBeamHorizontalSpread: webgl.getUniformLocation(prog2, "uBeamHorizontalSpread"),
+      uBeamStripeStrength: webgl.getUniformLocation(prog2, "uBeamStripeStrength"),
+      uBeamWhiteBloom: webgl.getUniformLocation(prog2, "uBeamWhiteBloom"),
+      uBeamWarmBloom: webgl.getUniformLocation(prog2, "uBeamWarmBloom"),
+      uScreenFaceGlow: webgl.getUniformLocation(prog2, "uScreenFaceGlow"),
       uLumaAmount: webgl.getUniformLocation(prog2, "uLumaAmount"),
       uLumaLow: webgl.getUniformLocation(prog2, "uLumaLow"),
       uLumaHigh: webgl.getUniformLocation(prog2, "uLumaHigh"),
@@ -2573,11 +2686,14 @@ function setupRenderer(webgl, onReady, initialSettings) {
       uPhosphorDotLightBalance: webgl.getUniformLocation(prog2, "uPhosphorDotLightBalance"),
       uPixelAspect: webgl.getUniformLocation(prog2, "uPixelAspect"),
       uPhosphorDotMode: webgl.getUniformLocation(prog2, "uPhosphorDotMode"),
+      uPhosphorDotShape: webgl.getUniformLocation(prog2, "uPhosphorDotShape"),
       uPhosphorDotInternalScale: webgl.getUniformLocation(prog2, "uPhosphorDotInternalScale"),
+      uPhosphorDotSizeResponse: webgl.getUniformLocation(prog2, "uPhosphorDotSizeResponse"),
       uPhosphorDotBrightCore: webgl.getUniformLocation(prog2, "uPhosphorDotBrightCore"),
       uPhosphorDotCellFill: webgl.getUniformLocation(prog2, "uPhosphorDotCellFill"),
       uPhosphorDotFlatDisc: webgl.getUniformLocation(prog2, "uPhosphorDotFlatDisc"),
       uPhosphorDotNeighborBlend: webgl.getUniformLocation(prog2, "uPhosphorDotNeighborBlend"),
+      uPhosphorDotGrainStrength: webgl.getUniformLocation(prog2, "uPhosphorDotGrainStrength"),
       uCloseUpNoiseStrength: webgl.getUniformLocation(prog2, "uCloseUpNoiseStrength"),
       uTime: webgl.getUniformLocation(prog2, "uTime"),
       uFlipH: webgl.getUniformLocation(prog2, "uFlipH"),
@@ -2641,6 +2757,11 @@ function ensureRendererFramebuffer(gl, renderer) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  // Creating the FBO texture above leaves it bound on the active texture unit.
+  // Pass 1 must sample from renderer.texture, not the just-created render target,
+  // otherwise Chrome/ANGLE detects a framebuffer-texture feedback loop.
+  gl.bindTexture(gl.TEXTURE_2D, renderer.texture);
 
   renderer.fbo = fbo;
   renderer.fboTexture = texture;

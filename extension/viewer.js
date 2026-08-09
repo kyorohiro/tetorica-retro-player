@@ -83,16 +83,32 @@ const isPc98PaletteMode = (mode) =>
   || mode === "pc98_512_sat"
   || mode === "pc98_4096";
 
+function isBeamCrossModeEnabled(settings) {
+  return settings.phosphorDotShape === "beam";
+}
+
+function isPhosphorDotModeEnabled(settings) {
+  return settings.phosphorDotShape !== "beam" &&
+    (settings.spotMaskStrength ?? 0) > 0.001 &&
+    (
+      (settings.phosphorDotInternalScale ?? 1) > 1 ||
+      !!settings.phosphorDotBrightCore ||
+      (settings.phosphorDotCellFill ?? 0) > 0.001 ||
+      !!settings.phosphorDotFlatDisc ||
+      !!settings.phosphorDotNeighborBlend
+    );
+}
+
 function getWindowsLiteShaderSources(settings) {
   const pass1 = isPc98PaletteMode(settings.paletteMode)
     ? FILTER_FRAGMENT_PASS1_PC98_LITE
     : FILTER_FRAGMENT_PASS1_LITE;
-  const pass2 = settings.phosphorDotShape === "beam"
+  const pass2 = isBeamCrossModeEnabled(settings)
     ? FILTER_FRAGMENT_PASS2_BEAM_LITE
     :
     settings.phosphorStrength > 0.001
     || settings.spotMaskStrength > 0.001
-    || settings.phosphorDotMode
+    || isPhosphorDotModeEnabled(settings)
       ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
       : FILTER_FRAGMENT_PASS2_LITE;
   return { pass1, pass2 };
@@ -285,6 +301,9 @@ async function init() {
 
   await startCapture(session.streamId);
   applyCurrentSettings();
+  if (session?.sourceHasProtectedVideo) {
+    setStatus("Protected video detected in source tab. Chrome may return gray frames.");
+  }
 }
 
 async function getCaptureSession() {
@@ -318,6 +337,9 @@ async function startCapture(streamId) {
   await connectStreamAudio(mediaStream);
   startedAt = performance.now();
   drawFrame();
+  if (currentSession?.sourceHasProtectedVideo) {
+    setStatus("Protected video detected in source tab. Chrome may return gray frames.");
+  }
 }
 
 function stopCapture() {
@@ -381,7 +403,10 @@ function drawFrame() {
     gl.uniform1f(uniformLocations.uTime, (performance.now() - startedAt) / 1000);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, fboTexture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.activeTexture(gl.TEXTURE0);
   } else {
     gl.useProgram(activeProgram);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -637,6 +662,14 @@ function updateCanvasAspectRatio() {
   canvas.style.setProperty("--canvas-aspect-ratio", `${getCaptureAspectRatio()}`);
 }
 
+function getDisplaySize() {
+  const dpr = window.devicePixelRatio || 1;
+  return {
+    width: Math.max(1, Math.round((canvas.clientWidth || gl?.drawingBufferWidth || 1) * dpr)),
+    height: Math.max(1, Math.round((canvas.clientHeight || gl?.drawingBufferHeight || 1) * dpr)),
+  };
+}
+
 function logCaptureAspect(reason) {
   void reason;
 }
@@ -648,10 +681,48 @@ function applyPreset(presetKey) {
   applyPass2Settings();
 }
 
+function getPhosphorDotLimitedTargetSize(settings, visibleWidth, visibleHeight) {
+  const isBeamMode = isBeamCrossModeEnabled(settings);
+  const isDotMode = isPhosphorDotModeEnabled(settings);
+  if ((!isBeamMode && !isDotMode) || !visibleWidth || !visibleHeight) {
+    return { w: settings.targetWidth, h: settings.targetHeight };
+  }
+
+  const bulbRadius = settings.bulbRadius ?? 0.22;
+  const beamCapFloor = 1.2;
+  const beamBloomFloor = (settings.beamWhiteBloom ?? 1) * 0.6;
+  const baseMinCellPixels = isBeamMode
+    ? Math.max(beamCapFloor, beamBloomFloor)
+    : Math.max(1.1, 2.15 + bulbRadius * 1.15);
+  const internalScale = Math.min(4, Math.max(1, Number(settings.phosphorDotInternalScale ?? 1)));
+  const effectiveInternalScale = isBeamMode ? 1 : internalScale;
+  const minCellPixels = Math.max(1.0, baseMinCellPixels / effectiveInternalScale);
+  const scaledW = settings.targetWidth * effectiveInternalScale;
+  const scaledH = settings.targetHeight * effectiveInternalScale;
+  const maxWidth = Math.max(1, Math.floor(visibleWidth / minCellPixels));
+  const maxHeight = Math.max(1, Math.floor(visibleHeight / minCellPixels));
+  const scale = Math.min(
+    1,
+    maxWidth / Math.max(scaledW, 1),
+    maxHeight / Math.max(scaledH, 1),
+  );
+
+  return {
+    w: Math.max(1, Math.round(scaledW * scale)),
+    h: Math.max(1, Math.round(scaledH * scale)),
+  };
+}
+
 function applyPass1Settings() {
   if (!gl || !pass1Program || !pass1UniformLocations) return;
+  const displaySize = getDisplaySize();
+  const limitedSize = getPhosphorDotLimitedTargetSize(
+    currentSettings,
+    displaySize.width,
+    displaySize.height,
+  );
   gl.useProgram(pass1Program);
-  gl.uniform2f(pass1UniformLocations.uTargetSize, currentSettings.targetWidth, currentSettings.targetHeight);
+  gl.uniform2f(pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
   gl.uniform1f(pass1UniformLocations.uColorLevels, currentSettings.colorLevels);
   gl.uniform1f(pass1UniformLocations.uDitherStrength, currentSettings.ditherStrength);
   gl.uniform1f(pass1UniformLocations.uPaletteMode, paletteModeToUniform(currentSettings.paletteMode));
@@ -669,18 +740,48 @@ function applyPass1Settings() {
 
 function applyPass2Settings() {
   if (!gl || !program || !uniformLocations) return;
+  const displaySize = getDisplaySize();
+  const limitedSize = getPhosphorDotLimitedTargetSize(
+    currentSettings,
+    displaySize.width,
+    displaySize.height,
+  );
   gl.useProgram(program);
-  gl.uniform2f(uniformLocations.uTargetSize, currentSettings.targetWidth, currentSettings.targetHeight);
+  gl.uniform2f(uniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
+  gl.uniform2f(uniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
+  gl.uniform2f(uniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  gl.uniform2f(uniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
+  gl.uniform1f(uniformLocations.uColorLevels, currentSettings.colorLevels);
+  gl.uniform1f(uniformLocations.uDitherStrength, currentSettings.ditherStrength);
+  gl.uniform1f(uniformLocations.uSamplingMode, 0);
   gl.uniform1f(uniformLocations.uCurvature, currentSettings.curvature);
   gl.uniform1f(uniformLocations.uScanlineStrength, currentSettings.scanlineStrength);
   gl.uniform1f(uniformLocations.uScanline2Strength, currentSettings.scanline2Strength);
   gl.uniform1f(uniformLocations.uScanlineBrightnessFade, currentSettings.scanlineBrightnessFade);
   gl.uniform1f(uniformLocations.uVignetteStrength, currentSettings.vignetteStrength);
+  gl.uniform1f(uniformLocations.uLcdCrosstalkStrength, currentSettings.lcdCrosstalkStrength ?? 0);
   gl.uniform1f(uniformLocations.uGlowStrength, currentSettings.glowStrength);
+  gl.uniform1f(uniformLocations.uHorizontalSharpness, currentSettings.horizontalSharpness ?? 0);
+  gl.uniform1f(uniformLocations.uRgbConvergenceOffset, currentSettings.rgbConvergenceOffset ?? 0);
+  gl.uniform1f(uniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
   gl.uniform1f(uniformLocations.uPhosphorStrength, currentSettings.phosphorStrength);
   gl.uniform1f(uniformLocations.uSpotMaskStrength, currentSettings.spotMaskStrength);
   gl.uniform1f(uniformLocations.uBulbRadius, currentSettings.bulbRadius ?? 0.22);
   gl.uniform1f(uniformLocations.uBlackFloor, currentSettings.blackFloor ?? 0.01);
+  gl.uniform1f(uniformLocations.uBasicContrast, currentSettings.basicContrast ?? 1);
+  gl.uniform1f(uniformLocations.uBasicSaturation, currentSettings.basicSaturation ?? 1);
+  gl.uniform1f(uniformLocations.uReflectiveLcdBase, currentSettings.reflectiveLcdBase ?? 0);
+  gl.uniform1f(uniformLocations.uLightDependentTint, currentSettings.lightDependentTint ?? 0);
+  gl.uniform1f(uniformLocations.uGrainVisibilityMode, currentSettings.grainVisibilityMode ? 1 : 0);
+  gl.uniform1f(uniformLocations.uBeamDarkCutoff, currentSettings.beamDarkCutoff ?? 0);
+  gl.uniform1f(uniformLocations.uBeamHorizontalSpread, currentSettings.beamHorizontalSpread ?? 0.5);
+  gl.uniform1f(uniformLocations.uBeamStripeStrength, currentSettings.beamStripeStrength ?? 0);
+  gl.uniform1f(uniformLocations.uBeamWhiteBloom, currentSettings.beamWhiteBloom ?? 1);
+  gl.uniform1f(uniformLocations.uBeamWarmBloom, currentSettings.beamWarmBloom ?? 0);
+  gl.uniform1f(uniformLocations.uScreenFaceGlow, currentSettings.screenFaceGlow ?? 0);
+  gl.uniform1f(uniformLocations.uFocusStrength, currentSettings.focusStrength ?? 0);
+  gl.uniform2f(uniformLocations.uFocusSize, currentSettings.focusSizeX ?? 0.35, currentSettings.focusSizeY ?? 0.2);
+  gl.uniform2f(uniformLocations.uFocusCenter, currentSettings.focusCenterX ?? 0.5, currentSettings.focusCenterY ?? 0.5);
   gl.uniform1f(uniformLocations.uLumaAmount, currentSettings.lumaAmount ?? 1);
   gl.uniform1f(uniformLocations.uLumaLow, currentSettings.lumaLow ?? 0);
   gl.uniform1f(uniformLocations.uLumaHigh, currentSettings.lumaHigh ?? 1);
@@ -696,8 +797,13 @@ function applyPass2Settings() {
     (Math.max(gl.drawingBufferWidth, 1) * Math.max(currentSettings.targetHeight, 1)) /
       (Math.max(gl.drawingBufferHeight, 1) * Math.max(currentSettings.targetWidth, 1)),
   );
-  gl.uniform1f(uniformLocations.uPhosphorDotMode, currentSettings.phosphorDotMode ? 1 : 0);
-  gl.uniform1f(uniformLocations.uPhosphorDotInternalScale, currentSettings.phosphorDotInternalScale ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotMode, isPhosphorDotModeEnabled(currentSettings) ? 1 : 0);
+  gl.uniform1f(uniformLocations.uPhosphorDotShape, phosphorDotShapeToUniform(currentSettings.phosphorDotShape));
+  gl.uniform1f(
+    uniformLocations.uPhosphorDotInternalScale,
+    Math.min(4, Math.max(1, Number(currentSettings.phosphorDotInternalScale ?? 1))),
+  );
+  gl.uniform1f(uniformLocations.uPhosphorDotSizeResponse, currentSettings.phosphorDotSizeResponse ?? 1);
   gl.uniform1f(uniformLocations.uPhosphorDotBrightCore, currentSettings.phosphorDotBrightCore ? 1 : 0);
   gl.uniform1f(uniformLocations.uPhosphorDotCellFill, currentSettings.phosphorDotCellFill ?? 0);
   gl.uniform1f(uniformLocations.uPhosphorDotFlatDisc, currentSettings.phosphorDotFlatDisc ? 1 : 0);
@@ -705,6 +811,7 @@ function applyPass2Settings() {
     uniformLocations.uPhosphorDotNeighborBlend,
     currentSettings.phosphorDotNeighborBlend ? 1 : 0,
   );
+  gl.uniform1f(uniformLocations.uPhosphorDotGrainStrength, currentSettings.phosphorDotGrainStrength ?? 0);
   gl.uniform1f(uniformLocations.uCloseUpNoiseStrength, currentSettings.closeUpNoiseStrength);
 }
 
@@ -996,18 +1103,43 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
 
   webgl.useProgram(prog2);
   webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
+  webgl.uniform1i(webgl.getUniformLocation(prog2, "uSourceTexture"), 1);
   uniformLocations = {
     uTargetSize: webgl.getUniformLocation(prog2, "uTargetSize"),
+    uOutputSize: webgl.getUniformLocation(prog2, "uOutputSize"),
+    uDisplaySize: webgl.getUniformLocation(prog2, "uDisplaySize"),
+    uBeamSourceSize: webgl.getUniformLocation(prog2, "uBeamSourceSize"),
+    uColorLevels: webgl.getUniformLocation(prog2, "uColorLevels"),
+    uDitherStrength: webgl.getUniformLocation(prog2, "uDitherStrength"),
+    uSamplingMode: webgl.getUniformLocation(prog2, "uSamplingMode"),
     uCurvature: webgl.getUniformLocation(prog2, "uCurvature"),
     uScanlineStrength: webgl.getUniformLocation(prog2, "uScanlineStrength"),
     uScanline2Strength: webgl.getUniformLocation(prog2, "uScanline2Strength"),
     uScanlineBrightnessFade: webgl.getUniformLocation(prog2, "uScanlineBrightnessFade"),
     uVignetteStrength: webgl.getUniformLocation(prog2, "uVignetteStrength"),
+    uLcdCrosstalkStrength: webgl.getUniformLocation(prog2, "uLcdCrosstalkStrength"),
     uGlowStrength: webgl.getUniformLocation(prog2, "uGlowStrength"),
+    uHorizontalSharpness: webgl.getUniformLocation(prog2, "uHorizontalSharpness"),
+    uRgbConvergenceOffset: webgl.getUniformLocation(prog2, "uRgbConvergenceOffset"),
+    uSmoothStrength: webgl.getUniformLocation(prog2, "uSmoothStrength"),
     uPhosphorStrength: webgl.getUniformLocation(prog2, "uPhosphorStrength"),
     uSpotMaskStrength: webgl.getUniformLocation(prog2, "uSpotMaskStrength"),
     uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
     uBlackFloor: webgl.getUniformLocation(prog2, "uBlackFloor"),
+    uBasicContrast: webgl.getUniformLocation(prog2, "uBasicContrast"),
+    uBasicSaturation: webgl.getUniformLocation(prog2, "uBasicSaturation"),
+    uReflectiveLcdBase: webgl.getUniformLocation(prog2, "uReflectiveLcdBase"),
+    uLightDependentTint: webgl.getUniformLocation(prog2, "uLightDependentTint"),
+    uGrainVisibilityMode: webgl.getUniformLocation(prog2, "uGrainVisibilityMode"),
+    uBeamDarkCutoff: webgl.getUniformLocation(prog2, "uBeamDarkCutoff"),
+    uBeamHorizontalSpread: webgl.getUniformLocation(prog2, "uBeamHorizontalSpread"),
+    uBeamStripeStrength: webgl.getUniformLocation(prog2, "uBeamStripeStrength"),
+    uBeamWhiteBloom: webgl.getUniformLocation(prog2, "uBeamWhiteBloom"),
+    uBeamWarmBloom: webgl.getUniformLocation(prog2, "uBeamWarmBloom"),
+    uScreenFaceGlow: webgl.getUniformLocation(prog2, "uScreenFaceGlow"),
+    uFocusStrength: webgl.getUniformLocation(prog2, "uFocusStrength"),
+    uFocusSize: webgl.getUniformLocation(prog2, "uFocusSize"),
+    uFocusCenter: webgl.getUniformLocation(prog2, "uFocusCenter"),
     uLumaAmount: webgl.getUniformLocation(prog2, "uLumaAmount"),
     uLumaLow: webgl.getUniformLocation(prog2, "uLumaLow"),
     uLumaHigh: webgl.getUniformLocation(prog2, "uLumaHigh"),
@@ -1020,11 +1152,14 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
     uPhosphorDotLightBalance: webgl.getUniformLocation(prog2, "uPhosphorDotLightBalance"),
     uPixelAspect: webgl.getUniformLocation(prog2, "uPixelAspect"),
     uPhosphorDotMode: webgl.getUniformLocation(prog2, "uPhosphorDotMode"),
+    uPhosphorDotShape: webgl.getUniformLocation(prog2, "uPhosphorDotShape"),
     uPhosphorDotInternalScale: webgl.getUniformLocation(prog2, "uPhosphorDotInternalScale"),
+    uPhosphorDotSizeResponse: webgl.getUniformLocation(prog2, "uPhosphorDotSizeResponse"),
     uPhosphorDotBrightCore: webgl.getUniformLocation(prog2, "uPhosphorDotBrightCore"),
     uPhosphorDotCellFill: webgl.getUniformLocation(prog2, "uPhosphorDotCellFill"),
     uPhosphorDotFlatDisc: webgl.getUniformLocation(prog2, "uPhosphorDotFlatDisc"),
     uPhosphorDotNeighborBlend: webgl.getUniformLocation(prog2, "uPhosphorDotNeighborBlend"),
+    uPhosphorDotGrainStrength: webgl.getUniformLocation(prog2, "uPhosphorDotGrainStrength"),
     uCloseUpNoiseStrength: webgl.getUniformLocation(prog2, "uCloseUpNoiseStrength"),
     uTime: webgl.getUniformLocation(prog2, "uTime"),
   };
@@ -1068,6 +1203,11 @@ function ensureFramebuffer(width, height) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, nextFbo);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, nextTexture, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  // Creating the FBO texture above leaves it bound on the active texture unit.
+  // Pass 1 must continue sampling from the live capture texture, otherwise
+  // Chrome can detect a framebuffer/texture feedback loop and render garbage.
+  gl.bindTexture(gl.TEXTURE_2D, texture);
 
   fbo = nextFbo;
   fboTexture = nextTexture;
@@ -1136,5 +1276,12 @@ function paletteModeToUniform(mode) {
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
   if (mode === "anime") return 10;
+  return 0;
+}
+
+function phosphorDotShapeToUniform(shape) {
+  if (shape === "heart") return 1;
+  if (shape === "beam") return 2;
+  if (shape === "square") return 3;
   return 0;
 }

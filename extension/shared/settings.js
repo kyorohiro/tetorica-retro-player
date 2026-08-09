@@ -596,11 +596,16 @@ export const PRESETS = {
   },
   phosphorDotLite: {
     label: "Phosphor Dot Bright",
+    autoTargetSize: true,
     targetWidth: 640,
     targetHeight: 360,
     colorLevels: 256,
     ditherStrength: 0,
     paletteMode: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    basicContrast: 1.2,
+    basicSaturation: 1,
     curvature: 0.03,
     scanlineStrength: 0,
     scanline2Strength: 0,
@@ -613,16 +618,35 @@ export const PRESETS = {
     blackFloor: 0,
     outputBrightness: 0.83,
     phosphorDotLightBalance: 0.65,
+    phosphorDotShape: "heart",
     phosphorDotInternalScale: 1.4,
     phosphorDotBrightCore: true,
     phosphorDotCellFill: 0.132,
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0.11892071150027211,
     scanlineBrightnessFade: 0.6,
+    preFilterDownscaleEnabled: true,
+    coloredGlowEnabled: true,
+    postCurvatureEnabled: false,
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.73,
+    compositeChromaDelay: 0.24,
+    compositeNoise: 0.49,
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 1,
+    beamStripeStrength: 1,
+    beamWhiteBloom: 1,
+    beamWarmBloom: 0,
+    screenFaceGlow: 0.07,
     monoTint: "gray",
     neonBoost: 1,
     neonSaturation: 1,
     neonDetail: 1,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
     isAudioFxEnabled: false,
     lofiAmount: 0,
     wowFlutterAmount: 0,
@@ -631,6 +655,7 @@ export const PRESETS = {
   },
   phosphorDot: {
     label: "Phosphor Dot",
+    autoTargetSize: true,
     targetWidth: 320,
     targetHeight: 180,
     colorLevels: 32,
@@ -642,6 +667,8 @@ export const PRESETS = {
     vignetteStrength: 0.3,
     glowStrength: 0.78,
     smoothStrength: 0.55,
+    horizontalSharpness: 1.8,
+    basicContrast: 1.12,
     phosphorStrength: 0,
     spotMaskStrength: 0.3,
     bulbRadius: 0.5,
@@ -653,6 +680,11 @@ export const PRESETS = {
     phosphorDotCellFill: 0.12,
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
+    phosphorDotGrainStrength: 0.12,
+    preFilterDownscaleEnabled: true,
+    coloredGlowEnabled: true,
+    screenFaceGlow: 0.22,
+    beamWarmBloom: 0.22,
     monoTint: "gray",
     neonBoost: 1,
     neonSaturation: 1,
@@ -666,10 +698,12 @@ export const PRESETS = {
   },
   phosphorDotSmooth: {
     label: "Phosphor Smooth",
+    autoTargetSize: true,
     targetWidth: 320,
     targetHeight: 180,
     colorLevels: 32,
     ditherStrength: 0.55,
+    samplingMode: "average_fast_4",
     paletteMode: 0,
     curvature: 0.065,
     scanlineStrength: 0,
@@ -677,6 +711,8 @@ export const PRESETS = {
     vignetteStrength: 0.3,
     glowStrength: 0.78,
     smoothStrength: 0.88,
+    horizontalSharpness: 0.12,
+    basicContrast: 1.12,
     phosphorStrength: 0,
     spotMaskStrength: 0.3,
     bulbRadius: 0.5,
@@ -688,6 +724,16 @@ export const PRESETS = {
     phosphorDotCellFill: 0.12,
     phosphorDotFlatDisc: true,
     phosphorDotNeighborBlend: true,
+    phosphorDotGrainStrength: 0.12,
+    preFilterDownscaleEnabled: true,
+    coloredGlowEnabled: true,
+    screenFaceGlow: 0.22,
+    beamWarmBloom: 0.22,
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.73,
+    compositeChromaDelay: 0.24,
+    compositeNoise: 0.49,
     monoTint: "gray",
     neonBoost: 1,
     neonSaturation: 1,
@@ -700,6 +746,7 @@ export const PRESETS = {
   },
   crtBeam: {
     label: "CRT Beam",
+    autoTargetSize: true,
     targetWidth: 320,
     targetHeight: 180,
     colorLevels: 32,
@@ -716,7 +763,17 @@ export const PRESETS = {
     bulbRadius: 0.5,
     blackFloor: 0.001,
     outputBrightness: 1,
+    screenFaceGlow: 0.33,
+    phosphorDotShape: "beam",
     phosphorDotInternalScale: 2,
+    preFilterDownscaleEnabled: true,
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 1.27,
+    beamStripeStrength: 0.95,
+    beamWhiteBloom: 1.14,
+    beamWarmBloom: 0.28,
+    basicContrast: 1.59,
+    basicSaturation: 1.83,
     monoTint: "gray",
     neonBoost: 1,
     neonSaturation: 1,
@@ -729,6 +786,7 @@ export const PRESETS = {
   },
   crtBeamNtsc: {
     label: "CRT Beam NTSC",
+    autoTargetSize: true,
     targetWidth: 1480,
     targetHeight: 1080,
     colorLevels: 32,
@@ -749,17 +807,38 @@ export const PRESETS = {
     bulbRadius: 0.5,
     blackFloor: 0.001,
     outputBrightness: 1.35,
+    basicContrast: 1.03,
+    basicSaturation: 1.46,
+    phosphorDotShape: "beam",
     phosphorDotLightBalance: 1,
     phosphorDotInternalScale: 2,
     phosphorDotBrightCore: false,
     phosphorDotCellFill: 0,
     phosphorDotFlatDisc: false,
     phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0,
     scanlineBrightnessFade: 0.67,
+    preFilterDownscaleEnabled: true,
+    coloredGlowEnabled: true,
+    postCurvatureEnabled: false,
+    compositeEnabled: true,
+    compositeAmount: 1,
+    compositeChromaBlur: 0.61,
+    compositeChromaDelay: 0.11,
+    compositeNoise: 0.88,
+    beamDarkCutoff: 0,
+    beamHorizontalSpread: 0.5,
+    beamStripeStrength: 0.7,
+    beamWhiteBloom: 1.06,
+    beamWarmBloom: 0.4,
+    screenFaceGlow: 0.17,
     monoTint: "gray",
     neonBoost: 1,
     neonSaturation: 1,
     neonDetail: 1,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
     isAudioFxEnabled: false,
     lofiAmount: 0,
     wowFlutterAmount: 0,
@@ -1035,6 +1114,7 @@ export const DEFAULT_SETTINGS = {
   presetKey: DEFAULT_PRESET_KEY,
   audioPresetKey: "custom",
   crtAspect: 1.0,
+  autoTargetSize: false,
   paletteMode: "mono",
   monoTint: "amber",
   targetWidth: 960,
@@ -1050,6 +1130,7 @@ export const DEFAULT_SETTINGS = {
   phosphorStrength: 0.05,
   spotMaskStrength: 0.0,
   phosphorDotMode: false,
+  phosphorDotShape: "circle",
   bulbRadius: 0.22,
   blackFloor: 0.01,
   lumaAmount: 1.0,
@@ -1062,7 +1143,7 @@ export const DEFAULT_SETTINGS = {
   saturationKnee: 0.2,
   outputBrightness: 1.0,
   phosphorDotLightBalance: 1.0,
-  phosphorDotInternalScale: false,
+  phosphorDotInternalScale: 1,
   phosphorDotBrightCore: false,
   phosphorDotCellFill: 0.0,
   phosphorDotFlatDisc: false,
@@ -1114,6 +1195,26 @@ export const OVERLAY_TARGET_LIMITS = {
   max: 12,
 };
 
+function isPhosphorDotShape(value) {
+  return value === "circle" || value === "heart" || value === "beam" || value === "square";
+}
+
+function normalizePhosphorDotInternalScale(value, fallback) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return clamp(value, 1, 4);
+  }
+  if (value === true) {
+    return clamp(typeof fallback === "number" ? fallback : 2, 1, 4);
+  }
+  if (value === false) {
+    return 1;
+  }
+  if (typeof fallback === "number" && Number.isFinite(fallback)) {
+    return clamp(fallback, 1, 4);
+  }
+  return 1;
+}
+
 export function normalizeSettings(candidate) {
   const presetKey = typeof candidate?.presetKey === "string" && candidate.presetKey in PRESETS
     ? candidate.presetKey
@@ -1147,6 +1248,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.crtAspect === "number"
         ? clamp(candidate.crtAspect, 0.9, 1.1)
         : basePresetSettings.crtAspect,
+    autoTargetSize:
+      typeof candidate?.autoTargetSize === "boolean"
+        ? candidate.autoTargetSize
+        : basePresetSettings.autoTargetSize ?? DEFAULT_SETTINGS.autoTargetSize,
     paletteMode,
     monoTint,
     targetWidth:
@@ -1201,6 +1306,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.phosphorDotMode === "boolean"
         ? candidate.phosphorDotMode
         : basePresetSettings.phosphorDotMode ?? DEFAULT_SETTINGS.phosphorDotMode,
+    phosphorDotShape:
+      isPhosphorDotShape(candidate?.phosphorDotShape)
+        ? candidate.phosphorDotShape
+        : basePresetSettings.phosphorDotShape ?? DEFAULT_SETTINGS.phosphorDotShape,
     bulbRadius:
       typeof candidate?.bulbRadius === "number"
         ? clamp(candidate.bulbRadius, 0.001, 0.5)
@@ -1250,9 +1359,10 @@ export function normalizeSettings(candidate) {
         ? clamp(candidate.phosphorDotLightBalance, 0, 2)
         : basePresetSettings.phosphorDotLightBalance ?? DEFAULT_SETTINGS.phosphorDotLightBalance,
     phosphorDotInternalScale:
-      typeof candidate?.phosphorDotInternalScale === "boolean"
-        ? candidate.phosphorDotInternalScale
-        : basePresetSettings.phosphorDotInternalScale ?? DEFAULT_SETTINGS.phosphorDotInternalScale,
+      normalizePhosphorDotInternalScale(
+        candidate?.phosphorDotInternalScale,
+        basePresetSettings.phosphorDotInternalScale ?? DEFAULT_SETTINGS.phosphorDotInternalScale,
+      ),
     phosphorDotBrightCore:
       typeof candidate?.phosphorDotBrightCore === "boolean"
         ? candidate.phosphorDotBrightCore
@@ -1425,6 +1535,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.crtAspect === "number"
         ? preset.crtAspect
         : DEFAULT_SETTINGS.crtAspect,
+    autoTargetSize:
+      typeof preset.autoTargetSize === "boolean"
+        ? preset.autoTargetSize
+        : DEFAULT_SETTINGS.autoTargetSize,
     targetWidth: preset.targetWidth,
     targetHeight: preset.targetHeight,
     matchTargetAspect:
@@ -1452,6 +1566,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.phosphorDotMode === "boolean"
         ? preset.phosphorDotMode
         : DEFAULT_SETTINGS.phosphorDotMode,
+    phosphorDotShape:
+      isPhosphorDotShape(preset.phosphorDotShape)
+        ? preset.phosphorDotShape
+        : DEFAULT_SETTINGS.phosphorDotShape,
     bulbRadius:
       typeof preset.bulbRadius === "number"
         ? preset.bulbRadius
@@ -1501,9 +1619,10 @@ export function applyPresetToSettings(presetKey) {
         ? preset.phosphorDotLightBalance
         : DEFAULT_SETTINGS.phosphorDotLightBalance,
     phosphorDotInternalScale:
-      typeof preset.phosphorDotInternalScale === "boolean"
-        ? preset.phosphorDotInternalScale
-        : DEFAULT_SETTINGS.phosphorDotInternalScale,
+      normalizePhosphorDotInternalScale(
+        preset.phosphorDotInternalScale,
+        DEFAULT_SETTINGS.phosphorDotInternalScale,
+      ),
     phosphorDotBrightCore:
       typeof preset.phosphorDotBrightCore === "boolean"
         ? preset.phosphorDotBrightCore

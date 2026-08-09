@@ -776,6 +776,14 @@ type WindowsLiteCompiledPrograms = {
   beamCompose?: WebGLProgram;
 };
 
+type SharedCompiledProgramStage =
+  | "pass1"
+  | "pass2"
+  | "compositeMid"
+  | "phosphorCore"
+  | "beamKernel"
+  | "beamCompose";
+
 function beginProgramCompile(
   gl: WebGL2RenderingContext,
 ): SubmittedProgram {
@@ -965,6 +973,8 @@ export class TetoricaRetroVideoPipeline {
     WindowsLiteVariantKey,
     WindowsLiteCompiledPrograms
   >();
+  private readonly sharedProgramCache = new Map<string, WebGLProgram>();
+  private readonly sharedProgramCompileInflight = new Map<string, Promise<WebGLProgram>>();
   private windowsLitePrewarmStarted = false;
   private isDisposed = false;
   private compileSourceNonce = 0;
@@ -1560,6 +1570,47 @@ export class TetoricaRetroVideoPipeline {
     logShaderCompileInfo(key);
   }
 
+  private getSharedProgramCacheKey(fragmentSource: string) {
+    return fragmentSource;
+  }
+
+  private async getOrCompileSharedProgram(
+    stage: SharedCompiledProgramStage,
+    fragmentSource: string,
+    variantKey: WindowsLiteVariantKey,
+  ) {
+    const cacheKey = this.getSharedProgramCacheKey(fragmentSource);
+    const cached = this.sharedProgramCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const inflight = this.sharedProgramCompileInflight.get(cacheKey);
+    if (inflight) {
+      return inflight;
+    }
+
+    const compilePromise = (async () => {
+      await this.updateCompileState(`Compiling shader (${variantKey} / ${stage})...`);
+      this.logProgramCompile(`variant:${variantKey}:${stage}`);
+      const program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, fragmentSource);
+      try {
+        await this.updateCompileState(`Linking shader (${variantKey} / ${stage})...`);
+        await waitAndVerifyPrograms(this.gl, [program]);
+        this.sharedProgramCache.set(cacheKey, program);
+        return program;
+      } catch (error) {
+        this.gl.deleteProgram(program);
+        throw error;
+      } finally {
+        this.sharedProgramCompileInflight.delete(cacheKey);
+      }
+    })();
+
+    this.sharedProgramCompileInflight.set(cacheKey, compilePromise);
+    return compilePromise;
+  }
+
   private reserveCompileTurn() {
     const waitForCompileTurn = this.windowsLiteCompileSerialPromise.catch(() => {});
     let releaseCompileTurn!: () => void;
@@ -1809,51 +1860,25 @@ export class TetoricaRetroVideoPipeline {
           : beamKernelBaseSource
         : null;
 
-      await this.updateCompileState(`Compiling shader (${variantKey} / pass 1)...`);
-      this.logProgramCompile(`variant:${variantKey}:pass1`);
-      const pass1Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass1Source);
-      let compositeMidProgram: WebGLProgram | null = null;
-      let phosphorCoreProgram: WebGLProgram | null = null;
-      let pass2Program: WebGLProgram | null = null;
-      let beamKernelProgram: WebGLProgram | null = null;
-      let beamComposeProgram: WebGLProgram | null = null;
-
       try {
-        await this.updateCompileState(`Linking shader (${variantKey} / pass 1)...`);
-        await waitAndVerifyPrograms(this.gl, [pass1Program]);
+        const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source, variantKey);
+        let compositeMidProgram: WebGLProgram | null = null;
+        let phosphorCoreProgram: WebGLProgram | null = null;
+        let beamKernelProgram: WebGLProgram | null = null;
+        let beamComposeProgram: WebGLProgram | null = null;
         if (compositeMidSource) {
-          await this.updateCompileState(`Compiling shader (${variantKey} / composite mid)...`);
-          this.logProgramCompile(`variant:${variantKey}:compositeMid`);
-          compositeMidProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, compositeMidSource);
-          await this.updateCompileState(`Linking shader (${variantKey} / composite mid)...`);
-          await waitAndVerifyPrograms(this.gl, [compositeMidProgram]);
+          compositeMidProgram = await this.getOrCompileSharedProgram("compositeMid", compositeMidSource, variantKey);
         }
         if (phosphorCoreSource) {
-          await this.updateCompileState(`Compiling shader (${variantKey} / phosphor core)...`);
-          this.logProgramCompile(`variant:${variantKey}:phosphorCore`);
-          phosphorCoreProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, phosphorCoreSource);
-          await this.updateCompileState(`Linking shader (${variantKey} / phosphor core)...`);
-          await waitAndVerifyPrograms(this.gl, [phosphorCoreProgram]);
+          phosphorCoreProgram = await this.getOrCompileSharedProgram("phosphorCore", phosphorCoreSource, variantKey);
         }
         if (beamKernelSource) {
-          await this.updateCompileState(`Compiling shader (${variantKey} / beam kernel)...`);
-          this.logProgramCompile(`variant:${variantKey}:beamKernel`);
-          beamKernelProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamKernelSource);
-          await this.updateCompileState(`Linking shader (${variantKey} / beam kernel)...`);
-          await waitAndVerifyPrograms(this.gl, [beamKernelProgram]);
+          beamKernelProgram = await this.getOrCompileSharedProgram("beamKernel", beamKernelSource, variantKey);
         }
         if (beamComposeSource) {
-          await this.updateCompileState(`Compiling shader (${variantKey} / beam compose)...`);
-          this.logProgramCompile(`variant:${variantKey}:beamCompose`);
-          beamComposeProgram = submitProgram(this.gl, VERTEX_SHADER_SOURCE, beamComposeSource);
-          await this.updateCompileState(`Linking shader (${variantKey} / beam compose)...`);
-          await waitAndVerifyPrograms(this.gl, [beamComposeProgram]);
+          beamComposeProgram = await this.getOrCompileSharedProgram("beamCompose", beamComposeSource, variantKey);
         }
-        await this.updateCompileState(`Compiling shader (${variantKey} / pass 2)...`);
-        this.logProgramCompile(`variant:${variantKey}:pass2`);
-        pass2Program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, pass2Source);
-        await this.updateCompileState(`Linking shader (${variantKey} / pass 2)...`);
-        await waitAndVerifyPrograms(this.gl, [pass2Program]);
+        const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source, variantKey);
         if (this.isDisposed || this.gl.isContextLost()) {
           throw new Error("Pipeline was disposed during shader compile.");
         }
@@ -1875,12 +1900,6 @@ export class TetoricaRetroVideoPipeline {
         );
         return entry;
       } catch (error) {
-        this.gl.deleteProgram(pass1Program);
-        if (compositeMidProgram) this.gl.deleteProgram(compositeMidProgram);
-        if (phosphorCoreProgram) this.gl.deleteProgram(phosphorCoreProgram);
-        if (pass2Program) this.gl.deleteProgram(pass2Program);
-        if (beamKernelProgram) this.gl.deleteProgram(beamKernelProgram);
-        if (beamComposeProgram) this.gl.deleteProgram(beamComposeProgram);
         throw error;
       } finally {
         releaseCompileTurn();
@@ -2734,18 +2753,12 @@ export class TetoricaRetroVideoPipeline {
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);
     if (this.windowsLiteMode) {
-      // filterPass1Program/filterPass2Program are just the currently-active
-      // entry from this cache, not separately owned — free the cache instead
-      // to also release the other pre-warmed variants.
-      for (const { pass1, pass2, compositeMid, phosphorCore, beamKernel, beamCompose } of this.windowsLiteProgramCache.values()) {
-        gl.deleteProgram(pass1);
-        gl.deleteProgram(pass2);
-        if (compositeMid) gl.deleteProgram(compositeMid);
-        if (phosphorCore) gl.deleteProgram(phosphorCore);
-        if (beamKernel) gl.deleteProgram(beamKernel);
-        if (beamCompose) gl.deleteProgram(beamCompose);
+      for (const program of this.sharedProgramCache.values()) {
+        gl.deleteProgram(program);
       }
       this.windowsLiteProgramCache.clear();
+      this.sharedProgramCache.clear();
+      this.sharedProgramCompileInflight.clear();
     } else {
       if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
         gl.deleteProgram(this.filterPass1Program);

@@ -753,7 +753,7 @@ spotMaskStrengthInput.addEventListener("input", () => {
 phosphorDotInternalScaleInput.addEventListener("change", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
-    phosphorDotInternalScale: phosphorDotInternalScaleInput.checked,
+    phosphorDotInternalScale: phosphorDotInternalScaleInput.checked ? 2 : 1,
   });
 });
 
@@ -1135,7 +1135,7 @@ function renderSettings(settings) {
   phosphorStrengthValue.textContent = settings.phosphorStrength.toFixed(2);
   spotMaskStrengthInput.value = String(settings.spotMaskStrength);
   spotMaskStrengthValue.textContent = settings.spotMaskStrength.toFixed(2);
-  phosphorDotInternalScaleInput.checked = settings.phosphorDotInternalScale;
+  phosphorDotInternalScaleInput.checked = (settings.phosphorDotInternalScale ?? 1) > 1;
   phosphorDotBrightCoreInput.checked = settings.phosphorDotBrightCore;
   phosphorDotFlatDiscInput.checked = settings.phosphorDotFlatDisc;
   phosphorDotNeighborBlendInput.checked = settings.phosphorDotNeighborBlend;
