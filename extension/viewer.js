@@ -505,6 +505,10 @@ function drawFrame() {
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
   if (program && uniformLocations && pass1Program && pass1UniformLocations) {
+    if (compileBusyOverlay && !compileBusyOverlay.hidden) {
+      publishCompileState(false, "");
+      renderViewerCompileState("");
+    }
     applyPass1Settings();
     applyPass2Settings();
     ensureFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
