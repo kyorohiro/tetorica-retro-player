@@ -1,6 +1,6 @@
 # Savepoint
 
-Last updated: 2026-08-08
+Last updated: 2026-08-10
 
 ## For You
 
@@ -191,3 +191,112 @@ Last updated: 2026-08-08
    - `prepareFilterVariant(...)`
    - `initPixi()`
    に時間計測ログを足してボトルネックを切る
+
+## Chrome Extension Savepoint
+
+### Current State
+
+- Chrome Web Store には一旦 release 済み
+- 直近は `extension/` 配下、とくに
+  - `overlayRuntime.js`
+  - `background.js`
+  - `popup.js`
+  を触っていた
+
+### What Was Fixed
+
+#### 1. reload 後に `Overlay current video (Experimental)` が復帰しない問題
+
+- 原因:
+  - `background.js` の再注入条件が `changeInfo.url` に強く依存していた
+  - 単純な `reload` では URL が変わらず、overlay が active 保存されていても `startRetroOverlay()` が再実行されなかった
+- 修正:
+  - `extension/background.js`
+  - `tabs.onUpdated` で `changeInfo.status === "complete"` かつ `OVERLAY_ACTIVE_KEY` に入っているタブなら再注入するように変更
+
+#### 2. `Preparing Shader...` が出っぱなし / compile status がチャタる問題
+
+- `extension/background.js`
+  - `SET_COMPILE_STATUS` を dedupe
+- `extension/viewer.js`
+  - compile state の publish を dedupe
+  - stale setup generation を無視
+- `extension/overlayRuntime.js`
+  - compile state の publish を dedupe
+  - stale setup generation を無視
+
+#### 3. `texImage2D: no video` で overlay が壊れる問題
+
+- `extension/overlayRuntime.js`
+  - `drawableSource` が未準備の `HTMLVideoElement` のときは upload しない
+  - `no video` 系は permanent failure 扱いではなく、その frame だけ skip するようにした
+
+### What Still Looks Broken
+
+#### 1. overlay が重い
+
+- ユーザー体感:
+  - `M2 Mac` でも overlay がもっさりする
+- 強い容疑:
+  - `extension/overlayRuntime.js`
+  - `isActuallyVisibleElement()` の `getComputedStyle(...)`
+  - `isFrontmostMediaAtCenter()` の `document.elementsFromPoint(...)`
+  - これらが draw loop で高頻度に走っている
+- 途中対応:
+  - 可視判定キャッシュ導入を始めた
+  - `VISIBILITY_CHECK_FRAME_WINDOW = 24` に上げた
+  - `isInViewport(..., rect)` / `isFrontmostMediaAtCenter(..., rect)` のように rect 再利用を入れ始めた
+- ただし:
+  - 「1 秒に 2-3 回でよい」という判断にまだ完全には寄せ切れていない
+  - 次回はもっと強く間引いてよい
+
+#### 2. `Overlay current video (Experimental)` の上下反転
+
+- 現状:
+  - overlay モードだけ上下反転して見える
+  - これは 2-4 回前くらいの修正から発生
+- 試したこと:
+  - `UNPACK_FLIP_Y_WEBGL` を `true -> false`
+  - overlay 専用の base flip を追加
+  - `pass1/pass2` の `uFlipV` の相殺を疑って補正
+- まだ直っていない
+- 有力メモ:
+  - overlay 側でだけ座標系が viewer とズレている
+  - `pass1` / `pass2` のどちらで反転しているかを一度ログで切るのがよい
+
+#### 3. overlay の target 復帰 / 追随は不安定な場面がまだある
+
+- 以前からの流れ:
+  - hidden / covered な video の上に古い overlay が残る問題に対して
+    - `isActuallyVisibleElement`
+    - `isFrontmostMediaAtCenter`
+    - source identity tracking
+    を追加した
+- 副作用:
+  - 判定コストが上がっている可能性が高い
+- 次回:
+  - 「重さを優先してまず間引く」
+  - それでも残るズレだけ個別に詰める
+
+### Important Files For Next Time
+
+- `extension/overlayRuntime.js`
+- `extension/background.js`
+- `extension/popup.js`
+- `extension/viewer.js`
+
+### Recommended Next Steps For Extension
+
+1. `overlayRuntime.js` の可視判定をさらに間引く
+   - 目安はユーザー希望どおり `1秒に2-3回`
+   - `elementsFromPoint` / `getComputedStyle` を draw loop 直下から極力外す
+2. overlay の上下反転を切り分ける
+   - `pass1` 時点で逆なのか
+   - `pass2` で逆になるのか
+   - upload 時点なのか
+3. overlay の target 復帰と重さのトレードオフを整理する
+   - まずは軽さ優先
+4. release 後の不具合として
+   - `reload 後に overlay が戻ること`
+   - `Overlay current video` が ON のまま効かない状態がないこと
+   を先に再確認する
