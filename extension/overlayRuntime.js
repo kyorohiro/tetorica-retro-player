@@ -2880,7 +2880,10 @@ function applyFlipUniforms(gl, renderer, flipH, flipV) {
   if (renderer.program && renderer.uniformLocations) {
     gl.useProgram(renderer.program);
     gl.uniform1f(renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
-    gl.uniform1f(renderer.uniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
+    gl.uniform1f(
+      renderer.uniformLocations.uFlipV,
+      renderer.pass1Program ? (flipV ? 1 : 0) : (effectiveFlipV ? 1 : 0),
+    );
   }
 }
 
