@@ -1131,6 +1131,13 @@ function createOverlay(settings) {
       return;
     }
 
+    if (!isDrawableSourceReady(drawableSource)) {
+      surface.canvas.style.setProperty("display", "none", "important");
+      surface.hideCompileOverlay();
+      surface.hideFailureOverlay();
+      return;
+    }
+
     if (rejectedElements.has(targetElement)) {
       surface.canvas.style.setProperty("display", "none", "important");
       surface.hideCompileOverlay();
@@ -1293,6 +1300,11 @@ function createOverlay(settings) {
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
       }
     } catch (error) {
+      if (isTransientVideoUploadError(error, drawableSource)) {
+        surface.canvas.style.setProperty("display", "none", "important");
+        surface.hideFailureOverlay();
+        return;
+      }
       if (error instanceof DOMException && error.name === "SecurityError") {
         rejectedElements.add(targetElement);
         surface.canvas.style.setProperty("display", "none", "important");
@@ -2600,6 +2612,47 @@ function isUsableVideo(candidate) {
   return rect.width > 32 &&
     rect.height > 32 &&
     (hasVisiblePixels || hasEnoughMediaState);
+}
+
+function isDrawableSourceReady(source) {
+  if (source instanceof HTMLVideoElement) {
+    return (
+      source.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      source.videoWidth > 0 &&
+      source.videoHeight > 0
+    );
+  }
+
+  if (source instanceof HTMLImageElement) {
+    return source.complete && source.naturalWidth > 0 && source.naturalHeight > 0;
+  }
+
+  if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap) {
+    return source.width > 0 && source.height > 0;
+  }
+
+  if (typeof HTMLCanvasElement !== "undefined" && source instanceof HTMLCanvasElement) {
+    return source.width > 0 && source.height > 0;
+  }
+
+  if (typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas) {
+    return source.width > 0 && source.height > 0;
+  }
+
+  return true;
+}
+
+function isTransientVideoUploadError(error, source) {
+  if (!(source instanceof HTMLVideoElement)) {
+    return false;
+  }
+  const message = error instanceof Error ? String(error.message || "") : "";
+  return (
+    source.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+    source.videoWidth < 1 ||
+    source.videoHeight < 1 ||
+    message.includes("no video")
+  );
 }
 
 function isRelaxedVideoCandidate(candidate) {
