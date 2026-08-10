@@ -1491,7 +1491,7 @@ export function normalizeSettings(candidate) {
         : basePresetSettings.closeUpNoiseStrength ?? DEFAULT_SETTINGS.closeUpNoiseStrength,
     smoothStrength:
       typeof candidate?.smoothStrength === "number"
-        ? clamp(candidate.smoothStrength, 0, 1)
+        ? clamp(candidate.smoothStrength, 0, 4)
         : basePresetSettings.smoothStrength ?? DEFAULT_SETTINGS.smoothStrength,
     toonSteps:
       typeof candidate?.toonSteps === "number"

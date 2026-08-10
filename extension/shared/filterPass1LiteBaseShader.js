@@ -120,12 +120,33 @@ vec3 sampleSourceColorAtCell(vec2 cell)
     return center;
   }
 
+  float smoothAmount = clamp(uSmoothStrength, 0.0, 4.0);
+  float localMix = min(smoothAmount, 1.0);
+  float wideMix = clamp((smoothAmount - 1.0) / 3.0, 0.0, 1.0);
   vec3 left = sampleBaseSourceColorAtCell(cell + vec2(-1.0, 0.0));
   vec3 right = sampleBaseSourceColorAtCell(cell + vec2(1.0, 0.0));
   vec3 up = sampleBaseSourceColorAtCell(cell + vec2(0.0, -1.0));
   vec3 down = sampleBaseSourceColorAtCell(cell + vec2(0.0, 1.0));
   vec3 blurred = center * 0.4 + (left + right + up + down) * 0.15;
-  return mix(center, blurred, clamp(uSmoothStrength, 0.0, 1.0));
+  vec3 baseSmoothed = mix(center, blurred, localMix);
+  if (wideMix <= 0.001) {
+    return baseSmoothed;
+  }
+
+  vec3 left2 = sampleBaseSourceColorAtCell(cell + vec2(-2.0, 0.0));
+  vec3 right2 = sampleBaseSourceColorAtCell(cell + vec2(2.0, 0.0));
+  vec3 up2 = sampleBaseSourceColorAtCell(cell + vec2(0.0, -2.0));
+  vec3 down2 = sampleBaseSourceColorAtCell(cell + vec2(0.0, 2.0));
+  vec3 upLeft = sampleBaseSourceColorAtCell(cell + vec2(-1.0, -1.0));
+  vec3 upRight = sampleBaseSourceColorAtCell(cell + vec2(1.0, -1.0));
+  vec3 downLeft = sampleBaseSourceColorAtCell(cell + vec2(-1.0, 1.0));
+  vec3 downRight = sampleBaseSourceColorAtCell(cell + vec2(1.0, 1.0));
+  vec3 wideBlurred =
+    center * 0.24 +
+    (left + right + up + down) * 0.10 +
+    (upLeft + upRight + downLeft + downRight) * 0.06 +
+    (left2 + right2 + up2 + down2) * 0.03;
+  return mix(baseSmoothed, wideBlurred, wideMix);
 }
 
 vec3 sampleConvergedColor(vec2 uv, vec2 texel)
