@@ -94,6 +94,7 @@ let recordedChunks = [];
 let isAlarmArmed = false;
 let alarmOverlayEl = null;
 let alarmClockIntervalId = null;
+let activeRendererVariantSignature = null;
 
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
@@ -191,6 +192,13 @@ function getWindowsLiteShaderSources(settings) {
           : null,
     beamCompose: pass2Variant === "beam_crt" ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE : null,
   };
+}
+
+function getRendererVariantSignature(settings) {
+  return JSON.stringify({
+    variantKey: getWindowsLiteVariantKey(settings),
+    beamDownscale: shouldUsePreFilterDownscale(settings),
+  });
 }
 
 function logViewerAudioRecovery(label, payload = {}, level = "info") {
@@ -359,12 +367,12 @@ async function init() {
     throw new Error("WebGL2 is not available in this extension page.");
   }
 
+  currentSettings = await loadSettings();
   setupRenderer(gl);
   resizeCanvas();
   window.addEventListener("resize", handleWindowResize);
   fitButton?.addEventListener("click", toggleFitMode);
   recordButton?.addEventListener("click", handleRecordButtonClick);
-  currentSettings = await loadSettings();
   applyCurrentSettings();
   if (chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener(handleStorageChanged);
@@ -1163,6 +1171,7 @@ async function disposeAudioEngine() {
 }
 
 function setupRenderer(webgl) {
+  activeRendererVariantSignature = getRendererVariantSignature(currentSettings);
   // --- Passthrough program (tiny; compiles instantly, safe to link-check now) ---
   // Used while the full filter shader compiles in the background so the canvas
   // shows raw video immediately instead of staying black.
@@ -1183,6 +1192,17 @@ function setupRenderer(webgl) {
   // --- Filter programs (lite variants only) ---
   const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
   const shaderSources = getWindowsLiteShaderSources(currentSettings);
+  console.info("[viewer shader route]", {
+    presetKey: currentSettings.presetKey,
+    phosphorDotShape: currentSettings.phosphorDotShape,
+    variantKey: getWindowsLiteVariantKey(currentSettings),
+    beamDownscale: Boolean(shaderSources.beamDownscale),
+    beamKernel: Boolean(shaderSources.beamKernel),
+    beamCompose: Boolean(shaderSources.beamCompose),
+    beamStripeStrength: currentSettings.beamStripeStrength ?? 0,
+    beamWhiteBloom: currentSettings.beamWhiteBloom ?? 1,
+    beamWarmBloom: currentSettings.beamWarmBloom ?? 0,
+  });
   const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1);
   const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2);
 
@@ -1460,6 +1480,12 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
   } else {
     beamComposeUniformLocations = null;
   }
+  console.info("[viewer shader ready]", {
+    variantKey: getWindowsLiteVariantKey(currentSettings),
+    beamDownscaleProgram: Boolean(beamDownscaleProgram),
+    beamKernelProgram: Boolean(beamKernelProgram),
+    beamComposeProgram: Boolean(beamComposeProgram),
+  });
   applyCurrentSettings();
 }
 
@@ -1588,7 +1614,14 @@ function handleStorageChanged(changes, areaName) {
     return;
   }
 
-  currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
+  const nextSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
+  const previousSignature = activeRendererVariantSignature;
+  const nextSignature = getRendererVariantSignature(nextSettings);
+  currentSettings = nextSettings;
+  if (gl && previousSignature !== nextSignature) {
+    setupRenderer(gl);
+    return;
+  }
   applyCurrentSettings();
 }
 

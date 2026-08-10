@@ -282,7 +282,10 @@ async function openViewerTab(session = currentSession) {
   const existing = tabs[0];
 
   if (existing?.id) {
-    await chrome.tabs.update(existing.id, { active: true });
+    await chrome.tabs.update(existing.id, {
+      url: VIEWER_URL,
+      active: true,
+    });
     return;
   }
 

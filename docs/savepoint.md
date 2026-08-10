@@ -1,134 +1,154 @@
 # Savepoint
 
-最終更新: 2026-07-28
+最終更新: 2026-08-09
 
 ## いまの到達点
 
-- `main` に戻したあと、CRT / NES / Composite 周りの調整を継続中。
-- 基本方針として、`LCD` 系を普段使いの基準ライン、`CRT` 系を高性能PC向けの演出ラインとして考える。
-- `CRT Beam` は「CRTっぽさ優先」で、初回 compile/link が長い前提の preset として扱う方針。
-- `phosphorDot` は文字優先、`phosphorDotSmooth` はモアレ対策寄り、という使い分けにした。
-- `colored glow` は入っており、明るくしても色が飛びにくくなっている。
-- `Composite / NTSC` の最小実装を pass1 に追加済み。
-  - 新しい pass は増やしていない。
-  - Windows Chrome ANGLE の compile 負荷を増やしにくい実装を優先している。
-- 効果は出るようになったが、まだ「変化が強く分かる」ほどではない可能性がある。
+- Chrome extension 周りを修正中。
+- `Capture current tab` は再び動作しており、上下に少し圧縮される問題は修正済み。
+- `Overlay current video (Experimental)` は一度 `video` タグを見失っていたが、検出は復旧済み。
+- Overlay は現在、filter 自体は再びかかる状態まで戻せている。
+- ただし Beam 系はまだ「本体 viewer と同じ見た目」になっていない。
+- spotlight と flip も途中まで直しているが、最終確認は未完了。
 
-## 直近で触った主なファイル
+## 今回の主対象ファイル
 
-- `src/retro-player/retro/filterPass1LiteShader.ts`
-- `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
-- `src/retro-player/hooks/useRetroFilterState.ts`
-- `src/retro-player/hooks/persistedRetroSettings.ts`
-- `src/retro-player/hooks/presetFile.ts`
-- `src/retro-player/retro/config.ts`
-- `src/retro-player/components/RetroFilterPanel.tsx`
-- `src/retro-player/components/RetroControlPanel.tsx`
+- `extension/overlayRuntime.js`
+- `extension/viewer.js`
+- `extension/shared/settings.js`
+- 必要に応じて
+  - `extension/shared/filterPass2BeamLiteShader.js`
+  - `extension/shared/filterPass2BeamLiteCompositeShader.js`
+  - `extension/shared/filterPass2BeamLiteCrtPostShader.js`
+  - `extension/shared/filterPass2BeamLiteCrtKernelShader.js`
+  - `extension/shared/filterPass2BeamLiteCrtComposeShader.js`
 
-## Composite / NTSC の現状
+## 直近で直したこと
 
-### 追加した UI / state
+### 1. Capture current tab の縦圧縮
 
-- `Composite / NTSC` セクションを追加
-- 設定項目:
-  - `compositeEnabled`
-  - `compositeAmount`
-  - `compositeChromaBlur`
-  - `compositeChromaDelay`
-  - `compositeNoise`
+- `extension/viewer.js` の `getSessionAspectRatio()` で `sourceOuterWidth` を混ぜていたのが怪しく、`sourceViewportWidth / sourceViewportHeight` ベースに戻した。
+- ユーザー確認では「上下に少し圧縮がかかる」は解消済み。
 
-### 実装の置き場所
+### 2. Overlay current video の復旧
 
-- 実処理は `filterPass1LiteShader.ts` の pass1 内。
-- `RGB -> YIQっぽい表現 -> 横方向のクロマぼかし / 遅延 / ノイズ -> RGBへ戻す`
-  という軽量近似。
-- 新しい shader variant や独立 pass は追加していない。
+- `overlayRuntime.js` の media 検出を単純系に戻したことで、`video` タグを見つけられるようになった。
+- shader/runtime 世代ずれで canvas が灰色になる問題も一度解消した。
+- pass2 が要求する `uSourceTexture` や追加 uniform を overlay 側で埋める修正を入れてある。
 
-### いまの見立て
+### 3. spotlight / flip の途中修正
 
-- 変化は起きる。
-- ただし、ユーザー視点では「そんなに変化が見えない」可能性がある。
-- 次に詰めるなら:
-  - chroma blur の効きをさらに分かりやすくする
-  - phase jitter / dot crawl 系を足す
-  - ただし ANGLE compile 時間の悪化には注意
+- spotlight は `mask-image` を `!important` 付きで当てる方向へ変更。
+- flip は video 要素だけでなく overlay canvas 側にも `transform` を入れるよう変更。
+- ただし、この変更の最終動作確認はまだ必要。
 
-## CRT / phosphor 周りの整理
+## Beam の現状整理
 
-- `LCD / Edge / Native`:
-  - 普段使い向け
-  - 低負荷・可読性優先
-- `phosphorDot`:
-  - 文字の読みやすさ優先
-  - CRTっぽさは残るが、モアレは出やすい
-- `phosphorDotSmooth`:
-  - 低周波化や平滑化寄り
-  - モアレは減るが、文字や輪郭が柔らかくなりやすい
-- `CRT Beam`:
-  - CRTっぽさ優先
-  - compile/link や pass の重さを許容する高性能PC向け
-- `colored glow`:
-  - on/off 比較できるようにしてある
-  - glow を強めても色味が抜けにくいので使いやすい
+### 重要: overlay Beam と viewer Beam はまだ同じルートではない
 
-## NES / Safari / Native の整理
+- `extension/overlayRuntime.js` の Beam は現状:
+  - `pass1 = FILTER_FRAGMENT_PASS1_LITE`
+  - `pass2 = FILTER_FRAGMENT_PASS2_BEAM_LITE`
+  - つまり基本は 2 パス
+- `extension/viewer.js` の Beam は現状:
+  - variant 分岐あり
+  - `beamDownscale`
+  - `beamKernel`
+  - `beamCompose`
+  - final pass2
+  - という multi-pass ルート
 
-- `jsnes` は将来的にはサポート継続対象。
-- Safari ブラウザでは、`captureStream` 経由や video loop 系で重くなりやすかった。
-- `Native` 表示は軽くしやすいが、Audio の扱いは構成差分に注意。
-- `docs/issues` 側に Safari や NES direct canvas + auxAudioStream の注意点を残している流れだった。
+### なぜ Beam が別物に見えるか
 
-## いま困っていること
+- overlay 側には viewer の `beam_full / beam_crt` ルートがまだ移植されていない。
+- そのため、
+  - stripe 感
+  - 光源の発光感
+  - kernel/compose 由来の質感
+  が不足して見える可能性が高い。
 
-- `Composite / NTSC` の見た目変化がまだ弱い。
-- CRTらしさを上げると、ノートPCサイズでは文字が潰れやすい。
-- 文字を優先すると CRTっぽさが薄くなる。
-- `CRT Beam` は質感は面白いが、Windows ANGLE compile/link が重い。
+### さらに重要: Capture current tab 側でも Beam が失敗している
 
-## 次回の再開ポイント
+- ユーザー報告では、overlay だけでなく `Capture current tab` でも Beam がダメ。
+- つまり overlay へ移植する前に、viewer 側の Beam variant 自体が期待通りの見た目になっているか確認が必要。
 
-次に再開する人は、まず以下を見る:
+## viewer 側 Beam の見立て
 
-1. `src/retro-player/retro/filterPass1LiteShader.ts`
-2. `src/retro-player/components/RetroFilterPanel.tsx`
-3. `src/retro-player/video/TetoricaRetroVideoPipeline.ts`
-4. `src/retro-player/hooks/useRetroFilterState.ts`
+### 現在の分岐
 
-## 次にやる候補
+- `extension/viewer.js` の `getWindowsLiteVariantKey(settings)` では:
+  - `presetKey === "crtBeam"` のときだけ `basic_nearest:beam_crt`
+  - それ以外で `phosphorDotShape === "beam"` なら `${pass1}:beam_full`
 
-### A. Composite / NTSC を見た目でもっと分かりやすくする
+### 疑いポイント
 
-- `compositeAmount` を上げたときの色にじみを強める
-- 横方向だけでなく、位相ずれっぽい揺れを少量足す
-- 可能なら `dot crawl` っぽい見え方を追加する
+- ユーザーが Beam preset を使っているつもりでも、実際には `presetKey` が `custom` に落ちていて `beam_full` に入っている可能性がある。
+- その場合、`crtBeam` と `beam_full` で見た目差が出る。
+- まず viewer で「いま実際にどの variant に入っているか」を確認する必要がある。
 
-### B. preset / default の整理
+## 次回すぐやること
 
-- `LCD` 系をデフォルトの基準として育てる
-- `Composite / NTSC` はデフォルト off のまま維持
-- `CRT Beam` はデフォルトで使わない前提
-- `phosphorDot` / `phosphorDotSmooth` の役割を preset 名か説明文でも分かるようにする
+### A. viewer の実際の Beam variant を確認する
 
-### C. Windows 実機確認
+- `extension/viewer.js` に一時ログを入れて確認する:
+  - `currentSettings.presetKey`
+  - `currentSettings.phosphorDotShape`
+  - `getWindowsLiteVariantKey(currentSettings)` の結果
+- これで
+  - `crtBeam`
+  - `beam_full`
+  - `beam_crt`
+  のどれに入っているかを確定する。
 
-- Chrome + ANGLE で compile/link の体感を確認
-- `Composite / NTSC` を有効にしても compile の悪化がほぼ無いか確認
+### B. viewer 側 Beam の見た目不一致を先に解く
 
-## 動作確認の目安
+- もし `Capture current tab` でも Beam がダメなら、overlay へ移植する前に viewer 側を先に直す。
+- 調べるポイント:
+  - `beamDownscale` の入力が `fboTexture` で正しいか
+  - `limitedSize` の算出が Beam に対して強すぎないか
+  - `beamKernel` / `beamCompose` に渡す uniform が preset と一致しているか
+  - `crtBeam` と `beam_full` の見た目差が想定通りか
 
-- `Composite / NTSC`
-  - `Composite amount`: 0.8 前後
-  - `Chroma blur`: 0.7 前後
-  - `Chroma delay`: `0.4` / `-0.4`
-  - `Composite noise`: 0.2 前後
-- 比較対象:
-  - 輪郭の色にじみ
-  - 白地の色ずれ
-  - 細線の滲み方
-  - テキスト可読性
+### C. overlay に viewer の beam_full / beam_crt ルートを移植する
+
+- viewer 側が正常と確認できたら、overlay にも同じ構造を持っていく。
+- 移植対象:
+  - variant key の分岐
+  - `beamDownscale`
+  - `beamKernel`
+  - `beamCompose`
+  - FBO 管理
+  - final pass2 への texture bind
+- 目的は「overlay Beam を viewer と同じ見た目にする」こと。
+
+## 今のコードで覚えておくこと
+
+### overlayRuntime.js
+
+- いまは overlay を壊さないため、Beam selector は既知で動く `FILTER_FRAGMENT_PASS2_BEAM_LITE` に戻している。
+- `FILTER_FRAGMENT_PASS1_LITE_NEAREST` / `FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE` へ寄せた変更は一度戻した。
+- これは「Overlay current video が効かなくなる」副作用を避けるため。
+
+### viewer.js
+
+- multi-pass Beam ルートはすでにある。
+- なので overlay 移植の元ネタは viewer を使えばよい。
+- ただし、その viewer 側もユーザー体感では Beam が失敗しているので、まず viewer の variant と見た目を確定する。
+
+## いまのユーザー確認結果
+
+- `Capture current tab`
+  - 動く
+  - 上下圧縮は修正済み
+  - Beam はまだダメ
+- `Overlay current video (Experimental)`
+  - `video` タグ検出は復旧
+  - filter はかかるようになった
+  - Beam は別物
+  - spotlight と flip はまだ要確認
 
 ## 注意
 
-- 作業ツリーは dirty の可能性が高い。ユーザーの未コミット変更や release 物が混ざっているので、むやみに戻さない。
-- `CRT Beam` や shader 周りは、見た目だけでなく Windows の compile/link 時間も副作用として確認する。
-- `Composite / NTSC` はまだ「雰囲気づけの軽量近似」であり、komm64-san のような信号経路モデルそのものではない。
+- 作業ツリーは dirty の可能性がある。既存変更はむやみに戻さない。
+- overlay は「一度動いていたものが、Beam 変更で再度壊れた」ので、Beam を進める時は小さく戻せる単位で進めること。
+- 次はまず viewer に variant ログを入れて、「本当にどの Beam ルートへ入っているか」を確認するのが最優先。
