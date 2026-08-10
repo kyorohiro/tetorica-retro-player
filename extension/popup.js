@@ -29,6 +29,7 @@ const colorLevelsInput = document.getElementById("colorLevels");
 const colorLevelsValue = document.getElementById("colorLevelsValue");
 const ditherStrengthInput = document.getElementById("ditherStrength");
 const ditherStrengthValue = document.getElementById("ditherStrengthValue");
+const shaderCompileCacheBusterEnabledInput = document.getElementById("shaderCompileCacheBusterEnabled");
 const curvatureInput = document.getElementById("curvature");
 const curvatureValue = document.getElementById("curvatureValue");
 const crtAspectInput = document.getElementById("crtAspect");
@@ -696,6 +697,14 @@ ditherStrengthInput.addEventListener("input", () => {
   });
 });
 
+if (shaderCompileCacheBusterEnabledInput) {
+  shaderCompileCacheBusterEnabledInput.addEventListener("change", () => {
+    updateSettings({
+      shaderCompileCacheBusterEnabled: shaderCompileCacheBusterEnabledInput.checked,
+    });
+  });
+}
+
 curvatureInput.addEventListener("input", () => {
   updateSettings({
     presetKey: CUSTOM_PRESET_KEY,
@@ -1130,6 +1139,9 @@ function renderSettings(settings) {
   );
   ditherStrengthInput.value = String(settings.ditherStrength);
   ditherStrengthValue.textContent = settings.ditherStrength.toFixed(2);
+  if (shaderCompileCacheBusterEnabledInput) {
+    shaderCompileCacheBusterEnabledInput.checked = settings.shaderCompileCacheBusterEnabled ?? false;
+  }
   curvatureInput.value = String(settings.curvature);
   curvatureValue.textContent = settings.curvature.toFixed(2);
   crtAspectInput.value = String(settings.crtAspect);

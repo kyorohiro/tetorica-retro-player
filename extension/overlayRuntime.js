@@ -29,6 +29,8 @@ const OVERLAY_KEY = "__tetoricaRetroOverlay";
 let _sharedAudioCtx = null;
 let _sharedAudioSource = null;
 let _sharedAudioSourceEl = null;
+let _shaderCompileNonce = 0;
+const _shaderCompileSessionSalt = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 // lo-fi ボタンの ON/OFF 状態をオーバーレイをまたいで保持する。
 // isAudioFxEnabled（settings の effects on/off）とは独立した制御:
 //   _sharedAudioFxEnabled = "audio chain を使うか"（source の routing 先）
@@ -146,6 +148,22 @@ function getWindowsLiteShaderSources(settings) {
   };
 }
 
+function getOverlayRendererVariantSignature(settings) {
+  return JSON.stringify({
+    variantKey: getWindowsLiteVariantKey(settings),
+    beamDownscale: shouldUsePreFilterDownscale(settings),
+    shaderCompileCacheBusterEnabled: settings.shaderCompileCacheBusterEnabled ?? false,
+  });
+}
+
+function withShaderCompileCacheBuster(source, settings) {
+  if (!settings?.shaderCompileCacheBusterEnabled) {
+    return source;
+  }
+  _shaderCompileNonce += 1;
+  return `${source}\n// shader-id:${_shaderCompileSessionSalt}:${_shaderCompileNonce}`;
+}
+
 export function isRetroOverlayActive() {
   return !!globalThis[OVERLAY_KEY];
 }
@@ -194,6 +212,7 @@ publishOverlayCompileState.lastKey = "";
 
 function createOverlay(settings) {
   let currentSettings = settings;
+  let currentRendererVariantSignature = getOverlayRendererVariantSignature(currentSettings);
   const recordButton = document.createElement("button");
   const opacityButton = document.createElement("button");
   opacityButton.type = "button";
@@ -837,8 +856,16 @@ function createOverlay(settings) {
         return;
       }
 
-      currentSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
-      applySettingsToSurfaces();
+      const nextSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
+      const previousSignature = currentRendererVariantSignature;
+      const nextSignature = getOverlayRendererVariantSignature(nextSettings);
+      currentSettings = nextSettings;
+      currentRendererVariantSignature = nextSignature;
+      if (previousSignature !== nextSignature) {
+        destroySurfaces();
+      } else {
+        applySettingsToSurfaces();
+      }
       syncSurfaceCount(currentSettings.overlayTargetCount);
       if (overlayAudioEngine) overlayAudioEngine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
     };
@@ -2775,8 +2802,8 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   // compiles in the background. After compilation, renderer.program is swapped.
   let passthruProg = null;
   onCompileState?.("Preparing retro filter...");
-  const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT_OVERLAY);
+  const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings);
+  const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT_OVERLAY, initialSettings);
   const passthru = webgl.createProgram();
   if (passthru) {
     webgl.attachShader(passthru, passVert);
@@ -2791,19 +2818,19 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
 
   // --- Filter programs (lite variants only) ---
   onCompileState?.("Compiling shader (pass 1/2)...");
-  const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
+  const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings);
   const shaderSources = getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS);
-  const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1);
+  const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1, initialSettings);
   onCompileState?.("Compiling shader (pass 2/2)...");
-  const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2);
+  const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2, initialSettings);
   const beamDownscaleFrag = shaderSources.beamDownscale
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamDownscale)
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamDownscale, initialSettings)
     : null;
   const beamKernelFrag = shaderSources.beamKernel
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamKernel)
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamKernel, initialSettings)
     : null;
   const beamComposeFrag = shaderSources.beamCompose
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamCompose)
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamCompose, initialSettings)
     : null;
   const prog1 = webgl.createProgram();
   const prog2 = webgl.createProgram();
@@ -2830,19 +2857,19 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   onCompileState?.("Linking shader (pass 2/2)...");
   webgl.linkProgram(prog2);
   if (beamDownscaleProg && beamDownscaleFrag) {
-    webgl.attachShader(beamDownscaleProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
+    webgl.attachShader(beamDownscaleProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
     webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
     onCompileState?.("Linking shader (beam downscale)...");
     webgl.linkProgram(beamDownscaleProg);
   }
   if (beamKernelProg && beamKernelFrag) {
-    webgl.attachShader(beamKernelProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
+    webgl.attachShader(beamKernelProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
     webgl.attachShader(beamKernelProg, beamKernelFrag);
     onCompileState?.("Linking shader (beam kernel)...");
     webgl.linkProgram(beamKernelProg);
   }
   if (beamComposeProg && beamComposeFrag) {
-    webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
+    webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
     webgl.attachShader(beamComposeProg, beamComposeFrag);
     onCompileState?.("Linking shader (beam compose)...");
     webgl.linkProgram(beamComposeProg);
@@ -3338,13 +3365,13 @@ function ensureBeamComposeFramebuffer(gl, renderer, width, height) {
   renderer.beamComposeFboHeight = height;
 }
 
-function compileShader(webgl, type, source) {
+function compileShader(webgl, type, source, settings) {
   const shader = webgl.createShader(type);
   if (!shader) {
     throw new Error("Failed to create shader.");
   }
 
-  webgl.shaderSource(shader, source);
+  webgl.shaderSource(shader, withShaderCompileCacheBuster(source, settings));
   webgl.compileShader(shader);
 
   if (!webgl.getShaderParameter(shader, webgl.COMPILE_STATUS)) {

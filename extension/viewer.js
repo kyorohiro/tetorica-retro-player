@@ -100,6 +100,8 @@ let activeRendererVariantSignature = null;
 let compileStatusTimerId = null;
 let lastPublishedCompileStateKey = "";
 let rendererSetupGeneration = 0;
+let shaderCompileNonce = 0;
+const shaderCompileSessionSalt = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
@@ -203,7 +205,16 @@ function getRendererVariantSignature(settings) {
   return JSON.stringify({
     variantKey: getWindowsLiteVariantKey(settings),
     beamDownscale: shouldUsePreFilterDownscale(settings),
+    shaderCompileCacheBusterEnabled: settings.shaderCompileCacheBusterEnabled ?? false,
   });
+}
+
+function withShaderCompileCacheBuster(source, settings) {
+  if (!settings?.shaderCompileCacheBusterEnabled) {
+    return source;
+  }
+  shaderCompileNonce += 1;
+  return `${source}\n// shader-id:${shaderCompileSessionSalt}:${shaderCompileNonce}`;
 }
 
 function logViewerAudioRecovery(label, payload = {}, level = "info") {
@@ -1663,13 +1674,13 @@ function ensureFramebuffer(width, height) {
   fboHeight = height;
 }
 
-function compileShader(webgl, type, source) {
+function compileShader(webgl, type, source, settings = currentSettings) {
   const shader = webgl.createShader(type);
   if (!shader) {
     throw new Error("Failed to create shader.");
   }
 
-  webgl.shaderSource(shader, source);
+  webgl.shaderSource(shader, withShaderCompileCacheBuster(source, settings));
   webgl.compileShader(shader);
 
   if (!webgl.getShaderParameter(shader, webgl.COMPILE_STATUS)) {
