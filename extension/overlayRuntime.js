@@ -1092,6 +1092,12 @@ function createOverlay(settings) {
       return;
     }
 
+    if (!isInViewport(targetElement)) {
+      surface.updateTarget(null);
+      surface.hide();
+      return;
+    }
+
     if (targetElement instanceof HTMLVideoElement && targetElement.mediaKeys != null) {
       surface.updateTarget(null);
       surface.canvas.style.setProperty("display", "none", "important");
@@ -1947,7 +1953,7 @@ function isVisibleMediaRect(element) {
 function appendUniqueDrawableTarget(targets, candidate, options = {}) {
   const { relaxed = false } = options;
   const isDrawable = relaxed ? isRelaxedDrawableElement(candidate) : isDrawableElement(candidate);
-  if (!candidate || !isDrawable || targets.includes(candidate)) {
+  if (!candidate || !isDrawable || !isInViewport(candidate) || targets.includes(candidate)) {
     return;
   }
 
