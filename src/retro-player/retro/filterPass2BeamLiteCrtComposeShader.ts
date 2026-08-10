@@ -118,7 +118,7 @@ vec3 sampleEmitterColorSmooth(vec2 emitterCell, vec2 sourceSize) {
 void sampleBeamStripeMasks(vec2 uv, vec2 sourceSize, out vec3 stripeMask, out vec3 bleedMask) {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
   vec2 cellCoord = uv * safeSourceSize;
-  float stripeCoordX = cellCoord.x * 3.0;
+  float stripeCoordX = cellCoord.x;
   float cellIndex = floor(cellCoord.x);
   float staggerShift = mod(cellIndex, 2.0) * 0.28;
   vec2 local = fract(vec2(stripeCoordX, cellCoord.y + staggerShift));
@@ -130,11 +130,11 @@ void sampleBeamStripeMasks(vec2 uv, vec2 sourceSize, out vec3 stripeMask, out ve
   float bleedG = (local.x - 0.5) / 0.21;
   float bleedB = (local.x - 5.0 / 6.0) / 0.21;
   vec3 bleedBars = exp(-vec3(bleedR * bleedR, bleedG * bleedG, bleedB * bleedB));
-  float flatBody = smoothstep(0.01, 0.1, local.y) * (1.0 - smoothstep(0.9, 0.99, local.y));
-  float roundedCapsCoord = (local.y - 0.5) / 0.62;
+  float flatBody = smoothstep(0.14, 0.28, local.y) * (1.0 - smoothstep(0.72, 0.86, local.y));
+  float roundedCapsCoord = (local.y - 0.5) / 0.34;
   float roundedCaps = exp(-(roundedCapsCoord * roundedCapsCoord));
-  float verticalShape = clamp(flatBody * 0.48 + roundedCaps * 0.68, 0.0, 1.0);
-  float softVerticalCoord = (local.y - 0.5) / 1.22;
+  float verticalShape = clamp(flatBody * 0.34 + roundedCaps * 0.58, 0.0, 1.0);
+  float softVerticalCoord = (local.y - 0.5) / 0.64;
   float softVertical = exp(-(softVerticalCoord * softVerticalCoord));
   stripeMask = clamp(stripeBars * verticalShape, 0.0, 1.0);
   bleedMask = clamp(bleedBars * softVertical, 0.0, 1.0);
@@ -145,7 +145,7 @@ float getBeamStripeResolve(vec2 sourceSize) {
   vec2 visibleSize = max(min(uDisplaySize, uOutputSize), vec2(1.0));
   float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
   float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
-  float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
+  float subpixelPixels = min(pixelsPerCellX, pixelsPerCellY);
   return clamp(smoothstep(1.0, 1.45, subpixelPixels), 0.0, 1.0);
 }
 
