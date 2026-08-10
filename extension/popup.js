@@ -248,8 +248,16 @@ function renderCompileState(state) {
 }
 
 async function syncCompileWarmupFrame() {
-  const response = await chrome.runtime.sendMessage({ type: "GET_RENDERER_ACTIVITY" }).catch(() => null);
-  const shouldWarmup = Boolean(response?.ok) && !response.hasViewerTab && !response.hasOverlayActive;
+  const [rendererResponse, compileStateResponse] = await Promise.all([
+    chrome.runtime.sendMessage({ type: "GET_RENDERER_ACTIVITY" }).catch(() => null),
+    chrome.runtime.sendMessage({ type: "GET_COMPILE_STATUS" }).catch(() => null),
+  ]);
+  const isCompileActive = Boolean(compileStateResponse?.ok && compileStateResponse.state?.active);
+  const shouldWarmup =
+    Boolean(rendererResponse?.ok) &&
+    !rendererResponse.hasViewerTab &&
+    !rendererResponse.hasOverlayActive &&
+    !isCompileActive;
 
   if (!shouldWarmup) {
     if (compileWarmupFrame?.isConnected) {
@@ -1138,7 +1146,6 @@ async function init() {
   const stored = await chrome.storage.local.get([SETTINGS_STORAGE_KEY, ALARM_STORAGE_KEY]);
   currentSettings = normalizeSettings(stored[SETTINGS_STORAGE_KEY]);
   renderSettings(currentSettings);
-  await persistSettings();
   await syncCompileWarmupFrame();
   await loadOverlayState();
   renderAlarmState(stored[ALARM_STORAGE_KEY]);
