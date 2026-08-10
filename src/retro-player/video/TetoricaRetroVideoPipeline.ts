@@ -57,6 +57,7 @@ export type RetroVideoFilterState = {
   blackFloor: number;
   outputBrightness: number;
   basicContrast: number;
+  shadowCrush: number;
   basicSaturation: number;
   reflectiveLcdBase: number;
   lightDependentTint: number;
@@ -191,6 +192,7 @@ type Pass2UniformLocations = {
   uBlackFloor: WebGLUniformLocation | null;
   uOutputBrightness: WebGLUniformLocation | null;
   uBasicContrast: WebGLUniformLocation | null;
+  uShadowCrush: WebGLUniformLocation | null;
   uBasicSaturation: WebGLUniformLocation | null;
   uReflectiveLcdBase: WebGLUniformLocation | null;
   uLightDependentTint: WebGLUniformLocation | null;
@@ -2196,6 +2198,7 @@ export class TetoricaRetroVideoPipeline {
       uBlackFloor: gl.getUniformLocation(program, "uBlackFloor"),
       uOutputBrightness: gl.getUniformLocation(program, "uOutputBrightness"),
       uBasicContrast: gl.getUniformLocation(program, "uBasicContrast"),
+      uShadowCrush: gl.getUniformLocation(program, "uShadowCrush"),
       uBasicSaturation: gl.getUniformLocation(program, "uBasicSaturation"),
       uReflectiveLcdBase: gl.getUniformLocation(program, "uReflectiveLcdBase"),
       uLightDependentTint: gl.getUniformLocation(program, "uLightDependentTint"),
@@ -2968,6 +2971,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(locs.uBlackFloor, filterState.blackFloor);
     gl.uniform1f(locs.uOutputBrightness, filterState.outputBrightness);
     gl.uniform1f(locs.uBasicContrast, filterState.basicContrast);
+    gl.uniform1f(locs.uShadowCrush, filterState.shadowCrush);
     gl.uniform1f(locs.uBasicSaturation, filterState.basicSaturation);
     gl.uniform1f(locs.uReflectiveLcdBase, filterState.reflectiveLcdBase);
     gl.uniform1f(locs.uLightDependentTint, filterState.lightDependentTint);

@@ -975,6 +975,7 @@ function applyPass2Settings() {
   gl.uniform1f(uniformLocations.uBulbRadius, currentSettings.bulbRadius ?? 0.22);
   gl.uniform1f(uniformLocations.uBlackFloor, currentSettings.blackFloor ?? 0.01);
   gl.uniform1f(uniformLocations.uBasicContrast, currentSettings.basicContrast ?? 1);
+  gl.uniform1f(uniformLocations.uShadowCrush, currentSettings.shadowCrush ?? 0);
   gl.uniform1f(uniformLocations.uBasicSaturation, currentSettings.basicSaturation ?? 1);
   gl.uniform1f(uniformLocations.uReflectiveLcdBase, currentSettings.reflectiveLcdBase ?? 0);
   gl.uniform1f(uniformLocations.uLightDependentTint, currentSettings.lightDependentTint ?? 0);
@@ -1485,6 +1486,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2, setupGeneration) {
     uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
     uBlackFloor: webgl.getUniformLocation(prog2, "uBlackFloor"),
     uBasicContrast: webgl.getUniformLocation(prog2, "uBasicContrast"),
+    uShadowCrush: webgl.getUniformLocation(prog2, "uShadowCrush"),
     uBasicSaturation: webgl.getUniformLocation(prog2, "uBasicSaturation"),
     uReflectiveLcdBase: webgl.getUniformLocation(prog2, "uReflectiveLcdBase"),
     uLightDependentTint: webgl.getUniformLocation(prog2, "uLightDependentTint"),

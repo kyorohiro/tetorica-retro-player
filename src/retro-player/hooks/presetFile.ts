@@ -50,6 +50,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   blackFloor: DEFAULT_PRESET.blackFloor,
   outputBrightness: 1,
   basicContrast: DEFAULT_PRESET.basicContrast ?? 1,
+  shadowCrush: DEFAULT_PRESET.shadowCrush ?? 0,
   basicSaturation: DEFAULT_PRESET.basicSaturation ?? 1,
   reflectiveLcdBase: DEFAULT_PRESET.reflectiveLcdBase ?? 0,
   lightDependentTint: DEFAULT_PRESET.lightDependentTint ?? 0,

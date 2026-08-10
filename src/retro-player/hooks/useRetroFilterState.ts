@@ -52,6 +52,7 @@ export type RetroFilterInitialState = Partial<{
   blackFloor: number;
   outputBrightness: number;
   basicContrast: number;
+  shadowCrush: number;
   basicSaturation: number;
   reflectiveLcdBase: number;
   lightDependentTint: number;
@@ -132,6 +133,7 @@ const doesPresetMatchState = (
     preset.blackFloor === state.blackFloor &&
     (preset.outputBrightness ?? 1) === state.outputBrightness &&
     (preset.basicContrast ?? 1) === state.basicContrast &&
+    (preset.shadowCrush ?? 0) === state.shadowCrush &&
     (preset.basicSaturation ?? 1) === state.basicSaturation &&
     (preset.reflectiveLcdBase ?? 0) === state.reflectiveLcdBase &&
     (preset.lightDependentTint ?? 0) === state.lightDependentTint &&
@@ -243,6 +245,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
     outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
     basicContrast: initialState.basicContrast ?? (DEFAULT_PRESET.basicContrast ?? 1),
+    shadowCrush: initialState.shadowCrush ?? (DEFAULT_PRESET.shadowCrush ?? 0),
     basicSaturation: initialState.basicSaturation ?? (DEFAULT_PRESET.basicSaturation ?? 1),
     reflectiveLcdBase: initialState.reflectiveLcdBase ?? (DEFAULT_PRESET.reflectiveLcdBase ?? 0),
     lightDependentTint: initialState.lightDependentTint ?? (DEFAULT_PRESET.lightDependentTint ?? 0),
@@ -510,6 +513,11 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setBasicContrast = (basicContrast: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.basicContrast === basicContrast ? current : { ...current, basicContrast }));
+  };
+
+  const setShadowCrush = (shadowCrush: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (current.shadowCrush === shadowCrush ? current : { ...current, shadowCrush }));
   };
 
   const setBasicSaturation = (basicSaturation: number) => {
@@ -814,6 +822,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       blackFloor: presetSettings.blackFloor,
       outputBrightness: presetSettings.outputBrightness ?? 1,
       basicContrast: presetSettings.basicContrast ?? 1,
+      shadowCrush: presetSettings.shadowCrush ?? 0,
       basicSaturation: presetSettings.basicSaturation ?? 1,
       reflectiveLcdBase: presetSettings.reflectiveLcdBase ?? 0,
       lightDependentTint: presetSettings.lightDependentTint ?? 0,
@@ -917,6 +926,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBlackFloor,
     setOutputBrightness,
     setBasicContrast,
+    setShadowCrush,
     setBasicSaturation,
     setReflectiveLcdBase,
     setLightDependentTint,

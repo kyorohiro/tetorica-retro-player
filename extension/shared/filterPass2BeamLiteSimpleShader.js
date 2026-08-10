@@ -25,6 +25,7 @@ uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
+uniform float uShadowCrush;
 uniform float uBasicSaturation;
 uniform float uReflectiveLcdBase;
 uniform float uLightDependentTint;
@@ -115,7 +116,15 @@ vec3 applyBasicColorControls(vec3 color)
   float luma = dot(color, vec3(0.299, 0.587, 0.114));
   vec3 saturated = mix(vec3(luma), color, saturation);
   vec3 contrasted = (saturated - 0.5) * contrast + 0.5;
-  return clamp(contrasted, 0.0, 1.0);
+  float shadowAmount = clamp(uShadowCrush, 0.0, 2.0);
+  if (shadowAmount <= 0.001) {
+    return clamp(contrasted, 0.0, 1.0);
+  }
+  float contrastedLuma = dot(contrasted, vec3(0.299, 0.587, 0.114));
+  float shadowMask = 1.0 - smoothstep(0.05, 0.55, contrastedLuma);
+  float crush = clamp(shadowMask * shadowAmount * 0.72, 0.0, 0.95);
+  vec3 shadowed = contrasted * (1.0 - crush);
+  return clamp(shadowed, 0.0, 1.0);
 }
 
 vec3 applyReflectiveLcdBase(vec3 color)

@@ -101,6 +101,7 @@ export type RetroPresetDefinition = {
   blackFloor: number;
   outputBrightness?: number;
   basicContrast?: number;
+  shadowCrush?: number;
   basicSaturation?: number;
   reflectiveLcdBase?: number;
   lightDependentTint?: number;

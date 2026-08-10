@@ -98,6 +98,7 @@ type RetroFilterPanelProps = {
   blackFloor: number;
   outputBrightness: number;
   basicContrast: number;
+  shadowCrush: number;
   basicSaturation: number;
   reflectiveLcdBase: number;
   lightDependentTint: number;
@@ -166,6 +167,7 @@ type RetroFilterPanelProps = {
   onSetBlackFloor: (value: number) => void;
   onSetOutputBrightness: (value: number) => void;
   onSetBasicContrast: (value: number) => void;
+  onSetShadowCrush: (value: number) => void;
   onSetBasicSaturation: (value: number) => void;
   onSetReflectiveLcdBase: (value: number) => void;
   onSetLightDependentTint: (value: number) => void;
@@ -235,6 +237,7 @@ export function RetroFilterPanel({
   blackFloor,
   outputBrightness,
   basicContrast,
+  shadowCrush,
   basicSaturation,
   reflectiveLcdBase,
   lightDependentTint,
@@ -300,6 +303,7 @@ export function RetroFilterPanel({
   onSetBlackFloor,
   onSetOutputBrightness,
   onSetBasicContrast,
+  onSetShadowCrush,
   onSetBasicSaturation,
   onSetReflectiveLcdBase,
   onSetLightDependentTint,
@@ -437,6 +441,8 @@ export function RetroFilterPanel({
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
             "映像全体の明暗差を素直に広げたり弱めたりします。1.00 が標準で、下げると柔らかく、上げるとメリハリが強くなります。",
+          shadowCrush:
+            "暗部だけを選んで締めます。Smooth で残した明るいにじみはなるべく保ったまま、黒や影だけを沈めたい時に使います。",
           basicSaturation:
             "映像全体の色の強さを一括で調整します。1.00 が標準で、下げると落ち着いた色、上げると鮮やかな色になります。",
           reflectiveLcdBase:
@@ -540,6 +546,8 @@ export function RetroFilterPanel({
             "Applies a single uniform brightness gain to the final image, after scanlines, vignette, and every other effect. It's the same kind of last-stage adjustment as CSS brightness, so it doesn't change dot shapes or introduce moire.",
           basicContrast:
             "Adjusts overall contrast in a straightforward way. 1.00 is neutral; lower values soften the image, while higher values add punch.",
+          shadowCrush:
+            "Darkens only the shadow side. Use it when you want to keep bright smooth bleed but still tighten blacks and low-value detail.",
           basicSaturation:
             "Adjusts overall color intensity across the whole image. 1.00 is neutral; lower values mute the image, higher values make it more vivid.",
           reflectiveLcdBase:
@@ -1081,6 +1089,24 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={basicContrast}
                 onChange={(ev) => onSetBasicContrast(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Shadow crush: ${fixedNumber(shadowCrush, 2)}`}
+                  text={helpText.shadowCrush}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={shadowCrush}
+                onChange={(ev) => onSetShadowCrush(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

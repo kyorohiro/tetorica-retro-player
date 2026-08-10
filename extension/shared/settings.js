@@ -1136,6 +1136,7 @@ export const DEFAULT_SETTINGS = {
   bulbRadius: 0.22,
   blackFloor: 0.01,
   basicContrast: 1.0,
+  shadowCrush: 0.0,
   basicSaturation: 1.0,
   reflectiveLcdBase: 0.0,
   lightDependentTint: 0.0,
@@ -1352,6 +1353,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.basicContrast === "number"
         ? clamp(candidate.basicContrast, 0, 2)
         : basePresetSettings.basicContrast ?? DEFAULT_SETTINGS.basicContrast,
+    shadowCrush:
+      typeof candidate?.shadowCrush === "number"
+        ? clamp(candidate.shadowCrush, 0, 2)
+        : basePresetSettings.shadowCrush ?? DEFAULT_SETTINGS.shadowCrush,
     basicSaturation:
       typeof candidate?.basicSaturation === "number"
         ? clamp(candidate.basicSaturation, 0, 2)
@@ -1704,6 +1709,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.basicContrast === "number"
         ? preset.basicContrast
         : DEFAULT_SETTINGS.basicContrast,
+    shadowCrush:
+      typeof preset.shadowCrush === "number"
+        ? preset.shadowCrush
+        : DEFAULT_SETTINGS.shadowCrush,
     basicSaturation:
       typeof preset.basicSaturation === "number"
         ? preset.basicSaturation

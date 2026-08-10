@@ -2844,6 +2844,7 @@ function applySettings(gl, renderer, settings) {
   set2f(uniformLocations.uFocusSize, settings.focusSizeX ?? 0.35, settings.focusSizeY ?? 0.2);
   set2f(uniformLocations.uFocusCenter, settings.focusCenterX ?? 0.5, settings.focusCenterY ?? 0.5);
   set1f(uniformLocations.uBasicContrast, settings.basicContrast ?? 1);
+  set1f(uniformLocations.uShadowCrush, settings.shadowCrush ?? 0);
   set1f(uniformLocations.uBasicSaturation, settings.basicSaturation ?? 1);
   set1f(uniformLocations.uReflectiveLcdBase, settings.reflectiveLcdBase ?? 0);
   set1f(uniformLocations.uLightDependentTint, settings.lightDependentTint ?? 0);
@@ -3241,6 +3242,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       uFocusSize: webgl.getUniformLocation(prog2, "uFocusSize"),
       uFocusCenter: webgl.getUniformLocation(prog2, "uFocusCenter"),
       uBasicContrast: webgl.getUniformLocation(prog2, "uBasicContrast"),
+      uShadowCrush: webgl.getUniformLocation(prog2, "uShadowCrush"),
       uBasicSaturation: webgl.getUniformLocation(prog2, "uBasicSaturation"),
       uReflectiveLcdBase: webgl.getUniformLocation(prog2, "uReflectiveLcdBase"),
       uLightDependentTint: webgl.getUniformLocation(prog2, "uLightDependentTint"),

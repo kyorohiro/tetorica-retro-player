@@ -78,6 +78,8 @@ const saturationKneeInput = document.getElementById("saturationKnee");
 const saturationKneeValue = document.getElementById("saturationKneeValue");
 const outputBrightnessInput = document.getElementById("outputBrightness");
 const outputBrightnessValue = document.getElementById("outputBrightnessValue");
+const shadowCrushInput = document.getElementById("shadowCrush");
+const shadowCrushValue = document.getElementById("shadowCrushValue");
 const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength");
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const smoothStrengthInput = document.getElementById("smoothStrength");
@@ -930,6 +932,14 @@ outputBrightnessInput.addEventListener("input", () => {
     outputBrightness: Number(outputBrightnessInput.value),
   });
 });
+shadowCrushInput.addEventListener("input", () => {
+  const shadowCrush = Number(shadowCrushInput.value);
+  shadowCrushValue.textContent = shadowCrush.toFixed(2);
+  updateSettings({
+    presetKey: CUSTOM_PRESET_KEY,
+    shadowCrush,
+  });
+});
 
 closeUpNoiseStrengthInput.addEventListener("input", () => {
   const closeUpNoiseStrength = Number(closeUpNoiseStrengthInput.value);
@@ -1232,6 +1242,8 @@ function renderSettings(settings) {
   saturationKneeValue.textContent = (settings.saturationKnee ?? 0.2).toFixed(2);
   outputBrightnessInput.value = String(settings.outputBrightness ?? 1);
   outputBrightnessValue.textContent = (settings.outputBrightness ?? 1).toFixed(2);
+  shadowCrushInput.value = String(settings.shadowCrush ?? 0);
+  shadowCrushValue.textContent = (settings.shadowCrush ?? 0).toFixed(2);
   closeUpNoiseStrengthInput.value = String(settings.closeUpNoiseStrength);
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   smoothStrengthInput.value = String(settings.smoothStrength ?? 0);

@@ -44,6 +44,7 @@ export type PersistedRetroFilterSettings = {
   blackFloor: number;
   outputBrightness: number;
   basicContrast: number;
+  shadowCrush: number;
   basicSaturation: number;
   reflectiveLcdBase: number;
   lightDependentTint: number;

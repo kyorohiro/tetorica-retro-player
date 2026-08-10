@@ -372,6 +372,7 @@ export function RetroControlPanel({
               blackFloor={filterState.blackFloor}
               outputBrightness={filterState.outputBrightness}
               basicContrast={filterState.basicContrast}
+              shadowCrush={filterState.shadowCrush}
               basicSaturation={filterState.basicSaturation}
               reflectiveLcdBase={filterState.reflectiveLcdBase}
               lightDependentTint={filterState.lightDependentTint}
@@ -440,6 +441,7 @@ export function RetroControlPanel({
               onSetBlackFloor={filterState.setBlackFloor}
               onSetOutputBrightness={filterState.setOutputBrightness}
               onSetBasicContrast={filterState.setBasicContrast}
+              onSetShadowCrush={filterState.setShadowCrush}
               onSetBasicSaturation={filterState.setBasicSaturation}
               onSetReflectiveLcdBase={filterState.setReflectiveLcdBase}
               onSetLightDependentTint={filterState.setLightDependentTint}

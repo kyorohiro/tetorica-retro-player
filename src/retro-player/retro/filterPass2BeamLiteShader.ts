@@ -29,6 +29,7 @@ uniform float uScanlineBrightnessFade;
 uniform float uVignetteStrength;
 uniform float uOutputBrightness;
 uniform float uBasicContrast;
+uniform float uShadowCrush;
 uniform float uBasicSaturation;
 uniform float uBeamDarkCutoff;
 uniform float uBeamHorizontalSpread;
@@ -242,9 +243,20 @@ vec3 applyBasicColorControls(vec3 color)
     (saturated - 0.5) *
     contrast +
     0.5;
-
+  float shadowAmount = clamp(uShadowCrush, 0.0, 2.0);
+  if (shadowAmount <= 0.001) {
+    return clamp(
+      contrasted,
+      0.0,
+      1.0
+    );
+  }
+  float contrastedLuma = dot(contrasted, vec3(0.299, 0.587, 0.114));
+  float shadowMask = 1.0 - smoothstep(0.05, 0.55, contrastedLuma);
+  float crush = clamp(shadowMask * shadowAmount * 0.72, 0.0, 0.95);
+  vec3 shadowed = contrasted * (1.0 - crush);
   return clamp(
-    contrasted,
+    shadowed,
     0.0,
     1.0
   );
