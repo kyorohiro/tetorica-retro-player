@@ -42,6 +42,7 @@ export type RetroFilterInitialState = Partial<{
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
+  smoothLumaBias: number;
   toonSteps: number;
   edgeBoost: number;
   animeEdgeLow: number;
@@ -122,6 +123,7 @@ const doesPresetMatchState = (
     (preset.horizontalSharpness ?? 1) === state.horizontalSharpness &&
     (preset.rgbConvergenceOffset ?? 0) === state.rgbConvergenceOffset &&
     (preset.smoothStrength ?? 0) === state.smoothStrength &&
+    (preset.smoothLumaBias ?? 0) === state.smoothLumaBias &&
     (preset.toonSteps ?? 0) === state.toonSteps &&
     (preset.edgeBoost ?? 0) === state.edgeBoost &&
     (preset.animeEdgeLow ?? 0.08) === state.animeEdgeLow &&
@@ -233,6 +235,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     horizontalSharpness: initialState.horizontalSharpness ?? (DEFAULT_PRESET.horizontalSharpness ?? 1),
     rgbConvergenceOffset: initialState.rgbConvergenceOffset ?? (DEFAULT_PRESET.rgbConvergenceOffset ?? 0),
     smoothStrength: initialState.smoothStrength ?? (DEFAULT_PRESET.smoothStrength ?? 0),
+    smoothLumaBias: initialState.smoothLumaBias ?? (DEFAULT_PRESET.smoothLumaBias ?? 0),
     toonSteps: initialState.toonSteps ?? (DEFAULT_PRESET.toonSteps ?? 0),
     edgeBoost: initialState.edgeBoost ?? (DEFAULT_PRESET.edgeBoost ?? 0),
     animeEdgeLow: initialState.animeEdgeLow ?? (DEFAULT_PRESET.animeEdgeLow ?? 0.08),
@@ -460,6 +463,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setSmoothStrength = (smoothStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.smoothStrength === smoothStrength ? current : { ...current, smoothStrength }));
+  };
+
+  const setSmoothLumaBias = (smoothLumaBias: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.smoothLumaBias === smoothLumaBias ? current : { ...current, smoothLumaBias }
+    ));
   };
 
   const setToonSteps = (toonSteps: number) => {
@@ -804,6 +814,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       horizontalSharpness: presetSettings.horizontalSharpness ?? 1,
       rgbConvergenceOffset: presetSettings.rgbConvergenceOffset ?? 0,
       smoothStrength: presetSettings.smoothStrength ?? 0,
+      smoothLumaBias: presetSettings.smoothLumaBias ?? 0,
       toonSteps: presetSettings.toonSteps ?? 0,
       edgeBoost: presetSettings.edgeBoost ?? 0,
       animeEdgeLow: presetSettings.animeEdgeLow ?? 0.08,
@@ -907,6 +918,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setHorizontalSharpness,
     setRgbConvergenceOffset,
     setSmoothStrength,
+    setSmoothLumaBias,
     setToonSteps,
     setEdgeBoost,
     setAnimeEdgeLow,

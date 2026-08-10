@@ -34,6 +34,7 @@ export type PersistedRetroFilterSettings = {
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
+  smoothLumaBias: number;
   toonSteps: number;
   edgeBoost: number;
   animeEdgeLow: number;

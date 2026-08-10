@@ -85,6 +85,7 @@ type RetroFilterPanelProps = {
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
+  smoothLumaBias: number;
   toonSteps: number;
   edgeBoost: number;
   animeEdgeLow: number;
@@ -154,6 +155,7 @@ type RetroFilterPanelProps = {
   onSetHorizontalSharpness: (value: number) => void;
   onSetRgbConvergenceOffset: (value: number) => void;
   onSetSmoothStrength: (value: number) => void;
+  onSetSmoothLumaBias: (value: number) => void;
   onSetToonSteps: (value: number) => void;
   onSetEdgeBoost: (value: number) => void;
   onSetAnimeEdgeLow: (value: number) => void;
@@ -222,6 +224,7 @@ export function RetroFilterPanel({
   horizontalSharpness,
   rgbConvergenceOffset,
   smoothStrength,
+  smoothLumaBias,
   toonSteps,
   edgeBoost,
   animeEdgeLow,
@@ -288,6 +291,7 @@ export function RetroFilterPanel({
   onSetHorizontalSharpness,
   onSetRgbConvergenceOffset,
   onSetSmoothStrength,
+  onSetSmoothLumaBias,
   onSetToonSteps,
   onSetEdgeBoost,
   onSetAnimeEdgeLow,
@@ -387,6 +391,8 @@ export function RetroFilterPanel({
             "R と B を左右にわずかにずらして、ブラウン管の色収差や調整ずれのような発光縁を作ります。少量でも効きやすいです。",
           smooth:
             "近い色同士を少しだけならして、細かな質感を減らします。アニメ調では面がまとまりやすくなりますが、上げすぎると眠い絵になります。",
+          smoothLumaBias:
+            "Smooth の広がりを明るい部分優先にします。0 で従来どおり均一、上げるほど暗部は広がりにくく、明部の発光だけ残しやすくなります。",
           toonSteps:
             "明るさの段階数を減らして、セル画みたいな影の切れ目を作ります。0 で無効、少ないほどアニメ寄りになります。",
           edgeBoost:
@@ -490,6 +496,8 @@ export function RetroFilterPanel({
             "Offsets the red and blue channels slightly left and right to mimic CRT convergence error. Even small values can add a convincing colored glow fringe.",
           smooth:
             "Gently blends nearby colors to knock back fine texture. This helps toon-style presets form cleaner color regions, but too much will make the image feel sleepy.",
+          smoothLumaBias:
+            "Biases Smooth toward brighter areas. At 0 it behaves like the old uniform blur; higher values keep dark areas tighter while bright glow spreads more naturally.",
           toonSteps:
             "Reduces the number of brightness bands to create cel-style shading breaks. Use 0 to disable it; fewer steps look more toon-like.",
           edgeBoost:
@@ -1045,6 +1053,24 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={smoothStrength}
                 onChange={(ev) => onSetSmoothStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Smooth luma bias: ${fixedNumber(smoothLumaBias, 2)}`}
+                  text={helpText.smoothLumaBias}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={smoothLumaBias}
+                onChange={(ev) => onSetSmoothLumaBias(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

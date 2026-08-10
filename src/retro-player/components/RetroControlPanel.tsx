@@ -356,6 +356,7 @@ export function RetroControlPanel({
               horizontalSharpness={filterState.horizontalSharpness}
               rgbConvergenceOffset={filterState.rgbConvergenceOffset}
               smoothStrength={filterState.smoothStrength}
+              smoothLumaBias={filterState.smoothLumaBias}
               toonSteps={filterState.toonSteps}
               edgeBoost={filterState.edgeBoost}
               animeEdgeLow={filterState.animeEdgeLow}
@@ -424,6 +425,7 @@ export function RetroControlPanel({
               onSetHorizontalSharpness={filterState.setHorizontalSharpness}
               onSetRgbConvergenceOffset={filterState.setRgbConvergenceOffset}
               onSetSmoothStrength={filterState.setSmoothStrength}
+              onSetSmoothLumaBias={filterState.setSmoothLumaBias}
               onSetToonSteps={filterState.setToonSteps}
               onSetEdgeBoost={filterState.setEdgeBoost}
               onSetAnimeEdgeLow={filterState.setAnimeEdgeLow}

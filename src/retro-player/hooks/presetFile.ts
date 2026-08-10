@@ -40,6 +40,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   horizontalSharpness: DEFAULT_PRESET.horizontalSharpness ?? 1,
   rgbConvergenceOffset: DEFAULT_PRESET.rgbConvergenceOffset ?? 0,
   smoothStrength: DEFAULT_PRESET.smoothStrength ?? 0,
+  smoothLumaBias: DEFAULT_PRESET.smoothLumaBias ?? 0,
   toonSteps: DEFAULT_PRESET.toonSteps ?? 0,
   edgeBoost: DEFAULT_PRESET.edgeBoost ?? 0,
   animeEdgeLow: 0.08,

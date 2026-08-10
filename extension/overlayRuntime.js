@@ -2796,6 +2796,7 @@ function applySettings(gl, renderer, settings) {
     gl.uniform1f(renderer.pass1UniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
     gl.uniform1f(renderer.pass1UniformLocations.uGlowStrength, settings.glowStrength);
     gl.uniform1f(renderer.pass1UniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uSmoothLumaBias, settings.smoothLumaBias ?? 0);
     gl.uniform1f(renderer.pass1UniformLocations.uToonSteps, settings.toonSteps ?? 0);
     gl.uniform1f(renderer.pass1UniformLocations.uEdgeBoost, settings.edgeBoost ?? 0);
     gl.uniform1f(renderer.pass1UniformLocations.uAnimeEdgeLow, settings.animeEdgeLow ?? 0.08);
@@ -2836,6 +2837,7 @@ function applySettings(gl, renderer, settings) {
   set1f(uniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
   set1f(uniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
   set1f(uniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
+  set1f(uniformLocations.uSmoothLumaBias, settings.smoothLumaBias ?? 0);
   set1f(uniformLocations.uPhosphorStrength, settings.phosphorStrength);
   set1f(uniformLocations.uSpotMaskStrength, settings.spotMaskStrength);
   set1f(uniformLocations.uBulbRadius, settings.bulbRadius ?? 0.22);
@@ -3193,6 +3195,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       uPaletteMode: webgl.getUniformLocation(prog1, "uPaletteMode"),
       uGlowStrength: webgl.getUniformLocation(prog1, "uGlowStrength"),
       uSmoothStrength: webgl.getUniformLocation(prog1, "uSmoothStrength"),
+      uSmoothLumaBias: webgl.getUniformLocation(prog1, "uSmoothLumaBias"),
       uToonSteps: webgl.getUniformLocation(prog1, "uToonSteps"),
       uEdgeBoost: webgl.getUniformLocation(prog1, "uEdgeBoost"),
       uAnimeEdgeLow: webgl.getUniformLocation(prog1, "uAnimeEdgeLow"),
@@ -3233,6 +3236,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       uHorizontalSharpness: webgl.getUniformLocation(prog2, "uHorizontalSharpness"),
       uRgbConvergenceOffset: webgl.getUniformLocation(prog2, "uRgbConvergenceOffset"),
       uSmoothStrength: webgl.getUniformLocation(prog2, "uSmoothStrength"),
+      uSmoothLumaBias: webgl.getUniformLocation(prog2, "uSmoothLumaBias"),
       uPhosphorStrength: webgl.getUniformLocation(prog2, "uPhosphorStrength"),
       uSpotMaskStrength: webgl.getUniformLocation(prog2, "uSpotMaskStrength"),
       uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
@@ -3304,6 +3308,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         uHorizontalSharpness: webgl.getUniformLocation(beamKernelProg, "uHorizontalSharpness"),
         uRgbConvergenceOffset: webgl.getUniformLocation(beamKernelProg, "uRgbConvergenceOffset"),
         uSmoothStrength: webgl.getUniformLocation(beamKernelProg, "uSmoothStrength"),
+        uSmoothLumaBias: webgl.getUniformLocation(beamKernelProg, "uSmoothLumaBias"),
         uCurvature: webgl.getUniformLocation(beamKernelProg, "uCurvature"),
         uBeamDarkCutoff: webgl.getUniformLocation(beamKernelProg, "uBeamDarkCutoff"),
         uBeamHorizontalSpread: webgl.getUniformLocation(beamKernelProg, "uBeamHorizontalSpread"),
@@ -3418,6 +3423,7 @@ function applyBeamKernelSettings(gl, renderer, limitedSize, settings) {
   gl.uniform1f(renderer.beamKernelUniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
+  gl.uniform1f(renderer.beamKernelUniformLocations.uSmoothLumaBias, settings.smoothLumaBias ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uCurvature, settings.curvature ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uBeamDarkCutoff, settings.beamDarkCutoff ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uBeamHorizontalSpread, settings.beamHorizontalSpread ?? 0.5);

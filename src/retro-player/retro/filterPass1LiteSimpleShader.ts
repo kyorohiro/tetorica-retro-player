@@ -13,6 +13,7 @@ uniform float uPaletteMode;
 uniform float uHorizontalSharpness;
 uniform float uRgbConvergenceOffset;
 uniform float uSmoothStrength;
+uniform float uSmoothLumaBias;
 uniform float uToonSteps;
 uniform float uEdgeBoost;
 uniform float uAnimeEdgeLow;
@@ -111,6 +112,16 @@ vec3 sampleBaseSourceColorAtCell(vec2 cell)
   return sampleCellAverage8(cellMin, cellSize);
 }
 
+float getSmoothLumaMask(vec3 color)
+{
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  float brightness = max(max(color.r, color.g), color.b);
+  float lumaMask = smoothstep(0.03, 0.75, luma);
+  float brightMask = smoothstep(0.08, 0.98, brightness);
+  float biasedMask = clamp(max(brightMask, mix(0.18, 1.0, lumaMask)), 0.0, 1.0);
+  return mix(1.0, biasedMask, clamp(uSmoothLumaBias, 0.0, 1.0));
+}
+
 vec3 sampleSourceColorAtCell(vec2 cell)
 {
   vec3 center = sampleBaseSourceColorAtCell(cell);
@@ -119,8 +130,9 @@ vec3 sampleSourceColorAtCell(vec2 cell)
   }
 
   float smoothAmount = clamp(uSmoothStrength, 0.0, 4.0);
-  float localMix = min(smoothAmount, 1.0);
-  float wideMix = clamp((smoothAmount - 1.0) / 3.0, 0.0, 1.0);
+  float lumaMask = getSmoothLumaMask(center);
+  float localMix = min(smoothAmount, 1.0) * lumaMask;
+  float wideMix = clamp((smoothAmount - 1.0) / 3.0, 0.0, 1.0) * lumaMask;
   vec3 left = sampleBaseSourceColorAtCell(cell + vec2(-1.0, 0.0));
   vec3 right = sampleBaseSourceColorAtCell(cell + vec2(1.0, 0.0));
   vec3 up = sampleBaseSourceColorAtCell(cell + vec2(0.0, -1.0));

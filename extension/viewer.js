@@ -934,6 +934,7 @@ function applyPass1Settings() {
   gl.uniform1f(pass1UniformLocations.uPaletteMode, paletteModeToUniform(currentSettings.paletteMode));
   gl.uniform1f(pass1UniformLocations.uGlowStrength, currentSettings.glowStrength);
   gl.uniform1f(pass1UniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
+  gl.uniform1f(pass1UniformLocations.uSmoothLumaBias, currentSettings.smoothLumaBias ?? 0);
   gl.uniform1f(pass1UniformLocations.uToonSteps, currentSettings.toonSteps ?? 0);
   gl.uniform1f(pass1UniformLocations.uEdgeBoost, currentSettings.edgeBoost ?? 0);
   gl.uniform1f(pass1UniformLocations.uAnimeEdgeLow, currentSettings.animeEdgeLow ?? 0.08);
@@ -970,6 +971,7 @@ function applyPass2Settings() {
   gl.uniform1f(uniformLocations.uHorizontalSharpness, currentSettings.horizontalSharpness ?? 0);
   gl.uniform1f(uniformLocations.uRgbConvergenceOffset, currentSettings.rgbConvergenceOffset ?? 0);
   gl.uniform1f(uniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
+  gl.uniform1f(uniformLocations.uSmoothLumaBias, currentSettings.smoothLumaBias ?? 0);
   gl.uniform1f(uniformLocations.uPhosphorStrength, currentSettings.phosphorStrength);
   gl.uniform1f(uniformLocations.uSpotMaskStrength, currentSettings.spotMaskStrength);
   gl.uniform1f(uniformLocations.uBulbRadius, currentSettings.bulbRadius ?? 0.22);
@@ -1033,6 +1035,7 @@ function applyBeamKernelSettings(limitedSize) {
   gl.uniform1f(beamKernelUniformLocations.uHorizontalSharpness, currentSettings.horizontalSharpness ?? 0);
   gl.uniform1f(beamKernelUniformLocations.uRgbConvergenceOffset, currentSettings.rgbConvergenceOffset ?? 0);
   gl.uniform1f(beamKernelUniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
+  gl.uniform1f(beamKernelUniformLocations.uSmoothLumaBias, currentSettings.smoothLumaBias ?? 0);
   gl.uniform1f(beamKernelUniformLocations.uCurvature, currentSettings.curvature ?? 0);
   gl.uniform1f(beamKernelUniformLocations.uBeamDarkCutoff, currentSettings.beamDarkCutoff ?? 0);
   gl.uniform1f(beamKernelUniformLocations.uBeamHorizontalSpread, currentSettings.beamHorizontalSpread ?? 0.5);
@@ -1448,6 +1451,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2, setupGeneration) {
     uPaletteMode: webgl.getUniformLocation(prog1, "uPaletteMode"),
     uGlowStrength: webgl.getUniformLocation(prog1, "uGlowStrength"),
     uSmoothStrength: webgl.getUniformLocation(prog1, "uSmoothStrength"),
+    uSmoothLumaBias: webgl.getUniformLocation(prog1, "uSmoothLumaBias"),
     uToonSteps: webgl.getUniformLocation(prog1, "uToonSteps"),
     uEdgeBoost: webgl.getUniformLocation(prog1, "uEdgeBoost"),
     uAnimeEdgeLow: webgl.getUniformLocation(prog1, "uAnimeEdgeLow"),
@@ -1480,6 +1484,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2, setupGeneration) {
     uHorizontalSharpness: webgl.getUniformLocation(prog2, "uHorizontalSharpness"),
     uRgbConvergenceOffset: webgl.getUniformLocation(prog2, "uRgbConvergenceOffset"),
     uSmoothStrength: webgl.getUniformLocation(prog2, "uSmoothStrength"),
+    uSmoothLumaBias: webgl.getUniformLocation(prog2, "uSmoothLumaBias"),
     uPhosphorStrength: webgl.getUniformLocation(prog2, "uPhosphorStrength"),
     uSpotMaskStrength: webgl.getUniformLocation(prog2, "uSpotMaskStrength"),
     uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
@@ -1551,6 +1556,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2, setupGeneration) {
       uHorizontalSharpness: webgl.getUniformLocation(beamKernelProg, "uHorizontalSharpness"),
       uRgbConvergenceOffset: webgl.getUniformLocation(beamKernelProg, "uRgbConvergenceOffset"),
       uSmoothStrength: webgl.getUniformLocation(beamKernelProg, "uSmoothStrength"),
+      uSmoothLumaBias: webgl.getUniformLocation(beamKernelProg, "uSmoothLumaBias"),
       uCurvature: webgl.getUniformLocation(beamKernelProg, "uCurvature"),
       uBeamDarkCutoff: webgl.getUniformLocation(beamKernelProg, "uBeamDarkCutoff"),
       uBeamHorizontalSpread: webgl.getUniformLocation(beamKernelProg, "uBeamHorizontalSpread"),

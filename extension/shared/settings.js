@@ -1170,6 +1170,7 @@ export const DEFAULT_SETTINGS = {
   phosphorDotGrainStrength: 0.0,
   closeUpNoiseStrength: 0.0,
   smoothStrength: 0.0,
+  smoothLumaBias: 0.0,
   toonSteps: 0,
   edgeBoost: 0.0,
   animeEdgeLow: 0.08,
@@ -1493,6 +1494,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.smoothStrength === "number"
         ? clamp(candidate.smoothStrength, 0, 4)
         : basePresetSettings.smoothStrength ?? DEFAULT_SETTINGS.smoothStrength,
+    smoothLumaBias:
+      typeof candidate?.smoothLumaBias === "number"
+        ? clamp(candidate.smoothLumaBias, 0, 1)
+        : basePresetSettings.smoothLumaBias ?? DEFAULT_SETTINGS.smoothLumaBias,
     toonSteps:
       typeof candidate?.toonSteps === "number"
         ? Math.max(0, Math.round(candidate.toonSteps))
@@ -1862,6 +1867,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.smoothStrength === "number"
         ? preset.smoothStrength
         : DEFAULT_SETTINGS.smoothStrength,
+    smoothLumaBias:
+      typeof preset.smoothLumaBias === "number"
+        ? preset.smoothLumaBias
+        : DEFAULT_SETTINGS.smoothLumaBias,
     toonSteps:
       typeof preset.toonSteps === "number"
         ? preset.toonSteps

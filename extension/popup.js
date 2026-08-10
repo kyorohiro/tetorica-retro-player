@@ -82,6 +82,8 @@ const closeUpNoiseStrengthInput = document.getElementById("closeUpNoiseStrength"
 const closeUpNoiseStrengthValue = document.getElementById("closeUpNoiseStrengthValue");
 const smoothStrengthInput = document.getElementById("smoothStrength");
 const smoothStrengthValue = document.getElementById("smoothStrengthValue");
+const smoothLumaBiasInput = document.getElementById("smoothLumaBias");
+const smoothLumaBiasValue = document.getElementById("smoothLumaBiasValue");
 const toonStepsInput = document.getElementById("toonSteps");
 const toonStepsValue = document.getElementById("toonStepsValue");
 const edgeBoostInput = document.getElementById("edgeBoost");
@@ -945,6 +947,11 @@ smoothStrengthInput.addEventListener("input", () => {
   smoothStrengthValue.textContent = smoothStrength.toFixed(2);
   updateSettings({ presetKey: CUSTOM_PRESET_KEY, smoothStrength });
 });
+smoothLumaBiasInput.addEventListener("input", () => {
+  const smoothLumaBias = Number(smoothLumaBiasInput.value);
+  smoothLumaBiasValue.textContent = smoothLumaBias.toFixed(2);
+  updateSettings({ presetKey: CUSTOM_PRESET_KEY, smoothLumaBias });
+});
 
 toonStepsInput.addEventListener("input", () => {
   const toonSteps = Number(toonStepsInput.value);
@@ -1236,6 +1243,8 @@ function renderSettings(settings) {
   closeUpNoiseStrengthValue.textContent = settings.closeUpNoiseStrength.toFixed(2);
   smoothStrengthInput.value = String(settings.smoothStrength ?? 0);
   smoothStrengthValue.textContent = (settings.smoothStrength ?? 0).toFixed(2);
+  smoothLumaBiasInput.value = String(settings.smoothLumaBias ?? 0);
+  smoothLumaBiasValue.textContent = (settings.smoothLumaBias ?? 0).toFixed(2);
   toonStepsInput.value = String(settings.toonSteps ?? 0);
   toonStepsValue.textContent = (settings.toonSteps ?? 0) === 0 ? "off" : String(settings.toonSteps);
   edgeBoostInput.value = String(settings.edgeBoost ?? 0);

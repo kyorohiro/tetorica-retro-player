@@ -98,6 +98,14 @@
             <input id="smoothStrength" type="range" min="0" max="2" step="0.01" />
             <output id="smoothStrengthValue"></output>
           </label>
+          <label class="control">
+            <span class="label-with-tip">
+              <span>Smooth luma bias</span>
+              <span class="info-tip" tabindex="0" data-tip="Biases Smooth toward brighter areas. 0 keeps the old uniform spread; higher values keep dark areas tighter while bright glow spreads more naturally.">?</span>
+            </span>
+            <input id="smoothLumaBias" type="range" min="0" max="1" step="0.01" />
+            <output id="smoothLumaBiasValue"></output>
+          </label>
 
           <label class="control control-toggle">
             <span class="label-with-tip">

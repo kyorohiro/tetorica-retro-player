@@ -47,6 +47,7 @@ export type RetroVideoFilterState = {
   horizontalSharpness: number;
   rgbConvergenceOffset: number;
   smoothStrength: number;
+  smoothLumaBias: number;
   toonSteps: number;
   edgeBoost: number;
   animeEdgeLow: number;
@@ -149,6 +150,7 @@ type Pass1UniformLocations = {
   uHorizontalSharpness: WebGLUniformLocation | null;
   uRgbConvergenceOffset: WebGLUniformLocation | null;
   uSmoothStrength: WebGLUniformLocation | null;
+  uSmoothLumaBias: WebGLUniformLocation | null;
   uToonSteps: WebGLUniformLocation | null;
   uEdgeBoost: WebGLUniformLocation | null;
   uAnimeEdgeLow: WebGLUniformLocation | null;
@@ -185,6 +187,7 @@ type Pass2UniformLocations = {
   uHorizontalSharpness: WebGLUniformLocation | null;
   uRgbConvergenceOffset: WebGLUniformLocation | null;
   uSmoothStrength: WebGLUniformLocation | null;
+  uSmoothLumaBias: WebGLUniformLocation | null;
   uPhosphorStrength: WebGLUniformLocation | null;
   uSpotMaskStrength: WebGLUniformLocation | null;
   uBulbRadius: WebGLUniformLocation | null;
@@ -265,6 +268,7 @@ type BeamKernelUniformLocations = {
   uHorizontalSharpness: WebGLUniformLocation | null;
   uRgbConvergenceOffset: WebGLUniformLocation | null;
   uSmoothStrength: WebGLUniformLocation | null;
+  uSmoothLumaBias: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
   uBeamDarkCutoff: WebGLUniformLocation | null;
   uBeamHorizontalSpread: WebGLUniformLocation | null;
@@ -1417,6 +1421,7 @@ export class TetoricaRetroVideoPipeline {
       uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
       uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
+      uSmoothLumaBias: gl.getUniformLocation(program, "uSmoothLumaBias"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
       uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
       uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
@@ -2151,6 +2156,7 @@ export class TetoricaRetroVideoPipeline {
       uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
       uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
+      uSmoothLumaBias: gl.getUniformLocation(program, "uSmoothLumaBias"),
       uToonSteps: gl.getUniformLocation(program, "uToonSteps"),
       uEdgeBoost: gl.getUniformLocation(program, "uEdgeBoost"),
       uAnimeEdgeLow: gl.getUniformLocation(program, "uAnimeEdgeLow"),
@@ -2190,6 +2196,7 @@ export class TetoricaRetroVideoPipeline {
       uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
       uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uSmoothStrength: gl.getUniformLocation(program, "uSmoothStrength"),
+      uSmoothLumaBias: gl.getUniformLocation(program, "uSmoothLumaBias"),
       uPhosphorStrength: gl.getUniformLocation(program, "uPhosphorStrength"),
       uSpotMaskStrength: gl.getUniformLocation(program, "uSpotMaskStrength"),
       uBulbRadius: gl.getUniformLocation(program, "uBulbRadius"),
@@ -2597,6 +2604,7 @@ export class TetoricaRetroVideoPipeline {
           gl.uniform1f(this.beamKernelLocs.uHorizontalSharpness, filterState.horizontalSharpness);
           gl.uniform1f(this.beamKernelLocs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
           gl.uniform1f(this.beamKernelLocs.uSmoothStrength, filterState.smoothStrength);
+          gl.uniform1f(this.beamKernelLocs.uSmoothLumaBias, filterState.smoothLumaBias);
           gl.uniform1f(this.beamKernelLocs.uCurvature, getEffectivePreCurvature(filterState));
           gl.uniform1f(this.beamKernelLocs.uBeamDarkCutoff, filterState.beamDarkCutoff);
           gl.uniform1f(this.beamKernelLocs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
@@ -2876,6 +2884,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass1Locs.uHorizontalSharpness, filterState.horizontalSharpness);
     gl.uniform1f(this.pass1Locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
     gl.uniform1f(this.pass1Locs.uSmoothStrength, filterState.smoothStrength);
+    gl.uniform1f(this.pass1Locs.uSmoothLumaBias, filterState.smoothLumaBias);
     gl.uniform1f(this.pass1Locs.uToonSteps, filterState.toonSteps);
     gl.uniform1f(this.pass1Locs.uEdgeBoost, filterState.edgeBoost);
     gl.uniform1f(this.pass1Locs.uAnimeEdgeLow, filterState.animeEdgeLow);
@@ -2962,6 +2971,7 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(locs.uHorizontalSharpness, filterState.horizontalSharpness);
     gl.uniform1f(locs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
     gl.uniform1f(locs.uSmoothStrength, filterState.smoothStrength);
+    gl.uniform1f(locs.uSmoothLumaBias, filterState.smoothLumaBias);
     gl.uniform1f(locs.uPhosphorStrength, filterState.phosphorStrength);
     gl.uniform1f(locs.uSpotMaskStrength, filterState.spotMaskStrength);
     gl.uniform1f(locs.uBulbRadius, filterState.bulbRadius);
