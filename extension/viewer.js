@@ -29,6 +29,8 @@ const canvas = document.getElementById("glCanvas");
 const video = document.getElementById("sourceVideo");
 const fitButton = document.getElementById("fitButton");
 const recordButton = document.getElementById("recordButton");
+const compileBusyOverlay = document.getElementById("compileBusyOverlay");
+const compileBusyLabel = document.getElementById("compileBusyLabel");
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
@@ -95,6 +97,7 @@ let isAlarmArmed = false;
 let alarmOverlayEl = null;
 let alarmClockIntervalId = null;
 let activeRendererVariantSignature = null;
+let compileStatusTimerId = null;
 
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
@@ -218,6 +221,35 @@ function logViewerAudioRecovery(label, payload = {}, level = "info") {
     return;
   }
   console.info(prefix, details);
+}
+
+function renderViewerCompileState(message) {
+  if (compileBusyLabel) {
+    compileBusyLabel.textContent = message || "Preparing shader...";
+  }
+  if (compileBusyOverlay) {
+    compileBusyOverlay.hidden = !message;
+  }
+}
+
+function publishCompileState(active, label = "") {
+  renderViewerCompileState(active ? label : "");
+  void chrome.runtime.sendMessage({
+    type: "SET_COMPILE_STATUS",
+    state: active
+      ? {
+          active: true,
+          label,
+          source: "viewer",
+          updatedAt: Date.now(),
+        }
+      : {
+          active: false,
+          label: "",
+          source: "viewer",
+          updatedAt: Date.now(),
+        },
+  }).catch(() => {});
 }
 
 function createAlarmOverlay(targetAt) {
@@ -1172,6 +1204,15 @@ async function disposeAudioEngine() {
 
 function setupRenderer(webgl) {
   activeRendererVariantSignature = getRendererVariantSignature(currentSettings);
+  if (compileStatusTimerId != null) {
+    window.clearTimeout(compileStatusTimerId);
+    compileStatusTimerId = null;
+  }
+  renderViewerCompileState("Preparing retro filter...");
+  compileStatusTimerId = window.setTimeout(() => {
+    compileStatusTimerId = null;
+    publishCompileState(true, "Preparing retro filter...");
+  }, 120);
   // --- Passthrough program (tiny; compiles instantly, safe to link-check now) ---
   // Used while the full filter shader compiles in the background so the canvas
   // shows raw video immediately instead of staying black.
@@ -1259,6 +1300,13 @@ function setupRenderer(webgl) {
 
 async function finalizeFilterProgram(webgl, prog1, prog2) {
   const shaderSources = getWindowsLiteShaderSources(currentSettings);
+  const updateCompileState = (message) => {
+    if (compileStatusTimerId != null) {
+      window.clearTimeout(compileStatusTimerId);
+      compileStatusTimerId = null;
+    }
+    publishCompileState(Boolean(message), message || "");
+  };
   const beamDownscaleFrag = shaderSources.beamDownscale
     ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamDownscale)
     : null;
@@ -1275,16 +1323,19 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
     throw new Error("Failed to create viewer beam programs.");
   }
   if (beamDownscaleProg && beamDownscaleFrag) {
+    updateCompileState("Linking shader (beam downscale)...");
     webgl.attachShader(beamDownscaleProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
     webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
     webgl.linkProgram(beamDownscaleProg);
   }
   if (beamKernelProg && beamKernelFrag) {
+    updateCompileState("Linking shader (beam kernel)...");
     webgl.attachShader(beamKernelProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
     webgl.attachShader(beamKernelProg, beamKernelFrag);
     webgl.linkProgram(beamKernelProg);
   }
   if (beamComposeProg && beamComposeFrag) {
+    updateCompileState("Linking shader (beam compose)...");
     webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
     webgl.attachShader(beamComposeProg, beamComposeFrag);
     webgl.linkProgram(beamComposeProg);
@@ -1296,6 +1347,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
   if (ext) {
     await new Promise((resolve) => {
       const poll = () => {
+        updateCompileState("Linking shader (waiting for GPU)...");
         const ready1 = webgl.getProgramParameter(prog1, ext.COMPLETION_STATUS_KHR);
         const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
         const ready3 = beamDownscaleProg ? webgl.getProgramParameter(beamDownscaleProg, ext.COMPLETION_STATUS_KHR) : true;
@@ -1316,25 +1368,30 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
   }
 
   if (!webgl.getProgramParameter(prog1, webgl.LINK_STATUS)) {
+    updateCompileState("");
     const message = webgl.getProgramInfoLog(prog1) || "Unknown pass1 program link error.";
     console.error("[viewer] Filter shader link failed:", message);
     return;
   }
 
   if (!webgl.getProgramParameter(prog2, webgl.LINK_STATUS)) {
+    updateCompileState("");
     const message = webgl.getProgramInfoLog(prog2) || "Unknown pass2 program link error.";
     console.error("[viewer] Filter shader link failed:", message);
     return;
   }
   if (beamDownscaleProg && !webgl.getProgramParameter(beamDownscaleProg, webgl.LINK_STATUS)) {
+    updateCompileState("");
     console.error("[viewer] Beam downscale shader link failed:", webgl.getProgramInfoLog(beamDownscaleProg) || "unknown");
     return;
   }
   if (beamKernelProg && !webgl.getProgramParameter(beamKernelProg, webgl.LINK_STATUS)) {
+    updateCompileState("");
     console.error("[viewer] Beam kernel shader link failed:", webgl.getProgramInfoLog(beamKernelProg) || "unknown");
     return;
   }
   if (beamComposeProg && !webgl.getProgramParameter(beamComposeProg, webgl.LINK_STATUS)) {
+    updateCompileState("");
     console.error("[viewer] Beam compose shader link failed:", webgl.getProgramInfoLog(beamComposeProg) || "unknown");
     return;
   }
@@ -1486,6 +1543,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
     beamKernelProgram: Boolean(beamKernelProgram),
     beamComposeProgram: Boolean(beamComposeProgram),
   });
+  updateCompileState("");
   applyCurrentSettings();
 }
 

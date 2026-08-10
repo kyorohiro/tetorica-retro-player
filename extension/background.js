@@ -5,8 +5,14 @@ import {
 
 const VIEWER_URL = chrome.runtime.getURL("viewer.html");
 const ALARM_STORAGE_KEY = "retro-alarm-state";
+const COMPILE_STATUS_SESSION_KEY = "retro-compile-status";
 
 let currentSession = null;
+let currentCompileStatus = null;
+
+chrome.storage.session.get(COMPILE_STATUS_SESSION_KEY).then((stored) => {
+  currentCompileStatus = stored[COMPILE_STATUS_SESSION_KEY] ?? null;
+}).catch(() => {});
 
 async function sendMessageToViewer(message) {
   const tabs = await chrome.tabs.query({ url: VIEWER_URL });
@@ -166,6 +172,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
       });
     return true;
+  }
+
+  if (message?.type === "SET_COMPILE_STATUS") {
+    currentCompileStatus = message.state ?? null;
+    void chrome.storage.session
+      .set({ [COMPILE_STATUS_SESSION_KEY]: currentCompileStatus })
+      .catch(() => {});
+    void chrome.runtime.sendMessage({
+      type: "COMPILE_STATUS_UPDATED",
+      state: currentCompileStatus,
+    }).catch(() => {
+      // Ignore when no popup/viewer is currently listening.
+    });
+    sendResponse({ ok: true });
+    return;
+  }
+
+  if (message?.type === "GET_COMPILE_STATUS") {
+    sendResponse({
+      ok: true,
+      state: currentCompileStatus,
+    });
+    return;
   }
 
   if (message?.type === "CLEAR_CAPTURE_SESSION") {

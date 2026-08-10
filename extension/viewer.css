@@ -136,12 +136,36 @@ body.fit-mode {
 }
 
 .canvas-frame {
+  position: relative;
   overflow: hidden;
   border-radius: 18px;
   border: 1px solid rgba(196, 230, 125, 0.12);
   background:
     linear-gradient(180deg, rgba(191, 255, 138, 0.06), transparent),
     #050604;
+}
+
+.compile-busy-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 4, 0.62);
+  pointer-events: none;
+}
+
+.compile-busy-chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(196, 230, 125, 0.22);
+  background: rgba(6, 8, 6, 0.9);
+  color: #eef7d3;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(196, 230, 125, 0.12);
 }
 
 body.fit-mode .header,

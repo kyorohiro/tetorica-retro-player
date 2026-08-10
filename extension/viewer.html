@@ -69,6 +69,11 @@
 
         <div class="canvas-frame">
           <canvas id="glCanvas" width="1280" height="720"></canvas>
+          <div id="compileBusyOverlay" class="compile-busy-overlay" hidden>
+            <div class="compile-busy-chip">
+              <span id="compileBusyLabel">Preparing shader...</span>
+            </div>
+          </div>
         </div>
 
         <video id="sourceVideo" autoplay muted playsinline hidden></video>

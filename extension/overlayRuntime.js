@@ -171,6 +171,25 @@ export async function toggleRetroOverlay(settingsInput) {
   return startRetroOverlay(settingsInput);
 }
 
+function publishOverlayCompileState(message) {
+  void chrome.runtime.sendMessage({
+    type: "SET_COMPILE_STATUS",
+    state: message
+      ? {
+          active: true,
+          label: message,
+          source: "overlay",
+          updatedAt: Date.now(),
+        }
+      : {
+          active: false,
+          label: "",
+          source: "overlay",
+          updatedAt: Date.now(),
+        },
+  }).catch(() => {});
+}
+
 function createOverlay(settings) {
   let currentSettings = settings;
   const recordButton = document.createElement("button");
@@ -2027,8 +2046,10 @@ function createOverlaySurface(index, onReady, initialSettings) {
           compileStatusMessage = message || "";
           compileOverlayLabel.textContent = compileStatusMessage;
           if (compileStatusMessage) {
+            publishOverlayCompileState(compileStatusMessage);
             scheduleCompileOverlay();
           } else {
+            publishOverlayCompileState("");
             if (compileStatusTimer != null) {
               window.clearTimeout(compileStatusTimer);
               compileStatusTimer = null;

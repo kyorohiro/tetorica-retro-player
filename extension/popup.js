@@ -135,6 +135,7 @@ const compressorAmountValue = document.getElementById("compressorAmountValue");
 const fxOutputTrimAmountInput = document.getElementById("fxOutputTrimAmount");
 const fxOutputTrimAmountValue = document.getElementById("fxOutputTrimAmountValue");
 const statusText = document.getElementById("statusText");
+const compileStateText = document.getElementById("compileStateText");
 const resetButton = document.getElementById("resetButton");
 const alarmStatusText = document.getElementById("alarmStatusText");
 const alarmOffButton = document.getElementById("alarmOffButton");
@@ -223,6 +224,33 @@ tabButtons.forEach((btn) => {
 switchTab(localStorage.getItem(TAB_KEY) ?? "video");
 
 let currentSettings = { ...DEFAULT_SETTINGS };
+
+function renderCompileState(state) {
+  if (!compileStateText) {
+    return;
+  }
+  if (!state?.active || !state?.label) {
+    compileStateText.hidden = true;
+    compileStateText.textContent = "";
+    return;
+  }
+  const sourceLabel =
+    state.source === "overlay"
+      ? "Overlay"
+      : state.source === "viewer"
+        ? "Capture"
+        : "Shader";
+  compileStateText.hidden = false;
+  compileStateText.textContent = `${sourceLabel}: ${state.label}`;
+}
+
+if (chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === "COMPILE_STATUS_UPDATED") {
+      renderCompileState(message.state);
+    }
+  });
+}
 
 const AUDIO_PRESET_OPTIONS = [
   { key: "none", label: "None" },
@@ -1070,6 +1098,8 @@ async function init() {
   await persistSettings();
   await loadOverlayState();
   renderAlarmState(stored[ALARM_STORAGE_KEY]);
+  const compileStateResponse = await chrome.runtime.sendMessage({ type: "GET_COMPILE_STATUS" });
+  renderCompileState(compileStateResponse?.ok ? compileStateResponse.state : null);
 }
 
 function renderSettings(settings) {
