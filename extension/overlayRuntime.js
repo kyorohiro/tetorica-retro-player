@@ -221,6 +221,7 @@ publishOverlayCompileState.lastKey = "";
 function createOverlay(settings) {
   let currentSettings = settings;
   let currentRendererVariantSignature = getOverlayRendererVariantSignature(currentSettings);
+  const VISIBILITY_CHECK_FRAME_WINDOW = 24;
   const recordButton = document.createElement("button");
   const opacityButton = document.createElement("button");
   opacityButton.type = "button";
@@ -1093,11 +1094,7 @@ function createOverlay(settings) {
       return;
     }
 
-    if (
-      !isInViewport(targetElement) ||
-      !isActuallyVisibleElement(targetElement) ||
-      !isFrontmostMediaAtCenter(targetElement)
-    ) {
+    if (!surface.isRenderableTarget(targetElement, rect, frameCount, VISIBILITY_CHECK_FRAME_WINDOW)) {
       surface.updateTarget(null);
       surface.hide();
       return;
@@ -1931,9 +1928,9 @@ function isVisibleMediaRect(element) {
   const rect = element.getBoundingClientRect();
   return rect.width > 32 &&
     rect.height > 32 &&
-    isInViewport(element) &&
+    isInViewport(element, rect) &&
     isActuallyVisibleElement(element) &&
-    isFrontmostMediaAtCenter(element);
+    isFrontmostMediaAtCenter(element, rect);
 }
 
 function appendUniqueDrawableTarget(targets, candidate, options = {}) {
@@ -2141,6 +2138,8 @@ function createOverlaySurface(index, onReady, initialSettings) {
     didTargetChange: true,
     _spotlightActive: false,
     _spotlightKey: "",
+    _targetRenderable: false,
+    _targetRenderableFrame: -999,
     getCompileStatusMessage() {
       return compileStatusMessage;
     },
@@ -2185,6 +2184,24 @@ function createOverlaySurface(index, onReady, initialSettings) {
       this.hideFailureOverlay();
       this.setFailureMessage("Cross-origin image");
       this.ensureProxyVideo(nextTarget);
+      this._targetRenderable = false;
+      this._targetRenderableFrame = -999;
+    },
+    isRenderableTarget(targetElement, rect, currentFrame, frameWindow) {
+      if (
+        this.targetElement === targetElement &&
+        currentFrame - this._targetRenderableFrame < frameWindow
+      ) {
+        return this._targetRenderable;
+      }
+
+      const renderable =
+        isInViewport(targetElement, rect) &&
+        isActuallyVisibleElement(targetElement) &&
+        isFrontmostMediaAtCenter(targetElement, rect);
+      this._targetRenderable = renderable;
+      this._targetRenderableFrame = currentFrame;
+      return renderable;
     },
     syncRect(rect) {
       const dpr = window.devicePixelRatio || 1;
@@ -2477,13 +2494,13 @@ function findHoveredMediaElement(clientX, clientY, selector, isUsable) {
   return null;
 }
 
-function isInViewport(element) {
-  const rect = element.getBoundingClientRect();
+function isInViewport(element, rect = null) {
+  const resolvedRect = rect ?? element.getBoundingClientRect();
   return (
-    rect.bottom > 0 &&
-    rect.right > 0 &&
-    rect.top < window.innerHeight &&
-    rect.left < window.innerWidth
+    resolvedRect.bottom > 0 &&
+    resolvedRect.right > 0 &&
+    resolvedRect.top < window.innerHeight &&
+    resolvedRect.left < window.innerWidth
   );
 }
 
@@ -2516,13 +2533,13 @@ function isActuallyVisibleElement(element) {
   return true;
 }
 
-function isFrontmostMediaAtCenter(element) {
+function isFrontmostMediaAtCenter(element, rect = null) {
   if (!element?.isConnected) {
     return false;
   }
-  const rect = element.getBoundingClientRect();
-  const centerX = rect.left + rect.width * 0.5;
-  const centerY = rect.top + rect.height * 0.5;
+  const resolvedRect = rect ?? element.getBoundingClientRect();
+  const centerX = resolvedRect.left + resolvedRect.width * 0.5;
+  const centerY = resolvedRect.top + resolvedRect.height * 0.5;
   if (
     centerX < 0 ||
     centerY < 0 ||

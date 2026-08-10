@@ -99,17 +99,19 @@ chrome.storage.session.get(SESSION_CACHE_KEY).then((stored) => {
 const pendingReinjection = new Set();
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
+  const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
+
   // URL changed → mark this tab as needing re-injection if overlay is active.
   if (changeInfo.url) {
-    const stored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
-    const activeTabs = stored[OVERLAY_ACTIVE_KEY] ?? {};
     if (activeTabs[tabId]) {
       pendingReinjection.add(tabId);
     }
   }
 
-  // Page fully loaded → re-inject if pending.
-  if (changeInfo.status === "complete" && pendingReinjection.has(tabId)) {
+  // Page fully loaded → re-inject whenever this tab is marked overlay-active.
+  // Plain reload often keeps the same URL, so waiting for changeInfo.url misses it.
+  if (changeInfo.status === "complete" && activeTabs[tabId]) {
     pendingReinjection.delete(tabId);
     const stored = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
     const settings = stored[SETTINGS_STORAGE_KEY] ?? DEFAULT_SETTINGS;
