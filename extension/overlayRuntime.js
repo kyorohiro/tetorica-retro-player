@@ -20,6 +20,7 @@ import {
 import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js";
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
+const OVERLAY_BASE_FLIP_V = true;
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
 // 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
@@ -2870,15 +2871,16 @@ function applyFlipUniforms(gl, renderer, flipH, flipV) {
   if (!gl || !renderer) {
     return;
   }
+  const effectiveFlipV = OVERLAY_BASE_FLIP_V ? !flipV : flipV;
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
     gl.uniform1f(renderer.pass1UniformLocations.uFlipH, flipH ? 1 : 0);
-    gl.uniform1f(renderer.pass1UniformLocations.uFlipV, flipV ? 1 : 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
   }
   if (renderer.program && renderer.uniformLocations) {
     gl.useProgram(renderer.program);
     gl.uniform1f(renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
-    gl.uniform1f(renderer.uniformLocations.uFlipV, flipV ? 1 : 0);
+    gl.uniform1f(renderer.uniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
   }
 }
 
