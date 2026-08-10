@@ -1179,6 +1179,7 @@ export const DEFAULT_SETTINGS = {
   neonDetail: 1.0,
   colorLevels: 32,
   preFilterDownscaleEnabled: false,
+  shaderCompileCacheBusterEnabled: false,
   overlayTargetCount: 1,
   overlayVideo: true,
   overlayImage: true,
@@ -1525,6 +1526,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.preFilterDownscaleEnabled === "boolean"
         ? candidate.preFilterDownscaleEnabled
         : basePresetSettings.preFilterDownscaleEnabled ?? DEFAULT_SETTINGS.preFilterDownscaleEnabled,
+    shaderCompileCacheBusterEnabled:
+      typeof candidate?.shaderCompileCacheBusterEnabled === "boolean"
+        ? candidate.shaderCompileCacheBusterEnabled
+        : DEFAULT_SETTINGS.shaderCompileCacheBusterEnabled,
     overlayTargetCount:
       typeof candidate?.overlayTargetCount === "number"
         ? clamp(
