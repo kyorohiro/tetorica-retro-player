@@ -1544,6 +1544,7 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
     beamComposeProgram: Boolean(beamComposeProgram),
   });
   updateCompileState("");
+  renderViewerCompileState("");
   applyCurrentSettings();
 }
 

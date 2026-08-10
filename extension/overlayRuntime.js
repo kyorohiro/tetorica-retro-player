@@ -2011,6 +2011,14 @@ function createOverlaySurface(index, onReady, initialSettings) {
     compileStatusVisible = false;
   };
 
+  const positionCompileOverlayToCanvas = () => {
+    const rect = canvas.getBoundingClientRect();
+    compileOverlay.style.setProperty("left", `${rect.left}px`, "important");
+    compileOverlay.style.setProperty("top", `${rect.top}px`, "important");
+    compileOverlay.style.setProperty("width", `${rect.width}px`, "important");
+    compileOverlay.style.setProperty("height", `${rect.height}px`, "important");
+  };
+
   const scheduleCompileOverlay = () => {
     if (compileStatusVisible || compileStatusTimer != null || !compileStatusMessage) {
       return;
@@ -2020,7 +2028,10 @@ function createOverlaySurface(index, onReady, initialSettings) {
       if (!compileStatusMessage) {
         return;
       }
+      compileOverlayLabel.textContent = compileStatusMessage;
       compileStatusVisible = true;
+      positionCompileOverlayToCanvas();
+      compileOverlay.style.setProperty("display", "flex", "important");
     }, 300);
   };
 
@@ -2037,6 +2048,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
   if (gl) {
     try {
       compileStatusMessage = "Preparing retro filter...";
+      compileOverlayLabel.textContent = compileStatusMessage;
       scheduleCompileOverlay();
       renderer = setupRenderer(
         gl,
@@ -2331,6 +2343,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
         hideCompileOverlayNow();
         return;
       }
+      compileOverlayLabel.textContent = compileStatusMessage;
       compileOverlay.style.setProperty("display", "flex", "important");
       compileOverlay.style.setProperty("left", `${rect.left}px`, "important");
       compileOverlay.style.setProperty("top", `${rect.top}px`, "important");
