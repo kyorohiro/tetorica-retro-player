@@ -2007,6 +2007,8 @@ function createOverlaySurface(index, onReady, initialSettings) {
   let compileStatusTimer = null;
 
   const hideCompileOverlayNow = () => {
+    compileStatusMessage = "";
+    compileOverlayLabel.textContent = "";
     compileOverlay.style.setProperty("display", "none", "important");
     compileStatusVisible = false;
   };
@@ -2115,6 +2117,8 @@ function createOverlaySurface(index, onReady, initialSettings) {
         window.clearTimeout(compileStatusTimer);
         compileStatusTimer = null;
       }
+      publishOverlayCompileState("");
+      hideCompileOverlayNow();
       canvas.remove();
       compileOverlay.remove();
       failureOverlay.remove();
@@ -2351,6 +2355,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
       compileOverlay.style.setProperty("height", `${rect.height}px`, "important");
     },
     hideCompileOverlay() {
+      publishOverlayCompileState("");
       hideCompileOverlayNow();
     },
     hide() {
