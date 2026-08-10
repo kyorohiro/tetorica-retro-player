@@ -2133,6 +2133,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
     _proxyStuckSince: 0,
     startedAt: performance.now(),
     lastRectKey: "",
+    targetSourceIdentity: "",
     didTargetChange: true,
     _spotlightActive: false,
     _spotlightKey: "",
@@ -2160,7 +2161,8 @@ function createOverlaySurface(index, onReady, initialSettings) {
       failureOverlay.remove();
     },
     updateTarget(nextTarget) {
-      if (this.targetElement === nextTarget) {
+      const nextSourceIdentity = nextTarget ? getMediaSourceIdentity(nextTarget) : "";
+      if (this.targetElement === nextTarget && this.targetSourceIdentity === nextSourceIdentity) {
         return;
       }
 
@@ -2170,6 +2172,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
       }
       this.disposeProxyVideo();
       this.targetElement = nextTarget;
+      this.targetSourceIdentity = nextSourceIdentity;
       this.startedAt = performance.now();
       this.lastRectKey = "";
       this.didTargetChange = true;
@@ -2491,6 +2494,33 @@ function isPointInsideRect(rect, clientX, clientY) {
   );
 }
 
+function getMediaSourceIdentity(element) {
+  if (element instanceof HTMLVideoElement) {
+    const streamTracks = element.srcObject instanceof MediaStream
+      ? element.srcObject.getTracks().map((track) => `${track.kind}:${track.id}`).join(",")
+      : "";
+    return [
+      "video",
+      element.currentSrc || element.src || "",
+      streamTracks,
+      element.readyState,
+      element.videoWidth,
+      element.videoHeight,
+    ].join("|");
+  }
+
+  if (element instanceof HTMLImageElement) {
+    return [
+      "img",
+      element.currentSrc || element.src || "",
+      element.naturalWidth,
+      element.naturalHeight,
+    ].join("|");
+  }
+
+  return "";
+}
+
 function isDrawableElement(candidate) {
   if (candidate instanceof HTMLVideoElement) {
     return isUsableVideo(candidate);
@@ -2525,6 +2555,7 @@ function isRelaxedDrawableElement(candidate) {
 
 function isUsableVideo(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
+  if (!candidate.isConnected) return false;
   const rect = candidate.getBoundingClientRect();
   const hasVisiblePixels =
     candidate.videoWidth > 0 &&
@@ -2539,12 +2570,14 @@ function isUsableVideo(candidate) {
 
 function isRelaxedVideoCandidate(candidate) {
   if (!(candidate instanceof HTMLVideoElement)) return false;
+  if (!candidate.isConnected) return false;
   if (!isVisibleMediaRect(candidate)) return false;
   return !!candidate.currentSrc || !!candidate.srcObject || candidate.readyState >= HTMLMediaElement.HAVE_NOTHING;
 }
 
 function isUsableImage(candidate) {
   if (!(candidate instanceof HTMLImageElement)) return false;
+  if (!candidate.isConnected) return false;
   if (!candidate.complete || candidate.naturalWidth < 1 || candidate.naturalHeight < 1) {
     return false;
   }
@@ -2554,6 +2587,7 @@ function isUsableImage(candidate) {
 
 function isRelaxedImageCandidate(candidate) {
   if (!(candidate instanceof HTMLImageElement)) return false;
+  if (!candidate.isConnected) return false;
   if (!isVisibleMediaRect(candidate)) return false;
   return !!candidate.currentSrc || !!candidate.src;
 }
