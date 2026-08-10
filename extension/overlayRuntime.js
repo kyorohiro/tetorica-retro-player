@@ -3029,7 +3029,10 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
 
   const texture = webgl.createTexture();
   webgl.bindTexture(webgl.TEXTURE_2D, texture);
-  webgl.pixelStorei(webgl.UNPACK_FLIP_Y_WEBGL, true);
+  // Overlay sources come from live page media elements. Flipping at upload time
+  // here double-inverts some site videos, so keep DOM upload orientation as-is
+  // and let the shared fullscreen shader path handle the sampling direction.
+  webgl.pixelStorei(webgl.UNPACK_FLIP_Y_WEBGL, false);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MIN_FILTER, webgl.LINEAR);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MAG_FILTER, webgl.LINEAR);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
