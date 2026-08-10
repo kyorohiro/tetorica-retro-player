@@ -1124,26 +1124,6 @@ function createOverlay(settings) {
     }
     const drawableSource = surface.getDrawableSource(targetElement);
 
-    if (shouldUseDirectVideoFallback(targetElement)) {
-      if (!drawableSource) {
-        if (!surface._proxyStuckSince) {
-          surface._proxyStuckSince = performance.now();
-        } else if (performance.now() - surface._proxyStuckSince > 1500) {
-          // Proxy has been unable to deliver a frame for >1.5s — reset and retry.
-          surface.disposeProxyVideo();
-          surface.ensureProxyVideo(targetElement);
-          surface._proxyStuckSince = 0;
-        }
-      surface.canvas.style.setProperty("display", "none", "important");
-      surface.hideCompileOverlay();
-      surface.showFailureOverlay(rect, "Filter unavailable in Windows Chrome overlay");
-      return;
-      }
-      surface._proxyStuckSince = 0;
-      // proxyBitmap or proxyVideo is available — safe for texImage2D on Windows.
-      // Fall through to the normal WebGL rendering path to apply the retro filter.
-    }
-
     if (!drawableSource) {
       surface.canvas.style.setProperty("display", "none", "important");
       surface.hideCompileOverlay();
@@ -1221,13 +1201,6 @@ function createOverlay(settings) {
         surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
         surface.gl.useProgram(surface.renderer.pass1Program);
-        // On Windows/ANGLE, UNPACK_FLIP_Y_WEBGL is not applied to ImageBitmap sources
-        // (ImageCapture.grabFrame() proxy frames). Compensate with a UV flip in pass1
-        // so the FBO receives correctly-oriented content. Pass2 reads from the FBO
-        // (written by WebGL, always correct orientation) and needs no adjustment.
-        if (isWindowsChromiumAngleRisk() && drawableSource !== targetElement) {
-          surface.gl.uniform1f(surface.renderer.pass1UniformLocations.uFlipV, flipV ? 0.0 : 1.0);
-        }
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
 
         const displaySize = getOverlayDisplaySize(surface.gl, surface.renderer);
@@ -1355,24 +1328,16 @@ function createOverlay(settings) {
   function startRecording() {
     const activeSurface = surfaces[0];
     const targetElement = activeSurface?.targetElement ?? activePrimaryTarget ?? null;
-    const directVideoStream = shouldUseDirectVideoFallback(targetElement)
-      ? getElementVideoStream(targetElement)
-      : null;
     const canUseCanvas = !!activeSurface?.targetElement && activeSurface.canvas.style.display !== "none";
 
-    if (!targetElement || (!directVideoStream && !canUseCanvas)) {
+    if (!targetElement || !canUseCanvas) {
       window.alert("Move the pointer over a visible video or image first.");
       return;
     }
 
     const nextRecordingStream = new MediaStream();
-
-    if (directVideoStream) {
-      directVideoStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
-    } else {
-      const canvasStream = activeSurface.canvas.captureStream(30);
-      canvasStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
-    }
+    const canvasStream = activeSurface.canvas.captureStream(30);
+    canvasStream.getVideoTracks().forEach((track) => nextRecordingStream.addTrack(track));
 
     const audioStream = getElementAudioStream(targetElement);
     audioStream?.getAudioTracks().forEach((track) => nextRecordingStream.addTrack(track));
@@ -1923,7 +1888,7 @@ let _autoDrawableCache = [];
 let _autoDrawableCacheFrame = -999;
 
 function getAutoDrawableCacheFrameWindow() {
-  return isWindowsChromiumAngleRisk() ? 2 : 6;
+  return 6;
 }
 
 function findAutoDrawableTargets(frameCount) {
@@ -2606,12 +2571,8 @@ function isDrawableElement(candidate) {
   return false;
 }
 
-function shouldUseDirectVideoFallback(candidate) {
-  return (
-    isWindowsChromiumAngleRisk()
-    && candidate instanceof HTMLVideoElement
-    && candidate.mediaKeys == null
-  );
+function shouldUseDirectVideoFallback(_candidate) {
+  return false;
 }
 
 function isRelaxedDrawableElement(candidate) {
