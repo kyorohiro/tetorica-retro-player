@@ -2549,12 +2549,15 @@ function isFrontmostMediaAtCenter(element) {
 
   const stack = document.elementsFromPoint(centerX, centerY);
   for (const node of stack) {
+    if (node === element) {
+      return true;
+    }
     if (node instanceof HTMLVideoElement || node instanceof HTMLImageElement) {
-      return node === element;
+      return false;
     }
   }
 
-  return false;
+  return true;
 }
 
 function getMediaSourceIdentity(element) {
