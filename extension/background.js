@@ -208,6 +208,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return;
   }
 
+  if (message?.type === "GET_RENDERER_ACTIVITY") {
+    void (async () => {
+      const viewerTabs = await chrome.tabs.query({ url: VIEWER_URL });
+      const overlayStored = await chrome.storage.local.get(OVERLAY_ACTIVE_KEY);
+      const activeTabs = overlayStored[OVERLAY_ACTIVE_KEY] ?? {};
+      sendResponse({
+        ok: true,
+        hasViewerTab: viewerTabs.length > 0,
+        hasOverlayActive: Object.keys(activeTabs).length > 0,
+      });
+    })().catch((error) => {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+    return true;
+  }
+
   if (message?.type === "CLEAR_CAPTURE_SESSION") {
     currentSession = null;
     sendResponse({ ok: true });

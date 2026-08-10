@@ -145,10 +145,12 @@ const alarmSetButton = document.getElementById("alarmSetButton");
 const alarmQuickButtons = document.querySelectorAll(".alarm-quick-btn[data-minutes]");
 
 const ALARM_STORAGE_KEY = "retro-alarm-state";
+const COMPILE_WARMUP_FRAME_ID = "retroCompileWarmupFrame";
 
 const TAB_KEY = "retro-popup-tab";
 const tabButtons = document.querySelectorAll(".tab-btn[data-tab]");
 const tabPanels = document.querySelectorAll("[data-tab-panel]");
+let compileWarmupFrame = null;
 
 function renderAlarmState(state) {
   const isArmed = state?.status === "armed" && state?.targetAt;
@@ -243,6 +245,38 @@ function renderCompileState(state) {
         : "Shader";
   compileStateText.hidden = false;
   compileStateText.textContent = `${sourceLabel}: ${state.label}`;
+}
+
+async function syncCompileWarmupFrame() {
+  const response = await chrome.runtime.sendMessage({ type: "GET_RENDERER_ACTIVITY" }).catch(() => null);
+  const shouldWarmup = Boolean(response?.ok) && !response.hasViewerTab && !response.hasOverlayActive;
+
+  if (!shouldWarmup) {
+    if (compileWarmupFrame?.isConnected) {
+      compileWarmupFrame.remove();
+    }
+    compileWarmupFrame = null;
+    return;
+  }
+
+  if (compileWarmupFrame?.isConnected) {
+    return;
+  }
+
+  compileWarmupFrame = document.createElement("iframe");
+  compileWarmupFrame.id = COMPILE_WARMUP_FRAME_ID;
+  compileWarmupFrame.src = chrome.runtime.getURL("viewer.html?warmup=1");
+  compileWarmupFrame.tabIndex = -1;
+  compileWarmupFrame.setAttribute("aria-hidden", "true");
+  compileWarmupFrame.style.position = "absolute";
+  compileWarmupFrame.style.width = "1px";
+  compileWarmupFrame.style.height = "1px";
+  compileWarmupFrame.style.opacity = "0";
+  compileWarmupFrame.style.pointerEvents = "none";
+  compileWarmupFrame.style.border = "0";
+  compileWarmupFrame.style.left = "-9999px";
+  compileWarmupFrame.style.top = "-9999px";
+  document.body.append(compileWarmupFrame);
 }
 
 if (chrome.runtime?.onMessage) {
@@ -1105,6 +1139,7 @@ async function init() {
   currentSettings = normalizeSettings(stored[SETTINGS_STORAGE_KEY]);
   renderSettings(currentSettings);
   await persistSettings();
+  await syncCompileWarmupFrame();
   await loadOverlayState();
   renderAlarmState(stored[ALARM_STORAGE_KEY]);
   const compileStateResponse = await chrome.runtime.sendMessage({ type: "GET_COMPILE_STATUS" });
@@ -1283,6 +1318,7 @@ async function updateSettings(patch) {
 async function persistSettings() {
   renderSettings(currentSettings);
   await chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: currentSettings });
+  await syncCompileWarmupFrame();
 }
 
 function updateAudioSettings(patch) {

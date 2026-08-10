@@ -1912,8 +1912,14 @@ function findPreferredHoverElement(clientX, clientY) {
 let _autoDrawableCache = [];
 let _autoDrawableCacheFrame = -999;
 
+function getAutoDrawableCacheFrameWindow() {
+  return isWindowsChromiumAngleRisk() ? 2 : 6;
+}
+
 function findAutoDrawableTargets(frameCount) {
-  if (frameCount - _autoDrawableCacheFrame < 30) return _autoDrawableCache;
+  if (frameCount - _autoDrawableCacheFrame < getAutoDrawableCacheFrameWindow()) {
+    return _autoDrawableCache;
+  }
   _autoDrawableCacheFrame = frameCount;
   _hoveredMediaCache.clear();
   const elements = [...document.querySelectorAll("video, img")].filter(isDrawableElement);
