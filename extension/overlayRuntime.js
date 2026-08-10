@@ -1947,7 +1947,11 @@ function compareElementAreaDesc(a, b) {
 
 function isVisibleMediaRect(element) {
   const rect = element.getBoundingClientRect();
-  return rect.width > 32 && rect.height > 32 && isInViewport(element);
+  return rect.width > 32 &&
+    rect.height > 32 &&
+    isInViewport(element) &&
+    isActuallyVisibleElement(element) &&
+    isFrontmostMediaAtCenter(element);
 }
 
 function appendUniqueDrawableTarget(targets, candidate, options = {}) {
@@ -2504,6 +2508,48 @@ function isPointInsideRect(rect, clientX, clientY) {
     clientY >= rect.top &&
     clientY <= rect.bottom
   );
+}
+
+function isActuallyVisibleElement(element) {
+  if (!element?.isConnected) {
+    return false;
+  }
+  const style = window.getComputedStyle(element);
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.visibility === "collapse" ||
+    Number(style.opacity || "1") <= 0.001
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isFrontmostMediaAtCenter(element) {
+  if (!element?.isConnected) {
+    return false;
+  }
+  const rect = element.getBoundingClientRect();
+  const centerX = rect.left + rect.width * 0.5;
+  const centerY = rect.top + rect.height * 0.5;
+  if (
+    centerX < 0 ||
+    centerY < 0 ||
+    centerX > window.innerWidth ||
+    centerY > window.innerHeight
+  ) {
+    return false;
+  }
+
+  const stack = document.elementsFromPoint(centerX, centerY);
+  for (const node of stack) {
+    if (node instanceof HTMLVideoElement || node instanceof HTMLImageElement) {
+      return node === element;
+    }
+  }
+
+  return false;
 }
 
 function getMediaSourceIdentity(element) {
