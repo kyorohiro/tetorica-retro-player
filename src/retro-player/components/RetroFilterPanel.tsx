@@ -1059,7 +1059,7 @@ export function RetroFilterPanel({
               <input
                 type="range"
                 min="0.4"
-                max="2.5"
+                max="4.0"
                 step="0.01"
                 value={outputBrightness}
                 onChange={(ev) => onSetOutputBrightness(Number(ev.currentTarget.value))}
