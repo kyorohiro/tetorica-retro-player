@@ -29,7 +29,6 @@ const OVERLAY_KEY = "__tetoricaRetroOverlay";
 let _sharedAudioCtx = null;
 let _sharedAudioSource = null;
 let _sharedAudioSourceEl = null;
-let _shaderCompileNonce = 0;
 const _shaderCompileSessionSalt = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 // lo-fi ボタンの ON/OFF 状態をオーバーレイをまたいで保持する。
 // isAudioFxEnabled（settings の effects on/off）とは独立した制御:
@@ -156,12 +155,20 @@ function getOverlayRendererVariantSignature(settings) {
   });
 }
 
+function hashShaderSource(source) {
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function withShaderCompileCacheBuster(source, settings) {
   if (!settings?.shaderCompileCacheBusterEnabled) {
     return source;
   }
-  _shaderCompileNonce += 1;
-  return `${source}\n// shader-id:${_shaderCompileSessionSalt}:${_shaderCompileNonce}`;
+  return `${source}\n// shader-id:${_shaderCompileSessionSalt}:${hashShaderSource(source)}`;
 }
 
 export function isRetroOverlayActive() {

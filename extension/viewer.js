@@ -100,7 +100,6 @@ let activeRendererVariantSignature = null;
 let compileStatusTimerId = null;
 let lastPublishedCompileStateKey = "";
 let rendererSetupGeneration = 0;
-let shaderCompileNonce = 0;
 const shaderCompileSessionSalt = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isWindowsChromiumAngleRisk = () => {
@@ -209,12 +208,20 @@ function getRendererVariantSignature(settings) {
   });
 }
 
+function hashShaderSource(source) {
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function withShaderCompileCacheBuster(source, settings) {
   if (!settings?.shaderCompileCacheBusterEnabled) {
     return source;
   }
-  shaderCompileNonce += 1;
-  return `${source}\n// shader-id:${shaderCompileSessionSalt}:${shaderCompileNonce}`;
+  return `${source}\n// shader-id:${shaderCompileSessionSalt}:${hashShaderSource(source)}`;
 }
 
 function logViewerAudioRecovery(label, payload = {}, level = "info") {
