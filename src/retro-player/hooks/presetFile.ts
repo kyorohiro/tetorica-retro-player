@@ -48,6 +48,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   spotMaskStrength: DEFAULT_PRESET.spotMask,
   bulbRadius: DEFAULT_PRESET.bulbRadius,
   blackFloor: DEFAULT_PRESET.blackFloor,
+  sourceZoom: DEFAULT_PRESET.sourceZoom ?? 1,
   outputBrightness: 1,
   basicContrast: DEFAULT_PRESET.basicContrast ?? 1,
   shadowCrush: DEFAULT_PRESET.shadowCrush ?? 0,

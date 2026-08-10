@@ -370,6 +370,7 @@ export function RetroControlPanel({
               spotMaskStrength={filterState.spotMaskStrength}
               bulbRadius={filterState.bulbRadius}
               blackFloor={filterState.blackFloor}
+              sourceZoom={filterState.sourceZoom}
               outputBrightness={filterState.outputBrightness}
               basicContrast={filterState.basicContrast}
               shadowCrush={filterState.shadowCrush}
@@ -439,6 +440,7 @@ export function RetroControlPanel({
               onSetSpotMaskStrength={filterState.setSpotMaskStrength}
               onSetBulbRadius={filterState.setBulbRadius}
               onSetBlackFloor={filterState.setBlackFloor}
+              onSetSourceZoom={filterState.setSourceZoom}
               onSetOutputBrightness={filterState.setOutputBrightness}
               onSetBasicContrast={filterState.setBasicContrast}
               onSetShadowCrush={filterState.setShadowCrush}

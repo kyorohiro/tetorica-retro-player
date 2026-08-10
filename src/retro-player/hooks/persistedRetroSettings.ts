@@ -42,6 +42,7 @@ export type PersistedRetroFilterSettings = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  sourceZoom: number;
   outputBrightness: number;
   basicContrast: number;
   shadowCrush: number;

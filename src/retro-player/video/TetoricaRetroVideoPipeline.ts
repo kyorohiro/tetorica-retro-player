@@ -55,6 +55,7 @@ export type RetroVideoFilterState = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  sourceZoom: number;
   outputBrightness: number;
   basicContrast: number;
   shadowCrush: number;
@@ -251,6 +252,11 @@ type PostCurvatureUniformLocations = {
   uCurvature: WebGLUniformLocation | null;
 };
 
+type SourceTransformUniformLocations = {
+  uTexture: WebGLUniformLocation | null;
+  uSourceZoom: WebGLUniformLocation | null;
+};
+
 type FilterBufferCap = {
   width: number;
   height: number;
@@ -299,6 +305,29 @@ uniform sampler2D uTexture;
 void main(void)
 {
   finalColor = texture(uTexture, vTextureCoord);
+}
+`;
+
+const SOURCE_TRANSFORM_FRAGMENT = `#version 300 es
+precision mediump float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform float uSourceZoom;
+
+vec2 zoomedUv(vec2 uv, float zoom)
+{
+  float safeZoom = max(zoom, 1.0);
+  vec2 cropSize = vec2(1.0 / safeZoom);
+  vec2 offset = (vec2(1.0) - cropSize) * 0.5;
+  return offset + uv * cropSize;
+}
+
+void main(void)
+{
+  finalColor = texture(uTexture, zoomedUv(vTextureCoord, uSourceZoom));
 }
 `;
 
@@ -550,6 +579,11 @@ const shouldUsePostCurvaturePass = (
   filterState.postCurvatureEnabled &&
   filterState.curvature > 0.0001;
 
+const shouldUseSourceTransformPass = (
+  filterState: RetroVideoFilterState,
+) =>
+  filterState.sourceZoom > 1.0001;
+
 const getEffectivePreCurvature = (filterState: RetroVideoFilterState) =>
   filterState.postCurvatureEnabled ? 0 : filterState.curvature;
 
@@ -704,6 +738,7 @@ export const getEffectiveRetroTargetSize = (
   const internalScale = getPhosphorDotInternalScale(filterState);
   const isBeamMode = isBeamCrossModeEnabled(filterState);
   const effectiveResolutionScale = isBeamMode ? 1 : internalScale;
+  const sourceZoom = Math.max(filterState.sourceZoom ?? 1, 1);
   const requestedWidth = Math.max(filterState.targetWidth, 1);
   const requestedHeight = Math.max(filterState.targetHeight, 1);
   const aspectCorrected = filterState.matchTargetAspect
@@ -717,8 +752,10 @@ export const getEffectiveRetroTargetSize = (
       width: requestedWidth,
       height: requestedHeight,
     };
-  const scaledWidth = aspectCorrected.width * effectiveResolutionScale;
-  const scaledHeight = aspectCorrected.height * effectiveResolutionScale;
+  const zoomAdjustedWidth = Math.max(1, aspectCorrected.width / sourceZoom);
+  const zoomAdjustedHeight = Math.max(1, aspectCorrected.height / sourceZoom);
+  const scaledWidth = zoomAdjustedWidth * effectiveResolutionScale;
+  const scaledHeight = zoomAdjustedHeight * effectiveResolutionScale;
   const viewportLimited = getPhosphorDotViewportLimitedSize(
     scaledWidth,
     scaledHeight,
@@ -896,9 +933,11 @@ export class TetoricaRetroVideoPipeline {
   private beamDownscaleProgram: WebGLProgram | null = null;
   private compositeMidProgram: WebGLProgram | null = null;
   private postCurvatureProgram: WebGLProgram | null = null;
+  private sourceTransformProgram: WebGLProgram | null = null;
   private beamDownscaleLocs: BeamDownscaleUniformLocations | null = null;
   private compositeMidLocs: CompositeMidUniformLocations | null = null;
   private postCurvatureLocs: PostCurvatureUniformLocations | null = null;
+  private sourceTransformLocs: SourceTransformUniformLocations | null = null;
   private phosphorCoreProgram: WebGLProgram | null = null;
   private phosphorCoreLocs: Pass2UniformLocations | null = null;
   private beamKernelProgram: WebGLProgram | null = null;
@@ -920,6 +959,11 @@ export class TetoricaRetroVideoPipeline {
   private fboWidth = 0;
   private fboHeight = 0;
   private fboTextureSamplingFilter: number | null = null;
+  private sourceTransformFbo: WebGLFramebuffer | null = null;
+  private sourceTransformTexture: WebGLTexture | null = null;
+  private sourceTransformFboWidth = 0;
+  private sourceTransformFboHeight = 0;
+  private sourceTransformTextureSamplingFilter: number | null = null;
   private beamSourceFbo: WebGLFramebuffer | null = null;
   private beamSourceTexture: WebGLTexture | null = null;
   private beamSourceFboWidth = 0;
@@ -1071,6 +1115,42 @@ export class TetoricaRetroVideoPipeline {
     this.beamSourceFboWidth = width;
     this.beamSourceFboHeight = height;
     this.beamSourceTextureSamplingFilter = gl.LINEAR;
+  }
+
+  private ensureSourceTransformFbo(width: number, height: number) {
+    if (
+      this.sourceTransformFboWidth === width &&
+      this.sourceTransformFboHeight === height &&
+      this.sourceTransformFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.sourceTransformFbo) gl.deleteFramebuffer(this.sourceTransformFbo);
+    if (this.sourceTransformTexture) gl.deleteTexture(this.sourceTransformTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create source transform FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create source transform FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.sourceTransformFbo = fbo;
+    this.sourceTransformTexture = tex;
+    this.sourceTransformFboWidth = width;
+    this.sourceTransformFboHeight = height;
+    this.sourceTransformTextureSamplingFilter = gl.LINEAR;
   }
 
   private ensureCompositeMidFbo(width: number, height: number) {
@@ -1261,6 +1341,18 @@ export class TetoricaRetroVideoPipeline {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
     this.fboTextureSamplingFilter = nextFilter;
+  }
+
+  private syncSourceTransformTextureSamplingFilter(nextFilter: number) {
+    if (!this.sourceTransformTexture || this.sourceTransformTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.sourceTransformTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.sourceTransformTextureSamplingFilter = nextFilter;
   }
 
   private syncBeamSourceTextureSamplingFilter(nextFilter: number) {
@@ -1712,6 +1804,10 @@ export class TetoricaRetroVideoPipeline {
     if (shouldUsePostCurvaturePass(filterState) && (!this.postCurvatureProgram || !this.postCurvatureLocs)) {
       await this.ensurePostCurvatureProgram();
     }
+
+    if (shouldUseSourceTransformPass(filterState) && (!this.sourceTransformProgram || !this.sourceTransformLocs)) {
+      await this.ensureSourceTransformProgram();
+    }
   }
 
   private async ensureSupportProgramsForFilterState(filterState: RetroVideoFilterState | null) {
@@ -1788,8 +1884,11 @@ export class TetoricaRetroVideoPipeline {
     const needsPostCurvature =
       shouldUsePostCurvaturePass(filterState) &&
       (!this.postCurvatureProgram || !this.postCurvatureLocs);
+    const needsSourceTransform =
+      shouldUseSourceTransformPass(filterState) &&
+      (!this.sourceTransformProgram || !this.sourceTransformLocs);
 
-    if (!needsBeamDownscale && !needsPostCurvature) {
+    if (!needsBeamDownscale && !needsPostCurvature && !needsSourceTransform) {
       return;
     }
 
@@ -2141,6 +2240,36 @@ export class TetoricaRetroVideoPipeline {
     }
   }
 
+  private async ensureSourceTransformProgram() {
+    if (this.sourceTransformProgram && this.sourceTransformLocs) {
+      return;
+    }
+
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
+    await waitForCompileTurn;
+
+    try {
+      await this.updateCompileState("Compiling shader (source transform)...");
+      logShaderCompileInfo("base:sourceTransform");
+      const program = submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        SOURCE_TRANSFORM_FRAGMENT,
+      );
+      await this.updateCompileState("Linking shader (source transform)...");
+      await waitAndVerifyPrograms(this.gl, [program]);
+      this.sourceTransformProgram = program;
+      this.gl.useProgram(program);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
+      this.sourceTransformLocs = {
+        uTexture: this.gl.getUniformLocation(program, "uTexture"),
+        uSourceZoom: this.gl.getUniformLocation(program, "uSourceZoom"),
+      };
+    } finally {
+      releaseCompileTurn();
+    }
+  }
+
   private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
     const { gl } = this;
     return {
@@ -2249,9 +2378,11 @@ export class TetoricaRetroVideoPipeline {
   private hasPreparedSupportProgramsForFilterState(filterState: RetroVideoFilterState) {
     const needsBeamDownscale = shouldUsePreFilterDownscale(filterState);
     const needsPostCurvature = shouldUsePostCurvaturePass(filterState);
+    const needsSourceTransform = shouldUseSourceTransformPass(filterState);
     const hasBeamDownscale = !needsBeamDownscale || (!!this.beamDownscaleProgram && !!this.beamDownscaleLocs);
     const hasPostCurvature = !needsPostCurvature || (!!this.postCurvatureProgram && !!this.postCurvatureLocs);
-    return hasBeamDownscale && hasPostCurvature;
+    const hasSourceTransform = !needsSourceTransform || (!!this.sourceTransformProgram && !!this.sourceTransformLocs);
+    return hasBeamDownscale && hasPostCurvature && hasSourceTransform;
   }
 
   hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
@@ -2488,11 +2619,49 @@ export class TetoricaRetroVideoPipeline {
     }
 
     const usingFilter = filterState.isFilterEnabled && this.filterPass1Program && this.filterPass2Program;
+    const useSourceTransformPass =
+      shouldUseSourceTransformPass(filterState) &&
+      !!this.sourceTransformProgram &&
+      !!this.sourceTransformLocs;
+    let sourceTextureForRender: WebGLTexture = this.texture;
+    let sourceSize = getRetroVideoSourceSize(source);
+
+    if (useSourceTransformPass && this.sourceTransformProgram && this.sourceTransformLocs) {
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
+      if (usingFilter) {
+        this.ensureSourceTransformFbo(w, h);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, usingFilter ? this.sourceTransformFbo : null);
+      gl.viewport(0, 0, w, h);
+      gl.clearColor(usingFilter ? 0 : 0.01, usingFilter ? 0 : 0.02, usingFilter ? 0 : 0.01, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(this.sourceTransformProgram);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.texture);
+      this.syncTextureSamplingFilter(gl.LINEAR);
+      gl.uniform1f(this.sourceTransformLocs.uSourceZoom, Math.max(filterState.sourceZoom, 1));
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      if (usingFilter && this.sourceTransformTexture) {
+        sourceTextureForRender = this.sourceTransformTexture;
+        sourceSize = { width: w, height: h };
+      } else {
+        this.lastRenderedFilterState = filterState;
+        this.lastRenderedSource = source;
+        this.lastRenderedBufferWidth = gl.drawingBufferWidth;
+        this.lastRenderedBufferHeight = gl.drawingBufferHeight;
+        this.renderCount++;
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.syncTextureSamplingFilter(textureFilter);
+        return;
+      }
+    }
 
     if (usingFilter) {
       const w = gl.drawingBufferWidth;
       const h = gl.drawingBufferHeight;
-      const sourceSize = getRetroVideoSourceSize(source);
       const timeSec = this.advanceAnimationClock();
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
@@ -2502,6 +2671,13 @@ export class TetoricaRetroVideoPipeline {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(this.filterPass1Program);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, sourceTextureForRender);
+      if (sourceTextureForRender === this.sourceTransformTexture) {
+        this.syncSourceTransformTextureSamplingFilter(textureFilter);
+      } else {
+        this.syncTextureSamplingFilter(textureFilter);
+      }
       this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height, timeSec);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -2541,7 +2717,7 @@ export class TetoricaRetroVideoPipeline {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      let pass2SourceTexture: WebGLTexture = this.texture;
+      let pass2SourceTexture: WebGLTexture = sourceTextureForRender;
       let pass2PrimaryTexture: WebGLTexture | null = pass1OutputTexture;
       let pass2Sizing: Pass2Sizing | null = null;
       if (canUsePreFilterDownscale && this.beamDownscaleProgram && this.beamDownscaleLocs) {
@@ -2588,6 +2764,8 @@ export class TetoricaRetroVideoPipeline {
           gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
           if (pass2SourceTexture === this.beamSourceTexture) {
             this.syncBeamSourceTextureSamplingFilter(gl.LINEAR);
+          } else if (pass2SourceTexture === this.sourceTransformTexture) {
+            this.syncSourceTransformTextureSamplingFilter(gl.LINEAR);
           } else {
             this.syncTextureSamplingFilter(gl.LINEAR);
           }
@@ -2625,6 +2803,8 @@ export class TetoricaRetroVideoPipeline {
           gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
           if (pass2SourceTexture === this.beamSourceTexture) {
             this.syncBeamSourceTextureSamplingFilter(gl.LINEAR);
+          } else if (pass2SourceTexture === this.sourceTransformTexture) {
+            this.syncSourceTransformTextureSamplingFilter(gl.LINEAR);
           } else {
             this.syncTextureSamplingFilter(gl.LINEAR);
           }
@@ -2688,6 +2868,8 @@ export class TetoricaRetroVideoPipeline {
         gl.bindTexture(gl.TEXTURE_2D, pass2SourceTexture);
         if (pass2SourceTexture === this.beamSourceTexture) {
           this.syncBeamSourceTextureSamplingFilter(gl.LINEAR);
+        } else if (pass2SourceTexture === this.sourceTransformTexture) {
+          this.syncSourceTransformTextureSamplingFilter(gl.LINEAR);
         } else {
           this.syncTextureSamplingFilter(gl.LINEAR);
         }
@@ -2771,8 +2953,11 @@ export class TetoricaRetroVideoPipeline {
     gl.deleteProgram(this.passthroughProgram);
     if (this.beamDownscaleProgram) gl.deleteProgram(this.beamDownscaleProgram);
     if (this.postCurvatureProgram) gl.deleteProgram(this.postCurvatureProgram);
+    if (this.sourceTransformProgram) gl.deleteProgram(this.sourceTransformProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
+    if (this.sourceTransformFbo) gl.deleteFramebuffer(this.sourceTransformFbo);
+    if (this.sourceTransformTexture) gl.deleteTexture(this.sourceTransformTexture);
     if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
     if (this.beamSourceTexture) gl.deleteTexture(this.beamSourceTexture);
     if (this.compositeMidFbo) gl.deleteFramebuffer(this.compositeMidFbo);

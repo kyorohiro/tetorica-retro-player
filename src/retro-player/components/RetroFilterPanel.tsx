@@ -96,6 +96,7 @@ type RetroFilterPanelProps = {
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  sourceZoom: number;
   outputBrightness: number;
   basicContrast: number;
   shadowCrush: number;
@@ -165,6 +166,7 @@ type RetroFilterPanelProps = {
   onSetSpotMaskStrength: (value: number) => void;
   onSetBulbRadius: (value: number) => void;
   onSetBlackFloor: (value: number) => void;
+  onSetSourceZoom: (value: number) => void;
   onSetOutputBrightness: (value: number) => void;
   onSetBasicContrast: (value: number) => void;
   onSetShadowCrush: (value: number) => void;
@@ -235,6 +237,7 @@ export function RetroFilterPanel({
   spotMaskStrength,
   bulbRadius,
   blackFloor,
+  sourceZoom,
   outputBrightness,
   basicContrast,
   shadowCrush,
@@ -301,6 +304,7 @@ export function RetroFilterPanel({
   onSetSpotMaskStrength,
   onSetBulbRadius,
   onSetBlackFloor,
+  onSetSourceZoom,
   onSetOutputBrightness,
   onSetBasicContrast,
   onSetShadowCrush,
@@ -407,6 +411,8 @@ export function RetroFilterPanel({
             "各 phosphor セル内で光るバルブの大きさを決めます。下げるほど明るい芯が小さくなり、周囲の黒が増えます。",
           blackFloor:
             "phosphor バルブ周囲の黒背景へどれだけ光が漏れるかを決めます。下げるほど未点灯部分が純黒に近づきます。",
+          sourceZoom:
+            "元画像の中央を切り出して拡大します。canvas ではなく WebGL 内で縮小と切り出しを行うので、OS ごとの差が出にくいズームです。",
           lumaAmount:
             "Luma compressor 全体の効き量です。0 で無効、1 で通常、上げると明暗補正が強く出ます。",
           lumaLow:
@@ -512,6 +518,8 @@ export function RetroFilterPanel({
             "Sets how large the glowing bulb can grow inside each phosphor cell. Lower values make the lit core smaller and expose more black around it.",
           blackFloor:
             "Sets how much light leaks into the black background around each phosphor bulb. Lower values keep the unlit area closer to pure black.",
+          sourceZoom:
+            "Crops into the center of the source and enlarges it. This zoom happens inside WebGL instead of via canvas resizing, which keeps behavior more consistent across platforms.",
           lumaAmount:
             "Overall strength of the luma compressor. 0 disables it, 1 is normal, and higher values push the tone shaping harder.",
           lumaLow:
@@ -1053,6 +1061,24 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={smoothStrength}
                 onChange={(ev) => onSetSmoothStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Source zoom: ${fixedNumber(sourceZoom, 2)}`}
+                  text={helpText.sourceZoom}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="1"
+                max="4"
+                step="0.01"
+                value={sourceZoom}
+                onChange={(ev) => onSetSourceZoom(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

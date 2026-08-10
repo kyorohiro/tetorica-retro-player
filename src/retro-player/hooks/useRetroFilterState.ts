@@ -50,6 +50,7 @@ export type RetroFilterInitialState = Partial<{
   spotMaskStrength: number;
   bulbRadius: number;
   blackFloor: number;
+  sourceZoom: number;
   outputBrightness: number;
   basicContrast: number;
   shadowCrush: number;
@@ -131,6 +132,7 @@ const doesPresetMatchState = (
     preset.spotMask === state.spotMaskStrength &&
     preset.bulbRadius === state.bulbRadius &&
     preset.blackFloor === state.blackFloor &&
+    (preset.sourceZoom ?? 1) === state.sourceZoom &&
     (preset.outputBrightness ?? 1) === state.outputBrightness &&
     (preset.basicContrast ?? 1) === state.basicContrast &&
     (preset.shadowCrush ?? 0) === state.shadowCrush &&
@@ -243,6 +245,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     spotMaskStrength: initialState.spotMaskStrength ?? DEFAULT_PRESET.spotMask,
     bulbRadius: initialState.bulbRadius ?? DEFAULT_PRESET.bulbRadius,
     blackFloor: initialState.blackFloor ?? DEFAULT_PRESET.blackFloor,
+    sourceZoom: initialState.sourceZoom ?? (DEFAULT_PRESET.sourceZoom ?? 1),
     outputBrightness: initialState.outputBrightness ?? (DEFAULT_PRESET.outputBrightness ?? 1),
     basicContrast: initialState.basicContrast ?? (DEFAULT_PRESET.basicContrast ?? 1),
     shadowCrush: initialState.shadowCrush ?? (DEFAULT_PRESET.shadowCrush ?? 0),
@@ -503,6 +506,12 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
   const setBlackFloor = (blackFloor: number) => {
     markPresetAsCustom();
     setSettings((current) => (current.blackFloor === blackFloor ? current : { ...current, blackFloor }));
+  };
+
+  const setSourceZoom = (sourceZoom: number) => {
+    const normalized = Math.max(1, Math.min(4, Math.round(sourceZoom * 100) / 100));
+    markPresetAsCustom();
+    setSettings((current) => (current.sourceZoom === normalized ? current : { ...current, sourceZoom: normalized }));
   };
 
   const setOutputBrightness = (outputBrightness: number) => {
@@ -820,6 +829,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       spotMaskStrength: presetSettings.spotMask,
       bulbRadius: presetSettings.bulbRadius,
       blackFloor: presetSettings.blackFloor,
+      sourceZoom: presetSettings.sourceZoom ?? 1,
       outputBrightness: presetSettings.outputBrightness ?? 1,
       basicContrast: presetSettings.basicContrast ?? 1,
       shadowCrush: presetSettings.shadowCrush ?? 0,
@@ -924,6 +934,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setSpotMaskStrength,
     setBulbRadius,
     setBlackFloor,
+    setSourceZoom,
     setOutputBrightness,
     setBasicContrast,
     setShadowCrush,
