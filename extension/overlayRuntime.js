@@ -172,23 +172,25 @@ export async function toggleRetroOverlay(settingsInput) {
 }
 
 function publishOverlayCompileState(message) {
+  const nextState = {
+    active: Boolean(message),
+    label: message || "",
+    source: "overlay",
+  };
+  const nextKey = JSON.stringify(nextState);
+  if (publishOverlayCompileState.lastKey === nextKey) {
+    return;
+  }
+  publishOverlayCompileState.lastKey = nextKey;
   void chrome.runtime.sendMessage({
     type: "SET_COMPILE_STATUS",
-    state: message
-      ? {
-          active: true,
-          label: message,
-          source: "overlay",
-          updatedAt: Date.now(),
-        }
-      : {
-          active: false,
-          label: "",
-          source: "overlay",
-          updatedAt: Date.now(),
-        },
+    state: {
+      ...nextState,
+      updatedAt: Date.now(),
+    },
   }).catch(() => {});
 }
+publishOverlayCompileState.lastKey = "";
 
 function createOverlay(settings) {
   let currentSettings = settings;

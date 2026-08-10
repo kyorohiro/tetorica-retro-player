@@ -98,6 +98,8 @@ let alarmOverlayEl = null;
 let alarmClockIntervalId = null;
 let activeRendererVariantSignature = null;
 let compileStatusTimerId = null;
+let lastPublishedCompileStateKey = "";
+let rendererSetupGeneration = 0;
 
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
@@ -233,22 +235,29 @@ function renderViewerCompileState(message) {
 }
 
 function publishCompileState(active, label = "") {
+  const nextState = active
+    ? {
+        active: true,
+        label,
+        source: "viewer",
+      }
+    : {
+        active: false,
+        label: "",
+        source: "viewer",
+      };
+  const nextKey = JSON.stringify(nextState);
   renderViewerCompileState(active ? label : "");
+  if (lastPublishedCompileStateKey === nextKey) {
+    return;
+  }
+  lastPublishedCompileStateKey = nextKey;
   void chrome.runtime.sendMessage({
     type: "SET_COMPILE_STATUS",
-    state: active
-      ? {
-          active: true,
-          label,
-          source: "viewer",
-          updatedAt: Date.now(),
-        }
-      : {
-          active: false,
-          label: "",
-          source: "viewer",
-          updatedAt: Date.now(),
-        },
+    state: {
+      ...nextState,
+      updatedAt: Date.now(),
+    },
   }).catch(() => {});
 }
 
@@ -1207,6 +1216,7 @@ async function disposeAudioEngine() {
 }
 
 function setupRenderer(webgl) {
+  const setupGeneration = ++rendererSetupGeneration;
   activeRendererVariantSignature = getRendererVariantSignature(currentSettings);
   if (compileStatusTimerId != null) {
     window.clearTimeout(compileStatusTimerId);
@@ -1299,12 +1309,15 @@ function setupRenderer(webgl) {
 
   // useProgram, getUniformLocation, and uniformLocations assignment are deferred
   // to finalizeFilterProgram() to avoid the Windows D3D cache freeze.
-  finalizeFilterProgram(webgl, prog1, prog2);
+  void finalizeFilterProgram(webgl, prog1, prog2, setupGeneration);
 }
 
-async function finalizeFilterProgram(webgl, prog1, prog2) {
+async function finalizeFilterProgram(webgl, prog1, prog2, setupGeneration) {
   const shaderSources = getWindowsLiteShaderSources(currentSettings);
   const updateCompileState = (message) => {
+    if (setupGeneration !== rendererSetupGeneration) {
+      return;
+    }
     if (compileStatusTimerId != null) {
       window.clearTimeout(compileStatusTimerId);
       compileStatusTimerId = null;
@@ -1351,6 +1364,10 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
   if (ext) {
     await new Promise((resolve) => {
       const poll = () => {
+        if (setupGeneration !== rendererSetupGeneration) {
+          resolve();
+          return;
+        }
         updateCompileState("Linking shader (waiting for GPU)...");
         const ready1 = webgl.getProgramParameter(prog1, ext.COMPLETION_STATUS_KHR);
         const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
@@ -1369,6 +1386,10 @@ async function finalizeFilterProgram(webgl, prog1, prog2) {
     // Chromium should normally expose parallel shader compile. Keep a minimal
     // fallback for unexpected runtimes rather than hard-failing.
     await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+
+  if (setupGeneration !== rendererSetupGeneration) {
+    return;
   }
 
   if (!webgl.getProgramParameter(prog1, webgl.LINK_STATUS)) {

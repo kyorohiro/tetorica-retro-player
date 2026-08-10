@@ -10,6 +10,12 @@ const COMPILE_STATUS_SESSION_KEY = "retro-compile-status";
 let currentSession = null;
 let currentCompileStatus = null;
 
+function isSameCompileStatus(a, b) {
+  return Boolean(a?.active) === Boolean(b?.active)
+    && (a?.label ?? "") === (b?.label ?? "")
+    && (a?.source ?? "") === (b?.source ?? "");
+}
+
 chrome.storage.session.get(COMPILE_STATUS_SESSION_KEY).then((stored) => {
   currentCompileStatus = stored[COMPILE_STATUS_SESSION_KEY] ?? null;
 }).catch(() => {});
@@ -175,7 +181,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "SET_COMPILE_STATUS") {
-    currentCompileStatus = message.state ?? null;
+    const nextState = message.state ?? null;
+    if (isSameCompileStatus(currentCompileStatus, nextState)) {
+      sendResponse({ ok: true, deduped: true });
+      return;
+    }
+    currentCompileStatus = nextState;
     void chrome.storage.session
       .set({ [COMPILE_STATUS_SESSION_KEY]: currentCompileStatus })
       .catch(() => {});

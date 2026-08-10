@@ -155,6 +155,10 @@ body.fit-mode {
   pointer-events: none;
 }
 
+.compile-busy-overlay[hidden] {
+  display: none !important;
+}
+
 .compile-busy-chip {
   padding: 10px 14px;
   border-radius: 999px;
