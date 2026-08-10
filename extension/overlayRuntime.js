@@ -1961,8 +1961,7 @@ function isVisibleMediaRect(element) {
 function appendUniqueDrawableTarget(targets, candidate, options = {}) {
   const { relaxed = false } = options;
   const isDrawable = relaxed ? isRelaxedDrawableElement(candidate) : isDrawableElement(candidate);
-  const isVisible = relaxed ? isVisibleMediaRect(candidate) : isVisibleMediaRect(candidate);
-  if (!candidate || !isDrawable || !isVisible || targets.includes(candidate)) {
+  if (!candidate || !isDrawable || !isInViewport(candidate) || targets.includes(candidate)) {
     return;
   }
 
@@ -2062,6 +2061,8 @@ function createOverlaySurface(index, onReady, initialSettings) {
   let compileStatusMessage = "";
   let compileStatusVisible = false;
   let compileStatusTimer = null;
+  let setupGeneration = 0;
+  let surfaceDisposed = false;
 
   const hideCompileOverlayNow = () => {
     compileStatusMessage = "";
@@ -2106,6 +2107,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
   let renderer = null;
   if (gl) {
     try {
+      const activeSetupGeneration = ++setupGeneration;
       compileStatusMessage = "Preparing retro filter...";
       compileOverlayLabel.textContent = compileStatusMessage;
       scheduleCompileOverlay();
@@ -2114,6 +2116,9 @@ function createOverlaySurface(index, onReady, initialSettings) {
         onReady,
         initialSettings,
         (message) => {
+          if (surfaceDisposed || activeSetupGeneration !== setupGeneration) {
+            return;
+          }
           compileStatusMessage = message || "";
           compileOverlayLabel.textContent = compileStatusMessage;
           if (compileStatusMessage) {
@@ -2162,6 +2167,8 @@ function createOverlaySurface(index, onReady, initialSettings) {
       return compileStatusMessage;
     },
     destroy() {
+      surfaceDisposed = true;
+      setupGeneration += 1;
       if (this.targetElement instanceof HTMLVideoElement) {
         this.targetElement.style.transform = "";
         this.targetElement.style.transformOrigin = "";
