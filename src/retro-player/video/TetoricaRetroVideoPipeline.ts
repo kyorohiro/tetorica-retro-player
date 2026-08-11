@@ -18,6 +18,7 @@ import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE } from "../retro/filterPass
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE } from "../retro/filterPass2BeamLiteSimpleComposeShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "../retro/filterPass2PhosphorLiteCoreShader.ts";
@@ -1544,8 +1545,9 @@ export class TetoricaRetroVideoPipeline {
           : null,
       pass2:
         pass2Variant === "beam_simple" ||
-          pass2Variant === "beam_full" ||
-          pass2Variant === "beam_crt"
+          pass2Variant === "beam_full"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_POST
+          : pass2Variant === "beam_crt"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
           : pass2Variant === "phosphor"
             ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
