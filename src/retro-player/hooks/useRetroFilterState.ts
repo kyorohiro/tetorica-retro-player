@@ -15,6 +15,7 @@ import {
   type RetroPresetKey,
   type TargetSamplingMode,
   type VBlankSimulationMode,
+  type WideGlowMode,
 } from "../retro/config";
 import {
   loadPersistedRetroSettings,
@@ -83,8 +84,10 @@ export type RetroFilterInitialState = Partial<{
   beamWarmBloom: number;
   screenFaceGlow: number;
   wideGlowEnabled: boolean;
+  wideGlowMode: WideGlowMode;
   wideGlowStrength: number;
   wideGlowRadius: number;
+  wideGlowDownscale: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -168,8 +171,10 @@ const doesPresetMatchState = (
     (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
     (preset.screenFaceGlow ?? 0) === state.screenFaceGlow &&
     (preset.wideGlowEnabled ?? false) === state.wideGlowEnabled &&
+    (preset.wideGlowMode ?? "optical") === state.wideGlowMode &&
     (preset.wideGlowStrength ?? 0) === state.wideGlowStrength &&
     (preset.wideGlowRadius ?? 1) === state.wideGlowRadius &&
+    (preset.wideGlowDownscale ?? 4) === state.wideGlowDownscale &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -313,10 +318,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.screenFaceGlow ?? (DEFAULT_PRESET.screenFaceGlow ?? 0),
     wideGlowEnabled:
       initialState.wideGlowEnabled ?? (DEFAULT_PRESET.wideGlowEnabled ?? false),
+    wideGlowMode:
+      initialState.wideGlowMode ?? (DEFAULT_PRESET.wideGlowMode ?? "optical"),
     wideGlowStrength:
       initialState.wideGlowStrength ?? (DEFAULT_PRESET.wideGlowStrength ?? 0),
     wideGlowRadius:
       initialState.wideGlowRadius ?? (DEFAULT_PRESET.wideGlowRadius ?? 1),
+    wideGlowDownscale:
+      initialState.wideGlowDownscale ?? (DEFAULT_PRESET.wideGlowDownscale ?? 4),
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -753,6 +762,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setWideGlowMode = (wideGlowMode: WideGlowMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowMode === wideGlowMode ? current : { ...current, wideGlowMode }
+    ));
+  };
+
   const setWideGlowStrength = (wideGlowStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -764,6 +780,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     markPresetAsCustom();
     setSettings((current) => (
       current.wideGlowRadius === wideGlowRadius ? current : { ...current, wideGlowRadius }
+    ));
+  };
+
+  const setWideGlowDownscale = (wideGlowDownscale: number) => {
+    const normalized = wideGlowDownscale === 2 || wideGlowDownscale === 8 ? wideGlowDownscale : 4;
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowDownscale === normalized ? current : { ...current, wideGlowDownscale: normalized }
     ));
   };
 
@@ -901,8 +925,10 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
       screenFaceGlow: presetSettings.screenFaceGlow ?? 0,
       wideGlowEnabled: presetSettings.wideGlowEnabled ?? false,
+      wideGlowMode: presetSettings.wideGlowMode ?? "optical",
       wideGlowStrength: presetSettings.wideGlowStrength ?? 0,
       wideGlowRadius: presetSettings.wideGlowRadius ?? 1,
+      wideGlowDownscale: presetSettings.wideGlowDownscale ?? 4,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -1005,8 +1031,10 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBeamWarmBloom,
     setScreenFaceGlow,
     setWideGlowEnabled,
+    setWideGlowMode,
     setWideGlowStrength,
     setWideGlowRadius,
+    setWideGlowDownscale,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

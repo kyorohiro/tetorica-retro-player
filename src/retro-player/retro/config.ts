@@ -15,6 +15,7 @@ export type PhosphorDotShape = "circle" | "heart" | "beam" | "square";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 export type GrainVisibilityMode = "all" | "bright_only";
 export type BeamStripeMode = "legacy" | "modern";
+export type WideGlowMode = "optical" | "smoky";
 export type TargetSamplingMode =
   | "nearest"
   | "average_fast_4"
@@ -133,8 +134,10 @@ export type RetroPresetDefinition = {
   beamWarmBloom?: number;
   screenFaceGlow?: number;
   wideGlowEnabled?: boolean;
+  wideGlowMode?: WideGlowMode;
   wideGlowStrength?: number;
   wideGlowRadius?: number;
+  wideGlowDownscale?: number;
   scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;

@@ -14,6 +14,7 @@ import {
   type RetroPresetKey,
   type TargetSamplingMode,
   type VBlankSimulationMode,
+  type WideGlowMode,
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -128,8 +129,10 @@ type RetroFilterPanelProps = {
   beamWarmBloom: number;
   screenFaceGlow: number;
   wideGlowEnabled: boolean;
+  wideGlowMode: WideGlowMode;
   wideGlowStrength: number;
   wideGlowRadius: number;
+  wideGlowDownscale: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -201,8 +204,10 @@ type RetroFilterPanelProps = {
   onSetBeamWarmBloom: (value: number) => void;
   onSetScreenFaceGlow: (value: number) => void;
   onSetWideGlowEnabled: (value: boolean) => void;
+  onSetWideGlowMode: (value: WideGlowMode) => void;
   onSetWideGlowStrength: (value: number) => void;
   onSetWideGlowRadius: (value: number) => void;
+  onSetWideGlowDownscale: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -275,8 +280,10 @@ export function RetroFilterPanel({
   beamWarmBloom,
   screenFaceGlow,
   wideGlowEnabled,
+  wideGlowMode,
   wideGlowStrength,
   wideGlowRadius,
+  wideGlowDownscale,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -345,8 +352,10 @@ export function RetroFilterPanel({
   onSetBeamWarmBloom,
   onSetScreenFaceGlow,
   onSetWideGlowEnabled,
+  onSetWideGlowMode,
   onSetWideGlowStrength,
   onSetWideGlowRadius,
+  onSetWideGlowDownscale,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -456,8 +465,12 @@ export function RetroFilterPanel({
             "画面中央に、うっすら面発光する明るさを足します。0 なら無効で、上げるほど黒背景でもブラウン管の表面がぼんやり光っている感じを出します。",
           wideGlow:
             "最終出力のいちばん外側に、ごく弱い広域なハローを足します。近距離の glow や phosphor の粒はそのままに、ガラス越しの光漏れだけを後段で重ねます。",
+          wideGlowMode:
+            "Optical halo は発光体のまわりに等方的な光学ハローを足します。Smoky glow は現在の煙や絵の具っぽい広がり方を残すモードです。",
           wideGlowRadius:
             "Wide Glow がどれくらい遠くまで広がるかです。blur の tap 数は増やさず、低解像度側のサンプル間隔だけを広げます。",
+          wideGlowDownscale:
+            "Glow を作るためにいったん縮小する解像度です。2 は細かく、4 は標準、8 はさらに広くて軽い halo になります。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -1468,6 +1481,34 @@ export function RetroFilterPanel({
             >
               Wide glow
             </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onSetWideGlowMode("optical")}
+                title={helpText.wideGlowMode ?? ""}
+                className={[
+                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                  wideGlowMode === "optical"
+                    ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                Optical halo
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetWideGlowMode("smoky")}
+                title={helpText.wideGlowMode ?? ""}
+                className={[
+                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                  wideGlowMode === "smoky"
+                    ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                Smoky glow
+              </button>
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -1504,6 +1545,24 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[2, 4, 8].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onSetWideGlowDownscale(value)}
+                  title={helpText.wideGlowDownscale ?? ""}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    wideGlowDownscale === value
+                      ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {`1/${value}`}
+                </button>
+              ))}
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip

@@ -1,4 +1,4 @@
-export const FILTER_FRAGMENT_WIDE_GLOW_DOWNSAMPLE = `#version 300 es
+export const FILTER_FRAGMENT_WIDE_GLOW_SMOKY_DOWNSAMPLE = `#version 300 es
 precision highp float;
 
 in vec2 vTextureCoord;
