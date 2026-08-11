@@ -1209,8 +1209,8 @@ export function RetroPreviewView({
             : shouldUseFloatingPinnedLayout
               ? "fixed z-30 bg-slate-950/92 shadow-2xl backdrop-blur-sm"
               : fillHeight
-                ? "flex-1 min-h-0 overflow-visible"
-                : "overflow-visible"
+                ? "relative flex-1 min-h-0 overflow-visible"
+                : "relative overflow-visible"
         }`}
         style={
           shouldUseFloatingPinnedLayout && pinnedPreviewMetrics
@@ -1287,17 +1287,6 @@ export function RetroPreviewView({
             onPointerUp={handlePreviewPointerEnd}
             onPointerCancel={handlePreviewPointerEnd}
             >
-            {player.renderCapHintState.isCapEnabled && (
-              <div className="absolute bottom-2 right-2 z-0">
-                <button
-                  type="button"
-                  onClick={onTemporarilyDisableRenderCap}
-                  className="inline-flex items-center justify-center rounded-full border border-amber-300/45 bg-slate-950/82 px-3 py-1.5 text-[11px] font-medium text-amber-100 shadow-md backdrop-blur-sm transition hover:bg-slate-900"
-                >
-                  {locale === "ja" ? "画質優先" : "Quality priority"}
-                </button>
-              </div>
-            )}
             <div
               ref={player.canvasHostRef}
               className="pointer-events-none relative z-10 h-full w-full touch-manipulation"
@@ -1606,6 +1595,27 @@ export function RetroPreviewView({
               selectedPreset={selectedPreset}
               onApplyPreset={onApplyPreset}
             />
+          </div>
+        )}
+
+        {player.renderCapHintState.isCapEnabled && (
+          <div
+            className={[
+              "absolute right-2 z-0 pointer-events-auto",
+              isPreviewMaximized
+                ? "bottom-14"
+                : shouldUseFloatingPinnedLayout
+                  ? "bottom-14"
+                  : "bottom-2",
+            ].join(" ")}
+          >
+            <button
+              type="button"
+              onClick={onTemporarilyDisableRenderCap}
+              className="inline-flex items-center justify-center rounded-full border border-amber-300/45 bg-slate-950/82 px-3 py-1.5 text-[11px] font-medium text-amber-100 shadow-md backdrop-blur-sm transition hover:bg-slate-900"
+            >
+              {locale === "ja" ? "画質優先" : "Quality priority"}
+            </button>
           </div>
         )}
 

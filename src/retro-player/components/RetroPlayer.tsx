@@ -414,7 +414,13 @@ export function RetroPlayer({
   }, [filterState, player]);
 
   const handleToggleHighResolution = React.useCallback(() => {
-    setRenderResolutionPreset((current) => (current > 1 ? 1 : 2));
+    setRenderResolutionPreset((current) => {
+      const next = current > 1 ? 1 : 2;
+      if (next > 1) {
+        setMaximizePerformanceModeSessionOverride("off");
+      }
+      return next;
+    });
   }, []);
 
   const handleMaximizePerformanceModeChange = React.useCallback((nextValue: "auto" | "on" | "off") => {
