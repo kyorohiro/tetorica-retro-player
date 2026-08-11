@@ -14,12 +14,13 @@ import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpl
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "../retro/filterPass1LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS_COMPOSITE_MID } from "../retro/filterPassCompositeMidShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE_COMPOSE } from "../retro/filterPass2BeamLiteCompositeComposeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE } from "../retro/filterPass2BeamLiteCrtComposeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE } from "../retro/filterPass2BeamLiteSimpleComposeShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "../retro/filterPass2PhosphorLiteCoreShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc98LiteNearestShader.ts";
@@ -280,9 +281,14 @@ type BeamComposeUniformLocations = {
   uOutputSize: WebGLUniformLocation | null;
   uDisplaySize: WebGLUniformLocation | null;
   uBeamSourceSize: WebGLUniformLocation | null;
+  uColorLevels: WebGLUniformLocation | null;
+  uDitherStrength: WebGLUniformLocation | null;
   uSamplingMode: WebGLUniformLocation | null;
+  uHorizontalSharpness: WebGLUniformLocation | null;
   uRgbConvergenceOffset: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
+  uBeamDarkCutoff: WebGLUniformLocation | null;
+  uBeamHorizontalSpread: WebGLUniformLocation | null;
   uBeamStripeStrength: WebGLUniformLocation | null;
   uBeamWhiteBloom: WebGLUniformLocation | null;
   uBeamWarmBloom: WebGLUniformLocation | null;
@@ -1448,18 +1454,29 @@ export class TetoricaRetroVideoPipeline {
 
     const { gl } = this;
     gl.useProgram(program);
-    gl.uniform1i(gl.getUniformLocation(program, "uSourceTexture"), 1);
-    gl.uniform1i(gl.getUniformLocation(program, "uBeamKernelTexture"), 2);
+    const uSourceTexture = gl.getUniformLocation(program, "uSourceTexture");
+    const uBeamKernelTexture = gl.getUniformLocation(program, "uBeamKernelTexture");
+    if (uSourceTexture) {
+      gl.uniform1i(uSourceTexture, 1);
+    }
+    if (uBeamKernelTexture) {
+      gl.uniform1i(uBeamKernelTexture, 2);
+    }
     this.beamComposeLocs = {
-      uSourceTexture: gl.getUniformLocation(program, "uSourceTexture"),
-      uBeamKernelTexture: gl.getUniformLocation(program, "uBeamKernelTexture"),
+      uSourceTexture,
+      uBeamKernelTexture,
       uTargetSize: gl.getUniformLocation(program, "uTargetSize"),
       uOutputSize: gl.getUniformLocation(program, "uOutputSize"),
       uDisplaySize: gl.getUniformLocation(program, "uDisplaySize"),
       uBeamSourceSize: gl.getUniformLocation(program, "uBeamSourceSize"),
+      uColorLevels: gl.getUniformLocation(program, "uColorLevels"),
+      uDitherStrength: gl.getUniformLocation(program, "uDitherStrength"),
       uSamplingMode: gl.getUniformLocation(program, "uSamplingMode"),
+      uHorizontalSharpness: gl.getUniformLocation(program, "uHorizontalSharpness"),
       uRgbConvergenceOffset: gl.getUniformLocation(program, "uRgbConvergenceOffset"),
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
+      uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
+      uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
       uBeamStripeStrength: gl.getUniformLocation(program, "uBeamStripeStrength"),
       uBeamWhiteBloom: gl.getUniformLocation(program, "uBeamWhiteBloom"),
       uBeamWarmBloom: gl.getUniformLocation(program, "uBeamWarmBloom"),
@@ -1497,9 +1514,24 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform2f(this.beamComposeLocs.uOutputSize, Math.max(outputWidth, 1), Math.max(outputHeight, 1));
     gl.uniform2f(this.beamComposeLocs.uDisplaySize, displaySize.width, displaySize.height);
     gl.uniform2f(this.beamComposeLocs.uBeamSourceSize, Math.max(pass2Sizing.beamSourceWidth, 1), Math.max(pass2Sizing.beamSourceHeight, 1));
+    if (this.beamComposeLocs.uColorLevels) {
+      gl.uniform1f(this.beamComposeLocs.uColorLevels, Math.max(filterState.colorLevels, 2));
+    }
+    if (this.beamComposeLocs.uDitherStrength) {
+      gl.uniform1f(this.beamComposeLocs.uDitherStrength, filterState.ditherStrength);
+    }
     gl.uniform1f(this.beamComposeLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
+    if (this.beamComposeLocs.uHorizontalSharpness) {
+      gl.uniform1f(this.beamComposeLocs.uHorizontalSharpness, filterState.horizontalSharpness);
+    }
     gl.uniform1f(this.beamComposeLocs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
     gl.uniform1f(this.beamComposeLocs.uCurvature, getEffectivePreCurvature(filterState));
+    if (this.beamComposeLocs.uBeamDarkCutoff) {
+      gl.uniform1f(this.beamComposeLocs.uBeamDarkCutoff, filterState.beamDarkCutoff);
+    }
+    if (this.beamComposeLocs.uBeamHorizontalSpread) {
+      gl.uniform1f(this.beamComposeLocs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
+    }
     gl.uniform1f(this.beamComposeLocs.uBeamStripeStrength, filterState.beamStripeStrength);
     gl.uniform1f(this.beamComposeLocs.uBeamWhiteBloom, filterState.beamWhiteBloom);
     gl.uniform1f(this.beamComposeLocs.uBeamWarmBloom, filterState.beamWarmBloom);
@@ -1535,16 +1567,18 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE
           : null,
       beamCompose:
-        pass2Variant === "beam_crt"
+        pass2Variant === "beam_simple"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE
+          : pass2Variant === "beam_full"
+            ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE_COMPOSE
+            : pass2Variant === "beam_crt"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE
           : null,
       pass2:
-        pass2Variant === "beam_simple"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
+        pass2Variant === "beam_simple" || pass2Variant === "beam_full"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_POST
           : pass2Variant === "beam_crt"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
-          : pass2Variant === "beam_full"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE
           : pass2Variant === "phosphor"
             ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
             : FILTER_FRAGMENT_PASS2_LITE,
@@ -2609,11 +2643,11 @@ export class TetoricaRetroVideoPipeline {
           gl.viewport(0, 0, w, h);
         }
         if (
-          isBeamCrtVariant &&
+          isBeamVariant &&
           pass2Sizing &&
           this.beamComposeProgram &&
           this.beamComposeLocs &&
-          this.beamKernelTexture
+          (!isBeamKernelVariant || this.beamKernelTexture)
         ) {
           this.ensureBeamComposeFbo(w, h);
           gl.bindFramebuffer(gl.FRAMEBUFFER, this.beamComposeFbo);
@@ -2628,9 +2662,11 @@ export class TetoricaRetroVideoPipeline {
           } else {
             this.syncTextureSamplingFilter(gl.LINEAR);
           }
-          gl.activeTexture(gl.TEXTURE2);
-          gl.bindTexture(gl.TEXTURE_2D, this.beamKernelTexture);
-          this.syncBeamKernelTextureSamplingFilter(gl.LINEAR);
+          if (isBeamKernelVariant && this.beamKernelTexture) {
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, this.beamKernelTexture);
+            this.syncBeamKernelTextureSamplingFilter(gl.LINEAR);
+          }
           this.applyBeamComposeUniforms(filterState, pass2Sizing, w, h);
           gl.drawArrays(gl.TRIANGLES, 0, 6);
           gl.bindFramebuffer(gl.FRAMEBUFFER, null);
