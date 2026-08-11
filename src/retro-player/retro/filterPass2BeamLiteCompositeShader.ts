@@ -189,21 +189,21 @@ void sampleBeamStripeMasks(vec2 uv, vec2 sourceSize, out vec3 stripeMask, out ve
   vec2 cellCoord = uv * safeSourceSize;
   float stripeCoordX = cellCoord.x;
   float cellIndex = floor(cellCoord.x);
-  float staggerShift = mod(cellIndex, 2.0) * 0.28;
+  float staggerShift = mod(cellIndex, 2.0) * 0.0;
   vec2 local = fract(vec2(stripeCoordX, cellCoord.y + staggerShift));
-  float stripeR = (local.x - 1.0 / 6.0) / 0.075;
-  float stripeG = (local.x - 0.5) / 0.075;
-  float stripeB = (local.x - 5.0 / 6.0) / 0.075;
+  float stripeR = (local.x - 1.0 / 6.0) / 0.105;
+  float stripeG = (local.x - 0.5) / 0.105;
+  float stripeB = (local.x - 5.0 / 6.0) / 0.105;
   vec3 stripeBars = exp(-vec3(stripeR * stripeR, stripeG * stripeG, stripeB * stripeB));
-  float bleedR = (local.x - 1.0 / 6.0) / 0.105;
-  float bleedG = (local.x - 0.5) / 0.105;
-  float bleedB = (local.x - 5.0 / 6.0) / 0.105;
+  float bleedR = (local.x - 1.0 / 6.0) / 0.145;
+  float bleedG = (local.x - 0.5) / 0.145;
+  float bleedB = (local.x - 5.0 / 6.0) / 0.145;
   vec3 bleedBars = exp(-vec3(bleedR * bleedR, bleedG * bleedG, bleedB * bleedB));
-  float flatBody = smoothstep(0.26, 0.38, local.y) * (1.0 - smoothstep(0.62, 0.74, local.y));
-  float roundedCapsCoord = (local.y - 0.5) / 0.18;
+  float flatBody = smoothstep(0.06, 0.12, local.y) * (1.0 - smoothstep(0.88, 0.94, local.y));
+  float roundedCapsCoord = (local.y - 0.5) / 0.52;
   float roundedCaps = exp(-(roundedCapsCoord * roundedCapsCoord));
-  float verticalShape = clamp(flatBody * 0.28 + roundedCaps * 0.52, 0.0, 1.0);
-  float softVerticalCoord = (local.y - 0.5) / 0.32;
+  float verticalShape = clamp(flatBody * 0.94 + roundedCaps * 0.04, 0.0, 1.0);
+  float softVerticalCoord = (local.y - 0.5) / 0.44;
   float softVertical = exp(-(softVerticalCoord * softVerticalCoord));
   stripeMask = clamp(stripeBars * verticalShape, 0.0, 1.0);
   bleedMask = clamp(bleedBars * softVertical, 0.0, 1.0);
@@ -251,7 +251,7 @@ void main(void) {
   float mergedStripeMaskScalar = dot(stripeMask, vec3(1.0 / 3.0));
   float mergedBleedMaskScalar = dot(stripeBleedMask, vec3(1.0 / 3.0));
   vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.48, 0.56);
-  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.74, 1.08);
+  vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.88, 1.18);
   stripeMask = mix(
     mergedStripeMask * mergedStripeMaskScalar,
     stripeMask,
@@ -264,10 +264,10 @@ void main(void) {
   );
   float effectiveStripeStrength = getBeamStripeStrength() * mix(0.42, 1.0, stripeResolve);
   float lightMask = smoothstep(BEAM_LIGHTMASK_LOW, BEAM_LIGHTMASK_HIGH, beamLuma);
-  vec3 beamField = beamColor * (BEAM_FIELD_BASE + lightMask * BEAM_FIELD_LIGHT_GAIN);
+  vec3 beamField = beamColor * (BEAM_FIELD_BASE + 0.018 + lightMask * (BEAM_FIELD_LIGHT_GAIN + 0.016));
   vec3 stripeGlow = stripeMask * beamColor * (BEAM_STRIPE_GLOW_BASE + lightMask * BEAM_STRIPE_GLOW_LIGHT_GAIN) * effectiveStripeStrength;
-  vec3 stripeBleed = stripeBleedMask * beamColor * (BEAM_STRIPE_BLEED_BASE + lightMask * BEAM_STRIPE_BLEED_LIGHT_GAIN) * effectiveStripeStrength;
-  vec3 mergedFlare = beamColor * beamLuma * (BEAM_MERGED_FLARE_BASE + lightMask * BEAM_MERGED_FLARE_LIGHT_GAIN);
+  vec3 stripeBleed = stripeBleedMask * beamColor * (BEAM_STRIPE_BLEED_BASE + 0.028 + lightMask * (BEAM_STRIPE_BLEED_LIGHT_GAIN + 0.032)) * effectiveStripeStrength;
+  vec3 mergedFlare = beamColor * beamLuma * (BEAM_MERGED_FLARE_BASE + 0.035 + lightMask * (BEAM_MERGED_FLARE_LIGHT_GAIN + 0.028));
   vec3 whiteBloom = vec3(beamLuma) * lightMask * BEAM_WHITE_BLOOM_GAIN * getBeamWhiteBloom();
   vec3 warmBloom = vec3(1.0, 0.82, 0.30) * beamLuma * lightMask * BEAM_WHITE_BLOOM_GAIN * 0.55 * getBeamWhiteBloom() * getBeamWarmBloom();
   vec3 sourceDetail = sourceDetailColor * smoothstep(0.03, 0.22, sourceDetailLuma) * (BEAM_SOURCE_DETAIL_BASE + lightMask * BEAM_SOURCE_DETAIL_LIGHT_GAIN);

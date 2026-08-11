@@ -14,12 +14,11 @@ import { FILTER_FRAGMENT_PASS1_LITE_SIMPLE } from "../retro/filterPass1LiteSimpl
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "../retro/filterPass1LiteNearestShader.ts";
 import { FILTER_FRAGMENT_PASS_COMPOSITE_MID } from "../retro/filterPassCompositeMidShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "../retro/filterPass2BeamLiteCompositeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE } from "../retro/filterPass2BeamLiteCrtComposeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE } from "../retro/filterPass2BeamLiteSimpleShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE } from "../retro/filterPass2BeamLiteSimpleComposeShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "../retro/filterPass2PhosphorLiteCoreShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc98LiteNearestShader.ts";
@@ -463,7 +462,10 @@ const getWindowsLiteVariantKey = (
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
-    if (isExactSelectedPreset(filterState, "crtBeam")) {
+    if (
+      isExactSelectedPreset(filterState, "crtBeam") ||
+      isExactSelectedPreset(filterState, "crtBeamNtsc")
+    ) {
       return "basic_nearest:beam_crt";
     }
     return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
@@ -1535,16 +1537,16 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE
           : null,
       beamCompose:
-        pass2Variant === "beam_crt"
+        pass2Variant === "beam_simple"
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE
+          : pass2Variant === "beam_full" || pass2Variant === "beam_crt"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE
           : null,
       pass2:
-        pass2Variant === "beam_simple"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE
-          : pass2Variant === "beam_crt"
+        pass2Variant === "beam_simple" ||
+          pass2Variant === "beam_full" ||
+          pass2Variant === "beam_crt"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
-          : pass2Variant === "beam_full"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE
           : pass2Variant === "phosphor"
             ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
             : FILTER_FRAGMENT_PASS2_LITE,
@@ -2609,11 +2611,11 @@ export class TetoricaRetroVideoPipeline {
           gl.viewport(0, 0, w, h);
         }
         if (
-          isBeamCrtVariant &&
+          isBeamVariant &&
           pass2Sizing &&
           this.beamComposeProgram &&
           this.beamComposeLocs &&
-          this.beamKernelTexture
+          (!isBeamKernelVariant || this.beamKernelTexture)
         ) {
           this.ensureBeamComposeFbo(w, h);
           gl.bindFramebuffer(gl.FRAMEBUFFER, this.beamComposeFbo);
@@ -2628,9 +2630,11 @@ export class TetoricaRetroVideoPipeline {
           } else {
             this.syncTextureSamplingFilter(gl.LINEAR);
           }
-          gl.activeTexture(gl.TEXTURE2);
-          gl.bindTexture(gl.TEXTURE_2D, this.beamKernelTexture);
-          this.syncBeamKernelTextureSamplingFilter(gl.LINEAR);
+          if (isBeamKernelVariant && this.beamKernelTexture) {
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, this.beamKernelTexture);
+            this.syncBeamKernelTextureSamplingFilter(gl.LINEAR);
+          }
           this.applyBeamComposeUniforms(filterState, pass2Sizing, w, h);
           gl.drawArrays(gl.TRIANGLES, 0, 6);
           gl.bindFramebuffer(gl.FRAMEBUFFER, null);
