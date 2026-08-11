@@ -138,6 +138,7 @@ export type RetroPresetDefinition = {
   wideGlowStrength?: number;
   wideGlowRadius?: number;
   wideGlowDownscale?: number;
+  wideGlowUpdateInterval?: number;
   scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;

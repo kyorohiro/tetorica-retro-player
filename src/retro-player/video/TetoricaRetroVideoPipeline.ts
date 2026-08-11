@@ -97,6 +97,7 @@ export type RetroVideoFilterState = {
   wideGlowStrength: number;
   wideGlowRadius: number;
   wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
@@ -163,6 +164,12 @@ function shouldUseWideGlow(filterState: RetroVideoFilterState | null) {
 
 function isOpticalWideGlowMode(filterState: RetroVideoFilterState | null) {
   return !filterState || filterState.wideGlowMode !== "smoky";
+}
+
+function getWideGlowUpdateInterval(filterState: RetroVideoFilterState | null) {
+  if (!filterState) return 1;
+  const value = filterState.wideGlowUpdateInterval;
+  return value === 2 || value === 4 || value === 8 || value === 12 ? value : 1;
 }
 
 type Pass1UniformLocations = {
@@ -1067,6 +1074,8 @@ export class TetoricaRetroVideoPipeline {
   private lastRenderedSource: RetroVideoSource | null = null;
   private lastRenderedBufferWidth = 0;
   private lastRenderedBufferHeight = 0;
+  private wideGlowCacheInitialized = false;
+  private wideGlowCacheKey = "";
 
   // Skip re-uploading the same HTMLImageElement on consecutive render() calls.
   // Video frames always upload (content changes each frame). Raw frames (HEIC)
@@ -3185,10 +3194,28 @@ export class TetoricaRetroVideoPipeline {
         const blurRadiusSecondary = Math.max(0.75, blurRadius * 0.55);
         const glowWidth = Math.max(1, Math.round(w / glowDivisor));
         const glowHeight = Math.max(1, Math.round(h / glowDivisor));
+        const wideGlowUpdateInterval = isOpticalWideGlow
+          ? getWideGlowUpdateInterval(filterState)
+          : 1;
+        const wideGlowCacheKey = [
+          isOpticalWideGlow ? "optical" : "smoky",
+          glowDivisor,
+          glowWidth,
+          glowHeight,
+          w,
+          h,
+          blurRadius.toFixed(3),
+          blurRadiusSecondary.toFixed(3),
+        ].join(":");
+        const shouldRefreshWideGlow =
+          !this.wideGlowCacheInitialized ||
+          this.wideGlowCacheKey !== wideGlowCacheKey ||
+          wideGlowUpdateInterval <= 1 ||
+          this.renderCount % wideGlowUpdateInterval === 0;
         this.ensureWideGlowQuarterFbo(glowWidth, glowHeight);
         this.ensureWideGlowBlurFbo(glowWidth, glowHeight);
 
-        if (wideGlowDownsampleProgram && wideGlowDownsampleLocs) {
+        if (shouldRefreshWideGlow && wideGlowDownsampleProgram && wideGlowDownsampleLocs) {
           gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowQuarterFbo);
           gl.viewport(0, 0, glowWidth, glowHeight);
           gl.useProgram(wideGlowDownsampleProgram);
@@ -3199,36 +3226,16 @@ export class TetoricaRetroVideoPipeline {
           gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowBlurFbo);
-        gl.viewport(0, 0, glowWidth, glowHeight);
-        gl.useProgram(this.wideGlowBlurProgram);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.wideGlowQuarterTexture);
-        this.syncWideGlowQuarterTextureSamplingFilter(gl.LINEAR);
-        gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
-        gl.uniform2f(this.wideGlowBlurLocs.uDirection, 1, 0);
-        gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadius);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowQuarterFbo);
-        gl.viewport(0, 0, glowWidth, glowHeight);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.wideGlowBlurTexture);
-        this.syncWideGlowBlurTextureSamplingFilter(gl.LINEAR);
-        gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
-        gl.uniform2f(this.wideGlowBlurLocs.uDirection, 0, 1);
-        gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadius);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-        if (isOpticalWideGlow) {
+        if (shouldRefreshWideGlow) {
           gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowBlurFbo);
           gl.viewport(0, 0, glowWidth, glowHeight);
+          gl.useProgram(this.wideGlowBlurProgram);
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_2D, this.wideGlowQuarterTexture);
           this.syncWideGlowQuarterTextureSamplingFilter(gl.LINEAR);
           gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
           gl.uniform2f(this.wideGlowBlurLocs.uDirection, 1, 0);
-          gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadiusSecondary);
+          gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadius);
           gl.drawArrays(gl.TRIANGLES, 0, 6);
 
           gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowQuarterFbo);
@@ -3238,8 +3245,33 @@ export class TetoricaRetroVideoPipeline {
           this.syncWideGlowBlurTextureSamplingFilter(gl.LINEAR);
           gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
           gl.uniform2f(this.wideGlowBlurLocs.uDirection, 0, 1);
-          gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadiusSecondary);
+          gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadius);
           gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+          if (isOpticalWideGlow) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowBlurFbo);
+            gl.viewport(0, 0, glowWidth, glowHeight);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, this.wideGlowQuarterTexture);
+            this.syncWideGlowQuarterTextureSamplingFilter(gl.LINEAR);
+            gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
+            gl.uniform2f(this.wideGlowBlurLocs.uDirection, 1, 0);
+            gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadiusSecondary);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowQuarterFbo);
+            gl.viewport(0, 0, glowWidth, glowHeight);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, this.wideGlowBlurTexture);
+            this.syncWideGlowBlurTextureSamplingFilter(gl.LINEAR);
+            gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
+            gl.uniform2f(this.wideGlowBlurLocs.uDirection, 0, 1);
+            gl.uniform1f(this.wideGlowBlurLocs.uRadius, blurRadiusSecondary);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+          }
+
+          this.wideGlowCacheInitialized = true;
+          this.wideGlowCacheKey = wideGlowCacheKey;
         }
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -3344,6 +3376,8 @@ export class TetoricaRetroVideoPipeline {
     this.lastUploadedImageSource = null;
     this.lastUploadedVideoSource = null;
     this.lastUploadedVideoTime = Number.NaN;
+    this.wideGlowCacheInitialized = false;
+    this.wideGlowCacheKey = "";
   }
 
   private getUploadSource(

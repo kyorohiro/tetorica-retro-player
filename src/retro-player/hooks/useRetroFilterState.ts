@@ -88,6 +88,7 @@ export type RetroFilterInitialState = Partial<{
   wideGlowStrength: number;
   wideGlowRadius: number;
   wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -175,6 +176,7 @@ const doesPresetMatchState = (
     (preset.wideGlowStrength ?? 0) === state.wideGlowStrength &&
     (preset.wideGlowRadius ?? 1) === state.wideGlowRadius &&
     (preset.wideGlowDownscale ?? 4) === state.wideGlowDownscale &&
+    (preset.wideGlowUpdateInterval ?? 1) === state.wideGlowUpdateInterval &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -326,6 +328,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.wideGlowRadius ?? (DEFAULT_PRESET.wideGlowRadius ?? 1),
     wideGlowDownscale:
       initialState.wideGlowDownscale ?? (DEFAULT_PRESET.wideGlowDownscale ?? 4),
+    wideGlowUpdateInterval:
+      initialState.wideGlowUpdateInterval ?? (DEFAULT_PRESET.wideGlowUpdateInterval ?? 1),
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -791,6 +795,22 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setWideGlowUpdateInterval = (wideGlowUpdateInterval: number) => {
+    const normalized =
+      wideGlowUpdateInterval === 2 ||
+      wideGlowUpdateInterval === 4 ||
+      wideGlowUpdateInterval === 8 ||
+      wideGlowUpdateInterval === 12
+        ? wideGlowUpdateInterval
+        : 1;
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowUpdateInterval === normalized
+        ? current
+        : { ...current, wideGlowUpdateInterval: normalized }
+    ));
+  };
+
   const setMonoTint = (monoTint: MonoTintMode) => {
     markPresetAsCustom();
     setSettings((current) => (current.monoTint === monoTint ? current : { ...current, monoTint }));
@@ -929,6 +949,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       wideGlowStrength: presetSettings.wideGlowStrength ?? 0,
       wideGlowRadius: presetSettings.wideGlowRadius ?? 1,
       wideGlowDownscale: presetSettings.wideGlowDownscale ?? 4,
+      wideGlowUpdateInterval: presetSettings.wideGlowUpdateInterval ?? 1,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -1035,6 +1056,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setWideGlowStrength,
     setWideGlowRadius,
     setWideGlowDownscale,
+    setWideGlowUpdateInterval,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

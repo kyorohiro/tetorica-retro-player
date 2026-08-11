@@ -84,6 +84,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   wideGlowStrength: DEFAULT_PRESET.wideGlowStrength ?? 0,
   wideGlowRadius: DEFAULT_PRESET.wideGlowRadius ?? 1,
   wideGlowDownscale: DEFAULT_PRESET.wideGlowDownscale ?? 4,
+  wideGlowUpdateInterval: DEFAULT_PRESET.wideGlowUpdateInterval ?? 1,
   monoTint: DEFAULT_PRESET.monoTint,
   neonBoost: DEFAULT_PRESET.neonBoost,
   neonSaturation: DEFAULT_PRESET.neonSaturation,

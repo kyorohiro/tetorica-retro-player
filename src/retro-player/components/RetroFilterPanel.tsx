@@ -133,6 +133,7 @@ type RetroFilterPanelProps = {
   wideGlowStrength: number;
   wideGlowRadius: number;
   wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -208,6 +209,7 @@ type RetroFilterPanelProps = {
   onSetWideGlowStrength: (value: number) => void;
   onSetWideGlowRadius: (value: number) => void;
   onSetWideGlowDownscale: (value: number) => void;
+  onSetWideGlowUpdateInterval: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -284,6 +286,7 @@ export function RetroFilterPanel({
   wideGlowStrength,
   wideGlowRadius,
   wideGlowDownscale,
+  wideGlowUpdateInterval,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -356,6 +359,7 @@ export function RetroFilterPanel({
   onSetWideGlowStrength,
   onSetWideGlowRadius,
   onSetWideGlowDownscale,
+  onSetWideGlowUpdateInterval,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -471,6 +475,8 @@ export function RetroFilterPanel({
             "Wide Glow がどれくらい遠くまで広がるかです。blur の tap 数は増やさず、低解像度側のサンプル間隔だけを広げます。",
           wideGlowDownscale:
             "Glow を作るためにいったん縮小する解像度です。2 は細かく、4 は標準、8 はさらに広くて軽い halo になります。",
+          wideGlowUpdateInterval:
+            "Halo の再計算を何フレームごとに行うかです。値を大きくすると軽くなり、少し残光やゴースト感が出ます。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -1560,6 +1566,24 @@ export function RetroFilterPanel({
                   ].join(" ")}
                 >
                   {`1/${value}`}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 4, 8, 12].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onSetWideGlowUpdateInterval(value)}
+                  title={helpText.wideGlowUpdateInterval ?? ""}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    wideGlowUpdateInterval === value
+                      ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {value === 1 ? "Every" : `${value}f`}
                 </button>
               ))}
             </div>

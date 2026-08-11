@@ -81,6 +81,7 @@ export type PersistedRetroFilterSettings = {
   wideGlowStrength: number;
   wideGlowRadius: number;
   wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -220,6 +221,13 @@ const normalizePersistedRetroSettings = (
           filter.wideGlowDownscale === 2 || filter.wideGlowDownscale === 8
             ? filter.wideGlowDownscale
             : 4,
+        wideGlowUpdateInterval:
+          filter.wideGlowUpdateInterval === 2 ||
+          filter.wideGlowUpdateInterval === 4 ||
+          filter.wideGlowUpdateInterval === 8 ||
+          filter.wideGlowUpdateInterval === 12
+            ? filter.wideGlowUpdateInterval
+            : 1,
         preFilterDownscaleEnabled: filter.preFilterDownscaleEnabled === true,
       }
       : filter,

@@ -406,6 +406,7 @@ export function RetroControlPanel({
               wideGlowStrength={filterState.wideGlowStrength}
               wideGlowRadius={filterState.wideGlowRadius}
               wideGlowDownscale={filterState.wideGlowDownscale}
+              wideGlowUpdateInterval={filterState.wideGlowUpdateInterval}
               scanlineBrightnessFade={filterState.scanlineBrightnessFade}
               scanlineStrength={filterState.scanlineStrength}
               scanline2Strength={filterState.scanline2Strength}
@@ -481,6 +482,7 @@ export function RetroControlPanel({
               onSetWideGlowStrength={filterState.setWideGlowStrength}
               onSetWideGlowRadius={filterState.setWideGlowRadius}
               onSetWideGlowDownscale={filterState.setWideGlowDownscale}
+              onSetWideGlowUpdateInterval={filterState.setWideGlowUpdateInterval}
               onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
               onSetScanlineStrength={filterState.setScanlineStrength}
               onSetScanline2Strength={filterState.setScanline2Strength}
