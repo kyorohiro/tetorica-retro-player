@@ -127,6 +127,9 @@ type RetroFilterPanelProps = {
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
+  wideGlowEnabled: boolean;
+  wideGlowStrength: number;
+  wideGlowRadius: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -197,6 +200,9 @@ type RetroFilterPanelProps = {
   onSetBeamWhiteBloom: (value: number) => void;
   onSetBeamWarmBloom: (value: number) => void;
   onSetScreenFaceGlow: (value: number) => void;
+  onSetWideGlowEnabled: (value: boolean) => void;
+  onSetWideGlowStrength: (value: number) => void;
+  onSetWideGlowRadius: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -268,6 +274,9 @@ export function RetroFilterPanel({
   beamWhiteBloom,
   beamWarmBloom,
   screenFaceGlow,
+  wideGlowEnabled,
+  wideGlowStrength,
+  wideGlowRadius,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -335,6 +344,9 @@ export function RetroFilterPanel({
   onSetBeamWhiteBloom,
   onSetBeamWarmBloom,
   onSetScreenFaceGlow,
+  onSetWideGlowEnabled,
+  onSetWideGlowStrength,
+  onSetWideGlowRadius,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -442,6 +454,10 @@ export function RetroFilterPanel({
             "Beam Cross の bloom を少し暖色寄りにします。上げるほど白い光にアンバーの熱感が混ざり、実写でもゲームでも少し温かい発光に見えます。",
           screenFaceGlow:
             "画面中央に、うっすら面発光する明るさを足します。0 なら無効で、上げるほど黒背景でもブラウン管の表面がぼんやり光っている感じを出します。",
+          wideGlow:
+            "最終出力のいちばん外側に、ごく弱い広域なハローを足します。近距離の glow や phosphor の粒はそのままに、ガラス越しの光漏れだけを後段で重ねます。",
+          wideGlowRadius:
+            "Wide Glow がどれくらい遠くまで広がるかです。blur の tap 数は増やさず、低解像度側のサンプル間隔だけを広げます。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -1436,6 +1452,55 @@ export function RetroFilterPanel({
                 step="0.01"
                 value={screenFaceGlow}
                 onChange={(ev) => onSetScreenFaceGlow(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => onSetWideGlowEnabled(!wideGlowEnabled)}
+              title={helpText.wideGlow ?? ""}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                wideGlowEnabled
+                  ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Wide glow
+            </button>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Wide glow strength: ${fixedNumber(wideGlowStrength, 2)}`}
+                  text={helpText.wideGlow ?? ""}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.8"
+                step="0.01"
+                value={wideGlowStrength}
+                onChange={(ev) => onSetWideGlowStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Wide glow radius: ${fixedNumber(wideGlowRadius, 2)}`}
+                  text={helpText.wideGlowRadius ?? ""}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.5"
+                max="8"
+                step="0.1"
+                value={wideGlowRadius}
+                onChange={(ev) => onSetWideGlowRadius(Number(ev.currentTarget.value))}
                 className="mt-2 w-full"
               />
             </label>

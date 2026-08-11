@@ -82,6 +82,9 @@ export type RetroFilterInitialState = Partial<{
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
+  wideGlowEnabled: boolean;
+  wideGlowStrength: number;
+  wideGlowRadius: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -164,6 +167,9 @@ const doesPresetMatchState = (
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
     (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
     (preset.screenFaceGlow ?? 0) === state.screenFaceGlow &&
+    (preset.wideGlowEnabled ?? false) === state.wideGlowEnabled &&
+    (preset.wideGlowStrength ?? 0) === state.wideGlowStrength &&
+    (preset.wideGlowRadius ?? 1) === state.wideGlowRadius &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -305,6 +311,12 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamWarmBloom ?? (DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom),
     screenFaceGlow:
       initialState.screenFaceGlow ?? (DEFAULT_PRESET.screenFaceGlow ?? 0),
+    wideGlowEnabled:
+      initialState.wideGlowEnabled ?? (DEFAULT_PRESET.wideGlowEnabled ?? false),
+    wideGlowStrength:
+      initialState.wideGlowStrength ?? (DEFAULT_PRESET.wideGlowStrength ?? 0),
+    wideGlowRadius:
+      initialState.wideGlowRadius ?? (DEFAULT_PRESET.wideGlowRadius ?? 1),
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -734,6 +746,27 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setWideGlowEnabled = (wideGlowEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowEnabled === wideGlowEnabled ? current : { ...current, wideGlowEnabled }
+    ));
+  };
+
+  const setWideGlowStrength = (wideGlowStrength: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowStrength === wideGlowStrength ? current : { ...current, wideGlowStrength }
+    ));
+  };
+
+  const setWideGlowRadius = (wideGlowRadius: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowRadius === wideGlowRadius ? current : { ...current, wideGlowRadius }
+    ));
+  };
+
   const setMonoTint = (monoTint: MonoTintMode) => {
     markPresetAsCustom();
     setSettings((current) => (current.monoTint === monoTint ? current : { ...current, monoTint }));
@@ -867,6 +900,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
       beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
       screenFaceGlow: presetSettings.screenFaceGlow ?? 0,
+      wideGlowEnabled: presetSettings.wideGlowEnabled ?? false,
+      wideGlowStrength: presetSettings.wideGlowStrength ?? 0,
+      wideGlowRadius: presetSettings.wideGlowRadius ?? 1,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -968,6 +1004,9 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setBeamWhiteBloom,
     setBeamWarmBloom,
     setScreenFaceGlow,
+    setWideGlowEnabled,
+    setWideGlowStrength,
+    setWideGlowRadius,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

@@ -401,6 +401,9 @@ export function RetroControlPanel({
               beamWhiteBloom={filterState.beamWhiteBloom}
               beamWarmBloom={filterState.beamWarmBloom}
               screenFaceGlow={filterState.screenFaceGlow}
+              wideGlowEnabled={filterState.wideGlowEnabled}
+              wideGlowStrength={filterState.wideGlowStrength}
+              wideGlowRadius={filterState.wideGlowRadius}
               scanlineBrightnessFade={filterState.scanlineBrightnessFade}
               scanlineStrength={filterState.scanlineStrength}
               scanline2Strength={filterState.scanline2Strength}
@@ -471,6 +474,9 @@ export function RetroControlPanel({
               onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
               onSetBeamWarmBloom={filterState.setBeamWarmBloom}
               onSetScreenFaceGlow={filterState.setScreenFaceGlow}
+              onSetWideGlowEnabled={filterState.setWideGlowEnabled}
+              onSetWideGlowStrength={filterState.setWideGlowStrength}
+              onSetWideGlowRadius={filterState.setWideGlowRadius}
               onSetScanlineBrightnessFade={filterState.setScanlineBrightnessFade}
               onSetScanlineStrength={filterState.setScanlineStrength}
               onSetScanline2Strength={filterState.setScanline2Strength}

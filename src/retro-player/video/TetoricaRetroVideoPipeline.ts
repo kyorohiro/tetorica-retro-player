@@ -25,6 +25,9 @@ import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE } from "../retro/filterP
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "../retro/filterPass2PhosphorLiteCoreShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "../retro/filterPass1Pc98LiteNearestShader.ts";
+import { FILTER_FRAGMENT_WIDE_GLOW_BLUR } from "../retro/filterWideGlowBlurShader.ts";
+import { FILTER_FRAGMENT_WIDE_GLOW_COMPOSITE } from "../retro/filterWideGlowCompositeShader.ts";
+import { FILTER_FRAGMENT_WIDE_GLOW_DOWNSAMPLE } from "../retro/filterWideGlowDownsampleShader.ts";
 import { isWindowsRuntime } from "../platform/runtime.ts";
 
 export type RetroVideoFilterState = {
@@ -87,6 +90,9 @@ export type RetroVideoFilterState = {
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
+  wideGlowEnabled: boolean;
+  wideGlowStrength: number;
+  wideGlowRadius: number;
   focusStrength: number;
   focusWidth: number;
   focusHeight: number;
@@ -145,6 +151,10 @@ function getGrainVisibilityModeValue(mode: GrainVisibilityMode): number {
 
 function getBeamStripeModeValue(mode: BeamStripeMode): number {
   return mode === "modern" ? 1 : 0;
+}
+
+function shouldUseWideGlow(filterState: RetroVideoFilterState | null) {
+  return !!filterState && filterState.wideGlowEnabled && filterState.wideGlowStrength > 0.0001;
 }
 
 type Pass1UniformLocations = {
@@ -256,6 +266,24 @@ type CompositeMidUniformLocations = {
 type PostCurvatureUniformLocations = {
   uTexture: WebGLUniformLocation | null;
   uCurvature: WebGLUniformLocation | null;
+};
+
+type WideGlowDownsampleUniformLocations = {
+  uTexture: WebGLUniformLocation | null;
+  uTexelSize: WebGLUniformLocation | null;
+};
+
+type WideGlowBlurUniformLocations = {
+  uTexture: WebGLUniformLocation | null;
+  uTexelSize: WebGLUniformLocation | null;
+  uDirection: WebGLUniformLocation | null;
+  uRadius: WebGLUniformLocation | null;
+};
+
+type WideGlowCompositeUniformLocations = {
+  uSharpTexture: WebGLUniformLocation | null;
+  uGlowTexture: WebGLUniformLocation | null;
+  uStrength: WebGLUniformLocation | null;
 };
 
 type FilterBufferCap = {
@@ -909,9 +937,15 @@ export class TetoricaRetroVideoPipeline {
   private beamDownscaleProgram: WebGLProgram | null = null;
   private compositeMidProgram: WebGLProgram | null = null;
   private postCurvatureProgram: WebGLProgram | null = null;
+  private wideGlowDownsampleProgram: WebGLProgram | null = null;
+  private wideGlowBlurProgram: WebGLProgram | null = null;
+  private wideGlowCompositeProgram: WebGLProgram | null = null;
   private beamDownscaleLocs: BeamDownscaleUniformLocations | null = null;
   private compositeMidLocs: CompositeMidUniformLocations | null = null;
   private postCurvatureLocs: PostCurvatureUniformLocations | null = null;
+  private wideGlowDownsampleLocs: WideGlowDownsampleUniformLocations | null = null;
+  private wideGlowBlurLocs: WideGlowBlurUniformLocations | null = null;
+  private wideGlowCompositeLocs: WideGlowCompositeUniformLocations | null = null;
   private phosphorCoreProgram: WebGLProgram | null = null;
   private phosphorCoreLocs: Pass2UniformLocations | null = null;
   private beamKernelProgram: WebGLProgram | null = null;
@@ -963,6 +997,21 @@ export class TetoricaRetroVideoPipeline {
   private postCurvatureFboWidth = 0;
   private postCurvatureFboHeight = 0;
   private postCurvatureTextureSamplingFilter: number | null = null;
+  private finalSceneFbo: WebGLFramebuffer | null = null;
+  private finalSceneTexture: WebGLTexture | null = null;
+  private finalSceneFboWidth = 0;
+  private finalSceneFboHeight = 0;
+  private finalSceneTextureSamplingFilter: number | null = null;
+  private wideGlowQuarterFbo: WebGLFramebuffer | null = null;
+  private wideGlowQuarterTexture: WebGLTexture | null = null;
+  private wideGlowQuarterFboWidth = 0;
+  private wideGlowQuarterFboHeight = 0;
+  private wideGlowQuarterTextureSamplingFilter: number | null = null;
+  private wideGlowBlurFbo: WebGLFramebuffer | null = null;
+  private wideGlowBlurTexture: WebGLTexture | null = null;
+  private wideGlowBlurFboWidth = 0;
+  private wideGlowBlurFboHeight = 0;
+  private wideGlowBlurTextureSamplingFilter: number | null = null;
 
   private currentSource: RetroVideoSource | null = null;
 
@@ -1264,6 +1313,114 @@ export class TetoricaRetroVideoPipeline {
     this.postCurvatureTextureSamplingFilter = gl.LINEAR;
   }
 
+  private ensureFinalSceneFbo(width: number, height: number) {
+    if (
+      this.finalSceneFboWidth === width &&
+      this.finalSceneFboHeight === height &&
+      this.finalSceneFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.finalSceneFbo) gl.deleteFramebuffer(this.finalSceneFbo);
+    if (this.finalSceneTexture) gl.deleteTexture(this.finalSceneTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create final-scene FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create final-scene FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.finalSceneFbo = fbo;
+    this.finalSceneTexture = tex;
+    this.finalSceneFboWidth = width;
+    this.finalSceneFboHeight = height;
+    this.finalSceneTextureSamplingFilter = gl.LINEAR;
+  }
+
+  private ensureWideGlowQuarterFbo(width: number, height: number) {
+    if (
+      this.wideGlowQuarterFboWidth === width &&
+      this.wideGlowQuarterFboHeight === height &&
+      this.wideGlowQuarterFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.wideGlowQuarterFbo) gl.deleteFramebuffer(this.wideGlowQuarterFbo);
+    if (this.wideGlowQuarterTexture) gl.deleteTexture(this.wideGlowQuarterTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create wide-glow quarter FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create wide-glow quarter FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.wideGlowQuarterFbo = fbo;
+    this.wideGlowQuarterTexture = tex;
+    this.wideGlowQuarterFboWidth = width;
+    this.wideGlowQuarterFboHeight = height;
+    this.wideGlowQuarterTextureSamplingFilter = gl.LINEAR;
+  }
+
+  private ensureWideGlowBlurFbo(width: number, height: number) {
+    if (
+      this.wideGlowBlurFboWidth === width &&
+      this.wideGlowBlurFboHeight === height &&
+      this.wideGlowBlurFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.wideGlowBlurFbo) gl.deleteFramebuffer(this.wideGlowBlurFbo);
+    if (this.wideGlowBlurTexture) gl.deleteTexture(this.wideGlowBlurTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create wide-glow blur FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create wide-glow blur FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.wideGlowBlurFbo = fbo;
+    this.wideGlowBlurTexture = tex;
+    this.wideGlowBlurFboWidth = width;
+    this.wideGlowBlurFboHeight = height;
+    this.wideGlowBlurTextureSamplingFilter = gl.LINEAR;
+  }
+
   private syncFboTextureSamplingFilter(nextFilter: number) {
     if (!this.fboTexture || this.fboTextureSamplingFilter === nextFilter) {
       return;
@@ -1346,6 +1503,42 @@ export class TetoricaRetroVideoPipeline {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
     this.postCurvatureTextureSamplingFilter = nextFilter;
+  }
+
+  private syncFinalSceneTextureSamplingFilter(nextFilter: number) {
+    if (!this.finalSceneTexture || this.finalSceneTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.finalSceneTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.finalSceneTextureSamplingFilter = nextFilter;
+  }
+
+  private syncWideGlowQuarterTextureSamplingFilter(nextFilter: number) {
+    if (!this.wideGlowQuarterTexture || this.wideGlowQuarterTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.wideGlowQuarterTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.wideGlowQuarterTextureSamplingFilter = nextFilter;
+  }
+
+  private syncWideGlowBlurTextureSamplingFilter(nextFilter: number) {
+    if (!this.wideGlowBlurTexture || this.wideGlowBlurTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.wideGlowBlurTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.wideGlowBlurTextureSamplingFilter = nextFilter;
   }
 
   // Called once the background filter compilation succeeds.
@@ -1757,6 +1950,18 @@ export class TetoricaRetroVideoPipeline {
     if (shouldUsePostCurvaturePass(filterState) && (!this.postCurvatureProgram || !this.postCurvatureLocs)) {
       await this.ensurePostCurvatureProgram();
     }
+
+    if (shouldUseWideGlow(filterState)) {
+      if (!this.wideGlowDownsampleProgram || !this.wideGlowDownsampleLocs) {
+        await this.ensureWideGlowDownsampleProgram();
+      }
+      if (!this.wideGlowBlurProgram || !this.wideGlowBlurLocs) {
+        await this.ensureWideGlowBlurProgram();
+      }
+      if (!this.wideGlowCompositeProgram || !this.wideGlowCompositeLocs) {
+        await this.ensureWideGlowCompositeProgram();
+      }
+    }
   }
 
   private async ensureSupportProgramsForFilterState(filterState: RetroVideoFilterState | null) {
@@ -1833,8 +2038,18 @@ export class TetoricaRetroVideoPipeline {
     const needsPostCurvature =
       shouldUsePostCurvaturePass(filterState) &&
       (!this.postCurvatureProgram || !this.postCurvatureLocs);
+    const needsWideGlow =
+      shouldUseWideGlow(filterState) &&
+      (
+        !this.wideGlowDownsampleProgram ||
+        !this.wideGlowDownsampleLocs ||
+        !this.wideGlowBlurProgram ||
+        !this.wideGlowBlurLocs ||
+        !this.wideGlowCompositeProgram ||
+        !this.wideGlowCompositeLocs
+      );
 
-    if (!needsBeamDownscale && !needsPostCurvature) {
+    if (!needsBeamDownscale && !needsPostCurvature && !needsWideGlow) {
       return;
     }
 
@@ -2186,6 +2401,100 @@ export class TetoricaRetroVideoPipeline {
     }
   }
 
+  private async ensureWideGlowDownsampleProgram() {
+    if (this.wideGlowDownsampleProgram && this.wideGlowDownsampleLocs) {
+      return;
+    }
+
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
+    await waitForCompileTurn;
+
+    try {
+      await this.updateCompileState("Compiling shader (wide glow downsample)...");
+      logShaderCompileInfo("base:wideGlowDownsample");
+      const program = submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        FILTER_FRAGMENT_WIDE_GLOW_DOWNSAMPLE,
+      );
+      await this.updateCompileState("Linking shader (wide glow downsample)...");
+      await waitAndVerifyPrograms(this.gl, [program]);
+      this.wideGlowDownsampleProgram = program;
+      this.gl.useProgram(program);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
+      this.wideGlowDownsampleLocs = {
+        uTexture: this.gl.getUniformLocation(program, "uTexture"),
+        uTexelSize: this.gl.getUniformLocation(program, "uTexelSize"),
+      };
+    } finally {
+      releaseCompileTurn();
+    }
+  }
+
+  private async ensureWideGlowBlurProgram() {
+    if (this.wideGlowBlurProgram && this.wideGlowBlurLocs) {
+      return;
+    }
+
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
+    await waitForCompileTurn;
+
+    try {
+      await this.updateCompileState("Compiling shader (wide glow blur)...");
+      logShaderCompileInfo("base:wideGlowBlur");
+      const program = submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        FILTER_FRAGMENT_WIDE_GLOW_BLUR,
+      );
+      await this.updateCompileState("Linking shader (wide glow blur)...");
+      await waitAndVerifyPrograms(this.gl, [program]);
+      this.wideGlowBlurProgram = program;
+      this.gl.useProgram(program);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
+      this.wideGlowBlurLocs = {
+        uTexture: this.gl.getUniformLocation(program, "uTexture"),
+        uTexelSize: this.gl.getUniformLocation(program, "uTexelSize"),
+        uDirection: this.gl.getUniformLocation(program, "uDirection"),
+        uRadius: this.gl.getUniformLocation(program, "uRadius"),
+      };
+    } finally {
+      releaseCompileTurn();
+    }
+  }
+
+  private async ensureWideGlowCompositeProgram() {
+    if (this.wideGlowCompositeProgram && this.wideGlowCompositeLocs) {
+      return;
+    }
+
+    const { waitForCompileTurn, releaseCompileTurn } = this.reserveCompileTurn();
+    await waitForCompileTurn;
+
+    try {
+      await this.updateCompileState("Compiling shader (wide glow composite)...");
+      logShaderCompileInfo("base:wideGlowComposite");
+      const program = submitProgram(
+        this.gl,
+        VERTEX_SHADER_SOURCE,
+        FILTER_FRAGMENT_WIDE_GLOW_COMPOSITE,
+      );
+      await this.updateCompileState("Linking shader (wide glow composite)...");
+      await waitAndVerifyPrograms(this.gl, [program]);
+      this.wideGlowCompositeProgram = program;
+      this.gl.useProgram(program);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uSharpTexture"), 0);
+      this.gl.uniform1i(this.gl.getUniformLocation(program, "uGlowTexture"), 1);
+      this.wideGlowCompositeLocs = {
+        uSharpTexture: this.gl.getUniformLocation(program, "uSharpTexture"),
+        uGlowTexture: this.gl.getUniformLocation(program, "uGlowTexture"),
+        uStrength: this.gl.getUniformLocation(program, "uStrength"),
+      };
+    } finally {
+      releaseCompileTurn();
+    }
+  }
+
   private buildPass1UniformLocations(program: WebGLProgram): Pass1UniformLocations {
     const { gl } = this;
     return {
@@ -2294,9 +2603,20 @@ export class TetoricaRetroVideoPipeline {
   private hasPreparedSupportProgramsForFilterState(filterState: RetroVideoFilterState) {
     const needsBeamDownscale = shouldUsePreFilterDownscale(filterState);
     const needsPostCurvature = shouldUsePostCurvaturePass(filterState);
+    const needsWideGlow = shouldUseWideGlow(filterState);
     const hasBeamDownscale = !needsBeamDownscale || (!!this.beamDownscaleProgram && !!this.beamDownscaleLocs);
     const hasPostCurvature = !needsPostCurvature || (!!this.postCurvatureProgram && !!this.postCurvatureLocs);
-    return hasBeamDownscale && hasPostCurvature;
+    const hasWideGlow =
+      !needsWideGlow ||
+      (
+        !!this.wideGlowDownsampleProgram &&
+        !!this.wideGlowDownsampleLocs &&
+        !!this.wideGlowBlurProgram &&
+        !!this.wideGlowBlurLocs &&
+        !!this.wideGlowCompositeProgram &&
+        !!this.wideGlowCompositeLocs
+      );
+    return hasBeamDownscale && hasPostCurvature && hasWideGlow;
   }
 
   hasPreparedFilterStateVariant(filterState: RetroVideoFilterState) {
@@ -2579,10 +2899,27 @@ export class TetoricaRetroVideoPipeline {
       const canUsePostCurvaturePass =
         usePostCurvaturePass &&
         Boolean(this.postCurvatureProgram && this.postCurvatureLocs);
+      const canUseWideGlow =
+        shouldUseWideGlow(filterState) &&
+        Boolean(
+          this.wideGlowDownsampleProgram &&
+          this.wideGlowDownsampleLocs &&
+          this.wideGlowBlurProgram &&
+          this.wideGlowBlurLocs &&
+          this.wideGlowCompositeProgram &&
+          this.wideGlowCompositeLocs,
+        );
       if (canUsePostCurvaturePass) {
         this.ensurePostCurvatureFbo(w, h);
       }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, canUsePostCurvaturePass ? this.postCurvatureFbo : null);
+      if (canUseWideGlow) {
+        this.ensureFinalSceneFbo(w, h);
+      }
+      const finalSceneTargetFbo = canUseWideGlow ? this.finalSceneFbo : null;
+      gl.bindFramebuffer(
+        gl.FRAMEBUFFER,
+        canUsePostCurvaturePass ? this.postCurvatureFbo : finalSceneTargetFbo,
+      );
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -2709,11 +3046,17 @@ export class TetoricaRetroVideoPipeline {
           timeSec,
         );
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, canUsePostCurvaturePass ? this.postCurvatureFbo : null);
+        gl.bindFramebuffer(
+          gl.FRAMEBUFFER,
+          canUsePostCurvaturePass ? this.postCurvatureFbo : finalSceneTargetFbo,
+        );
         gl.viewport(0, 0, w, h);
         pass2PrimaryTexture = this.phosphorCoreTexture ?? pass2PrimaryTexture;
       }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, canUsePostCurvaturePass ? this.postCurvatureFbo : null);
+      gl.bindFramebuffer(
+        gl.FRAMEBUFFER,
+        canUsePostCurvaturePass ? this.postCurvatureFbo : finalSceneTargetFbo,
+      );
       gl.viewport(0, 0, w, h);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, pass2PrimaryTexture);
@@ -2754,7 +3097,7 @@ export class TetoricaRetroVideoPipeline {
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       if (canUsePostCurvaturePass && this.postCurvatureTexture && this.postCurvatureProgram && this.postCurvatureLocs) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, finalSceneTargetFbo);
         gl.viewport(0, 0, w, h);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -2763,6 +3106,66 @@ export class TetoricaRetroVideoPipeline {
         gl.bindTexture(gl.TEXTURE_2D, this.postCurvatureTexture);
         this.syncPostCurvatureTextureSamplingFilter(gl.LINEAR);
         gl.uniform1f(this.postCurvatureLocs.uCurvature, filterState.curvature);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      if (
+        canUseWideGlow &&
+        this.finalSceneTexture &&
+        this.wideGlowDownsampleProgram &&
+        this.wideGlowDownsampleLocs &&
+        this.wideGlowBlurProgram &&
+        this.wideGlowBlurLocs &&
+        this.wideGlowCompositeProgram &&
+        this.wideGlowCompositeLocs
+      ) {
+        const glowWidth = Math.max(1, Math.round(w / 4));
+        const glowHeight = Math.max(1, Math.round(h / 4));
+        this.ensureWideGlowQuarterFbo(glowWidth, glowHeight);
+        this.ensureWideGlowBlurFbo(glowWidth, glowHeight);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowQuarterFbo);
+        gl.viewport(0, 0, glowWidth, glowHeight);
+        gl.useProgram(this.wideGlowDownsampleProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.finalSceneTexture);
+        this.syncFinalSceneTextureSamplingFilter(gl.LINEAR);
+        gl.uniform2f(this.wideGlowDownsampleLocs.uTexelSize, 1 / Math.max(w, 1), 1 / Math.max(h, 1));
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowBlurFbo);
+        gl.viewport(0, 0, glowWidth, glowHeight);
+        gl.useProgram(this.wideGlowBlurProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.wideGlowQuarterTexture);
+        this.syncWideGlowQuarterTextureSamplingFilter(gl.LINEAR);
+        gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
+        gl.uniform2f(this.wideGlowBlurLocs.uDirection, 1, 0);
+        gl.uniform1f(this.wideGlowBlurLocs.uRadius, filterState.wideGlowRadius);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.wideGlowQuarterFbo);
+        gl.viewport(0, 0, glowWidth, glowHeight);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.wideGlowBlurTexture);
+        this.syncWideGlowBlurTextureSamplingFilter(gl.LINEAR);
+        gl.uniform2f(this.wideGlowBlurLocs.uTexelSize, 1 / Math.max(glowWidth, 1), 1 / Math.max(glowHeight, 1));
+        gl.uniform2f(this.wideGlowBlurLocs.uDirection, 0, 1);
+        gl.uniform1f(this.wideGlowBlurLocs.uRadius, filterState.wideGlowRadius);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(this.wideGlowCompositeProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.finalSceneTexture);
+        this.syncFinalSceneTextureSamplingFilter(gl.LINEAR);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.wideGlowQuarterTexture);
+        this.syncWideGlowQuarterTextureSamplingFilter(gl.LINEAR);
+        gl.uniform1f(this.wideGlowCompositeLocs.uStrength, filterState.wideGlowStrength);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
 
@@ -2818,6 +3221,9 @@ export class TetoricaRetroVideoPipeline {
     gl.deleteProgram(this.passthroughProgram);
     if (this.beamDownscaleProgram) gl.deleteProgram(this.beamDownscaleProgram);
     if (this.postCurvatureProgram) gl.deleteProgram(this.postCurvatureProgram);
+    if (this.wideGlowDownsampleProgram) gl.deleteProgram(this.wideGlowDownsampleProgram);
+    if (this.wideGlowBlurProgram) gl.deleteProgram(this.wideGlowBlurProgram);
+    if (this.wideGlowCompositeProgram) gl.deleteProgram(this.wideGlowCompositeProgram);
     if (this.fbo) gl.deleteFramebuffer(this.fbo);
     if (this.fboTexture) gl.deleteTexture(this.fboTexture);
     if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
@@ -2832,6 +3238,12 @@ export class TetoricaRetroVideoPipeline {
     if (this.beamComposeTexture) gl.deleteTexture(this.beamComposeTexture);
     if (this.postCurvatureFbo) gl.deleteFramebuffer(this.postCurvatureFbo);
     if (this.postCurvatureTexture) gl.deleteTexture(this.postCurvatureTexture);
+    if (this.finalSceneFbo) gl.deleteFramebuffer(this.finalSceneFbo);
+    if (this.finalSceneTexture) gl.deleteTexture(this.finalSceneTexture);
+    if (this.wideGlowQuarterFbo) gl.deleteFramebuffer(this.wideGlowQuarterFbo);
+    if (this.wideGlowQuarterTexture) gl.deleteTexture(this.wideGlowQuarterTexture);
+    if (this.wideGlowBlurFbo) gl.deleteFramebuffer(this.wideGlowBlurFbo);
+    if (this.wideGlowBlurTexture) gl.deleteTexture(this.wideGlowBlurTexture);
     this.currentSource = null;
     this.currentFilterState = null;
     this.lastRenderedFilterState = null;
