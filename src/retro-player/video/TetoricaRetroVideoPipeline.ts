@@ -1,6 +1,7 @@
 import {
   MONO_TINTS,
   paletteModeToUniform,
+  type BeamStripeMode,
   type GrainVisibilityMode,
   type MonoTintMode,
   type PaletteMode,
@@ -81,6 +82,7 @@ export type RetroVideoFilterState = {
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
@@ -139,6 +141,10 @@ function getSamplingModeValue(mode: TargetSamplingMode): number {
 
 function getGrainVisibilityModeValue(mode: GrainVisibilityMode): number {
   return mode === "bright_only" ? 1 : 0;
+}
+
+function getBeamStripeModeValue(mode: BeamStripeMode): number {
+  return mode === "modern" ? 1 : 0;
 }
 
 type Pass1UniformLocations = {
@@ -289,6 +295,7 @@ type BeamComposeUniformLocations = {
   uCurvature: WebGLUniformLocation | null;
   uBeamDarkCutoff: WebGLUniformLocation | null;
   uBeamHorizontalSpread: WebGLUniformLocation | null;
+  uBeamStripeMode: WebGLUniformLocation | null;
   uBeamStripeStrength: WebGLUniformLocation | null;
   uBeamWhiteBloom: WebGLUniformLocation | null;
   uBeamWarmBloom: WebGLUniformLocation | null;
@@ -642,7 +649,7 @@ const getPhosphorDotViewportLimitedSize = (
   }
 
   const isBeamMode = isBeamCrossModeEnabled(filterState);
-  const beamCapFloor = isCapActive ? 1.6 : 1.2;
+  const beamCapFloor = isCapActive ? 1.8 : 1.2;
   const beamBloomFloor = filterState.beamWhiteBloom * 0.6;
   const baseMinCellPixels = isBeamMode
     ? Math.max(beamCapFloor, beamBloomFloor)
@@ -1477,6 +1484,7 @@ export class TetoricaRetroVideoPipeline {
       uCurvature: gl.getUniformLocation(program, "uCurvature"),
       uBeamDarkCutoff: gl.getUniformLocation(program, "uBeamDarkCutoff"),
       uBeamHorizontalSpread: gl.getUniformLocation(program, "uBeamHorizontalSpread"),
+      uBeamStripeMode: gl.getUniformLocation(program, "uBeamStripeMode"),
       uBeamStripeStrength: gl.getUniformLocation(program, "uBeamStripeStrength"),
       uBeamWhiteBloom: gl.getUniformLocation(program, "uBeamWhiteBloom"),
       uBeamWarmBloom: gl.getUniformLocation(program, "uBeamWarmBloom"),
@@ -1531,6 +1539,9 @@ export class TetoricaRetroVideoPipeline {
     }
     if (this.beamComposeLocs.uBeamHorizontalSpread) {
       gl.uniform1f(this.beamComposeLocs.uBeamHorizontalSpread, filterState.beamHorizontalSpread);
+    }
+    if (this.beamComposeLocs.uBeamStripeMode) {
+      gl.uniform1f(this.beamComposeLocs.uBeamStripeMode, getBeamStripeModeValue(filterState.beamStripeMode));
     }
     gl.uniform1f(this.beamComposeLocs.uBeamStripeStrength, filterState.beamStripeStrength);
     gl.uniform1f(this.beamComposeLocs.uBeamWhiteBloom, filterState.beamWhiteBloom);

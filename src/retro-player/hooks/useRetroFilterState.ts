@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  type BeamStripeMode,
   DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
@@ -76,6 +77,7 @@ export type RetroFilterInitialState = Partial<{
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
@@ -157,6 +159,7 @@ const doesPresetMatchState = (
     (preset.compositeNoise ?? 0) === state.compositeNoise &&
     (preset.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff) === state.beamDarkCutoff &&
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
+    (preset.beamStripeMode ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode) === state.beamStripeMode &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
     (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
@@ -292,6 +295,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamDarkCutoff ?? (DEFAULT_PRESET.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff),
     beamHorizontalSpread:
       initialState.beamHorizontalSpread ?? (DEFAULT_PRESET.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread),
+    beamStripeMode:
+      initialState.beamStripeMode ?? (DEFAULT_PRESET.beamStripeMode ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode),
     beamStripeStrength:
       initialState.beamStripeStrength ?? (DEFAULT_PRESET.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength),
     beamWhiteBloom:
@@ -694,6 +699,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setBeamStripeMode = (beamStripeMode: BeamStripeMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamStripeMode === beamStripeMode ? current : { ...current, beamStripeMode }
+    ));
+  };
+
   const setBeamStripeStrength = (beamStripeStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -850,6 +862,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       compositeNoise: presetSettings.compositeNoise ?? 0,
       beamDarkCutoff: presetSettings.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
+      beamStripeMode: presetSettings.beamStripeMode ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
       beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
@@ -950,6 +963,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setCompositeNoise,
     setBeamDarkCutoff,
     setBeamHorizontalSpread,
+    setBeamStripeMode,
     setBeamStripeStrength,
     setBeamWhiteBloom,
     setBeamWarmBloom,

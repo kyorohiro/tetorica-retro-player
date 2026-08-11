@@ -396,6 +396,7 @@ export function RetroControlPanel({
               compositeNoise={filterState.compositeNoise}
               beamDarkCutoff={filterState.beamDarkCutoff}
               beamHorizontalSpread={filterState.beamHorizontalSpread}
+              beamStripeMode={filterState.beamStripeMode}
               beamStripeStrength={filterState.beamStripeStrength}
               beamWhiteBloom={filterState.beamWhiteBloom}
               beamWarmBloom={filterState.beamWarmBloom}
@@ -465,6 +466,7 @@ export function RetroControlPanel({
               onSetCompositeNoise={filterState.setCompositeNoise}
               onSetBeamDarkCutoff={filterState.setBeamDarkCutoff}
               onSetBeamHorizontalSpread={filterState.setBeamHorizontalSpread}
+              onSetBeamStripeMode={filterState.setBeamStripeMode}
               onSetBeamStripeStrength={filterState.setBeamStripeStrength}
               onSetBeamWhiteBloom={filterState.setBeamWhiteBloom}
               onSetBeamWarmBloom={filterState.setBeamWarmBloom}

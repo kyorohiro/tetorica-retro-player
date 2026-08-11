@@ -1,5 +1,7 @@
 import {
+  DEFAULT_BEAM_CROSS_SETTINGS,
   normalizePhosphorDotShape,
+  type BeamStripeMode,
   type GrainVisibilityMode,
   type LegacyPhosphorDotShape,
   type MonoTintMode,
@@ -68,6 +70,7 @@ export type PersistedRetroFilterSettings = {
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
@@ -201,6 +204,10 @@ const normalizePersistedRetroSettings = (
           filter.grainVisibilityMode === "bright_only"
             ? "bright_only"
             : "all",
+        beamStripeMode:
+          filter.beamStripeMode === "modern"
+            ? "modern"
+            : DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode,
         preFilterDownscaleEnabled: filter.preFilterDownscaleEnabled === true,
       }
       : filter,

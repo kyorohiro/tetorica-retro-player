@@ -74,6 +74,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   compositeNoise: 0,
   beamDarkCutoff: DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
   beamHorizontalSpread: DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
+  beamStripeMode: DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode,
   beamStripeStrength: DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
   beamWhiteBloom: DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
   beamWarmBloom: DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,

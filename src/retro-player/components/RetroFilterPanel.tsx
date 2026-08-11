@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  type BeamStripeMode,
   type GrainVisibilityMode,
   MONO_TINTS,
   RETRO_PRESET_CATEGORY_ITEMS,
@@ -121,6 +122,7 @@ type RetroFilterPanelProps = {
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
@@ -190,6 +192,7 @@ type RetroFilterPanelProps = {
   onSetCompositeNoise: (value: number) => void;
   onSetBeamDarkCutoff: (value: number) => void;
   onSetBeamHorizontalSpread: (value: number) => void;
+  onSetBeamStripeMode: (value: BeamStripeMode) => void;
   onSetBeamStripeStrength: (value: number) => void;
   onSetBeamWhiteBloom: (value: number) => void;
   onSetBeamWarmBloom: (value: number) => void;
@@ -260,6 +263,7 @@ export function RetroFilterPanel({
   compositeNoise,
   beamDarkCutoff,
   beamHorizontalSpread,
+  beamStripeMode,
   beamStripeStrength,
   beamWhiteBloom,
   beamWarmBloom,
@@ -326,6 +330,7 @@ export function RetroFilterPanel({
   onSetCompositeNoise,
   onSetBeamDarkCutoff,
   onSetBeamHorizontalSpread,
+  onSetBeamStripeMode,
   onSetBeamStripeStrength,
   onSetBeamWhiteBloom,
   onSetBeamWarmBloom,
@@ -2070,6 +2075,38 @@ export function RetroFilterPanel({
                   }}
                   className="mt-2 w-full"
                 />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="text-[#12141c] text-[12px] font-medium">
+                  Beam stripe
+                </span>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { onSetBeamStripeMode("legacy"); }}
+                    className={[
+                      "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                      beamStripeMode === "legacy"
+                        ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                        : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                    ].join(" ")}
+                  >
+                    Main
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onSetBeamStripeMode("modern"); }}
+                    className={[
+                      "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                      beamStripeMode === "modern"
+                        ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                        : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                    ].join(" ")}
+                  >
+                    Current
+                  </button>
+                </div>
               </label>
 
               <label className="mt-3 block">
