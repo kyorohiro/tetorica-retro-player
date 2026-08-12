@@ -22,7 +22,7 @@ import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2Be
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE } from "../retro/filterPass2BeamLiteSimpleComposeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_CORE } from "../retro/filterPass2BeamLiteSimpleCoreShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE } from "../retro/filterPass2BeamLiteStripeShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "../retro/filterPass2PhosphorLiteCoreShader.ts";
@@ -2004,13 +2004,11 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE
           : null,
       beamStripe:
-        pass2Variant === "beam_full" || pass2Variant === "beam_crt"
+        pass2Variant === "beam_simple" || pass2Variant === "beam_full" || pass2Variant === "beam_crt"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE
           : null,
       beamCompose:
-        pass2Variant === "beam_simple"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_COMPOSE
-          : pass2Variant === "beam_full" || pass2Variant === "beam_crt"
+        pass2Variant === "beam_simple" || pass2Variant === "beam_full" || pass2Variant === "beam_crt"
             ? FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE
           : null,
       pass2:
@@ -2367,7 +2365,15 @@ export class TetoricaRetroVideoPipeline {
         : null;
       const beamKernelBaseSource = variantKey.endsWith(":beam_crt")
         ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
-        : (variantKey.endsWith(":beam_full") ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL : null);
+        : (
+          variantKey.endsWith(":beam_full")
+            ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+            : (
+              variantKey.endsWith(":beam_simple")
+                ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_CORE
+                : null
+            )
+        );
       const beamKernelSource = beamKernelBaseSource
         ? this.shaderCompileCacheBusterEnabled
           ? this.appendShaderCompileBuster(beamKernelBaseSource)
@@ -3197,9 +3203,10 @@ export class TetoricaRetroVideoPipeline {
 
       // Pass 2: FBO → screen/FBO (CRT effects: curvature, scanlines, phosphor dots, vignette)
       const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
+      const isBeamSimpleVariant = this.windowsLiteVariantKey?.includes(":beam_simple") ?? false;
       const isBeamFullVariant = this.windowsLiteVariantKey?.includes(":beam_full") ?? false;
       const isBeamCrtVariant = this.windowsLiteVariantKey?.includes(":beam_crt") ?? false;
-      const isBeamKernelVariant = isBeamFullVariant || isBeamCrtVariant;
+      const isBeamKernelVariant = isBeamSimpleVariant || isBeamFullVariant || isBeamCrtVariant;
       const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
       const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState);
       const canUsePreFilterDownscale =
