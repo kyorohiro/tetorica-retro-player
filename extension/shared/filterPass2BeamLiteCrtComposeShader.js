@@ -18,6 +18,7 @@ uniform float uCurvature;
 uniform float uBeamStripeStrength;
 uniform float uBeamWhiteBloom;
 uniform float uBeamWarmBloom;
+uniform float uBeamStripeMode;
 
 const float PI = 3.141592653589793;
 const float BEAM_SOURCE_DETAIL_SMOOTH_BLEND = 0.36;
@@ -119,23 +120,30 @@ vec3 sampleEmitterColorSmooth(vec2 emitterCell, vec2 sourceSize) {
 void sampleBeamStripeMasks(vec2 uv, vec2 sourceSize, out vec3 stripeMask, out vec3 bleedMask) {
   vec2 safeSourceSize = max(sourceSize, vec2(1.0));
   vec2 cellCoord = uv * safeSourceSize;
-  float stripeCoordX = cellCoord.x * 3.0;
+  bool useModernStripe = uBeamStripeMode > 0.5;
+  float stripeCoordX = useModernStripe ? cellCoord.x : cellCoord.x * 3.0;
   float cellIndex = floor(cellCoord.x);
-  float staggerShift = mod(cellIndex, 2.0) * 0.28;
+  float staggerShift = mod(cellIndex, 2.0) * (useModernStripe ? 0.0 : 0.28);
   vec2 local = fract(vec2(stripeCoordX, cellCoord.y + staggerShift));
-  float stripeR = (local.x - 1.0 / 6.0) / 0.15;
-  float stripeG = (local.x - 0.5) / 0.15;
-  float stripeB = (local.x - 5.0 / 6.0) / 0.15;
+  float stripeWidth = useModernStripe ? 0.105 : 0.15;
+  float bleedWidth = useModernStripe ? 0.145 : 0.21;
+  float stripeR = (local.x - 1.0 / 6.0) / stripeWidth;
+  float stripeG = (local.x - 0.5) / stripeWidth;
+  float stripeB = (local.x - 5.0 / 6.0) / stripeWidth;
   vec3 stripeBars = exp(-vec3(stripeR * stripeR, stripeG * stripeG, stripeB * stripeB));
-  float bleedR = (local.x - 1.0 / 6.0) / 0.21;
-  float bleedG = (local.x - 0.5) / 0.21;
-  float bleedB = (local.x - 5.0 / 6.0) / 0.21;
+  float bleedR = (local.x - 1.0 / 6.0) / bleedWidth;
+  float bleedG = (local.x - 0.5) / bleedWidth;
+  float bleedB = (local.x - 5.0 / 6.0) / bleedWidth;
   vec3 bleedBars = exp(-vec3(bleedR * bleedR, bleedG * bleedG, bleedB * bleedB));
-  float flatBody = smoothstep(0.01, 0.1, local.y) * (1.0 - smoothstep(0.9, 0.99, local.y));
-  float roundedCapsCoord = (local.y - 0.5) / 0.62;
+  float flatBody = useModernStripe
+    ? smoothstep(0.06, 0.12, local.y) * (1.0 - smoothstep(0.88, 0.94, local.y))
+    : smoothstep(0.01, 0.1, local.y) * (1.0 - smoothstep(0.9, 0.99, local.y));
+  float roundedCapsCoord = (local.y - 0.5) / (useModernStripe ? 0.52 : 0.62);
   float roundedCaps = exp(-(roundedCapsCoord * roundedCapsCoord));
-  float verticalShape = clamp(flatBody * 0.48 + roundedCaps * 0.68, 0.0, 1.0);
-  float softVerticalCoord = (local.y - 0.5) / 1.22;
+  float verticalShape = useModernStripe
+    ? clamp(flatBody * 0.94 + roundedCaps * 0.04, 0.0, 1.0)
+    : clamp(flatBody * 0.48 + roundedCaps * 0.68, 0.0, 1.0);
+  float softVerticalCoord = (local.y - 0.5) / (useModernStripe ? 0.44 : 1.22);
   float softVertical = exp(-(softVerticalCoord * softVerticalCoord));
   stripeMask = clamp(stripeBars * verticalShape, 0.0, 1.0);
   bleedMask = clamp(bleedBars * softVertical, 0.0, 1.0);
@@ -146,8 +154,9 @@ float getBeamStripeResolve(vec2 sourceSize) {
   vec2 visibleSize = max(min(uDisplaySize, uOutputSize), vec2(1.0));
   float pixelsPerCellX = visibleSize.x / safeSourceSize.x;
   float pixelsPerCellY = visibleSize.y / safeSourceSize.y;
-  float subpixelPixels = min(pixelsPerCellX / 3.0, pixelsPerCellY);
-  return clamp(smoothstep(1.0, 1.45, subpixelPixels), 0.0, 1.0);
+  bool useModernStripe = uBeamStripeMode > 0.5;
+  float subpixelPixels = min(useModernStripe ? pixelsPerCellX : pixelsPerCellX / 3.0, pixelsPerCellY);
+  return clamp(smoothstep(3.0, 4.5, subpixelPixels), 0.0, 1.0);
 }
 
 vec3 sampleBeamMergedMask(vec2 uv, vec2 sourceSize, float sigmaX, float sigmaY) {

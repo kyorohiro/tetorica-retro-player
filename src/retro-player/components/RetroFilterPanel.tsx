@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  type BeamStripeMode,
   type GrainVisibilityMode,
   MONO_TINTS,
   RETRO_PRESET_CATEGORY_ITEMS,
@@ -13,6 +14,7 @@ import {
   type RetroPresetKey,
   type TargetSamplingMode,
   type VBlankSimulationMode,
+  type WideGlowMode,
 } from "../retro/config";
 import type { RetroPlayerLocale } from "../types";
 
@@ -121,10 +123,17 @@ type RetroFilterPanelProps = {
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
+  wideGlowEnabled: boolean;
+  wideGlowMode: WideGlowMode;
+  wideGlowStrength: number;
+  wideGlowRadius: number;
+  wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   scanlineBrightnessFade: number;
   scanlineStrength: number;
   scanline2Strength: number;
@@ -190,10 +199,17 @@ type RetroFilterPanelProps = {
   onSetCompositeNoise: (value: number) => void;
   onSetBeamDarkCutoff: (value: number) => void;
   onSetBeamHorizontalSpread: (value: number) => void;
+  onSetBeamStripeMode: (value: BeamStripeMode) => void;
   onSetBeamStripeStrength: (value: number) => void;
   onSetBeamWhiteBloom: (value: number) => void;
   onSetBeamWarmBloom: (value: number) => void;
   onSetScreenFaceGlow: (value: number) => void;
+  onSetWideGlowEnabled: (value: boolean) => void;
+  onSetWideGlowMode: (value: WideGlowMode) => void;
+  onSetWideGlowStrength: (value: number) => void;
+  onSetWideGlowRadius: (value: number) => void;
+  onSetWideGlowDownscale: (value: number) => void;
+  onSetWideGlowUpdateInterval: (value: number) => void;
   onSetScanlineBrightnessFade: (value: number) => void;
   onSetScanlineStrength: (value: number) => void;
   onSetScanline2Strength: (value: number) => void;
@@ -260,10 +276,17 @@ export function RetroFilterPanel({
   compositeNoise,
   beamDarkCutoff,
   beamHorizontalSpread,
+  beamStripeMode,
   beamStripeStrength,
   beamWhiteBloom,
   beamWarmBloom,
   screenFaceGlow,
+  wideGlowEnabled,
+  wideGlowMode,
+  wideGlowStrength,
+  wideGlowRadius,
+  wideGlowDownscale,
+  wideGlowUpdateInterval,
   scanlineBrightnessFade,
   scanlineStrength,
   scanline2Strength,
@@ -326,10 +349,17 @@ export function RetroFilterPanel({
   onSetCompositeNoise,
   onSetBeamDarkCutoff,
   onSetBeamHorizontalSpread,
+  onSetBeamStripeMode,
   onSetBeamStripeStrength,
   onSetBeamWhiteBloom,
   onSetBeamWarmBloom,
   onSetScreenFaceGlow,
+  onSetWideGlowEnabled,
+  onSetWideGlowMode,
+  onSetWideGlowStrength,
+  onSetWideGlowRadius,
+  onSetWideGlowDownscale,
+  onSetWideGlowUpdateInterval,
   onSetScanlineBrightnessFade,
   onSetScanlineStrength,
   onSetScanline2Strength,
@@ -437,6 +467,16 @@ export function RetroFilterPanel({
             "Beam Cross の bloom を少し暖色寄りにします。上げるほど白い光にアンバーの熱感が混ざり、実写でもゲームでも少し温かい発光に見えます。",
           screenFaceGlow:
             "画面中央に、うっすら面発光する明るさを足します。0 なら無効で、上げるほど黒背景でもブラウン管の表面がぼんやり光っている感じを出します。",
+          wideGlow:
+            "最終出力のいちばん外側に、ごく弱い広域なハローを足します。近距離の glow や phosphor の粒はそのままに、ガラス越しの光漏れだけを後段で重ねます。",
+          wideGlowMode:
+            "Optical halo は発光体のまわりに等方的な光学ハローを足します。Smoky glow は現在の煙や絵の具っぽい広がり方を残すモードです。",
+          wideGlowRadius:
+            "Wide Glow がどれくらい遠くまで広がるかです。blur の tap 数は増やさず、低解像度側のサンプル間隔だけを広げます。",
+          wideGlowDownscale:
+            "Glow を作るためにいったん縮小する解像度です。2 は細かく、4 は標準、8 はさらに広くて軽い halo になります。",
+          wideGlowUpdateInterval:
+            "Halo の再計算を何フレームごとに行うかです。値を大きくすると軽くなり、少し残光やゴースト感が出ます。",
           outputBrightness:
             "スキャンラインやヴィネットなど全ての効果を適用し終えた最終映像に、一律の明るさゲインを掛けます。CSS の brightness と同じ最終段の調整なので、ドットの形やモアレには影響しません。",
           basicContrast:
@@ -1434,6 +1474,119 @@ export function RetroFilterPanel({
                 className="mt-2 w-full"
               />
             </label>
+            <button
+              type="button"
+              onClick={() => onSetWideGlowEnabled(!wideGlowEnabled)}
+              title={helpText.wideGlow ?? ""}
+              className={[
+                "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                wideGlowEnabled
+                  ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                  : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+              ].join(" ")}
+            >
+              Wide glow
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onSetWideGlowMode("optical")}
+                title={helpText.wideGlowMode ?? ""}
+                className={[
+                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                  wideGlowMode === "optical"
+                    ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                Optical halo
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetWideGlowMode("smoky")}
+                title={helpText.wideGlowMode ?? ""}
+                className={[
+                  "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                  wideGlowMode === "smoky"
+                    ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                    : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                ].join(" ")}
+              >
+                Smoky glow
+              </button>
+            </div>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Wide glow strength: ${fixedNumber(wideGlowStrength, 2)}`}
+                  text={helpText.wideGlow ?? ""}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="0.8"
+                step="0.01"
+                value={wideGlowStrength}
+                onChange={(ev) => onSetWideGlowStrength(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[#12141c]">
+                <InfoTip
+                  label={`Wide glow radius: ${fixedNumber(wideGlowRadius, 2)}`}
+                  text={helpText.wideGlowRadius ?? ""}
+                  helpSuffix={helpText.helpSuffix}
+                />
+              </span>
+              <input
+                type="range"
+                min="0.5"
+                max="8"
+                step="0.1"
+                value={wideGlowRadius}
+                onChange={(ev) => onSetWideGlowRadius(Number(ev.currentTarget.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[2, 4, 8].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onSetWideGlowDownscale(value)}
+                  title={helpText.wideGlowDownscale ?? ""}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    wideGlowDownscale === value
+                      ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {`1/${value}`}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 4, 8, 12].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onSetWideGlowUpdateInterval(value)}
+                  title={helpText.wideGlowUpdateInterval ?? ""}
+                  className={[
+                    "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                    wideGlowUpdateInterval === value
+                      ? "border-amber-600/60 bg-amber-500/15 text-[#5a3200] font-semibold"
+                      : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                  ].join(" ")}
+                >
+                  {value === 1 ? "Every" : `${value}f`}
+                </button>
+              ))}
+            </div>
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
@@ -2070,6 +2223,38 @@ export function RetroFilterPanel({
                   }}
                   className="mt-2 w-full"
                 />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="text-[#12141c] text-[12px] font-medium">
+                  Beam stripe
+                </span>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { onSetBeamStripeMode("legacy"); }}
+                    className={[
+                      "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                      beamStripeMode === "legacy"
+                        ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                        : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                    ].join(" ")}
+                  >
+                    Main
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onSetBeamStripeMode("modern"); }}
+                    className={[
+                      "min-h-10 rounded-lg border px-2 py-2 text-[11px] leading-tight text-[#12141c]",
+                      beamStripeMode === "modern"
+                        ? "border-sky-600/60 bg-sky-500/15 text-sky-950 font-semibold"
+                        : "border-[#bcb4a6] bg-[#f5f1ea] hover:bg-[#e2ddd5]",
+                    ].join(" ")}
+                  >
+                    Current
+                  </button>
+                </div>
               </label>
 
               <label className="mt-3 block">

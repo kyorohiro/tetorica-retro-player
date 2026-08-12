@@ -1,5 +1,7 @@
 import {
+  DEFAULT_BEAM_CROSS_SETTINGS,
   normalizePhosphorDotShape,
+  type BeamStripeMode,
   type GrainVisibilityMode,
   type LegacyPhosphorDotShape,
   type MonoTintMode,
@@ -7,6 +9,7 @@ import {
   type PhosphorDotShape,
   type TargetSamplingMode,
   type VBlankSimulationMode,
+  type WideGlowMode,
 } from "../retro/config";
 import { isWindowsRuntime } from "../platform/runtime";
 
@@ -68,10 +71,17 @@ export type PersistedRetroFilterSettings = {
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
+  wideGlowEnabled: boolean;
+  wideGlowMode: WideGlowMode;
+  wideGlowStrength: number;
+  wideGlowRadius: number;
+  wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -201,6 +211,23 @@ const normalizePersistedRetroSettings = (
           filter.grainVisibilityMode === "bright_only"
             ? "bright_only"
             : "all",
+        beamStripeMode:
+          filter.beamStripeMode === "modern"
+            ? "modern"
+            : DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode,
+        wideGlowMode:
+          filter.wideGlowMode === "smoky" ? "smoky" : "optical",
+        wideGlowDownscale:
+          filter.wideGlowDownscale === 2 || filter.wideGlowDownscale === 8
+            ? filter.wideGlowDownscale
+            : 4,
+        wideGlowUpdateInterval:
+          filter.wideGlowUpdateInterval === 2 ||
+          filter.wideGlowUpdateInterval === 4 ||
+          filter.wideGlowUpdateInterval === 8 ||
+          filter.wideGlowUpdateInterval === 12
+            ? filter.wideGlowUpdateInterval
+            : 1,
         preFilterDownscaleEnabled: filter.preFilterDownscaleEnabled === true,
       }
       : filter,

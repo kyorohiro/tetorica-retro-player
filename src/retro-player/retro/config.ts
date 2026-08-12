@@ -14,6 +14,8 @@ export type MonoTintMode = "gray" | "green" | "amber" | "ice";
 export type PhosphorDotShape = "circle" | "heart" | "beam" | "square";
 export type LegacyPhosphorDotShape = PhosphorDotShape | "crt_stripe" | "rgb_block";
 export type GrainVisibilityMode = "all" | "bright_only";
+export type BeamStripeMode = "legacy" | "modern";
+export type WideGlowMode = "optical" | "smoky";
 export type TargetSamplingMode =
   | "nearest"
   | "average_fast_4"
@@ -24,6 +26,7 @@ export type VBlankSimulationMode = "off" | "mild" | "strong";
 export const DEFAULT_BEAM_CROSS_SETTINGS = {
   beamDarkCutoff: 0.04,
   beamHorizontalSpread: 1,
+  beamStripeMode: "legacy" as BeamStripeMode,
   beamStripeStrength: 1,
   beamWhiteBloom: 1,
   beamWarmBloom: 0,
@@ -125,10 +128,17 @@ export type RetroPresetDefinition = {
   compositeNoise?: number;
   beamDarkCutoff?: number;
   beamHorizontalSpread?: number;
+  beamStripeMode?: BeamStripeMode;
   beamStripeStrength?: number;
   beamWhiteBloom?: number;
   beamWarmBloom?: number;
   screenFaceGlow?: number;
+  wideGlowEnabled?: boolean;
+  wideGlowMode?: WideGlowMode;
+  wideGlowStrength?: number;
+  wideGlowRadius?: number;
+  wideGlowDownscale?: number;
+  wideGlowUpdateInterval?: number;
   scanlineBrightnessFade?: number;
   monoTint: MonoTintMode;
   neonBoost: number;
@@ -890,6 +900,7 @@ export const RETRO_PRESETS = {
     label: "CRT Beam NTSC",
     autoTargetSize: true,
     samplingMode: "nearest",
+    vblankSimulationMode: "strong",
     width: 1480,
     height: 1080,
     colors: 32,
@@ -926,6 +937,9 @@ export const RETRO_PRESETS = {
     preFilterDownscaleEnabled: true,
     coloredGlowEnabled: true,
     postCurvatureEnabled: false,
+    wideGlowMode: "optical",
+    wideGlowDownscale: 4,
+    wideGlowUpdateInterval: 4,
     compositeEnabled: true,
     compositeAmount: 1,
     compositeChromaBlur: 0.61,
@@ -937,6 +951,75 @@ export const RETRO_PRESETS = {
     beamWhiteBloom: 1.06,
     beamWarmBloom: 0.4,
     screenFaceGlow: 0.17,
+    monoTint: "gray",
+    neonBoost: 1.0,
+    neonSaturation: 1.0,
+    neonDetail: 1.0,
+    focusStrength: 0,
+    focusWidth: 0.24,
+    focusHeight: 0.16,
+  },
+  crtBeamNext: {
+    label: "CRT Beam Next",
+    autoTargetSize: true,
+    samplingMode: "nearest",
+    vblankSimulationMode: "strong",
+    width: 16,
+    height: 16,
+    colors: 32,
+    dither: 0.55,
+    smoothStrength: 0.0,
+    palette: "free",
+    curvature: 0.03,
+    scanline: 0.0,
+    scanline2: 0.01,
+    scanlineBrightnessFade: 0.6,
+    vignette: 0.3,
+    glow: 0.33,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    toonSteps: 0,
+    edgeBoost: 0,
+    animeEdgeLow: 0.08,
+    animeEdgeHigh: 0.55,
+    phosphor: 0.0,
+    spotMask: 0.3,
+    bulbRadius: 0.5,
+    blackFloor: 0.001,
+    outputBrightness: 1.0,
+    basicContrast: 1.03,
+    shadowCrush: 0.36,
+    basicSaturation: 1.33,
+    reflectiveLcdBase: 0,
+    lightDependentTint: 0,
+    grainVisibilityMode: "all",
+    phosphorDotLightBalance: 1,
+    phosphorDotShape: "beam",
+    phosphorDotInternalScale: 2,
+    phosphorDotSizeResponse: 1,
+    phosphorDotBrightCore: false,
+    phosphorDotCellFill: 0,
+    phosphorDotFlatDisc: false,
+    phosphorDotNeighborBlend: false,
+    phosphorDotGrainStrength: 0,
+    preFilterDownscaleEnabled: true,
+    coloredGlowEnabled: true,
+    postCurvatureEnabled: false,
+    wideGlowMode: "optical",
+    wideGlowDownscale: 4,
+    wideGlowUpdateInterval: 4,
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.46,
+    compositeChromaDelay: 0,
+    compositeNoise: 0.77,
+    beamDarkCutoff: 0.04,
+    beamHorizontalSpread: 0.8,
+    beamStripeMode: "modern",
+    beamStripeStrength: 0.67,
+    beamWhiteBloom: 1.5,
+    beamWarmBloom: 0.28,
+    screenFaceGlow: 0.27,
     monoTint: "gray",
     neonBoost: 1.0,
     neonSaturation: 1.0,
@@ -1327,6 +1410,7 @@ export const RETRO_PRESET_CATEGORIES = {
   phosphorDotSmooth: "crt",
   crtBeam: "crt",
   crtBeamNtsc: "crt",
+  crtBeamNext: "crt",
   crtNtsc: "crt",
   crtOnly: "crt",
   crtEdge: "crt",
@@ -1418,6 +1502,7 @@ export const RETRO_PRESET_CATEGORY_ITEMS: Record<
       variants: [
         { key: "crtBeam", label: "Beam" },
         { key: "crtBeamNtsc", label: "NTSC" },
+        { key: "crtBeamNext", label: "Next" },
       ],
     },
     {

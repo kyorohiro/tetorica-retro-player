@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  type BeamStripeMode,
   DEFAULT_BEAM_CROSS_SETTINGS,
   RETRO_PRESETS,
   defaultPresetId,
@@ -14,6 +15,7 @@ import {
   type RetroPresetKey,
   type TargetSamplingMode,
   type VBlankSimulationMode,
+  type WideGlowMode,
 } from "../retro/config";
 import {
   loadPersistedRetroSettings,
@@ -76,10 +78,17 @@ export type RetroFilterInitialState = Partial<{
   compositeNoise: number;
   beamDarkCutoff: number;
   beamHorizontalSpread: number;
+  beamStripeMode: BeamStripeMode;
   beamStripeStrength: number;
   beamWhiteBloom: number;
   beamWarmBloom: number;
   screenFaceGlow: number;
+  wideGlowEnabled: boolean;
+  wideGlowMode: WideGlowMode;
+  wideGlowStrength: number;
+  wideGlowRadius: number;
+  wideGlowDownscale: number;
+  wideGlowUpdateInterval: number;
   monoTint: MonoTintMode;
   neonBoost: number;
   neonSaturation: number;
@@ -157,10 +166,17 @@ const doesPresetMatchState = (
     (preset.compositeNoise ?? 0) === state.compositeNoise &&
     (preset.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff) === state.beamDarkCutoff &&
     (preset.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread) === state.beamHorizontalSpread &&
+    (preset.beamStripeMode ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode) === state.beamStripeMode &&
     (preset.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength) === state.beamStripeStrength &&
     (preset.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom) === state.beamWhiteBloom &&
     (preset.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom) === state.beamWarmBloom &&
     (preset.screenFaceGlow ?? 0) === state.screenFaceGlow &&
+    (preset.wideGlowEnabled ?? false) === state.wideGlowEnabled &&
+    (preset.wideGlowMode ?? "optical") === state.wideGlowMode &&
+    (preset.wideGlowStrength ?? 0) === state.wideGlowStrength &&
+    (preset.wideGlowRadius ?? 1) === state.wideGlowRadius &&
+    (preset.wideGlowDownscale ?? 4) === state.wideGlowDownscale &&
+    (preset.wideGlowUpdateInterval ?? 1) === state.wideGlowUpdateInterval &&
     (preset.focusStrength ?? 0) === state.focusStrength &&
     (preset.focusWidth ?? 0.24) === state.focusWidth &&
     (preset.focusHeight ?? 0.16) === state.focusHeight &&
@@ -292,6 +308,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamDarkCutoff ?? (DEFAULT_PRESET.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff),
     beamHorizontalSpread:
       initialState.beamHorizontalSpread ?? (DEFAULT_PRESET.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread),
+    beamStripeMode:
+      initialState.beamStripeMode ?? (DEFAULT_PRESET.beamStripeMode ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode),
     beamStripeStrength:
       initialState.beamStripeStrength ?? (DEFAULT_PRESET.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength),
     beamWhiteBloom:
@@ -300,6 +318,18 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       initialState.beamWarmBloom ?? (DEFAULT_PRESET.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom),
     screenFaceGlow:
       initialState.screenFaceGlow ?? (DEFAULT_PRESET.screenFaceGlow ?? 0),
+    wideGlowEnabled:
+      initialState.wideGlowEnabled ?? (DEFAULT_PRESET.wideGlowEnabled ?? false),
+    wideGlowMode:
+      initialState.wideGlowMode ?? (DEFAULT_PRESET.wideGlowMode ?? "optical"),
+    wideGlowStrength:
+      initialState.wideGlowStrength ?? (DEFAULT_PRESET.wideGlowStrength ?? 0),
+    wideGlowRadius:
+      initialState.wideGlowRadius ?? (DEFAULT_PRESET.wideGlowRadius ?? 1),
+    wideGlowDownscale:
+      initialState.wideGlowDownscale ?? (DEFAULT_PRESET.wideGlowDownscale ?? 4),
+    wideGlowUpdateInterval:
+      initialState.wideGlowUpdateInterval ?? (DEFAULT_PRESET.wideGlowUpdateInterval ?? 1),
     monoTint: initialState.monoTint ?? DEFAULT_PRESET.monoTint,
     neonBoost: initialState.neonBoost ?? DEFAULT_PRESET.neonBoost,
     neonSaturation: initialState.neonSaturation ?? DEFAULT_PRESET.neonSaturation,
@@ -694,6 +724,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     ));
   };
 
+  const setBeamStripeMode = (beamStripeMode: BeamStripeMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.beamStripeMode === beamStripeMode ? current : { ...current, beamStripeMode }
+    ));
+  };
+
   const setBeamStripeStrength = (beamStripeStrength: number) => {
     markPresetAsCustom();
     setSettings((current) => (
@@ -719,6 +756,58 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     markPresetAsCustom();
     setSettings((current) => (
       current.screenFaceGlow === screenFaceGlow ? current : { ...current, screenFaceGlow }
+    ));
+  };
+
+  const setWideGlowEnabled = (wideGlowEnabled: boolean) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowEnabled === wideGlowEnabled ? current : { ...current, wideGlowEnabled }
+    ));
+  };
+
+  const setWideGlowMode = (wideGlowMode: WideGlowMode) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowMode === wideGlowMode ? current : { ...current, wideGlowMode }
+    ));
+  };
+
+  const setWideGlowStrength = (wideGlowStrength: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowStrength === wideGlowStrength ? current : { ...current, wideGlowStrength }
+    ));
+  };
+
+  const setWideGlowRadius = (wideGlowRadius: number) => {
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowRadius === wideGlowRadius ? current : { ...current, wideGlowRadius }
+    ));
+  };
+
+  const setWideGlowDownscale = (wideGlowDownscale: number) => {
+    const normalized = wideGlowDownscale === 2 || wideGlowDownscale === 8 ? wideGlowDownscale : 4;
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowDownscale === normalized ? current : { ...current, wideGlowDownscale: normalized }
+    ));
+  };
+
+  const setWideGlowUpdateInterval = (wideGlowUpdateInterval: number) => {
+    const normalized =
+      wideGlowUpdateInterval === 2 ||
+      wideGlowUpdateInterval === 4 ||
+      wideGlowUpdateInterval === 8 ||
+      wideGlowUpdateInterval === 12
+        ? wideGlowUpdateInterval
+        : 1;
+    markPresetAsCustom();
+    setSettings((current) => (
+      current.wideGlowUpdateInterval === normalized
+        ? current
+        : { ...current, wideGlowUpdateInterval: normalized }
     ));
   };
 
@@ -850,10 +939,17 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       compositeNoise: presetSettings.compositeNoise ?? 0,
       beamDarkCutoff: presetSettings.beamDarkCutoff ?? DEFAULT_BEAM_CROSS_SETTINGS.beamDarkCutoff,
       beamHorizontalSpread: presetSettings.beamHorizontalSpread ?? DEFAULT_BEAM_CROSS_SETTINGS.beamHorizontalSpread,
+      beamStripeMode: presetSettings.beamStripeMode ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeMode,
       beamStripeStrength: presetSettings.beamStripeStrength ?? DEFAULT_BEAM_CROSS_SETTINGS.beamStripeStrength,
       beamWhiteBloom: presetSettings.beamWhiteBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWhiteBloom,
       beamWarmBloom: presetSettings.beamWarmBloom ?? DEFAULT_BEAM_CROSS_SETTINGS.beamWarmBloom,
       screenFaceGlow: presetSettings.screenFaceGlow ?? 0,
+      wideGlowEnabled: presetSettings.wideGlowEnabled ?? false,
+      wideGlowMode: presetSettings.wideGlowMode ?? "optical",
+      wideGlowStrength: presetSettings.wideGlowStrength ?? 0,
+      wideGlowRadius: presetSettings.wideGlowRadius ?? 1,
+      wideGlowDownscale: presetSettings.wideGlowDownscale ?? 4,
+      wideGlowUpdateInterval: presetSettings.wideGlowUpdateInterval ?? 1,
       scanlineBrightnessFade: presetSettings.scanlineBrightnessFade ?? 0.6,
       monoTint: presetSettings.monoTint,
       neonBoost: presetSettings.neonBoost,
@@ -950,10 +1046,17 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setCompositeNoise,
     setBeamDarkCutoff,
     setBeamHorizontalSpread,
+    setBeamStripeMode,
     setBeamStripeStrength,
     setBeamWhiteBloom,
     setBeamWarmBloom,
     setScreenFaceGlow,
+    setWideGlowEnabled,
+    setWideGlowMode,
+    setWideGlowStrength,
+    setWideGlowRadius,
+    setWideGlowDownscale,
+    setWideGlowUpdateInterval,
     setMonoTint,
     setNeonBoost,
     setNeonSaturation,

@@ -1,8 +1,9 @@
-export const FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE = `#version 300 es
+export const FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE_COMPOSE = `#version 300 es
 precision highp float;
 precision highp int;
 
 in vec2 vTextureCoord;
+in vec2 vMaskCoord;
 out vec4 finalColor;
 
 uniform sampler2D uSourceTexture;
@@ -174,7 +175,6 @@ void main(void) {
     finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
   }
-  vec2 targetSize = max(uTargetSize, vec2(1.0));
   vec2 sourceSize = max(uBeamSourceSize, vec2(1.0));
   vec2 sourceCoord = curvedUv * sourceSize;
   vec4 beamKernel = texture(uBeamKernelTexture, vTextureCoord);
@@ -190,8 +190,16 @@ void main(void) {
   float mergedBleedMaskScalar = dot(stripeBleedMask, vec3(1.0 / 3.0));
   vec3 mergedStripeMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.48, 0.56);
   vec3 mergedBleedMask = sampleBeamMergedMask(curvedUv, sourceSize, 0.74, 1.08);
-  stripeMask = mix(mergedStripeMask * mergedStripeMaskScalar, stripeMask, stripeResolve);
-  stripeBleedMask = mix(mergedBleedMask * mergedBleedMaskScalar, stripeBleedMask, stripeResolve);
+  stripeMask = mix(
+    mergedStripeMask * mergedStripeMaskScalar,
+    stripeMask,
+    stripeResolve
+  );
+  stripeBleedMask = mix(
+    mergedBleedMask * mergedBleedMaskScalar,
+    stripeBleedMask,
+    stripeResolve
+  );
   float effectiveStripeStrength = getBeamStripeStrength() * mix(0.42, 1.0, stripeResolve);
   float lightMask = smoothstep(BEAM_LIGHTMASK_LOW, BEAM_LIGHTMASK_HIGH, beamLuma);
   vec3 beamField = beamColor * (BEAM_FIELD_BASE + lightMask * BEAM_FIELD_LIGHT_GAIN);
