@@ -91,7 +91,6 @@ void main(void) {
   color *= 1.0 - clamp(scanlineMask, 0.0, 1.0);
   float scanline2 = sin((vTextureCoord.y + uTime * 0.05) * 720.0) * uScanline2Strength * visibility;
   color += vec3(scanline2);
-  color = applyScreenFaceGlow(color);
   float vignette = distance(vMaskCoord, vec2(0.5));
   float vignetteAmount = smoothstep(0.2, 0.78, vignette) * clamp(uVignetteStrength, 0.0, 1.0);
   color *= 1.0 - vignetteAmount;
