@@ -17,12 +17,10 @@ import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "../retro/filterPass1LiteNear
 import { FILTER_FRAGMENT_PASS_COMPOSITE_APPLY } from "../retro/filterPassCompositeApplyShader.ts";
 import { FILTER_FRAGMENT_PASS_COMPOSITE_PREP } from "../retro/filterPassCompositePrepShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_CORE } from "../retro/filterPass2BeamLiteSimpleCoreShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE } from "../retro/filterPass2BeamLiteStripeShader.ts";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "../retro/filterPass1Pc98LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "../retro/filterPass2PhosphorLiteCoreShader.ts";
@@ -483,7 +481,7 @@ type WindowsLitePass1Variant =
   | "pc98_nearest"
   | "pc98"
   | "pc98_composite";
-type WindowsLitePass2Variant = "basic" | "phosphor" | "beam_simple" | "beam_full" | "beam_crt";
+type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
 
 const isPc98PaletteMode = (mode: PaletteMode) =>
@@ -499,12 +497,6 @@ const isHeavyPc98PaletteMode = (mode: PaletteMode) =>
 const isNearestSamplingMode = (filterState: RetroVideoFilterState) =>
   getSamplingModeValue(filterState.samplingMode) < 0.5;
 
-const isSimpleBeamCrossMode = (filterState: RetroVideoFilterState) =>
-  isBeamCrossModeEnabled(filterState) &&
-  filterState.smoothStrength <= 0.001 &&
-  filterState.rgbConvergenceOffset <= 0.0001 &&
-  isNearestSamplingMode(filterState);
-
 const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
   filterState.compositeAmount > 0.001;
@@ -514,11 +506,6 @@ const getVBlankFrameInterval = (mode: VBlankSimulationMode | undefined): number 
   if (mode === "strong") return 3;
   return 1;
 };
-
-const isExactSelectedPreset = (
-  filterState: RetroVideoFilterState,
-  presetKey: RetroPresetKey,
-) => filterState.selectedPreset === presetKey;
 
 const getWindowsLiteVariantKey = (
   filterState: RetroVideoFilterState | null,
@@ -539,10 +526,7 @@ const getWindowsLiteVariantKey = (
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
-    if (isExactSelectedPreset(filterState, "crtBeam")) {
-      return "basic_nearest:beam_crt";
-    }
-    return `${pass1}:${isSimpleBeamCrossMode(filterState) ? "beam_simple" : "beam_full"}`;
+    return `${pass1}:beam`;
   }
   const pass2: WindowsLitePass2Variant =
     filterState &&
@@ -2004,18 +1988,16 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE
           : null,
       beamStripe:
-        pass2Variant === "beam_simple" || pass2Variant === "beam_full" || pass2Variant === "beam_crt"
+        pass2Variant === "beam"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE
           : null,
       beamCompose:
-        pass2Variant === "beam_simple" || pass2Variant === "beam_full" || pass2Variant === "beam_crt"
+        pass2Variant === "beam"
             ? FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE
           : null,
       pass2:
-        pass2Variant === "beam_simple" || pass2Variant === "beam_full"
+        pass2Variant === "beam"
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_POST
-          : pass2Variant === "beam_crt"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
           : pass2Variant === "phosphor"
             ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
             : FILTER_FRAGMENT_PASS2_LITE,
@@ -2363,17 +2345,9 @@ export class TetoricaRetroVideoPipeline {
           ? this.appendShaderCompileBuster(beamStripe)
           : beamStripe
         : null;
-      const beamKernelBaseSource = variantKey.endsWith(":beam_crt")
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
-        : (
-          variantKey.endsWith(":beam_full")
-            ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
-            : (
-              variantKey.endsWith(":beam_simple")
-                ? FILTER_FRAGMENT_PASS2_BEAM_LITE_SIMPLE_CORE
-                : null
-            )
-        );
+      const beamKernelBaseSource = variantKey.endsWith(":beam")
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+        : null;
       const beamKernelSource = beamKernelBaseSource
         ? this.shaderCompileCacheBusterEnabled
           ? this.appendShaderCompileBuster(beamKernelBaseSource)
@@ -3202,11 +3176,8 @@ export class TetoricaRetroVideoPipeline {
       }
 
       // Pass 2: FBO → screen/FBO (CRT effects: curvature, scanlines, phosphor dots, vignette)
-      const isBeamVariant = this.windowsLiteVariantKey?.includes(":beam_") ?? false;
-      const isBeamSimpleVariant = this.windowsLiteVariantKey?.includes(":beam_simple") ?? false;
-      const isBeamFullVariant = this.windowsLiteVariantKey?.includes(":beam_full") ?? false;
-      const isBeamCrtVariant = this.windowsLiteVariantKey?.includes(":beam_crt") ?? false;
-      const isBeamKernelVariant = isBeamSimpleVariant || isBeamFullVariant || isBeamCrtVariant;
+      const isBeamVariant = this.windowsLiteVariantKey?.endsWith(":beam") ?? false;
+      const isBeamKernelVariant = isBeamVariant;
       const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
       const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState);
       const canUsePreFilterDownscale =
