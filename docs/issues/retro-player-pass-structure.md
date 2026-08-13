@@ -33,6 +33,89 @@ Windows Chrome / ANGLE では、
 4. 必要なら `postCurvature`
 5. 必要なら `wideGlow composite`
 
+---
+
+## Where Pre-filter Downscale And Sampling Happen
+
+この 2 つは名前が似ているが、役割は別。
+
+### Pre-filter Downscale
+
+`Pre-filter downscale` は、
+
+- beam / phosphor / heavy filter の前に
+- 入力 texture をいったん小さくして
+- その小さい texture を後段 shader の source に使う
+
+処理。
+
+いまは主に `beamDownscale` pass で行っている。
+
+ポイント:
+
+- `uSamplingMode` ではない
+- texture sampling filter の `LINEAR` 縮小を使う
+- 目的は
+  - moire を減らす
+  - 後段 shader の入力サイズを抑える
+  - beam の発光体数を表示密度に合わせる
+
+実装上の位置:
+
+- `TetoricaRetroVideoPipeline.ts`
+  - `canUsePreFilterDownscale`
+  - `beamDownscaleProgram`
+  - `beamSourceTexture`
+
+流れ:
+
+1. `pass1OutputTexture`
+2. `beamDownscale`
+3. `beamSourceTexture`
+4. beam / phosphor の後段で使用
+
+### Sampling
+
+`Sampling` は、
+
+- 各 shader の中で
+- 「source cell をどう読むか」
+
+を決める設定。
+
+`nearest` / `average_fast_4` / `average_fast_8` は
+`uSamplingMode` uniform として渡している。
+
+意味:
+
+- `nearest`
+  - 1 点をそのまま読む
+- `average_fast_4`
+  - セル内 4 点平均
+- `average_fast_8`
+  - セル内 8 点平均
+
+つまり `Sampling` は、
+
+- 最後の canvas 拡大方法
+
+ではなく
+
+- shader が source を読む方法
+
+を変えている。
+
+### Important Difference
+
+- `Pre-filter downscale`
+  - pass 間で texture 自体を小さく作り直す
+  - 物理的な中間 FBO サイズ変更
+- `Sampling`
+  - 同じ texture を shader の中でどう読むか
+  - `nearest` か平均化かの違い
+
+---
+
 ### Base Pass 1
 
 入力:
@@ -47,6 +130,7 @@ Windows Chrome / ANGLE では、
 
 - palette / reduced color
 - dither
+- sampling (`uSamplingMode`)
 - smooth
 - horizontal sharpness
 - RGB convergence
@@ -116,6 +200,7 @@ Windows Chrome / ANGLE では、
 
 - composite / NTSC 系を `pass2` から分離
 - compile / link を小さくする
+- `compositePrep` 側で sampling (`uSamplingMode`) を使用
 
 関連 shader:
 
@@ -148,6 +233,12 @@ Windows Chrome / ANGLE では、
   - vignette
   - color finish
   - final `screenFaceGlow`
+
+sampling の位置:
+
+- `pass1` で使用
+- composite 有効なら `compositePrep` でも使用
+- phosphor 自体は `phosphorCore` へ入る前の source に依存する
 
 関連 shader:
 
@@ -190,12 +281,15 @@ Windows lite variant 上は `beam` 1 系統に寄せている。
 
 - beam 用 source を target 相当に縮小
 - moire を減らす前段
+- `Pre-filter downscale` の本体
+- `uSamplingMode` ではなく `LINEAR` 縮小
 
 #### `beamKernel`
 
 - beam 本体の発光分布
 - flare / leak / halo / aura
 - smooth / RGB convergence / sharpness を含む beam 入力処理
+- sampling (`uSamplingMode`) を使って beam の source cell を読む
 
 #### `beamStripe`
 
@@ -208,6 +302,7 @@ Windows lite variant 上は `beam` 1 系統に寄せている。
 
 - `pass1` の source detail を beam 発光へ戻す
 - stripe 結果と source detail の合成
+- sampling (`uSamplingMode`) を使って source detail を戻す
 
 #### `pass2`
 
@@ -241,6 +336,41 @@ Windows lite variant 上は `beam` 1 系統に寄せている。
 
 - heavy な mode でも最後に curvature をかける
 - base shader 側の責務を減らす
+- `Curvature after mask` の実体
+- beam / phosphor / spot mask / scanline まで描いたあとに、完成画像全体を曲げる
+
+つまり `Curvature after mask` が On のときは、
+
+- mask を作ってから曲げる
+- 発光体や scanline も含めた最終絵を曲げる
+
+という順番になる
+
+逆に通常の pre-curvature は、
+
+- source を読む段階で UV を曲げる
+- beam / phosphor / mask 自体も「曲がった座標系」で生成する
+
+という違いがある
+
+### Curvature Placement Summary
+
+- pre-curvature
+  - beamKernel
+  - beamStripe
+  - beamCompose
+  - 各 pass2 内の sampling 座標
+  - などで使う
+- `Curvature after mask`
+  - `postCurvature` pass で最後に 1 回だけ使う
+  - mask 後、screenFaceGlow 後、wideGlow 前
+
+この違いで見え方が変わる。
+
+- pre-curvature:
+  - phosphor dot / stripe / mask 自体も曲面に沿う
+- after mask:
+  - いったん平面で描いた最終画像を後から曲げる
 
 関連 shader:
 
@@ -380,6 +510,54 @@ mode:
 
 そのため preset JSON をそのまま config preset へ移すときは、
 この項目だけ別途扱う必要がある。
+
+### Sampling Is Not The Same As Canvas Scaling
+
+`samplingMode` を変えても、
+
+- CSS の表示サイズ
+- final canvas の拡大率
+- render cap の有無
+
+を直接変えているわけではない。
+
+変わるのは主に、
+
+- `pass1`
+- `compositePrep`
+- `beamKernel`
+- `beamCompose`
+
+での source の読み方。
+
+### Pre-filter Downscale Is A Real Extra Pass
+
+`preFilterDownscaleEnabled` は見た目オプションというより、
+
+- 追加の中間 texture を作るか
+- beam/phosphor の入力解像度を事前に落とすか
+
+を決める switch。
+
+### Curvature After Mask Is Also A Real Extra Pass
+
+`Curvature after mask` は単なる uniform の切り替えではなく、
+
+- `postCurvatureFbo`
+- `postCurvatureTexture`
+- `postCurvatureProgram`
+
+を使う追加 pass。
+
+そのため、
+
+- Off:
+  - `pass2` の出力をそのまま screen へ出す
+- On:
+  - `pass2` の出力を一度 `postCurvatureTexture` に書く
+  - その texture を最後に曲げて screen へ出す
+
+という差がある。
 
 ---
 
