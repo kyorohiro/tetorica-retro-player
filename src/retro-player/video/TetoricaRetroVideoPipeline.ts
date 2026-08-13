@@ -149,10 +149,6 @@ function getSamplingModeValue(mode: TargetSamplingMode): number {
   return 0;
 }
 
-function getPostSamplingModeValue(): number {
-  return 0;
-}
-
 function getGrainVisibilityModeValue(mode: GrainVisibilityMode): number {
   return mode === "bright_only" ? 1 : 0;
 }
@@ -499,6 +495,12 @@ const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
   filterState.compositeAmount > 0.001;
 
+const isHeavyPc98PaletteMode = (mode: PaletteMode) =>
+  mode === "pc98_tile" || mode === "pc98_512_sat";
+
+const isNearestSamplingMode = (filterState: RetroVideoFilterState) =>
+  getSamplingModeValue(filterState.samplingMode) < 0.5;
+
 const getVBlankFrameInterval = (mode: VBlankSimulationMode | undefined): number => {
   if (mode === "mild") return 2;
   if (mode === "strong") return 3;
@@ -513,9 +515,14 @@ const getWindowsLiteVariantKey = (
       ? isPc98PaletteMode(filterState.paletteMode)
         ? isCompositeNtscEnabled(filterState)
           ? "pc98_composite"
+          : isNearestSamplingMode(filterState) &&
+              !isHeavyPc98PaletteMode(filterState.paletteMode)
+            ? "pc98_nearest"
           : "pc98"
         : isCompositeNtscEnabled(filterState)
           ? "basic_composite"
+          : isNearestSamplingMode(filterState)
+            ? "basic_nearest"
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
@@ -1902,7 +1909,7 @@ export class TetoricaRetroVideoPipeline {
     if (this.beamComposeLocs.uDitherStrength) {
       gl.uniform1f(this.beamComposeLocs.uDitherStrength, filterState.ditherStrength);
     }
-    gl.uniform1f(this.beamComposeLocs.uSamplingMode, getPostSamplingModeValue());
+    gl.uniform1f(this.beamComposeLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     if (this.beamComposeLocs.uHorizontalSharpness) {
       gl.uniform1f(this.beamComposeLocs.uHorizontalSharpness, filterState.horizontalSharpness);
     }
@@ -3207,7 +3214,7 @@ export class TetoricaRetroVideoPipeline {
           gl.uniform2f(this.beamKernelLocs.uDisplaySize, displaySize.width, displaySize.height);
           gl.uniform1f(this.beamKernelLocs.uColorLevels, Math.max(filterState.colorLevels, 2));
           gl.uniform1f(this.beamKernelLocs.uDitherStrength, filterState.ditherStrength);
-          gl.uniform1f(this.beamKernelLocs.uSamplingMode, getPostSamplingModeValue());
+          gl.uniform1f(this.beamKernelLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
           gl.uniform1f(this.beamKernelLocs.uHorizontalSharpness, filterState.horizontalSharpness);
           gl.uniform1f(this.beamKernelLocs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
           gl.uniform1f(this.beamKernelLocs.uSmoothStrength, filterState.smoothStrength);
@@ -3738,7 +3745,7 @@ export class TetoricaRetroVideoPipeline {
     );
     gl.uniform1f(locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(locs.uDitherStrength, filterState.ditherStrength);
-    gl.uniform1f(locs.uSamplingMode, getPostSamplingModeValue());
+    gl.uniform1f(locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     gl.uniform1f(locs.uCurvature, getEffectivePreCurvature(filterState));
     gl.uniform1f(locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(locs.uScanline2Strength, filterState.scanline2Strength);
