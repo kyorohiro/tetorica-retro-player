@@ -477,7 +477,9 @@ const waitForCompileStatusPaint = async () => {
 type WindowsLitePass1Variant =
   | "basic_nearest"
   | "basic"
+  | "basic_sampled"
   | "basic_composite"
+  | "basic_composite_sampled"
   | "pc98_nearest"
   | "pc98"
   | "pc98_composite";
@@ -501,6 +503,10 @@ const isHeavyPc98PaletteMode = (mode: PaletteMode) =>
 const isNearestSamplingMode = (filterState: RetroVideoFilterState) =>
   getSamplingModeValue(filterState.samplingMode) < 0.5;
 
+const shouldUsePass1SamplingPrep = (filterState: RetroVideoFilterState) =>
+  !isNearestSamplingMode(filterState) &&
+  !isPc98PaletteMode(filterState.paletteMode);
+
 const getVBlankFrameInterval = (mode: VBlankSimulationMode | undefined): number => {
   if (mode === "mild") return 2;
   if (mode === "strong") return 3;
@@ -520,7 +526,11 @@ const getWindowsLiteVariantKey = (
             ? "pc98_nearest"
           : "pc98"
         : isCompositeNtscEnabled(filterState)
-          ? "basic_composite"
+          ? shouldUsePass1SamplingPrep(filterState)
+            ? "basic_composite_sampled"
+            : "basic_composite"
+          : shouldUsePass1SamplingPrep(filterState)
+            ? "basic_sampled"
           : isNearestSamplingMode(filterState)
             ? "basic_nearest"
           : "basic"
@@ -548,6 +558,32 @@ const getInitialWindowsLiteCompileFilterState = (
 const shouldQueueWindowsLiteVariant = (
   filterState: RetroVideoFilterState | null,
 ) => filterState?.isFilterEnabled === true;
+
+const getWindowsLitePass1Variant = (
+  variantKey: WindowsLiteVariantKey | null,
+): WindowsLitePass1Variant | null => {
+  if (!variantKey) {
+    return null;
+  }
+  return variantKey.split(":")[0] as WindowsLitePass1Variant;
+};
+
+const isPass1SamplingPrepVariant = (variantKey: WindowsLiteVariantKey | null) => {
+  const pass1Variant = getWindowsLitePass1Variant(variantKey);
+  return (
+    pass1Variant === "basic_sampled" ||
+    pass1Variant === "basic_composite_sampled"
+  );
+};
+
+const isCompositePostVariant = (variantKey: WindowsLiteVariantKey | null) => {
+  const pass1Variant = getWindowsLitePass1Variant(variantKey);
+  return (
+    pass1Variant === "basic_composite" ||
+    pass1Variant === "basic_composite_sampled" ||
+    pass1Variant === "pc98_composite"
+  );
+};
 
 const isHtmlVideoElement = (value: unknown): value is HTMLVideoElement =>
   typeof HTMLVideoElement !== "undefined" && value instanceof HTMLVideoElement;
@@ -1965,6 +2001,10 @@ export class TetoricaRetroVideoPipeline {
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
           : pass1Variant === "pc98_composite"
             ? FILTER_FRAGMENT_PASS1_PC98_LITE
+            : pass1Variant === "basic_sampled"
+              ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
+            : pass1Variant === "basic_composite_sampled"
+              ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
             : pass1Variant === "basic_composite"
               ? FILTER_FRAGMENT_PASS1_LITE_BASE
               : pass1Variant === "basic_nearest"
@@ -1973,7 +2013,9 @@ export class TetoricaRetroVideoPipeline {
                   ? FILTER_FRAGMENT_PASS1_LITE_BASE
                   : FILTER_FRAGMENT_PASS1_LITE_SIMPLE,
       compositePrep:
-        pass1Variant === "basic_composite" || pass1Variant === "pc98_composite"
+        pass1Variant === "basic_composite" ||
+        pass1Variant === "basic_composite_sampled" ||
+        pass1Variant === "pc98_composite"
           ? FILTER_FRAGMENT_PASS_COMPOSITE_PREP
           : null,
       compositeMid:
@@ -3080,6 +3122,24 @@ export class TetoricaRetroVideoPipeline {
       const h = gl.drawingBufferHeight;
       const sourceSize = getRetroVideoSourceSize(source);
       const timeSec = this.advanceAnimationClock();
+      const usePass1SamplingPrep = isPass1SamplingPrepVariant(this.windowsLiteVariantKey);
+      const useCompositePost = isCompositePostVariant(this.windowsLiteVariantKey);
+      let pass1InputTexture: WebGLTexture | null = null;
+
+      if (usePass1SamplingPrep && this.compositePrepProgram && this.compositePrepLocs) {
+        this.ensureCompositeMidFbo(w, h);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.compositeMidFbo);
+        gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(this.compositePrepProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.syncTextureSamplingFilter(textureFilter);
+        this.applyCompositePrepUniforms(filterState);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        pass1InputTexture = this.compositeMidTexture;
+      }
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
       this.ensureFbo(w, h);
@@ -3088,11 +3148,18 @@ export class TetoricaRetroVideoPipeline {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(this.filterPass1Program);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, pass1InputTexture ?? this.texture);
+      if (pass1InputTexture === this.compositeMidTexture) {
+        this.syncCompositeMidTextureSamplingFilter(gl.NEAREST);
+      } else {
+        this.syncTextureSamplingFilter(textureFilter);
+      }
       this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height, timeSec);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       let pass1OutputTexture: WebGLTexture | null = this.fboTexture;
-      if (this.compositePrepProgram && this.compositePrepLocs && this.fboTexture) {
+      if (useCompositePost && this.compositePrepProgram && this.compositePrepLocs && this.fboTexture) {
         this.ensureCompositeMidFbo(w, h);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.compositeMidFbo);
         gl.viewport(0, 0, w, h);
@@ -3664,7 +3731,10 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform2f(this.pass1Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
     gl.uniform1f(this.pass1Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
-    gl.uniform1f(this.pass1Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
+    gl.uniform1f(
+      this.pass1Locs.uSamplingMode,
+      shouldUsePass1SamplingPrep(filterState) ? 0 : getSamplingModeValue(filterState.samplingMode),
+    );
     gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
     gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);
     gl.uniform1f(this.pass1Locs.uHorizontalSharpness, filterState.horizontalSharpness);
