@@ -1069,9 +1069,6 @@ export class TetoricaRetroVideoPipeline {
   private windowsLitePendingVariantKey: WindowsLiteVariantKey | null = null;
   private windowsLiteCompilePromise: Promise<void> | null = null;
   private windowsLiteCompileScheduled = false;
-  private supportProgramCompilePromise: Promise<void> | null = null;
-  private supportProgramCompileScheduled = false;
-  private pendingSupportProgramFilterState: RetroVideoFilterState | null = null;
   private readonly windowsLiteProgramCache = new Map<
     WindowsLiteVariantKey,
     WindowsLiteCompiledPrograms
@@ -2066,6 +2063,22 @@ export class TetoricaRetroVideoPipeline {
     return compilePromise;
   }
 
+  private isSupersededVariantCompile(variantKey: WindowsLiteVariantKey) {
+    return (
+      !this.isDisposed &&
+      !this.gl.isContextLost() &&
+      !!this.windowsLitePendingVariantKey &&
+      this.windowsLitePendingVariantKey !== variantKey &&
+      this.windowsLitePendingVariantKey !== this.windowsLiteVariantKey
+    );
+  }
+
+  private throwIfVariantCompileSuperseded(variantKey: WindowsLiteVariantKey) {
+    if (this.isSupersededVariantCompile(variantKey)) {
+      throw new Error(`Superseded variant compile: ${variantKey}`);
+    }
+  }
+
   private reserveCompileTurn() {
     const waitForCompileTurn = this.windowsLiteCompileSerialPromise.catch(() => {});
     let releaseCompileTurn!: () => void;
@@ -2194,89 +2207,16 @@ export class TetoricaRetroVideoPipeline {
       return;
     }
 
-    if (this.supportProgramCompilePromise) {
-      await this.supportProgramCompilePromise;
-      return;
-    }
-
-    this.supportProgramCompilePromise = this.compileSupportProgramsForFilterState(filterState)
+    await this.compileSupportProgramsForFilterState(filterState)
       .catch((error) => {
         console.warn("[retro-player] support shader compile failed", error);
         throw error;
       })
       .finally(() => {
-        this.supportProgramCompilePromise = null;
         if (!this.windowsLiteCompilePromise) {
           this.onCompileStateChange?.({ active: false });
         }
       });
-
-    await this.supportProgramCompilePromise;
-  }
-
-  private scheduleSupportProgramCompile() {
-    if (
-      this.isDisposed ||
-      this.supportProgramCompilePromise ||
-      this.supportProgramCompileScheduled
-    ) {
-      return;
-    }
-
-    this.supportProgramCompileScheduled = true;
-    window.setTimeout(() => {
-      if (this.isDisposed) {
-        this.supportProgramCompileScheduled = false;
-        return;
-      }
-
-      this.supportProgramCompileScheduled = false;
-      const pendingFilterState = this.pendingSupportProgramFilterState;
-      this.pendingSupportProgramFilterState = null;
-      this.supportProgramCompilePromise = this.ensureSupportProgramsForFilterState(pendingFilterState)
-        .catch(() => {
-          // Logged in ensureSupportProgramsForFilterState.
-        })
-        .finally(() => {
-          if (!this.windowsLiteCompilePromise) {
-            this.onCompileStateChange?.({ active: false });
-          }
-          if (!this.isDisposed && this.currentFilterState) {
-            this.queueSupportProgramsForFilterState(this.currentFilterState);
-          }
-        });
-    }, 0);
-  }
-
-  private queueSupportProgramsForFilterState(filterState: RetroVideoFilterState | null) {
-    if (!filterState || this.isDisposed) {
-      return;
-    }
-
-    const needsBeamDownscale =
-      shouldUsePreFilterDownscale(filterState) &&
-      (!this.beamDownscaleProgram || !this.beamDownscaleLocs);
-    const needsPostCurvature =
-      shouldUsePostCurvaturePass(filterState) &&
-      (!this.postCurvatureProgram || !this.postCurvatureLocs);
-    const needsWideGlow =
-      shouldUseWideGlow(filterState) &&
-      (
-        (isOpticalWideGlowMode(filterState)
-          ? (!this.wideGlowOpticalDownsampleProgram || !this.wideGlowOpticalDownsampleLocs)
-          : (!this.wideGlowSmokyDownsampleProgram || !this.wideGlowSmokyDownsampleLocs)) ||
-        !this.wideGlowBlurProgram ||
-        !this.wideGlowBlurLocs ||
-        !this.wideGlowCompositeProgram ||
-        !this.wideGlowCompositeLocs
-      );
-
-    if (!needsBeamDownscale && !needsPostCurvature && !needsWideGlow) {
-      return;
-    }
-
-    this.pendingSupportProgramFilterState = filterState;
-    this.scheduleSupportProgramCompile();
   }
 
   // Compiles a variant at most once; subsequent requests for the same
@@ -2355,7 +2295,9 @@ export class TetoricaRetroVideoPipeline {
         : null;
 
       try {
+        this.throwIfVariantCompileSuperseded(variantKey);
         const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source, variantKey);
+        this.throwIfVariantCompileSuperseded(variantKey);
         let compositePrepProgram: WebGLProgram | null = null;
         let compositeMidProgram: WebGLProgram | null = null;
         let phosphorCoreProgram: WebGLProgram | null = null;
@@ -2363,23 +2305,30 @@ export class TetoricaRetroVideoPipeline {
         let beamStripeProgram: WebGLProgram | null = null;
         let beamComposeProgram: WebGLProgram | null = null;
         if (compositePrepSource) {
+          this.throwIfVariantCompileSuperseded(variantKey);
           compositePrepProgram = await this.getOrCompileSharedProgram("compositePrep", compositePrepSource, variantKey);
         }
         if (compositeMidSource) {
+          this.throwIfVariantCompileSuperseded(variantKey);
           compositeMidProgram = await this.getOrCompileSharedProgram("compositeMid", compositeMidSource, variantKey);
         }
         if (phosphorCoreSource) {
+          this.throwIfVariantCompileSuperseded(variantKey);
           phosphorCoreProgram = await this.getOrCompileSharedProgram("phosphorCore", phosphorCoreSource, variantKey);
         }
         if (beamKernelSource) {
+          this.throwIfVariantCompileSuperseded(variantKey);
           beamKernelProgram = await this.getOrCompileSharedProgram("beamKernel", beamKernelSource, variantKey);
         }
         if (beamStripeSource) {
+          this.throwIfVariantCompileSuperseded(variantKey);
           beamStripeProgram = await this.getOrCompileSharedProgram("beamStripe", beamStripeSource, variantKey);
         }
         if (beamComposeSource) {
+          this.throwIfVariantCompileSuperseded(variantKey);
           beamComposeProgram = await this.getOrCompileSharedProgram("beamCompose", beamComposeSource, variantKey);
         }
+        this.throwIfVariantCompileSuperseded(variantKey);
         const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source, variantKey);
         if (this.isDisposed || this.gl.isContextLost()) {
           throw new Error("Pipeline was disposed during shader compile.");
@@ -2461,9 +2410,7 @@ export class TetoricaRetroVideoPipeline {
         this.setFilterPrograms(pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose);
         this.windowsLiteVariantKey = variantKey;
         this.windowsLitePendingVariantKey = null;
-        if (!this.supportProgramCompilePromise) {
-          this.onCompileStateChange?.({ active: false });
-        }
+        this.onCompileStateChange?.({ active: false });
         TetoricaRetroVideoPipeline.showDebug(`filter: Windows lite variant ${variantKey} LOADED`);
 
         if (!this.windowsLitePrewarmStarted) {
@@ -2471,13 +2418,14 @@ export class TetoricaRetroVideoPipeline {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (message.startsWith("Superseded variant compile:")) {
+          continue;
+        }
         TetoricaRetroVideoPipeline.showDebug(
           `filter: Windows lite variant ${variantKey} failed, keeping previous programs (${message})`,
         );
         this.windowsLitePendingVariantKey = null;
-        if (!this.supportProgramCompilePromise) {
-          this.onCompileStateChange?.({ active: false });
-        }
+        this.onCompileStateChange?.({ active: false });
         return;
       }
     }
@@ -2527,7 +2475,6 @@ export class TetoricaRetroVideoPipeline {
         pipeline.setFilterPrograms(pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose);
         pipeline.windowsLiteVariantKey = initialVariantKey;
         pipeline.windowsLitePendingVariantKey = null;
-        pipeline.queueSupportProgramsForFilterState(initialCompileFilterState);
         onCompileStateChange?.({ active: false });
         onFilterReady?.();
       } catch (error) {
@@ -2870,7 +2817,6 @@ export class TetoricaRetroVideoPipeline {
     }
 
     this.currentFilterState = filterState;
-    this.queueSupportProgramsForFilterState(filterState);
     this.queueWindowsLiteVariant(filterState);
   }
 
