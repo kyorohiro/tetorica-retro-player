@@ -18,6 +18,7 @@ import { FILTER_FRAGMENT_PASS_COMPOSITE_APPLY } from "../retro/filterPassComposi
 import { FILTER_FRAGMENT_PASS_COMPOSITE_PREP } from "../retro/filterPassCompositePrepShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
@@ -29,7 +30,6 @@ import { FILTER_FRAGMENT_WIDE_GLOW_BLUR } from "../retro/filterWideGlowBlurShade
 import { FILTER_FRAGMENT_WIDE_GLOW_COMPOSITE } from "../retro/filterWideGlowCompositeShader.ts";
 import { FILTER_FRAGMENT_WIDE_GLOW_OPTICAL_DOWNSAMPLE } from "../retro/filterWideGlowOpticalDownsampleShader.ts";
 import { FILTER_FRAGMENT_WIDE_GLOW_SMOKY_DOWNSAMPLE } from "../retro/filterWideGlowDownsampleShader.ts";
-import { isWindowsRuntime } from "../platform/runtime.ts";
 
 export type RetroVideoFilterState = {
   selectedPreset?: RetroPresetKey | null;
@@ -146,10 +146,6 @@ function getSamplingModeValue(mode: TargetSamplingMode): number {
   if (mode === "average") {
     return 2;
   }
-  return 0;
-}
-
-function getPostSamplingModeValue(): number {
   return 0;
 }
 
@@ -481,9 +477,12 @@ const waitForCompileStatusPaint = async () => {
 type WindowsLitePass1Variant =
   | "basic_nearest"
   | "basic"
+  | "basic_sampled"
   | "basic_composite"
+  | "basic_composite_sampled"
   | "pc98_nearest"
   | "pc98"
+  | "pc98_sampled"
   | "pc98_composite";
 type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
 type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
@@ -499,6 +498,19 @@ const isCompositeNtscEnabled = (filterState: RetroVideoFilterState) =>
   filterState.compositeEnabled &&
   filterState.compositeAmount > 0.001;
 
+const isHeavyPc98PaletteMode = (mode: PaletteMode) =>
+  mode === "pc98_tile" || mode === "pc98_512_sat";
+
+const isNearestSamplingMode = (filterState: RetroVideoFilterState) =>
+  getSamplingModeValue(filterState.samplingMode) < 0.5;
+
+const shouldUsePass1SamplingPrep = (filterState: RetroVideoFilterState) =>
+  !isNearestSamplingMode(filterState);
+
+const shouldUsePass2SamplingPrep = (filterState: RetroVideoFilterState) =>
+  !isNearestSamplingMode(filterState) &&
+  !isBeamCrossModeEnabled(filterState);
+
 const getVBlankFrameInterval = (mode: VBlankSimulationMode | undefined): number => {
   if (mode === "mild") return 2;
   if (mode === "strong") return 3;
@@ -513,9 +525,21 @@ const getWindowsLiteVariantKey = (
       ? isPc98PaletteMode(filterState.paletteMode)
         ? isCompositeNtscEnabled(filterState)
           ? "pc98_composite"
+          : shouldUsePass1SamplingPrep(filterState) &&
+              !isHeavyPc98PaletteMode(filterState.paletteMode)
+            ? "pc98_sampled"
+          : isNearestSamplingMode(filterState) &&
+              !isHeavyPc98PaletteMode(filterState.paletteMode)
+            ? "pc98_nearest"
           : "pc98"
         : isCompositeNtscEnabled(filterState)
-          ? "basic_composite"
+          ? shouldUsePass1SamplingPrep(filterState)
+            ? "basic_composite_sampled"
+            : "basic_composite"
+          : shouldUsePass1SamplingPrep(filterState)
+            ? "basic_sampled"
+          : isNearestSamplingMode(filterState)
+            ? "basic_nearest"
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
@@ -541,6 +565,33 @@ const getInitialWindowsLiteCompileFilterState = (
 const shouldQueueWindowsLiteVariant = (
   filterState: RetroVideoFilterState | null,
 ) => filterState?.isFilterEnabled === true;
+
+const getWindowsLitePass1Variant = (
+  variantKey: WindowsLiteVariantKey | null,
+): WindowsLitePass1Variant | null => {
+  if (!variantKey) {
+    return null;
+  }
+  return variantKey.split(":")[0] as WindowsLitePass1Variant;
+};
+
+const isPass1SamplingPrepVariant = (variantKey: WindowsLiteVariantKey | null) => {
+  const pass1Variant = getWindowsLitePass1Variant(variantKey);
+  return (
+    pass1Variant === "basic_sampled" ||
+    pass1Variant === "basic_composite_sampled" ||
+    pass1Variant === "pc98_sampled"
+  );
+};
+
+const isCompositePostVariant = (variantKey: WindowsLiteVariantKey | null) => {
+  const pass1Variant = getWindowsLitePass1Variant(variantKey);
+  return (
+    pass1Variant === "basic_composite" ||
+    pass1Variant === "basic_composite_sampled" ||
+    pass1Variant === "pc98_composite"
+  );
+};
 
 const isHtmlVideoElement = (value: unknown): value is HTMLVideoElement =>
   typeof HTMLVideoElement !== "undefined" && value instanceof HTMLVideoElement;
@@ -799,12 +850,8 @@ type KHRParallelShaderCompile = {
 
 const getParallelShaderCompileExtension = (gl: WebGL2RenderingContext) =>
   (
-    isWindowsRuntime()
-      ? null
-      : (
-        gl.getExtension("WEBGL_parallel_shader_compile") ??
-        gl.getExtension("KHR_parallel_shader_compile")
-      )
+    gl.getExtension("WEBGL_parallel_shader_compile") ??
+    gl.getExtension("KHR_parallel_shader_compile")
   ) as KHRParallelShaderCompile | null;
 
 const isRetroVideoDebugEnabled = () =>
@@ -889,6 +936,27 @@ function submitProgram(
   }
 }
 
+function compileProgramShaders(
+  gl: WebGL2RenderingContext,
+  vertexSource: string,
+  fragmentSource: string,
+): SubmittedProgram {
+  const submitted = beginProgramCompile(gl);
+
+  try {
+    gl.shaderSource(submitted.vertexShader, vertexSource);
+    gl.shaderSource(submitted.fragmentShader, fragmentSource);
+    gl.compileShader(submitted.vertexShader);
+    gl.compileShader(submitted.fragmentShader);
+    return submitted;
+  } catch (error) {
+    gl.deleteProgram(submitted.program);
+    gl.deleteShader(submitted.vertexShader);
+    gl.deleteShader(submitted.fragmentShader);
+    throw error;
+  }
+}
+
 function finishProgramLink(
   gl: WebGL2RenderingContext,
   submitted: SubmittedProgram,
@@ -913,15 +981,40 @@ function logShaderCompileWarn(message: string) {
   console.warn(`WARN : DUPLICATE COMPILE SHADER : ${message}`);
 }
 
+const waitMs = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
 // Verify link status after submitProgram() has already compiled and linked.
-// The LINK_STATUS readback itself can still block, but we no longer insert an
-// extra RAF here because the shader-busy overlay is now shown via direct DOM
-// writes before compilation starts.
+// If KHR_parallel_shader_compile is available, poll COMPLETION_STATUS_KHR first
+// and defer the LINK_STATUS readback until the driver reports completion.
 async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
   programs: WebGLProgram[],
 ): Promise<void> {
-  void getParallelShaderCompileExtension;
+  const parallelShaderCompileExt = getParallelShaderCompileExtension(gl);
+
+  if (parallelShaderCompileExt) {
+    const pollStart = nowMs();
+    const pollTimeoutMs = 900;
+    while (true) {
+      let allCompleted = true;
+      for (const program of programs) {
+        if (!gl.getProgramParameter(program, parallelShaderCompileExt.COMPLETION_STATUS_KHR)) {
+          allCompleted = false;
+          break;
+        }
+      }
+      if (allCompleted) {
+        break;
+      }
+      if (nowMs() - pollStart >= pollTimeoutMs) {
+        break;
+      }
+      await waitMs(24);
+    }
+  }
 
   for (const program of programs) {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -1004,6 +1097,11 @@ export class TetoricaRetroVideoPipeline {
   private compositeApplyFboWidth = 0;
   private compositeApplyFboHeight = 0;
   private compositeApplyTextureSamplingFilter: number | null = null;
+  private pass2SamplingFbo: WebGLFramebuffer | null = null;
+  private pass2SamplingTexture: WebGLTexture | null = null;
+  private pass2SamplingFboWidth = 0;
+  private pass2SamplingFboHeight = 0;
+  private pass2SamplingTextureSamplingFilter: number | null = null;
   private phosphorCoreFbo: WebGLFramebuffer | null = null;
   private phosphorCoreTexture: WebGLTexture | null = null;
   private phosphorCoreFboWidth = 0;
@@ -1272,6 +1370,42 @@ export class TetoricaRetroVideoPipeline {
     this.phosphorCoreFboWidth = width;
     this.phosphorCoreFboHeight = height;
     this.phosphorCoreTextureSamplingFilter = gl.NEAREST;
+  }
+
+  private ensurePass2SamplingFbo(width: number, height: number) {
+    if (
+      this.pass2SamplingFboWidth === width &&
+      this.pass2SamplingFboHeight === height &&
+      this.pass2SamplingFbo
+    ) {
+      return;
+    }
+
+    const { gl } = this;
+    if (this.pass2SamplingFbo) gl.deleteFramebuffer(this.pass2SamplingFbo);
+    if (this.pass2SamplingTexture) gl.deleteTexture(this.pass2SamplingTexture);
+
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Failed to create pass2 sampling FBO texture.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("Failed to create pass2 sampling FBO.");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    this.pass2SamplingFbo = fbo;
+    this.pass2SamplingTexture = tex;
+    this.pass2SamplingFboWidth = width;
+    this.pass2SamplingFboHeight = height;
+    this.pass2SamplingTextureSamplingFilter = gl.NEAREST;
   }
 
   private ensureBeamKernelFbo(width: number, height: number) {
@@ -1619,6 +1753,18 @@ export class TetoricaRetroVideoPipeline {
     this.phosphorCoreTextureSamplingFilter = nextFilter;
   }
 
+  private syncPass2SamplingTextureSamplingFilter(nextFilter: number) {
+    if (!this.pass2SamplingTexture || this.pass2SamplingTextureSamplingFilter === nextFilter) {
+      return;
+    }
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.pass2SamplingTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nextFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nextFilter);
+    this.pass2SamplingTextureSamplingFilter = nextFilter;
+  }
+
   private syncPostCurvatureTextureSamplingFilter(nextFilter: number) {
     if (!this.postCurvatureTexture || this.postCurvatureTextureSamplingFilter === nextFilter) {
       return;
@@ -1856,23 +2002,39 @@ export class TetoricaRetroVideoPipeline {
     };
   }
 
-  private applyCompositePrepUniforms(filterState: RetroVideoFilterState) {
+  private applyCompositePrepUniforms(
+    filterState: RetroVideoFilterState,
+    sourceWidth?: number,
+    sourceHeight?: number,
+    targetWidth?: number,
+    targetHeight?: number,
+  ) {
     if (!this.compositePrepLocs) {
       return;
     }
 
+    const resolvedTargetWidth =
+      targetWidth ?? this.resolvePass1TargetSize(filterState, sourceWidth, sourceHeight).width;
+    const resolvedTargetHeight =
+      targetHeight ?? this.resolvePass1TargetSize(filterState, sourceWidth, sourceHeight).height;
     const { gl } = this;
-    gl.uniform2f(this.compositePrepLocs.uTargetSize, Math.max(filterState.targetWidth, 1), Math.max(filterState.targetHeight, 1));
+    gl.uniform2f(this.compositePrepLocs.uTargetSize, resolvedTargetWidth, resolvedTargetHeight);
     gl.uniform1f(this.compositePrepLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
   }
 
-  private applyCompositeMidUniforms(filterState: RetroVideoFilterState, timeSec: number) {
+  private applyCompositeMidUniforms(
+    filterState: RetroVideoFilterState,
+    sourceWidth: number | undefined,
+    sourceHeight: number | undefined,
+    timeSec: number,
+  ) {
     if (!this.compositeMidLocs) {
       return;
     }
 
+    const { width, height } = this.resolvePass1TargetSize(filterState, sourceWidth, sourceHeight);
     const { gl } = this;
-    gl.uniform2f(this.compositeMidLocs.uTargetSize, Math.max(filterState.targetWidth, 1), Math.max(filterState.targetHeight, 1));
+    gl.uniform2f(this.compositeMidLocs.uTargetSize, width, height);
     gl.uniform1f(this.compositeMidLocs.uCompositeAmount, filterState.compositeEnabled ? filterState.compositeAmount : 0);
     gl.uniform1f(this.compositeMidLocs.uCompositeChromaBlur, filterState.compositeChromaBlur);
     gl.uniform1f(this.compositeMidLocs.uCompositeChromaDelay, filterState.compositeChromaDelay);
@@ -1902,7 +2064,7 @@ export class TetoricaRetroVideoPipeline {
     if (this.beamComposeLocs.uDitherStrength) {
       gl.uniform1f(this.beamComposeLocs.uDitherStrength, filterState.ditherStrength);
     }
-    gl.uniform1f(this.beamComposeLocs.uSamplingMode, getPostSamplingModeValue());
+    gl.uniform1f(this.beamComposeLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
     if (this.beamComposeLocs.uHorizontalSharpness) {
       gl.uniform1f(this.beamComposeLocs.uHorizontalSharpness, filterState.horizontalSharpness);
     }
@@ -1954,10 +2116,16 @@ export class TetoricaRetroVideoPipeline {
       pass1:
         pass1Variant === "pc98_nearest"
           ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
+          : pass1Variant === "pc98_sampled"
+            ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
           : pass1Variant === "pc98"
           ? FILTER_FRAGMENT_PASS1_PC98_LITE
           : pass1Variant === "pc98_composite"
             ? FILTER_FRAGMENT_PASS1_PC98_LITE
+            : pass1Variant === "basic_sampled"
+              ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
+            : pass1Variant === "basic_composite_sampled"
+              ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
             : pass1Variant === "basic_composite"
               ? FILTER_FRAGMENT_PASS1_LITE_BASE
               : pass1Variant === "basic_nearest"
@@ -1966,7 +2134,11 @@ export class TetoricaRetroVideoPipeline {
                   ? FILTER_FRAGMENT_PASS1_LITE_BASE
                   : FILTER_FRAGMENT_PASS1_LITE_SIMPLE,
       compositePrep:
-        pass1Variant === "basic_composite" || pass1Variant === "pc98_composite"
+        pass1Variant === "basic_sampled" ||
+        pass1Variant === "basic_composite" ||
+        pass1Variant === "basic_composite_sampled" ||
+        pass1Variant === "pc98_sampled" ||
+        pass1Variant === "pc98_composite"
           ? FILTER_FRAGMENT_PASS_COMPOSITE_PREP
           : null,
       compositeMid:
@@ -2019,6 +2191,76 @@ export class TetoricaRetroVideoPipeline {
     return fragmentSource;
   }
 
+  private getVariantStageSources(variantKey: WindowsLiteVariantKey) {
+    const { pass1, compositePrep, compositeMid, phosphorCore, beamStripe, beamCompose, pass2 } =
+      this.getWindowsLiteShaderSources(variantKey);
+
+    const withBuster = (source: string | null) =>
+      !source
+        ? null
+        : this.shaderCompileCacheBusterEnabled
+          ? this.appendShaderCompileBuster(source)
+          : source;
+
+    const beamKernelBaseSource = variantKey.endsWith(":beam")
+      ? variantKey.startsWith("basic_nearest:beam")
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
+        : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+      : null;
+
+    return {
+      pass1: withBuster(pass1),
+      compositePrep: withBuster(compositePrep),
+      compositeMid: withBuster(compositeMid),
+      phosphorCore: withBuster(phosphorCore),
+      beamKernel: withBuster(beamKernelBaseSource),
+      beamStripe: withBuster(beamStripe),
+      beamCompose: withBuster(beamCompose),
+      pass2: withBuster(pass2),
+    };
+  }
+
+  private tryAssembleCachedWindowsLiteVariant(
+    variantKey: WindowsLiteVariantKey,
+  ): WindowsLiteCompiledPrograms | null {
+    const stageSources = this.getVariantStageSources(variantKey);
+    const getCachedProgram = (source: string | null) =>
+      source ? this.sharedProgramCache.get(this.getSharedProgramCacheKey(source)) ?? null : null;
+
+    const pass1 = getCachedProgram(stageSources.pass1);
+    const pass2 = getCachedProgram(stageSources.pass2);
+    if (!pass1 || !pass2) {
+      return null;
+    }
+
+    const compositePrep = getCachedProgram(stageSources.compositePrep);
+    const compositeMid = getCachedProgram(stageSources.compositeMid);
+    const phosphorCore = getCachedProgram(stageSources.phosphorCore);
+    const beamKernel = getCachedProgram(stageSources.beamKernel);
+    const beamStripe = getCachedProgram(stageSources.beamStripe);
+    const beamCompose = getCachedProgram(stageSources.beamCompose);
+
+    if (stageSources.compositePrep && !compositePrep) return null;
+    if (stageSources.compositeMid && !compositeMid) return null;
+    if (stageSources.phosphorCore && !phosphorCore) return null;
+    if (stageSources.beamKernel && !beamKernel) return null;
+    if (stageSources.beamStripe && !beamStripe) return null;
+    if (stageSources.beamCompose && !beamCompose) return null;
+
+    const entry: WindowsLiteCompiledPrograms = {
+      pass1,
+      pass2,
+      ...(compositePrep ? { compositePrep } : {}),
+      ...(compositeMid ? { compositeMid } : {}),
+      ...(phosphorCore ? { phosphorCore } : {}),
+      ...(beamKernel ? { beamKernel } : {}),
+      ...(beamStripe ? { beamStripe } : {}),
+      ...(beamCompose ? { beamCompose } : {}),
+    };
+    this.windowsLiteProgramCache.set(variantKey, entry);
+    return entry;
+  }
+
   private async getOrCompileSharedProgram(
     stage: SharedCompiledProgramStage,
     fragmentSource: string,
@@ -2038,14 +2280,15 @@ export class TetoricaRetroVideoPipeline {
     const compilePromise = (async () => {
       await this.updateCompileState(`Compiling shader (${variantKey} / ${stage})...`);
       this.logProgramCompile(`variant:${variantKey}:${stage}`);
-      const program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, fragmentSource);
+      const submitted = compileProgramShaders(this.gl, VERTEX_SHADER_SOURCE, fragmentSource);
       try {
         await this.updateCompileState(`Linking shader (${variantKey} / ${stage})...`);
+        const program = finishProgramLink(this.gl, submitted);
         await waitAndVerifyPrograms(this.gl, [program]);
         this.sharedProgramCache.set(cacheKey, program);
         return program;
       } catch (error) {
-        this.gl.deleteProgram(program);
+        this.gl.deleteProgram(submitted.program);
         throw error;
       } finally {
         this.sharedProgramCompileInflight.delete(cacheKey);
@@ -2223,6 +2466,10 @@ export class TetoricaRetroVideoPipeline {
   ): Promise<WindowsLiteCompiledPrograms> {
     const cached = this.windowsLiteProgramCache.get(variantKey);
     if (cached) return cached;
+    const assembledFromSharedCache = this.tryAssembleCachedWindowsLiteVariant(variantKey);
+    if (assembledFromSharedCache) {
+      return assembledFromSharedCache;
+    }
     const inflight = this.windowsLiteVariantCompileInflight.get(variantKey);
     if (inflight) {
       logShaderCompileWarn(`variant:${variantKey}`);
@@ -2241,55 +2488,29 @@ export class TetoricaRetroVideoPipeline {
       if (cachedAfterWait) {
         return cachedAfterWait;
       }
+      const assembledAfterWait = this.tryAssembleCachedWindowsLiteVariant(variantKey);
+      if (assembledAfterWait) {
+        return assembledAfterWait;
+      }
       if (this.isDisposed || this.gl.isContextLost()) {
         throw new Error("Pipeline was disposed before shader compile started.");
       }
 
       const compileStartTime = nowMs();
-      const { pass1, compositePrep, compositeMid, phosphorCore, beamStripe, beamCompose, pass2 } = this.getWindowsLiteShaderSources(variantKey);
-      const pass1Source = this.shaderCompileCacheBusterEnabled
-        ? this.appendShaderCompileBuster(pass1)
-        : pass1;
-      const pass2Source = this.shaderCompileCacheBusterEnabled
-        ? this.appendShaderCompileBuster(pass2)
-        : pass2;
-      const compositePrepSource = compositePrep
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(compositePrep)
-          : compositePrep
-        : null;
-      const compositeMidSource = compositeMid
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(compositeMid)
-          : compositeMid
-        : null;
-      const phosphorCoreSource = phosphorCore
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(phosphorCore)
-          : phosphorCore
-        : null;
-      const beamComposeSource = beamCompose
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(beamCompose)
-          : beamCompose
-        : null;
-      const beamStripeSource = beamStripe
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(beamStripe)
-          : beamStripe
-        : null;
-      const beamKernelBaseSource = variantKey.endsWith(":beam")
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
-        : null;
-      const beamKernelSource = beamKernelBaseSource
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(beamKernelBaseSource)
-          : beamKernelBaseSource
-        : null;
+      const {
+        pass1: pass1Source,
+        compositePrep: compositePrepSource,
+        compositeMid: compositeMidSource,
+        phosphorCore: phosphorCoreSource,
+        beamKernel: beamKernelSource,
+        beamStripe: beamStripeSource,
+        beamCompose: beamComposeSource,
+        pass2: pass2Source,
+      } = this.getVariantStageSources(variantKey);
 
       try {
         this.throwIfVariantCompileSuperseded(variantKey);
-        const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source, variantKey);
+        const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source!, variantKey);
         this.throwIfVariantCompileSuperseded(variantKey);
         let compositePrepProgram: WebGLProgram | null = null;
         let compositeMidProgram: WebGLProgram | null = null;
@@ -2322,7 +2543,7 @@ export class TetoricaRetroVideoPipeline {
           beamComposeProgram = await this.getOrCompileSharedProgram("beamCompose", beamComposeSource, variantKey);
         }
         this.throwIfVariantCompileSuperseded(variantKey);
-        const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source, variantKey);
+        const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source!, variantKey);
         if (this.isDisposed || this.gl.isContextLost()) {
           throw new Error("Pipeline was disposed during shader compile.");
         }
@@ -3073,19 +3294,55 @@ export class TetoricaRetroVideoPipeline {
       const h = gl.drawingBufferHeight;
       const sourceSize = getRetroVideoSourceSize(source);
       const timeSec = this.advanceAnimationClock();
+      const usePass1SamplingPrep = isPass1SamplingPrepVariant(this.windowsLiteVariantKey);
+      const useCompositePost = isCompositePostVariant(this.windowsLiteVariantKey);
+      const pass1TargetSize = this.resolvePass1TargetSize(
+        filterState,
+        sourceSize.width,
+        sourceSize.height,
+      );
+      const pass1RenderWidth = usePass1SamplingPrep ? pass1TargetSize.width : w;
+      const pass1RenderHeight = usePass1SamplingPrep ? pass1TargetSize.height : h;
+      let pass1InputTexture: WebGLTexture | null = null;
+
+      if (usePass1SamplingPrep && this.compositePrepProgram && this.compositePrepLocs) {
+        this.ensureCompositeMidFbo(w, h);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.compositeMidFbo);
+        gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(this.compositePrepProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.syncTextureSamplingFilter(textureFilter);
+        this.applyCompositePrepUniforms(
+          filterState,
+          sourceSize.width,
+          sourceSize.height,
+        );
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        pass1InputTexture = this.compositeMidTexture;
+      }
 
       // Pass 1: source → FBO (palette quantization, dithering, glow, edge boost)
-      this.ensureFbo(w, h);
+      this.ensureFbo(pass1RenderWidth, pass1RenderHeight);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-      gl.viewport(0, 0, w, h);
+      gl.viewport(0, 0, pass1RenderWidth, pass1RenderHeight);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(this.filterPass1Program);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, pass1InputTexture ?? this.texture);
+      if (pass1InputTexture === this.compositeMidTexture) {
+        this.syncCompositeMidTextureSamplingFilter(gl.NEAREST);
+      } else {
+        this.syncTextureSamplingFilter(textureFilter);
+      }
       this.applyPass1Uniforms(filterState, sourceSize.width, sourceSize.height, timeSec);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       let pass1OutputTexture: WebGLTexture | null = this.fboTexture;
-      if (this.compositePrepProgram && this.compositePrepLocs && this.fboTexture) {
+      if (useCompositePost && this.compositePrepProgram && this.compositePrepLocs && this.fboTexture) {
         this.ensureCompositeMidFbo(w, h);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.compositeMidFbo);
         gl.viewport(0, 0, w, h);
@@ -3095,7 +3352,11 @@ export class TetoricaRetroVideoPipeline {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.fboTexture);
         this.syncFboTextureSamplingFilter(gl.NEAREST);
-        this.applyCompositePrepUniforms(filterState);
+        this.applyCompositePrepUniforms(
+          filterState,
+          sourceSize.width,
+          sourceSize.height,
+        );
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         pass1OutputTexture = this.compositeMidTexture;
       }
@@ -3109,7 +3370,12 @@ export class TetoricaRetroVideoPipeline {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.compositeMidTexture);
         this.syncCompositeMidTextureSamplingFilter(gl.NEAREST);
-        this.applyCompositeMidUniforms(filterState, timeSec);
+        this.applyCompositeMidUniforms(
+          filterState,
+          sourceSize.width,
+          sourceSize.height,
+          timeSec,
+        );
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         pass1OutputTexture = this.compositeApplyTexture;
       }
@@ -3153,6 +3419,7 @@ export class TetoricaRetroVideoPipeline {
       let pass2SourceTexture: WebGLTexture = this.texture;
       let pass2PrimaryTexture: WebGLTexture | null = pass1OutputTexture;
       let pass2Sizing: Pass2Sizing | null = null;
+      const usePass2Sampling = shouldUsePass2SamplingPrep(filterState);
       if (canUsePreFilterDownscale && this.beamDownscaleProgram && this.beamDownscaleLocs) {
         pass2Sizing = this.resolvePass2Sizing(filterState, sourceSize.width, sourceSize.height);
         const {
@@ -3207,7 +3474,7 @@ export class TetoricaRetroVideoPipeline {
           gl.uniform2f(this.beamKernelLocs.uDisplaySize, displaySize.width, displaySize.height);
           gl.uniform1f(this.beamKernelLocs.uColorLevels, Math.max(filterState.colorLevels, 2));
           gl.uniform1f(this.beamKernelLocs.uDitherStrength, filterState.ditherStrength);
-          gl.uniform1f(this.beamKernelLocs.uSamplingMode, getPostSamplingModeValue());
+          gl.uniform1f(this.beamKernelLocs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
           gl.uniform1f(this.beamKernelLocs.uHorizontalSharpness, filterState.horizontalSharpness);
           gl.uniform1f(this.beamKernelLocs.uRgbConvergenceOffset, filterState.rgbConvergenceOffset);
           gl.uniform1f(this.beamKernelLocs.uSmoothStrength, filterState.smoothStrength);
@@ -3274,6 +3541,48 @@ export class TetoricaRetroVideoPipeline {
           pass2PrimaryTexture = this.beamComposeTexture ?? pass2PrimaryTexture;
         }
       }
+      if (
+        usePass2Sampling &&
+        this.compositePrepProgram &&
+        this.compositePrepLocs &&
+        pass2PrimaryTexture &&
+        !isBeamVariant
+      ) {
+        pass2Sizing ??= this.resolvePass2Sizing(filterState, sourceSize.width, sourceSize.height);
+        this.ensurePass2SamplingFbo(pass2Sizing.pass2TargetWidth, pass2Sizing.pass2TargetHeight);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.pass2SamplingFbo);
+        gl.viewport(0, 0, pass2Sizing.pass2TargetWidth, pass2Sizing.pass2TargetHeight);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(this.compositePrepProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, pass2PrimaryTexture);
+        if (pass2PrimaryTexture === this.compositeApplyTexture) {
+          this.syncCompositeApplyTextureSamplingFilter(gl.NEAREST);
+        } else if (pass2PrimaryTexture === this.compositeMidTexture) {
+          this.syncCompositeMidTextureSamplingFilter(gl.NEAREST);
+        } else if (pass2PrimaryTexture === this.phosphorCoreTexture) {
+          this.syncPhosphorCoreTextureSamplingFilter(gl.NEAREST);
+        } else if (pass2PrimaryTexture === this.beamSourceTexture) {
+          this.syncBeamSourceTextureSamplingFilter(gl.NEAREST);
+        } else {
+          this.syncFboTextureSamplingFilter(gl.NEAREST);
+        }
+        this.applyCompositePrepUniforms(
+          filterState,
+          sourceSize.width,
+          sourceSize.height,
+          pass2Sizing.pass2TargetWidth,
+          pass2Sizing.pass2TargetHeight,
+        );
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.bindFramebuffer(
+          gl.FRAMEBUFFER,
+          canUsePostCurvaturePass ? this.postCurvatureFbo : finalSceneTargetFbo,
+        );
+        gl.viewport(0, 0, w, h);
+        pass2PrimaryTexture = this.pass2SamplingTexture ?? pass2PrimaryTexture;
+      }
       if (this.phosphorCoreProgram && this.phosphorCoreLocs && pass2PrimaryTexture) {
         this.ensurePhosphorCoreFbo(w, h);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.phosphorCoreFbo);
@@ -3288,6 +3597,8 @@ export class TetoricaRetroVideoPipeline {
           this.syncCompositeApplyTextureSamplingFilter(gl.NEAREST);
         } else if (pass2PrimaryTexture === this.compositeMidTexture) {
           this.syncCompositeMidTextureSamplingFilter(gl.NEAREST);
+        } else if (pass2PrimaryTexture === this.pass2SamplingTexture) {
+          this.syncPass2SamplingTextureSamplingFilter(gl.NEAREST);
         } else {
           this.syncFboTextureSamplingFilter(gl.NEAREST);
         }
@@ -3324,6 +3635,8 @@ export class TetoricaRetroVideoPipeline {
         this.syncPhosphorCoreTextureSamplingFilter(pass2TextureFilter);
       } else if (pass2PrimaryTexture === this.beamComposeTexture) {
         this.syncBeamComposeTextureSamplingFilter(pass2TextureFilter);
+      } else if (pass2PrimaryTexture === this.pass2SamplingTexture) {
+        this.syncPass2SamplingTextureSamplingFilter(pass2TextureFilter);
       } else if (pass2PrimaryTexture === this.compositeMidTexture) {
         this.syncCompositeMidTextureSamplingFilter(pass2TextureFilter);
       } else {
@@ -3551,6 +3864,8 @@ export class TetoricaRetroVideoPipeline {
     if (this.compositeMidTexture) gl.deleteTexture(this.compositeMidTexture);
     if (this.compositeApplyFbo) gl.deleteFramebuffer(this.compositeApplyFbo);
     if (this.compositeApplyTexture) gl.deleteTexture(this.compositeApplyTexture);
+    if (this.pass2SamplingFbo) gl.deleteFramebuffer(this.pass2SamplingFbo);
+    if (this.pass2SamplingTexture) gl.deleteTexture(this.pass2SamplingTexture);
     if (this.phosphorCoreFbo) gl.deleteFramebuffer(this.phosphorCoreFbo);
     if (this.phosphorCoreTexture) gl.deleteTexture(this.phosphorCoreTexture);
     if (this.beamKernelFbo) gl.deleteFramebuffer(this.beamKernelFbo);
@@ -3630,6 +3945,28 @@ export class TetoricaRetroVideoPipeline {
     };
   }
 
+  private resolvePass1TargetSize(
+    filterState: RetroVideoFilterState,
+    sourceWidth?: number,
+    sourceHeight?: number,
+  ) {
+    const viewportFloorSize = this.getEffectiveViewportFloorSize();
+    const visibleWidth = viewportFloorSize.width;
+    const visibleHeight = viewportFloorSize.height;
+    const { width, height } = getEffectiveRetroTargetSize(
+      filterState,
+      sourceWidth,
+      sourceHeight,
+      visibleWidth,
+      visibleHeight,
+      this.isFilterBufferCapEnabled,
+    );
+    return {
+      width,
+      height,
+    };
+  }
+
   private applyPass1Uniforms(
     filterState: RetroVideoFilterState,
     sourceWidth: number | undefined,
@@ -3638,26 +3975,17 @@ export class TetoricaRetroVideoPipeline {
   ) {
     if (!this.pass1Locs || !this.filterPass1Program) return;
     const { gl } = this;
-    const viewportFloorSize = this.getEffectiveViewportFloorSize();
-    const visibleWidth = viewportFloorSize.width;
-    const visibleHeight = viewportFloorSize.height;
-    const {
-      width: effectiveTargetWidth,
-      height: effectiveTargetHeight,
-    } = getEffectiveRetroTargetSize(
-      filterState,
-      sourceWidth,
-      sourceHeight,
-      visibleWidth,
-      visibleHeight,
-      this.isFilterBufferCapEnabled,
-    );
+    const { width: effectiveTargetWidth, height: effectiveTargetHeight } =
+      this.resolvePass1TargetSize(filterState, sourceWidth, sourceHeight);
 
     gl.useProgram(this.filterPass1Program);
     gl.uniform2f(this.pass1Locs.uTargetSize, effectiveTargetWidth, effectiveTargetHeight);
     gl.uniform1f(this.pass1Locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
-    gl.uniform1f(this.pass1Locs.uSamplingMode, getSamplingModeValue(filterState.samplingMode));
+    gl.uniform1f(
+      this.pass1Locs.uSamplingMode,
+      shouldUsePass1SamplingPrep(filterState) ? 0 : getSamplingModeValue(filterState.samplingMode),
+    );
     gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
     gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);
     gl.uniform1f(this.pass1Locs.uHorizontalSharpness, filterState.horizontalSharpness);
@@ -3738,7 +4066,10 @@ export class TetoricaRetroVideoPipeline {
     );
     gl.uniform1f(locs.uColorLevels, Math.max(filterState.colorLevels, 2));
     gl.uniform1f(locs.uDitherStrength, filterState.ditherStrength);
-    gl.uniform1f(locs.uSamplingMode, getPostSamplingModeValue());
+    gl.uniform1f(
+      locs.uSamplingMode,
+      shouldUsePass2SamplingPrep(filterState) ? 0 : getSamplingModeValue(filterState.samplingMode),
+    );
     gl.uniform1f(locs.uCurvature, getEffectivePreCurvature(filterState));
     gl.uniform1f(locs.uScanlineStrength, filterState.scanlineStrength);
     gl.uniform1f(locs.uScanline2Strength, filterState.scanline2Strength);
