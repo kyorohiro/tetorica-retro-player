@@ -2149,6 +2149,74 @@ export class TetoricaRetroVideoPipeline {
     return fragmentSource;
   }
 
+  private getVariantStageSources(variantKey: WindowsLiteVariantKey) {
+    const { pass1, compositePrep, compositeMid, phosphorCore, beamStripe, beamCompose, pass2 } =
+      this.getWindowsLiteShaderSources(variantKey);
+
+    const withBuster = (source: string | null) =>
+      !source
+        ? null
+        : this.shaderCompileCacheBusterEnabled
+          ? this.appendShaderCompileBuster(source)
+          : source;
+
+    const beamKernelBaseSource = variantKey.endsWith(":beam")
+      ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+      : null;
+
+    return {
+      pass1: withBuster(pass1),
+      compositePrep: withBuster(compositePrep),
+      compositeMid: withBuster(compositeMid),
+      phosphorCore: withBuster(phosphorCore),
+      beamKernel: withBuster(beamKernelBaseSource),
+      beamStripe: withBuster(beamStripe),
+      beamCompose: withBuster(beamCompose),
+      pass2: withBuster(pass2),
+    };
+  }
+
+  private tryAssembleCachedWindowsLiteVariant(
+    variantKey: WindowsLiteVariantKey,
+  ): WindowsLiteCompiledPrograms | null {
+    const stageSources = this.getVariantStageSources(variantKey);
+    const getCachedProgram = (source: string | null) =>
+      source ? this.sharedProgramCache.get(this.getSharedProgramCacheKey(source)) ?? null : null;
+
+    const pass1 = getCachedProgram(stageSources.pass1);
+    const pass2 = getCachedProgram(stageSources.pass2);
+    if (!pass1 || !pass2) {
+      return null;
+    }
+
+    const compositePrep = getCachedProgram(stageSources.compositePrep);
+    const compositeMid = getCachedProgram(stageSources.compositeMid);
+    const phosphorCore = getCachedProgram(stageSources.phosphorCore);
+    const beamKernel = getCachedProgram(stageSources.beamKernel);
+    const beamStripe = getCachedProgram(stageSources.beamStripe);
+    const beamCompose = getCachedProgram(stageSources.beamCompose);
+
+    if (stageSources.compositePrep && !compositePrep) return null;
+    if (stageSources.compositeMid && !compositeMid) return null;
+    if (stageSources.phosphorCore && !phosphorCore) return null;
+    if (stageSources.beamKernel && !beamKernel) return null;
+    if (stageSources.beamStripe && !beamStripe) return null;
+    if (stageSources.beamCompose && !beamCompose) return null;
+
+    const entry: WindowsLiteCompiledPrograms = {
+      pass1,
+      pass2,
+      ...(compositePrep ? { compositePrep } : {}),
+      ...(compositeMid ? { compositeMid } : {}),
+      ...(phosphorCore ? { phosphorCore } : {}),
+      ...(beamKernel ? { beamKernel } : {}),
+      ...(beamStripe ? { beamStripe } : {}),
+      ...(beamCompose ? { beamCompose } : {}),
+    };
+    this.windowsLiteProgramCache.set(variantKey, entry);
+    return entry;
+  }
+
   private async getOrCompileSharedProgram(
     stage: SharedCompiledProgramStage,
     fragmentSource: string,
@@ -2353,6 +2421,10 @@ export class TetoricaRetroVideoPipeline {
   ): Promise<WindowsLiteCompiledPrograms> {
     const cached = this.windowsLiteProgramCache.get(variantKey);
     if (cached) return cached;
+    const assembledFromSharedCache = this.tryAssembleCachedWindowsLiteVariant(variantKey);
+    if (assembledFromSharedCache) {
+      return assembledFromSharedCache;
+    }
     const inflight = this.windowsLiteVariantCompileInflight.get(variantKey);
     if (inflight) {
       logShaderCompileWarn(`variant:${variantKey}`);
@@ -2371,55 +2443,29 @@ export class TetoricaRetroVideoPipeline {
       if (cachedAfterWait) {
         return cachedAfterWait;
       }
+      const assembledAfterWait = this.tryAssembleCachedWindowsLiteVariant(variantKey);
+      if (assembledAfterWait) {
+        return assembledAfterWait;
+      }
       if (this.isDisposed || this.gl.isContextLost()) {
         throw new Error("Pipeline was disposed before shader compile started.");
       }
 
       const compileStartTime = nowMs();
-      const { pass1, compositePrep, compositeMid, phosphorCore, beamStripe, beamCompose, pass2 } = this.getWindowsLiteShaderSources(variantKey);
-      const pass1Source = this.shaderCompileCacheBusterEnabled
-        ? this.appendShaderCompileBuster(pass1)
-        : pass1;
-      const pass2Source = this.shaderCompileCacheBusterEnabled
-        ? this.appendShaderCompileBuster(pass2)
-        : pass2;
-      const compositePrepSource = compositePrep
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(compositePrep)
-          : compositePrep
-        : null;
-      const compositeMidSource = compositeMid
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(compositeMid)
-          : compositeMid
-        : null;
-      const phosphorCoreSource = phosphorCore
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(phosphorCore)
-          : phosphorCore
-        : null;
-      const beamComposeSource = beamCompose
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(beamCompose)
-          : beamCompose
-        : null;
-      const beamStripeSource = beamStripe
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(beamStripe)
-          : beamStripe
-        : null;
-      const beamKernelBaseSource = variantKey.endsWith(":beam")
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
-        : null;
-      const beamKernelSource = beamKernelBaseSource
-        ? this.shaderCompileCacheBusterEnabled
-          ? this.appendShaderCompileBuster(beamKernelBaseSource)
-          : beamKernelBaseSource
-        : null;
+      const {
+        pass1: pass1Source,
+        compositePrep: compositePrepSource,
+        compositeMid: compositeMidSource,
+        phosphorCore: phosphorCoreSource,
+        beamKernel: beamKernelSource,
+        beamStripe: beamStripeSource,
+        beamCompose: beamComposeSource,
+        pass2: pass2Source,
+      } = this.getVariantStageSources(variantKey);
 
       try {
         this.throwIfVariantCompileSuperseded(variantKey);
-        const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source, variantKey);
+        const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source!, variantKey);
         this.throwIfVariantCompileSuperseded(variantKey);
         let compositePrepProgram: WebGLProgram | null = null;
         let compositeMidProgram: WebGLProgram | null = null;
@@ -2452,7 +2498,7 @@ export class TetoricaRetroVideoPipeline {
           beamComposeProgram = await this.getOrCompileSharedProgram("beamCompose", beamComposeSource, variantKey);
         }
         this.throwIfVariantCompileSuperseded(variantKey);
-        const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source, variantKey);
+        const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source!, variantKey);
         if (this.isDisposed || this.gl.isContextLost()) {
           throw new Error("Pipeline was disposed during shader compile.");
         }
