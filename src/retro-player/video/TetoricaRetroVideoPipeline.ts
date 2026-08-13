@@ -18,6 +18,7 @@ import { FILTER_FRAGMENT_PASS_COMPOSITE_APPLY } from "../retro/filterPassComposi
 import { FILTER_FRAGMENT_PASS_COMPOSITE_PREP } from "../retro/filterPassCompositePrepShader.ts";
 import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
@@ -29,7 +30,6 @@ import { FILTER_FRAGMENT_WIDE_GLOW_BLUR } from "../retro/filterWideGlowBlurShade
 import { FILTER_FRAGMENT_WIDE_GLOW_COMPOSITE } from "../retro/filterWideGlowCompositeShader.ts";
 import { FILTER_FRAGMENT_WIDE_GLOW_OPTICAL_DOWNSAMPLE } from "../retro/filterWideGlowOpticalDownsampleShader.ts";
 import { FILTER_FRAGMENT_WIDE_GLOW_SMOKY_DOWNSAMPLE } from "../retro/filterWideGlowDownsampleShader.ts";
-import { isWindowsRuntime } from "../platform/runtime.ts";
 
 export type RetroVideoFilterState = {
   selectedPreset?: RetroPresetKey | null;
@@ -850,12 +850,8 @@ type KHRParallelShaderCompile = {
 
 const getParallelShaderCompileExtension = (gl: WebGL2RenderingContext) =>
   (
-    isWindowsRuntime()
-      ? null
-      : (
-        gl.getExtension("WEBGL_parallel_shader_compile") ??
-        gl.getExtension("KHR_parallel_shader_compile")
-      )
+    gl.getExtension("WEBGL_parallel_shader_compile") ??
+    gl.getExtension("KHR_parallel_shader_compile")
   ) as KHRParallelShaderCompile | null;
 
 const isRetroVideoDebugEnabled = () =>
@@ -940,6 +936,27 @@ function submitProgram(
   }
 }
 
+function compileProgramShaders(
+  gl: WebGL2RenderingContext,
+  vertexSource: string,
+  fragmentSource: string,
+): SubmittedProgram {
+  const submitted = beginProgramCompile(gl);
+
+  try {
+    gl.shaderSource(submitted.vertexShader, vertexSource);
+    gl.shaderSource(submitted.fragmentShader, fragmentSource);
+    gl.compileShader(submitted.vertexShader);
+    gl.compileShader(submitted.fragmentShader);
+    return submitted;
+  } catch (error) {
+    gl.deleteProgram(submitted.program);
+    gl.deleteShader(submitted.vertexShader);
+    gl.deleteShader(submitted.fragmentShader);
+    throw error;
+  }
+}
+
 function finishProgramLink(
   gl: WebGL2RenderingContext,
   submitted: SubmittedProgram,
@@ -964,15 +981,40 @@ function logShaderCompileWarn(message: string) {
   console.warn(`WARN : DUPLICATE COMPILE SHADER : ${message}`);
 }
 
+const waitMs = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
 // Verify link status after submitProgram() has already compiled and linked.
-// The LINK_STATUS readback itself can still block, but we no longer insert an
-// extra RAF here because the shader-busy overlay is now shown via direct DOM
-// writes before compilation starts.
+// If KHR_parallel_shader_compile is available, poll COMPLETION_STATUS_KHR first
+// and defer the LINK_STATUS readback until the driver reports completion.
 async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
   programs: WebGLProgram[],
 ): Promise<void> {
-  void getParallelShaderCompileExtension;
+  const parallelShaderCompileExt = getParallelShaderCompileExtension(gl);
+
+  if (parallelShaderCompileExt) {
+    const pollStart = nowMs();
+    const pollTimeoutMs = 900;
+    while (true) {
+      let allCompleted = true;
+      for (const program of programs) {
+        if (!gl.getProgramParameter(program, parallelShaderCompileExt.COMPLETION_STATUS_KHR)) {
+          allCompleted = false;
+          break;
+        }
+      }
+      if (allCompleted) {
+        break;
+      }
+      if (nowMs() - pollStart >= pollTimeoutMs) {
+        break;
+      }
+      await waitMs(24);
+    }
+  }
 
   for (const program of programs) {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -2161,7 +2203,9 @@ export class TetoricaRetroVideoPipeline {
           : source;
 
     const beamKernelBaseSource = variantKey.endsWith(":beam")
-      ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+      ? variantKey.startsWith("basic_nearest:beam")
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
+        : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
       : null;
 
     return {
@@ -2236,14 +2280,15 @@ export class TetoricaRetroVideoPipeline {
     const compilePromise = (async () => {
       await this.updateCompileState(`Compiling shader (${variantKey} / ${stage})...`);
       this.logProgramCompile(`variant:${variantKey}:${stage}`);
-      const program = submitProgram(this.gl, VERTEX_SHADER_SOURCE, fragmentSource);
+      const submitted = compileProgramShaders(this.gl, VERTEX_SHADER_SOURCE, fragmentSource);
       try {
         await this.updateCompileState(`Linking shader (${variantKey} / ${stage})...`);
+        const program = finishProgramLink(this.gl, submitted);
         await waitAndVerifyPrograms(this.gl, [program]);
         this.sharedProgramCache.set(cacheKey, program);
         return program;
       } catch (error) {
-        this.gl.deleteProgram(program);
+        this.gl.deleteProgram(submitted.program);
         throw error;
       } finally {
         this.sharedProgramCompileInflight.delete(cacheKey);
