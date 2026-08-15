@@ -95,14 +95,14 @@ async function releaseOverlayCompileSlot(requesterId) {
   }).catch(() => {});
 }
 
-const OVERLAY_GPU_LINK_POLL_TIMEOUT_MS = 900;
+const OVERLAY_GPU_LINK_POLL_TIMEOUT_MS = 12000;
 const OVERLAY_GPU_LINK_POLL_INTERVAL_MS = 24;
 
 async function waitForOverlayProgramsToComplete(webgl, ext, programs, onCompileState) {
   if (!ext) {
     onCompileState?.("Linking shader (finalizing)...");
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    return;
+    return true;
   }
 
   onCompileState?.("Linking shader (waiting for GPU)...");
@@ -119,10 +119,10 @@ async function waitForOverlayProgramsToComplete(webgl, ext, programs, onCompileS
       }
     }
     if (allCompleted) {
-      return;
+      return true;
     }
     if (performance.now() - pollStartedAt >= OVERLAY_GPU_LINK_POLL_TIMEOUT_MS) {
-      return;
+      return false;
     }
     await new Promise((resolve) => setTimeout(resolve, OVERLAY_GPU_LINK_POLL_INTERVAL_MS));
   }
@@ -3628,7 +3628,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         webgl.getExtension("WEBGL_parallel_shader_compile")
         || webgl.getExtension("KHR_parallel_shader_compile");
 
-      await waitForOverlayProgramsToComplete(
+      const didProgramsComplete = await waitForOverlayProgramsToComplete(
         webgl,
         ext,
         [prog1, prog2, beamDownscaleProg, beamKernelProg, beamStripeProg, beamComposeProg],
