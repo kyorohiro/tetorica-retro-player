@@ -1318,6 +1318,9 @@ function createOverlay(settings) {
     appendUniqueDrawableTarget(targets, lastHoveredElement);
 
     for (const candidate of findAutoDrawableTargets(frameCount, currentSettings)) {
+      if (candidate instanceof HTMLImageElement) {
+        continue;
+      }
       if (!isTargetTypeEnabled(candidate)) continue;
       appendUniqueDrawableTarget(targets, candidate);
       if (targets.length >= currentSettings.overlayTargetCount) {
@@ -1329,8 +1332,12 @@ function createOverlay(settings) {
       appendUniqueDrawableTarget(targets, findLargestVisibleVideoElement({ relaxed: true }), { relaxed: true });
     }
 
-    if (targets.length === 0 && currentSettings.overlayImage) {
-      appendUniqueDrawableTarget(targets, findLargestVisibleImageElement({ relaxed: true }), { relaxed: true });
+    if (
+      targets.length === 0 &&
+      currentSettings.overlayImage &&
+      lastHoveredElement instanceof HTMLImageElement
+    ) {
+      appendUniqueDrawableTarget(targets, lastHoveredElement, { relaxed: true });
     }
 
     return targets.slice(0, currentSettings.overlayTargetCount);

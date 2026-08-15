@@ -105,6 +105,7 @@ let compileStatusTimerId = null;
 let lastPublishedCompileStateKey = "";
 let rendererSetupGeneration = 0;
 const shaderCompileSessionSalt = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+let viewerShaderCompileCacheBusterSessionEnabled = false;
 
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
@@ -202,7 +203,6 @@ function getRendererVariantSignature(settings) {
   return JSON.stringify({
     variantKey: getWindowsLiteVariantKey(settings),
     beamDownscale: shouldUsePreFilterDownscale(settings),
-    shaderCompileCacheBusterEnabled: settings.shaderCompileCacheBusterEnabled ?? false,
   });
 }
 
@@ -216,7 +216,8 @@ function hashShaderSource(source) {
 }
 
 function withShaderCompileCacheBuster(source, settings) {
-  if (!settings?.shaderCompileCacheBusterEnabled) {
+  void settings;
+  if (!viewerShaderCompileCacheBusterSessionEnabled) {
     return source;
   }
   return `${source}\n// shader-id:${shaderCompileSessionSalt}:${hashShaderSource(source)}`;
@@ -425,6 +426,7 @@ async function init() {
   }
 
   currentSettings = await loadSettings();
+  viewerShaderCompileCacheBusterSessionEnabled = !!currentSettings.shaderCompileCacheBusterEnabled;
   setupRenderer(gl);
   resizeCanvas();
   window.addEventListener("resize", handleWindowResize);
