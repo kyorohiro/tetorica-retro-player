@@ -1304,7 +1304,6 @@ function createOverlay(settings) {
           surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
         }
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
-        surface.markFilteredFrameRendered();
         surface.gl.activeTexture(surface.gl.TEXTURE0);
       } else {
         surface.gl.useProgram(surface.renderer.program);
@@ -2049,7 +2048,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
   let compileStatusMessage = "";
   let compileStatusVisible = false;
   let compileStatusTimer = null;
-  let pendingCompileClear = false;
   let setupGeneration = 0;
   let surfaceDisposed = false;
 
@@ -2108,14 +2106,18 @@ function createOverlaySurface(index, onReady, initialSettings) {
           if (surfaceDisposed || activeSetupGeneration !== setupGeneration) {
             return;
           }
-          if (message) {
-            pendingCompileClear = false;
-            compileStatusMessage = message;
-            compileOverlayLabel.textContent = compileStatusMessage;
+          compileStatusMessage = message || "";
+          compileOverlayLabel.textContent = compileStatusMessage;
+          if (compileStatusMessage) {
             publishOverlayCompileState(compileStatusMessage);
             scheduleCompileOverlay();
           } else {
-            pendingCompileClear = true;
+            publishOverlayCompileState("");
+            if (compileStatusTimer != null) {
+              window.clearTimeout(compileStatusTimer);
+              compileStatusTimer = null;
+            }
+            hideCompileOverlayNow();
           }
         },
       );
@@ -2151,18 +2153,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
     _spotlightKey: "",
     _targetRenderable: false,
     _targetRenderableFrame: -999,
-    markFilteredFrameRendered() {
-      if (!pendingCompileClear) {
-        return;
-      }
-      pendingCompileClear = false;
-      publishOverlayCompileState("");
-      if (compileStatusTimer != null) {
-        window.clearTimeout(compileStatusTimer);
-        compileStatusTimer = null;
-      }
-      hideCompileOverlayNow();
-    },
     getCompileStatusMessage() {
       return compileStatusMessage;
     },
@@ -2183,7 +2173,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
         compileStatusTimer = null;
       }
       publishOverlayCompileState("");
-      pendingCompileClear = false;
       hideCompileOverlayNow();
       canvas.remove();
       compileOverlay.remove();
@@ -2392,7 +2381,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
     },
     setCompileStatus(message) {
       compileStatusMessage = message || "";
-      pendingCompileClear = false;
       compileOverlayLabel.textContent = compileStatusMessage;
       if (!compileStatusMessage) {
         if (compileStatusTimer != null) {
@@ -2442,7 +2430,6 @@ function createOverlaySurface(index, onReady, initialSettings) {
       compileOverlay.style.setProperty("height", `${rect.height}px`, "important");
     },
     hideCompileOverlay() {
-      pendingCompileClear = false;
       publishOverlayCompileState("");
       hideCompileOverlayNow();
     },
