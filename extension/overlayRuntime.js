@@ -103,6 +103,67 @@ async function validateOverlayProgramLink(webgl, program, label, onCompileState)
   return false;
 }
 
+function warmUpOverlayRendererPrograms(webgl, renderer, settings) {
+  const placeholderTexture = renderer.texture;
+  if (!placeholderTexture) {
+    return;
+  }
+
+  const limitedSize = { w: 1, h: 1 };
+
+  webgl.bindFramebuffer(webgl.FRAMEBUFFER, null);
+  webgl.viewport(0, 0, 1, 1);
+  webgl.clearColor(0, 0, 0, 0);
+  webgl.clear(webgl.COLOR_BUFFER_BIT);
+
+  webgl.activeTexture(webgl.TEXTURE0);
+  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
+  webgl.activeTexture(webgl.TEXTURE1);
+  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
+  webgl.activeTexture(webgl.TEXTURE2);
+  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
+
+  if (renderer.pass1Program && renderer.pass1UniformLocations) {
+    webgl.useProgram(renderer.pass1Program);
+    webgl.uniform2f(renderer.pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
+    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
+  }
+
+  if (renderer.beamDownscaleProgram && renderer.beamDownscaleUniformLocations) {
+    webgl.useProgram(renderer.beamDownscaleProgram);
+    webgl.uniform2f(renderer.beamDownscaleUniformLocations.uSourceSize, 1, 1);
+    webgl.uniform2f(renderer.beamDownscaleUniformLocations.uTargetSize, 1, 1);
+    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
+  }
+
+  if (renderer.beamKernelProgram && renderer.beamKernelUniformLocations) {
+    applyBeamKernelSettings(webgl, renderer, limitedSize, settings);
+    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
+  }
+
+  if (renderer.beamStripeProgram && renderer.beamStripeUniformLocations) {
+    applyBeamStripeSettings(webgl, renderer, limitedSize, settings);
+    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
+  }
+
+  if (renderer.beamComposeProgram && renderer.beamComposeUniformLocations) {
+    applyBeamComposeSettings(webgl, renderer, limitedSize, settings);
+    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
+  }
+
+  if (renderer.program && renderer.uniformLocations) {
+    applySettings(webgl, renderer, settings);
+    webgl.useProgram(renderer.program);
+    if (renderer.uniformLocations.uTime != null) {
+      webgl.uniform1f(renderer.uniformLocations.uTime, 0);
+    }
+    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
+  }
+
+  webgl.activeTexture(webgl.TEXTURE0);
+  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
+}
+
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
   const isWindows = /Windows/i.test(userAgent);
@@ -3073,6 +3134,17 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MAG_FILTER, webgl.LINEAR);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
   webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.CLAMP_TO_EDGE);
+  webgl.texImage2D(
+    webgl.TEXTURE_2D,
+    0,
+    webgl.RGBA,
+    1,
+    1,
+    0,
+    webgl.RGBA,
+    webgl.UNSIGNED_BYTE,
+    new Uint8Array([0, 0, 0, 0]),
+  );
 
   // destroyed: set by cancel() when the surface is torn down before compilation
   // finishes. compiling: true until the async block below exits. Together they
@@ -3505,6 +3577,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
       };
     }
+    onCompileState?.("Warming shader...");
+    await yieldOverlayCompileTurn();
+    warmUpOverlayRendererPrograms(webgl, renderer, initialSettings);
     compiling = false;
     onCompileState?.("");
     onReady?.(renderer);
