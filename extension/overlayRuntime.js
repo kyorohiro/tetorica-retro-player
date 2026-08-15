@@ -1051,7 +1051,7 @@ function createOverlay(settings) {
         if (!renderer.uniformLocations) return;
         applySettings(surface.gl, renderer, currentSettings);
         applyFlipUniforms(surface.gl, renderer, flipH, flipV);
-      }, currentSettings);
+      }, currentSettings, { flipH, flipV });
       applyOverlayOpacityToSurface(surface);
       applyOverlayBrightnessToSurface(surface);
       surfaces.push(surface);
@@ -1967,7 +1967,11 @@ function getFrameIntervalForPriority(priorityIndex) {
   return 4;
 }
 
-function createOverlaySurface(index, onReady, initialSettings) {
+function createOverlaySurface(index, onReady, initialSettings, initialFlipState = {}) {
+  const {
+    flipH: initialFlipH = false,
+    flipV: initialFlipV = false,
+  } = initialFlipState;
   const canvas = document.createElement("canvas");
   canvas.style.setProperty("all", "initial", "important");
   canvas.style.setProperty("position", "fixed", "important");
@@ -2121,7 +2125,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
           }
         },
       );
-      applyFlipUniforms(gl, renderer, flipH, flipV);
+      applyFlipUniforms(gl, renderer, initialFlipH, initialFlipV);
     } catch (error) {
       console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
       gl = null;
