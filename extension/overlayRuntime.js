@@ -239,67 +239,6 @@ const PASS2_BEAM_UNIFORM_NAMES = [
   "uFlipV",
 ];
 
-function warmUpOverlayRendererPrograms(webgl, renderer, settings) {
-  const placeholderTexture = renderer.texture;
-  if (!placeholderTexture) {
-    return;
-  }
-
-  const limitedSize = { w: 1, h: 1 };
-
-  webgl.bindFramebuffer(webgl.FRAMEBUFFER, null);
-  webgl.viewport(0, 0, 1, 1);
-  webgl.clearColor(0, 0, 0, 0);
-  webgl.clear(webgl.COLOR_BUFFER_BIT);
-
-  webgl.activeTexture(webgl.TEXTURE0);
-  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
-  webgl.activeTexture(webgl.TEXTURE1);
-  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
-  webgl.activeTexture(webgl.TEXTURE2);
-  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
-
-  if (renderer.pass1Program && renderer.pass1UniformLocations) {
-    webgl.useProgram(renderer.pass1Program);
-    webgl.uniform2f(renderer.pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
-    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
-  }
-
-  if (renderer.beamDownscaleProgram && renderer.beamDownscaleUniformLocations) {
-    webgl.useProgram(renderer.beamDownscaleProgram);
-    webgl.uniform2f(renderer.beamDownscaleUniformLocations.uSourceSize, 1, 1);
-    webgl.uniform2f(renderer.beamDownscaleUniformLocations.uTargetSize, 1, 1);
-    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
-  }
-
-  if (renderer.beamKernelProgram && renderer.beamKernelUniformLocations) {
-    applyBeamKernelSettings(webgl, renderer, limitedSize, settings);
-    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
-  }
-
-  if (renderer.beamStripeProgram && renderer.beamStripeUniformLocations) {
-    applyBeamStripeSettings(webgl, renderer, limitedSize, settings);
-    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
-  }
-
-  if (renderer.beamComposeProgram && renderer.beamComposeUniformLocations) {
-    applyBeamComposeSettings(webgl, renderer, limitedSize, settings);
-    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
-  }
-
-  if (renderer.program && renderer.uniformLocations) {
-    applySettings(webgl, renderer, settings);
-    webgl.useProgram(renderer.program);
-    if (renderer.uniformLocations.uTime != null) {
-      webgl.uniform1f(renderer.uniformLocations.uTime, 0);
-    }
-    webgl.drawArrays(webgl.TRIANGLES, 0, 6);
-  }
-
-  webgl.activeTexture(webgl.TEXTURE0);
-  webgl.bindTexture(webgl.TEXTURE_2D, placeholderTexture);
-}
-
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
   const isWindows = /Windows/i.test(userAgent);
@@ -3649,9 +3588,6 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
       };
     }
-    onCompileState?.("Warming shader...");
-    await yieldOverlayCompileTurn();
-    warmUpOverlayRendererPrograms(webgl, renderer, initialSettings);
     compiling = false;
     onCompileState?.("");
     onReady?.(renderer);
