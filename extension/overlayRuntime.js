@@ -1439,6 +1439,13 @@ function createOverlay(settings) {
       return;
     }
 
+    if (!surface.gl && !surface.ctx2d && !surface.renderer) {
+      surface.ensureRenderer(currentSettings);
+      if (surface.getCompileStatusMessage()) {
+        surface.showCompileOverlay(rect);
+      }
+    }
+
     if (rejectedElements.has(targetElement)) {
       surface.canvas.style.setProperty("display", "none", "important");
       surface.hideCompileOverlay();
@@ -2402,17 +2409,28 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     }, 300);
   };
 
-  let gl = canvas.getContext("webgl2", {
-    alpha: true,
-    antialias: false,
-    depth: false,
-    stencil: false,
-    preserveDrawingBuffer: false,
-    powerPreference: "default",
-  });
-  let ctx2d = gl ? null : canvas.getContext("2d");
+  let gl = null;
+  let ctx2d = null;
   let renderer = null;
-  if (gl) {
+  let rendererSetupStarted = false;
+
+  const startRendererSetup = (settings) => {
+    if (rendererSetupStarted || surfaceDisposed) {
+      return;
+    }
+    rendererSetupStarted = true;
+    gl = canvas.getContext("webgl2", {
+      alpha: true,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: false,
+      powerPreference: "default",
+    });
+    if (!gl) {
+      ctx2d = canvas.getContext("2d");
+      return;
+    }
     try {
       const activeSetupGeneration = ++setupGeneration;
       compileStatusMessage = "Preparing retro filter...";
@@ -2421,7 +2439,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       renderer = setupRenderer(
         gl,
         onReady,
-        initialSettings,
+        settings,
         (message) => {
           if (surfaceDisposed || activeSetupGeneration !== setupGeneration) {
             return;
@@ -2445,9 +2463,10 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     } catch (error) {
       console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
       gl = null;
+      renderer = null;
       ctx2d = canvas.getContext("2d");
     }
-  }
+  };
 
   return {
     canvas,
@@ -2473,6 +2492,9 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     _spotlightKey: "",
     _targetRenderable: false,
     _targetRenderableFrame: -999,
+    ensureRenderer(settings) {
+      startRendererSetup(settings ?? initialSettings);
+    },
     getCompileStatusMessage() {
       return compileStatusMessage;
     },
