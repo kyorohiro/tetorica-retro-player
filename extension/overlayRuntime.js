@@ -2460,6 +2460,9 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     });
     if (!gl) {
       ctx2d = canvas.getContext("2d");
+      surfaceApi.gl = gl;
+      surfaceApi.ctx2d = ctx2d;
+      surfaceApi.renderer = renderer;
       return;
     }
     try {
@@ -2491,15 +2494,21 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
         },
       );
       applyFlipUniforms(gl, renderer, initialFlipH, initialFlipV);
+      surfaceApi.gl = gl;
+      surfaceApi.ctx2d = ctx2d;
+      surfaceApi.renderer = renderer;
     } catch (error) {
       console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
       gl = null;
       renderer = null;
       ctx2d = canvas.getContext("2d");
+      surfaceApi.gl = gl;
+      surfaceApi.ctx2d = ctx2d;
+      surfaceApi.renderer = renderer;
     }
   };
 
-  return {
+  const surfaceApi = {
     canvas,
     failureOverlay,
     compileOverlay,
@@ -2812,6 +2821,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       this.hideFailureOverlay();
     },
   };
+  return surfaceApi;
 }
 
 function findHoveredVideo(clientX, clientY) {
