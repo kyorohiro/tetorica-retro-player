@@ -1317,7 +1317,7 @@ function createOverlay(settings) {
     const targets = [];
     appendUniqueDrawableTarget(targets, lastHoveredElement);
 
-    for (const candidate of findAutoDrawableTargets(frameCount)) {
+    for (const candidate of findAutoDrawableTargets(frameCount, currentSettings)) {
       if (!isTargetTypeEnabled(candidate)) continue;
       appendUniqueDrawableTarget(targets, candidate);
       if (targets.length >= currentSettings.overlayTargetCount) {
@@ -2185,7 +2185,7 @@ function createOverlay(settings) {
 }
 
 function findPrimaryDrawableElement() {
-  return findAutoDrawableTargets(_autoDrawableCacheFrame)[0] ?? null;
+  return findAutoDrawableTargets(_autoDrawableCacheFrame, null)[0] ?? null;
 }
 
 function findLargestVisibleVideoElement(options = {}) {
@@ -2231,18 +2231,42 @@ function findPreferredHoverElement(clientX, clientY) {
 
 let _autoDrawableCache = [];
 let _autoDrawableCacheFrame = -999;
+let _autoDrawableCacheSelector = "";
+let _autoDrawableCacheAtMs = 0;
 
 function getAutoDrawableCacheFrameWindow() {
-  return 6;
+  return 30;
 }
 
-function findAutoDrawableTargets(frameCount) {
-  if (frameCount - _autoDrawableCacheFrame < getAutoDrawableCacheFrameWindow()) {
+function getAutoDrawableSelector(settings) {
+  const parts = [];
+  if (settings?.overlayVideo) parts.push("video");
+  if (settings?.overlayImage) parts.push("img");
+  return parts.join(", ");
+}
+
+function findAutoDrawableTargets(frameCount, settings) {
+  const selector = getAutoDrawableSelector(settings);
+  const now = performance.now();
+  if (
+    selector === _autoDrawableCacheSelector &&
+    frameCount - _autoDrawableCacheFrame < getAutoDrawableCacheFrameWindow() &&
+    now - _autoDrawableCacheAtMs < 500
+  ) {
+    return _autoDrawableCache;
+  }
+  if (!selector || document.readyState === "loading") {
+    _autoDrawableCache = [];
+    _autoDrawableCacheFrame = frameCount;
+    _autoDrawableCacheSelector = selector;
+    _autoDrawableCacheAtMs = now;
     return _autoDrawableCache;
   }
   _autoDrawableCacheFrame = frameCount;
+  _autoDrawableCacheSelector = selector;
+  _autoDrawableCacheAtMs = now;
   _hoveredMediaCache.clear();
-  const elements = [...document.querySelectorAll("video, img")].filter(isDrawableElement);
+  const elements = [...document.querySelectorAll(selector)].filter(isDrawableElement);
   // Pre-compute rects once so the sort comparator never forces layout
   const withArea = elements.map((el) => {
     const r = el.getBoundingClientRect();
