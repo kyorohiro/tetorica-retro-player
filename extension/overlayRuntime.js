@@ -149,6 +149,99 @@ function collectOverlayUniformLocations(webgl, program, names) {
   return locations;
 }
 
+function finalizeOverlayRendererPrograms(webgl, renderer, settings) {
+  if (!renderer?.pass1Program || !renderer?.program || renderer.uniformLocations) {
+    return;
+  }
+
+  const variantKey = getWindowsLiteVariantKey(settings ?? DEFAULT_SETTINGS);
+  const [, pass2Variant] = variantKey.split(":");
+
+  webgl.useProgram(renderer.pass1Program);
+  webgl.uniform1i(webgl.getUniformLocation(renderer.pass1Program, "uTexture"), 0);
+  renderer.pass1UniformLocations = collectOverlayUniformLocations(
+    webgl,
+    renderer.pass1Program,
+    PASS1_UNIFORM_NAMES,
+  );
+
+  webgl.useProgram(renderer.program);
+  webgl.uniform1i(webgl.getUniformLocation(renderer.program, "uPass1Texture"), 0);
+  const sourceTextureLocation = webgl.getUniformLocation(renderer.program, "uSourceTexture");
+  if (sourceTextureLocation != null) {
+    webgl.uniform1i(sourceTextureLocation, 1);
+  }
+  const beamKernelTextureLocation = webgl.getUniformLocation(renderer.program, "uBeamKernelTexture");
+  if (beamKernelTextureLocation != null) {
+    webgl.uniform1i(beamKernelTextureLocation, 2);
+  }
+  const pass2UniformNames =
+    pass2Variant === "beam"
+      ? PASS2_BEAM_UNIFORM_NAMES
+      : pass2Variant === "phosphor"
+        ? PASS2_PHOSPHOR_UNIFORM_NAMES
+        : PASS2_BASIC_UNIFORM_NAMES;
+  renderer.uniformLocations = collectOverlayUniformLocations(webgl, renderer.program, pass2UniformNames);
+
+  if (renderer.beamDownscaleProgram) {
+    webgl.useProgram(renderer.beamDownscaleProgram);
+    webgl.uniform1i(webgl.getUniformLocation(renderer.beamDownscaleProgram, "uTexture"), 0);
+    renderer.beamDownscaleUniformLocations = {
+      uTexture: webgl.getUniformLocation(renderer.beamDownscaleProgram, "uTexture"),
+      uSourceSize: webgl.getUniformLocation(renderer.beamDownscaleProgram, "uSourceSize"),
+      uTargetSize: webgl.getUniformLocation(renderer.beamDownscaleProgram, "uTargetSize"),
+    };
+  }
+  if (renderer.beamKernelProgram) {
+    webgl.useProgram(renderer.beamKernelProgram);
+    webgl.uniform1i(webgl.getUniformLocation(renderer.beamKernelProgram, "uSourceTexture"), 1);
+    renderer.beamKernelUniformLocations = {
+      uSourceTexture: webgl.getUniformLocation(renderer.beamKernelProgram, "uSourceTexture"),
+      uBeamSourceSize: webgl.getUniformLocation(renderer.beamKernelProgram, "uBeamSourceSize"),
+      uDisplaySize: webgl.getUniformLocation(renderer.beamKernelProgram, "uDisplaySize"),
+      uColorLevels: webgl.getUniformLocation(renderer.beamKernelProgram, "uColorLevels"),
+      uDitherStrength: webgl.getUniformLocation(renderer.beamKernelProgram, "uDitherStrength"),
+      uSamplingMode: webgl.getUniformLocation(renderer.beamKernelProgram, "uSamplingMode"),
+      uHorizontalSharpness: webgl.getUniformLocation(renderer.beamKernelProgram, "uHorizontalSharpness"),
+      uRgbConvergenceOffset: webgl.getUniformLocation(renderer.beamKernelProgram, "uRgbConvergenceOffset"),
+      uSmoothStrength: webgl.getUniformLocation(renderer.beamKernelProgram, "uSmoothStrength"),
+      uCurvature: webgl.getUniformLocation(renderer.beamKernelProgram, "uCurvature"),
+      uBeamDarkCutoff: webgl.getUniformLocation(renderer.beamKernelProgram, "uBeamDarkCutoff"),
+      uBeamHorizontalSpread: webgl.getUniformLocation(renderer.beamKernelProgram, "uBeamHorizontalSpread"),
+      uBeamWhiteBloom: webgl.getUniformLocation(renderer.beamKernelProgram, "uBeamWhiteBloom"),
+    };
+  }
+  if (renderer.beamStripeProgram) {
+    webgl.useProgram(renderer.beamStripeProgram);
+    webgl.uniform1i(webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamKernelTexture"), 2);
+    renderer.beamStripeUniformLocations = {
+      uBeamKernelTexture: webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamKernelTexture"),
+      uOutputSize: webgl.getUniformLocation(renderer.beamStripeProgram, "uOutputSize"),
+      uDisplaySize: webgl.getUniformLocation(renderer.beamStripeProgram, "uDisplaySize"),
+      uBeamSourceSize: webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamSourceSize"),
+      uCurvature: webgl.getUniformLocation(renderer.beamStripeProgram, "uCurvature"),
+      uBeamStripeMode: webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamStripeMode"),
+      uBeamStripeStrength: webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamStripeStrength"),
+      uBeamWhiteBloom: webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamWhiteBloom"),
+      uBeamWarmBloom: webgl.getUniformLocation(renderer.beamStripeProgram, "uBeamWarmBloom"),
+    };
+  }
+  if (renderer.beamComposeProgram) {
+    webgl.useProgram(renderer.beamComposeProgram);
+    webgl.uniform1i(webgl.getUniformLocation(renderer.beamComposeProgram, "uSourceTexture"), 1);
+    webgl.uniform1i(webgl.getUniformLocation(renderer.beamComposeProgram, "uBeamKernelTexture"), 2);
+    renderer.beamComposeUniformLocations = {
+      uSourceTexture: webgl.getUniformLocation(renderer.beamComposeProgram, "uSourceTexture"),
+      uBeamKernelTexture: webgl.getUniformLocation(renderer.beamComposeProgram, "uBeamKernelTexture"),
+      uBeamSourceSize: webgl.getUniformLocation(renderer.beamComposeProgram, "uBeamSourceSize"),
+      uDisplaySize: webgl.getUniformLocation(renderer.beamComposeProgram, "uDisplaySize"),
+      uSamplingMode: webgl.getUniformLocation(renderer.beamComposeProgram, "uSamplingMode"),
+      uRgbConvergenceOffset: webgl.getUniformLocation(renderer.beamComposeProgram, "uRgbConvergenceOffset"),
+      uCurvature: webgl.getUniformLocation(renderer.beamComposeProgram, "uCurvature"),
+    };
+  }
+}
+
 const PASS1_UNIFORM_NAMES = [
   "uTargetSize",
   "uColorLevels",
@@ -1409,6 +1502,14 @@ function createOverlay(settings) {
           return;
         }
       }
+      if (surface.renderer.pass1Program && !surface.renderer.uniformLocations) {
+        finalizeOverlayRendererPrograms(surface.gl, surface.renderer, currentSettings);
+        if (surface.renderer.uniformLocations) {
+          applySettings(surface.gl, surface.renderer, currentSettings);
+          applyFlipUniforms(surface.gl, surface.renderer, flipH, flipV);
+        }
+      }
+
       if (surface.renderer.pass1Program && surface.renderer.pass1UniformLocations && surface.renderer.uniformLocations) {
         ensureRendererFramebuffer(surface.gl, surface.renderer);
         surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.fbo);
@@ -3258,9 +3359,6 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   let destroyed = false;
   let compiling = true;
   let passthruUniformLocations = null;
-  const variantKey = getWindowsLiteVariantKey(initialSettings ?? DEFAULT_SETTINGS);
-  const [, pass2Variant] = variantKey.split(":");
-
   const renderer = {
     program: passthruProg,
     pass1Program: null,
@@ -3520,28 +3618,6 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         return;
       }
 
-      webgl.useProgram(prog1);
-      webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
-      renderer.pass1UniformLocations = collectOverlayUniformLocations(webgl, prog1, PASS1_UNIFORM_NAMES);
-
-      webgl.useProgram(prog2);
-      webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
-      const sourceTextureLocation = webgl.getUniformLocation(prog2, "uSourceTexture");
-      if (sourceTextureLocation != null) {
-        webgl.uniform1i(sourceTextureLocation, 1);
-      }
-      const beamKernelTextureLocation = webgl.getUniformLocation(prog2, "uBeamKernelTexture");
-      if (beamKernelTextureLocation != null) {
-        webgl.uniform1i(beamKernelTextureLocation, 2);
-      }
-      const pass2UniformNames =
-        pass2Variant === "beam"
-          ? PASS2_BEAM_UNIFORM_NAMES
-          : pass2Variant === "phosphor"
-            ? PASS2_PHOSPHOR_UNIFORM_NAMES
-            : PASS2_BASIC_UNIFORM_NAMES;
-      renderer.uniformLocations = collectOverlayUniformLocations(webgl, prog2, pass2UniformNames);
-
       renderer.pass1Program = prog1;
       renderer.program = prog2;
       renderer.passthruProgram = passthruProg;
@@ -3549,63 +3625,6 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       renderer.beamKernelProgram = beamKernelProg;
       renderer.beamStripeProgram = beamStripeProg;
       renderer.beamComposeProgram = beamComposeProg;
-      if (beamDownscaleProg) {
-        webgl.useProgram(beamDownscaleProg);
-        webgl.uniform1i(webgl.getUniformLocation(beamDownscaleProg, "uTexture"), 0);
-        renderer.beamDownscaleUniformLocations = {
-          uTexture: webgl.getUniformLocation(beamDownscaleProg, "uTexture"),
-          uSourceSize: webgl.getUniformLocation(beamDownscaleProg, "uSourceSize"),
-          uTargetSize: webgl.getUniformLocation(beamDownscaleProg, "uTargetSize"),
-        };
-      }
-      if (beamKernelProg) {
-        webgl.useProgram(beamKernelProg);
-        webgl.uniform1i(webgl.getUniformLocation(beamKernelProg, "uSourceTexture"), 1);
-        renderer.beamKernelUniformLocations = {
-          uSourceTexture: webgl.getUniformLocation(beamKernelProg, "uSourceTexture"),
-          uBeamSourceSize: webgl.getUniformLocation(beamKernelProg, "uBeamSourceSize"),
-          uDisplaySize: webgl.getUniformLocation(beamKernelProg, "uDisplaySize"),
-          uColorLevels: webgl.getUniformLocation(beamKernelProg, "uColorLevels"),
-          uDitherStrength: webgl.getUniformLocation(beamKernelProg, "uDitherStrength"),
-          uSamplingMode: webgl.getUniformLocation(beamKernelProg, "uSamplingMode"),
-          uHorizontalSharpness: webgl.getUniformLocation(beamKernelProg, "uHorizontalSharpness"),
-          uRgbConvergenceOffset: webgl.getUniformLocation(beamKernelProg, "uRgbConvergenceOffset"),
-          uSmoothStrength: webgl.getUniformLocation(beamKernelProg, "uSmoothStrength"),
-          uCurvature: webgl.getUniformLocation(beamKernelProg, "uCurvature"),
-          uBeamDarkCutoff: webgl.getUniformLocation(beamKernelProg, "uBeamDarkCutoff"),
-          uBeamHorizontalSpread: webgl.getUniformLocation(beamKernelProg, "uBeamHorizontalSpread"),
-          uBeamWhiteBloom: webgl.getUniformLocation(beamKernelProg, "uBeamWhiteBloom"),
-        };
-      }
-      if (beamStripeProg) {
-        webgl.useProgram(beamStripeProg);
-        webgl.uniform1i(webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"), 2);
-        renderer.beamStripeUniformLocations = {
-          uBeamKernelTexture: webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"),
-          uOutputSize: webgl.getUniformLocation(beamStripeProg, "uOutputSize"),
-          uDisplaySize: webgl.getUniformLocation(beamStripeProg, "uDisplaySize"),
-          uBeamSourceSize: webgl.getUniformLocation(beamStripeProg, "uBeamSourceSize"),
-          uCurvature: webgl.getUniformLocation(beamStripeProg, "uCurvature"),
-          uBeamStripeMode: webgl.getUniformLocation(beamStripeProg, "uBeamStripeMode"),
-          uBeamStripeStrength: webgl.getUniformLocation(beamStripeProg, "uBeamStripeStrength"),
-          uBeamWhiteBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWhiteBloom"),
-          uBeamWarmBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWarmBloom"),
-        };
-      }
-      if (beamComposeProg) {
-        webgl.useProgram(beamComposeProg);
-        webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uSourceTexture"), 1);
-        webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"), 2);
-        renderer.beamComposeUniformLocations = {
-          uSourceTexture: webgl.getUniformLocation(beamComposeProg, "uSourceTexture"),
-          uBeamKernelTexture: webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"),
-          uBeamSourceSize: webgl.getUniformLocation(beamComposeProg, "uBeamSourceSize"),
-          uDisplaySize: webgl.getUniformLocation(beamComposeProg, "uDisplaySize"),
-          uSamplingMode: webgl.getUniformLocation(beamComposeProg, "uSamplingMode"),
-          uRgbConvergenceOffset: webgl.getUniformLocation(beamComposeProg, "uRgbConvergenceOffset"),
-          uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
-        };
-      }
       compiling = false;
       onCompileState?.("");
       onReady?.(renderer);
