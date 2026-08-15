@@ -21,6 +21,7 @@ import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 const OVERLAY_BASE_FLIP_V = true;
 let _overlayRendererCompileQueue = Promise.resolve();
+let _overlayShaderCompileCacheBusterSessionEnabled = false;
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
 // 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
@@ -267,7 +268,6 @@ function getOverlayRendererVariantSignature(settings) {
   return JSON.stringify({
     variantKey: getWindowsLiteVariantKey(settings),
     beamDownscale: shouldUsePreFilterDownscale(settings),
-    shaderCompileCacheBusterEnabled: settings.shaderCompileCacheBusterEnabled ?? false,
   });
 }
 
@@ -281,7 +281,8 @@ function hashShaderSource(source) {
 }
 
 function withShaderCompileCacheBuster(source, settings) {
-  if (!settings?.shaderCompileCacheBusterEnabled) {
+  void settings;
+  if (!_overlayShaderCompileCacheBusterSessionEnabled) {
     return source;
   }
   return `${source}\n// shader-id:${_shaderCompileSessionSalt}:${hashShaderSource(source)}`;
@@ -334,6 +335,7 @@ function publishOverlayCompileState(message) {
 publishOverlayCompileState.lastKey = "";
 
 function createOverlay(settings) {
+  _overlayShaderCompileCacheBusterSessionEnabled = !!settings.shaderCompileCacheBusterEnabled;
   let currentSettings = settings;
   let currentRendererVariantSignature = getOverlayRendererVariantSignature(currentSettings);
   const VISIBILITY_CHECK_FRAME_WINDOW = 24;
