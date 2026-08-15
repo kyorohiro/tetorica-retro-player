@@ -113,6 +113,132 @@ async function validateOverlayProgramLink(webgl, program, label, onCompileState)
   return false;
 }
 
+function collectOverlayUniformLocations(webgl, program, names) {
+  const locations = {};
+  for (const name of names) {
+    locations[name] = webgl.getUniformLocation(program, name);
+  }
+  return locations;
+}
+
+const PASS1_UNIFORM_NAMES = [
+  "uTargetSize",
+  "uColorLevels",
+  "uDitherStrength",
+  "uPaletteMode",
+  "uGlowStrength",
+  "uSmoothStrength",
+  "uToonSteps",
+  "uEdgeBoost",
+  "uAnimeEdgeLow",
+  "uAnimeEdgeHigh",
+  "uMonoTint",
+  "uNeonBoost",
+  "uNeonSaturation",
+  "uNeonDetail",
+  "uFlipH",
+  "uFlipV",
+];
+
+const PASS2_BASIC_UNIFORM_NAMES = [
+  "uTargetSize",
+  "uCurvature",
+  "uScanlineStrength",
+  "uScanline2Strength",
+  "uScanlineBrightnessFade",
+  "uVignetteStrength",
+  "uLcdCrosstalkStrength",
+  "uOutputBrightness",
+  "uBasicContrast",
+  "uShadowCrush",
+  "uBasicSaturation",
+  "uReflectiveLcdBase",
+  "uLightDependentTint",
+  "uScreenFaceGlow",
+  "uFocusStrength",
+  "uFocusSize",
+  "uFocusCenter",
+  "uTime",
+  "uFlipH",
+  "uFlipV",
+];
+
+const PASS2_PHOSPHOR_UNIFORM_NAMES = [
+  "uTargetSize",
+  "uCurvature",
+  "uScanlineStrength",
+  "uScanline2Strength",
+  "uScanlineBrightnessFade",
+  "uVignetteStrength",
+  "uLcdCrosstalkStrength",
+  "uPhosphorStrength",
+  "uSpotMaskStrength",
+  "uBulbRadius",
+  "uBlackFloor",
+  "uFocusStrength",
+  "uFocusSize",
+  "uFocusCenter",
+  "uGlowStrength",
+  "uBeamWarmBloom",
+  "uScreenFaceGlow",
+  "uTime",
+  "uPhosphorDotLightBalance",
+  "uOutputBrightness",
+  "uBasicContrast",
+  "uShadowCrush",
+  "uBasicSaturation",
+  "uReflectiveLcdBase",
+  "uLightDependentTint",
+  "uGrainVisibilityMode",
+  "uPixelAspect",
+  "uPhosphorDotMode",
+  "uPhosphorDotShape",
+  "uPhosphorDotInternalScale",
+  "uPhosphorDotSizeResponse",
+  "uPhosphorDotBrightCore",
+  "uPhosphorDotCellFill",
+  "uPhosphorDotFlatDisc",
+  "uPhosphorDotNeighborBlend",
+  "uPhosphorDotGrainStrength",
+  "uFlipH",
+  "uFlipV",
+];
+
+const PASS2_BEAM_UNIFORM_NAMES = [
+  "uTargetSize",
+  "uOutputSize",
+  "uDisplaySize",
+  "uBeamSourceSize",
+  "uColorLevels",
+  "uDitherStrength",
+  "uSamplingMode",
+  "uCurvature",
+  "uScanlineStrength",
+  "uScanline2Strength",
+  "uScanlineBrightnessFade",
+  "uVignetteStrength",
+  "uLcdCrosstalkStrength",
+  "uGlowStrength",
+  "uHorizontalSharpness",
+  "uRgbConvergenceOffset",
+  "uSmoothStrength",
+  "uBasicContrast",
+  "uShadowCrush",
+  "uBasicSaturation",
+  "uReflectiveLcdBase",
+  "uLightDependentTint",
+  "uBeamDarkCutoff",
+  "uBeamHorizontalSpread",
+  "uBeamStripeStrength",
+  "uBeamWhiteBloom",
+  "uBeamWarmBloom",
+  "uScreenFaceGlow",
+  "uOutputBrightness",
+  "uTime",
+  "uFlipH",
+  "uFlipV",
+];
+
 function warmUpOverlayRendererPrograms(webgl, renderer, settings) {
   const placeholderTexture = renderer.texture;
   if (!placeholderTexture) {
@@ -3165,6 +3291,8 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   let destroyed = false;
   let compiling = true;
   let passthruUniformLocations = null;
+  const variantKey = getWindowsLiteVariantKey(initialSettings ?? DEFAULT_SETTINGS);
+  const [, pass2Variant] = variantKey.split(":");
 
   const renderer = {
     program: passthruProg,
@@ -3437,24 +3565,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
 
     webgl.useProgram(prog1);
     webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
-    renderer.pass1UniformLocations = {
-      uTargetSize: webgl.getUniformLocation(prog1, "uTargetSize"),
-      uColorLevels: webgl.getUniformLocation(prog1, "uColorLevels"),
-      uDitherStrength: webgl.getUniformLocation(prog1, "uDitherStrength"),
-      uPaletteMode: webgl.getUniformLocation(prog1, "uPaletteMode"),
-      uGlowStrength: webgl.getUniformLocation(prog1, "uGlowStrength"),
-      uSmoothStrength: webgl.getUniformLocation(prog1, "uSmoothStrength"),
-      uToonSteps: webgl.getUniformLocation(prog1, "uToonSteps"),
-      uEdgeBoost: webgl.getUniformLocation(prog1, "uEdgeBoost"),
-      uAnimeEdgeLow: webgl.getUniformLocation(prog1, "uAnimeEdgeLow"),
-      uAnimeEdgeHigh: webgl.getUniformLocation(prog1, "uAnimeEdgeHigh"),
-      uMonoTint: webgl.getUniformLocation(prog1, "uMonoTint"),
-      uNeonBoost: webgl.getUniformLocation(prog1, "uNeonBoost"),
-      uNeonSaturation: webgl.getUniformLocation(prog1, "uNeonSaturation"),
-      uNeonDetail: webgl.getUniformLocation(prog1, "uNeonDetail"),
-      uFlipH: webgl.getUniformLocation(prog1, "uFlipH"),
-      uFlipV: webgl.getUniformLocation(prog1, "uFlipV"),
-    };
+    renderer.pass1UniformLocations = collectOverlayUniformLocations(webgl, prog1, PASS1_UNIFORM_NAMES);
 
     webgl.useProgram(prog2);
     webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
@@ -3466,68 +3577,13 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     if (beamKernelTextureLocation != null) {
       webgl.uniform1i(beamKernelTextureLocation, 2);
     }
-    renderer.uniformLocations = {
-      uTargetSize: webgl.getUniformLocation(prog2, "uTargetSize"),
-      uOutputSize: webgl.getUniformLocation(prog2, "uOutputSize"),
-      uDisplaySize: webgl.getUniformLocation(prog2, "uDisplaySize"),
-      uBeamSourceSize: webgl.getUniformLocation(prog2, "uBeamSourceSize"),
-      uColorLevels: webgl.getUniformLocation(prog2, "uColorLevels"),
-      uDitherStrength: webgl.getUniformLocation(prog2, "uDitherStrength"),
-      uSamplingMode: webgl.getUniformLocation(prog2, "uSamplingMode"),
-      uCurvature: webgl.getUniformLocation(prog2, "uCurvature"),
-      uScanlineStrength: webgl.getUniformLocation(prog2, "uScanlineStrength"),
-      uScanline2Strength: webgl.getUniformLocation(prog2, "uScanline2Strength"),
-      uScanlineBrightnessFade: webgl.getUniformLocation(prog2, "uScanlineBrightnessFade"),
-      uVignetteStrength: webgl.getUniformLocation(prog2, "uVignetteStrength"),
-      uLcdCrosstalkStrength: webgl.getUniformLocation(prog2, "uLcdCrosstalkStrength"),
-      uGlowStrength: webgl.getUniformLocation(prog2, "uGlowStrength"),
-      uHorizontalSharpness: webgl.getUniformLocation(prog2, "uHorizontalSharpness"),
-      uRgbConvergenceOffset: webgl.getUniformLocation(prog2, "uRgbConvergenceOffset"),
-      uSmoothStrength: webgl.getUniformLocation(prog2, "uSmoothStrength"),
-      uPhosphorStrength: webgl.getUniformLocation(prog2, "uPhosphorStrength"),
-      uSpotMaskStrength: webgl.getUniformLocation(prog2, "uSpotMaskStrength"),
-      uBulbRadius: webgl.getUniformLocation(prog2, "uBulbRadius"),
-      uBlackFloor: webgl.getUniformLocation(prog2, "uBlackFloor"),
-      uFocusStrength: webgl.getUniformLocation(prog2, "uFocusStrength"),
-      uFocusSize: webgl.getUniformLocation(prog2, "uFocusSize"),
-      uFocusCenter: webgl.getUniformLocation(prog2, "uFocusCenter"),
-      uBasicContrast: webgl.getUniformLocation(prog2, "uBasicContrast"),
-      uShadowCrush: webgl.getUniformLocation(prog2, "uShadowCrush"),
-      uBasicSaturation: webgl.getUniformLocation(prog2, "uBasicSaturation"),
-      uReflectiveLcdBase: webgl.getUniformLocation(prog2, "uReflectiveLcdBase"),
-      uLightDependentTint: webgl.getUniformLocation(prog2, "uLightDependentTint"),
-      uGrainVisibilityMode: webgl.getUniformLocation(prog2, "uGrainVisibilityMode"),
-      uBeamDarkCutoff: webgl.getUniformLocation(prog2, "uBeamDarkCutoff"),
-      uBeamHorizontalSpread: webgl.getUniformLocation(prog2, "uBeamHorizontalSpread"),
-      uBeamStripeStrength: webgl.getUniformLocation(prog2, "uBeamStripeStrength"),
-      uBeamWhiteBloom: webgl.getUniformLocation(prog2, "uBeamWhiteBloom"),
-      uBeamWarmBloom: webgl.getUniformLocation(prog2, "uBeamWarmBloom"),
-      uScreenFaceGlow: webgl.getUniformLocation(prog2, "uScreenFaceGlow"),
-      uLumaAmount: webgl.getUniformLocation(prog2, "uLumaAmount"),
-      uLumaLow: webgl.getUniformLocation(prog2, "uLumaLow"),
-      uLumaHigh: webgl.getUniformLocation(prog2, "uLumaHigh"),
-      uLumaKnee: webgl.getUniformLocation(prog2, "uLumaKnee"),
-      uSaturationAmount: webgl.getUniformLocation(prog2, "uSaturationAmount"),
-      uSaturationLow: webgl.getUniformLocation(prog2, "uSaturationLow"),
-      uSaturationHigh: webgl.getUniformLocation(prog2, "uSaturationHigh"),
-      uSaturationKnee: webgl.getUniformLocation(prog2, "uSaturationKnee"),
-      uOutputBrightness: webgl.getUniformLocation(prog2, "uOutputBrightness"),
-      uPhosphorDotLightBalance: webgl.getUniformLocation(prog2, "uPhosphorDotLightBalance"),
-      uPixelAspect: webgl.getUniformLocation(prog2, "uPixelAspect"),
-      uPhosphorDotMode: webgl.getUniformLocation(prog2, "uPhosphorDotMode"),
-      uPhosphorDotShape: webgl.getUniformLocation(prog2, "uPhosphorDotShape"),
-      uPhosphorDotInternalScale: webgl.getUniformLocation(prog2, "uPhosphorDotInternalScale"),
-      uPhosphorDotSizeResponse: webgl.getUniformLocation(prog2, "uPhosphorDotSizeResponse"),
-      uPhosphorDotBrightCore: webgl.getUniformLocation(prog2, "uPhosphorDotBrightCore"),
-      uPhosphorDotCellFill: webgl.getUniformLocation(prog2, "uPhosphorDotCellFill"),
-      uPhosphorDotFlatDisc: webgl.getUniformLocation(prog2, "uPhosphorDotFlatDisc"),
-      uPhosphorDotNeighborBlend: webgl.getUniformLocation(prog2, "uPhosphorDotNeighborBlend"),
-      uPhosphorDotGrainStrength: webgl.getUniformLocation(prog2, "uPhosphorDotGrainStrength"),
-      uCloseUpNoiseStrength: webgl.getUniformLocation(prog2, "uCloseUpNoiseStrength"),
-      uTime: webgl.getUniformLocation(prog2, "uTime"),
-      uFlipH: webgl.getUniformLocation(prog2, "uFlipH"),
-      uFlipV: webgl.getUniformLocation(prog2, "uFlipV"),
-    };
+    const pass2UniformNames =
+      pass2Variant === "beam"
+        ? PASS2_BEAM_UNIFORM_NAMES
+        : pass2Variant === "phosphor"
+          ? PASS2_PHOSPHOR_UNIFORM_NAMES
+          : PASS2_BASIC_UNIFORM_NAMES;
+    renderer.uniformLocations = collectOverlayUniformLocations(webgl, prog2, pass2UniformNames);
 
     renderer.pass1Program = prog1;
     renderer.program = prog2;
