@@ -2121,6 +2121,7 @@ function createOverlaySurface(index, onReady, initialSettings) {
           }
         },
       );
+      applyFlipUniforms(gl, renderer, flipH, flipV);
     } catch (error) {
       console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
       gl = null;
@@ -2902,6 +2903,11 @@ function applyFlipUniforms(gl, renderer, flipH, flipV) {
     return;
   }
   const effectiveFlipV = OVERLAY_BASE_FLIP_V ? !flipV : flipV;
+  if (renderer.passthruProgram && renderer.passthruUniformLocations) {
+    gl.useProgram(renderer.passthruProgram);
+    gl.uniform1f(renderer.passthruUniformLocations.uFlipH, flipH ? 1 : 0);
+    gl.uniform1f(renderer.passthruUniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
+  }
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
     gl.uniform1f(renderer.pass1UniformLocations.uFlipH, flipH ? 1 : 0);
@@ -3091,6 +3097,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   // (to avoid freezing while D3D DXBC is still loading from the shader cache).
   let destroyed = false;
   let compiling = true;
+  let passthruUniformLocations = null;
 
   const renderer = {
     program: passthruProg,
@@ -3126,6 +3133,8 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     beamComposeTexture: null,
     beamComposeFboWidth: 0,
     beamComposeFboHeight: 0,
+    passthruProgram: passthruProg,
+    passthruUniformLocations,
     cancel() {
       destroyed = true;
       if (!compiling) {
@@ -3317,6 +3326,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
 
     renderer.pass1Program = prog1;
     renderer.program = prog2;
+    renderer.passthruProgram = passthruProg;
     renderer.beamDownscaleProgram = beamDownscaleProg;
     renderer.beamKernelProgram = beamKernelProg;
     renderer.beamStripeProgram = beamStripeProg;
@@ -3382,6 +3392,14 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     onCompileState?.("");
     onReady?.(renderer);
   })();
+
+  if (passthruProg) {
+    passthruUniformLocations = {
+      uFlipH: webgl.getUniformLocation(passthruProg, "uFlipH"),
+      uFlipV: webgl.getUniformLocation(passthruProg, "uFlipV"),
+    };
+    renderer.passthruUniformLocations = passthruUniformLocations;
+  }
 
   return renderer;
 }
