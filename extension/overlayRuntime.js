@@ -57,6 +57,19 @@ const yieldOverlayCompileTurn = () => new Promise((resolve) => {
   window.setTimeout(resolve, 0);
 });
 
+async function validateOverlayProgramLink(webgl, program, label, onCompileState) {
+  if (!program) {
+    return true;
+  }
+  onCompileState?.(`Finalizing shader (${label})...`);
+  await yieldOverlayCompileTurn();
+  if (webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+    return true;
+  }
+  console.error(`[overlay] ${label} shader link failed:`, webgl.getProgramInfoLog(program) || "unknown");
+  return false;
+}
+
 const isWindowsChromiumAngleRisk = () => {
   const userAgent = navigator.userAgent || "";
   const isWindows = /Windows/i.test(userAgent);
@@ -3086,34 +3099,76 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   (async () => {
     await yieldOverlayCompileTurn();
     onCompileState?.("Compiling shader (pass 1/2)...");
-    const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings);
+    const vertexShader = compileShader(
+      webgl,
+      webgl.VERTEX_SHADER,
+      vertexShaderSource,
+      initialSettings,
+      { skipStatusCheck: true },
+    );
     await yieldOverlayCompileTurn();
     const shaderSources = getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS);
-    const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1, initialSettings);
+    const pass1Frag = compileShader(
+      webgl,
+      webgl.FRAGMENT_SHADER,
+      shaderSources.pass1,
+      initialSettings,
+      { skipStatusCheck: true },
+    );
     await yieldOverlayCompileTurn();
     onCompileState?.("Compiling shader (pass 2/2)...");
-    const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2, initialSettings);
+    const pass2Frag = compileShader(
+      webgl,
+      webgl.FRAGMENT_SHADER,
+      shaderSources.pass2,
+      initialSettings,
+      { skipStatusCheck: true },
+    );
     await yieldOverlayCompileTurn();
     const beamDownscaleFrag = shaderSources.beamDownscale
-      ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamDownscale, initialSettings)
+      ? compileShader(
+        webgl,
+        webgl.FRAGMENT_SHADER,
+        shaderSources.beamDownscale,
+        initialSettings,
+        { skipStatusCheck: true },
+      )
       : null;
     if (beamDownscaleFrag) {
       await yieldOverlayCompileTurn();
     }
     const beamKernelFrag = shaderSources.beamKernel
-      ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamKernel, initialSettings)
+      ? compileShader(
+        webgl,
+        webgl.FRAGMENT_SHADER,
+        shaderSources.beamKernel,
+        initialSettings,
+        { skipStatusCheck: true },
+      )
       : null;
     if (beamKernelFrag) {
       await yieldOverlayCompileTurn();
     }
     const beamStripeFrag = shaderSources.beamStripe
-      ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamStripe, initialSettings)
+      ? compileShader(
+        webgl,
+        webgl.FRAGMENT_SHADER,
+        shaderSources.beamStripe,
+        initialSettings,
+        { skipStatusCheck: true },
+      )
       : null;
     if (beamStripeFrag) {
       await yieldOverlayCompileTurn();
     }
     const beamComposeFrag = shaderSources.beamCompose
-      ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamCompose, initialSettings)
+      ? compileShader(
+        webgl,
+        webgl.FRAGMENT_SHADER,
+        shaderSources.beamCompose,
+        initialSettings,
+        { skipStatusCheck: true },
+      )
       : null;
     if (beamComposeFrag) {
       await yieldOverlayCompileTurn();
@@ -3148,28 +3203,64 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     webgl.linkProgram(prog2);
     await yieldOverlayCompileTurn();
     if (beamDownscaleProg && beamDownscaleFrag) {
-      webgl.attachShader(beamDownscaleProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
+      webgl.attachShader(
+        beamDownscaleProg,
+        compileShader(
+          webgl,
+          webgl.VERTEX_SHADER,
+          vertexShaderSource,
+          initialSettings,
+          { skipStatusCheck: true },
+        ),
+      );
       webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
       onCompileState?.("Linking shader (beam downscale)...");
       webgl.linkProgram(beamDownscaleProg);
       await yieldOverlayCompileTurn();
     }
     if (beamKernelProg && beamKernelFrag) {
-      webgl.attachShader(beamKernelProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
+      webgl.attachShader(
+        beamKernelProg,
+        compileShader(
+          webgl,
+          webgl.VERTEX_SHADER,
+          vertexShaderSource,
+          initialSettings,
+          { skipStatusCheck: true },
+        ),
+      );
       webgl.attachShader(beamKernelProg, beamKernelFrag);
       onCompileState?.("Linking shader (beam kernel)...");
       webgl.linkProgram(beamKernelProg);
       await yieldOverlayCompileTurn();
     }
     if (beamStripeProg && beamStripeFrag) {
-      webgl.attachShader(beamStripeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
+      webgl.attachShader(
+        beamStripeProg,
+        compileShader(
+          webgl,
+          webgl.VERTEX_SHADER,
+          vertexShaderSource,
+          initialSettings,
+          { skipStatusCheck: true },
+        ),
+      );
       webgl.attachShader(beamStripeProg, beamStripeFrag);
       onCompileState?.("Linking shader (beam stripe)...");
       webgl.linkProgram(beamStripeProg);
       await yieldOverlayCompileTurn();
     }
     if (beamComposeProg && beamComposeFrag) {
-      webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
+      webgl.attachShader(
+        beamComposeProg,
+        compileShader(
+          webgl,
+          webgl.VERTEX_SHADER,
+          vertexShaderSource,
+          initialSettings,
+          { skipStatusCheck: true },
+        ),
+      );
       webgl.attachShader(beamComposeProg, beamComposeFrag);
       onCompileState?.("Linking shader (beam finalize)...");
       webgl.linkProgram(beamComposeProg);
@@ -3215,39 +3306,33 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       return;
     }
 
-    if (!webgl.getProgramParameter(prog1, webgl.LINK_STATUS)) {
-      console.error("[overlay] Filter shader link failed:", webgl.getProgramInfoLog(prog1) || "unknown");
+    if (!(await validateOverlayProgramLink(webgl, prog1, "pass 1/2", onCompileState))) {
       compiling = false;
       onCompileState?.("");
       return;
     }
 
-    if (!webgl.getProgramParameter(prog2, webgl.LINK_STATUS)) {
-      console.error("[overlay] Filter shader link failed:", webgl.getProgramInfoLog(prog2) || "unknown");
+    if (!(await validateOverlayProgramLink(webgl, prog2, "pass 2/2", onCompileState))) {
       compiling = false;
       onCompileState?.("");
       return;
     }
-    if (beamDownscaleProg && !webgl.getProgramParameter(beamDownscaleProg, webgl.LINK_STATUS)) {
-      console.error("[overlay] Beam downscale shader link failed:", webgl.getProgramInfoLog(beamDownscaleProg) || "unknown");
+    if (!(await validateOverlayProgramLink(webgl, beamDownscaleProg, "beam downscale", onCompileState))) {
       compiling = false;
       onCompileState?.("");
       return;
     }
-    if (beamKernelProg && !webgl.getProgramParameter(beamKernelProg, webgl.LINK_STATUS)) {
-      console.error("[overlay] Beam kernel shader link failed:", webgl.getProgramInfoLog(beamKernelProg) || "unknown");
+    if (!(await validateOverlayProgramLink(webgl, beamKernelProg, "beam kernel", onCompileState))) {
       compiling = false;
       onCompileState?.("");
       return;
     }
-    if (beamStripeProg && !webgl.getProgramParameter(beamStripeProg, webgl.LINK_STATUS)) {
-      console.error("[overlay] Beam stripe shader link failed:", webgl.getProgramInfoLog(beamStripeProg) || "unknown");
+    if (!(await validateOverlayProgramLink(webgl, beamStripeProg, "beam stripe", onCompileState))) {
       compiling = false;
       onCompileState?.("");
       return;
     }
-    if (beamComposeProg && !webgl.getProgramParameter(beamComposeProg, webgl.LINK_STATUS)) {
-      console.error("[overlay] Beam finalize shader link failed:", webgl.getProgramInfoLog(beamComposeProg) || "unknown");
+    if (!(await validateOverlayProgramLink(webgl, beamComposeProg, "beam finalize", onCompileState))) {
       compiling = false;
       onCompileState?.("");
       return;
@@ -3661,7 +3746,8 @@ function getBeamStripeModeValue(mode) {
   return mode === "next" ? 1 : 0;
 }
 
-function compileShader(webgl, type, source, settings) {
+function compileShader(webgl, type, source, settings, options = {}) {
+  const { skipStatusCheck = false } = options;
   const shader = webgl.createShader(type);
   if (!shader) {
     throw new Error("Failed to create shader.");
@@ -3670,7 +3756,7 @@ function compileShader(webgl, type, source, settings) {
   webgl.shaderSource(shader, withShaderCompileCacheBuster(source, settings));
   webgl.compileShader(shader);
 
-  if (!webgl.getShaderParameter(shader, webgl.COMPILE_STATUS)) {
+  if (!skipStatusCheck && !webgl.getShaderParameter(shader, webgl.COMPILE_STATUS)) {
     throw new Error(webgl.getShaderInfoLog(shader) || "Failed to compile shader.");
   }
 
