@@ -20,6 +20,7 @@ import { createTetoricaRetroAudioNode } from "./shared/TetoricaRetroAudioNode.js
 
 const OVERLAY_KEY = "__tetoricaRetroOverlay";
 const OVERLAY_BASE_FLIP_V = true;
+let _overlayRendererCompileQueue = Promise.resolve();
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
 // 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
@@ -56,6 +57,14 @@ void main() {
 const yieldOverlayCompileTurn = () => new Promise((resolve) => {
   window.setTimeout(resolve, 0);
 });
+
+function enqueueOverlayRendererCompile(task) {
+  const run = _overlayRendererCompileQueue
+    .catch(() => {})
+    .then(task);
+  _overlayRendererCompileQueue = run.catch(() => {});
+  return run;
+}
 
 const OVERLAY_GPU_LINK_POLL_TIMEOUT_MS = 900;
 const OVERLAY_GPU_LINK_POLL_INTERVAL_MS = 24;
@@ -3201,7 +3210,12 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     },
   };
 
-  (async () => {
+  void enqueueOverlayRendererCompile(async () => {
+    if (destroyed) {
+      compiling = false;
+      onCompileState?.("");
+      return;
+    }
     await yieldOverlayCompileTurn();
     onCompileState?.("Compiling shader (pass 1/2)...");
     const vertexShader = compileShader(
@@ -3583,7 +3597,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     compiling = false;
     onCompileState?.("");
     onReady?.(renderer);
-  })();
+  });
 
   if (passthruProg) {
     passthruUniformLocations = {
