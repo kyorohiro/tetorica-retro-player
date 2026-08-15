@@ -57,6 +57,39 @@ const yieldOverlayCompileTurn = () => new Promise((resolve) => {
   window.setTimeout(resolve, 0);
 });
 
+const OVERLAY_GPU_LINK_POLL_TIMEOUT_MS = 900;
+const OVERLAY_GPU_LINK_POLL_INTERVAL_MS = 24;
+
+async function waitForOverlayProgramsToComplete(webgl, ext, programs, onCompileState) {
+  if (!ext) {
+    onCompileState?.("Linking shader (finalizing)...");
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    return;
+  }
+
+  onCompileState?.("Linking shader (waiting for GPU)...");
+  const pollStartedAt = performance.now();
+  while (true) {
+    let allCompleted = true;
+    for (const program of programs) {
+      if (!program) {
+        continue;
+      }
+      if (!webgl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR)) {
+        allCompleted = false;
+        break;
+      }
+    }
+    if (allCompleted) {
+      return;
+    }
+    if (performance.now() - pollStartedAt >= OVERLAY_GPU_LINK_POLL_TIMEOUT_MS) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, OVERLAY_GPU_LINK_POLL_INTERVAL_MS));
+  }
+}
+
 async function validateOverlayProgramLink(webgl, program, label, onCompileState) {
   if (!program) {
     return true;
@@ -3173,6 +3206,19 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     if (beamComposeFrag) {
       await yieldOverlayCompileTurn();
     }
+    const auxiliaryVertexShader =
+      beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag
+        ? compileShader(
+          webgl,
+          webgl.VERTEX_SHADER,
+          vertexShaderSource,
+          initialSettings,
+          { skipStatusCheck: true },
+        )
+        : null;
+    if (auxiliaryVertexShader) {
+      await yieldOverlayCompileTurn();
+    }
 
     const prog1 = webgl.createProgram();
     const prog2 = webgl.createProgram();
@@ -3205,13 +3251,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     if (beamDownscaleProg && beamDownscaleFrag) {
       webgl.attachShader(
         beamDownscaleProg,
-        compileShader(
-          webgl,
-          webgl.VERTEX_SHADER,
-          vertexShaderSource,
-          initialSettings,
-          { skipStatusCheck: true },
-        ),
+        auxiliaryVertexShader,
       );
       webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
       onCompileState?.("Linking shader (beam downscale)...");
@@ -3221,13 +3261,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     if (beamKernelProg && beamKernelFrag) {
       webgl.attachShader(
         beamKernelProg,
-        compileShader(
-          webgl,
-          webgl.VERTEX_SHADER,
-          vertexShaderSource,
-          initialSettings,
-          { skipStatusCheck: true },
-        ),
+        auxiliaryVertexShader,
       );
       webgl.attachShader(beamKernelProg, beamKernelFrag);
       onCompileState?.("Linking shader (beam kernel)...");
@@ -3237,13 +3271,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     if (beamStripeProg && beamStripeFrag) {
       webgl.attachShader(
         beamStripeProg,
-        compileShader(
-          webgl,
-          webgl.VERTEX_SHADER,
-          vertexShaderSource,
-          initialSettings,
-          { skipStatusCheck: true },
-        ),
+        auxiliaryVertexShader,
       );
       webgl.attachShader(beamStripeProg, beamStripeFrag);
       onCompileState?.("Linking shader (beam stripe)...");
@@ -3253,13 +3281,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     if (beamComposeProg && beamComposeFrag) {
       webgl.attachShader(
         beamComposeProg,
-        compileShader(
-          webgl,
-          webgl.VERTEX_SHADER,
-          vertexShaderSource,
-          initialSettings,
-          { skipStatusCheck: true },
-        ),
+        auxiliaryVertexShader,
       );
       webgl.attachShader(beamComposeProg, beamComposeFrag);
       onCompileState?.("Linking shader (beam finalize)...");
@@ -3271,32 +3293,12 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       webgl.getExtension("WEBGL_parallel_shader_compile")
       || webgl.getExtension("KHR_parallel_shader_compile");
 
-    if (ext) {
-      onCompileState?.("Linking shader (waiting for GPU)...");
-      await new Promise((resolve) => {
-        const startedAt = performance.now();
-        const poll = () => {
-          const ready1 = webgl.getProgramParameter(prog1, ext.COMPLETION_STATUS_KHR);
-          const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
-          const ready3 = beamDownscaleProg ? webgl.getProgramParameter(beamDownscaleProg, ext.COMPLETION_STATUS_KHR) : true;
-          const ready4 = beamKernelProg ? webgl.getProgramParameter(beamKernelProg, ext.COMPLETION_STATUS_KHR) : true;
-          const ready5 = beamStripeProg ? webgl.getProgramParameter(beamStripeProg, ext.COMPLETION_STATUS_KHR) : true;
-          const ready6 = beamComposeProg ? webgl.getProgramParameter(beamComposeProg, ext.COMPLETION_STATUS_KHR) : true;
-          const timedOut = performance.now() - startedAt >= 8000;
-          if ((ready1 && ready2 && ready3 && ready4 && ready5 && ready6) || timedOut) {
-            resolve();
-            return;
-          }
-          window.setTimeout(poll, 50);
-        };
-        window.setTimeout(poll, 50);
-      });
-    } else {
-      // Chromium should normally expose parallel shader compile. Keep a small
-      // fallback for unexpected runtimes instead of breaking the overlay.
-      onCompileState?.("Linking shader (finalizing)...");
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
+    await waitForOverlayProgramsToComplete(
+      webgl,
+      ext,
+      [prog1, prog2, beamDownscaleProg, beamKernelProg, beamStripeProg, beamComposeProg],
+      onCompileState,
+    );
 
     if (destroyed) {
       // Surface was torn down during the wait; loseContext() is now safe.
