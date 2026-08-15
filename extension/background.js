@@ -6,6 +6,7 @@ import {
 const VIEWER_URL = chrome.runtime.getURL("viewer.html");
 const ALARM_STORAGE_KEY = "retro-alarm-state";
 const COMPILE_STATUS_SESSION_KEY = "retro-compile-status";
+const OVERLAY_COMPILE_SLOT_TTL_MS = 3000;
 
 let currentSession = null;
 let currentCompileStatus = null;
@@ -13,8 +14,6 @@ let overlayCompileSlot = {
   holderId: null,
   expiresAt: 0,
 };
-
-const OVERLAY_COMPILE_SLOT_TTL_MS = 45000;
 
 function isSameCompileStatus(a, b) {
   return Boolean(a?.active) === Boolean(b?.active)
@@ -225,6 +224,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       };
     }
     sendResponse({ ok: true });
+    return;
+  }
+
+  if (message?.type === "REFRESH_OVERLAY_COMPILE_SLOT") {
+    const requesterId = message.requesterId || null;
+    if (requesterId && overlayCompileSlot.holderId === requesterId) {
+      overlayCompileSlot = {
+        holderId: requesterId,
+        expiresAt: Date.now() + OVERLAY_COMPILE_SLOT_TTL_MS,
+      };
+      sendResponse({ ok: true, refreshed: true });
+      return;
+    }
+    sendResponse({ ok: true, refreshed: false });
     return;
   }
 

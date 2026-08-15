@@ -23,6 +23,7 @@ const OVERLAY_BASE_FLIP_V = true;
 let _overlayRendererCompileQueue = Promise.resolve();
 let _overlayShaderCompileCacheBusterSessionEnabled = false;
 let _overlayCompileRequestIdCounter = 0;
+const OVERLAY_COMPILE_SLOT_HEARTBEAT_MS = 1000;
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
 // 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
@@ -93,6 +94,15 @@ async function releaseOverlayCompileSlot(requesterId) {
     type: "RELEASE_OVERLAY_COMPILE_SLOT",
     requesterId,
   }).catch(() => {});
+}
+
+function startOverlayCompileSlotHeartbeat(requesterId) {
+  return window.setInterval(() => {
+    void chrome.runtime.sendMessage({
+      type: "REFRESH_OVERLAY_COMPILE_SLOT",
+      requesterId,
+    }).catch(() => {});
+  }, OVERLAY_COMPILE_SLOT_HEARTBEAT_MS);
 }
 
 const OVERLAY_GPU_LINK_POLL_INTERVAL_MS = 24;
@@ -1630,6 +1640,7 @@ function createOverlay(settings) {
         }
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
         surface.gl.activeTexture(surface.gl.TEXTURE0);
+        surface.markShaderActivated();
       } else {
         surface.gl.useProgram(surface.renderer.program);
         surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
@@ -2403,6 +2414,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
   let compileStatusTimer = null;
   let setupGeneration = 0;
   let surfaceDisposed = false;
+  let isShaderActivated = false;
 
   const hideCompileOverlayNow = () => {
     compileStatusMessage = "";
@@ -2479,12 +2491,19 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
             publishOverlayCompileState(compileStatusMessage);
             scheduleCompileOverlay();
           } else {
-            publishOverlayCompileState("");
-            if (compileStatusTimer != null) {
-              window.clearTimeout(compileStatusTimer);
-              compileStatusTimer = null;
+            if (renderer?.pass1Program && !isShaderActivated) {
+              compileStatusMessage = "Activating shader...";
+              compileOverlayLabel.textContent = compileStatusMessage;
+              publishOverlayCompileState(compileStatusMessage);
+              scheduleCompileOverlay();
+            } else {
+              publishOverlayCompileState("");
+              if (compileStatusTimer != null) {
+                window.clearTimeout(compileStatusTimer);
+                compileStatusTimer = null;
+              }
+              hideCompileOverlayNow();
             }
-            hideCompileOverlayNow();
           }
         },
       );
@@ -2571,6 +2590,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       this.startedAt = performance.now();
       this.lastRectKey = "";
       this.didTargetChange = true;
+      isShaderActivated = false;
       this.hideFailureOverlay();
       this.setFailureMessage("Cross-origin image");
       this.ensureProxyVideo(nextTarget);
@@ -2814,6 +2834,18 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       canvas.style.setProperty("display", "none", "important");
       this.hideCompileOverlay();
       this.hideFailureOverlay();
+    },
+    markShaderActivated() {
+      if (isShaderActivated) {
+        return;
+      }
+      isShaderActivated = true;
+      publishOverlayCompileState("");
+      if (compileStatusTimer != null) {
+        window.clearTimeout(compileStatusTimer);
+        compileStatusTimer = null;
+      }
+      hideCompileOverlayNow();
     },
   };
   return surfaceApi;
@@ -3471,6 +3503,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       return;
     }
     await acquireOverlayCompileSlot(compileRequesterId, onCompileState);
+    const compileSlotHeartbeatId = startOverlayCompileSlotHeartbeat(compileRequesterId);
     try {
       await yieldOverlayCompileTurn();
       onCompileState?.("Compiling shader (pass 1/2)...");
@@ -3687,6 +3720,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       onCompileState?.("");
       onReady?.(renderer);
     } finally {
+      window.clearInterval(compileSlotHeartbeatId);
       await releaseOverlayCompileSlot(compileRequesterId);
     }
   });
