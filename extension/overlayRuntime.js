@@ -22,6 +22,7 @@ const OVERLAY_KEY = "__tetoricaRetroOverlay";
 const OVERLAY_BASE_FLIP_V = true;
 let _overlayRendererCompileQueue = Promise.resolve();
 let _overlayShaderCompileCacheBusterSessionEnabled = false;
+let _overlayCompileRequestIdCounter = 0;
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
 // 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
@@ -65,6 +66,33 @@ function enqueueOverlayRendererCompile(task) {
     .then(task);
   _overlayRendererCompileQueue = run.catch(() => {});
   return run;
+}
+
+function createOverlayCompileRequesterId() {
+  _overlayCompileRequestIdCounter += 1;
+  return `overlay-${Date.now().toString(36)}-${_overlayCompileRequestIdCounter.toString(36)}`;
+}
+
+async function acquireOverlayCompileSlot(requesterId, onCompileState) {
+  while (true) {
+    onCompileState?.("Preparing compile slot...");
+    const response = await chrome.runtime.sendMessage({
+      type: "ACQUIRE_OVERLAY_COMPILE_SLOT",
+      requesterId,
+    }).catch(() => null);
+    if (response?.ok && response?.acquired) {
+      return true;
+    }
+    const retryAfterMs = Math.max(80, Math.min(1000, Number(response?.retryAfterMs ?? 160)));
+    await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+  }
+}
+
+async function releaseOverlayCompileSlot(requesterId) {
+  await chrome.runtime.sendMessage({
+    type: "RELEASE_OVERLAY_COMPILE_SLOT",
+    requesterId,
+  }).catch(() => {});
 }
 
 const OVERLAY_GPU_LINK_POLL_TIMEOUT_MS = 900;
@@ -3279,318 +3307,311 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     },
   };
 
+  const compileRequesterId = createOverlayCompileRequesterId();
   void enqueueOverlayRendererCompile(async () => {
     if (destroyed) {
       compiling = false;
       onCompileState?.("");
       return;
     }
-    await yieldOverlayCompileTurn();
-    onCompileState?.("Compiling shader (pass 1/2)...");
-    const vertexShader = compileShader(
-      webgl,
-      webgl.VERTEX_SHADER,
-      vertexShaderSource,
-      initialSettings,
-      { skipStatusCheck: true },
-    );
-    await yieldOverlayCompileTurn();
-    const shaderSources = getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS);
-    const pass1Frag = compileShader(
-      webgl,
-      webgl.FRAGMENT_SHADER,
-      shaderSources.pass1,
-      initialSettings,
-      { skipStatusCheck: true },
-    );
-    await yieldOverlayCompileTurn();
-    onCompileState?.("Compiling shader (pass 2/2)...");
-    const pass2Frag = compileShader(
-      webgl,
-      webgl.FRAGMENT_SHADER,
-      shaderSources.pass2,
-      initialSettings,
-      { skipStatusCheck: true },
-    );
-    await yieldOverlayCompileTurn();
-    const beamDownscaleFrag = shaderSources.beamDownscale
-      ? compileShader(
+    await acquireOverlayCompileSlot(compileRequesterId, onCompileState);
+    try {
+      await yieldOverlayCompileTurn();
+      onCompileState?.("Compiling shader (pass 1/2)...");
+      const vertexShader = compileShader(
         webgl,
-        webgl.FRAGMENT_SHADER,
-        shaderSources.beamDownscale,
+        webgl.VERTEX_SHADER,
+        vertexShaderSource,
         initialSettings,
         { skipStatusCheck: true },
-      )
-      : null;
-    if (beamDownscaleFrag) {
+      );
       await yieldOverlayCompileTurn();
-    }
-    const beamKernelFrag = shaderSources.beamKernel
-      ? compileShader(
+      const shaderSources = getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS);
+      const pass1Frag = compileShader(
         webgl,
         webgl.FRAGMENT_SHADER,
-        shaderSources.beamKernel,
+        shaderSources.pass1,
         initialSettings,
         { skipStatusCheck: true },
-      )
-      : null;
-    if (beamKernelFrag) {
+      );
       await yieldOverlayCompileTurn();
-    }
-    const beamStripeFrag = shaderSources.beamStripe
-      ? compileShader(
+      onCompileState?.("Compiling shader (pass 2/2)...");
+      const pass2Frag = compileShader(
         webgl,
         webgl.FRAGMENT_SHADER,
-        shaderSources.beamStripe,
+        shaderSources.pass2,
         initialSettings,
         { skipStatusCheck: true },
-      )
-      : null;
-    if (beamStripeFrag) {
+      );
       await yieldOverlayCompileTurn();
-    }
-    const beamComposeFrag = shaderSources.beamCompose
-      ? compileShader(
-        webgl,
-        webgl.FRAGMENT_SHADER,
-        shaderSources.beamCompose,
-        initialSettings,
-        { skipStatusCheck: true },
-      )
-      : null;
-    if (beamComposeFrag) {
-      await yieldOverlayCompileTurn();
-    }
-    const auxiliaryVertexShader =
-      beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag
+      const beamDownscaleFrag = shaderSources.beamDownscale
         ? compileShader(
           webgl,
-          webgl.VERTEX_SHADER,
-          vertexShaderSource,
+          webgl.FRAGMENT_SHADER,
+          shaderSources.beamDownscale,
           initialSettings,
           { skipStatusCheck: true },
         )
         : null;
-    if (auxiliaryVertexShader) {
+      if (beamDownscaleFrag) {
+        await yieldOverlayCompileTurn();
+      }
+      const beamKernelFrag = shaderSources.beamKernel
+        ? compileShader(
+          webgl,
+          webgl.FRAGMENT_SHADER,
+          shaderSources.beamKernel,
+          initialSettings,
+          { skipStatusCheck: true },
+        )
+        : null;
+      if (beamKernelFrag) {
+        await yieldOverlayCompileTurn();
+      }
+      const beamStripeFrag = shaderSources.beamStripe
+        ? compileShader(
+          webgl,
+          webgl.FRAGMENT_SHADER,
+          shaderSources.beamStripe,
+          initialSettings,
+          { skipStatusCheck: true },
+        )
+        : null;
+      if (beamStripeFrag) {
+        await yieldOverlayCompileTurn();
+      }
+      const beamComposeFrag = shaderSources.beamCompose
+        ? compileShader(
+          webgl,
+          webgl.FRAGMENT_SHADER,
+          shaderSources.beamCompose,
+          initialSettings,
+          { skipStatusCheck: true },
+        )
+        : null;
+      if (beamComposeFrag) {
+        await yieldOverlayCompileTurn();
+      }
+      const auxiliaryVertexShader =
+        beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag
+          ? compileShader(
+            webgl,
+            webgl.VERTEX_SHADER,
+            vertexShaderSource,
+            initialSettings,
+            { skipStatusCheck: true },
+          )
+          : null;
+      if (auxiliaryVertexShader) {
+        await yieldOverlayCompileTurn();
+      }
+
+      const prog1 = webgl.createProgram();
+      const prog2 = webgl.createProgram();
+      const beamDownscaleProg = beamDownscaleFrag ? webgl.createProgram() : null;
+      const beamKernelProg = beamKernelFrag ? webgl.createProgram() : null;
+      const beamStripeProg = beamStripeFrag ? webgl.createProgram() : null;
+      const beamComposeProg = beamComposeFrag ? webgl.createProgram() : null;
+
+      if (
+        !prog1 ||
+        !prog2 ||
+        (beamDownscaleFrag && !beamDownscaleProg) ||
+        (beamKernelFrag && !beamKernelProg) ||
+        (beamStripeFrag && !beamStripeProg) ||
+        (beamComposeFrag && !beamComposeProg)
+      ) {
+        throw new Error("Failed to create WebGL program.");
+      }
+
+      webgl.attachShader(prog1, vertexShader);
+      webgl.attachShader(prog1, pass1Frag);
+      onCompileState?.("Linking shader (pass 1/2)...");
+      webgl.linkProgram(prog1);
       await yieldOverlayCompileTurn();
-    }
+      webgl.attachShader(prog2, vertexShader);
+      webgl.attachShader(prog2, pass2Frag);
+      onCompileState?.("Linking shader (pass 2/2)...");
+      webgl.linkProgram(prog2);
+      await yieldOverlayCompileTurn();
+      if (beamDownscaleProg && beamDownscaleFrag) {
+        webgl.attachShader(beamDownscaleProg, auxiliaryVertexShader);
+        webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
+        onCompileState?.("Linking shader (beam downscale)...");
+        webgl.linkProgram(beamDownscaleProg);
+        await yieldOverlayCompileTurn();
+      }
+      if (beamKernelProg && beamKernelFrag) {
+        webgl.attachShader(beamKernelProg, auxiliaryVertexShader);
+        webgl.attachShader(beamKernelProg, beamKernelFrag);
+        onCompileState?.("Linking shader (beam kernel)...");
+        webgl.linkProgram(beamKernelProg);
+        await yieldOverlayCompileTurn();
+      }
+      if (beamStripeProg && beamStripeFrag) {
+        webgl.attachShader(beamStripeProg, auxiliaryVertexShader);
+        webgl.attachShader(beamStripeProg, beamStripeFrag);
+        onCompileState?.("Linking shader (beam stripe)...");
+        webgl.linkProgram(beamStripeProg);
+        await yieldOverlayCompileTurn();
+      }
+      if (beamComposeProg && beamComposeFrag) {
+        webgl.attachShader(beamComposeProg, auxiliaryVertexShader);
+        webgl.attachShader(beamComposeProg, beamComposeFrag);
+        onCompileState?.("Linking shader (beam finalize)...");
+        webgl.linkProgram(beamComposeProg);
+        await yieldOverlayCompileTurn();
+      }
 
-    const prog1 = webgl.createProgram();
-    const prog2 = webgl.createProgram();
-    const beamDownscaleProg = beamDownscaleFrag ? webgl.createProgram() : null;
-    const beamKernelProg = beamKernelFrag ? webgl.createProgram() : null;
-    const beamStripeProg = beamStripeFrag ? webgl.createProgram() : null;
-    const beamComposeProg = beamComposeFrag ? webgl.createProgram() : null;
+      const ext =
+        webgl.getExtension("WEBGL_parallel_shader_compile")
+        || webgl.getExtension("KHR_parallel_shader_compile");
 
-    if (
-      !prog1 ||
-      !prog2 ||
-      (beamDownscaleFrag && !beamDownscaleProg) ||
-      (beamKernelFrag && !beamKernelProg) ||
-      (beamStripeFrag && !beamStripeProg) ||
-      (beamComposeFrag && !beamComposeProg)
-    ) {
-      throw new Error("Failed to create WebGL program.");
-    }
-
-    webgl.attachShader(prog1, vertexShader);
-    webgl.attachShader(prog1, pass1Frag);
-    onCompileState?.("Linking shader (pass 1/2)...");
-    webgl.linkProgram(prog1);
-    await yieldOverlayCompileTurn();
-    webgl.attachShader(prog2, vertexShader);
-    webgl.attachShader(prog2, pass2Frag);
-    onCompileState?.("Linking shader (pass 2/2)...");
-    webgl.linkProgram(prog2);
-    await yieldOverlayCompileTurn();
-    if (beamDownscaleProg && beamDownscaleFrag) {
-      webgl.attachShader(
-        beamDownscaleProg,
-        auxiliaryVertexShader,
+      await waitForOverlayProgramsToComplete(
+        webgl,
+        ext,
+        [prog1, prog2, beamDownscaleProg, beamKernelProg, beamStripeProg, beamComposeProg],
+        onCompileState,
       );
-      webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
-      onCompileState?.("Linking shader (beam downscale)...");
-      webgl.linkProgram(beamDownscaleProg);
-      await yieldOverlayCompileTurn();
-    }
-    if (beamKernelProg && beamKernelFrag) {
-      webgl.attachShader(
-        beamKernelProg,
-        auxiliaryVertexShader,
-      );
-      webgl.attachShader(beamKernelProg, beamKernelFrag);
-      onCompileState?.("Linking shader (beam kernel)...");
-      webgl.linkProgram(beamKernelProg);
-      await yieldOverlayCompileTurn();
-    }
-    if (beamStripeProg && beamStripeFrag) {
-      webgl.attachShader(
-        beamStripeProg,
-        auxiliaryVertexShader,
-      );
-      webgl.attachShader(beamStripeProg, beamStripeFrag);
-      onCompileState?.("Linking shader (beam stripe)...");
-      webgl.linkProgram(beamStripeProg);
-      await yieldOverlayCompileTurn();
-    }
-    if (beamComposeProg && beamComposeFrag) {
-      webgl.attachShader(
-        beamComposeProg,
-        auxiliaryVertexShader,
-      );
-      webgl.attachShader(beamComposeProg, beamComposeFrag);
-      onCompileState?.("Linking shader (beam finalize)...");
-      webgl.linkProgram(beamComposeProg);
-      await yieldOverlayCompileTurn();
-    }
 
-    const ext =
-      webgl.getExtension("WEBGL_parallel_shader_compile")
-      || webgl.getExtension("KHR_parallel_shader_compile");
+      if (destroyed) {
+        webgl.getExtension("WEBGL_lose_context")?.loseContext();
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
 
-    await waitForOverlayProgramsToComplete(
-      webgl,
-      ext,
-      [prog1, prog2, beamDownscaleProg, beamKernelProg, beamStripeProg, beamComposeProg],
-      onCompileState,
-    );
+      if (!(await validateOverlayProgramLink(webgl, prog1, "pass 1/2", onCompileState))) {
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
 
-    if (destroyed) {
-      // Surface was torn down during the wait; loseContext() is now safe.
-      webgl.getExtension("WEBGL_lose_context")?.loseContext();
+      if (!(await validateOverlayProgramLink(webgl, prog2, "pass 2/2", onCompileState))) {
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
+      if (!(await validateOverlayProgramLink(webgl, beamDownscaleProg, "beam downscale", onCompileState))) {
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
+      if (!(await validateOverlayProgramLink(webgl, beamKernelProg, "beam kernel", onCompileState))) {
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
+      if (!(await validateOverlayProgramLink(webgl, beamStripeProg, "beam stripe", onCompileState))) {
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
+      if (!(await validateOverlayProgramLink(webgl, beamComposeProg, "beam finalize", onCompileState))) {
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
+
+      if (destroyed) {
+        webgl.getExtension("WEBGL_lose_context")?.loseContext();
+        compiling = false;
+        onCompileState?.("");
+        return;
+      }
+
+      webgl.useProgram(prog1);
+      webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
+      renderer.pass1UniformLocations = collectOverlayUniformLocations(webgl, prog1, PASS1_UNIFORM_NAMES);
+
+      webgl.useProgram(prog2);
+      webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
+      const sourceTextureLocation = webgl.getUniformLocation(prog2, "uSourceTexture");
+      if (sourceTextureLocation != null) {
+        webgl.uniform1i(sourceTextureLocation, 1);
+      }
+      const beamKernelTextureLocation = webgl.getUniformLocation(prog2, "uBeamKernelTexture");
+      if (beamKernelTextureLocation != null) {
+        webgl.uniform1i(beamKernelTextureLocation, 2);
+      }
+      const pass2UniformNames =
+        pass2Variant === "beam"
+          ? PASS2_BEAM_UNIFORM_NAMES
+          : pass2Variant === "phosphor"
+            ? PASS2_PHOSPHOR_UNIFORM_NAMES
+            : PASS2_BASIC_UNIFORM_NAMES;
+      renderer.uniformLocations = collectOverlayUniformLocations(webgl, prog2, pass2UniformNames);
+
+      renderer.pass1Program = prog1;
+      renderer.program = prog2;
+      renderer.passthruProgram = passthruProg;
+      renderer.beamDownscaleProgram = beamDownscaleProg;
+      renderer.beamKernelProgram = beamKernelProg;
+      renderer.beamStripeProgram = beamStripeProg;
+      renderer.beamComposeProgram = beamComposeProg;
+      if (beamDownscaleProg) {
+        webgl.useProgram(beamDownscaleProg);
+        webgl.uniform1i(webgl.getUniformLocation(beamDownscaleProg, "uTexture"), 0);
+        renderer.beamDownscaleUniformLocations = {
+          uTexture: webgl.getUniformLocation(beamDownscaleProg, "uTexture"),
+          uSourceSize: webgl.getUniformLocation(beamDownscaleProg, "uSourceSize"),
+          uTargetSize: webgl.getUniformLocation(beamDownscaleProg, "uTargetSize"),
+        };
+      }
+      if (beamKernelProg) {
+        webgl.useProgram(beamKernelProg);
+        webgl.uniform1i(webgl.getUniformLocation(beamKernelProg, "uSourceTexture"), 1);
+        renderer.beamKernelUniformLocations = {
+          uSourceTexture: webgl.getUniformLocation(beamKernelProg, "uSourceTexture"),
+          uBeamSourceSize: webgl.getUniformLocation(beamKernelProg, "uBeamSourceSize"),
+          uDisplaySize: webgl.getUniformLocation(beamKernelProg, "uDisplaySize"),
+          uColorLevels: webgl.getUniformLocation(beamKernelProg, "uColorLevels"),
+          uDitherStrength: webgl.getUniformLocation(beamKernelProg, "uDitherStrength"),
+          uSamplingMode: webgl.getUniformLocation(beamKernelProg, "uSamplingMode"),
+          uHorizontalSharpness: webgl.getUniformLocation(beamKernelProg, "uHorizontalSharpness"),
+          uRgbConvergenceOffset: webgl.getUniformLocation(beamKernelProg, "uRgbConvergenceOffset"),
+          uSmoothStrength: webgl.getUniformLocation(beamKernelProg, "uSmoothStrength"),
+          uCurvature: webgl.getUniformLocation(beamKernelProg, "uCurvature"),
+          uBeamDarkCutoff: webgl.getUniformLocation(beamKernelProg, "uBeamDarkCutoff"),
+          uBeamHorizontalSpread: webgl.getUniformLocation(beamKernelProg, "uBeamHorizontalSpread"),
+          uBeamWhiteBloom: webgl.getUniformLocation(beamKernelProg, "uBeamWhiteBloom"),
+        };
+      }
+      if (beamStripeProg) {
+        webgl.useProgram(beamStripeProg);
+        webgl.uniform1i(webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"), 2);
+        renderer.beamStripeUniformLocations = {
+          uBeamKernelTexture: webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"),
+          uOutputSize: webgl.getUniformLocation(beamStripeProg, "uOutputSize"),
+          uDisplaySize: webgl.getUniformLocation(beamStripeProg, "uDisplaySize"),
+          uBeamSourceSize: webgl.getUniformLocation(beamStripeProg, "uBeamSourceSize"),
+          uCurvature: webgl.getUniformLocation(beamStripeProg, "uCurvature"),
+          uBeamStripeMode: webgl.getUniformLocation(beamStripeProg, "uBeamStripeMode"),
+          uBeamStripeStrength: webgl.getUniformLocation(beamStripeProg, "uBeamStripeStrength"),
+          uBeamWhiteBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWhiteBloom"),
+          uBeamWarmBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWarmBloom"),
+        };
+      }
+      if (beamComposeProg) {
+        webgl.useProgram(beamComposeProg);
+        webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uSourceTexture"), 1);
+        webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"), 2);
+        renderer.beamComposeUniformLocations = {
+          uSourceTexture: webgl.getUniformLocation(beamComposeProg, "uSourceTexture"),
+          uBeamKernelTexture: webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"),
+          uBeamSourceSize: webgl.getUniformLocation(beamComposeProg, "uBeamSourceSize"),
+          uDisplaySize: webgl.getUniformLocation(beamComposeProg, "uDisplaySize"),
+          uSamplingMode: webgl.getUniformLocation(beamComposeProg, "uSamplingMode"),
+          uRgbConvergenceOffset: webgl.getUniformLocation(beamComposeProg, "uRgbConvergenceOffset"),
+          uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
+        };
+      }
       compiling = false;
       onCompileState?.("");
-      return;
+      onReady?.(renderer);
+    } finally {
+      await releaseOverlayCompileSlot(compileRequesterId);
     }
-
-    if (!(await validateOverlayProgramLink(webgl, prog1, "pass 1/2", onCompileState))) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-
-    if (!(await validateOverlayProgramLink(webgl, prog2, "pass 2/2", onCompileState))) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-    if (!(await validateOverlayProgramLink(webgl, beamDownscaleProg, "beam downscale", onCompileState))) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-    if (!(await validateOverlayProgramLink(webgl, beamKernelProg, "beam kernel", onCompileState))) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-    if (!(await validateOverlayProgramLink(webgl, beamStripeProg, "beam stripe", onCompileState))) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-    if (!(await validateOverlayProgramLink(webgl, beamComposeProg, "beam finalize", onCompileState))) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-
-    if (destroyed) {
-      webgl.getExtension("WEBGL_lose_context")?.loseContext();
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-
-    webgl.useProgram(prog1);
-    webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
-    renderer.pass1UniformLocations = collectOverlayUniformLocations(webgl, prog1, PASS1_UNIFORM_NAMES);
-
-    webgl.useProgram(prog2);
-    webgl.uniform1i(webgl.getUniformLocation(prog2, "uPass1Texture"), 0);
-    const sourceTextureLocation = webgl.getUniformLocation(prog2, "uSourceTexture");
-    if (sourceTextureLocation != null) {
-      webgl.uniform1i(sourceTextureLocation, 1);
-    }
-    const beamKernelTextureLocation = webgl.getUniformLocation(prog2, "uBeamKernelTexture");
-    if (beamKernelTextureLocation != null) {
-      webgl.uniform1i(beamKernelTextureLocation, 2);
-    }
-    const pass2UniformNames =
-      pass2Variant === "beam"
-        ? PASS2_BEAM_UNIFORM_NAMES
-        : pass2Variant === "phosphor"
-          ? PASS2_PHOSPHOR_UNIFORM_NAMES
-          : PASS2_BASIC_UNIFORM_NAMES;
-    renderer.uniformLocations = collectOverlayUniformLocations(webgl, prog2, pass2UniformNames);
-
-    renderer.pass1Program = prog1;
-    renderer.program = prog2;
-    renderer.passthruProgram = passthruProg;
-    renderer.beamDownscaleProgram = beamDownscaleProg;
-    renderer.beamKernelProgram = beamKernelProg;
-    renderer.beamStripeProgram = beamStripeProg;
-    renderer.beamComposeProgram = beamComposeProg;
-    if (beamDownscaleProg) {
-      webgl.useProgram(beamDownscaleProg);
-      webgl.uniform1i(webgl.getUniformLocation(beamDownscaleProg, "uTexture"), 0);
-      renderer.beamDownscaleUniformLocations = {
-        uTexture: webgl.getUniformLocation(beamDownscaleProg, "uTexture"),
-        uSourceSize: webgl.getUniformLocation(beamDownscaleProg, "uSourceSize"),
-        uTargetSize: webgl.getUniformLocation(beamDownscaleProg, "uTargetSize"),
-      };
-    }
-    if (beamKernelProg) {
-      webgl.useProgram(beamKernelProg);
-      webgl.uniform1i(webgl.getUniformLocation(beamKernelProg, "uSourceTexture"), 1);
-      renderer.beamKernelUniformLocations = {
-        uSourceTexture: webgl.getUniformLocation(beamKernelProg, "uSourceTexture"),
-        uBeamSourceSize: webgl.getUniformLocation(beamKernelProg, "uBeamSourceSize"),
-        uDisplaySize: webgl.getUniformLocation(beamKernelProg, "uDisplaySize"),
-        uColorLevels: webgl.getUniformLocation(beamKernelProg, "uColorLevels"),
-        uDitherStrength: webgl.getUniformLocation(beamKernelProg, "uDitherStrength"),
-        uSamplingMode: webgl.getUniformLocation(beamKernelProg, "uSamplingMode"),
-        uHorizontalSharpness: webgl.getUniformLocation(beamKernelProg, "uHorizontalSharpness"),
-        uRgbConvergenceOffset: webgl.getUniformLocation(beamKernelProg, "uRgbConvergenceOffset"),
-        uSmoothStrength: webgl.getUniformLocation(beamKernelProg, "uSmoothStrength"),
-        uCurvature: webgl.getUniformLocation(beamKernelProg, "uCurvature"),
-        uBeamDarkCutoff: webgl.getUniformLocation(beamKernelProg, "uBeamDarkCutoff"),
-        uBeamHorizontalSpread: webgl.getUniformLocation(beamKernelProg, "uBeamHorizontalSpread"),
-        uBeamWhiteBloom: webgl.getUniformLocation(beamKernelProg, "uBeamWhiteBloom"),
-      };
-    }
-    if (beamStripeProg) {
-      webgl.useProgram(beamStripeProg);
-      webgl.uniform1i(webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"), 2);
-      renderer.beamStripeUniformLocations = {
-        uBeamKernelTexture: webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"),
-        uOutputSize: webgl.getUniformLocation(beamStripeProg, "uOutputSize"),
-        uDisplaySize: webgl.getUniformLocation(beamStripeProg, "uDisplaySize"),
-        uBeamSourceSize: webgl.getUniformLocation(beamStripeProg, "uBeamSourceSize"),
-        uCurvature: webgl.getUniformLocation(beamStripeProg, "uCurvature"),
-        uBeamStripeMode: webgl.getUniformLocation(beamStripeProg, "uBeamStripeMode"),
-        uBeamStripeStrength: webgl.getUniformLocation(beamStripeProg, "uBeamStripeStrength"),
-        uBeamWhiteBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWhiteBloom"),
-        uBeamWarmBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWarmBloom"),
-      };
-    }
-    if (beamComposeProg) {
-      webgl.useProgram(beamComposeProg);
-      webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uSourceTexture"), 1);
-      webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"), 2);
-      renderer.beamComposeUniformLocations = {
-        uSourceTexture: webgl.getUniformLocation(beamComposeProg, "uSourceTexture"),
-        uBeamKernelTexture: webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"),
-        uBeamSourceSize: webgl.getUniformLocation(beamComposeProg, "uBeamSourceSize"),
-        uDisplaySize: webgl.getUniformLocation(beamComposeProg, "uDisplaySize"),
-        uSamplingMode: webgl.getUniformLocation(beamComposeProg, "uSamplingMode"),
-        uRgbConvergenceOffset: webgl.getUniformLocation(beamComposeProg, "uRgbConvergenceOffset"),
-        uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
-      };
-    }
-    compiling = false;
-    onCompileState?.("");
-    onReady?.(renderer);
   });
 
   if (passthruProg) {

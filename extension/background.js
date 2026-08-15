@@ -9,11 +9,21 @@ const COMPILE_STATUS_SESSION_KEY = "retro-compile-status";
 
 let currentSession = null;
 let currentCompileStatus = null;
+let overlayCompileSlot = {
+  holderId: null,
+  expiresAt: 0,
+};
+
+const OVERLAY_COMPILE_SLOT_TTL_MS = 45000;
 
 function isSameCompileStatus(a, b) {
   return Boolean(a?.active) === Boolean(b?.active)
     && (a?.label ?? "") === (b?.label ?? "")
     && (a?.source ?? "") === (b?.source ?? "");
+}
+
+function isOverlayCompileSlotAvailable(now = Date.now()) {
+  return !overlayCompileSlot.holderId || overlayCompileSlot.expiresAt <= now;
 }
 
 chrome.storage.session.get(COMPILE_STATUS_SESSION_KEY).then((stored) => {
@@ -180,6 +190,42 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
       });
     return true;
+  }
+
+  if (message?.type === "ACQUIRE_OVERLAY_COMPILE_SLOT") {
+    const requesterId = message.requesterId || null;
+    const now = Date.now();
+    if (!requesterId) {
+      sendResponse({ ok: false, acquired: false, error: "missing requesterId" });
+      return;
+    }
+    if (overlayCompileSlot.holderId === requesterId || isOverlayCompileSlotAvailable(now)) {
+      overlayCompileSlot = {
+        holderId: requesterId,
+        expiresAt: now + OVERLAY_COMPILE_SLOT_TTL_MS,
+      };
+      sendResponse({ ok: true, acquired: true });
+      return;
+    }
+    sendResponse({
+      ok: true,
+      acquired: false,
+      holderId: overlayCompileSlot.holderId,
+      retryAfterMs: Math.max(50, Math.min(1000, overlayCompileSlot.expiresAt - now)),
+    });
+    return;
+  }
+
+  if (message?.type === "RELEASE_OVERLAY_COMPILE_SLOT") {
+    const requesterId = message.requesterId || null;
+    if (requesterId && overlayCompileSlot.holderId === requesterId) {
+      overlayCompileSlot = {
+        holderId: null,
+        expiresAt: 0,
+      };
+    }
+    sendResponse({ ok: true });
+    return;
   }
 
   if (message?.type === "SET_COMPILE_STATUS") {
