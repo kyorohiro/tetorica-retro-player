@@ -2,13 +2,12 @@ import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_BASE } from "./shared/filterPass1LiteBaseShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "./shared/filterPass1LiteNearestShader.js";
 import { FILTER_FRAGMENT_PASS2_LITE } from "./shared/filterPass2LiteShader.js";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE } from "./shared/filterPass2BeamLiteShader.js";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE } from "./shared/filterPass2BeamLiteCompositeShader.js";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "./shared/filterPass2BeamLiteKernelShader.js";
 import { FILTER_FRAGMENT_BEAM_SOURCE_DOWNSCALE } from "./shared/filterBeamSourceDownscaleShader.js";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "./shared/filterPass2BeamLiteCrtKernelShader.js";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE } from "./shared/filterPass2BeamLiteCrtComposeShader.js";
-import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "./shared/filterPass2BeamLiteCrtPostShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "./shared/filterPass2BeamLiteFinalizeShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "./shared/filterPass2BeamLitePostShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE } from "./shared/filterPass2BeamLiteStripeShader.js";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "./shared/filterPass1Pc98LiteShader.js";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "./shared/filterPass2PhosphorLiteShader.js";
 import {
@@ -99,10 +98,7 @@ function getWindowsLiteVariantKey(settings) {
       : "basic";
 
   if (isBeamCrossModeEnabled(settings)) {
-    if (settings.presetKey === "crtBeam") {
-      return "basic_nearest:beam_crt";
-    }
-    return `${pass1}:beam_full`;
+    return `${pass1}:beam`;
   }
 
   const pass2 =
@@ -127,24 +123,23 @@ function getWindowsLiteShaderSources(settings) {
           ? FILTER_FRAGMENT_PASS1_LITE_BASE
           : FILTER_FRAGMENT_PASS1_LITE;
   const pass2 =
-    pass2Variant === "beam_crt"
-      ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
-      : pass2Variant === "beam_full"
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_COMPOSITE
-        : pass2Variant === "phosphor"
-          ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
-          : FILTER_FRAGMENT_PASS2_LITE;
+    pass2Variant === "beam"
+      ? FILTER_FRAGMENT_PASS2_BEAM_LITE_POST
+      : pass2Variant === "phosphor"
+        ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
+        : FILTER_FRAGMENT_PASS2_LITE;
   return {
     pass1,
     pass2,
     beamDownscale: shouldUsePreFilterDownscale(settings) ? FILTER_FRAGMENT_BEAM_SOURCE_DOWNSCALE : null,
     beamKernel:
-      pass2Variant === "beam_crt"
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
-        : pass2Variant === "beam_full"
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
-          : null,
-    beamCompose: pass2Variant === "beam_crt" ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_COMPOSE : null,
+      pass2Variant === "beam"
+        ? variantKey.startsWith("basic_nearest:beam")
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
+          : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+        : null,
+    beamStripe: pass2Variant === "beam" ? FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE : null,
+    beamCompose: pass2Variant === "beam" ? FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE : null,
   };
 }
 
@@ -1257,6 +1252,23 @@ function createOverlay(settings) {
           surface.gl.activeTexture(surface.gl.TEXTURE1);
           surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
           surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+          let beamComposeInputTexture = surface.renderer.beamKernelTexture;
+          if (
+            surface.renderer.beamStripeProgram &&
+            surface.renderer.beamStripeUniformLocations
+          ) {
+            ensureBeamStripeFramebuffer(surface.gl, surface.renderer, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+            surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.beamStripeFbo);
+            surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+            surface.gl.clearColor(0, 0, 0, 1);
+            surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
+            surface.gl.useProgram(surface.renderer.beamStripeProgram);
+            applyBeamStripeSettings(surface.gl, surface.renderer, limitedSize, currentSettings);
+            surface.gl.activeTexture(surface.gl.TEXTURE2);
+            surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
+            surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+            beamComposeInputTexture = surface.renderer.beamStripeTexture;
+          }
           if (
             surface.renderer.beamComposeProgram &&
             surface.renderer.beamComposeUniformLocations
@@ -1271,7 +1283,7 @@ function createOverlay(settings) {
             surface.gl.activeTexture(surface.gl.TEXTURE1);
             surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
             surface.gl.activeTexture(surface.gl.TEXTURE2);
-            surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
+            surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamComposeInputTexture);
             surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
             pass2PrimaryTexture = surface.renderer.beamComposeTexture;
           }
@@ -2980,6 +2992,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   const beamKernelFrag = shaderSources.beamKernel
     ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamKernel, initialSettings)
     : null;
+  const beamStripeFrag = shaderSources.beamStripe
+    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamStripe, initialSettings)
+    : null;
   const beamComposeFrag = shaderSources.beamCompose
     ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamCompose, initialSettings)
     : null;
@@ -2987,6 +3002,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   const prog2 = webgl.createProgram();
   const beamDownscaleProg = beamDownscaleFrag ? webgl.createProgram() : null;
   const beamKernelProg = beamKernelFrag ? webgl.createProgram() : null;
+  const beamStripeProg = beamStripeFrag ? webgl.createProgram() : null;
   const beamComposeProg = beamComposeFrag ? webgl.createProgram() : null;
 
   if (
@@ -2994,6 +3010,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     !prog2 ||
     (beamDownscaleFrag && !beamDownscaleProg) ||
     (beamKernelFrag && !beamKernelProg) ||
+    (beamStripeFrag && !beamStripeProg) ||
     (beamComposeFrag && !beamComposeProg)
   ) {
     throw new Error("Failed to create WebGL program.");
@@ -3019,10 +3036,16 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     onCompileState?.("Linking shader (beam kernel)...");
     webgl.linkProgram(beamKernelProg);
   }
+  if (beamStripeProg && beamStripeFrag) {
+    webgl.attachShader(beamStripeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
+    webgl.attachShader(beamStripeProg, beamStripeFrag);
+    onCompileState?.("Linking shader (beam stripe)...");
+    webgl.linkProgram(beamStripeProg);
+  }
   if (beamComposeProg && beamComposeFrag) {
     webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings));
     webgl.attachShader(beamComposeProg, beamComposeFrag);
-    onCompileState?.("Linking shader (beam compose)...");
+    onCompileState?.("Linking shader (beam finalize)...");
     webgl.linkProgram(beamComposeProg);
   }
 
@@ -3079,6 +3102,8 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     beamDownscaleUniformLocations: null,
     beamKernelProgram: null,
     beamKernelUniformLocations: null,
+    beamStripeProgram: null,
+    beamStripeUniformLocations: null,
     beamComposeProgram: null,
     beamComposeUniformLocations: null,
     fbo: null,
@@ -3093,6 +3118,10 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     beamKernelTexture: null,
     beamKernelFboWidth: 0,
     beamKernelFboHeight: 0,
+    beamStripeFbo: null,
+    beamStripeTexture: null,
+    beamStripeFboWidth: 0,
+    beamStripeFboHeight: 0,
     beamComposeFbo: null,
     beamComposeTexture: null,
     beamComposeFboWidth: 0,
@@ -3121,9 +3150,10 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
           const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
           const ready3 = beamDownscaleProg ? webgl.getProgramParameter(beamDownscaleProg, ext.COMPLETION_STATUS_KHR) : true;
           const ready4 = beamKernelProg ? webgl.getProgramParameter(beamKernelProg, ext.COMPLETION_STATUS_KHR) : true;
-          const ready5 = beamComposeProg ? webgl.getProgramParameter(beamComposeProg, ext.COMPLETION_STATUS_KHR) : true;
+          const ready5 = beamStripeProg ? webgl.getProgramParameter(beamStripeProg, ext.COMPLETION_STATUS_KHR) : true;
+          const ready6 = beamComposeProg ? webgl.getProgramParameter(beamComposeProg, ext.COMPLETION_STATUS_KHR) : true;
           const timedOut = performance.now() - startedAt >= 8000;
-          if ((ready1 && ready2 && ready3 && ready4 && ready5) || timedOut) {
+          if ((ready1 && ready2 && ready3 && ready4 && ready5 && ready6) || timedOut) {
             resolve();
             return;
           }
@@ -3171,8 +3201,14 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       onCompileState?.("");
       return;
     }
+    if (beamStripeProg && !webgl.getProgramParameter(beamStripeProg, webgl.LINK_STATUS)) {
+      console.error("[overlay] Beam stripe shader link failed:", webgl.getProgramInfoLog(beamStripeProg) || "unknown");
+      compiling = false;
+      onCompileState?.("");
+      return;
+    }
     if (beamComposeProg && !webgl.getProgramParameter(beamComposeProg, webgl.LINK_STATUS)) {
-      console.error("[overlay] Beam compose shader link failed:", webgl.getProgramInfoLog(beamComposeProg) || "unknown");
+      console.error("[overlay] Beam finalize shader link failed:", webgl.getProgramInfoLog(beamComposeProg) || "unknown");
       compiling = false;
       onCompileState?.("");
       return;
@@ -3283,6 +3319,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     renderer.program = prog2;
     renderer.beamDownscaleProgram = beamDownscaleProg;
     renderer.beamKernelProgram = beamKernelProg;
+    renderer.beamStripeProgram = beamStripeProg;
     renderer.beamComposeProgram = beamComposeProg;
     if (beamDownscaleProg) {
       webgl.useProgram(beamDownscaleProg);
@@ -3312,6 +3349,21 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         uBeamWhiteBloom: webgl.getUniformLocation(beamKernelProg, "uBeamWhiteBloom"),
       };
     }
+    if (beamStripeProg) {
+      webgl.useProgram(beamStripeProg);
+      webgl.uniform1i(webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"), 2);
+      renderer.beamStripeUniformLocations = {
+        uBeamKernelTexture: webgl.getUniformLocation(beamStripeProg, "uBeamKernelTexture"),
+        uOutputSize: webgl.getUniformLocation(beamStripeProg, "uOutputSize"),
+        uDisplaySize: webgl.getUniformLocation(beamStripeProg, "uDisplaySize"),
+        uBeamSourceSize: webgl.getUniformLocation(beamStripeProg, "uBeamSourceSize"),
+        uCurvature: webgl.getUniformLocation(beamStripeProg, "uCurvature"),
+        uBeamStripeMode: webgl.getUniformLocation(beamStripeProg, "uBeamStripeMode"),
+        uBeamStripeStrength: webgl.getUniformLocation(beamStripeProg, "uBeamStripeStrength"),
+        uBeamWhiteBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWhiteBloom"),
+        uBeamWarmBloom: webgl.getUniformLocation(beamStripeProg, "uBeamWarmBloom"),
+      };
+    }
     if (beamComposeProg) {
       webgl.useProgram(beamComposeProg);
       webgl.uniform1i(webgl.getUniformLocation(beamComposeProg, "uSourceTexture"), 1);
@@ -3319,16 +3371,11 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       renderer.beamComposeUniformLocations = {
         uSourceTexture: webgl.getUniformLocation(beamComposeProg, "uSourceTexture"),
         uBeamKernelTexture: webgl.getUniformLocation(beamComposeProg, "uBeamKernelTexture"),
-        uTargetSize: webgl.getUniformLocation(beamComposeProg, "uTargetSize"),
-        uOutputSize: webgl.getUniformLocation(beamComposeProg, "uOutputSize"),
-        uDisplaySize: webgl.getUniformLocation(beamComposeProg, "uDisplaySize"),
         uBeamSourceSize: webgl.getUniformLocation(beamComposeProg, "uBeamSourceSize"),
+        uDisplaySize: webgl.getUniformLocation(beamComposeProg, "uDisplaySize"),
         uSamplingMode: webgl.getUniformLocation(beamComposeProg, "uSamplingMode"),
         uRgbConvergenceOffset: webgl.getUniformLocation(beamComposeProg, "uRgbConvergenceOffset"),
         uCurvature: webgl.getUniformLocation(beamComposeProg, "uCurvature"),
-        uBeamStripeStrength: webgl.getUniformLocation(beamComposeProg, "uBeamStripeStrength"),
-        uBeamWhiteBloom: webgl.getUniformLocation(beamComposeProg, "uBeamWhiteBloom"),
-        uBeamWarmBloom: webgl.getUniformLocation(beamComposeProg, "uBeamWarmBloom"),
       };
     }
     compiling = false;
@@ -3416,7 +3463,7 @@ function applyBeamKernelSettings(gl, renderer, limitedSize, settings) {
   gl.uniform2f(renderer.beamKernelUniformLocations.uDisplaySize, displaySize.width, displaySize.height);
   gl.uniform1f(renderer.beamKernelUniformLocations.uColorLevels, Math.max(settings.colorLevels, 2));
   gl.uniform1f(renderer.beamKernelUniformLocations.uDitherStrength, settings.ditherStrength);
-  gl.uniform1f(renderer.beamKernelUniformLocations.uSamplingMode, 0);
+  gl.uniform1f(renderer.beamKernelUniformLocations.uSamplingMode, getSamplingModeValue(settings.samplingMode));
   gl.uniform1f(renderer.beamKernelUniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
   gl.uniform1f(renderer.beamKernelUniformLocations.uSmoothStrength, settings.smoothStrength ?? 0);
@@ -3426,20 +3473,29 @@ function applyBeamKernelSettings(gl, renderer, limitedSize, settings) {
   gl.uniform1f(renderer.beamKernelUniformLocations.uBeamWhiteBloom, settings.beamWhiteBloom ?? 1);
 }
 
+function applyBeamStripeSettings(gl, renderer, limitedSize, settings) {
+  if (!renderer.beamStripeUniformLocations) return;
+  const displaySize = getOverlayDisplaySize(gl, renderer);
+  gl.useProgram(renderer.beamStripeProgram);
+  gl.uniform2f(renderer.beamStripeUniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
+  gl.uniform2f(renderer.beamStripeUniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  gl.uniform2f(renderer.beamStripeUniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
+  gl.uniform1f(renderer.beamStripeUniformLocations.uCurvature, settings.curvature ?? 0);
+  gl.uniform1f(renderer.beamStripeUniformLocations.uBeamStripeMode, getBeamStripeModeValue(settings.beamStripeMode));
+  gl.uniform1f(renderer.beamStripeUniformLocations.uBeamStripeStrength, settings.beamStripeStrength ?? 0);
+  gl.uniform1f(renderer.beamStripeUniformLocations.uBeamWhiteBloom, settings.beamWhiteBloom ?? 1);
+  gl.uniform1f(renderer.beamStripeUniformLocations.uBeamWarmBloom, settings.beamWarmBloom ?? 0);
+}
+
 function applyBeamComposeSettings(gl, renderer, limitedSize, settings) {
   if (!renderer.beamComposeUniformLocations) return;
   const displaySize = getOverlayDisplaySize(gl, renderer);
   gl.useProgram(renderer.beamComposeProgram);
-  gl.uniform2f(renderer.beamComposeUniformLocations.uTargetSize, Math.max(settings.targetWidth, 1), Math.max(settings.targetHeight, 1));
-  gl.uniform2f(renderer.beamComposeUniformLocations.uOutputSize, Math.max(gl.drawingBufferWidth, 1), Math.max(gl.drawingBufferHeight, 1));
-  gl.uniform2f(renderer.beamComposeUniformLocations.uDisplaySize, displaySize.width, displaySize.height);
   gl.uniform2f(renderer.beamComposeUniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
-  gl.uniform1f(renderer.beamComposeUniformLocations.uSamplingMode, 0);
+  gl.uniform2f(renderer.beamComposeUniformLocations.uDisplaySize, displaySize.width, displaySize.height);
+  gl.uniform1f(renderer.beamComposeUniformLocations.uSamplingMode, getSamplingModeValue(settings.samplingMode));
   gl.uniform1f(renderer.beamComposeUniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
   gl.uniform1f(renderer.beamComposeUniformLocations.uCurvature, settings.curvature ?? 0);
-  gl.uniform1f(renderer.beamComposeUniformLocations.uBeamStripeStrength, settings.beamStripeStrength ?? 0);
-  gl.uniform1f(renderer.beamComposeUniformLocations.uBeamWhiteBloom, settings.beamWhiteBloom ?? 1);
-  gl.uniform1f(renderer.beamComposeUniformLocations.uBeamWarmBloom, settings.beamWarmBloom ?? 0);
 }
 
 function ensureBeamSourceFramebuffer(gl, renderer, width, height) {
@@ -3494,6 +3550,32 @@ function ensureBeamKernelFramebuffer(gl, renderer, width, height) {
   renderer.beamKernelFboHeight = height;
 }
 
+function ensureBeamStripeFramebuffer(gl, renderer, width, height) {
+  if (
+    renderer.beamStripeFbo &&
+    renderer.beamStripeTexture &&
+    renderer.beamStripeFboWidth === width &&
+    renderer.beamStripeFboHeight === height
+  ) {
+    return;
+  }
+  if (renderer.beamStripeFbo) gl.deleteFramebuffer(renderer.beamStripeFbo);
+  if (renderer.beamStripeTexture) gl.deleteTexture(renderer.beamStripeTexture);
+  renderer.beamStripeTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, renderer.beamStripeTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  renderer.beamStripeFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, renderer.beamStripeFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderer.beamStripeTexture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  renderer.beamStripeFboWidth = width;
+  renderer.beamStripeFboHeight = height;
+}
+
 function ensureBeamComposeFramebuffer(gl, renderer, width, height) {
   if (
     renderer.beamComposeFbo &&
@@ -3518,6 +3600,17 @@ function ensureBeamComposeFramebuffer(gl, renderer, width, height) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   renderer.beamComposeFboWidth = width;
   renderer.beamComposeFboHeight = height;
+}
+
+function getSamplingModeValue(mode) {
+  if (mode === "average_fast_8") return 3;
+  if (mode === "average_fast_4") return 2;
+  if (mode === "average") return 1;
+  return 0;
+}
+
+function getBeamStripeModeValue(mode) {
+  return mode === "next" ? 1 : 0;
 }
 
 function compileShader(webgl, type, source, settings) {
