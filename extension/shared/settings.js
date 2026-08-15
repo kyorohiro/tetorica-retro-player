@@ -1216,6 +1216,7 @@ export const DEFAULT_SETTINGS = {
   grainVisibilityMode: false,
   beamDarkCutoff: 0.0,
   beamHorizontalSpread: 0.5,
+  beamStripeMode: "legacy",
   beamStripeStrength: 0.0,
   beamWhiteBloom: 1.0,
   beamWarmBloom: 0.0,
@@ -1293,6 +1294,10 @@ export const OVERLAY_TARGET_LIMITS = {
 
 function isPhosphorDotShape(value) {
   return value === "circle" || value === "heart" || value === "beam" || value === "square";
+}
+
+function isBeamStripeMode(value) {
+  return value === "legacy" || value === "modern";
 }
 
 function normalizePhosphorDotInternalScale(value, fallback) {
@@ -1454,6 +1459,10 @@ export function normalizeSettings(candidate) {
       typeof candidate?.beamHorizontalSpread === "number"
         ? clamp(candidate.beamHorizontalSpread, 0.5, 2)
         : basePresetSettings.beamHorizontalSpread ?? DEFAULT_SETTINGS.beamHorizontalSpread,
+    beamStripeMode:
+      isBeamStripeMode(candidate?.beamStripeMode)
+        ? candidate.beamStripeMode
+        : basePresetSettings.beamStripeMode ?? DEFAULT_SETTINGS.beamStripeMode,
     beamStripeStrength:
       typeof candidate?.beamStripeStrength === "number"
         ? clamp(candidate.beamStripeStrength, 0, 2)
@@ -1810,6 +1819,10 @@ export function applyPresetToSettings(presetKey) {
       typeof preset.beamHorizontalSpread === "number"
         ? preset.beamHorizontalSpread
         : DEFAULT_SETTINGS.beamHorizontalSpread,
+    beamStripeMode:
+      isBeamStripeMode(preset.beamStripeMode)
+        ? preset.beamStripeMode
+        : DEFAULT_SETTINGS.beamStripeMode,
     beamStripeStrength:
       typeof preset.beamStripeStrength === "number"
         ? preset.beamStripeStrength
