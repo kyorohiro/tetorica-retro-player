@@ -2423,6 +2423,16 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     compileStatusVisible = false;
   };
 
+  const showCompileOverlayNow = () => {
+    if (!compileStatusMessage) {
+      return;
+    }
+    compileOverlayLabel.textContent = compileStatusMessage;
+    compileStatusVisible = true;
+    positionCompileOverlayToCanvas();
+    compileOverlay.style.setProperty("display", "flex", "important");
+  };
+
   const positionCompileOverlayToCanvas = () => {
     const rect = canvas.getBoundingClientRect();
     compileOverlay.style.setProperty("left", `${rect.left}px`, "important");
@@ -2476,7 +2486,8 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       const activeSetupGeneration = ++setupGeneration;
       compileStatusMessage = "Preparing retro filter...";
       compileOverlayLabel.textContent = compileStatusMessage;
-      scheduleCompileOverlay();
+      publishOverlayCompileState(compileStatusMessage);
+      showCompileOverlayNow();
       renderer = setupRenderer(
         gl,
         onReady,
@@ -2489,13 +2500,13 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
           compileOverlayLabel.textContent = compileStatusMessage;
           if (compileStatusMessage) {
             publishOverlayCompileState(compileStatusMessage);
-            scheduleCompileOverlay();
+            showCompileOverlayNow();
           } else {
             if (renderer?.pass1Program && !isShaderActivated) {
               compileStatusMessage = "Activating shader...";
               compileOverlayLabel.textContent = compileStatusMessage;
               publishOverlayCompileState(compileStatusMessage);
-              scheduleCompileOverlay();
+              showCompileOverlayNow();
             } else {
               publishOverlayCompileState("");
               if (compileStatusTimer != null) {
