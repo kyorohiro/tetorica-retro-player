@@ -1522,6 +1522,7 @@ function createOverlay(settings) {
         }
       }
       if (surface.renderer.pass1Program && !surface.renderer.uniformLocations) {
+        surface.setCompileStatus("Activating shader...");
         finalizeOverlayRendererPrograms(surface.gl, surface.renderer, currentSettings);
         if (surface.renderer.uniformLocations) {
           applySettings(surface.gl, surface.renderer, currentSettings);
@@ -2502,19 +2503,12 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
             publishOverlayCompileState(compileStatusMessage);
             showCompileOverlayNow();
           } else {
-            if (renderer?.pass1Program && !isShaderActivated) {
-              compileStatusMessage = "Activating shader...";
-              compileOverlayLabel.textContent = compileStatusMessage;
-              publishOverlayCompileState(compileStatusMessage);
-              showCompileOverlayNow();
-            } else {
-              publishOverlayCompileState("");
-              if (compileStatusTimer != null) {
-                window.clearTimeout(compileStatusTimer);
-                compileStatusTimer = null;
-              }
-              hideCompileOverlayNow();
+            publishOverlayCompileState("");
+            if (compileStatusTimer != null) {
+              window.clearTimeout(compileStatusTimer);
+              compileStatusTimer = null;
             }
+            hideCompileOverlayNow();
           }
         },
       );
@@ -3391,7 +3385,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   // Returned immediately so the overlay shows raw video while the full filter
   // compiles in the background. After compilation, renderer.program is swapped.
   let passthruProg = null;
-  onCompileState?.("Preparing retro filter...");
+  onCompileState?.("Preparing retro filter (passthrough)...");
   const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings);
   const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT_OVERLAY, initialSettings);
   const passthru = webgl.createProgram();
@@ -3517,7 +3511,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     const compileSlotHeartbeatId = startOverlayCompileSlotHeartbeat(compileRequesterId);
     try {
       await yieldOverlayCompileTurn();
-      onCompileState?.("Compiling shader (pass 1/2)...");
+      onCompileState?.("Compiling shader (shared vertex)...");
       const vertexShader = compileShader(
         webgl,
         webgl.VERTEX_SHADER,
@@ -3526,7 +3520,10 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         { skipStatusCheck: true },
       );
       await yieldOverlayCompileTurn();
+      onCompileState?.("Preparing shader sources...");
       const shaderSources = getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS);
+      await yieldOverlayCompileTurn();
+      onCompileState?.("Compiling shader (pass 1 fragment)...");
       const pass1Frag = compileShader(
         webgl,
         webgl.FRAGMENT_SHADER,
@@ -3535,7 +3532,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         { skipStatusCheck: true },
       );
       await yieldOverlayCompileTurn();
-      onCompileState?.("Compiling shader (pass 2/2)...");
+      onCompileState?.("Compiling shader (pass 2 fragment)...");
       const pass2Frag = compileShader(
         webgl,
         webgl.FRAGMENT_SHADER,
@@ -3544,6 +3541,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         { skipStatusCheck: true },
       );
       await yieldOverlayCompileTurn();
+      if (shaderSources.beamDownscale) {
+        onCompileState?.("Compiling shader (beam downscale fragment)...");
+      }
       const beamDownscaleFrag = shaderSources.beamDownscale
         ? compileShader(
           webgl,
@@ -3555,6 +3555,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         : null;
       if (beamDownscaleFrag) {
         await yieldOverlayCompileTurn();
+      }
+      if (shaderSources.beamKernel) {
+        onCompileState?.("Compiling shader (beam kernel fragment)...");
       }
       const beamKernelFrag = shaderSources.beamKernel
         ? compileShader(
@@ -3568,6 +3571,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       if (beamKernelFrag) {
         await yieldOverlayCompileTurn();
       }
+      if (shaderSources.beamStripe) {
+        onCompileState?.("Compiling shader (beam stripe fragment)...");
+      }
       const beamStripeFrag = shaderSources.beamStripe
         ? compileShader(
           webgl,
@@ -3580,6 +3586,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       if (beamStripeFrag) {
         await yieldOverlayCompileTurn();
       }
+      if (shaderSources.beamCompose) {
+        onCompileState?.("Compiling shader (beam finalize fragment)...");
+      }
       const beamComposeFrag = shaderSources.beamCompose
         ? compileShader(
           webgl,
@@ -3591,6 +3600,9 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         : null;
       if (beamComposeFrag) {
         await yieldOverlayCompileTurn();
+      }
+      if (beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag) {
+        onCompileState?.("Compiling shader (beam shared vertex)...");
       }
       const auxiliaryVertexShader =
         beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag
@@ -3667,7 +3679,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
         webgl.getExtension("WEBGL_parallel_shader_compile")
         || webgl.getExtension("KHR_parallel_shader_compile");
 
-      const didProgramsComplete = await waitForOverlayProgramsToComplete(
+      await waitForOverlayProgramsToComplete(
         webgl,
         ext,
         [prog1, prog2, beamDownscaleProg, beamKernelProg, beamStripeProg, beamComposeProg],
@@ -3728,7 +3740,7 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
       renderer.beamStripeProgram = beamStripeProg;
       renderer.beamComposeProgram = beamComposeProg;
       compiling = false;
-      onCompileState?.("");
+      onCompileState?.("Shader linked. Waiting for first filtered frame...");
       onReady?.(renderer);
     } finally {
       window.clearInterval(compileSlotHeartbeatId);
