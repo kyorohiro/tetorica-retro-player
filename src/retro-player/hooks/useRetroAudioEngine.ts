@@ -518,7 +518,9 @@ export function useRetroAudioEngine({
   };
 
   const connectMediaAudio = async (media: HTMLMediaElement) => {
+    if (mediaRef.current !== media) return;
     const context = await ensureInitialized({ requireActivation: true });
+    if (mediaRef.current !== media) return;
     const engine = audioEngineRef.current;
     if (!context || !engine || !engine.input) {
       debugAudio("connectMediaAudio:no-context", {

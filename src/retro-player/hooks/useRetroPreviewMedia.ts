@@ -1313,7 +1313,9 @@ export function useRetroPreviewMedia({
     kind: "video" | "image" | "capture",
     skipLayoutRefresh = false,
   ) => {
+    const requestId = previewRequestIdRef.current;
     const app = await ensureRendererReady();
+    if (requestId !== previewRequestIdRef.current) throw new DOMException("Preview superseded", "AbortError");
     previewElementRef.current = source;
     fitSprite(app, null, source);
     setPreviewKindState(kind);
@@ -1705,6 +1707,10 @@ export function useRetroPreviewMedia({
           { url },
           {
             onCreated: (element) => {
+              if (requestId !== previewRequestIdRef.current) {
+                releaseDetachedMedia(element, url);
+                throw new DOMException("Preview superseded", "AbortError");
+              }
               applyMediaSettings(element);
               attachMediaEventListeners(element);
               previewElementRef.current = element;
@@ -1734,8 +1740,10 @@ export function useRetroPreviewMedia({
           attachNativeVideoPreview(media);
         } else {
           await ensureRendererReady();
+          if (requestId !== previewRequestIdRef.current) return;
           await attachVisualPreview(media, "video");
           await ensureVisualStartupReady("video");
+          if (requestId !== previewRequestIdRef.current) return;
           if (getHlsInstance(media) || getHlsSourceUrl(media) || media.src.includes(".m3u8")) {
             beginLoading("Loading video preview...");
             await waitForPreviewFrame(
@@ -1747,6 +1755,7 @@ export function useRetroPreviewMedia({
           }
         }
         await connectMediaAudio(media);
+        if (requestId !== previewRequestIdRef.current) return;
         syncVideoState();
       } else if (kind === "image") {
         const imageSource = await createImageMediaSource({ url });
@@ -1768,8 +1777,10 @@ export function useRetroPreviewMedia({
           attachNativeImagePreview(image);
         } else {
           await ensureRendererReady();
+          if (requestId !== previewRequestIdRef.current) return;
           await attachVisualPreview(image, "image", canReuseImagePreview);
           await ensureVisualStartupReady("image");
+          if (requestId !== previewRequestIdRef.current) return;
         }
         syncVideoState();
       } else {
@@ -1777,6 +1788,10 @@ export function useRetroPreviewMedia({
           { url },
           {
             onCreated: (element) => {
+              if (requestId !== previewRequestIdRef.current) {
+                releaseDetachedMedia(element, url);
+                throw new DOMException("Preview superseded", "AbortError");
+              }
               applyMediaSettings(element);
               attachMediaEventListeners(element);
             },
@@ -1801,7 +1816,9 @@ export function useRetroPreviewMedia({
         mediaRef.current = audio;
         safeRender();
         await ensureRendererReady();
+          if (requestId !== previewRequestIdRef.current) return;
         await connectMediaAudio(audio);
+        if (requestId !== previewRequestIdRef.current) return;
         syncVideoState();
       }
 
@@ -1809,6 +1826,7 @@ export function useRetroPreviewMedia({
 
       if ((kind === "video" || kind === "audio") && autoPlayRef.current) {
         await waitForMediaSwitchCooldown();
+        if (requestId !== previewRequestIdRef.current) return;
         await playVideoWithAudio();
       } else if (kind === "video" || kind === "audio") {
         settleManualStartState();

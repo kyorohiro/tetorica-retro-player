@@ -358,6 +358,7 @@ export function useRetroPixiStage({
     HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | null
   >(null);
   const filterRef = useRef<Record<string, never> | null>(null);
+  const initGenerationRef = useRef(0);
   const initPromiseRef = useRef<Promise<void> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const renderFrameRef = useRef<() => void>(() => {});
@@ -927,7 +928,8 @@ export function useRetroPixiStage({
 
     appliedLayoutKeyRef.current = null;
 
-    initPromiseRef.current = (async () => {
+    const generation = initGenerationRef.current;
+    const pendingInit = (async () => {
       const host = canvasHostRef.current;
       if (!host || appRef.current) return;
       const initStartedAt =
@@ -978,11 +980,13 @@ export function useRetroPixiStage({
       setShaderCompileLabel("Compiling shader...");
       showShaderBusyOverlay("Compiling shader...", "Shader preparation in progress.");
       await waitForShaderBusyOverlayPaint();
+      if (generation !== initGenerationRef.current || !host.isConnected) return;
       filterReadyPromiseRef.current = new Promise<void>((resolve) => {
         resolveFilterReadyRef.current = resolve;
       });
       appliedShaderCompileCacheBusterEnabledRef.current = shaderCompileCacheBusterEnabled;
       const onFilterReady = () => {
+        if (generation !== initGenerationRef.current || !host.isConnected) return;
         hideShaderBusyOverlay();
         setIsShaderCompiling(false);
         setShaderCompileLabel("");
@@ -993,6 +997,7 @@ export function useRetroPixiStage({
         startTicker();
       };
       const handleCompileStateChange = (state: { active: boolean; label?: string; error?: string }) => {
+        if (generation !== initGenerationRef.current || !host.isConnected) return;
         if (state.active) {
           showShaderBusyOverlay(
             state.label ?? "Compiling shader...",
@@ -1027,7 +1032,8 @@ export function useRetroPixiStage({
       };
 
       const nextHost = canvasHostRef.current;
-      if (!nextHost || nextHost !== host || !nextHost.isConnected) {
+      if (generation !== initGenerationRef.current || !nextHost || nextHost !== host || !nextHost.isConnected) {
+        pipeline.dispose();
         return;
       }
 
@@ -1066,10 +1072,11 @@ export function useRetroPixiStage({
       });
     })();
 
+    initPromiseRef.current = pendingInit;
     try {
-      await initPromiseRef.current;
+      await pendingInit;
     } finally {
-      initPromiseRef.current = null;
+      if (initPromiseRef.current === pendingInit) initPromiseRef.current = null;
     }
   }, [
     buildPipelineFilterState,
@@ -1102,6 +1109,8 @@ export function useRetroPixiStage({
   }, [initPixi]);
 
   const destroyPixi = useCallback(() => {
+    initGenerationRef.current++;
+    lastDrawnSourceRef.current = null;
     initPromiseRef.current = null;
     appliedLayoutKeyRef.current = null;
     resolveFilterReadyRef.current?.();

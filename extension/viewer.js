@@ -104,6 +104,8 @@ let alarmClockIntervalId = null;
 let activeRendererVariantSignature = null;
 let compileStatusTimerId = null;
 let lastPublishedCompileStateKey = "";
+let captureGeneration = 0;
+let captureStartQueue = Promise.resolve();
 let rendererSetupGeneration = 0;
 let rendererPreparing = false;
 let rendererFailed = false;
@@ -111,6 +113,7 @@ let rendererCompileQueue = Promise.resolve();
 let rendererProgramCache = null;
 const rendererAbort = new AbortController();
 window.addEventListener("pagehide", () => {
+  void stopCapture();
   rendererAbort.abort();
   rendererSetupGeneration++;
   rendererFailed = true;
@@ -469,38 +472,50 @@ async function getCaptureSession() {
   return response?.session ?? null;
 }
 
-async function startCapture(streamId) {
-  stopCapture();
-
-  mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId,
-      },
-    },
-    video: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId,
-      },
-    },
+function startCapture(streamId) {
+  const generation = ++captureGeneration;
+  const pending = captureStartQueue.catch(() => {}).then(async () => {
+    if (generation !== captureGeneration) return;
+    await stopCapture(false);
+    if (generation !== captureGeneration) return;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId } },
+      video: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId } },
+    });
+    if (generation !== captureGeneration) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    mediaStream = stream;
+    try {
+      video.srcObject = stream;
+      await video.play();
+      if (generation !== captureGeneration) return;
+      logCaptureAspect("startCapture");
+      attachCaptureSizeListeners();
+      resizeCanvas();
+      await connectStreamAudio(stream);
+      if (generation !== captureGeneration) return;
+      startedAt = performance.now();
+      drawFrame();
+      if (currentSession?.sourceHasProtectedVideo) {
+        setStatus("Protected video detected in source tab. Chrome may return gray frames.");
+      }
+    } catch (error) {
+      await stopCapture(false);
+      throw error;
+    } finally {
+      if (generation !== captureGeneration) await stopCapture(false);
+    }
   });
-
-  video.srcObject = mediaStream;
-  await video.play();
-  logCaptureAspect("startCapture");
-  attachCaptureSizeListeners();
-  resizeCanvas();
-  await connectStreamAudio(mediaStream);
-  startedAt = performance.now();
-  drawFrame();
-  if (currentSession?.sourceHasProtectedVideo) {
-    setStatus("Protected video detected in source tab. Chrome may return gray frames.");
-  }
+  captureStartQueue = pending;
+  return pending.catch(error => {
+    if (generation === captureGeneration) throw error;
+  });
 }
 
-function stopCapture() {
+function stopCapture(invalidate = true) {
+  if (invalidate) captureGeneration++;
   stopRecording({ save: true });
   detachCaptureSizeListeners();
 
@@ -509,7 +524,7 @@ function stopCapture() {
     animationFrameId = 0;
   }
 
-  void disposeAudioEngine();
+  const closingAudio = disposeAudioEngine();
 
   if (mediaStream) {
     mediaStream.getTracks().forEach((track) => track.stop());
@@ -517,6 +532,7 @@ function stopCapture() {
   }
 
   video.srcObject = null;
+  return closingAudio;
 }
 
 function attachCaptureSizeListeners() {
@@ -1264,17 +1280,18 @@ async function recoverViewerAudioOutput(reason) {
 }
 
 async function disposeAudioEngine() {
-  mediaSourceNode?.disconnect();
-  mediaSourceNode = null;
-
-  if (audioEngine) {
-    await audioEngine.dispose();
-    audioEngine = null;
-  }
-
+  const source = mediaSourceNode;
+  const engine = audioEngine;
   const context = audioContext;
+  mediaSourceNode = null;
+  audioEngine = null;
   audioContext = null;
-  await closeViewerAudioContext(context);
+  source?.disconnect();
+  try {
+    await engine?.dispose();
+  } finally {
+    await closeViewerAudioContext(context);
+  }
 }
 
 function setupRenderer(webgl) {
