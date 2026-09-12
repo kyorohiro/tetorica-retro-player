@@ -25,3 +25,4 @@ dist-ssr
 
 target
 src-tauri/binaries/_ffmpeg-aarch64-apple-darwin
+src-tauri/binaries/__ffmpeg-aarch64-apple-darwin
