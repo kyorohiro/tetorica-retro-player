@@ -39,6 +39,13 @@ class RetroBitcrusherProcessor extends AudioWorkletProcessor {
     }
 
     const channelCount = output.length;
+    // These AudioParams are k-rate: constant for the whole render quantum.
+    const bitDepth = parameters.bitDepth[0];
+    const holdFrames = Math.max(1, Math.round(parameters.holdFrames[0]));
+    const mix = parameters.mix[0];
+    const resolvedBitDepth = Math.max(2, Math.min(16, Math.round(bitDepth)));
+    const levelsMinusOne = 2 ** resolvedBitDepth - 1;
+    const lsb = 2 / Math.pow(2, bitDepth);
     while (this.channelState.length < channelCount) {
       this.channelState.push({
         holdCounter: 0,
@@ -48,23 +55,31 @@ class RetroBitcrusherProcessor extends AudioWorkletProcessor {
     }
 
     for (let channel = 0; channel < channelCount; channel += 1) {
-      const inputChannel = input?.[channel] ?? output[channel];
+      const inputChannel = input?.[channel];
       const outputChannel = output[channel];
       const state = this.channelState[channel];
 
+      if (mix === 0) {
+        if (inputChannel) outputChannel.set(inputChannel);
+        else outputChannel.fill(0);
+        // Restart from fresh input when enabled; do not retain an old held sample.
+        state.holdCounter = 0;
+        state.heldSample = 0;
+        state.nsError = 0;
+        continue;
+      }
+
       for (let index = 0; index < outputChannel.length; index += 1) {
-        const bitDepth = readParam(parameters.bitDepth, index);
-        const holdFrames = Math.max(1, Math.round(readParam(parameters.holdFrames, index)));
-        const mix = readParam(parameters.mix, index);
         const source = inputChannel?.[index] ?? 0;
 
         if (state.holdCounter <= 0) {
           // 三角ディザリング: 量子化歪み → サラサラしたヒス音に変換
-          const lsb = 2 / Math.pow(2, bitDepth);
           const dither = (Math.random() + Math.random() - 1) * lsb;
           // 1次ノイズシェーピング: 前回の量子化誤差をフィードバックして高域へ押し出す
           const shaped = Math.max(-1, Math.min(1, source + dither - state.nsError * 0.85));
-          state.heldSample = quantizeSample(shaped, bitDepth);
+          state.heldSample = resolvedBitDepth >= 16
+            ? shaped
+            : Math.round((shaped + 1) * 0.5 * levelsMinusOne) / levelsMinusOne * 2 - 1;
           state.nsError = state.heldSample - shaped;
           state.holdCounter = holdFrames - 1;
         } else {
@@ -77,22 +92,6 @@ class RetroBitcrusherProcessor extends AudioWorkletProcessor {
 
     return true;
   }
-}
-
-function readParam(values, index) {
-  return values.length === 1 ? values[0] : values[index];
-}
-
-function quantizeSample(sample, bitDepth) {
-  const resolvedBitDepth = Math.max(2, Math.min(16, Math.round(bitDepth)));
-  if (resolvedBitDepth >= 16) {
-    return sample;
-  }
-
-  const levels = 2 ** resolvedBitDepth;
-  const normalized = (sample + 1) * 0.5;
-  const quantized = Math.round(normalized * (levels - 1)) / (levels - 1);
-  return quantized * 2 - 1;
 }
 
 registerProcessor("retro-bitcrusher", RetroBitcrusherProcessor);
