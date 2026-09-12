@@ -1,4 +1,5 @@
 import { isDisplayCaptureStream } from "../media/displayCaptureOptions";
+import { hasCurrentPlaybackData } from "../media/playbackReadiness";
 import { describeAudioTracks, recordCaptureAudioDiagnostic } from "../media/captureAudioDiagnostics";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -347,6 +348,7 @@ export function usePixiVideoPlayer(
 
   const {
     canvasHostRef,
+    hasDrawnSource,
     appRef,
     spriteRef,
     textureRef,
@@ -916,6 +918,7 @@ export function usePixiVideoPlayer(
     scheduleRefreshLayout,
     safeRender,
     resetFilterInstance,
+    hasDrawnSource,
     initPixi,
     ensureFilterReady,
     debugVideo,
@@ -1897,7 +1900,7 @@ export function usePixiVideoPlayer(
       return;
     }
 
-    if (isPlaying) {
+    if (isPlaying && hasCurrentPlaybackData(mediaRef.current)) {
       finishLoading();
     }
   }, [

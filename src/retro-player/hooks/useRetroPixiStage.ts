@@ -444,6 +444,9 @@ export function useRetroPixiStage({
     }
   }, []);
 
+  const lastDrawnSourceRef = useRef<unknown>(null);
+  const hasDrawnSource = useCallback((source: HTMLVideoElement) => lastDrawnSourceRef.current === source, []);
+
   const renderFrame = useCallback(() => {
     const app = appRef.current;
     const source = previewElementRef.current;
@@ -458,7 +461,12 @@ export function useRetroPixiStage({
       if (layoutSourceRef.current !== source || !isDisplayAutoTargetReady(
         getRetroVideoSourceSize(source), presentedViewportSizeRef.current, settings)) return;
     }
+    if (app.pipeline.isShaderPreparationBlocking()) return;
     app.pipeline.render();
+    if (source && (!(source instanceof HTMLVideoElement) ||
+      (source.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && source.videoWidth > 0 && source.videoHeight > 0))) {
+      lastDrawnSourceRef.current = source;
+    }
     const beamSizing = settings.isFilterEnabled && isBeamCrossModeEnabled(settings)
       ? app.pipeline.getBeamSizingDiagnostic() : "";
     if (app.canvas.dataset.retroBeamSizing !== beamSizing) {
@@ -1259,6 +1267,7 @@ export function useRetroPixiStage({
 
   return {
     canvasHostRef,
+    hasDrawnSource,
     appRef,
     spriteRef,
     textureRef,

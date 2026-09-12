@@ -1,4 +1,6 @@
 import { useRef } from "react";
+import { hasCurrentPlaybackData } from "../media/playbackReadiness";
+import { waitForPreviewFrame } from "../media/waitForPreviewFrame";
 import { getDisplayCaptureOptions, markDisplayCaptureStream, isDisplayCaptureStream } from "../media/displayCaptureOptions";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
@@ -82,6 +84,7 @@ type UseRetroPreviewMediaParams = {
   setIsPoweredOn: (value: boolean) => void;
   beginLoading: (label: string) => void;
   finishLoading: () => void;
+  hasDrawnSource: (source: HTMLVideoElement) => boolean;
   setIsBuffering: (v: boolean) => void;
   ensureAudioContext: () => Promise<AudioContext | null>;
   updateAudioNodes: () => void;
@@ -169,6 +172,7 @@ export function useRetroPreviewMedia({
   setIsPoweredOn,
   beginLoading,
   finishLoading,
+  hasDrawnSource,
   setIsBuffering,
   ensureAudioContext,
   updateAudioNodes,
@@ -427,7 +431,7 @@ export function useRetroPreviewMedia({
       };
 
       const handleMaybeReady = () => {
-        if (!media.paused && isAdvanced()) {
+        if (!media.paused && isAdvanced() && hasCurrentPlaybackData(media)) {
           finish();
         }
       };
@@ -441,7 +445,7 @@ export function useRetroPreviewMedia({
         );
       };
 
-      if (!media.paused && isAdvanced()) {
+      if (!media.paused && isAdvanced() && hasCurrentPlaybackData(media)) {
         resolve();
         return;
       }
@@ -453,7 +457,7 @@ export function useRetroPreviewMedia({
       const timer = window.setTimeout(() => {
         cleanup();
         const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
-        if (!media.paused && media.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        if (!media.paused && media.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && hasCurrentPlaybackData(media)) {
           resolve();
           return;
         }
@@ -827,6 +831,7 @@ export function useRetroPreviewMedia({
     });
     media.addEventListener("playing", () => {
       if (isCurrentMedia()) setIsBuffering(false);
+      syncIfCurrentMedia();
       clearTerminalHlsBufferTimer();
       debugMediaEvent("playing");
     });
@@ -880,6 +885,7 @@ export function useRetroPreviewMedia({
     // rendering at the old aspect ratio, squishing the content vertically.
     if (media instanceof HTMLVideoElement) {
       media.addEventListener("resize", () => {
+        if (!isCurrentMedia()) return;
         const w = media.videoWidth;
         const h = media.videoHeight;
         if (w > 0 && h > 0) {
@@ -943,7 +949,7 @@ export function useRetroPreviewMedia({
     ) {
       setIsBuffering(false);
     }
-    if (effectivelyPlaying) {
+    if (effectivelyPlaying && hasCurrentPlaybackData(currentMedia)) {
       finishLoading();
     }
     setCurrentTime(currentMedia.currentTime);
@@ -1072,7 +1078,7 @@ export function useRetroPreviewMedia({
       }
       const shouldConfirmPlaybackStart =
         media instanceof HTMLVideoElement &&
-        media.src.includes(".m3u8");
+        Boolean(getHlsInstance(media) || getHlsSourceUrl(media) || media.src.includes(".m3u8"));
       const startedAtTime = media.currentTime;
       await media.play();
       if (isPlaybackAttemptStale()) {
@@ -1730,6 +1736,15 @@ export function useRetroPreviewMedia({
           await ensureRendererReady();
           await attachVisualPreview(media, "video");
           await ensureVisualStartupReady("video");
+          if (getHlsInstance(media) || getHlsSourceUrl(media) || media.src.includes(".m3u8")) {
+            beginLoading("Loading video preview...");
+            await waitForPreviewFrame(
+              () => hasDrawnSource(media),
+              () => requestId === previewRequestIdRef.current,
+              safeRender,
+            );
+            if (requestId !== previewRequestIdRef.current) return;
+          }
         }
         await connectMediaAudio(media);
         syncVideoState();
