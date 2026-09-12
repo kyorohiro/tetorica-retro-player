@@ -778,8 +778,7 @@ export function useRetroPixiStage({
       lastWindowedCanvasSizeRef.current = { width: nextWidth, height: nextHeight };
     }
 
-    if (app.canvas.width !== nextWidth) app.canvas.width = nextWidth;
-    if (app.canvas.height !== nextHeight) app.canvas.height = nextHeight;
+    app.pipeline.setDrawingBufferSize(nextWidth, nextHeight);
 
     app.canvas.style.position = "absolute";
     app.canvas.style.left = `${nextLeft}px`;
@@ -902,14 +901,18 @@ export function useRetroPixiStage({
         renderFrameRef.current();
         startTicker();
       };
-      const handleCompileStateChange = (state: { active: boolean; label?: string }) => {
+      const handleCompileStateChange = (state: { active: boolean; label?: string; error?: string }) => {
         if (state.active) {
           showShaderBusyOverlay(
             state.label ?? "Compiling shader...",
             "Shader preparation in progress.",
           );
+        } else if (state.error) {
+          showShaderBusyOverlay("Filter unavailable", state.error);
         } else {
           hideShaderBusyOverlay();
+          refreshLayout();
+          renderFrameRef.current();
         }
         setIsShaderCompiling(state.active);
         setShaderCompileLabel(state.active ? (state.label ?? "Compiling shader...") : "");

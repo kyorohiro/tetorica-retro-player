@@ -19,11 +19,12 @@ function createPipeline() {
   const gl = {
     VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, LINK_STATUS: 3,
     drawingBufferWidth: 2, drawingBufferHeight: 2,
+    canvas: { width: 2, height: 2 },
     bindFramebuffer: vi.fn(), activeTexture: vi.fn(), viewport: vi.fn(), clearColor: vi.fn(), clear: vi.fn(), texImage2D: vi.fn(), drawArrays: vi.fn(), getError: vi.fn(),
     createBuffer: vi.fn(() => ({})), createVertexArray: vi.fn(() => ({})), createTexture: vi.fn(() => ({})),
     createShader: vi.fn(() => ({})), createProgram: vi.fn(() => ({})),
     getExtension: vi.fn(() => ({ COMPLETION_STATUS_KHR: 4 })),
-    getProgramParameter: vi.fn(() => true), getProgramInfoLog: vi.fn(() => "failure"),
+    getProgramParameter: vi.fn((_program: WebGLProgram, _parameter: number) => true), getProgramInfoLog: vi.fn(() => "failure"),
     isContextLost: vi.fn(() => false),
     bindBuffer: vi.fn(), bufferData: vi.fn(), bindVertexArray: vi.fn(), enableVertexAttribArray: vi.fn(), vertexAttribPointer: vi.fn(),
     bindTexture: vi.fn(), pixelStorei: vi.fn(), texParameteri: vi.fn(), useProgram: vi.fn(), uniform1i: vi.fn(), getUniformLocation: vi.fn(),
@@ -135,4 +136,71 @@ it("does not perform diagnostic GPU readbacks during normal playback", () => {
   pipeline.dispose();
   pipeline.render();
   expect(gl.drawArrays).toHaveBeenCalledTimes(1);
+});
+
+
+it("waits beyond 900ms without LINK_STATUS, uploads, draws, or buffer resizing", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("DEV", false);
+  const { pipeline, internal, gl } = createPipeline();
+  let completed = false;
+  gl.getProgramParameter.mockImplementation((_program, parameter) => parameter === gl.LINK_STATUS || completed);
+  pipeline.setSource({ width: 2, height: 2, data: new Uint8Array(16) });
+  pipeline.setFilterState({ isFilterEnabled: false } as RetroVideoFilterState);
+  const pending = internal.getOrCompileSharedProgram("pass1", "slow", "basic:basic");
+  await vi.advanceTimersByTimeAsync(1200);
+  pipeline.setDrawingBufferSize(100, 80);
+  pipeline.setDrawingBufferSize(120, 90);
+  pipeline.render();
+  expect(gl.getProgramParameter.mock.calls.some(([, parameter]) => parameter === gl.LINK_STATUS)).toBe(false);
+  expect(gl.texImage2D).not.toHaveBeenCalled();
+  expect(gl.drawArrays).not.toHaveBeenCalled();
+  expect(gl.canvas).toEqual({ width: 2, height: 2 });
+  completed = true;
+  await vi.advanceTimersByTimeAsync(30);
+  await pending;
+  pipeline.render();
+  expect(gl.canvas).toEqual({ width: 120, height: 90 });
+  expect(gl.drawArrays).toHaveBeenCalledTimes(1);
+  pipeline.dispose();
+});
+
+it("times out without a synchronous readback and blocks further GPU work until recreation", async () => {
+  vi.useFakeTimers();
+  const { pipeline, internal, gl } = createPipeline();
+  gl.getProgramParameter.mockReturnValue(false);
+  const pending = internal.getOrCompileSharedProgram("pass1", "stuck", "basic:basic").catch(error => error);
+  await vi.advanceTimersByTimeAsync(15100);
+  expect((await pending).message).toMatch(/timed out/);
+  expect(gl.getProgramParameter.mock.calls.some(([, parameter]) => parameter === gl.LINK_STATUS)).toBe(false);
+  expect(internal.sharedProgramCache.size).toBe(0);
+  expect(pipeline.isShaderPreparationBlocking()).toBe(true);
+  pipeline.render();
+  expect(gl.drawArrays).not.toHaveBeenCalled();
+  expect(() => pipeline.readPixels()).toThrow(/not ready/);
+  await expect(internal.getOrCompileSharedProgram("pass2", "next", "basic:basic")).rejects.toThrow(/timed out/);
+  expect(gl.createProgram).toHaveBeenCalledTimes(1);
+  pipeline.dispose();
+  expect(gl.deleteProgram).not.toHaveBeenCalled();
+});
+
+it("also pauses rendering while a support shader is linking", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("DEV", false);
+  const { pipeline, internal, gl } = createPipeline();
+  gl.getProgramParameter.mockReturnValue(false);
+  pipeline.setSource({ width: 2, height: 2, data: new Uint8Array(16) });
+  pipeline.setFilterState({ isFilterEnabled: false } as RetroVideoFilterState);
+  const pending = internal.ensureBeamDownscaleProgram();
+  await vi.advanceTimersByTimeAsync(40);
+  pipeline.render();
+  expect(gl.texImage2D).not.toHaveBeenCalled();
+  expect(pipeline.isShaderPreparationBlocking()).toBe(true);
+  gl.getProgramParameter.mockReturnValue(true);
+  await vi.advanceTimersByTimeAsync(30);
+  await pending;
+  expect(pipeline.isShaderPreparationBlocking()).toBe(false);
+  pipeline.render();
+  expect(gl.drawArrays).toHaveBeenCalledTimes(1);
+  pipeline.dispose();
 });

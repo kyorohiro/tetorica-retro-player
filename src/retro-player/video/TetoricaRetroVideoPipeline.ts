@@ -989,6 +989,8 @@ const waitMs = (ms: number) =>
 // Verify link status after submitProgram() has already compiled and linked.
 // If KHR_parallel_shader_compile is available, poll COMPLETION_STATUS_KHR first
 // and defer the LINK_STATUS readback until the driver reports completion.
+class ShaderCompileTimeoutError extends Error {}
+
 async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
   programs: WebGLProgram[],
@@ -1003,7 +1005,7 @@ async function waitAndVerifyPrograms(
 
   if (parallelShaderCompileExt) {
     const pollStart = nowMs();
-    const pollTimeoutMs = 900;
+    const pollTimeoutMs = 15000;
     while (true) {
       check();
       let allCompleted = true;
@@ -1017,12 +1019,16 @@ async function waitAndVerifyPrograms(
         break;
       }
       if (nowMs() - pollStart >= pollTimeoutMs) {
-        break;
+        throw new ShaderCompileTimeoutError("Shader preparation timed out. Reload the player to retry.");
       }
       await waitMs(24);
     }
   }
 
+  if (!parallelShaderCompileExt) {
+    // No nonblocking query is available. Yield before the synchronous fallback.
+    await waitMs(100);
+  }
   for (const program of programs) {
     check();
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -1176,10 +1182,14 @@ export class TetoricaRetroVideoPipeline {
   private readonly sharedProgramCompileInflight = new Map<string, Promise<WebGLProgram>>();
   private windowsLitePrewarmStarted = false;
   private isDisposed = false;
+  private activeShaderCompiles = 0;
+  private shaderCompileFailure: Error | null = null;
+  private failedWindowsLiteVariantKey: WindowsLiteVariantKey | null = null;
+  private pendingDrawingBufferSize: { width: number; height: number } | null = null;
   private compileSourceNonce = 0;
   private shaderCompileBusterTag: string | null = null;
   private readonly shaderCompileCacheBusterEnabled: boolean;
-  private readonly onCompileStateChange?: (state: { active: boolean; label?: string }) => void;
+  private readonly onCompileStateChange?: (state: { active: boolean; label?: string; error?: string }) => void;
   private readonly windowsLiteVariantCompileInflight = new Map<
     WindowsLiteVariantKey,
     Promise<WindowsLiteCompiledPrograms>
@@ -2289,6 +2299,7 @@ export class TetoricaRetroVideoPipeline {
     const compilePromise = (async () => {
       let submitted: SubmittedProgram | null = null;
       let linked = false;
+      this.activeShaderCompiles += 1;
       try {
         await this.updateCompileState(`Compiling shader (${variantKey} / ${stage})...`);
         this.logProgramCompile(`variant:${variantKey}:${stage}`);
@@ -2296,12 +2307,12 @@ export class TetoricaRetroVideoPipeline {
         await this.updateCompileState(`Linking shader (${variantKey} / ${stage})...`);
         const program = finishProgramLink(this.gl, submitted);
         linked = true;
-        await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+        await this.verifyCompiledProgram(program);
         this.assertCompileActive();
         this.sharedProgramCache.set(cacheKey, program);
         return program;
       } catch (error) {
-        if (submitted) {
+        if (submitted && !(error instanceof ShaderCompileTimeoutError)) {
           this.gl.deleteProgram(submitted.program);
           if (!linked) {
             this.gl.deleteShader(submitted.vertexShader);
@@ -2310,6 +2321,7 @@ export class TetoricaRetroVideoPipeline {
         }
         throw error;
       } finally {
+        this.activeShaderCompiles -= 1;
         this.sharedProgramCompileInflight.delete(cacheKey);
       }
     })();
@@ -2346,8 +2358,41 @@ export class TetoricaRetroVideoPipeline {
     };
   }
 
+  isShaderPreparationBlocking() {
+    return this.activeShaderCompiles > 0 || this.shaderCompileFailure !== null;
+  }
+
+  setDrawingBufferSize(width: number, height: number) {
+    if (this.isDisposed) return;
+    this.pendingDrawingBufferSize = { width: Math.max(1, Math.floor(width)), height: Math.max(1, Math.floor(height)) };
+    this.applyDrawingBufferSize();
+  }
+
+  private applyDrawingBufferSize() {
+    if (this.isShaderPreparationBlocking() || !this.pendingDrawingBufferSize) return;
+    const { width, height } = this.pendingDrawingBufferSize;
+    this.pendingDrawingBufferSize = null;
+    if (this.gl.canvas.width !== width) this.gl.canvas.width = width;
+    if (this.gl.canvas.height !== height) this.gl.canvas.height = height;
+  }
+
+  private reportCompileIdle() {
+    if (this.isDisposed || this.activeShaderCompiles > 0) return;
+    this.onCompileStateChange?.({ active: false, ...(this.shaderCompileFailure ? { error: this.shaderCompileFailure.message } : {}) });
+  }
+
+  private async verifyCompiledProgram(program: WebGLProgram) {
+    try {
+      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+    } catch (error) {
+      if (error instanceof ShaderCompileTimeoutError) this.shaderCompileFailure = error;
+      throw error;
+    }
+  }
+
   private assertCompileActive() {
     if (this.isDisposed) throw new Error("Pipeline was disposed during shader compile.");
+    if (this.shaderCompileFailure) throw this.shaderCompileFailure;
     if (this.gl.isContextLost()) throw new Error("WebGL context lost during shader compile.");
   }
 
@@ -2359,7 +2404,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
-    if (!this.windowsLiteMode || this.isDisposed) {
+    if (!this.windowsLiteMode || this.isDisposed || this.shaderCompileFailure) {
       return;
     }
 
@@ -2369,15 +2414,15 @@ export class TetoricaRetroVideoPipeline {
     }
 
     const nextVariantKey = getWindowsLiteVariantKey(filterState);
+    if (this.failedWindowsLiteVariantKey === nextVariantKey) return;
+    this.failedWindowsLiteVariantKey = null;
     if (nextVariantKey === this.windowsLiteVariantKey) {
-      if (this.windowsLitePendingVariantKey === nextVariantKey) {
-        this.windowsLitePendingVariantKey = null;
-      }
+      this.windowsLitePendingVariantKey = null;
       return;
     }
 
     const cached = this.windowsLiteProgramCache.get(nextVariantKey);
-    if (cached) {
+    if (cached && !this.isShaderPreparationBlocking()) {
       this.setFilterPrograms(
         cached.pass1,
         cached.pass2,
@@ -2389,9 +2434,7 @@ export class TetoricaRetroVideoPipeline {
         cached.beamCompose,
       );
       this.windowsLiteVariantKey = nextVariantKey;
-      if (this.windowsLitePendingVariantKey === nextVariantKey) {
-        this.windowsLitePendingVariantKey = null;
-      }
+      this.windowsLitePendingVariantKey = null;
       return;
     }
 
@@ -2410,6 +2453,7 @@ export class TetoricaRetroVideoPipeline {
   private scheduleWindowsLiteForegroundCompile() {
     if (
       this.isDisposed ||
+      this.shaderCompileFailure ||
       this.windowsLiteCompilePromise ||
       this.windowsLiteCompileScheduled ||
       !this.windowsLitePendingVariantKey ||
@@ -2476,7 +2520,7 @@ export class TetoricaRetroVideoPipeline {
       })
       .finally(() => {
         if (!this.windowsLiteCompilePromise) {
-          this.onCompileStateChange?.({ active: false });
+          this.reportCompileIdle();
         }
       });
   }
@@ -2607,6 +2651,7 @@ export class TetoricaRetroVideoPipeline {
   private startWindowsLiteForegroundCompile() {
     if (
       this.isDisposed ||
+      this.shaderCompileFailure ||
       this.windowsLiteCompilePromise ||
       !this.windowsLitePendingVariantKey ||
       this.windowsLitePendingVariantKey === this.windowsLiteVariantKey
@@ -2638,6 +2683,8 @@ export class TetoricaRetroVideoPipeline {
       TetoricaRetroVideoPipeline.showDebug(`filter: loading Windows lite variant ${variantKey}...`);
 
       try {
+        await this.windowsLiteCompileSerialPromise;
+        this.assertCompileActive();
         const { pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose } = await this.compileWindowsLiteVariant(variantKey);
         if (this.isDisposed || this.gl.isContextLost()) return;
 
@@ -2650,7 +2697,7 @@ export class TetoricaRetroVideoPipeline {
         this.setFilterPrograms(pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose);
         this.windowsLiteVariantKey = variantKey;
         this.windowsLitePendingVariantKey = null;
-        this.onCompileStateChange?.({ active: false });
+        this.reportCompileIdle();
         TetoricaRetroVideoPipeline.showDebug(`filter: Windows lite variant ${variantKey} LOADED`);
 
         if (!this.windowsLitePrewarmStarted) {
@@ -2665,8 +2712,10 @@ export class TetoricaRetroVideoPipeline {
         TetoricaRetroVideoPipeline.showDebug(
           `filter: Windows lite variant ${variantKey} failed, keeping previous programs (${message})`,
         );
+        this.failedWindowsLiteVariantKey = variantKey;
+        if (this.windowsLitePendingVariantKey !== variantKey && !this.shaderCompileFailure) continue;
         this.windowsLitePendingVariantKey = null;
-        this.onCompileStateChange?.({ active: false });
+        this.reportCompileIdle();
         return;
       }
     }
@@ -2680,7 +2729,7 @@ export class TetoricaRetroVideoPipeline {
       shaderCompileCacheBusterEnabled?: boolean;
     },
     onFilterReady?: () => void,
-    onCompileStateChange?: (state: { active: boolean; label?: string }) => void,
+    onCompileStateChange?: (state: { active: boolean; label?: string; error?: string }) => void,
   ): Promise<TetoricaRetroVideoPipeline> {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     logShaderCompileInfo("base:passthrough");
@@ -2688,7 +2737,7 @@ export class TetoricaRetroVideoPipeline {
     try {
       await waitAndVerifyPrograms(gl, [passthroughProgram]);
     } catch (error) {
-      gl.deleteProgram(passthroughProgram);
+      if (!(error instanceof ShaderCompileTimeoutError)) gl.deleteProgram(passthroughProgram);
       throw error;
     }
     const pipeline = new TetoricaRetroVideoPipeline(
@@ -2698,16 +2747,16 @@ export class TetoricaRetroVideoPipeline {
       options?.shaderCompileCacheBusterEnabled === true,
       onCompileStateChange,
     );
-    const initialCompileFilterState = getInitialWindowsLiteCompileFilterState(initialFilterState);
+    pipeline.currentFilterState = getInitialWindowsLiteCompileFilterState(initialFilterState);
 
     window.setTimeout(async () => {
       if (pipeline.isDisposed || pipeline.gl.isContextLost()) return;
+      const initialCompileFilterState = pipeline.currentFilterState;
       if (!shouldQueueWindowsLiteVariant(initialCompileFilterState)) {
         onFilterReady?.();
         return;
       }
       try {
-        pipeline.currentFilterState = initialCompileFilterState;
         if (
           pipeline.shaderCompileCacheBusterEnabled &&
           pipeline.shaderCompileBusterTag === null
@@ -2719,16 +2768,19 @@ export class TetoricaRetroVideoPipeline {
         if (pipeline.isDisposed || pipeline.gl.isContextLost()) {
           return;
         }
-        pipeline.setFilterPrograms(pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose);
-        pipeline.windowsLiteVariantKey = initialVariantKey;
-        pipeline.windowsLitePendingVariantKey = null;
-        onCompileStateChange?.({ active: false });
+        if (shouldQueueWindowsLiteVariant(pipeline.currentFilterState) && getWindowsLiteVariantKey(pipeline.currentFilterState) === initialVariantKey) {
+          pipeline.setFilterPrograms(pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose);
+          pipeline.windowsLiteVariantKey = initialVariantKey;
+          pipeline.windowsLitePendingVariantKey = null;
+        }
         onFilterReady?.();
+        pipeline.reportCompileIdle();
       } catch (error) {
         if (pipeline.isDisposed) return;
-        onCompileStateChange?.({ active: false });
+        pipeline.failedWindowsLiteVariantKey = getWindowsLiteVariantKey(initialCompileFilterState);
         console.warn("[retro-player] initial shader compile failed", error);
         onFilterReady?.();
+        pipeline.reportCompileIdle();
       }
     }, 0);
 
@@ -2740,7 +2792,7 @@ export class TetoricaRetroVideoPipeline {
     passthroughProgram: WebGLProgram,
     windowsLiteMode = false,
     shaderCompileCacheBusterEnabled = false,
-    onCompileStateChange?: (state: { active: boolean; label?: string }) => void,
+    onCompileStateChange?: (state: { active: boolean; label?: string; error?: string }) => void,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
@@ -2789,6 +2841,7 @@ export class TetoricaRetroVideoPipeline {
     await waitForCompileTurn;
 
     let program: WebGLProgram | null = null;
+    this.activeShaderCompiles += 1;
     try {
       this.assertCompileActive();
       if (this.beamDownscaleProgram && this.beamDownscaleLocs) return;
@@ -2800,7 +2853,7 @@ export class TetoricaRetroVideoPipeline {
         BEAM_SOURCE_DOWNSCALE_FRAGMENT,
       );
       await this.updateCompileState("Linking shader (beam downscale)...");
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+      await this.verifyCompiledProgram(program);
       this.assertCompileActive();
       this.beamDownscaleProgram = program;
       this.gl.useProgram(program);
@@ -2811,11 +2864,12 @@ export class TetoricaRetroVideoPipeline {
         uTargetSize: this.gl.getUniformLocation(program, "uTargetSize"),
       };
     } catch (error) {
-      if (program) this.gl.deleteProgram(program);
+      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
       this.beamDownscaleProgram = null;
       this.beamDownscaleLocs = null;
       throw error;
     } finally {
+      this.activeShaderCompiles -= 1;
       releaseCompileTurn();
     }
   }
@@ -2830,6 +2884,7 @@ export class TetoricaRetroVideoPipeline {
     await waitForCompileTurn;
 
     let program: WebGLProgram | null = null;
+    this.activeShaderCompiles += 1;
     try {
       this.assertCompileActive();
       if (this.postCurvatureProgram && this.postCurvatureLocs) return;
@@ -2841,7 +2896,7 @@ export class TetoricaRetroVideoPipeline {
         POST_CURVATURE_FRAGMENT,
       );
       await this.updateCompileState("Linking shader (post curvature)...");
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+      await this.verifyCompiledProgram(program);
       this.assertCompileActive();
       this.postCurvatureProgram = program;
       this.gl.useProgram(program);
@@ -2851,11 +2906,12 @@ export class TetoricaRetroVideoPipeline {
         uCurvature: this.gl.getUniformLocation(program, "uCurvature"),
       };
     } catch (error) {
-      if (program) this.gl.deleteProgram(program);
+      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
       this.postCurvatureProgram = null;
       this.postCurvatureLocs = null;
       throw error;
     } finally {
+      this.activeShaderCompiles -= 1;
       releaseCompileTurn();
     }
   }
@@ -2870,6 +2926,7 @@ export class TetoricaRetroVideoPipeline {
     await waitForCompileTurn;
 
     let program: WebGLProgram | null = null;
+    this.activeShaderCompiles += 1;
     try {
       this.assertCompileActive();
       if (this.wideGlowOpticalDownsampleProgram && this.wideGlowOpticalDownsampleLocs) return;
@@ -2881,7 +2938,7 @@ export class TetoricaRetroVideoPipeline {
         FILTER_FRAGMENT_WIDE_GLOW_OPTICAL_DOWNSAMPLE,
       );
       await this.updateCompileState("Linking shader (wide glow optical downsample)...");
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+      await this.verifyCompiledProgram(program);
       this.assertCompileActive();
       this.wideGlowOpticalDownsampleProgram = program;
       this.gl.useProgram(program);
@@ -2891,11 +2948,12 @@ export class TetoricaRetroVideoPipeline {
         uTexelSize: this.gl.getUniformLocation(program, "uTexelSize"),
       };
     } catch (error) {
-      if (program) this.gl.deleteProgram(program);
+      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
       this.wideGlowOpticalDownsampleProgram = null;
       this.wideGlowOpticalDownsampleLocs = null;
       throw error;
     } finally {
+      this.activeShaderCompiles -= 1;
       releaseCompileTurn();
     }
   }
@@ -2910,6 +2968,7 @@ export class TetoricaRetroVideoPipeline {
     await waitForCompileTurn;
 
     let program: WebGLProgram | null = null;
+    this.activeShaderCompiles += 1;
     try {
       this.assertCompileActive();
       if (this.wideGlowSmokyDownsampleProgram && this.wideGlowSmokyDownsampleLocs) return;
@@ -2921,7 +2980,7 @@ export class TetoricaRetroVideoPipeline {
         FILTER_FRAGMENT_WIDE_GLOW_SMOKY_DOWNSAMPLE,
       );
       await this.updateCompileState("Linking shader (wide glow smoky downsample)...");
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+      await this.verifyCompiledProgram(program);
       this.assertCompileActive();
       this.wideGlowSmokyDownsampleProgram = program;
       this.gl.useProgram(program);
@@ -2931,11 +2990,12 @@ export class TetoricaRetroVideoPipeline {
         uTexelSize: this.gl.getUniformLocation(program, "uTexelSize"),
       };
     } catch (error) {
-      if (program) this.gl.deleteProgram(program);
+      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
       this.wideGlowSmokyDownsampleProgram = null;
       this.wideGlowSmokyDownsampleLocs = null;
       throw error;
     } finally {
+      this.activeShaderCompiles -= 1;
       releaseCompileTurn();
     }
   }
@@ -2950,6 +3010,7 @@ export class TetoricaRetroVideoPipeline {
     await waitForCompileTurn;
 
     let program: WebGLProgram | null = null;
+    this.activeShaderCompiles += 1;
     try {
       this.assertCompileActive();
       if (this.wideGlowBlurProgram && this.wideGlowBlurLocs) return;
@@ -2961,7 +3022,7 @@ export class TetoricaRetroVideoPipeline {
         FILTER_FRAGMENT_WIDE_GLOW_BLUR,
       );
       await this.updateCompileState("Linking shader (wide glow blur)...");
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+      await this.verifyCompiledProgram(program);
       this.assertCompileActive();
       this.wideGlowBlurProgram = program;
       this.gl.useProgram(program);
@@ -2973,11 +3034,12 @@ export class TetoricaRetroVideoPipeline {
         uRadius: this.gl.getUniformLocation(program, "uRadius"),
       };
     } catch (error) {
-      if (program) this.gl.deleteProgram(program);
+      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
       this.wideGlowBlurProgram = null;
       this.wideGlowBlurLocs = null;
       throw error;
     } finally {
+      this.activeShaderCompiles -= 1;
       releaseCompileTurn();
     }
   }
@@ -2992,6 +3054,7 @@ export class TetoricaRetroVideoPipeline {
     await waitForCompileTurn;
 
     let program: WebGLProgram | null = null;
+    this.activeShaderCompiles += 1;
     try {
       this.assertCompileActive();
       if (this.wideGlowCompositeProgram && this.wideGlowCompositeLocs) return;
@@ -3003,7 +3066,7 @@ export class TetoricaRetroVideoPipeline {
         FILTER_FRAGMENT_WIDE_GLOW_COMPOSITE,
       );
       await this.updateCompileState("Linking shader (wide glow composite)...");
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
+      await this.verifyCompiledProgram(program);
       this.assertCompileActive();
       this.wideGlowCompositeProgram = program;
       this.gl.useProgram(program);
@@ -3017,11 +3080,12 @@ export class TetoricaRetroVideoPipeline {
         uOpticalMode: this.gl.getUniformLocation(program, "uOpticalMode"),
       };
     } catch (error) {
-      if (program) this.gl.deleteProgram(program);
+      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
       this.wideGlowCompositeProgram = null;
       this.wideGlowCompositeLocs = null;
       throw error;
     } finally {
+      this.activeShaderCompiles -= 1;
       releaseCompileTurn();
     }
   }
@@ -3166,14 +3230,14 @@ export class TetoricaRetroVideoPipeline {
     try {
       await this.ensureSupportProgramsForFilterState(filterState);
       if (!this.windowsLiteMode) {
-        this.onCompileStateChange?.({ active: false });
+        this.reportCompileIdle();
         return;
       }
 
       await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
-      this.onCompileStateChange?.({ active: false });
+      this.reportCompileIdle();
     } catch (error) {
-      this.onCompileStateChange?.({ active: false });
+      this.reportCompileIdle();
       throw error;
     }
   }
@@ -3268,6 +3332,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   readPixels() {
+    if (this.isDisposed || this.isShaderPreparationBlocking()) throw new Error("Shader preparation is not ready for capture.");
     const buffer = new Uint8Array(
       Math.max(this.gl.drawingBufferWidth, 1) *
         Math.max(this.gl.drawingBufferHeight, 1) * 4,
@@ -3308,7 +3373,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   render() {
-    if (this.isDisposed) return;
+    if (this.isDisposed || this.isShaderPreparationBlocking()) return;
+    this.applyDrawingBufferSize();
     const { gl } = this;
     if (gl.isContextLost()) {
       console.warn("[retro-player] render() skipped: WebGL context is lost");
@@ -3932,55 +3998,60 @@ export class TetoricaRetroVideoPipeline {
     this.isDisposed = true;
     this.windowsLitePendingVariantKey = null;
     const { gl } = this;
-    gl.deleteTexture(this.texture);
-    gl.deleteVertexArray(this.vao);
-    gl.deleteBuffer(this.vertexBuffer);
-    if (this.windowsLiteMode) {
-      for (const program of this.sharedProgramCache.values()) {
-        gl.deleteProgram(program);
+    // A timed-out driver may still own pending work. Leave that context to GC
+    // instead of issuing synchronization-prone cleanup calls during reload.
+    if (!this.shaderCompileFailure) {
+      gl.deleteTexture(this.texture);
+      gl.deleteVertexArray(this.vao);
+      gl.deleteBuffer(this.vertexBuffer);
+      if (this.windowsLiteMode) {
+        for (const program of this.sharedProgramCache.values()) {
+          gl.deleteProgram(program);
+        }
+      } else {
+        if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
+          gl.deleteProgram(this.filterPass1Program);
+        }
+        if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
       }
-      this.windowsLiteProgramCache.clear();
-      this.sharedProgramCache.clear();
-      this.sharedProgramCompileInflight.clear();
-    } else {
-      if (this.filterPass1Program && this.filterPass1Program !== this.passthroughProgram) {
-        gl.deleteProgram(this.filterPass1Program);
-      }
-      if (this.filterPass2Program) gl.deleteProgram(this.filterPass2Program);
+      gl.deleteProgram(this.passthroughProgram);
+      if (this.beamDownscaleProgram) gl.deleteProgram(this.beamDownscaleProgram);
+      if (this.postCurvatureProgram) gl.deleteProgram(this.postCurvatureProgram);
+      if (this.wideGlowOpticalDownsampleProgram) gl.deleteProgram(this.wideGlowOpticalDownsampleProgram);
+      if (this.wideGlowSmokyDownsampleProgram) gl.deleteProgram(this.wideGlowSmokyDownsampleProgram);
+      if (this.wideGlowBlurProgram) gl.deleteProgram(this.wideGlowBlurProgram);
+      if (this.wideGlowCompositeProgram) gl.deleteProgram(this.wideGlowCompositeProgram);
+      if (this.fbo) gl.deleteFramebuffer(this.fbo);
+      if (this.fboTexture) gl.deleteTexture(this.fboTexture);
+      if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
+      if (this.beamSourceTexture) gl.deleteTexture(this.beamSourceTexture);
+      if (this.compositeMidFbo) gl.deleteFramebuffer(this.compositeMidFbo);
+      if (this.compositeMidTexture) gl.deleteTexture(this.compositeMidTexture);
+      if (this.compositeApplyFbo) gl.deleteFramebuffer(this.compositeApplyFbo);
+      if (this.compositeApplyTexture) gl.deleteTexture(this.compositeApplyTexture);
+      if (this.pass2SamplingFbo) gl.deleteFramebuffer(this.pass2SamplingFbo);
+      if (this.pass2SamplingTexture) gl.deleteTexture(this.pass2SamplingTexture);
+      if (this.phosphorCoreFbo) gl.deleteFramebuffer(this.phosphorCoreFbo);
+      if (this.phosphorCoreTexture) gl.deleteTexture(this.phosphorCoreTexture);
+      if (this.beamKernelFbo) gl.deleteFramebuffer(this.beamKernelFbo);
+      if (this.beamKernelTexture) gl.deleteTexture(this.beamKernelTexture);
+      if (this.beamStripeFbo) gl.deleteFramebuffer(this.beamStripeFbo);
+      if (this.beamStripeTexture) gl.deleteTexture(this.beamStripeTexture);
+      if (this.beamComposeFbo) gl.deleteFramebuffer(this.beamComposeFbo);
+      if (this.beamComposeTexture) gl.deleteTexture(this.beamComposeTexture);
+      if (this.postCurvatureFbo) gl.deleteFramebuffer(this.postCurvatureFbo);
+      if (this.postCurvatureTexture) gl.deleteTexture(this.postCurvatureTexture);
+      if (this.finalSceneFbo) gl.deleteFramebuffer(this.finalSceneFbo);
+      if (this.finalSceneTexture) gl.deleteTexture(this.finalSceneTexture);
+      if (this.wideGlowQuarterFbo) gl.deleteFramebuffer(this.wideGlowQuarterFbo);
+      if (this.wideGlowQuarterTexture) gl.deleteTexture(this.wideGlowQuarterTexture);
+      if (this.wideGlowBlurFbo) gl.deleteFramebuffer(this.wideGlowBlurFbo);
+      if (this.wideGlowBlurTexture) gl.deleteTexture(this.wideGlowBlurTexture);
     }
-    gl.deleteProgram(this.passthroughProgram);
-    if (this.beamDownscaleProgram) gl.deleteProgram(this.beamDownscaleProgram);
-    if (this.postCurvatureProgram) gl.deleteProgram(this.postCurvatureProgram);
-    if (this.wideGlowOpticalDownsampleProgram) gl.deleteProgram(this.wideGlowOpticalDownsampleProgram);
-    if (this.wideGlowSmokyDownsampleProgram) gl.deleteProgram(this.wideGlowSmokyDownsampleProgram);
-    if (this.wideGlowBlurProgram) gl.deleteProgram(this.wideGlowBlurProgram);
-    if (this.wideGlowCompositeProgram) gl.deleteProgram(this.wideGlowCompositeProgram);
-    if (this.fbo) gl.deleteFramebuffer(this.fbo);
-    if (this.fboTexture) gl.deleteTexture(this.fboTexture);
-    if (this.beamSourceFbo) gl.deleteFramebuffer(this.beamSourceFbo);
-    if (this.beamSourceTexture) gl.deleteTexture(this.beamSourceTexture);
-    if (this.compositeMidFbo) gl.deleteFramebuffer(this.compositeMidFbo);
-    if (this.compositeMidTexture) gl.deleteTexture(this.compositeMidTexture);
-    if (this.compositeApplyFbo) gl.deleteFramebuffer(this.compositeApplyFbo);
-    if (this.compositeApplyTexture) gl.deleteTexture(this.compositeApplyTexture);
-    if (this.pass2SamplingFbo) gl.deleteFramebuffer(this.pass2SamplingFbo);
-    if (this.pass2SamplingTexture) gl.deleteTexture(this.pass2SamplingTexture);
-    if (this.phosphorCoreFbo) gl.deleteFramebuffer(this.phosphorCoreFbo);
-    if (this.phosphorCoreTexture) gl.deleteTexture(this.phosphorCoreTexture);
-    if (this.beamKernelFbo) gl.deleteFramebuffer(this.beamKernelFbo);
-    if (this.beamKernelTexture) gl.deleteTexture(this.beamKernelTexture);
-    if (this.beamStripeFbo) gl.deleteFramebuffer(this.beamStripeFbo);
-    if (this.beamStripeTexture) gl.deleteTexture(this.beamStripeTexture);
-    if (this.beamComposeFbo) gl.deleteFramebuffer(this.beamComposeFbo);
-    if (this.beamComposeTexture) gl.deleteTexture(this.beamComposeTexture);
-    if (this.postCurvatureFbo) gl.deleteFramebuffer(this.postCurvatureFbo);
-    if (this.postCurvatureTexture) gl.deleteTexture(this.postCurvatureTexture);
-    if (this.finalSceneFbo) gl.deleteFramebuffer(this.finalSceneFbo);
-    if (this.finalSceneTexture) gl.deleteTexture(this.finalSceneTexture);
-    if (this.wideGlowQuarterFbo) gl.deleteFramebuffer(this.wideGlowQuarterFbo);
-    if (this.wideGlowQuarterTexture) gl.deleteTexture(this.wideGlowQuarterTexture);
-    if (this.wideGlowBlurFbo) gl.deleteFramebuffer(this.wideGlowBlurFbo);
-    if (this.wideGlowBlurTexture) gl.deleteTexture(this.wideGlowBlurTexture);
+    this.windowsLiteProgramCache.clear();
+    this.sharedProgramCache.clear();
+    this.sharedProgramCompileInflight.clear();
+    this.pendingDrawingBufferSize = null;
     this.currentSource = null;
     this.currentFilterState = null;
     this.lastRenderedFilterState = null;
