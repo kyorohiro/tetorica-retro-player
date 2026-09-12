@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getDisplayCaptureOptions } from "../media/displayCaptureOptions";
+import { getDisplayCaptureOptions, markDisplayCaptureStream } from "../media/displayCaptureOptions";
 import {
   getPreferredAudioInputDeviceId,
   setPreferredAudioInputDeviceId,
@@ -195,6 +195,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
 
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
+      markDisplayCaptureStream(stream);
 
       clearPreviewSrc();
       setPreviewKind("video");

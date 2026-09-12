@@ -5,3 +5,15 @@ export const getDisplayCaptureOptions = (): DisplayMediaStreamOptions & { window
   audio: true,
   windowAudio: "window",
 });
+
+const displayCaptureStreams = new WeakSet<MediaStream>();
+export const markDisplayCaptureStream = (stream: MediaStream) => {
+  displayCaptureStreams.add(stream);
+};
+export const isDisplayCaptureStream = (value: unknown): value is MediaStream => {
+  const stream = value as MediaStream | null;
+  return !!stream && typeof stream.getVideoTracks === "function" && (
+    displayCaptureStreams.has(stream) || stream.getVideoTracks().some(track =>
+      Boolean(track.getSettings().displaySurface))
+  );
+};

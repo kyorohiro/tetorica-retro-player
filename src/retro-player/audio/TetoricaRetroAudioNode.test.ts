@@ -2,6 +2,32 @@ import { describe, expect, it, vi } from "vitest";
 import { createRetroAudioEngine } from "./TetoricaRetroAudioNode";
 
 describe("audio graph initialization", () => {
+  it("mutes only monitoring during display capture and preserves processed recording", () => {
+    const engine = createRetroAudioEngine({
+      context: { currentTime: 0 } as AudioContext,
+      params: { isMuted: true, volume: 0.4, isNoiseEnabled: true, noiseLevel: 0.02 },
+    });
+    const param = () => ({ value: 1, cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn() });
+    const master = param(), monitor = param(), noise = param();
+    Object.assign((engine as unknown as { nodes: object }).nodes, {
+      masterGain: { gain: master }, monitorGain: { gain: monitor }, noiseGain: { gain: noise },
+    });
+    engine.setCaptureRecordingMode(true);
+    expect(master.setValueAtTime).toHaveBeenLastCalledWith(1, 0);
+    expect(monitor.value).toBe(0);
+    expect(noise.setValueAtTime).toHaveBeenLastCalledWith(0.11, 0);
+    engine.setParams({ isMuted: false }, true);
+    expect(monitor.value).toBe(0.4);
+    engine.setParams({ volume: 0 }, true);
+    expect(monitor.value).toBe(0);
+    expect(master.setValueAtTime).toHaveBeenLastCalledWith(1, 0);
+    engine.setParams({ isMuted: true, volume: 0.4 }, true);
+    engine.setCaptureRecordingMode(false);
+    expect(master.setValueAtTime).toHaveBeenLastCalledWith(0, 0);
+    expect(noise.setValueAtTime).toHaveBeenLastCalledWith(0, 0);
+    expect(monitor.value).toBe(1);
+  });
+
   it("shares one input and recording destination across concurrent callers", async () => {
     const context = { state: "running" } as AudioContext;
     const engine = createRetroAudioEngine({ context });

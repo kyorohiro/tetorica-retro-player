@@ -107,6 +107,7 @@ export class TetoricaRetroAudioNode {
   private _roomConvolverConnected = true;
   private _hallReverbConvolverConnected = true;
   private _destinationConnected = false;
+  private captureRecordingMode = false;
   private initializationPromise: Promise<void> | null = null;
   // Cache last WaveShaper curve amounts to avoid recreating 4096-sample Float32Arrays every update.
   private _driveCurveAmount = -1;
@@ -114,6 +115,7 @@ export class TetoricaRetroAudioNode {
   private readonly nodes = {
     audioContext: null as AudioContext | null,
     masterGain: null as GainNode | null,
+    monitorGain: null as GainNode | null,
     radioToneHighpass: null as BiquadFilterNode | null,
     radioToneLowpass: null as BiquadFilterNode | null,
     radioTonePresence: null as BiquadFilterNode | null,
@@ -379,8 +381,13 @@ export class TetoricaRetroAudioNode {
     this.updateAudioNodes();
   }
 
+  setCaptureRecordingMode(enabled: boolean) {
+    this.captureRecordingMode = enabled;
+    this.updateAudioNodes();
+  }
+
   setDestinationOutputEnabled(isEnabled: boolean) {
-    const outputNode = this.output;
+    const outputNode = this.nodes.monitorGain ?? this.output;
     const destination = this.context.destination;
     if (!outputNode || !destination) {
       this._destinationConnected = false;
@@ -415,6 +422,7 @@ export class TetoricaRetroAudioNode {
     Object.assign(this.nodes, {
       audioContext: null,
       masterGain: null,
+      monitorGain: null,
       radioToneHighpass: null,
       radioToneLowpass: null,
       radioTonePresence: null,
@@ -512,7 +520,13 @@ export class TetoricaRetroAudioNode {
     const vinylDustBedFilter = this.nodes.vinylDustBedFilter;
     const vinylDustBedGain = this.nodes.vinylDustBedGain;
     const { settings, isPlaying, isOutputEnabled } = this.runtimeState;
-    const audibleMasterGain = settings.isMuted || !isOutputEnabled ? 0 : settings.volume;
+    const recordingMuted = !this.captureRecordingMode && settings.isMuted;
+    const audibleMasterGain = !isOutputEnabled || recordingMuted ? 0 : this.captureRecordingMode ? 1 : settings.volume;
+    if (this.nodes.monitorGain) {
+      this.nodes.monitorGain.gain.value = this.captureRecordingMode
+        ? (settings.isMuted ? 0 : settings.volume)
+        : 1;
+    }
 
     if (masterGain) {
       // cancelScheduledValues prevents a pending quietAudioOutputImmediately ramp
@@ -675,7 +689,7 @@ export class TetoricaRetroAudioNode {
 
     if (noiseGainNode) {
       const targetNoiseGain =
-        settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying
+        settings.isNoiseEnabled && !recordingMuted && isOutputEnabled && isPlaying
           ? Math.min(0.24, settings.noiseLevel * 5.5)
           : 0;
       noiseGainNode.gain.cancelScheduledValues(this.context.currentTime);
@@ -684,7 +698,7 @@ export class TetoricaRetroAudioNode {
 
     if (crackleGainNode) {
       const isCrackleActive =
-        settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
+        settings.isNoiseEnabled && !recordingMuted && isOutputEnabled && isPlaying;
       crackleGainNode.gain.value = isCrackleActive
         ? Math.min(0.24, settings.vinylDustAmount * 0.22 + settings.noiseLevel * 0.25)
         : 0;
@@ -692,7 +706,7 @@ export class TetoricaRetroAudioNode {
 
     if (vinylDustBedFilter && vinylDustBedGain) {
       const isDustBedActive =
-        settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
+        settings.isNoiseEnabled && !recordingMuted && isOutputEnabled && isPlaying;
       const amount = isDustBedActive ? settings.vinylDustAmount : 0;
       vinylDustBedFilter.frequency.value = 2100 + amount * 2600;
       vinylDustBedFilter.Q.value = 0.35 + amount * 0.25;
@@ -869,6 +883,10 @@ export class TetoricaRetroAudioNode {
     const chorusLfoGain2 = context.createGain();
     const chorusWetGain = context.createGain();
     const fxOutputGain = context.createGain();
+    const monitorGain = context.createGain();
+    // Stay silent while the graph is being wired; updateAudioNodes applies
+    // the current monitoring preference before playback is ready.
+    monitorGain.gain.value = 0;
     const inputTrimGain = context.createGain();
     const analyser = context.createAnalyser();
     analyser.fftSize = 512;
@@ -1040,6 +1058,7 @@ export class TetoricaRetroAudioNode {
     outputBus.connect(busCompressor);
     busCompressor.connect(fxOutputGain);
     fxOutputGain.connect(analyser);
+    fxOutputGain.connect(monitorGain);
 
     // --- Wire noise / crackle chain ---
     noiseSource.connect(noiseHighpass);
@@ -1116,6 +1135,7 @@ export class TetoricaRetroAudioNode {
       tapeSaturator,
       busCompressor,
       fxOutputGain,
+      monitorGain,
       inputTrimGain,
       analyser,
     };
@@ -1136,7 +1156,7 @@ export class TetoricaRetroAudioNode {
     if (!fxOutputGain) return;
 
     if (this.connectOutputToDestination) {
-      fxOutputGain.connect(this.context.destination);
+      this.nodes.monitorGain!.connect(this.context.destination);
       this.autoConnections.add(this.context.destination);
       this._destinationConnected = true;
     }
@@ -1395,7 +1415,7 @@ export class TetoricaRetroAudioNode {
       this.nodes.noiseLfoGain, this.nodes.crackleFilter,
       this.nodes.vinylDustBedFilter, this.nodes.vinylDustBedGain, this.nodes.crackleGain,
       this.nodes.masterGain, this.nodes.outputBus, this.nodes.busCompressor,
-      this.nodes.fxOutputGain,
+      this.nodes.fxOutputGain, this.nodes.monitorGain,
     ];
     for (const node of internalNodes) {
       try { node?.disconnect(); } catch {}

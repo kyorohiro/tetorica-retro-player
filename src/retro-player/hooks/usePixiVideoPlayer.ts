@@ -838,7 +838,17 @@ export function usePixiVideoPlayer(
     appRef.current?.ticker.stop();
     syncVideoState();
   };
+  const capturePreviousMuteRef = useRef<boolean | null>(null);
   const media = useRetroPreviewMedia({
+    setCaptureMonitorMuted: () => {
+      if (capturePreviousMuteRef.current === null) capturePreviousMuteRef.current = isMutedRef.current;
+      setIsMuted(true);
+    },
+    restoreCaptureMonitor: () => {
+      const previous = capturePreviousMuteRef.current;
+      capturePreviousMuteRef.current = null;
+      if (previous !== null) setIsMuted(previous);
+    },
     locale: options?.locale ?? "en",
     preferNativeVideoSurface: options?.preferNativeVideoSurface ?? false,
     filterState,

@@ -16,6 +16,7 @@ import {
   type CurrentRef,
   type RetroAudioPreviewKind,
 } from "../audio/TetoricaRetroAudioNode";
+import { isDisplayCaptureStream } from "../media/displayCaptureOptions";
 import { getHlsInstance } from "../media/RetroMediaSource";
 import {
   DEFAULT_AUDIO_PRESET_SETTINGS,
@@ -253,6 +254,7 @@ export function useRetroAudioEngine({
       engine.setDestinationOutputEnabled(shouldUseDestinationOutput);
       audioEngineRef.current = engine;
     }
+    audioEngineRef.current.setCaptureRecordingMode(isDisplayCaptureStream(mediaRef.current?.srcObject));
     return audioEngineRef.current;
   };
 
@@ -371,7 +373,9 @@ export function useRetroAudioEngine({
   const ensureInitialized = (options?: { requireActivation?: boolean }) =>
     getOrCreateEngine().ensureInitialized(options);
   const ensureAudioContext = () => getOrCreateEngine().ensureInitialized();
-  const updateAudioNodes = () => audioEngineRef.current?.updateAudioNodes();
+  const updateAudioNodes = () => {
+    audioEngineRef.current?.setCaptureRecordingMode(isDisplayCaptureStream(mediaRef.current?.srcObject));
+  };
   const connectSourceNode = (sourceNode: AudioNode) =>
     getOrCreateEngine().connectSourceNode(sourceNode);
   const disposeAudioEngine = async () => { await audioEngineRef.current?.dispose(); };
@@ -987,6 +991,7 @@ export function useRetroAudioEngine({
   );
 
   useEffect(() => {
+    audioEngineRef.current?.setCaptureRecordingMode(isDisplayCaptureStream(mediaRef.current?.srcObject));
     setEngineIsPlaying(isPlaying);
     setOutputEnabled(
       previewKind === "video" ||

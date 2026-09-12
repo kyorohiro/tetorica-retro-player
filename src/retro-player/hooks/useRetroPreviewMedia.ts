@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { getDisplayCaptureOptions } from "../media/displayCaptureOptions";
+import { getDisplayCaptureOptions, markDisplayCaptureStream, isDisplayCaptureStream } from "../media/displayCaptureOptions";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
@@ -66,6 +66,8 @@ type UseRetroPreviewMediaParams = {
   isMuted: boolean;
   volume: number;
   previewKind: PreviewKind;
+  setCaptureMonitorMuted: () => void;
+  restoreCaptureMonitor: () => void;
   setPreviewName: (value: string) => void;
   setPreviewError: (value: string) => void;
   setNeedsUserPlay: (value: boolean) => void;
@@ -151,6 +153,8 @@ export function useRetroPreviewMedia({
   isMuted,
   volume,
   previewKind,
+  setCaptureMonitorMuted,
+  restoreCaptureMonitor,
   setPreviewName,
   setPreviewError,
   setNeedsUserPlay,
@@ -994,6 +998,7 @@ export function useRetroPreviewMedia({
       currentStream?.getTracks().forEach((track) => track.stop());
     }
 
+    restoreCaptureMonitor();
     safeRender();
   };
 
@@ -1479,6 +1484,7 @@ export function useRetroPreviewMedia({
     try {
       await ensureRendererReady();
       const stream = await navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
+      markDisplayCaptureStream(stream);
 
       if (requestId !== previewRequestIdRef.current) {
         stream.getTracks().forEach((track) => track.stop());
@@ -1489,6 +1495,7 @@ export function useRetroPreviewMedia({
         ? "Display Capture"
         : (locale === "ja" ? "Display Capture（音声なし）" : "Display Capture (no audio)"));
 
+      setCaptureMonitorMuted();
       const videoSource = await createVideoMediaSource(
         { stream },
         {
@@ -1555,6 +1562,7 @@ export function useRetroPreviewMedia({
       await ensureRendererReady();
 
       if (kind === "video") {
+        if (isDisplayCaptureStream(stream)) setCaptureMonitorMuted();
         const videoSource = await createVideoMediaSource(
           { stream },
           {
