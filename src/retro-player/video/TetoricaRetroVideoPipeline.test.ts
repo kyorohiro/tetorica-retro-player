@@ -139,6 +139,27 @@ it("does not perform diagnostic GPU readbacks during normal playback", () => {
 });
 
 
+it("reuses VBlank frames but draws immediately after settings or size changes", () => {
+  vi.stubEnv("DEV", false);
+  const { pipeline, gl } = createPipeline();
+  const settings = { isFilterEnabled: false, vblankSimulationMode: "strong" } as RetroVideoFilterState;
+  pipeline.setSource({ width: 2, height: 2, data: new Uint8Array(16) });
+  pipeline.setFilterState(settings);
+  pipeline.render();
+  pipeline.setFilterState(settings);
+  pipeline.render();
+  expect(gl.drawArrays).toHaveBeenCalledTimes(1);
+  expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+  pipeline.setFilterState({ ...settings, curvature: 0.1 });
+  pipeline.render();
+  expect(gl.drawArrays).toHaveBeenCalledTimes(2);
+  pipeline.render();
+  gl.drawingBufferWidth = 4;
+  pipeline.render();
+  expect(gl.drawArrays).toHaveBeenCalledTimes(4);
+  pipeline.dispose();
+});
+
 it("waits beyond 900ms without LINK_STATUS, uploads, draws, or buffer resizing", async () => {
   vi.useFakeTimers();
   vi.stubEnv("DEV", false);

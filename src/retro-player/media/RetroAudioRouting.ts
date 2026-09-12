@@ -136,8 +136,15 @@ export const applyElementAudioMode = (
 
 export const resolveRecordingAudioSourceOrder = ({
   bypassWebAudio,
-}: Pick<RetroPlaybackAudioRoute, "bypassWebAudio">): RetroRecordingAudioSourceKind[] => {
+  isMediaStreamSource = false,
+}: Pick<RetroPlaybackAudioRoute, "bypassWebAudio"> & Partial<Pick<RetroPlaybackAudioRoute, "isMediaStreamSource">>): RetroRecordingAudioSourceKind[] => {
   const order: RetroRecordingAudioSourceKind[] = [];
+
+  // Native stream playback does not feed the FX graph. Its destination may
+  // contain generated noise while carrying none of the captured source audio.
+  if (bypassWebAudio && isMediaStreamSource) {
+    return ["live-stream", "media-capture", "safari-tap"];
+  }
 
   if (isAppleWebKitFamily() && bypassWebAudio) {
     order.push("safari-tap");

@@ -410,9 +410,9 @@ export function useRetroPixiStage({
   isPoweredOnRef.current = isPoweredOn;
 
   const buildPipelineFilterState = useCallback(
-    (): RetroVideoFilterState => ({
-      ...(filterStateRef.current as RetroVideoFilterState),
-    }),
+    // Preserve identity until React supplies new settings. The pipeline uses
+    // it to decide whether a VBlank frame can reuse the previous rendering.
+    (): RetroVideoFilterState => filterStateRef.current as RetroVideoFilterState,
     [],
   );
 

@@ -107,6 +107,7 @@ export class TetoricaRetroAudioNode {
   private _roomConvolverConnected = true;
   private _hallReverbConvolverConnected = true;
   private _destinationConnected = false;
+  private initializationPromise: Promise<void> | null = null;
   // Cache last WaveShaper curve amounts to avoid recreating 4096-sample Float32Arrays every update.
   private _driveCurveAmount = -1;
   private _tapeSatCurveAmount = -1;
@@ -586,7 +587,7 @@ export class TetoricaRetroAudioNode {
         bitcrusherDiff.context.currentTime,
       );
       bitcrusherDiff.parameters.get("mix")?.setValueAtTime(
-        1,
+        crushNoiseAmount > 0 ? 1 : 0,
         bitcrusherDiff.context.currentTime,
       );
     }
@@ -1172,7 +1173,14 @@ export class TetoricaRetroAudioNode {
     }
 
     if (!this.nodes.audioContext || !this.nodes.masterGain) {
-      await this.initNodes();
+      // Playback activation and recording can request initialization together.
+      // They must share one graph, including its input and recording destination.
+      if (!this.initializationPromise) {
+        this.initializationPromise = this.initNodes().finally(() => {
+          this.initializationPromise = null;
+        });
+      }
+      await this.initializationPromise;
     }
 
     const activeContext = this.nodes.audioContext;

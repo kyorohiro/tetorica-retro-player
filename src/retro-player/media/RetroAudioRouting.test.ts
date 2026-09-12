@@ -99,4 +99,14 @@ describe("resolveRecordingAudioSourceOrder", () => {
       order.indexOf("recording-destination"),
     );
   });
+
+  it("records native capture from the live stream, never the unconnected FX destination", () => {
+    expect(resolveRecordingAudioSourceOrder({ bypassWebAudio: true, isMediaStreamSource: true }))
+      .toEqual(["live-stream", "media-capture", "safari-tap"]);
+  });
+
+  it("keeps processed audio first for a stream routed through WebAudio", () => {
+    expect(resolveRecordingAudioSourceOrder({ bypassWebAudio: false, isMediaStreamSource: true })[0])
+      .toBe("recording-destination");
+  });
 });

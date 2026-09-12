@@ -1528,6 +1528,14 @@ export function usePixiVideoPlayer(
     const recordingAudioSourceOrder = resolveRecordingAudioSourceOrder(
       playbackAudioRoute ?? { bypassWebAudio: false },
     );
+    debugVideo("recording:audio-route", {
+      bypassWebAudio: playbackAudioRoute?.bypassWebAudio ?? false,
+      isMediaStreamSource: playbackAudioRoute?.isMediaStreamSource ?? false,
+      liveAudioTrackCount: liveAudioTracks.length,
+      mediaCaptureTrackCount: mediaCaptureTracks.length,
+      recordingDestinationTrackCount: recordingDestinationTracks.length,
+      sourceOrder: recordingAudioSourceOrder,
+    });
 
     for (const source of recordingAudioSourceOrder) {
       if (source === "safari-tap") {
@@ -1561,7 +1569,11 @@ export function usePixiVideoPlayer(
       }
 
       if (source === "live-stream" && liveAudioTracks.length > 0) {
-        liveAudioTracks.forEach((track) => recordingStream.addTrack(track));
+        liveAudioTracks.forEach((track) => {
+          const clonedTrack = track.clone();
+          recordingStream.addTrack(clonedTrack);
+          ownedRecordingTracks.push(clonedTrack);
+        });
         break;
       }
     }
