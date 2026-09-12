@@ -77,7 +77,9 @@ pub async fn api_get_files(
 
     // 先頭の / を外して base_path に join
     let clean_sub_path = sub_path.trim_start_matches('/');
-    let target_path = base_path.join(clean_sub_path);
+    let Ok(target_path) = crate::shared_path::resolve_shared_path(base_path, clean_sub_path) else {
+        return serde_json::to_string(&files).unwrap();
+    };
 
     if !target_path.is_dir() {
         return serde_json::to_string(&files).unwrap();

@@ -145,21 +145,7 @@ async fn download_file_inner(
 }
 
 fn safe_join(base: &PathBuf, sub_path: &str) -> Result<PathBuf, (StatusCode, String)> {
-    let mut result = base.clone();
-
-    for part in sub_path.split('/') {
-        if part.is_empty() || part == "." {
-            continue;
-        }
-
-        if part == ".." || part.contains('\\') {
-            return Err((StatusCode::BAD_REQUEST, "invalid path".to_string()));
-        }
-
-        result.push(part);
-    }
-
-    Ok(result)
+    crate::shared_path::resolve_shared_path(base, sub_path)
 }
 
 struct DirEntryInfo {

@@ -61,7 +61,7 @@ pub async fn hls_sub_playlist(
     };
 
     let clean = subpath.trim_start_matches('/');
-    let file_path = folder_path.join(clean);
+    let file_path = crate::shared_path::resolve_shared_path(&folder_path, clean)?;
 
     let tmp_dir = start_hls_for_path(&state, &session_id, &file_path, port).await?;
     serve_playlist(&tmp_dir).await
@@ -215,6 +215,9 @@ pub async fn hls_segment(
     };
     state.touch_hls_session(&session_id);
 
+    if filename.contains('/') || filename.contains('\\') || filename.contains(':') || filename.contains("..") {
+        return Err((StatusCode::BAD_REQUEST, "invalid segment filename".into()));
+    }
     let file_path = tmp_dir.join(&filename);
 
     // Wait for the segment to be written (ffmpeg may still be transcoding)
@@ -355,7 +358,7 @@ fn resolve_folder_subpath(
     };
 
     let clean = subpath.trim_start_matches('/');
-    Ok(folder_path.join(clean))
+    crate::shared_path::resolve_shared_path(&folder_path, clean)
 }
 
 /// Ensure an HLS session exists for a directly registered file id.
@@ -389,13 +392,14 @@ async fn start_hls_for_path(
     state: &SharedHttpServerContext,
     session_id: &str,
     file_path: &PathBuf,
-    port: u16,
+    _port: u16,
 ) -> Result<PathBuf, (StatusCode, String)> {
-    if !state.begin_hls_session_start(session_id) {
+    while !state.begin_hls_session_start(session_id) {
         if let Some(dir) = wait_for_existing_or_starting_session(state, session_id).await? {
             return Ok(dir);
         }
     }
+    let _startup = HlsStartupGuard { state: state.clone(), id: session_id.to_string() };
 
     let input = file_path
         .to_str()
@@ -417,21 +421,20 @@ async fn start_hls_for_path(
     let segment_pattern = tmp_dir.join("seg%03d.ts");
 
     let start_result: Result<PathBuf, (StatusCode, String)> = async {
-    let (ffmpeg_cmd, prewarm_rx, use_qsv, max_hls_sessions, is_https) = {
+    let (ffmpeg_cmd, prewarm_rx, use_qsv, max_hls_sessions) = {
         let ctx = state.inner.lock().unwrap();
         (
             ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
             ctx.ffmpeg_prewarm_rx.clone(),
             ctx.ffmpeg_use_qsv,
             ctx.ffmpeg_max_concurrent_hls_sessions.max(1),
-            ctx.status.is_https == Some(true),
         )
     };
 
-    // Absolute base URL so WKWebView fetches segments from our server regardless of
-    // which playlist route was used (direct /hls/ or sub-file /hls-sub/).
-    let scheme = if is_https { "https" } else { "http" };
-    let base_url = format!("{scheme}://localhost:{}/hls/{}/", port, session_id);
+    // Origin-relative URL works for both localhost and remote LAN browsers,
+    // including playlists under /hls-sub/ and /audio-hls/.
+
+    let base_url = format!("/hls/{session_id}/");
 
     state.enforce_hls_session_limit(max_hls_sessions.saturating_sub(1).max(1));
 
@@ -641,13 +644,14 @@ async fn start_audio_hls_for_path(
     state: &SharedHttpServerContext,
     session_id: &str,
     file_path: &PathBuf,
-    port: u16,
+    _port: u16,
 ) -> Result<PathBuf, (StatusCode, String)> {
-    if !state.begin_hls_session_start(session_id) {
+    while !state.begin_hls_session_start(session_id) {
         if let Some(dir) = wait_for_existing_or_starting_session(state, session_id).await? {
             return Ok(dir);
         }
     }
+    let _startup = HlsStartupGuard { state: state.clone(), id: session_id.to_string() };
 
     let input = file_path
         .to_str()
@@ -669,18 +673,17 @@ async fn start_audio_hls_for_path(
     let segment_pattern = tmp_dir.join("seg%03d.ts");
 
     let start_result: Result<PathBuf, (StatusCode, String)> = async {
-        let (ffmpeg_cmd, prewarm_rx, max_hls_sessions, is_https) = {
+        let (ffmpeg_cmd, prewarm_rx, max_hls_sessions) = {
             let ctx = state.inner.lock().unwrap();
             (
                 ctx.ffmpeg_path.clone().unwrap_or_else(|| PathBuf::from("ffmpeg")),
                 ctx.ffmpeg_prewarm_rx.clone(),
                 ctx.ffmpeg_max_concurrent_hls_sessions.max(1),
-                ctx.status.is_https == Some(true),
             )
         };
 
-        let scheme = if is_https { "https" } else { "http" };
-        let base_url = format!("{scheme}://localhost:{}/hls/{}/", port, session_id);
+
+        let base_url = format!("/hls/{session_id}/");
 
         state.enforce_hls_session_limit(max_hls_sessions.saturating_sub(1).max(1));
 
@@ -725,7 +728,7 @@ async fn start_audio_hls_for_path(
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::from(log_file));
 
-        let child = cmd.spawn().map_err(|e| {
+        let mut child = cmd.spawn().map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("ffmpeg launch failed: {e}"),
@@ -733,6 +736,7 @@ async fn start_audio_hls_for_path(
         })?;
 
         if wait_for_playlist_ready(&playlist, 80, Duration::from_millis(200)).await.is_err() {
+            cleanup_failed_hls_child(&mut child, &tmp_dir).await;
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "ffmpeg did not produce audio HLS output in time".to_string(),
@@ -763,7 +767,9 @@ async fn start_audio_hls_for_path(
 pub async fn hls_cleanup_all(
     AxumState(state): AxumState<SharedHttpServerContext>,
 ) -> impl IntoResponse {
-    state.cleanup_hls_sessions();
+    // Legacy clients call this on close. Sessions are shared by LAN viewers:
+    // retain the bounded cache until eviction or server shutdown.
+    let _ = state;
     StatusCode::NO_CONTENT
 }
 
@@ -771,6 +777,12 @@ fn is_segment_ready(path: &FsPath) -> bool {
     std::fs::metadata(path)
         .map(|meta| meta.is_file() && meta.len() > 0)
         .unwrap_or(false)
+}
+
+async fn cleanup_failed_hls_child(child: &mut tokio::process::Child, dir: &FsPath) {
+    let _ = child.start_kill();
+    let _ = child.wait().await;
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 /// Create a Command for ffmpeg with platform-specific flags.
@@ -781,12 +793,15 @@ fn new_ffmpeg_command(ffmpeg_cmd: &PathBuf) -> Command {
         let mut cmd = Command::new(ffmpeg_cmd);
         // tokio::process::Command exposes creation_flags() directly on Windows.
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        cmd.kill_on_drop(true);
         cmd
     }
 
     #[cfg(not(windows))]
     {
-        Command::new(ffmpeg_cmd)
+        let mut cmd = Command::new(ffmpeg_cmd);
+        cmd.kill_on_drop(true);
+        cmd
     }
 }
 
@@ -887,4 +902,76 @@ mod tests {
         assert_eq!(HLS_SEGMENT_DURATION_SECONDS, "4");
         assert_eq!(HLS_VIDEO_AUDIO_BITRATE, "96k");
     }
+}
+
+// Runs for errors before spawning as well as cancelled startup futures.
+struct HlsStartupGuard {
+    state: SharedHttpServerContext,
+    id: String,
+}
+impl Drop for HlsStartupGuard {
+    fn drop(&mut self) { self.state.finish_hls_session_start(&self.id); }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    fn context() -> SharedHttpServerContext {
+        SharedHttpServerContext {
+            inner: std::sync::Arc::new(std::sync::Mutex::new(crate::http::HttpServerContext::new())),
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_directory_creation_releases_startup_marker() {
+        let state = context();
+        let id = format!("test-{}", uuid::Uuid::new_v4());
+        let path = std::env::temp_dir().join(format!("retro-hls-{id}"));
+        std::fs::write(&path, b"blocks directory creation").unwrap();
+        assert!(start_hls_for_path(&state, &id, &PathBuf::from("input.mp4"), 7878).await.is_err());
+        assert!(!state.is_hls_session_starting(&id));
+        assert!(start_audio_hls_for_path(&state, &id, &PathBuf::from("input.mp4"), 7878).await.is_err());
+        assert!(!state.is_hls_session_starting(&id));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn legacy_client_close_does_not_remove_other_viewers_session() {
+        let state = context();
+        state.inner.lock().unwrap().hls_sessions.insert("other-viewer".into(), PathBuf::from("shared-cache"));
+        hls_cleanup_all(AxumState(state.clone())).await;
+        assert!(state.inner.lock().unwrap().hls_sessions.contains_key("other-viewer"));
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn failed_audio_start_terminates_child_before_removing_files() {
+        let path = std::env::temp_dir().join(format!("mdrop-child-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&path).unwrap();
+        let mut child = new_ffmpeg_command(&PathBuf::from("/bin/sh"))
+            .args(["-c", "exec sleep 30"]).spawn().unwrap();
+        cleanup_failed_hls_child(&mut child, &path).await;
+        assert!(child.id().is_none());
+        assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires an installed ffmpeg; run explicitly for integration validation"]
+    async fn audio_hls_manifest_uses_server_relative_segments() {
+        let state = context();
+        let ffmpeg = std::env::var("FFMPEG_TEST_BINARY").unwrap_or_else(|_| "ffmpeg".into());
+        state.inner.lock().unwrap().ffmpeg_path = Some(PathBuf::from(&ffmpeg));
+        let id = format!("audio-test-{}", uuid::Uuid::new_v4());
+        let input = std::env::temp_dir().join(format!("{id}.wav"));
+        let status = Command::new(&ffmpeg).args(["-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1"])
+            .arg(&input).status().await.unwrap();
+        assert!(status.success());
+        let dir = start_audio_hls_for_path(&state, &id, &input, 7878).await.unwrap();
+        let playlist = tokio::fs::read_to_string(dir.join("index.m3u8")).await.unwrap();
+        assert!(playlist.lines().any(|line| line.starts_with(&format!("/hls/{id}/seg"))));
+        assert!(!playlist.contains("localhost"));
+        let mut child = state.inner.lock().unwrap().hls_children.remove(&id).unwrap();
+        cleanup_failed_hls_child(&mut child, &dir).await;
+        std::fs::remove_file(input).unwrap();
+    }
+
 }

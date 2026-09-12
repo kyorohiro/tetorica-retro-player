@@ -59,9 +59,6 @@ export function useMDropSharedListDialog() {
   return { showMDropSharedListDialog };
 }
 
-const cleanupHls = (apiServer: string) => {
-  fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
-};
 
 function MDropSharedListDialog({
   files,
@@ -228,7 +225,7 @@ function MDropSharedListDialog({
     <div className="safe-dialog-fullscreen flex flex-col overflow-hidden bg-slate-950">
       <button
         type="button"
-        onClick={() => { if (currentUseHls) cleanupHls(apiServer); onClose(); }}
+        onClick={onClose}
         aria-label="Close"
         className="safe-top-offset-right fixed right-2 z-9998 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-700 hover:text-slate-200"
       >

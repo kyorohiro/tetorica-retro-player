@@ -360,7 +360,6 @@ function FileListDialog({
                 <button
                     type="button"
                     onClick={() => {
-                        if (currentUseHls) fetch(`${apiServer}/hls/cleanup`, { method: "POST" }).catch(() => {});
                         onClose();
                     }}
                     aria-label="Close"

@@ -9,3 +9,5 @@ pub mod http_stream;
 pub fn hello() -> &'static str {
     "Hello from mDrop core"
 }
+
+mod shared_path;
