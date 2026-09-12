@@ -459,6 +459,11 @@ export function useRetroPixiStage({
         getRetroVideoSourceSize(source), presentedViewportSizeRef.current, settings)) return;
     }
     app.pipeline.render();
+    const beamSizing = settings.isFilterEnabled && isBeamCrossModeEnabled(settings)
+      ? app.pipeline.getBeamSizingDiagnostic() : "";
+    if (app.canvas.dataset.retroBeamSizing !== beamSizing) {
+      app.canvas.dataset.retroBeamSizing = beamSizing;
+    }
   }, [buildPipelineFilterState]);
 
   useLayoutEffect(() => {
@@ -750,6 +755,7 @@ export function useRetroPixiStage({
       nextLeft,
       nextTop,
       presentationSamplingMode,
+      currentFilterState.isFilterEnabled && isBeamCrossModeEnabled(currentFilterState) ? "beam-smooth" : "source-sampling",
       currentFilterState.isFilterEnabled ? 1 : 0,
       shouldUseLogicalBufferUpscale ? 1 : 0,
     ].join(":");
@@ -843,7 +849,10 @@ export function useRetroPixiStage({
     app.canvas.style.top = `${nextTop}px`;
     app.canvas.style.width = `${snappedPresentedStyleWidth}px`;
     app.canvas.style.height = `${snappedPresentedStyleHeight}px`;
-    app.canvas.style.imageRendering = isUpscalingContent ? "pixelated" : "auto";
+    // The completed CRT mask is not source pixel art. Its final browser
+    // scaling must not inherit the source texture's nearest-neighbor choice.
+    app.canvas.style.imageRendering = currentFilterState.isFilterEnabled && isBeamCrossModeEnabled(currentFilterState)
+      ? "auto" : isUpscalingContent ? "pixelated" : "auto";
     app.pipeline.setPresentationSamplingMode(presentationSamplingMode);
     app.pipeline.setDisplaySizeOverride({
       width: snappedPresentedStyleWidth,

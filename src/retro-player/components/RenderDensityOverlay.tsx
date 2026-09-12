@@ -36,6 +36,7 @@ export function RenderDensityOverlay({ hostRef }: {
         `Cap縮小倍率: ${number(info.totalScaleDownFactor)}`,
         `Source: ${info.sourceWidth} × ${info.sourceHeight}`,
         `設定Target: ${info.targetWidth} × ${info.targetHeight}`,
+        canvas.dataset.retroBeamSizing || "内部Target: —",
         `Spacing: X ${info.spacingX} / Y ${info.spacingY}`,
         `Auto: ${info.autoTargetSize ? info.basis : "off"} / 軸 ${info.selectedAxis}`,
         `Sampling: ${info.presentationSamplingMode}`,

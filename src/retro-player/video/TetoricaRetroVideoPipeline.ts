@@ -1166,6 +1166,11 @@ export class TetoricaRetroVideoPipeline {
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
   private filterViewportScale = 1;
   private presentationPixelRatio: number | null = null;
+  private beamSizingDiagnostic = "";
+
+  getBeamSizingDiagnostic() {
+    return this.beamSizingDiagnostic;
+  }
   private isFilterBufferCapEnabled = false;
   private displaySizeOverride: { width: number; height: number } | null = null;
 
@@ -4111,6 +4116,11 @@ export class TetoricaRetroVideoPipeline {
     const beamSourceHeight = usePreFilterDownscale
       ? pass2TargetHeight
       : Math.max(sourceHeight ?? pass2TargetHeight, 1);
+
+    // CPU-side values actually selected for the passes, not the UI target.
+    this.beamSizingDiagnostic = isBeamMode
+      ? `内部Target: ${pass2TargetWidth} × ${pass2TargetHeight}\nBeam source: ${beamSourceWidth} × ${beamSourceHeight}`
+      : "";
 
     return {
       pass2TargetWidth,

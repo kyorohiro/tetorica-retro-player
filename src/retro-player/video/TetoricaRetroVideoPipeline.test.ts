@@ -250,3 +250,31 @@ it("does not relink Beam programs as the canvas and auto target grow from 1x1", 
     pipeline.dispose();
   }
 });
+
+it("reduces the actual Beam pass target as the video area shrinks even when page density rises", () => {
+  const { pipeline, gl } = createPipeline();
+  const settings = {
+    phosphorDotShape: "beam", targetWidth: 640, targetHeight: 360,
+    matchTargetAspect: true, beamWhiteBloom: 0,
+  } as RetroVideoFilterState;
+  const sizing = pipeline as unknown as {
+    resolvePass2Sizing(state: RetroVideoFilterState, width: number, height: number): {
+      pass2TargetWidth: number; pass2TargetHeight: number;
+    };
+  };
+  pipeline.setDisplaySizeOverride({ width: 480, height: 270 });
+  pipeline.setPresentationPixelRatio(2);
+  gl.drawingBufferWidth = 960;
+  gl.drawingBufferHeight = 540;
+  const before = sizing.resolvePass2Sizing(settings, 640, 360);
+  pipeline.setDisplaySizeOverride({ width: 240, height: 135 });
+  pipeline.setPresentationPixelRatio(3);
+  gl.drawingBufferWidth = 480;
+  gl.drawingBufferHeight = 270;
+  const after = sizing.resolvePass2Sizing(settings, 640, 360);
+  expect(after.pass2TargetWidth).toBeLessThan(before.pass2TargetWidth);
+  expect(after.pass2TargetWidth).toBeLessThanOrEqual(200);
+  expect(after.pass2TargetHeight).toBeLessThanOrEqual(113);
+  expect(pipeline.getBeamSizingDiagnostic()).toContain(`内部Target: ${after.pass2TargetWidth} × ${after.pass2TargetHeight}`);
+  expect(gl.getProgramParameter).not.toHaveBeenCalled();
+});
