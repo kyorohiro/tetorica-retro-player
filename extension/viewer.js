@@ -1,3 +1,4 @@
+import { createProgramCache } from "./shared/overlayCompiler.js";
 import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_BASE } from "./shared/filterPass1LiteBaseShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "./shared/filterPass1LiteNearestShader.js";
@@ -104,6 +105,17 @@ let activeRendererVariantSignature = null;
 let compileStatusTimerId = null;
 let lastPublishedCompileStateKey = "";
 let rendererSetupGeneration = 0;
+let rendererPreparing = false;
+let rendererFailed = false;
+let rendererCompileQueue = Promise.resolve();
+let rendererProgramCache = null;
+const rendererAbort = new AbortController();
+window.addEventListener("pagehide", () => {
+  rendererAbort.abort();
+  rendererSetupGeneration++;
+  rendererFailed = true;
+  rendererProgramCache?.dispose();
+});
 const shaderCompileSessionSalt = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 let viewerShaderCompileCacheBusterSessionEnabled = false;
 
@@ -517,6 +529,10 @@ function detachCaptureSizeListeners() {
 }
 
 function drawFrame() {
+  if (rendererPreparing || rendererFailed) {
+    animationFrameId = requestAnimationFrame(drawFrame);
+    return;
+  }
   const activeProgram = program ?? passthroughProgram;
   if (!gl || !activeProgram || !texture || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
     animationFrameId = requestAnimationFrame(drawFrame);
@@ -642,6 +658,7 @@ function drawFrame() {
 }
 
 function resizeCanvas() {
+  if (rendererPreparing || rendererFailed) return;
   updateCanvasAspectRatio();
   const width = Math.max(640, Math.floor(canvas.clientWidth * window.devicePixelRatio));
   const aspectRatio = getCaptureAspectRatio();
@@ -934,6 +951,7 @@ function getPhosphorDotLimitedTargetSize(settings, visibleWidth, visibleHeight) 
 }
 
 function applyPass1Settings() {
+  if (rendererPreparing || rendererFailed) return;
   if (!gl || !pass1Program || !pass1UniformLocations) return;
   const displaySize = getDisplaySize();
   const limitedSize = getPhosphorDotLimitedTargetSize(
@@ -959,6 +977,7 @@ function applyPass1Settings() {
 }
 
 function applyPass2Settings() {
+  if (rendererPreparing || rendererFailed) return;
   if (!gl || !program || !uniformLocations) return;
   const displaySize = getDisplaySize();
   const limitedSize = getPhosphorDotLimitedTargetSize(
@@ -1037,6 +1056,7 @@ function applyPass2Settings() {
 }
 
 function applyBeamKernelSettings(limitedSize) {
+  if (rendererPreparing || rendererFailed) return;
   if (!gl || !beamKernelProgram || !beamKernelUniformLocations) return;
   const displaySize = getDisplaySize();
   gl.useProgram(beamKernelProgram);
@@ -1055,6 +1075,7 @@ function applyBeamKernelSettings(limitedSize) {
 }
 
 function applyBeamStripeSettings(limitedSize) {
+  if (rendererPreparing || rendererFailed) return;
   if (!gl || !beamStripeProgram || !beamStripeUniformLocations) return;
   const displaySize = getDisplaySize();
   gl.useProgram(beamStripeProgram);
@@ -1069,6 +1090,7 @@ function applyBeamStripeSettings(limitedSize) {
 }
 
 function applyBeamComposeSettings(limitedSize) {
+  if (rendererPreparing || rendererFailed) return;
   if (!gl || !beamComposeProgram || !beamComposeUniformLocations) return;
   gl.useProgram(beamComposeProgram);
   gl.uniform2f(beamComposeUniformLocations.uBeamSourceSize, limitedSize.w, limitedSize.h);
@@ -1256,226 +1278,94 @@ async function disposeAudioEngine() {
 }
 
 function setupRenderer(webgl) {
+  if (rendererFailed) return;
   const setupGeneration = ++rendererSetupGeneration;
-  activeRendererVariantSignature = getRendererVariantSignature(currentSettings);
-  if (compileStatusTimerId != null) {
-    window.clearTimeout(compileStatusTimerId);
-    compileStatusTimerId = null;
-  }
-  renderViewerCompileState("Preparing retro filter...");
-  compileStatusTimerId = window.setTimeout(() => {
-    compileStatusTimerId = null;
-    publishCompileState(true, "Preparing retro filter...");
-  }, 120);
-  // --- Passthrough program (tiny; compiles instantly, safe to link-check now) ---
-  // Used while the full filter shader compiles in the background so the canvas
-  // shows raw video immediately instead of staying black.
-  const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT);
-  const passthru = webgl.createProgram();
-  if (passthru) {
-    webgl.attachShader(passthru, passVert);
-    webgl.attachShader(passthru, passFrag);
-    webgl.linkProgram(passthru);
-    if (webgl.getProgramParameter(passthru, webgl.LINK_STATUS)) {
-      passthroughProgram = passthru;
-      webgl.useProgram(passthru);
-      webgl.uniform1i(webgl.getUniformLocation(passthru, "uTexture"), 0);
+  const settings = { ...currentSettings };
+  activeRendererVariantSignature = getRendererVariantSignature(settings);
+  rendererPreparing = true;
+  publishCompileState(true, "Preparing retro filter...");
+  rendererCompileQueue = rendererCompileQueue.then(async () => {
+    if (rendererFailed || setupGeneration !== rendererSetupGeneration) return;
+    await prepareRenderer(webgl, settings, setupGeneration);
+  }).catch(error => {
+    if (error?.name === "AbortError" && !webgl.isContextLost()) return;
+    // Do not submit further work to a context whose GPU completion is unknown.
+    rendererFailed = true;
+    console.error("[viewer] Shader preparation failed", error);
+    publishCompileState(false, "");
+    renderViewerCompileState("");
+    setStatus(`Filter unavailable: ${error instanceof Error ? error.message : String(error)}. Reload the viewer to retry.`);
+  }).finally(() => {
+    if (setupGeneration !== rendererSetupGeneration) return;
+    rendererPreparing = false;
+    if (!rendererFailed) {
+      resizeCanvas();
+      applyCurrentSettings();
     }
-  }
-
-  // --- Filter programs (lite variants only) ---
-  const vertexShader = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource);
-  const shaderSources = getWindowsLiteShaderSources(currentSettings);
-  console.info("[viewer shader route]", {
-    presetKey: currentSettings.presetKey,
-    phosphorDotShape: currentSettings.phosphorDotShape,
-    variantKey: getWindowsLiteVariantKey(currentSettings),
-    beamDownscale: Boolean(shaderSources.beamDownscale),
-    beamKernel: Boolean(shaderSources.beamKernel),
-    beamCompose: Boolean(shaderSources.beamCompose),
-    beamStripeStrength: currentSettings.beamStripeStrength ?? 0,
-    beamWhiteBloom: currentSettings.beamWhiteBloom ?? 1,
-    beamWarmBloom: currentSettings.beamWarmBloom ?? 0,
   });
-  const pass1Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass1);
-  const pass2Frag = compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.pass2);
-
-  const prog1 = webgl.createProgram();
-  const prog2 = webgl.createProgram();
-  if (!prog1 || !prog2) {
-    throw new Error("Failed to create WebGL program.");
-  }
-
-  webgl.attachShader(prog1, vertexShader);
-  webgl.attachShader(prog1, pass1Frag);
-  webgl.linkProgram(prog1);
-  webgl.attachShader(prog2, vertexShader);
-  webgl.attachShader(prog2, pass2Frag);
-  webgl.linkProgram(prog2);
-
-  // CRITICAL: Do NOT call getProgramParameter here. On Windows/ANGLE, Chrome's
-  // D3D GPU shader cache causes any readback during cache loading to freeze the
-  // main thread. program and uniformLocations are set asynchronously below.
-  // drawFrame() uses passthroughProgram until program is ready.
-
-  const vertices = new Float32Array([
-    -1, -1,
-     1, -1,
-    -1,  1,
-    -1,  1,
-     1, -1,
-     1,  1,
-  ]);
-
-  const vertexBuffer = webgl.createBuffer();
-  webgl.bindBuffer(webgl.ARRAY_BUFFER, vertexBuffer);
-  webgl.bufferData(webgl.ARRAY_BUFFER, vertices, webgl.STATIC_DRAW);
-
-  const vao = webgl.createVertexArray();
-  webgl.bindVertexArray(vao);
-  // aPosition is the only attribute so it is always assigned location 0.
-  webgl.enableVertexAttribArray(0);
-  webgl.vertexAttribPointer(0, 2, webgl.FLOAT, false, 0, 0);
-
-  texture = webgl.createTexture();
-  webgl.bindTexture(webgl.TEXTURE_2D, texture);
-  // DOM media uploads use a different vertical origin than the Pixi pipeline expects.
-  webgl.pixelStorei(webgl.UNPACK_FLIP_Y_WEBGL, true);
-  webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MIN_FILTER, webgl.LINEAR);
-  webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MAG_FILTER, webgl.LINEAR);
-  webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
-  webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.CLAMP_TO_EDGE);
-
-  // useProgram, getUniformLocation, and uniformLocations assignment are deferred
-  // to finalizeFilterProgram() to avoid the Windows D3D cache freeze.
-  void finalizeFilterProgram(webgl, prog1, prog2, setupGeneration);
 }
 
-async function finalizeFilterProgram(webgl, prog1, prog2, setupGeneration) {
-  const shaderSources = getWindowsLiteShaderSources(currentSettings);
+async function prepareRenderer(webgl, settings, setupGeneration) {
   const updateCompileState = (message) => {
-    if (setupGeneration !== rendererSetupGeneration) {
-      return;
-    }
-    if (compileStatusTimerId != null) {
-      window.clearTimeout(compileStatusTimerId);
-      compileStatusTimerId = null;
-    }
-    publishCompileState(Boolean(message), message || "");
+    if (setupGeneration === rendererSetupGeneration) publishCompileState(Boolean(message), message);
   };
-  const beamDownscaleFrag = shaderSources.beamDownscale
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamDownscale)
-    : null;
-  const beamKernelFrag = shaderSources.beamKernel
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamKernel)
-    : null;
-  const beamStripeFrag = shaderSources.beamStripe
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamStripe)
-    : null;
-  const beamComposeFrag = shaderSources.beamCompose
-    ? compileShader(webgl, webgl.FRAGMENT_SHADER, shaderSources.beamCompose)
-    : null;
-  const beamDownscaleProg = beamDownscaleFrag ? webgl.createProgram() : null;
-  const beamKernelProg = beamKernelFrag ? webgl.createProgram() : null;
-  const beamStripeProg = beamStripeFrag ? webgl.createProgram() : null;
-  const beamComposeProg = beamComposeFrag ? webgl.createProgram() : null;
-  if ((beamDownscaleFrag && !beamDownscaleProg) || (beamKernelFrag && !beamKernelProg) || (beamStripeFrag && !beamStripeProg) || (beamComposeFrag && !beamComposeProg)) {
-    throw new Error("Failed to create viewer beam programs.");
-  }
-  if (beamDownscaleProg && beamDownscaleFrag) {
-    updateCompileState("Linking shader (beam downscale)...");
-    webgl.attachShader(beamDownscaleProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
-    webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
-    webgl.linkProgram(beamDownscaleProg);
-  }
-  if (beamKernelProg && beamKernelFrag) {
-    updateCompileState("Linking shader (beam kernel)...");
-    webgl.attachShader(beamKernelProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
-    webgl.attachShader(beamKernelProg, beamKernelFrag);
-    webgl.linkProgram(beamKernelProg);
-  }
-  if (beamStripeProg && beamStripeFrag) {
-    updateCompileState("Linking shader (beam stripe)...");
-    webgl.attachShader(beamStripeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
-    webgl.attachShader(beamStripeProg, beamStripeFrag);
-    webgl.linkProgram(beamStripeProg);
-  }
-  if (beamComposeProg && beamComposeFrag) {
-    updateCompileState("Linking shader (beam compose)...");
-    webgl.attachShader(beamComposeProg, compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource));
-    webgl.attachShader(beamComposeProg, beamComposeFrag);
-    webgl.linkProgram(beamComposeProg);
-  }
-  const ext =
-    webgl.getExtension("WEBGL_parallel_shader_compile")
-    || webgl.getExtension("KHR_parallel_shader_compile");
-
-  if (ext) {
-    await new Promise((resolve) => {
-      const poll = () => {
-        if (setupGeneration !== rendererSetupGeneration) {
-          resolve();
-          return;
-        }
-        updateCompileState("Linking shader (waiting for GPU)...");
-        const ready1 = webgl.getProgramParameter(prog1, ext.COMPLETION_STATUS_KHR);
-        const ready2 = webgl.getProgramParameter(prog2, ext.COMPLETION_STATUS_KHR);
-        const ready3 = beamDownscaleProg ? webgl.getProgramParameter(beamDownscaleProg, ext.COMPLETION_STATUS_KHR) : true;
-        const ready4 = beamKernelProg ? webgl.getProgramParameter(beamKernelProg, ext.COMPLETION_STATUS_KHR) : true;
-        const ready5 = beamStripeProg ? webgl.getProgramParameter(beamStripeProg, ext.COMPLETION_STATUS_KHR) : true;
-        const ready6 = beamComposeProg ? webgl.getProgramParameter(beamComposeProg, ext.COMPLETION_STATUS_KHR) : true;
-        if (ready1 && ready2 && ready3 && ready4 && ready5 && ready6) {
-          resolve();
-          return;
-        }
-        requestAnimationFrame(poll);
-      };
-      requestAnimationFrame(poll);
+  if (!rendererProgramCache) {
+    rendererProgramCache = createProgramCache(webgl, withShaderCompileCacheBuster(vertexShaderSource, settings), {
+      onStage: (label, stage) => {
+        if (stage === "synchronous-link-fallback") console.warn("[viewer] synchronous-link-fallback", label);
+        if (stage !== "cached" && stage !== "ready") publishCompileState(true, `${label}: ${stage}`);
+      },
     });
-  } else {
-    // Chromium should normally expose parallel shader compile. Keep a minimal
-    // fallback for unexpected runtimes rather than hard-failing.
-    await new Promise((resolve) => setTimeout(resolve, 3000));
   }
+  const get = async (source, label) => {
+    if (setupGeneration !== rendererSetupGeneration) throw new DOMException("Renderer settings changed", "AbortError");
+    const result = source ? await rendererProgramCache.get(withShaderCompileCacheBuster(source, settings), label, rendererAbort.signal) : null;
+    if (setupGeneration !== rendererSetupGeneration) throw new DOMException("Renderer settings changed", "AbortError");
+    return result;
+  };
+  const shaderSources = getWindowsLiteShaderSources(settings);
+  const passthru = await get(PASSTHROUGH_FRAGMENT, "Passthrough");
+  const prog1 = await get(shaderSources.pass1, "Pass 1");
+  const prog2 = await get(shaderSources.pass2, "Pass 2");
+  const beamDownscaleProg = await get(shaderSources.beamDownscale, "Beam downscale");
+  const beamKernelProg = await get(shaderSources.beamKernel, "Beam kernel");
+  const beamStripeProg = await get(shaderSources.beamStripe, "Beam stripe");
+  const beamComposeProg = await get(shaderSources.beamCompose, "Beam compose");
 
-  if (setupGeneration !== rendererSetupGeneration) {
-    return;
-  }
+  // Allocate geometry/texture once, only after every required program is ready.
+  if (!texture) {
+    const vertices = new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1,
+    ]);
 
-  if (!webgl.getProgramParameter(prog1, webgl.LINK_STATUS)) {
-    updateCompileState("");
-    const message = webgl.getProgramInfoLog(prog1) || "Unknown pass1 program link error.";
-    console.error("[viewer] Filter shader link failed:", message);
-    return;
-  }
+    const vertexBuffer = webgl.createBuffer();
+    webgl.bindBuffer(webgl.ARRAY_BUFFER, vertexBuffer);
+    webgl.bufferData(webgl.ARRAY_BUFFER, vertices, webgl.STATIC_DRAW);
 
-  if (!webgl.getProgramParameter(prog2, webgl.LINK_STATUS)) {
-    updateCompileState("");
-    const message = webgl.getProgramInfoLog(prog2) || "Unknown pass2 program link error.";
-    console.error("[viewer] Filter shader link failed:", message);
-    return;
+    const vao = webgl.createVertexArray();
+    webgl.bindVertexArray(vao);
+    // aPosition is the only attribute so it is always assigned location 0.
+    webgl.enableVertexAttribArray(0);
+    webgl.vertexAttribPointer(0, 2, webgl.FLOAT, false, 0, 0);
+
+    texture = webgl.createTexture();
+    webgl.bindTexture(webgl.TEXTURE_2D, texture);
+    // DOM media uploads use a different vertical origin than the Pixi pipeline expects.
+    webgl.pixelStorei(webgl.UNPACK_FLIP_Y_WEBGL, true);
+    webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MIN_FILTER, webgl.LINEAR);
+    webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MAG_FILTER, webgl.LINEAR);
+    webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.CLAMP_TO_EDGE);
+    webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.CLAMP_TO_EDGE);
+
   }
-  if (beamDownscaleProg && !webgl.getProgramParameter(beamDownscaleProg, webgl.LINK_STATUS)) {
-    updateCompileState("");
-    console.error("[viewer] Beam downscale shader link failed:", webgl.getProgramInfoLog(beamDownscaleProg) || "unknown");
-    return;
-  }
-  if (beamKernelProg && !webgl.getProgramParameter(beamKernelProg, webgl.LINK_STATUS)) {
-    updateCompileState("");
-    console.error("[viewer] Beam kernel shader link failed:", webgl.getProgramInfoLog(beamKernelProg) || "unknown");
-    return;
-  }
-  if (beamStripeProg && !webgl.getProgramParameter(beamStripeProg, webgl.LINK_STATUS)) {
-    updateCompileState("");
-    console.error("[viewer] Beam stripe shader link failed:", webgl.getProgramInfoLog(beamStripeProg) || "unknown");
-    return;
-  }
-  if (beamComposeProg && !webgl.getProgramParameter(beamComposeProg, webgl.LINK_STATUS)) {
-    updateCompileState("");
-    console.error("[viewer] Beam compose shader link failed:", webgl.getProgramInfoLog(beamComposeProg) || "unknown");
-    return;
-  }
+  passthroughProgram = passthru;
+  webgl.useProgram(passthru);
+  webgl.uniform1i(webgl.getUniformLocation(passthru, "uTexture"), 0);
 
   webgl.useProgram(prog1);
   webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
@@ -1755,22 +1645,6 @@ function ensureFramebuffer(width, height) {
   fboHeight = height;
 }
 
-function compileShader(webgl, type, source, settings = currentSettings) {
-  const shader = webgl.createShader(type);
-  if (!shader) {
-    throw new Error("Failed to create shader.");
-  }
-
-  webgl.shaderSource(shader, withShaderCompileCacheBuster(source, settings));
-  webgl.compileShader(shader);
-
-  if (!webgl.getShaderParameter(shader, webgl.COMPILE_STATUS)) {
-    const message = webgl.getShaderInfoLog(shader) || "Unknown shader compile error.";
-    throw new Error(message);
-  }
-
-  return shader;
-}
 
 function setStatus(message) {
   statusText.textContent = message;

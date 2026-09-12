@@ -79,3 +79,18 @@ JavaScriptの`setTimeout`では、すでにブロックしている同期WebGL�
 - [9/12 古いWindows機向けの性能改善](w20260912/recover04-main-performance.md)
 - [通常表示の初期レイアウト修正](w20260912/recover11-inline-preview-layout.md)
 - [漫画ページ送りのプレイヤー再利用](w20260912/recover12-manga-player-reuse.md)
+
+## 2026-09-13: Capture Tab（viewer.js）への反映
+
+後日の確認で、Capture Tabにはコンパイル直後の`COMPILE_STATUS`取得と、passthroughのリンク直後の`LINK_STATUS`取得が残っていた。9/12のOverlay修正とは別に、以下を反映した。
+
+- Overlayの`createProgramCache`を共有し、passthrough・通常パス・Beam補助パスを順次コンパイルする。
+- KHRが利用可能なら完了を確認してから`LINK_STATUS`を読む。GPU待ちの上限は15秒。
+- 同一コンテキストのプログラムを再利用し、設定変更で重複コンパイルしない。
+- 設定が連続変更された場合、進行中のパスの完了を待って最新要求へ移る。古い要求を有効化しない。
+- 準備中は動画転送・描画・uniform更新・Canvasバッファのリサイズを停止し、成功後に現在のサイズと設定を反映する。
+- 失敗・タイムアウト時は追加のGPU操作を止め、viewer再読み込みを案内する。ページ終了時は待機を中断する。
+- KHRがない環境の同期確認フォールバックは残る。`synchronous-link-fallback`で明示する。
+
+初期表示用passthroughも含めて準備が完了するまでは描画を開始しない。切り替え中は直前の描画を保持する。
+この追加修正のWindows実機検証は未実施。モックで完了前の同期確認禁止、順序、キャッシュ、タイムアウト後の停止、描画・リサイズ抑止を検証する。
