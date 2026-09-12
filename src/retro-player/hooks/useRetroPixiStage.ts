@@ -1,3 +1,4 @@
+import { getDisplayAutoTargetSize, isDisplayAutoTargetReady } from "../video/autoTargetSize";
 import {
   useCallback,
   useEffect,
@@ -394,6 +395,8 @@ export function useRetroPixiStage({
   }>({
     isCapEnabled: false,
   });
+  const presentedViewportSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const layoutSourceRef = useRef<unknown>(null);
   const [presentedViewportSize, setPresentedViewportSize] = useState<{ width: number; height: number } | null>(null);
   const [viewportRect, setViewportRectState] = useState<typeof viewportRectRef.current>(null);
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
@@ -443,7 +446,11 @@ export function useRetroPixiStage({
     }
     viewportRectRef.current = resolved;
     setViewportRectState(resolved);
-    if (!resolved) setPresentedViewportSize(null);
+    if (!resolved) {
+      presentedViewportSizeRef.current = null;
+      layoutSourceRef.current = null;
+      setPresentedViewportSize(null);
+    }
   }, []);
 
   const renderFrame = useCallback(() => {
@@ -452,7 +459,14 @@ export function useRetroPixiStage({
     if (!app) return;
     app.pipeline.setOutputEnabled(isPoweredOnRef.current);
     app.pipeline.setSource(source);
+    const settings = filterStateRef.current;
     app.pipeline.setFilterState(buildPipelineFilterState());
+    if (source && settings.isFilterEnabled && settings.autoTargetSize && settings.autoTargetSizeBasis === "display") {
+      // Layout and React's auto-target update must agree before uploading or
+      // drawing a new frame. Shader preparation still proceeds normally.
+      if (layoutSourceRef.current !== source || !isDisplayAutoTargetReady(
+        getRetroVideoSourceSize(source), presentedViewportSizeRef.current, settings)) return;
+    }
     app.pipeline.render();
   }, [buildPipelineFilterState]);
 
@@ -626,6 +640,13 @@ export function useRetroPixiStage({
     const app = appRef.current;
     const host = canvasHostRef.current;
     if (!app || !host) return;
+    // A newly mounted, normal-size preview can have no layout yet. Do not
+    // turn that temporary measurement into a 1x1 canvas/target allocation.
+    if (host.clientWidth <= 1 || host.clientHeight <= 1) {
+      presentedViewportSizeRef.current = null;
+      layoutSourceRef.current = null;
+      return;
+    }
 
     fitCurrentSprite();
 
@@ -656,11 +677,18 @@ export function useRetroPixiStage({
       currentFilterState as RetroVideoFilterState,
     );
     const isFilterBufferCapEnabled = filterBufferCap !== null;
+    const provisionalTarget = currentFilterState.autoTargetSize && currentFilterState.autoTargetSizeBasis === "display"
+      ? getDisplayAutoTargetSize({ width: sourceWidth, height: sourceHeight },
+        { width: styleWidth, height: styleHeight }, currentFilterState.autoTargetSpacing, currentFilterState.autoTargetSpacingY)
+      : null;
+    const sizingFilterState = provisionalTarget
+      ? { ...currentFilterState, targetWidth: provisionalTarget.width, targetHeight: provisionalTarget.height }
+      : currentFilterState;
     const {
       width: effectiveTargetWidth,
       height: effectiveTargetHeight,
     } = getEffectiveRetroTargetSize(
-      currentFilterState as RetroVideoFilterState,
+      sizingFilterState as RetroVideoFilterState,
       previewSourceSize?.width,
       previewSourceSize?.height,
       styleWidth,
@@ -702,6 +730,8 @@ export function useRetroPixiStage({
     app.pipeline.setFilterViewportScale(totalScaleDownFactor);
     const snappedPresentedStyleWidth = snapCssToDevicePixel(presentedStyleWidth);
     const snappedPresentedStyleHeight = snapCssToDevicePixel(presentedStyleHeight);
+    presentedViewportSizeRef.current = { width: snappedPresentedStyleWidth, height: snappedPresentedStyleHeight };
+    layoutSourceRef.current = previewElementRef.current;
     // Auto target spacing must use the actual CSS presentation after caps,
     // not the larger fitted area retained in viewportRect for layout.
     setPresentedViewportSize(current =>
@@ -864,6 +894,11 @@ export function useRetroPixiStage({
       });
 
       const canvas = document.createElement("canvas");
+      // Never let the canvas's intrinsic 300x150 size determine the height
+      // of an inline preview while its source aspect is still loading.
+      canvas.style.position = "absolute";
+      canvas.style.left = "0";
+      canvas.style.top = "0";
       canvas.style.display = "block";
       canvas.style.width = "100%";
       canvas.style.height = "100%";
@@ -1116,10 +1151,8 @@ export function useRetroPixiStage({
     };
 
     const scheduleStableHostRefresh = (observed: { width: number; height: number }) => {
-      const changed = commitHostSizeIfChanged(observed);
-      if (changed) {
-        scheduleRefreshLayout();
-      }
+      // Commit only after a second matching measurement, rather than
+      // allocating buffers for every intermediate ResizeObserver size.
       pendingObservedHostSizeRef.current = observed;
       if (resizeValidationFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeValidationFrameRef.current);
@@ -1130,6 +1163,7 @@ export function useRetroPixiStage({
         if (!pending) return;
         const settled = readHostSize();
         if (settled.width !== pending.width || settled.height !== pending.height) {
+          scheduleStableHostRefresh(settled);
           return;
         }
         if (commitHostSizeIfChanged(settled)) {

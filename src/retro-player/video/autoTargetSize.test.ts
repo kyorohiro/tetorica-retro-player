@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDisplayAutoTargetSize, normalizeAutoTargetSpacing, normalizeAutoTargetSizeBasis } from "./autoTargetSize";
+import { isDisplayAutoTargetReady, getDisplayAutoTargetSize, normalizeAutoTargetSpacing, normalizeAutoTargetSizeBasis } from "./autoTargetSize";
 
 describe("display auto target size", () => {
   it("uses CSS display size, not the source resolution", () => {
@@ -48,4 +48,19 @@ it("uses source orientation despite rounded viewport dimensions and supports fra
     .toEqual({ width: 200, height: 200 });
   expect(getDisplayAutoTargetSize({ width: 420, height: 105 }, { width: 420, height: 105 }, 4.2, 2.5))
     .toEqual({ width: 100, height: 25 });
+});
+
+it("holds drawing until layout and target agree, including cap and orientation changes", () => {
+  const portrait = { width: 400, height: 800 };
+  const settings = { targetWidth: 1, targetHeight: 1, autoTargetSpacing: 4, autoTargetSpacingY: 2 };
+  expect(isDisplayAutoTargetReady(portrait, null, settings)).toBe(false);
+  expect(isDisplayAutoTargetReady(portrait, portrait, settings)).toBe(false);
+  const ready = { ...settings, targetWidth: 200, targetHeight: 400 };
+  expect(isDisplayAutoTargetReady(portrait, portrait, ready)).toBe(true);
+  const capped = { width: 200, height: 400 };
+  expect(isDisplayAutoTargetReady(portrait, capped, ready)).toBe(false);
+  expect(isDisplayAutoTargetReady(portrait, capped, { ...ready, targetWidth: 100, targetHeight: 200 })).toBe(true);
+  const landscape = { width: 800, height: 400 };
+  expect(isDisplayAutoTargetReady(landscape, landscape, ready)).toBe(false);
+  expect(isDisplayAutoTargetReady(landscape, landscape, { ...ready, targetWidth: 200, targetHeight: 100 })).toBe(true);
 });

@@ -25,3 +25,12 @@ export const getDisplayAutoTargetSize = (
     height: Math.max(1, Math.round(source.height * scale)),
   };
 };
+
+export const isDisplayAutoTargetReady = (
+  source: { width: number; height: number },
+  viewport: { width: number; height: number } | null,
+  settings: { targetWidth: number; targetHeight: number; autoTargetSpacing: number; autoTargetSpacingY: number },
+) => {
+  const target = getDisplayAutoTargetSize(source, viewport, settings.autoTargetSpacing, settings.autoTargetSpacingY);
+  return target !== null && target.width === settings.targetWidth && target.height === settings.targetHeight;
+};
