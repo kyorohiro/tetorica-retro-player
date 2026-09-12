@@ -1,3 +1,4 @@
+import { canReuseRetroImagePlayer } from "./previewPlayerIdentity";
 import React from "react";
 import type { RetroPreviewLayoutState } from "../../retro-player/previewLayoutState";
 import type { TargetFile } from "../api";
@@ -88,6 +89,7 @@ export function PreviewPage({
         useHls && (resolvedKind === "video" || resolvedKind === "audio");
     const [status, setStatus] = React.useState<PreviewPageStatus>("none");
     const [src, setSrc] = React.useState("");
+    const [loadedImageName, setLoadedImageName] = React.useState("");
     const [text, setText] = React.useState("");
     const [error, setError] = React.useState("");
     const [epubLocation, setEpubLocation] = React.useState<string | number>(0);
@@ -124,7 +126,12 @@ export function PreviewPage({
 
         const addObjectUrl = (url: string) => {
             if (url.startsWith("blob:")) {
-                objectUrls.push(url);
+                if (!alive) {
+                    if (releaseObjectUrl) releaseObjectUrl(url);
+                    else URL.revokeObjectURL(url);
+                } else {
+                    objectUrls.push(url);
+                }
             }
         };
 
@@ -205,6 +212,7 @@ export function PreviewPage({
 
                 if (!alive) return;
 
+                setLoadedImageName(file.path);
                 setSrc(convertedUrl);
                 setText("");
                 setStatus("loaded");
@@ -218,6 +226,7 @@ export function PreviewPage({
                 return;
             }
 
+            setLoadedImageName(file.path);
             setSrc(nextSrc);
             setText("");
             setStatus("loaded");
@@ -294,7 +303,9 @@ export function PreviewPage({
                     }
                 >
                     <RetroPlayer
-                        key={[
+                        key={canReuseRetroImagePlayer(file.path, isRetro, forcedKind)
+                            ? "retro-image-player"
+                            : [
                             file.id,
                             file.path,
                             requestSequence,
@@ -305,7 +316,7 @@ export function PreviewPage({
                         ].join(":")}
                         src={src}
                         kind={resolvedKind}
-                        displayName={file.path}
+                        displayName={canReuseRetroImagePlayer(file.path, isRetro, forcedKind) ? loadedImageName : file.path}
                         looping={forcedKind === "audio" ? false : undefined}
                         autoPlay={false}
                         startupNativePlaybackMode={!isRetro}
