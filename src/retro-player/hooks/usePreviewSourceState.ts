@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getDisplayCaptureOptions } from "../media/displayCaptureOptions";
 import {
   getPreferredAudioInputDeviceId,
   setPreferredAudioInputDeviceId,
@@ -193,14 +194,13 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
+      const stream = await navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
 
       clearPreviewSrc();
       setPreviewKind("video");
-      setPreviewLabel("Display Capture");
+      setPreviewLabel(stream.getAudioTracks().length > 0
+        ? "Display Capture"
+        : (locale === "ja" ? "Display Capture（音声なし）" : "Display Capture (no audio)"));
       setPreviewStreamSource("display-capture");
       setCaptureError("");
       setPreviewStream((current) => {
@@ -210,7 +210,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
 
       attachStreamEndHandlers(stream, () => {
         setPreviewKind((current) => (current === "video" ? undefined : current));
-        setPreviewLabel((current) => (current === "Display Capture" ? undefined : current));
+        setPreviewLabel((current) => (current?.startsWith("Display Capture") ? undefined : current));
         setPreviewStreamSource((current) => (current === "display-capture" ? null : current));
         setCaptureError("");
         setPreviewStream((current) => {

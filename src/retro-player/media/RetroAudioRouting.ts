@@ -18,6 +18,7 @@ export type RetroPlaybackAudioInputMode =
   | "media-element-source";
 
 export type RetroRecordingAudioSourceKind =
+  | "input-tap"
   | "safari-tap"
   | "media-capture"
   | "recording-destination"
@@ -137,13 +138,21 @@ export const applyElementAudioMode = (
 export const resolveRecordingAudioSourceOrder = ({
   bypassWebAudio,
   isMediaStreamSource = false,
-}: Pick<RetroPlaybackAudioRoute, "bypassWebAudio"> & Partial<Pick<RetroPlaybackAudioRoute, "isMediaStreamSource">>): RetroRecordingAudioSourceKind[] => {
+  preferRawAudio = false,
+}: Pick<RetroPlaybackAudioRoute, "bypassWebAudio"> & Partial<Pick<RetroPlaybackAudioRoute, "isMediaStreamSource">> & { preferRawAudio?: boolean }): RetroRecordingAudioSourceKind[] => {
   const order: RetroRecordingAudioSourceKind[] = [];
 
   // Native stream playback does not feed the FX graph. Its destination may
   // contain generated noise while carrying none of the captured source audio.
-  if (bypassWebAudio && isMediaStreamSource) {
-    return ["live-stream", "media-capture", "safari-tap"];
+  if ((bypassWebAudio || preferRawAudio) && isMediaStreamSource) {
+    return ["live-stream"];
+  }
+
+  if (preferRawAudio && bypassWebAudio) {
+    return isAppleWebKitFamily() ? ["safari-tap", "media-capture"] : ["media-capture"];
+  }
+  if (preferRawAudio) {
+    return ["input-tap", "media-capture"];
   }
 
   if (isAppleWebKitFamily() && bypassWebAudio) {

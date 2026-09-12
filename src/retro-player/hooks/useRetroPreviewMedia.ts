@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { getDisplayCaptureOptions } from "../media/displayCaptureOptions";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
@@ -1477,15 +1478,16 @@ export function useRetroPreviewMedia({
 
     try {
       await ensureRendererReady();
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
+      const stream = await navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
 
       if (requestId !== previewRequestIdRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
+
+      setPreviewName(stream.getAudioTracks().length > 0
+        ? "Display Capture"
+        : (locale === "ja" ? "Display Capture（音声なし）" : "Display Capture (no audio)"));
 
       const videoSource = await createVideoMediaSource(
         { stream },

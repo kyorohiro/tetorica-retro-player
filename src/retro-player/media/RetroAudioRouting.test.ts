@@ -102,11 +102,28 @@ describe("resolveRecordingAudioSourceOrder", () => {
 
   it("records native capture from the live stream, never the unconnected FX destination", () => {
     expect(resolveRecordingAudioSourceOrder({ bypassWebAudio: true, isMediaStreamSource: true }))
-      .toEqual(["live-stream", "media-capture", "safari-tap"]);
+      .toEqual(["live-stream"]);
   });
 
   it("keeps processed audio first for a stream routed through WebAudio", () => {
     expect(resolveRecordingAudioSourceOrder({ bypassWebAudio: false, isMediaStreamSource: true })[0])
       .toBe("recording-destination");
+  });
+
+  it("records original capture audio with FX off even when WebAudio playback is muted", () => {
+    expect(resolveRecordingAudioSourceOrder({ bypassWebAudio: false, isMediaStreamSource: true, preferRawAudio: true }))
+      .toEqual(["live-stream"]);
+  });
+
+  it("taps file playback before effects and volume for dry recording", () => {
+    expect(resolveRecordingAudioSourceOrder({ bypassWebAudio: false, preferRawAudio: true }))
+      .toEqual(["input-tap", "media-capture"]);
+  });
+
+  it("does not fall back to generated FX noise for native file recording", () => {
+    const order = resolveRecordingAudioSourceOrder({ bypassWebAudio: true, preferRawAudio: true });
+    expect(order).toContain("media-capture");
+    expect(order).not.toContain("recording-destination");
+    expect(order).not.toContain("input-tap");
   });
 });

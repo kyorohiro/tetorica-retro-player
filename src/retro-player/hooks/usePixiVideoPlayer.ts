@@ -1453,169 +1453,186 @@ export function usePixiVideoPlayer(
   };
 
   const startRecording = async () => {
-    await ensureAudioContext();
+    const media = mediaRef.current;
+    const livePreviewStream = media?.srcObject instanceof MediaStream
+      ? media.srcObject
+      : streamRef.current;
+    const useRawAudio = isNativeModePreferred || !isAudioFxEnabled;
+    const useRawVideo = isNativeModePreferred || !effectiveFilterState.isFilterEnabled;
+    // A raw capture must work without initializing the FX graph or unmuting
+    // local playback. Both tracks come from the original shared stream.
+    if (!useRawAudio || !(livePreviewStream instanceof MediaStream)) {
+      await ensureAudioContext();
+    }
 
     const recordingStream = new MediaStream();
     const shouldRecordVideo = previewKindRef.current !== "audio";
-    const livePreviewStream = streamRef.current;
     const ownedRecordingTracks: MediaStreamTrack[] = [];
+    const addClonedTracks = (tracks: MediaStreamTrack[]) => {
+      for (const track of tracks) {
+        const clone = track.clone();
+        recordingStream.addTrack(clone);
+        ownedRecordingTracks.push(clone);
+      }
+    };
+    let capturedMedia: MediaStream | null | undefined;
+    const getMediaCapture = () => {
+      if (capturedMedia !== undefined) return capturedMedia;
+      const capturable = media as (HTMLMediaElement & {
+        captureStream?: () => MediaStream;
+        mozCaptureStream?: () => MediaStream;
+      }) | null;
+      try {
+        capturedMedia = capturable?.captureStream?.() ?? capturable?.mozCaptureStream?.() ?? null;
+      } catch (error) {
+        capturedMedia = null;
+        debugVideo("recording:media-capture-unavailable", { message: String(error) });
+      }
+      return capturedMedia;
+    };
+    const liveAudioTracks = livePreviewStream?.getAudioTracks().filter(track => track.readyState === "live") ?? [];
+    const liveVideoTracks = livePreviewStream?.getVideoTracks().filter(track => track.readyState === "live") ?? [];
 
-    if (shouldRecordVideo) {
-      const nativeVideoTracks =
-        shouldUseNativeVisualSurface && mediaRef.current instanceof HTMLVideoElement
-          ? (
-            (
-              mediaRef.current as HTMLVideoElement & {
-                captureStream?: () => MediaStream;
-                mozCaptureStream?: () => MediaStream;
-              }
-            ).captureStream?.() ??
-            (
-              mediaRef.current as HTMLVideoElement & {
-                captureStream?: () => MediaStream;
-                mozCaptureStream?: () => MediaStream;
-              }
-            ).mozCaptureStream?.()
-          )?.getVideoTracks() ?? []
+    try {
+      if (shouldRecordVideo) {
+        const nativeVideoTracks = useRawVideo
+          ? (liveVideoTracks.length ? liveVideoTracks : getMediaCapture()?.getVideoTracks() ?? [])
           : [];
+        if (nativeVideoTracks.length > 0) {
+          addClonedTracks(nativeVideoTracks);
+        } else {
+          const canvas = appRef.current?.canvas;
+          if (!(canvas instanceof HTMLCanvasElement)) {
+            throw new Error("Preview canvas is not ready yet.");
+          }
+          for (const track of canvas.captureStream(30).getVideoTracks()) {
+            recordingStream.addTrack(track);
+            ownedRecordingTracks.push(track);
+          }
+        }
+      }
 
-      if (nativeVideoTracks.length > 0) {
-        nativeVideoTracks.forEach((track) => {
-          const clonedTrack = track.clone();
-          recordingStream.addTrack(clonedTrack);
-          ownedRecordingTracks.push(clonedTrack);
-        });
-      } else {
-        const canvas = appRef.current?.canvas;
+      const recordingDestinationTracks = recordingDestinationRef.current?.stream.getAudioTracks() ?? [];
+      // Do not invoke media.captureStream merely to inspect a fallback. A muted
+      // preview element is not the source of truth for shared capture audio.
+      const mediaCaptureTracks = useRawAudio && livePreviewStream instanceof MediaStream
+        ? []
+        : getMediaCapture()?.getAudioTracks() ?? [];
+      const playbackAudioRoute = resolveCurrentPlaybackAudioRoute();
+      const recordingAudioSourceOrder = resolveRecordingAudioSourceOrder(
+        {
+          ...(playbackAudioRoute ?? { bypassWebAudio: false }),
+          isMediaStreamSource: livePreviewStream instanceof MediaStream,
+          preferRawAudio: useRawAudio,
+        },
+      );
+      debugVideo("recording:audio-route", {
+        bypassWebAudio: playbackAudioRoute?.bypassWebAudio ?? false,
+        isMediaStreamSource: playbackAudioRoute?.isMediaStreamSource ?? false,
+        liveAudioTrackCount: liveAudioTracks.length,
+        mediaCaptureTrackCount: mediaCaptureTracks.length,
+        recordingDestinationTrackCount: recordingDestinationTracks.length,
+        sourceOrder: recordingAudioSourceOrder,
+      });
 
-        if (!(canvas instanceof HTMLCanvasElement)) {
-          throw new Error("Preview canvas is not ready yet.");
+      for (const source of recordingAudioSourceOrder) {
+        if (source === "input-tap" && mediaSourceRef.current && audioContextRef.current) {
+          // Tap before volume, mute and effects without adding a speaker output.
+          releaseRecordingTap();
+          const destination = audioContextRef.current.createMediaStreamDestination();
+          mediaSourceRef.current.connect(destination);
+          recordingTapNodeRef.current = mediaSourceRef.current;
+          recordingTapDestinationRef.current = destination;
+          recordingTapMediaRef.current = media;
+          addClonedTracks(destination.stream.getAudioTracks());
+          break;
+        }
+        if (source === "safari-tap") {
+          const safariTapAudioTracks = getSafariRecordingTapAudioTracks();
+          if (safariTapAudioTracks.length === 0) {
+            continue;
+          }
+          safariTapAudioTracks.forEach((track) => {
+            recordingStream.addTrack(track);
+            ownedRecordingTracks.push(track);
+          });
+          break;
         }
 
-        const canvasStream = canvas.captureStream(30);
-        canvasStream.getVideoTracks().forEach((track) => {
-          recordingStream.addTrack(track);
-          ownedRecordingTracks.push(track);
-        });
-      }
-    }
-
-    const recordingDestinationTracks =
-      recordingDestinationRef.current?.stream
-        .getAudioTracks() ?? [];
-    const mediaCaptureTracks =
-      mediaRef.current instanceof HTMLMediaElement
-        ? (
-          (
-            mediaRef.current as HTMLMediaElement & {
-              captureStream?: () => MediaStream;
-              mozCaptureStream?: () => MediaStream;
-            }
-          ).captureStream?.() ??
-          (
-            mediaRef.current as HTMLMediaElement & {
-              captureStream?: () => MediaStream;
-              mozCaptureStream?: () => MediaStream;
-            }
-          ).mozCaptureStream?.()
-        )?.getAudioTracks() ?? []
-        : [];
-    const liveAudioTracks =
-      livePreviewStream instanceof MediaStream
-        ? livePreviewStream.getAudioTracks()
-        : [];
-    const playbackAudioRoute = resolveCurrentPlaybackAudioRoute();
-    const recordingAudioSourceOrder = resolveRecordingAudioSourceOrder(
-      playbackAudioRoute ?? { bypassWebAudio: false },
-    );
-    debugVideo("recording:audio-route", {
-      bypassWebAudio: playbackAudioRoute?.bypassWebAudio ?? false,
-      isMediaStreamSource: playbackAudioRoute?.isMediaStreamSource ?? false,
-      liveAudioTrackCount: liveAudioTracks.length,
-      mediaCaptureTrackCount: mediaCaptureTracks.length,
-      recordingDestinationTrackCount: recordingDestinationTracks.length,
-      sourceOrder: recordingAudioSourceOrder,
-    });
-
-    for (const source of recordingAudioSourceOrder) {
-      if (source === "safari-tap") {
-        const safariTapAudioTracks = getSafariRecordingTapAudioTracks();
-        if (safariTapAudioTracks.length === 0) {
-          continue;
+        if (source === "media-capture" && mediaCaptureTracks.length > 0) {
+          mediaCaptureTracks.forEach((track) => {
+            const clonedTrack = track.clone();
+            recordingStream.addTrack(clonedTrack);
+            ownedRecordingTracks.push(clonedTrack);
+          });
+          break;
         }
-        safariTapAudioTracks.forEach((track) => {
-          recordingStream.addTrack(track);
-          ownedRecordingTracks.push(track);
-        });
-        break;
+
+        if (source === "recording-destination" && recordingDestinationTracks.length > 0) {
+          recordingDestinationTracks.forEach((track) => {
+            const clonedTrack = track.clone();
+            recordingStream.addTrack(clonedTrack);
+            ownedRecordingTracks.push(clonedTrack);
+          });
+          break;
+        }
+
+        if (source === "live-stream" && liveAudioTracks.length > 0) {
+          liveAudioTracks.forEach((track) => {
+            const clonedTrack = track.clone();
+            recordingStream.addTrack(clonedTrack);
+            ownedRecordingTracks.push(clonedTrack);
+          });
+          break;
+        }
       }
 
-      if (source === "media-capture" && mediaCaptureTracks.length > 0) {
-        mediaCaptureTracks.forEach((track) => {
-          const clonedTrack = track.clone();
-          recordingStream.addTrack(clonedTrack);
-          ownedRecordingTracks.push(clonedTrack);
-        });
-        break;
+      if (recordingStream.getTracks().length === 0) {
+        throw new Error("Nothing is available to record yet.");
       }
 
-      if (source === "recording-destination" && recordingDestinationTracks.length > 0) {
-        recordingDestinationTracks.forEach((track) => {
-          const clonedTrack = track.clone();
-          recordingStream.addTrack(clonedTrack);
-          ownedRecordingTracks.push(clonedTrack);
-        });
-        break;
-      }
+      const hasVideoTrack = recordingStream.getVideoTracks().length > 0;
+      const mimeType = getRecordingMimeType(hasVideoTrack);
+      const recorder = mimeType
+        ? new MediaRecorder(recordingStream, { mimeType })
+        : new MediaRecorder(recordingStream);
 
-      if (source === "live-stream" && liveAudioTracks.length > 0) {
-        liveAudioTracks.forEach((track) => {
-          const clonedTrack = track.clone();
-          recordingStream.addTrack(clonedTrack);
-          ownedRecordingTracks.push(clonedTrack);
-        });
-        break;
-      }
-    }
-
-    if (recordingStream.getTracks().length === 0) {
-      throw new Error("Nothing is available to record yet.");
-    }
-
-    const hasVideoTrack = recordingStream.getVideoTracks().length > 0;
-    const mimeType = getRecordingMimeType(hasVideoTrack);
-    const recorder = mimeType
-      ? new MediaRecorder(recordingStream, { mimeType })
-      : new MediaRecorder(recordingStream);
-
-    recordedChunksRef.current = [];
-    revokePendingRecording();
-    setPendingRecordingFilename(null);
-    recordingStreamRef.current = recordingStream;
-    recordingOwnedTracksRef.current = ownedRecordingTracks;
-    mediaRecorderRef.current = recorder;
-    recorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size > 0) {
-        recordedChunksRef.current.push(event.data);
-      }
-    });
-    recorder.addEventListener("stop", () => {
-      const resolvedFilename = saveRecording(recordedChunksRef.current, recorder.mimeType);
       recordedChunksRef.current = [];
-      recordingOwnedTracksRef.current.forEach((track) => track.stop());
+      revokePendingRecording();
+      setPendingRecordingFilename(null);
+      recordingStreamRef.current = recordingStream;
+      recordingOwnedTracksRef.current = ownedRecordingTracks;
+      mediaRecorderRef.current = recorder;
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      });
+      recorder.addEventListener("stop", () => {
+        const resolvedFilename = saveRecording(recordedChunksRef.current, recorder.mimeType);
+        recordedChunksRef.current = [];
+        recordingOwnedTracksRef.current.forEach((track) => track.stop());
+        recordingOwnedTracksRef.current = [];
+        recordingStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        releaseRecordingTap();
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        void ensureAudioContext();
+        stopRecordingResolverRef.current?.(resolvedFilename);
+        stopRecordingResolverRef.current = null;
+      }, { once: true });
+      recorder.start(100);
+      isRecordingRef.current = true;
+      setIsRecording(true);
+    } catch (error) {
+      ownedRecordingTracks.forEach(track => track.stop());
+      releaseRecordingTap();
       recordingOwnedTracksRef.current = [];
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
-      releaseRecordingTap();
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      void ensureAudioContext();
-      stopRecordingResolverRef.current?.(resolvedFilename);
-      stopRecordingResolverRef.current = null;
-    }, { once: true });
-    recorder.start(100);
-    isRecordingRef.current = true;
-    setIsRecording(true);
+      throw error;
+    }
   };
 
   const stopRecording = (shouldSave = true) => {
