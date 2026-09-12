@@ -1,3 +1,5 @@
+import { isDisplayCaptureStream } from "../media/displayCaptureOptions";
+import { describeAudioTracks, recordCaptureAudioDiagnostic } from "../media/captureAudioDiagnostics";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { shareFile } from "@choochmeque/tauri-plugin-sharekit-api";
@@ -356,6 +358,7 @@ export function usePixiVideoPlayer(
     shaderCompileLabel,
     renderCapHintState,
     viewportRect,
+    presentedViewportSize,
     setViewportRect,
     applyFilterState,
     destroyPixi,
@@ -1545,6 +1548,19 @@ export function usePixiVideoPlayer(
         sourceOrder: recordingAudioSourceOrder,
       });
 
+      let selectedAudioSource: string | null = null;
+      if (isDisplayCaptureStream(livePreviewStream)) {
+        recordCaptureAudioDiagnostic("recording-input", {
+          audio: describeAudioTracks(livePreviewStream.getAudioTracks()),
+          nativeMode: isNativeModePreferred,
+          audioFxEnabled: isAudioFxEnabled,
+          monitorMuted: isMutedRef.current,
+          monitorVolume: volumeRef.current,
+          contextState: audioContextRef.current?.state ?? null,
+          hasAudioInputNode: Boolean(mediaSourceRef.current),
+          sourceOrder: recordingAudioSourceOrder,
+        });
+      }
       for (const source of recordingAudioSourceOrder) {
         if (source === "input-tap" && mediaSourceRef.current && audioContextRef.current) {
           // Tap before volume, mute and effects without adding a speaker output.
@@ -1555,6 +1571,7 @@ export function usePixiVideoPlayer(
           recordingTapDestinationRef.current = destination;
           recordingTapMediaRef.current = media;
           addClonedTracks(destination.stream.getAudioTracks());
+          selectedAudioSource = source;
           break;
         }
         if (source === "safari-tap") {
@@ -1566,6 +1583,7 @@ export function usePixiVideoPlayer(
             recordingStream.addTrack(track);
             ownedRecordingTracks.push(track);
           });
+          selectedAudioSource = source;
           break;
         }
 
@@ -1575,6 +1593,7 @@ export function usePixiVideoPlayer(
             recordingStream.addTrack(clonedTrack);
             ownedRecordingTracks.push(clonedTrack);
           });
+          selectedAudioSource = source;
           break;
         }
 
@@ -1584,6 +1603,7 @@ export function usePixiVideoPlayer(
             recordingStream.addTrack(clonedTrack);
             ownedRecordingTracks.push(clonedTrack);
           });
+          selectedAudioSource = source;
           break;
         }
 
@@ -1593,8 +1613,16 @@ export function usePixiVideoPlayer(
             recordingStream.addTrack(clonedTrack);
             ownedRecordingTracks.push(clonedTrack);
           });
+          selectedAudioSource = source;
           break;
         }
+      }
+
+      if (isDisplayCaptureStream(livePreviewStream)) {
+        recordCaptureAudioDiagnostic("recording-output", {
+          selectedAudioSource,
+          audio: describeAudioTracks(recordingStream.getAudioTracks()),
+        });
       }
 
       if (recordingStream.getTracks().length === 0) {
@@ -2082,6 +2110,7 @@ export function usePixiVideoPlayer(
     isLooping,
     sourceDimensions,
     viewportRect,
+    presentedViewportSize,
     renderCapHintState,
     isAudioFxEnabled,
     lofiAmount,

@@ -3,6 +3,7 @@ import { isDisplayCaptureStream, markDisplayCaptureStream } from "./displayCaptu
 
 it("distinguishes display capture from camera, microphone and ordinary media", () => {
   const stream = (settings: MediaTrackSettings, hasVideo = true) => ({
+    getAudioTracks: () => [],
     getVideoTracks: () => hasVideo ? [{ getSettings: () => settings }] : [],
   }) as unknown as MediaStream;
   expect(isDisplayCaptureStream(stream({ displaySurface: "window" }))).toBe(true);

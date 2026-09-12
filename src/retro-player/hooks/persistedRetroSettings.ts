@@ -19,6 +19,8 @@ const STORAGE_VERSION = 1;
 
 export type PersistedRetroFilterSettings = {
   autoTargetSize: boolean;
+  autoTargetSizeBasis: "source" | "display";
+  autoTargetSpacing: number;
   samplingMode: TargetSamplingMode;
   vblankSimulationMode: VBlankSimulationMode;
   targetWidth: number;

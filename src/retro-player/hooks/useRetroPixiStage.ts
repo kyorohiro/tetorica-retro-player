@@ -251,7 +251,7 @@ const resolvePresentedStyleSize = ({
   };
 };
 
-const resolveCanvasSizing = ({
+export const resolveCanvasSizing = ({
   styleWidth,
   styleHeight,
   effectiveTargetWidth,
@@ -394,7 +394,8 @@ export function useRetroPixiStage({
   }>({
     isCapEnabled: false,
   });
-  const viewportRect = viewportRectRef.current;
+  const [presentedViewportSize, setPresentedViewportSize] = useState<{ width: number; height: number } | null>(null);
+  const [viewportRect, setViewportRectState] = useState<typeof viewportRectRef.current>(null);
   const initPixiRef = useRef<() => Promise<void>>(async () => {});
   const destroyPixiRef = useRef<() => void>(() => {});
   const appliedLayoutKeyRef = useRef<string | null>(null);
@@ -429,6 +430,7 @@ export function useRetroPixiStage({
       typeof nextValue === "function"
         ? nextValue(current)
         : nextValue;
+    if (current === resolved) return;
     if (
       current
       && resolved
@@ -440,6 +442,8 @@ export function useRetroPixiStage({
       return;
     }
     viewportRectRef.current = resolved;
+    setViewportRectState(resolved);
+    if (!resolved) setPresentedViewportSize(null);
   }, []);
 
   const renderFrame = useCallback(() => {
@@ -605,7 +609,6 @@ export function useRetroPixiStage({
       return current;
     }
 
-    viewportRectRef.current = next;
     updateViewportRect(next);
     return next;
   }, [fitMode, updateViewportRect]);
@@ -699,6 +702,12 @@ export function useRetroPixiStage({
     app.pipeline.setFilterViewportScale(totalScaleDownFactor);
     const snappedPresentedStyleWidth = snapCssToDevicePixel(presentedStyleWidth);
     const snappedPresentedStyleHeight = snapCssToDevicePixel(presentedStyleHeight);
+    // Auto target spacing must use the actual CSS presentation after caps,
+    // not the larger fitted area retained in viewportRect for layout.
+    setPresentedViewportSize(current =>
+      current?.width === snappedPresentedStyleWidth && current.height === snappedPresentedStyleHeight
+        ? current
+        : { width: snappedPresentedStyleWidth, height: snappedPresentedStyleHeight });
     const nextLeft = snapCssToDevicePixel(
       viewRect.x + (styleWidth - snappedPresentedStyleWidth) / 2,
     );
@@ -1188,6 +1197,7 @@ export function useRetroPixiStage({
     shaderCompileLabel,
     renderCapHintState,
     viewportRect,
+    presentedViewportSize,
     setViewportRect: updateViewportRect,
     applyFilterState,
     createVideoTexture: (_video: HTMLVideoElement) => null,

@@ -146,6 +146,10 @@ type RetroFilterPanelProps = {
   targetHeight: number;
   targetWidth: number;
   autoTargetSize: boolean;
+  autoTargetSizeBasis: "source" | "display";
+  autoTargetSpacing: number;
+  onSetAutoTargetSizeBasis: (value: "source" | "display") => void;
+  onSetAutoTargetSpacing: (value: number) => void;
   samplingMode: TargetSamplingMode;
   vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
@@ -299,6 +303,10 @@ export function RetroFilterPanel({
   targetHeight,
   targetWidth,
   autoTargetSize,
+  autoTargetSizeBasis,
+  autoTargetSpacing,
+  onSetAutoTargetSizeBasis,
+  onSetAutoTargetSpacing,
   samplingMode,
   vblankSimulationMode,
   matchTargetAspect,
@@ -950,11 +958,33 @@ export function RetroFilterPanel({
               className="h-5 w-5"
             />
           </label>
+          {autoTargetSize && (
+            <>
+              <label className="block">
+                <span>Auto target basis</span>
+                <select className="ml-2" value={autoTargetSizeBasis}
+                  onChange={ev => onSetAutoTargetSizeBasis(ev.currentTarget.value === "display" ? "display" : "source")}>
+                  <option value="source">Source size / 入力サイズ</option>
+                  <option value="display">Display size / 表示サイズ</option>
+                </select>
+              </label>
+              {autoTargetSizeBasis === "display" && (
+                <label className="block">
+                  <span>Auto target spacing: {autoTargetSpacing.toFixed(1)} CSS px</span>
+                  <input type="range" min="1" max="5" step="0.1" value={autoTargetSpacing}
+                    onChange={ev => onSetAutoTargetSpacing(Number(ev.currentTarget.value))}
+                    className="mt-2 w-full" />
+                  <span className="text-xs">表示サイズ ÷ Spacing（縦横比を維持）</span>
+                </label>
+              )}
+            </>
+          )}
           <label className="flex min-h-11 items-center justify-between rounded-lg border border-[#000000]/35 bg-[#111014]/10 px-3 py-2 text-[#12141c]">
             <span>Match aspect</span>
             <input
               type="checkbox"
-              checked={matchTargetAspect}
+              checked={autoTargetSize && autoTargetSizeBasis === "display" ? true : matchTargetAspect}
+              disabled={autoTargetSize && autoTargetSizeBasis === "display"}
               onChange={(ev) => {
                 onSetMatchTargetAspect(ev.currentTarget.checked);
               }}

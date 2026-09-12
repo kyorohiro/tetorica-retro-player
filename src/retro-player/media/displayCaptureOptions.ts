@@ -1,3 +1,5 @@
+import { describeAudioTracks, recordCaptureAudioDiagnostic } from "./captureAudioDiagnostics";
+
 // A hint to offer the selected window's audio; sharing still requires the
 // user's choice in the browser dialog. Unsupported hints can be ignored.
 export const getDisplayCaptureOptions = (): DisplayMediaStreamOptions & { windowAudio: "window" } => ({
@@ -9,6 +11,10 @@ export const getDisplayCaptureOptions = (): DisplayMediaStreamOptions & { window
 const displayCaptureStreams = new WeakSet<MediaStream>();
 export const markDisplayCaptureStream = (stream: MediaStream) => {
   displayCaptureStreams.add(stream);
+  recordCaptureAudioDiagnostic("acquired", {
+    audio: describeAudioTracks(stream.getAudioTracks()),
+    videoTrackCount: stream.getVideoTracks().length,
+  });
 };
 export const isDisplayCaptureStream = (value: unknown): value is MediaStream => {
   const stream = value as MediaStream | null;

@@ -77,6 +77,8 @@ export const MONO_TINTS: Record<
 export type RetroPresetDefinition = {
   label: string;
   autoTargetSize?: boolean;
+  autoTargetSizeBasis?: "source" | "display";
+  autoTargetSpacing?: number;
   samplingMode?: TargetSamplingMode;
   vblankSimulationMode?: VBlankSimulationMode;
   renderModeOverride?: RetroPresetRenderMode;
@@ -922,6 +924,8 @@ export const RETRO_PRESETS = {
   crtBeam: {
     label: "CRT Beam",
     autoTargetSize: true,
+    autoTargetSizeBasis: "display",
+    autoTargetSpacing: 4.2,
     samplingMode: "nearest",
     vblankSimulationMode: "strong",
     width: 320,
@@ -959,6 +963,8 @@ export const RETRO_PRESETS = {
   crtBeamNtsc: {
     label: "CRT Beam NTSC",
     autoTargetSize: true,
+    autoTargetSizeBasis: "display",
+    autoTargetSpacing: 4.2,
     samplingMode: "nearest",
     vblankSimulationMode: "strong",
     width: 1480,
@@ -1021,7 +1027,9 @@ export const RETRO_PRESETS = {
   },
   crtBeamNext: {
     label: "CRT Beam Next",
-    autoTargetSize: false,
+    autoTargetSize: true,
+    autoTargetSizeBasis: "display",
+    autoTargetSpacing: 4.2,
     samplingMode: "nearest",
     vblankSimulationMode: "strong",
     width: 256,

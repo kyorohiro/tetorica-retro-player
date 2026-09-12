@@ -1,3 +1,4 @@
+import { connectNativeInputSpectrum } from "../media/nativeInputSpectrum";
 import {
   useCallback,
   useEffect,
@@ -76,6 +77,8 @@ export function useRetroAudioEngine({
   nativePlaybackMode,
   playbackSource,
 }: UseRetroAudioEngineParams) {
+  const nativePlaybackModeRef = useRef(nativePlaybackMode);
+  nativePlaybackModeRef.current = nativePlaybackMode;
   const shouldUseDestinationOutput = !nativePlaybackMode || playbackSource === "builtin-tone";
   const [latencyHint, setLatencyHintState] = useState<AudioContextLatencyCategory>(loadLatencyHint);
   const latencyHintRef = useRef<AudioContextLatencyCategory>(latencyHint);
@@ -292,7 +295,9 @@ export function useRetroAudioEngine({
     vinylDustBedFilterRef: createCurrentAccessor(() => audioEngineRef.current?.vinylDustBedFilter ?? null),
     vinylDustBedGainRef: createCurrentAccessor(() => audioEngineRef.current?.vinylDustBedGain ?? null),
     crackleGainRef: createCurrentAccessor(() => audioEngineRef.current?.crackleGain ?? null),
-    analyserRef: createCurrentAccessor(() => audioEngineRef.current?.analyser ?? null),
+    analyserRef: createCurrentAccessor(() => nativePlaybackModeRef.current
+      ? (mediaSourceRef.current ? audioEngineRef.current?.inputAnalyser ?? null : null)
+      : audioEngineRef.current?.analyser ?? null),
   }));
 
   const {
@@ -533,6 +538,9 @@ export function useRetroAudioEngine({
     try {
       const route = resolveCurrentPlaybackAudioRoute(media);
       if (route.bypassWebAudio) {
+        mediaSourceRef.current = connectNativeInputSpectrum(
+          context, media, engine.inputAnalyser, route.isHlsManaged,
+        );
         applyElementAudioMode(
           media,
           "user-volume",
@@ -579,6 +587,7 @@ export function useRetroAudioEngine({
         // MediaStream from a different AudioContext. Use createMediaStreamSource directly.
         mediaSource = context.createMediaStreamSource(sourceStream);
         mediaSource.connect(engine.input);
+        if (engine.inputAnalyser) mediaSource.connect(engine.inputAnalyser);
       } else {
         const capturedStream = route.inputMode === "captured-media-stream"
           ? (media as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream?.()
@@ -588,9 +597,11 @@ export function useRetroAudioEngine({
         if (capturedStream && capturedAudioTracks.length > 0) {
           mediaSource = context.createMediaStreamSource(capturedStream);
           mediaSource.connect(engine.input);
+          if (engine.inputAnalyser) mediaSource.connect(engine.inputAnalyser);
         } else {
           mediaSource = context.createMediaElementSource(media);
           mediaSource.connect(engine.input);
+          if (engine.inputAnalyser) mediaSource.connect(engine.inputAnalyser);
         }
         applyElementAudioMode(
           media,
@@ -678,6 +689,7 @@ export function useRetroAudioEngine({
     try {
       const mediaSource = context.createMediaStreamSource(stream);
       mediaSource.connect(streamInputTarget);
+      if (engine.inputAnalyser) mediaSource.connect(engine.inputAnalyser);
       mediaSourceRef.current = mediaSource;
 
       debugAudio("connectMediaStream:connected", {
@@ -720,6 +732,7 @@ export function useRetroAudioEngine({
 
     mediaSource.disconnect();
     mediaSource.connect(engine.input);
+    if (engine.inputAnalyser) mediaSource.connect(engine.inputAnalyser);
     updateAudioNodes();
   };
 

@@ -1,3 +1,4 @@
+import { getDisplayAutoTargetSize } from "../video/autoTargetSize";
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
 import {
@@ -488,6 +489,8 @@ export function RetroPlayer({
     });
   }, [player]);
 
+  const useDisplayAutoTarget = filterState.autoTargetSize && filterState.autoTargetSizeBasis === "display";
+
   // phosphorDot preset needs aspect-aware dimension adjustment. This stays
   // true while phosphorDot's auto-aspect is in control of targetWidth/Height,
   // so a source that loads (or changes) later still gets corrected — see
@@ -706,7 +709,8 @@ export function RetroPlayer({
         player.toggleAudioFx();
       }
 
-      if (presetKey !== "phosphorDot" || !player.sourceDimensions) return;
+      if (presetKey !== "phosphorDot" || !player.sourceDimensions
+        || (selectedPreset.autoTargetSize && selectedPreset.autoTargetSizeBasis === "display")) return;
 
       const phosphorDotPreset: RetroPresetDefinition = RETRO_PRESETS.phosphorDot;
       const { width: nextWidth, height: nextHeight } = computePhosphorDotDimensions(
@@ -817,7 +821,7 @@ export function RetroPlayer({
   // Catch the cases the click-time correction above misses: the preset was
   // applied before a source was loaded, or a new source loads afterward.
   React.useEffect(() => {
-    if (!phosphorDotAspectActiveRef.current) return;
+    if (useDisplayAutoTarget || !phosphorDotAspectActiveRef.current) return;
     if (!player.sourceDimensions) return;
 
     const { width: nextWidth, height: nextHeight } = computePhosphorDotDimensions(
@@ -830,6 +834,7 @@ export function RetroPlayer({
     filterState.setTargetHeight(nextHeight);
   }, [
     player.sourceDimensions,
+    useDisplayAutoTarget,
     computePhosphorDotDimensions,
     filterState.targetWidth,
     filterState.targetHeight,
@@ -847,7 +852,7 @@ export function RetroPlayer({
     // Letting autoTargetSize write here as well causes a visible feedback loop
     // where source-size clamping and phosphor-dot aspect correction keep
     // overwriting each other every render.
-    if (phosphorDotAspectActiveRef.current) {
+    if (phosphorDotAspectActiveRef.current && !useDisplayAutoTarget) {
       autoTargetSizeAppliedKeyRef.current = null;
       return;
     }
@@ -855,7 +860,11 @@ export function RetroPlayer({
     const dims = player.sourceDimensions;
     if (!dims?.width || !dims?.height) return;
 
-    const { width: nextWidth, height: nextHeight } = clampAutoTargetSize(dims.width, dims.height);
+    const target = useDisplayAutoTarget
+      ? getDisplayAutoTargetSize(dims, player.presentedViewportSize, filterState.autoTargetSpacing)
+      : clampAutoTargetSize(dims.width, dims.height);
+    if (!target) return;
+    const { width: nextWidth, height: nextHeight } = target;
     const sourceKey = `${src ?? "stream"}:${stream?.id ?? ""}:${kind}:${dims.width}x${dims.height}`;
     const alreadyAppliedToThisSource = autoTargetSizeAppliedKeyRef.current === sourceKey;
     const targetAlreadyMatchesAutoSize =
@@ -872,6 +881,9 @@ export function RetroPlayer({
     }
   }, [
     clampAutoTargetSize,
+    useDisplayAutoTarget,
+    player.presentedViewportSize,
+    filterState.autoTargetSpacing,
     filterState.autoTargetSize,
     filterState.targetHeight,
     filterState.targetWidth,
@@ -890,11 +902,11 @@ export function RetroPlayer({
   // otherwise the two effects fight over targetWidth/targetHeight every
   // time either one changes (visible as constant chattering in the UI).
   React.useEffect(() => {
-    if (phosphorDotAspectActiveRef.current) return;
+    if (useDisplayAutoTarget || phosphorDotAspectActiveRef.current) return;
     if (!filterState.matchTargetAspect) return;
     if (!player.sourceDimensions) return;
     syncTargetAspect();
-  }, [filterState.matchTargetAspect, player.sourceDimensions, syncTargetAspect]);
+  }, [useDisplayAutoTarget, filterState.matchTargetAspect, player.sourceDimensions, syncTargetAspect]);
 
   // Load source: src URL or MediaStream.
   // lastPreviewRequestRef prevents duplicate loads on re-render.

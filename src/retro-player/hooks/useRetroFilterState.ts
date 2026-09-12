@@ -1,3 +1,4 @@
+import { normalizeAutoTargetSpacing, normalizeAutoTargetSizeBasis } from "../video/autoTargetSize";
 import { useCallback, useEffect, useState } from "react";
 import {
   type BeamStripeMode,
@@ -28,6 +29,8 @@ export type RetroFilterInitialState = Partial<{
   targetWidth: number;
   targetHeight: number;
   autoTargetSize: boolean;
+  autoTargetSizeBasis: "source" | "display";
+  autoTargetSpacing: number;
   samplingMode: TargetSamplingMode;
   vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
@@ -118,6 +121,8 @@ const doesPresetMatchState = (
         preset.height === state.targetHeight
       )) &&
     (preset.autoTargetSize ?? false) === state.autoTargetSize &&
+    normalizeAutoTargetSizeBasis(preset.autoTargetSizeBasis) === state.autoTargetSizeBasis &&
+    normalizeAutoTargetSpacing(preset.autoTargetSpacing) === state.autoTargetSpacing &&
     (preset.samplingMode ?? "nearest") === state.samplingMode &&
     (preset.vblankSimulationMode ?? "off") === state.vblankSimulationMode &&
     preset.colors === state.colorLevels &&
@@ -199,7 +204,7 @@ const resolvePresetKeyFromState = (
     }
   }
 
-  if (!state.matchTargetAspect) {
+  if (!state.matchTargetAspect && !state.autoTargetSize) {
     return null;
   }
 
@@ -235,6 +240,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     targetWidth: initialState.targetWidth ?? DEFAULT_PRESET.width,
     targetHeight: initialState.targetHeight ?? DEFAULT_PRESET.height,
     autoTargetSize: initialState.autoTargetSize ?? (DEFAULT_PRESET.autoTargetSize ?? false),
+    autoTargetSizeBasis: normalizeAutoTargetSizeBasis(initialState.autoTargetSizeBasis ?? DEFAULT_PRESET.autoTargetSizeBasis),
+    autoTargetSpacing: normalizeAutoTargetSpacing(initialState.autoTargetSpacing ?? DEFAULT_PRESET.autoTargetSpacing),
     samplingMode: initialState.samplingMode ?? (DEFAULT_PRESET.samplingMode ?? "nearest"),
     vblankSimulationMode: initialState.vblankSimulationMode ?? (DEFAULT_PRESET.vblankSimulationMode ?? "off"),
     matchTargetAspect: initialState.matchTargetAspect ?? true,
@@ -343,11 +350,14 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     isFilterEnabled: initialState.isFilterEnabled ?? true,
   }));
 
-  const [resolvedInitialState] = useState<RetroFilterSettings>(() => ({
-    ...baseInitialState,
-    ...loadPersistedRetroSettings()?.filter,
-    ...initialState,
-  }));
+  const [resolvedInitialState] = useState<RetroFilterSettings>(() => {
+    const merged = { ...baseInitialState, ...loadPersistedRetroSettings()?.filter, ...initialState };
+    return {
+      ...merged,
+      autoTargetSizeBasis: normalizeAutoTargetSizeBasis(merged.autoTargetSizeBasis),
+      autoTargetSpacing: normalizeAutoTargetSpacing(merged.autoTargetSpacing),
+    };
+  });
 
   const [settings, setSettings] = useState<RetroFilterSettings>(resolvedInitialState);
   const [selectedPreset, setSelectedPreset] = useState<RetroPresetKey | null>(
@@ -385,6 +395,13 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
         : { ...current, matchTargetAspect }
     ));
   }, [markPresetAsCustom]);
+
+  const setAutoTargetSizeBasis = useCallback((value: "source" | "display") => {
+    setSettings(current => ({ ...current, autoTargetSizeBasis: normalizeAutoTargetSizeBasis(value) }));
+  }, []);
+  const setAutoTargetSpacing = useCallback((value: number) => {
+    setSettings(current => ({ ...current, autoTargetSpacing: normalizeAutoTargetSpacing(value) }));
+  }, []);
 
   const setAutoTargetSize = useCallback((autoTargetSize: boolean) => {
     markPresetAsCustom();
@@ -887,6 +904,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
       targetWidth: presetSettings.width,
       targetHeight: presetSettings.height,
       autoTargetSize: presetSettings.autoTargetSize ?? false,
+      autoTargetSizeBasis: normalizeAutoTargetSizeBasis(presetSettings.autoTargetSizeBasis),
+      autoTargetSpacing: normalizeAutoTargetSpacing(presetSettings.autoTargetSpacing),
       samplingMode: presetSettings.samplingMode ?? "nearest",
       vblankSimulationMode: presetSettings.vblankSimulationMode ?? "off",
       colorLevels: presetSettings.colors,
@@ -967,7 +986,7 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
 
   const applyAllFilterSettings = (s: RetroFilterSettings) => {
     setSelectedPreset(resolvePresetKeyFromState(s));
-    setSettings(s);
+    setSettings({ ...s, autoTargetSizeBasis: normalizeAutoTargetSizeBasis(s.autoTargetSizeBasis), autoTargetSpacing: normalizeAutoTargetSpacing(s.autoTargetSpacing) });
   };
 
   const resetSettings = () => {
@@ -996,6 +1015,8 @@ export function useRetroFilterState(initialState: RetroFilterInitialState = {}) 
     setTargetWidth,
     setTargetHeight,
     setAutoTargetSize,
+    setAutoTargetSizeBasis,
+    setAutoTargetSpacing,
     setSamplingMode,
     setVBlankSimulationMode,
     setMatchTargetAspect,

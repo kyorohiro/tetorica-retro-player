@@ -174,6 +174,7 @@ export class TetoricaRetroAudioNode {
     busCompressor: null as DynamicsCompressorNode | null,
     fxOutputGain: null as GainNode | null,
     inputTrimGain: null as GainNode | null,
+    inputAnalyser: null as AnalyserNode | null,
     analyser: null as AnalyserNode | null,
   };
 
@@ -334,6 +335,10 @@ export class TetoricaRetroAudioNode {
     return this.nodes.crackleGain;
   }
 
+  get inputAnalyser() {
+    return this.nodes.inputAnalyser;
+  }
+
   get analyser() {
     return this.nodes.analyser;
   }
@@ -422,6 +427,7 @@ export class TetoricaRetroAudioNode {
     Object.assign(this.nodes, {
       audioContext: null,
       masterGain: null,
+      inputAnalyser: null,
       monitorGain: null,
       radioToneHighpass: null,
       radioToneLowpass: null,
@@ -888,6 +894,9 @@ export class TetoricaRetroAudioNode {
     // the current monitoring preference before playback is ready.
     monitorGain.gain.value = 0;
     const inputTrimGain = context.createGain();
+    const inputAnalyser = context.createAnalyser();
+    inputAnalyser.fftSize = 512;
+    inputAnalyser.smoothingTimeConstant = 0.8;
     const analyser = context.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
@@ -1137,6 +1146,7 @@ export class TetoricaRetroAudioNode {
       fxOutputGain,
       monitorGain,
       inputTrimGain,
+      inputAnalyser,
       analyser,
     };
   }
@@ -1415,7 +1425,7 @@ export class TetoricaRetroAudioNode {
       this.nodes.noiseLfoGain, this.nodes.crackleFilter,
       this.nodes.vinylDustBedFilter, this.nodes.vinylDustBedGain, this.nodes.crackleGain,
       this.nodes.masterGain, this.nodes.outputBus, this.nodes.busCompressor,
-      this.nodes.fxOutputGain, this.nodes.monitorGain,
+      this.nodes.fxOutputGain, this.nodes.monitorGain, this.nodes.inputAnalyser,
     ];
     for (const node of internalNodes) {
       try { node?.disconnect(); } catch {}

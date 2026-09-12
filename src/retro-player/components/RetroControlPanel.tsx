@@ -415,6 +415,10 @@ export function RetroControlPanel({
               targetHeight={filterState.targetHeight}
               targetWidth={filterState.targetWidth}
               autoTargetSize={filterState.autoTargetSize}
+              autoTargetSizeBasis={filterState.autoTargetSizeBasis}
+              autoTargetSpacing={filterState.autoTargetSpacing}
+              onSetAutoTargetSizeBasis={filterState.setAutoTargetSizeBasis}
+              onSetAutoTargetSpacing={filterState.setAutoTargetSpacing}
               samplingMode={filterState.samplingMode}
               vblankSimulationMode={filterState.vblankSimulationMode}
               matchTargetAspect={filterState.matchTargetAspect}

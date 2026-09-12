@@ -1,3 +1,4 @@
+import { normalizeAutoTargetSpacing, normalizeAutoTargetSizeBasis } from "../video/autoTargetSize";
 import { DEFAULT_AUDIO_PRESET_SETTINGS } from "../audio/preset";
 import { loadLocalePreference } from "../../i18n";
 import type { LocalePreference } from "../../i18n";
@@ -22,6 +23,8 @@ const DEFAULT_PRESET: RetroPresetDefinition = RETRO_PRESETS[defaultPresetId];
 
 const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   autoTargetSize: DEFAULT_PRESET.autoTargetSize ?? false,
+  autoTargetSizeBasis: normalizeAutoTargetSizeBasis(DEFAULT_PRESET.autoTargetSizeBasis),
+  autoTargetSpacing: normalizeAutoTargetSpacing(DEFAULT_PRESET.autoTargetSpacing),
   samplingMode: DEFAULT_PRESET.samplingMode ?? "nearest",
   vblankSimulationMode: DEFAULT_PRESET.vblankSimulationMode ?? "off",
   targetWidth: DEFAULT_PRESET.width,
@@ -129,6 +132,8 @@ const applyFilterDefaults = (
 ): PersistedRetroFilterSettings => ({
   ...DEFAULT_FILTER_SETTINGS,
   ...raw,
+  autoTargetSizeBasis: normalizeAutoTargetSizeBasis(raw.autoTargetSizeBasis),
+  autoTargetSpacing: normalizeAutoTargetSpacing(raw.autoTargetSpacing),
   phosphorDotShape: normalizePhosphorDotShape(raw.phosphorDotShape),
 });
 
