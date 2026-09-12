@@ -22,3 +22,10 @@ it("keeps older preset files on source sizing and normalizes invalid options", a
   const invalid = await importPresetFile(presetFile({ autoTargetSizeBasis: "invalid", autoTargetSpacing: 20 }));
   expect(invalid?.filter).toMatchObject({ autoTargetSizeBasis: "source", autoTargetSpacing: 5 });
 });
+
+it("migrates the legacy spacing to both axes and preserves separate axes", async () => {
+  const legacy = await importPresetFile(presetFile({ autoTargetSpacing: 4.2 }));
+  expect(legacy?.filter).toMatchObject({ autoTargetSpacing: 4.2, autoTargetSpacingY: 4.2 });
+  const separate = await importPresetFile(presetFile({ autoTargetSpacing: 4, autoTargetSpacingY: 2 }));
+  expect(separate?.filter).toMatchObject({ autoTargetSpacing: 4, autoTargetSpacingY: 2 });
+});

@@ -417,6 +417,8 @@ export function RetroControlPanel({
               autoTargetSize={filterState.autoTargetSize}
               autoTargetSizeBasis={filterState.autoTargetSizeBasis}
               autoTargetSpacing={filterState.autoTargetSpacing}
+              autoTargetSpacingY={filterState.autoTargetSpacingY}
+              onSetAutoTargetSpacingY={filterState.setAutoTargetSpacingY}
               onSetAutoTargetSizeBasis={filterState.setAutoTargetSizeBasis}
               onSetAutoTargetSpacing={filterState.setAutoTargetSpacing}
               samplingMode={filterState.samplingMode}

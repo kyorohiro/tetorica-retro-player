@@ -147,9 +147,11 @@ type RetroFilterPanelProps = {
   targetWidth: number;
   autoTargetSize: boolean;
   autoTargetSizeBasis: "source" | "display";
-  autoTargetSpacing: number;
+  autoTargetSpacing: number; // Horizontal spacing (legacy field name).
+  autoTargetSpacingY: number;
   onSetAutoTargetSizeBasis: (value: "source" | "display") => void;
   onSetAutoTargetSpacing: (value: number) => void;
+  onSetAutoTargetSpacingY: (value: number) => void;
   samplingMode: TargetSamplingMode;
   vblankSimulationMode: VBlankSimulationMode;
   matchTargetAspect: boolean;
@@ -305,6 +307,8 @@ export function RetroFilterPanel({
   autoTargetSize,
   autoTargetSizeBasis,
   autoTargetSpacing,
+  autoTargetSpacingY,
+  onSetAutoTargetSpacingY,
   onSetAutoTargetSizeBasis,
   onSetAutoTargetSpacing,
   samplingMode,
@@ -969,13 +973,21 @@ export function RetroFilterPanel({
                 </select>
               </label>
               {autoTargetSizeBasis === "display" && (
-                <label className="block">
-                  <span>Auto target spacing: {autoTargetSpacing.toFixed(1)} CSS px</span>
-                  <input type="range" min="1" max="5" step="0.1" value={autoTargetSpacing}
-                    onChange={ev => onSetAutoTargetSpacing(Number(ev.currentTarget.value))}
-                    className="mt-2 w-full" />
-                  <span className="text-xs">表示サイズ ÷ Spacing（縦横比を維持）</span>
-                </label>
+                <>
+                  <label className="block">
+                    <span>Auto target spacing X（横）: {autoTargetSpacing.toFixed(1)} CSS px</span>
+                    <input type="range" min="1" max="5" step="0.1" value={autoTargetSpacing}
+                      onChange={ev => onSetAutoTargetSpacing(Number(ev.currentTarget.value))}
+                      className="mt-2 w-full" />
+                  </label>
+                  <label className="block">
+                    <span>Auto target spacing Y（縦）: {autoTargetSpacingY.toFixed(1)} CSS px</span>
+                    <input type="range" min="1" max="5" step="0.1" value={autoTargetSpacingY}
+                      onChange={ev => onSetAutoTargetSpacingY(Number(ev.currentTarget.value))}
+                      className="mt-2 w-full" />
+                  </label>
+                  <p className="text-xs">縦長はY、横長・正方形はXを使い、縦横比を維持します。</p>
+                </>
               )}
             </>
           )}

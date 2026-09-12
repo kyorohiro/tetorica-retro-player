@@ -861,7 +861,7 @@ export function RetroPlayer({
     if (!dims?.width || !dims?.height) return;
 
     const target = useDisplayAutoTarget
-      ? getDisplayAutoTargetSize(dims, player.presentedViewportSize, filterState.autoTargetSpacing)
+      ? getDisplayAutoTargetSize(dims, player.presentedViewportSize, filterState.autoTargetSpacing, filterState.autoTargetSpacingY)
       : clampAutoTargetSize(dims.width, dims.height);
     if (!target) return;
     const { width: nextWidth, height: nextHeight } = target;
@@ -884,6 +884,7 @@ export function RetroPlayer({
     useDisplayAutoTarget,
     player.presentedViewportSize,
     filterState.autoTargetSpacing,
+    filterState.autoTargetSpacingY,
     filterState.autoTargetSize,
     filterState.targetHeight,
     filterState.targetWidth,

@@ -12,11 +12,16 @@ export const getDisplayAutoTargetSize = (
   source: { width: number; height: number },
   viewport: { width: number; height: number } | null,
   spacing: number,
+  spacingY: number = spacing,
 ): { width: number; height: number } | null => {
   if (!viewport || ![source.width, source.height, viewport.width, viewport.height]
     .every(value => Number.isFinite(value) && value > 0)) return null;
+  // Source aspect is stable even while the CSS viewport is rounded/resized.
+  const selectedSpacing = normalizeAutoTargetSpacing(source.height > source.width ? spacingY : spacing);
   const scale = Math.min(viewport.width / source.width, viewport.height / source.height)
-    / normalizeAutoTargetSpacing(spacing);
-  const width = Math.max(1, Math.round(source.width * scale));
-  return { width, height: Math.max(1, Math.round(width * source.height / source.width)) };
+    / selectedSpacing;
+  return {
+    width: Math.max(1, Math.round(source.width * scale)),
+    height: Math.max(1, Math.round(source.height * scale)),
+  };
 };

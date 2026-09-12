@@ -78,7 +78,8 @@ export type RetroPresetDefinition = {
   label: string;
   autoTargetSize?: boolean;
   autoTargetSizeBasis?: "source" | "display";
-  autoTargetSpacing?: number;
+  autoTargetSpacing?: number; // Horizontal; also the fallback for legacy vertical spacing.
+  autoTargetSpacingY?: number;
   samplingMode?: TargetSamplingMode;
   vblankSimulationMode?: VBlankSimulationMode;
   renderModeOverride?: RetroPresetRenderMode;
@@ -926,6 +927,7 @@ export const RETRO_PRESETS = {
     autoTargetSize: true,
     autoTargetSizeBasis: "display",
     autoTargetSpacing: 4.2,
+    autoTargetSpacingY: 1.0,
     samplingMode: "nearest",
     vblankSimulationMode: "strong",
     width: 320,
@@ -965,6 +967,7 @@ export const RETRO_PRESETS = {
     autoTargetSize: true,
     autoTargetSizeBasis: "display",
     autoTargetSpacing: 4.2,
+    autoTargetSpacingY: 1.0,
     samplingMode: "nearest",
     vblankSimulationMode: "strong",
     width: 1480,
@@ -1009,7 +1012,7 @@ export const RETRO_PRESETS = {
     compositeEnabled: true,
     compositeAmount: 1,
     compositeChromaBlur: 0.61,
-    compositeChromaDelay: 0.11,
+    compositeChromaDelay: 0.71,
     compositeNoise: 0.88,
     beamDarkCutoff: 0,
     beamHorizontalSpread: 0.5,
@@ -1030,6 +1033,7 @@ export const RETRO_PRESETS = {
     autoTargetSize: true,
     autoTargetSizeBasis: "display",
     autoTargetSpacing: 4.2,
+    autoTargetSpacingY: 1.0,
     samplingMode: "nearest",
     vblankSimulationMode: "strong",
     width: 256,
@@ -1082,7 +1086,7 @@ export const RETRO_PRESETS = {
     compositeEnabled: true,
     compositeAmount: 0.85,
     compositeChromaBlur: 0.46,
-    compositeChromaDelay: 0,
+    compositeChromaDelay: 0.71,
     compositeNoise: 0.77,
     beamDarkCutoff: 0.04,
     beamHorizontalSpread: 0.8,

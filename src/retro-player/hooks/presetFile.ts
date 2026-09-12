@@ -25,6 +25,7 @@ const DEFAULT_FILTER_SETTINGS: PersistedRetroFilterSettings = {
   autoTargetSize: DEFAULT_PRESET.autoTargetSize ?? false,
   autoTargetSizeBasis: normalizeAutoTargetSizeBasis(DEFAULT_PRESET.autoTargetSizeBasis),
   autoTargetSpacing: normalizeAutoTargetSpacing(DEFAULT_PRESET.autoTargetSpacing),
+  autoTargetSpacingY: normalizeAutoTargetSpacing(DEFAULT_PRESET.autoTargetSpacingY ?? DEFAULT_PRESET.autoTargetSpacing),
   samplingMode: DEFAULT_PRESET.samplingMode ?? "nearest",
   vblankSimulationMode: DEFAULT_PRESET.vblankSimulationMode ?? "off",
   targetWidth: DEFAULT_PRESET.width,
@@ -134,6 +135,7 @@ const applyFilterDefaults = (
   ...raw,
   autoTargetSizeBasis: normalizeAutoTargetSizeBasis(raw.autoTargetSizeBasis),
   autoTargetSpacing: normalizeAutoTargetSpacing(raw.autoTargetSpacing),
+  autoTargetSpacingY: normalizeAutoTargetSpacing(raw.autoTargetSpacingY ?? raw.autoTargetSpacing),
   phosphorDotShape: normalizePhosphorDotShape(raw.phosphorDotShape),
 });
 

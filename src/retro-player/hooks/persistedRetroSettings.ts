@@ -20,7 +20,8 @@ const STORAGE_VERSION = 1;
 export type PersistedRetroFilterSettings = {
   autoTargetSize: boolean;
   autoTargetSizeBasis: "source" | "display";
-  autoTargetSpacing: number;
+  autoTargetSpacing: number; // Horizontal spacing (legacy field name).
+  autoTargetSpacingY: number;
   samplingMode: TargetSamplingMode;
   vblankSimulationMode: VBlankSimulationMode;
   targetWidth: number;

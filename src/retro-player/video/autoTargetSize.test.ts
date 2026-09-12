@@ -32,3 +32,20 @@ describe("display auto target size", () => {
     expect(normalizeAutoTargetSpacing(2.56)).toBe(2.6);
   });
 });
+
+it("selects X for landscape and square, Y for portrait", () => {
+  for (const [width, height, expectedWidth, expectedHeight] of [
+    [400, 400, 100, 100],
+    [400, 100, 100, 25],
+    [100, 400, 50, 200],
+  ]) {
+    expect(getDisplayAutoTargetSize({ width, height }, { width, height }, 4, 2))
+      .toEqual({ width: expectedWidth, height: expectedHeight });
+  }
+});
+it("uses source orientation despite rounded viewport dimensions and supports fractional spacing", () => {
+  expect(getDisplayAutoTargetSize({ width: 400, height: 401 }, { width: 400, height: 400 }, 4, 2))
+    .toEqual({ width: 200, height: 200 });
+  expect(getDisplayAutoTargetSize({ width: 420, height: 105 }, { width: 420, height: 105 }, 4.2, 2.5))
+    .toEqual({ width: 100, height: 25 });
+});

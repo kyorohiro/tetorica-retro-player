@@ -225,3 +225,28 @@ it("also pauses rendering while a support shader is linking", async () => {
   expect(gl.drawArrays).toHaveBeenCalledTimes(1);
   pipeline.dispose();
 });
+
+it("does not relink Beam programs as the canvas and auto target grow from 1x1", async () => {
+  vi.useFakeTimers();
+  const { pipeline, gl } = createPipeline();
+  const settings = {
+    isFilterEnabled: true, paletteMode: "free", samplingMode: "nearest",
+    phosphorDotShape: "beam", phosphorStrength: 0, spotMaskStrength: 0,
+    targetWidth: 1, targetHeight: 1,
+  } as RetroVideoFilterState;
+  try {
+    pipeline.setFilterState(settings);
+    pipeline.setDrawingBufferSize(1, 1);
+    await vi.runAllTimersAsync();
+    const linked = gl.linkProgram.mock.calls.length;
+    expect(linked).toBeGreaterThan(0);
+    for (const size of [2, 100, 400, 800]) {
+      pipeline.setDrawingBufferSize(size, size * 2);
+      pipeline.setFilterState({ ...settings, targetWidth: size / 2, targetHeight: size });
+      await vi.runAllTimersAsync();
+    }
+    expect(gl.linkProgram).toHaveBeenCalledTimes(linked);
+  } finally {
+    pipeline.dispose();
+  }
+});
