@@ -30,7 +30,7 @@ import { AudioSpectrum } from "./AudioSpectrum";
 import { RenderDensityOverlay } from "./RenderDensityOverlay";
 
 // Enable temporarily when comparing browser rendering density.
-const SHOW_RENDER_DENSITY_DIAGNOSTICS = false;
+const SHOW_RENDER_DENSITY_DIAGNOSTICS = true;
 
 function LoadingRingIndicator({
   size = "md",

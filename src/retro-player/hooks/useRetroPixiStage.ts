@@ -1,5 +1,5 @@
 import { getDisplayAutoTargetSize, isDisplayAutoTargetReady } from "../video/autoTargetSize";
-import { useOutputPixelScale } from "./useOutputPixelScale";
+import { preferredOutputScale, useDisplayPixelRatio } from "./useOutputPixelScale";
 import {
   useCallback,
   useEffect,
@@ -27,14 +27,7 @@ import {
 } from "../ui/shaderBusyOverlay";
 
 const TAURI_HIDDEN_TICK_MS = 250;
-const snapCssToDevicePixel = (value: number) => {
-  if (typeof window === "undefined") {
-    return Math.round(value);
-  }
-
-  const dpr = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
-  return Math.round(value * dpr) / dpr;
-};
+const snapCssToDevicePixel = (value: number, dpr: number) => Math.round(value * dpr) / dpr;
 
 type PreviewKind = "video" | "audio" | "image" | "capture" | null;
 type FilterBufferCap = {
@@ -348,7 +341,10 @@ export function useRetroPixiStage({
   previewKindRef,
   debugVideo,
 }: UseRetroPixiStageParams) {
-  const preferredScale = useOutputPixelScale();
+  const displayPixelRatio = useDisplayPixelRatio();
+  const displayPixelRatioRef = useRef(displayPixelRatio);
+  displayPixelRatioRef.current = displayPixelRatio;
+  const preferredScale = preferredOutputScale(displayPixelRatio);
   const effectiveRenderResolutionScale = renderResolutionScale > 1
     ? Math.max(renderResolutionScale, preferredScale)
     : preferredScale;
@@ -662,7 +658,7 @@ export function useRetroPixiStage({
       : null;
     const sourceWidth = Math.max(previewSourceSize?.width ?? styleWidth, 1);
     const sourceHeight = Math.max(previewSourceSize?.height ?? styleHeight, 1);
-    const displayDpr = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+    const displayDpr = displayPixelRatioRef.current;
     app.pipeline.setPresentationPixelRatio(displayDpr);
     const isUpscalingContent =
       styleWidth * displayDpr > sourceWidth + 0.5 || styleHeight * displayDpr > sourceHeight + 0.5;
@@ -728,8 +724,8 @@ export function useRetroPixiStage({
       filterBufferCap,
     });
     app.pipeline.setFilterViewportScale(totalScaleDownFactor);
-    const snappedPresentedStyleWidth = snapCssToDevicePixel(presentedStyleWidth);
-    const snappedPresentedStyleHeight = snapCssToDevicePixel(presentedStyleHeight);
+    const snappedPresentedStyleWidth = snapCssToDevicePixel(presentedStyleWidth, displayDpr);
+    const snappedPresentedStyleHeight = snapCssToDevicePixel(presentedStyleHeight, displayDpr);
     presentedViewportSizeRef.current = { width: snappedPresentedStyleWidth, height: snappedPresentedStyleHeight };
     layoutSourceRef.current = previewElementRef.current;
     // Auto target spacing must use the actual CSS presentation after caps,
@@ -739,10 +735,10 @@ export function useRetroPixiStage({
         ? current
         : { width: snappedPresentedStyleWidth, height: snappedPresentedStyleHeight });
     const nextLeft = snapCssToDevicePixel(
-      viewRect.x + (styleWidth - snappedPresentedStyleWidth) / 2,
+      viewRect.x + (styleWidth - snappedPresentedStyleWidth) / 2, displayDpr,
     );
     const nextTop = snapCssToDevicePixel(
-      viewRect.y + (styleHeight - snappedPresentedStyleHeight) / 2,
+      viewRect.y + (styleHeight - snappedPresentedStyleHeight) / 2, displayDpr,
     );
     const nextLayoutKey = [
       styleWidth,
@@ -822,6 +818,7 @@ export function useRetroPixiStage({
       spacingY: currentFilterState.autoTargetSpacingY,
       selectedAxis: sourceHeight > sourceWidth ? "Y" : "X",
       renderScale: effectiveRenderResolutionScale,
+      displayPixelRatio: displayDpr,
       plannedBufferWidth: nextWidth,
       plannedBufferHeight: nextHeight,
       presentedCssWidth: snappedPresentedStyleWidth,
@@ -902,7 +899,7 @@ export function useRetroPixiStage({
         layoutFrameRef.current = null;
       }
     };
-  }, [effectiveRenderResolutionScale, scheduleRefreshLayout]);
+  }, [displayPixelRatio, effectiveRenderResolutionScale, scheduleRefreshLayout]);
 
   const initPixi = useCallback(async () => {
     if (appRef.current) return;
