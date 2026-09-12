@@ -479,12 +479,15 @@ var TetoricaRetroAudioNode = class {
   _roomConvolverConnected = true;
   _hallReverbConvolverConnected = true;
   _destinationConnected = false;
+  captureRecordingMode = false;
+  initializationPromise = null;
   // Cache last WaveShaper curve amounts to avoid recreating 4096-sample Float32Arrays every update.
   _driveCurveAmount = -1;
   _tapeSatCurveAmount = -1;
   nodes = {
     audioContext: null,
     masterGain: null,
+    monitorGain: null,
     radioToneHighpass: null,
     radioToneLowpass: null,
     radioTonePresence: null,
@@ -543,6 +546,7 @@ var TetoricaRetroAudioNode = class {
     busCompressor: null,
     fxOutputGain: null,
     inputTrimGain: null,
+    inputAnalyser: null,
     analyser: null
   };
   constructor({
@@ -666,6 +670,9 @@ var TetoricaRetroAudioNode = class {
   get crackleGain() {
     return this.nodes.crackleGain;
   }
+  get inputAnalyser() {
+    return this.nodes.inputAnalyser;
+  }
   get analyser() {
     return this.nodes.analyser;
   }
@@ -699,8 +706,12 @@ var TetoricaRetroAudioNode = class {
     this.runtimeState.isOutputEnabled = isEnabled;
     this.updateAudioNodes();
   }
+  setCaptureRecordingMode(enabled) {
+    this.captureRecordingMode = enabled;
+    this.updateAudioNodes();
+  }
   setDestinationOutputEnabled(isEnabled) {
-    const outputNode = this.output;
+    const outputNode = this.nodes.monitorGain ?? this.output;
     const destination = this.context.destination;
     if (!outputNode || !destination) {
       this._destinationConnected = false;
@@ -730,6 +741,8 @@ var TetoricaRetroAudioNode = class {
     Object.assign(this.nodes, {
       audioContext: null,
       masterGain: null,
+      inputAnalyser: null,
+      monitorGain: null,
       radioToneHighpass: null,
       radioToneLowpass: null,
       radioTonePresence: null,
@@ -821,7 +834,11 @@ var TetoricaRetroAudioNode = class {
     const vinylDustBedFilter = this.nodes.vinylDustBedFilter;
     const vinylDustBedGain = this.nodes.vinylDustBedGain;
     const { settings, isPlaying, isOutputEnabled } = this.runtimeState;
-    const audibleMasterGain = settings.isMuted || !isOutputEnabled ? 0 : settings.volume;
+    const recordingMuted = !this.captureRecordingMode && settings.isMuted;
+    const audibleMasterGain = !isOutputEnabled || recordingMuted ? 0 : this.captureRecordingMode ? 1 : settings.volume;
+    if (this.nodes.monitorGain) {
+      this.nodes.monitorGain.gain.value = this.captureRecordingMode ? settings.isMuted ? 0 : settings.volume : 1;
+    }
     if (masterGain) {
       masterGain.gain.cancelScheduledValues(this.context.currentTime);
       masterGain.gain.setValueAtTime(audibleMasterGain, this.context.currentTime);
@@ -883,7 +900,7 @@ var TetoricaRetroAudioNode = class {
         bitcrusherDiff.context.currentTime
       );
       bitcrusherDiff.parameters.get("mix")?.setValueAtTime(
-        1,
+        crushNoiseAmount > 0 ? 1 : 0,
         bitcrusherDiff.context.currentTime
       );
     }
@@ -965,16 +982,16 @@ var TetoricaRetroAudioNode = class {
       }
     }
     if (noiseGainNode) {
-      const targetNoiseGain = settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying ? Math.min(0.24, settings.noiseLevel * 5.5) : 0;
+      const targetNoiseGain = settings.isNoiseEnabled && !recordingMuted && isOutputEnabled && isPlaying ? Math.min(0.24, settings.noiseLevel * 5.5) : 0;
       noiseGainNode.gain.cancelScheduledValues(this.context.currentTime);
       noiseGainNode.gain.setValueAtTime(targetNoiseGain, this.context.currentTime);
     }
     if (crackleGainNode) {
-      const isCrackleActive = settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
+      const isCrackleActive = settings.isNoiseEnabled && !recordingMuted && isOutputEnabled && isPlaying;
       crackleGainNode.gain.value = isCrackleActive ? Math.min(0.24, settings.vinylDustAmount * 0.22 + settings.noiseLevel * 0.25) : 0;
     }
     if (vinylDustBedFilter && vinylDustBedGain) {
-      const isDustBedActive = settings.isNoiseEnabled && !settings.isMuted && isOutputEnabled && isPlaying;
+      const isDustBedActive = settings.isNoiseEnabled && !recordingMuted && isOutputEnabled && isPlaying;
       const amount = isDustBedActive ? settings.vinylDustAmount : 0;
       vinylDustBedFilter.frequency.value = 2100 + amount * 2600;
       vinylDustBedFilter.Q.value = 0.35 + amount * 0.25;
@@ -1127,7 +1144,12 @@ var TetoricaRetroAudioNode = class {
     const chorusLfoGain2 = context.createGain();
     const chorusWetGain = context.createGain();
     const fxOutputGain = context.createGain();
+    const monitorGain = context.createGain();
+    monitorGain.gain.value = 0;
     const inputTrimGain = context.createGain();
+    const inputAnalyser = context.createAnalyser();
+    inputAnalyser.fftSize = 512;
+    inputAnalyser.smoothingTimeConstant = 0.8;
     const analyser = context.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
@@ -1290,6 +1312,7 @@ var TetoricaRetroAudioNode = class {
     outputBus.connect(busCompressor);
     busCompressor.connect(fxOutputGain);
     fxOutputGain.connect(analyser);
+    fxOutputGain.connect(monitorGain);
     noiseSource.connect(noiseHighpass);
     noiseHighpass.connect(noiseLowpass);
     noiseLowpass.connect(noiseWarmth);
@@ -1363,7 +1386,9 @@ var TetoricaRetroAudioNode = class {
       tapeSaturator,
       busCompressor,
       fxOutputGain,
+      monitorGain,
       inputTrimGain,
+      inputAnalyser,
       analyser
     };
   }
@@ -1380,7 +1405,7 @@ var TetoricaRetroAudioNode = class {
     const fxOutputGain = this.nodes.fxOutputGain;
     if (!fxOutputGain) return;
     if (this.connectOutputToDestination) {
-      fxOutputGain.connect(this.context.destination);
+      this.nodes.monitorGain.connect(this.context.destination);
       this.autoConnections.add(this.context.destination);
       this._destinationConnected = true;
     }
@@ -1412,7 +1437,12 @@ var TetoricaRetroAudioNode = class {
       return null;
     }
     if (!this.nodes.audioContext || !this.nodes.masterGain) {
-      await this.initNodes();
+      if (!this.initializationPromise) {
+        this.initializationPromise = this.initNodes().finally(() => {
+          this.initializationPromise = null;
+        });
+      }
+      await this.initializationPromise;
     }
     const activeContext = this.nodes.audioContext;
     if (activeContext?.state === "suspended") {
@@ -1611,7 +1641,9 @@ var TetoricaRetroAudioNode = class {
       this.nodes.masterGain,
       this.nodes.outputBus,
       this.nodes.busCompressor,
-      this.nodes.fxOutputGain
+      this.nodes.fxOutputGain,
+      this.nodes.monitorGain,
+      this.nodes.inputAnalyser
     ];
     for (const node of internalNodes) {
       try {

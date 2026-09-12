@@ -27,6 +27,10 @@ import {
 import { RetroPreviewToolbar } from "./RetroPreviewToolbar";
 import type { RetroGameControls } from "../types/gameControls";
 import { AudioSpectrum } from "./AudioSpectrum";
+import { RenderDensityOverlay } from "./RenderDensityOverlay";
+
+// Enable temporarily when comparing browser rendering density.
+const SHOW_RENDER_DENSITY_DIAGNOSTICS = false;
 
 function LoadingRingIndicator({
   size = "md",
@@ -1276,6 +1280,9 @@ export function RetroPreviewView({
           }
         >
           {/* Canvas area + overlays */}
+          {SHOW_RENDER_DENSITY_DIAGNOSTICS && isCanvasVisible && !shouldKeepNativeVisualVisible && (
+            <RenderDensityOverlay hostRef={player.canvasHostRef} />
+          )}
           <div
             className={`relative w-full overflow-visible rounded-xl bg-slate-950 ${previewAspectRatio ? "h-full" : "h-full min-h-[100px]"}`}
             style={{

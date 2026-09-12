@@ -1,4 +1,5 @@
 import { getDisplayAutoTargetSize, isDisplayAutoTargetReady } from "../video/autoTargetSize";
+import { useOutputPixelScale } from "./useOutputPixelScale";
 import {
   useCallback,
   useEffect,
@@ -26,20 +27,12 @@ import {
 } from "../ui/shaderBusyOverlay";
 
 const TAURI_HIDDEN_TICK_MS = 250;
-const getPreferredOutputScale = () => {
-  if (typeof window === "undefined") {
-    return 1;
-  }
-
-  return Math.max(1, Math.min(2, Math.round(window.devicePixelRatio || 1)));
-};
-
 const snapCssToDevicePixel = (value: number) => {
   if (typeof window === "undefined") {
     return Math.round(value);
   }
 
-  const dpr = Math.max(window.devicePixelRatio || 1, 1);
+  const dpr = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
   return Math.round(value * dpr) / dpr;
 };
 
@@ -178,7 +171,7 @@ const resolveBufferSizing = ({
   isFilterEnabled,
   shouldUseLogicalBufferUpscale,
 }: BufferSizingInput): BufferSizingResult => {
-  const safeScale = Math.max(1, effectiveRenderResolutionScale);
+  const safeScale = effectiveRenderResolutionScale > 0 ? effectiveRenderResolutionScale : 1;
   const displayBufferWidth = Math.max(1, Math.round(styleWidth * safeScale));
   const displayBufferHeight = Math.max(1, Math.round(styleHeight * safeScale));
   const logicalBufferWidth = Math.max(
@@ -229,7 +222,7 @@ const resolvePresentedStyleSize = ({
   effectiveRenderResolutionScale: number;
   didApplyAnyCap: boolean;
 }) => {
-  const safeScale = Math.max(1, effectiveRenderResolutionScale);
+  const safeScale = effectiveRenderResolutionScale > 0 ? effectiveRenderResolutionScale : 1;
   const maxScaleFromWidth = styleWidth / Math.max(nextWidth, 1);
   const maxScaleFromHeight = styleHeight / Math.max(nextHeight, 1);
   const capSafeCssScale = Math.min(
@@ -355,10 +348,12 @@ export function useRetroPixiStage({
   previewKindRef,
   debugVideo,
 }: UseRetroPixiStageParams) {
-  const effectiveRenderResolutionScale = Math.max(
-    renderResolutionScale,
-    getPreferredOutputScale(),
-  );
+  const preferredScale = useOutputPixelScale();
+  const effectiveRenderResolutionScale = renderResolutionScale > 1
+    ? Math.max(renderResolutionScale, preferredScale)
+    : preferredScale;
+  const outputScaleRef = useRef(effectiveRenderResolutionScale);
+  outputScaleRef.current = effectiveRenderResolutionScale;
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<CanvasStageApp | null>(null);
   const spriteRef = useRef<null>(null);
@@ -637,6 +632,9 @@ export function useRetroPixiStage({
   }, [renderFrame]);
 
   const refreshLayout = useCallback(() => {
+    // Compilation callbacks can outlive a zoom change. Always use the latest
+    // density when they apply a deferred resize to the existing WebGL context.
+    const effectiveRenderResolutionScale = outputScaleRef.current;
     const app = appRef.current;
     const host = canvasHostRef.current;
     if (!app || !host) return;
@@ -664,8 +662,10 @@ export function useRetroPixiStage({
       : null;
     const sourceWidth = Math.max(previewSourceSize?.width ?? styleWidth, 1);
     const sourceHeight = Math.max(previewSourceSize?.height ?? styleHeight, 1);
+    const displayDpr = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+    app.pipeline.setPresentationPixelRatio(displayDpr);
     const isUpscalingContent =
-      styleWidth > sourceWidth + 0.5 || styleHeight > sourceHeight + 0.5;
+      styleWidth * displayDpr > sourceWidth + 0.5 || styleHeight * displayDpr > sourceHeight + 0.5;
     const presentationSamplingMode: RetroPresentationSamplingMode =
       isUpscalingContent ? "crisp" : "smooth";
     const shouldUseLogicalBufferUpscale =
@@ -808,6 +808,28 @@ export function useRetroPixiStage({
         : next;
     });
 
+    // Keep CPU-side sizing inputs inspectable even when spacing changes without
+    // resizing the canvas. Read actual canvas/DOM dimensions on demand; asking
+    // WebGL for state here could reintroduce a synchronization stall.
+    app.canvas.dataset.retroSizing = JSON.stringify({
+      sourceWidth,
+      sourceHeight,
+      targetWidth: currentFilterState.targetWidth,
+      targetHeight: currentFilterState.targetHeight,
+      autoTargetSize: currentFilterState.autoTargetSize,
+      basis: currentFilterState.autoTargetSizeBasis,
+      spacingX: currentFilterState.autoTargetSpacing,
+      spacingY: currentFilterState.autoTargetSpacingY,
+      selectedAxis: sourceHeight > sourceWidth ? "Y" : "X",
+      renderScale: effectiveRenderResolutionScale,
+      plannedBufferWidth: nextWidth,
+      plannedBufferHeight: nextHeight,
+      presentedCssWidth: snappedPresentedStyleWidth,
+      presentedCssHeight: snappedPresentedStyleHeight,
+      totalScaleDownFactor,
+      presentationSamplingMode,
+    });
+
     if (appliedLayoutKeyRef.current === nextLayoutKey) {
       return;
     }
@@ -870,6 +892,17 @@ export function useRetroPixiStage({
       refreshLayout();
     });
   }, [refreshLayout]);
+
+  useEffect(() => {
+    // ResizeObserver alone cannot detect a density change with fixed CSS size.
+    scheduleRefreshLayout();
+    return () => {
+      if (layoutFrameRef.current !== null) {
+        window.cancelAnimationFrame(layoutFrameRef.current);
+        layoutFrameRef.current = null;
+      }
+    };
+  }, [effectiveRenderResolutionScale, scheduleRefreshLayout]);
 
   const initPixi = useCallback(async () => {
     if (appRef.current) return;

@@ -1,3 +1,4 @@
+import { limitBeamViewportByDensity } from "./beamDensity";
 import {
   MONO_TINTS,
   paletteModeToUniform,
@@ -1164,6 +1165,7 @@ export class TetoricaRetroVideoPipeline {
   private outputEnabled = true;
   private presentationSamplingMode: RetroPresentationSamplingMode = "crisp";
   private filterViewportScale = 1;
+  private presentationPixelRatio: number | null = null;
   private isFilterBufferCapEnabled = false;
   private displaySizeOverride: { width: number; height: number } | null = null;
 
@@ -3250,6 +3252,10 @@ export class TetoricaRetroVideoPipeline {
     this.presentationSamplingMode = mode;
   }
 
+  setPresentationPixelRatio(dpr: number) {
+    this.presentationPixelRatio = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  }
+
   setFilterBufferCap(cap: FilterBufferCap | null) {
     this.isFilterBufferCapEnabled = cap !== null;
   }
@@ -3284,7 +3290,7 @@ export class TetoricaRetroVideoPipeline {
     };
   }
 
-  private getEffectiveViewportFloorSize() {
+  private getEffectiveViewportFloorSize(filterState: RetroVideoFilterState) {
     const viewportFloorSize = this.displaySizeOverride
       ? {
           width: Math.max(1, Math.floor(this.displaySizeOverride.width)),
@@ -3296,14 +3302,15 @@ export class TetoricaRetroVideoPipeline {
           Math.max(this.gl.drawingBufferHeight, 1),
         );
 
-    if (this.filterViewportScale <= 1.0001) {
-      return viewportFloorSize;
-    }
-
-    return {
+    const capped = this.filterViewportScale <= 1.0001 ? viewportFloorSize : {
       width: Math.max(1, Math.floor(viewportFloorSize.width / this.filterViewportScale)),
       height: Math.max(1, Math.floor(viewportFloorSize.height / this.filterViewportScale)),
     };
+    if (!isBeamCrossModeEnabled(filterState) || this.presentationPixelRatio === null) return capped;
+    return limitBeamViewportByDensity(capped, this.getEffectiveDisplaySize(), {
+      width: this.gl.drawingBufferWidth,
+      height: this.gl.drawingBufferHeight,
+    }, this.presentationPixelRatio);
   }
 
   private syncTextureSamplingFilter(nextFilter: number) {
@@ -4079,7 +4086,7 @@ export class TetoricaRetroVideoPipeline {
     sourceWidth: number | undefined,
     sourceHeight: number | undefined,
   ): Pass2Sizing {
-    const viewportFloorSize = this.getEffectiveViewportFloorSize();
+    const viewportFloorSize = this.getEffectiveViewportFloorSize(filterState);
     const visibleWidth = viewportFloorSize.width;
     const visibleHeight = viewportFloorSize.height;
     const {
@@ -4120,7 +4127,7 @@ export class TetoricaRetroVideoPipeline {
     sourceWidth?: number,
     sourceHeight?: number,
   ) {
-    const viewportFloorSize = this.getEffectiveViewportFloorSize();
+    const viewportFloorSize = this.getEffectiveViewportFloorSize(filterState);
     const visibleWidth = viewportFloorSize.width;
     const visibleHeight = viewportFloorSize.height;
     const { width, height } = getEffectiveRetroTargetSize(

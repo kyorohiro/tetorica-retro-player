@@ -33,3 +33,24 @@ it("returns to the full display target when the cap is disabled", () => {
   expect(target(size(1, false)).width).toBe(505);
   expect(target(size(2, false))).toEqual(target(size(1, false)));
 });
+
+it("allows sub-one density without enlarging the CSS presentation or exceeding a cap", () => {
+  const normal = size(0.67, false);
+  expect(normal.nextWidth).toBe(Math.round(1920 * 0.67));
+  expect(normal.presentedStyleWidth).toBe(1920);
+  const capped = size(0.67, true);
+  expect(capped.nextWidth).toBeLessThanOrEqual(960);
+  expect(capped.presentedStyleWidth).toBeLessThanOrEqual(1920);
+  expect(target(size(0.67, true, target(capped).width))).toEqual(target(capped));
+});
+
+it("matches fractional density without changing CSS target semantics, including caps", () => {
+  const uncapped = size(1.5, false);
+  expect(uncapped.nextWidth).toBe(2880);
+  expect(uncapped.nextWidth / uncapped.presentedStyleWidth).toBe(1.5);
+  expect(target(uncapped)).toEqual(target(size(1, false)));
+  const capped = size(1.5, true);
+  expect(capped.nextWidth).toBeLessThanOrEqual(960);
+  expect(capped.nextHeight).toBeLessThanOrEqual(720);
+  expect(target(size(1.5, true, target(capped).width))).toEqual(target(capped));
+});
