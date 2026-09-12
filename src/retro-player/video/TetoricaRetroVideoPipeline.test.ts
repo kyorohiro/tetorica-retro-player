@@ -278,3 +278,21 @@ it("reduces the actual Beam pass target as the video area shrinks even when page
   expect(pipeline.getBeamSizingDiagnostic()).toContain(`内部Target: ${after.pass2TargetWidth} × ${after.pass2TargetHeight}`);
   expect(gl.getProgramParameter).not.toHaveBeenCalled();
 });
+
+it("keeps the previous canvas during layout/target settling and commits only the latest size when drawing", () => {
+  const { pipeline, gl } = createPipeline();
+  pipeline.setSource({ width: 2, height: 2, data: new Uint8Array(16) });
+  pipeline.setFilterState({ isFilterEnabled: false } as RetroVideoFilterState);
+  pipeline.render();
+  const draws = gl.drawArrays.mock.calls.length;
+  pipeline.setDrawingBufferSize(800, 450);
+  pipeline.setDrawingBufferSize(640, 360);
+  // No render while the stage waits for the auto-target update: resizing must
+  // not clear the existing canvas or start another GPU operation in this gap.
+  expect(gl.canvas).toEqual({ width: 2, height: 2 });
+  expect(gl.drawArrays).toHaveBeenCalledTimes(draws);
+  pipeline.render();
+  expect(gl.canvas).toEqual({ width: 640, height: 360 });
+  expect(gl.drawArrays).toHaveBeenCalledTimes(draws + 1);
+  pipeline.dispose();
+});

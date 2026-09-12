@@ -2372,7 +2372,9 @@ export class TetoricaRetroVideoPipeline {
   setDrawingBufferSize(width: number, height: number) {
     if (this.isDisposed) return;
     this.pendingDrawingBufferSize = { width: Math.max(1, Math.floor(width)), height: Math.max(1, Math.floor(height)) };
-    this.applyDrawingBufferSize();
+    // Changing canvas.width/height clears the displayed frame. The stage may
+    // still be waiting for React's auto target to match the new layout, so
+    // commit only when render() actually runs. Multiple resizes keep the latest.
   }
 
   private applyDrawingBufferSize() {
