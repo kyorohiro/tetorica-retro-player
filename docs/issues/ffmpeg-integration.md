@@ -190,6 +190,57 @@ macOS 側の同種の問題は [`wkwebview-hls-webaudio.md`](wkwebview-hls-webau
 
 #### ffmpeg バイナリの準備
 
+##### Apple Silicon ネイティブ版の取得・確認（2026-09-12 追記）
+
+ARM64 の静的ビルドは次の配布元から取得できる。自前ビルドは必須ではない。
+
+- [OSXExperts](https://www.osxexperts.net/): **Apple Silicon** の ffmpeg を選ぶ。確認時点では「Download ffmpeg 9.0 (Apple Silicon)」。
+- [Martin Riedl](https://ffmpeg.martin-riedl.de/): **macOS / Apple Silicon・arm64** の ffmpeg を選ぶ。安定版を試す場合は release を選択する。
+
+取得先は確認済みだが、このプロジェクトでの新しい ARM64 バイナリの実行・同梱検証はこれから行う。以前動作確認した ARM 版がどちらの配布元だったかは未特定。
+
+調査時の `src-tauri/binaries/ffmpeg-aarch64-apple-darwin` は、名前に反して中身が **x86_64** だった。以下の旧手順で Intel 版を両方に配置した構成なので、ファイル名だけでは判断しない。
+
+1. 上記サイトから Apple Silicon / arm64 の ZIP を取得・展開する。
+2. 展開した実行ファイルを確認する。以下のパスは実際の展開先に置き換える。
+
+```bash
+file /展開先/ffmpeg
+# Mach-O 64-bit executable arm64 であること
+
+otool -L /展開先/ffmpeg
+# /opt/homebrew/、/usr/local/、配布元のビルド環境などへの依存がないか確認
+# /usr/lib/ や /System/Library/ の macOS 標準ライブラリへの依存はあり得る
+
+chmod +x /展開先/ffmpeg
+/展開先/ffmpeg -version
+/展開先/ffmpeg -hide_banner -encoders
+# 本体の HLS 変換で使う libx264、aac などを確認
+```
+
+3. リポジトリのルートで既存ファイルを退避し、ARM 版だけを置き換える。
+
+```bash
+# 退避先は毎回別ディレクトリになる
+ffmpeg_backup_dir=$(mktemp -d /tmp/tetorica-ffmpeg-backup.XXXXXX)
+cp src-tauri/binaries/ffmpeg-aarch64-apple-darwin "$ffmpeg_backup_dir/"
+echo "$ffmpeg_backup_dir"
+
+cp /展開先/ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+file src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+src-tauri/binaries/ffmpeg-aarch64-apple-darwin -version
+shasum -a 256 src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+```
+
+Intel 向けの `ffmpeg-x86_64-apple-darwin` はそのまま残す。配布元URL、取得バージョン、SHA-256、`-version` のビルド構成を控えておくと再取得しやすい。同梱する際は、取得したビルドに合わせてライセンス表記・対応ソースの案内も確認する。
+
+4. 以下のサイドカービルド手順で ARM64 向けにビルドし、アプリから HLS 変換・再生を試す。`-version` が動くだけではアプリ同梱時の動作確認にはならない。
+
+##### 旧運用: Intel 版を Rosetta で実行
+
+以下は過去の配置手順。**ARM64 版を配置した後に実行すると、Intel 版で上書きするため注意。**
+
 evermeet.cx は **x86_64（Intel）の静的ビルド**のみ提供している。
 Homebrew の ffmpeg は `/opt/homebrew/` への動的リンクが多く、配布アプリには使用不可。
 
@@ -205,6 +256,18 @@ unzip /tmp/ffmpeg.zip -d /tmp/
 # アーキテクチャを確認（x86_64 であることを確認）
 file /tmp/ffmpeg
 
+
+ffmpeg_dir=$(mktemp -d /tmp/ffmpeg-arm64.XXXXXX)
+
+curl -fL "https://www.osxexperts.net/ffmpeg9arm.zip" \
+  -o "$ffmpeg_dir/ffmpeg.zip"
+
+unzip "$ffmpeg_dir/ffmpeg.zip" -d "$ffmpeg_dir"
+
+file "$ffmpeg_dir/ffmpeg"
+shasum -a 256 "$ffmpeg_dir/ffmpeg"
+
+
 # 両アーキテクチャ向けに配置（同じバイナリを使用）
 cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
 cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
@@ -212,8 +275,7 @@ chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
 chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
 ```
 
-> **TODO（将来）**: Apple Silicon ネイティブ実行のためには ARM64 静的ビルドが必要。
-> evermeet.cx は ARM64 未提供のため、ソースからのスタティックビルドが必要。
+##### サイドカービルドの実行
 
 1. 現在のターゲットトリプルを確認:
 
@@ -223,8 +285,6 @@ rustc -Vv | grep host | awk '{print $2}'
 ```
 
 2. ビルド実行:
-
-3. ビルド実行:
 
 ```bash
 # 現在のマシンのアーキテクチャでビルド
