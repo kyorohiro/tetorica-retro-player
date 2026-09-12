@@ -50,6 +50,11 @@
         "shared/filterPass1Pc98LiteShader.js",
         "shared/filterPass2PhosphorLiteShader.js",
         "shared/stereoWidthWorklet.js",
+        "shared/filterPassCompositePrepShader.js",
+        "shared/filterPassCompositeApplyShader.js",
+        "shared/filterPass2PhosphorLiteCoreShader.js",
+        "shared/filterPass1Pc98LiteNearestShader.js",
+        "shared/overlayCompiler.js",
         "shared/settings.js"
       ],
       "matches": ["<all_urls>"]

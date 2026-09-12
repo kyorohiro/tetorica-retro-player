@@ -6,7 +6,7 @@ import {
 const VIEWER_URL = chrome.runtime.getURL("viewer.html");
 const ALARM_STORAGE_KEY = "retro-alarm-state";
 const COMPILE_STATUS_SESSION_KEY = "retro-compile-status";
-const OVERLAY_COMPILE_SLOT_TTL_MS = 3000;
+const OVERLAY_COMPILE_SLOT_TTL_MS = 30000;
 
 let currentSession = null;
 let currentCompileStatus = null;

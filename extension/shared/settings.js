@@ -24,6 +24,9 @@ export const MONO_TINT_OPTIONS = [
 
 export const PRESETS = {
   none: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "None",
     targetWidth: 1920,
     targetHeight: 1080,
@@ -136,6 +139,9 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   gb: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "GB",
     targetWidth: 160,
     targetHeight: 160,
@@ -171,6 +177,14 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   gbPlus: {
+    samplingMode: "nearest",
+    compositeEnabled: false,
+    compositeAmount: 0,
+    compositeChromaBlur: 0,
+    compositeChromaDelay: 0,
+    compositeNoise: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "GB+",
     targetWidth: 160,
     targetHeight: 160,
@@ -206,6 +220,9 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   gba: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "GBA",
     targetWidth: 240,
     targetHeight: 160,
@@ -241,6 +258,9 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   gbm: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "GBM",
     targetWidth: 240,
     targetHeight: 160,
@@ -595,6 +615,14 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   phosphorDotLite: {
+    samplingMode: "nearest",
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.73,
+    compositeChromaDelay: 0.24,
+    compositeNoise: 0.49,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "Phosphor Dot Bright",
     targetWidth: 640,
     targetHeight: 360,
@@ -624,8 +652,6 @@ export const PRESETS = {
     neonSaturation: 1,
     neonDetail: 1,
     autoTargetSize: true,
-    horizontalSharpness: 1,
-    rgbConvergenceOffset: 0,
     basicContrast: 1.2,
     basicSaturation: 1,
     phosphorDotShape: "heart",
@@ -633,11 +659,6 @@ export const PRESETS = {
     preFilterDownscaleEnabled: true,
     coloredGlowEnabled: true,
     postCurvatureEnabled: false,
-    compositeEnabled: true,
-    compositeAmount: 0.85,
-    compositeChromaBlur: 0.73,
-    compositeChromaDelay: 0.24,
-    compositeNoise: 0.49,
     beamDarkCutoff: 0.04,
     beamHorizontalSpread: 1,
     beamStripeStrength: 1,
@@ -654,6 +675,13 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   phosphorDot: {
+    samplingMode: "average_fast_8",
+    compositeEnabled: false,
+    compositeAmount: 0,
+    compositeChromaBlur: 0,
+    compositeChromaDelay: 0,
+    compositeNoise: 0,
+    horizontalSharpness: 0.71,
     label: "Phosphor Dot",
     targetWidth: 206,
     targetHeight: 231,
@@ -682,7 +710,6 @@ export const PRESETS = {
     neonSaturation: 1,
     neonDetail: 1,
     autoTargetSize: true,
-    horizontalSharpness: 1.8,
     basicContrast: 1.12,
     phosphorDotGrainStrength: 0.12,
     preFilterDownscaleEnabled: true,
@@ -697,6 +724,13 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   phosphorDotV1: {
+    samplingMode: "nearest",
+    compositeEnabled: false,
+    compositeAmount: 0,
+    compositeChromaBlur: 0,
+    compositeChromaDelay: 0,
+    compositeNoise: 0,
+    horizontalSharpness: 1.8,
     label: "Phosphor Dot V1",
     targetWidth: 320,
     targetHeight: 180,
@@ -731,6 +765,13 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   phosphorDotSmooth: {
+    samplingMode: "average_fast_4",
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.73,
+    compositeChromaDelay: 0.24,
+    compositeNoise: 0.49,
+    horizontalSharpness: 0.12,
     label: "Phosphor Smooth",
     targetWidth: 320,
     targetHeight: 180,
@@ -759,19 +800,12 @@ export const PRESETS = {
     neonSaturation: 1,
     neonDetail: 1,
     autoTargetSize: true,
-    samplingMode: "average_fast_4",
-    horizontalSharpness: 0.12,
     basicContrast: 1.12,
     phosphorDotGrainStrength: 0.12,
     preFilterDownscaleEnabled: true,
     coloredGlowEnabled: true,
     screenFaceGlow: 0.22,
     beamWarmBloom: 0.22,
-    compositeEnabled: true,
-    compositeAmount: 0.85,
-    compositeChromaBlur: 0.73,
-    compositeChromaDelay: 0.24,
-    compositeNoise: 0.49,
     isAudioFxEnabled: false,
     lofiAmount: 0,
     wowFlutterAmount: 0,
@@ -779,6 +813,7 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   crtBeam: {
+    samplingMode: "nearest",
     label: "CRT Beam",
     targetWidth: 320,
     targetHeight: 180,
@@ -819,6 +854,14 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   crtBeamNtsc: {
+    samplingMode: "nearest",
+    compositeEnabled: true,
+    compositeAmount: 1,
+    compositeChromaBlur: 0.61,
+    compositeChromaDelay: 0.11,
+    compositeNoise: 0.88,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "CRT Beam NTSC",
     targetWidth: 1480,
     targetHeight: 1080,
@@ -859,11 +902,6 @@ export const PRESETS = {
     preFilterDownscaleEnabled: true,
     coloredGlowEnabled: true,
     postCurvatureEnabled: false,
-    compositeEnabled: true,
-    compositeAmount: 1,
-    compositeChromaBlur: 0.61,
-    compositeChromaDelay: 0.11,
-    compositeNoise: 0.88,
     beamDarkCutoff: 0,
     beamHorizontalSpread: 0.5,
     beamStripeStrength: 0.7,
@@ -880,6 +918,15 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   crtBeamNext: {
+    samplingMode: "nearest",
+    compositeEnabled: true,
+    compositeAmount: 0.85,
+    compositeChromaBlur: 0.46,
+    compositeChromaDelay: 0,
+    compositeNoise: 0.77,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    beamStripeMode: "modern",
     label: "CRT Beam Next",
     targetWidth: 256,
     targetHeight: 187,
@@ -913,10 +960,7 @@ export const PRESETS = {
     neonSaturation: 1,
     neonDetail: 1,
     autoTargetSize: false,
-    samplingMode: "nearest",
     vblankSimulationMode: "strong",
-    horizontalSharpness: 1,
-    rgbConvergenceOffset: 0,
     basicContrast: 1.03,
     shadowCrush: 0.36,
     basicSaturation: 1.87,
@@ -935,14 +979,8 @@ export const PRESETS = {
     wideGlowRadius: 6.4,
     wideGlowDownscale: 4,
     wideGlowUpdateInterval: 4,
-    compositeEnabled: true,
-    compositeAmount: 0.85,
-    compositeChromaBlur: 0.46,
-    compositeChromaDelay: 0,
-    compositeNoise: 0.77,
     beamDarkCutoff: 0.04,
     beamHorizontalSpread: 0.8,
-    beamStripeMode: "modern",
     beamStripeStrength: 0.67,
     beamWhiteBloom: 1.5,
     beamWarmBloom: 0.28,
@@ -957,6 +995,14 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   crtNtsc: {
+    samplingMode: "nearest",
+    compositeEnabled: true,
+    compositeAmount: 0.68,
+    compositeChromaBlur: 0.82,
+    compositeChromaDelay: 0.76,
+    compositeNoise: 0.96,
+    horizontalSharpness: 2,
+    rgbConvergenceOffset: 1.47,
     label: "CRT NTSC",
     targetWidth: 640,
     targetHeight: 480,
@@ -1118,6 +1164,14 @@ export const PRESETS = {
     noiseLevel: 0,
   },
   tetoricaDot: {
+    samplingMode: "nearest",
+    compositeEnabled: false,
+    compositeAmount: 0,
+    compositeChromaBlur: 0,
+    compositeChromaDelay: 0,
+    compositeNoise: 0,
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
     label: "Tetorica Dot",
     targetWidth: 640,
     targetHeight: 360,
@@ -1222,6 +1276,12 @@ export const PRESETS = {
 export const DEFAULT_PRESET_KEY = "phosphorDot";
 
 export const DEFAULT_SETTINGS = {
+  samplingMode: "nearest",
+  compositeEnabled: false,
+  compositeAmount: 0.85,
+  compositeChromaBlur: 0.5,
+  compositeChromaDelay: 0,
+  compositeNoise: 0,
   presetKey: DEFAULT_PRESET_KEY,
   audioPresetKey: "custom",
   crtAspect: 1.0,
@@ -1334,6 +1394,10 @@ function isPhosphorDotShape(value) {
   return value === "circle" || value === "heart" || value === "beam" || value === "square";
 }
 
+function isSamplingMode(value) {
+  return ["nearest", "average_fast_4", "average_fast_8", "average"].includes(value);
+}
+
 function isBeamStripeMode(value) {
   return value === "legacy" || value === "modern";
 }
@@ -1391,6 +1455,24 @@ export function normalizeSettings(candidate) {
       typeof candidate?.autoTargetSize === "boolean"
         ? candidate.autoTargetSize
         : basePresetSettings.autoTargetSize ?? DEFAULT_SETTINGS.autoTargetSize,
+    compositeEnabled: typeof candidate?.compositeEnabled === "boolean"
+      ? candidate.compositeEnabled
+      : basePresetSettings.compositeEnabled ?? DEFAULT_SETTINGS.compositeEnabled,
+    compositeAmount: Number.isFinite(candidate?.compositeAmount)
+      ? clamp(candidate.compositeAmount, 0, 1)
+      : basePresetSettings.compositeAmount ?? DEFAULT_SETTINGS.compositeAmount,
+    compositeChromaBlur: Number.isFinite(candidate?.compositeChromaBlur)
+      ? clamp(candidate.compositeChromaBlur, 0, 1)
+      : basePresetSettings.compositeChromaBlur ?? DEFAULT_SETTINGS.compositeChromaBlur,
+    compositeChromaDelay: Number.isFinite(candidate?.compositeChromaDelay)
+      ? clamp(candidate.compositeChromaDelay, -1, 1)
+      : basePresetSettings.compositeChromaDelay ?? DEFAULT_SETTINGS.compositeChromaDelay,
+    compositeNoise: Number.isFinite(candidate?.compositeNoise)
+      ? clamp(candidate.compositeNoise, 0, 1)
+      : basePresetSettings.compositeNoise ?? DEFAULT_SETTINGS.compositeNoise,
+    samplingMode: isSamplingMode(candidate?.samplingMode)
+      ? candidate.samplingMode
+      : basePresetSettings.samplingMode ?? DEFAULT_SETTINGS.samplingMode,
     paletteMode,
     monoTint,
     targetWidth:
@@ -1768,6 +1850,12 @@ export function applyPresetToSettings(presetKey) {
 
   return {
     ...DEFAULT_SETTINGS,
+    compositeEnabled: preset.compositeEnabled ?? DEFAULT_SETTINGS.compositeEnabled,
+    compositeAmount: preset.compositeAmount ?? DEFAULT_SETTINGS.compositeAmount,
+    compositeChromaBlur: preset.compositeChromaBlur ?? DEFAULT_SETTINGS.compositeChromaBlur,
+    compositeChromaDelay: preset.compositeChromaDelay ?? DEFAULT_SETTINGS.compositeChromaDelay,
+    compositeNoise: preset.compositeNoise ?? DEFAULT_SETTINGS.compositeNoise,
+    samplingMode: isSamplingMode(preset.samplingMode) ? preset.samplingMode : DEFAULT_SETTINGS.samplingMode,
     presetKey,
     audioPresetKey: DEFAULT_SETTINGS.audioPresetKey,
     crtAspect:

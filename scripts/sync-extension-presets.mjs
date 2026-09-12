@@ -6,10 +6,16 @@ import path from "node:path";
 const configPath = path.join("src", "retro-player", "retro", "config.ts");
 const settingsPath = path.join("extension", "shared", "settings.js");
 
-// The extension's shader pipeline does not implement the "focus" (tilt-shift
-// blur) uniforms yet (uFocusStrength / uFocusCenter / uFocusSize are absent
-// from extension/shared/filterPass2Shader.js), so those fields are skipped.
 const FIELD_MAP = {
+  samplingMode: "samplingMode",
+  compositeEnabled: "compositeEnabled",
+  compositeAmount: "compositeAmount",
+  compositeChromaBlur: "compositeChromaBlur",
+  compositeChromaDelay: "compositeChromaDelay",
+  compositeNoise: "compositeNoise",
+  horizontalSharpness: "horizontalSharpness",
+  rgbConvergenceOffset: "rgbConvergenceOffset",
+  beamStripeMode: "beamStripeMode",
   label: "label",
   width: "targetWidth",
   height: "targetHeight",

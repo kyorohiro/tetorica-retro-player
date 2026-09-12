@@ -592,6 +592,36 @@ async function saveOverlayState(isOn) {
   await chrome.storage.local.set({ [OVERLAY_ACTIVE_KEY]: activeTabs });
 }
 
+document.getElementById("overlayDiagnosticsButton").addEventListener("click", async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab found.");
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      args: [chrome.runtime.getURL("overlayRuntime.js")],
+      func: async (moduleUrl) => {
+        const runtime = await import(moduleUrl);
+        return { userAgent: navigator.userAgent, events: runtime.getOverlayDiagnostics() };
+      },
+    });
+    const report = {
+      version: chrome.runtime.getManifest().version,
+      recordedAt: new Date().toISOString(),
+      settings: currentSettings,
+      ...result?.result,
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tetorica-overlay-${Date.now()}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setStatus("Overlay diagnostics saved.");
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error));
+  }
+});
+
 overlayButton.addEventListener("click", async () => {
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!activeTab?.id) {

@@ -1,3 +1,9 @@
+import { FILTER_FRAGMENT_PASS_COMPOSITE_PREP } from "./shared/filterPassCompositePrepShader.js";
+import { FILTER_FRAGMENT_PASS_COMPOSITE_APPLY } from "./shared/filterPassCompositeApplyShader.js";
+import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "./shared/filterPass2PhosphorLiteCoreShader.js";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "./shared/filterPass2BeamLiteCrtPostShader.js";
+import { FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST } from "./shared/filterPass1Pc98LiteNearestShader.js";
+import { createProgramCache, createCompileLease, checkSignal, abortError } from "./shared/overlayCompiler.js";
 import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_BASE } from "./shared/filterPass1LiteBaseShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_NEAREST } from "./shared/filterPass1LiteNearestShader.js";
@@ -9,7 +15,6 @@ import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "./shared/filterPass2Be
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "./shared/filterPass2BeamLitePostShader.js";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE } from "./shared/filterPass2BeamLiteStripeShader.js";
 import { FILTER_FRAGMENT_PASS1_PC98_LITE } from "./shared/filterPass1Pc98LiteShader.js";
-import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE } from "./shared/filterPass2PhosphorLiteShader.js";
 import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
@@ -23,7 +28,15 @@ const OVERLAY_BASE_FLIP_V = true;
 let _overlayRendererCompileQueue = Promise.resolve();
 let _overlayShaderCompileCacheBusterSessionEnabled = false;
 let _overlayCompileRequestIdCounter = 0;
-const OVERLAY_COMPILE_SLOT_HEARTBEAT_MS = 1000;
+const withOverlayCompileLease = createCompileLease((message) => chrome.runtime.sendMessage(message));
+const overlayDiagnostics = [];
+function traceOverlay(stage, detail = {}) {
+  const entry = { at: Math.round(performance.now()), stage, ...detail };
+  overlayDiagnostics.push(entry);
+  if (overlayDiagnostics.length > 200) overlayDiagnostics.shift();
+  console.debug("[tetorica-overlay]", entry);
+}
+export function getOverlayDiagnostics() { return overlayDiagnostics.slice(); }
 
 // AudioContext と MediaElementSourceNode はオーバーレイのライフサイクルを超えて維持する。
 // 理由: createMediaElementSource は同一 element に対して1度しか呼べない。
@@ -71,79 +84,7 @@ function enqueueOverlayRendererCompile(task) {
 
 function createOverlayCompileRequesterId() {
   _overlayCompileRequestIdCounter += 1;
-  return `overlay-${Date.now().toString(36)}-${_overlayCompileRequestIdCounter.toString(36)}`;
-}
-
-async function acquireOverlayCompileSlot(requesterId, onCompileState) {
-  while (true) {
-    onCompileState?.("Preparing compile slot...");
-    const response = await chrome.runtime.sendMessage({
-      type: "ACQUIRE_OVERLAY_COMPILE_SLOT",
-      requesterId,
-    }).catch(() => null);
-    if (response?.ok && response?.acquired) {
-      return true;
-    }
-    const retryAfterMs = Math.max(80, Math.min(1000, Number(response?.retryAfterMs ?? 160)));
-    await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
-  }
-}
-
-async function releaseOverlayCompileSlot(requesterId) {
-  await chrome.runtime.sendMessage({
-    type: "RELEASE_OVERLAY_COMPILE_SLOT",
-    requesterId,
-  }).catch(() => {});
-}
-
-function startOverlayCompileSlotHeartbeat(requesterId) {
-  return window.setInterval(() => {
-    void chrome.runtime.sendMessage({
-      type: "REFRESH_OVERLAY_COMPILE_SLOT",
-      requesterId,
-    }).catch(() => {});
-  }, OVERLAY_COMPILE_SLOT_HEARTBEAT_MS);
-}
-
-const OVERLAY_GPU_LINK_POLL_INTERVAL_MS = 24;
-
-async function waitForOverlayProgramsToComplete(webgl, ext, programs, onCompileState) {
-  if (!ext) {
-    onCompileState?.("Linking shader (finalizing)...");
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    return true;
-  }
-
-  onCompileState?.("Linking shader (waiting for GPU)...");
-  while (true) {
-    let allCompleted = true;
-    for (const program of programs) {
-      if (!program) {
-        continue;
-      }
-      if (!webgl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR)) {
-        allCompleted = false;
-        break;
-      }
-    }
-    if (allCompleted) {
-      return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, OVERLAY_GPU_LINK_POLL_INTERVAL_MS));
-  }
-}
-
-async function validateOverlayProgramLink(webgl, program, label, onCompileState) {
-  if (!program) {
-    return true;
-  }
-  onCompileState?.(`Finalizing shader (${label})...`);
-  await yieldOverlayCompileTurn();
-  if (webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
-    return true;
-  }
-  console.error(`[overlay] ${label} shader link failed:`, webgl.getProgramInfoLog(program) || "unknown");
-  return false;
+  return `overlay-${_shaderCompileSessionSalt}-${_overlayCompileRequestIdCounter.toString(36)}`;
 }
 
 function collectOverlayUniformLocations(webgl, program, names) {
@@ -187,6 +128,18 @@ function finalizeOverlayRendererPrograms(webgl, renderer, settings) {
         ? PASS2_PHOSPHOR_UNIFORM_NAMES
         : PASS2_BASIC_UNIFORM_NAMES;
   renderer.uniformLocations = collectOverlayUniformLocations(webgl, renderer.program, pass2UniformNames);
+
+  for (const [stage, sampler, names] of [
+    ["samplingPrep", "uTexture", ["uTargetSize", "uSamplingMode", "uFlipH", "uFlipV"]],
+    ["composite", "uTexture", ["uTargetSize", "uCompositeAmount", "uCompositeChromaBlur", "uCompositeChromaDelay", "uCompositeNoise", "uTime", "uFlipH", "uFlipV"]],
+    ["phosphorCore", "uPass1Texture", PASS2_PHOSPHOR_UNIFORM_NAMES],
+  ]) {
+    const program = renderer[`${stage}Program`];
+    if (!program) continue;
+    webgl.useProgram(program);
+    webgl.uniform1i(webgl.getUniformLocation(program, sampler), 0);
+    renderer[`${stage}UniformLocations`] = collectOverlayUniformLocations(webgl, program, names);
+  }
 
   if (renderer.beamDownscaleProgram) {
     webgl.useProgram(renderer.beamDownscaleProgram);
@@ -248,6 +201,10 @@ function finalizeOverlayRendererPrograms(webgl, renderer, settings) {
 }
 
 const PASS1_UNIFORM_NAMES = [
+  "uSamplingMode",
+  "uHorizontalSharpness",
+  "uRgbConvergenceOffset",
+  "uColoredGlowEnabled",
   "uTargetSize",
   "uColorLevels",
   "uDitherStrength",
@@ -403,11 +360,9 @@ function shouldUsePreFilterDownscale(settings) {
 }
 
 function getWindowsLiteVariantKey(settings) {
-  const pass1 = isPc98PaletteMode(settings.paletteMode)
-    ? "pc98"
-    : settings.presetKey === "crtBeam"
-      ? "basic_nearest"
-      : "basic";
+  const pc98 = isPc98PaletteMode(settings.paletteMode);
+  const heavyPc98 = settings.paletteMode === "pc98_tile" || settings.paletteMode === "pc98_512_sat";
+  const pass1 = pc98 ? (heavyPc98 ? "pc98" : "pc98_nearest") : "basic_nearest";
 
   if (isBeamCrossModeEnabled(settings)) {
     return `${pass1}:beam`;
@@ -427,7 +382,9 @@ function getWindowsLiteShaderSources(settings) {
   const variantKey = getWindowsLiteVariantKey(settings);
   const [pass1Variant, pass2Variant] = variantKey.split(":");
   const pass1 =
-    pass1Variant === "pc98"
+    pass1Variant === "pc98_nearest"
+      ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
+      : pass1Variant === "pc98"
       ? FILTER_FRAGMENT_PASS1_PC98_LITE
       : pass1Variant === "basic_nearest"
         ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
@@ -438,15 +395,18 @@ function getWindowsLiteShaderSources(settings) {
     pass2Variant === "beam"
       ? FILTER_FRAGMENT_PASS2_BEAM_LITE_POST
       : pass2Variant === "phosphor"
-        ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
         : FILTER_FRAGMENT_PASS2_LITE;
   return {
+    samplingPrep: getSamplingModeValue(settings.samplingMode) > 0 ? FILTER_FRAGMENT_PASS_COMPOSITE_PREP : null,
     pass1,
+    composite: settings.compositeEnabled && settings.compositeAmount > 0.001 ? FILTER_FRAGMENT_PASS_COMPOSITE_APPLY : null,
+    phosphorCore: pass2Variant === "phosphor" ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE : null,
     pass2,
     beamDownscale: shouldUsePreFilterDownscale(settings) ? FILTER_FRAGMENT_BEAM_SOURCE_DOWNSCALE : null,
     beamKernel:
       pass2Variant === "beam"
-        ? variantKey.startsWith("basic_nearest:beam")
+        ? variantKey.startsWith("basic_nearest:beam") && getSamplingModeValue(settings.samplingMode) === 0
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
           : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
         : null,
@@ -459,6 +419,8 @@ function getOverlayRendererVariantSignature(settings) {
   return JSON.stringify({
     variantKey: getWindowsLiteVariantKey(settings),
     beamDownscale: shouldUsePreFilterDownscale(settings),
+    samplingPrep: getSamplingModeValue(settings.samplingMode) > 0,
+    composite: !!settings.compositeEnabled && settings.compositeAmount > 0.001,
   });
 }
 
@@ -528,7 +490,6 @@ publishOverlayCompileState.lastKey = "";
 function createOverlay(settings) {
   _overlayShaderCompileCacheBusterSessionEnabled = !!settings.shaderCompileCacheBusterEnabled;
   let currentSettings = settings;
-  let currentRendererVariantSignature = getOverlayRendererVariantSignature(currentSettings);
   const VISIBILITY_CHECK_FRAME_WINDOW = 24;
   const recordButton = document.createElement("button");
   const opacityButton = document.createElement("button");
@@ -1174,15 +1135,11 @@ function createOverlay(settings) {
       }
 
       const nextSettings = normalizeSettings(changes[SETTINGS_STORAGE_KEY].newValue);
-      const previousSignature = currentRendererVariantSignature;
-      const nextSignature = getOverlayRendererVariantSignature(nextSettings);
       currentSettings = nextSettings;
-      currentRendererVariantSignature = nextSignature;
-      if (previousSignature !== nextSignature) {
-        destroySurfaces();
-      } else {
-        applySettingsToSurfaces();
+      for (const surface of surfaces) {
+        surface.renderer?.updateSettings(currentSettings);
       }
+      applySettingsToSurfaces();
       syncSurfaceCount(currentSettings.overlayTargetCount);
       if (overlayAudioEngine) overlayAudioEngine.setParams({ volume: 1.0, isMuted: false, ...overlayAudioSettings() }, true);
     };
@@ -1226,8 +1183,16 @@ function createOverlay(settings) {
       const surface = surfaces[index];
       const target = targets[index] ?? null;
       const rect = targetRects[index] ?? null;
-      renderSurface(surface, target, rect, index);
-      updateSurfaceSpotlight(surface, rect);
+      try {
+        renderSurface(surface, target, rect, index);
+        updateSurfaceSpotlight(surface, rect);
+      } catch (error) {
+        surface.hide();
+        if (!surface.unexpectedErrorReported) {
+          surface.unexpectedErrorReported = true;
+          traceOverlay("surface-failed", { message: error.message });
+        }
+      }
     }
 
     updateOpacityButton();
@@ -1465,6 +1430,18 @@ function createOverlay(settings) {
       return;
     }
 
+    if (surface.renderer?.error || surface.gl?.isContextLost()) {
+      surface.canvas.style.setProperty("display", "none", "important");
+      surface.hideCompileOverlay();
+      surface.showFailureOverlay(rect, "Filter unavailable. Toggle Overlay to retry.");
+      return;
+    }
+    if (surface.renderer?.compiling) {
+      surface.canvas.style.setProperty("display", "none", "important");
+      surface.showCompileOverlay(rect);
+      return;
+    }
+
     const shouldRenderNow =
       surface.didTargetChange || frameCount % getFrameIntervalForPriority(priorityIndex) === 0;
 
@@ -1501,8 +1478,11 @@ function createOverlay(settings) {
     surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.texture);
 
     try {
+      surface.renderer.diagnoseFrame = !surface.filteredFrameReported;
       const isSeeking = targetElement instanceof HTMLVideoElement && targetElement.seeking;
       if (!isSeeking) {
+        const firstUpload = surface.didTargetChange;
+        if (firstUpload) traceOverlay("first-upload-start");
         const uploadStart = performance.now();
         surface.gl.texImage2D(
           surface.gl.TEXTURE_2D,
@@ -1513,12 +1493,11 @@ function createOverlay(settings) {
           drawableSource,
         );
         const uploadMs = performance.now() - uploadStart;
+        if (firstUpload) traceOverlay("first-upload-ready", { elapsedMs: uploadMs });
         surface.didTargetChange = false;
-        if (uploadMs > 50) {
-          rejectedElements.add(targetElement);
-          surface.canvas.style.setProperty("display", "none", "important");
-          surface.showFailureOverlay(rect);
-          return;
+        if (uploadMs > 50 && !surface.slowUploadReported) {
+          surface.slowUploadReported = true;
+          traceOverlay("slow-upload", { elapsedMs: uploadMs });
         }
       }
       if (surface.renderer.pass1Program && !surface.renderer.uniformLocations) {
@@ -1531,13 +1510,21 @@ function createOverlay(settings) {
       }
 
       if (surface.renderer.pass1Program && surface.renderer.pass1UniformLocations && surface.renderer.uniformLocations) {
+        applySettings(surface.gl, surface.renderer, currentSettings);
+        applyFlipUniforms(surface.gl, surface.renderer, flipH, flipV);
+        let paletteSource = surface.renderer.texture;
+        if (surface.renderer.samplingPrepProgram) {
+          paletteSource = drawOverlayIntermediate(surface.gl, surface.renderer, "samplingPrep", paletteSource, currentSettings);
+        }
         ensureRendererFramebuffer(surface.gl, surface.renderer);
         surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.fbo);
         surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
         surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
         surface.gl.useProgram(surface.renderer.pass1Program);
-        surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+        surface.gl.activeTexture(surface.gl.TEXTURE0);
+        surface.gl.bindTexture(surface.gl.TEXTURE_2D, paletteSource);
+        drawOverlayPass(surface.gl, "pass1", surface.renderer.diagnoseFrame);
 
         const displaySize = getOverlayDisplaySize(surface.gl, surface.renderer);
         const limitedSize = getPhosphorDotLimitedTargetSize(
@@ -1548,6 +1535,9 @@ function createOverlay(settings) {
         );
         const timeSec = (performance.now() - surface.startedAt) / 1000;
         let pass2PrimaryTexture = surface.renderer.fboTexture;
+        if (surface.renderer.compositeProgram) {
+          pass2PrimaryTexture = drawOverlayIntermediate(surface.gl, surface.renderer, "composite", pass2PrimaryTexture, currentSettings);
+        }
         let beamSourcePrimaryTexture = surface.renderer.texture;
 
         if (surface.renderer.beamDownscaleProgram && surface.renderer.beamDownscaleUniformLocations) {
@@ -1568,8 +1558,8 @@ function createOverlay(settings) {
             Math.max(limitedSize.h, 1),
           );
           surface.gl.activeTexture(surface.gl.TEXTURE0);
-          surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.fboTexture);
-          surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+          surface.gl.bindTexture(surface.gl.TEXTURE_2D, pass2PrimaryTexture);
+          drawOverlayPass(surface.gl, "beamDownscale", surface.renderer.diagnoseFrame);
           beamSourcePrimaryTexture = surface.renderer.beamSourceTexture;
           pass2PrimaryTexture = surface.renderer.beamSourceTexture;
         }
@@ -1587,7 +1577,7 @@ function createOverlay(settings) {
           applyBeamKernelSettings(surface.gl, surface.renderer, limitedSize, currentSettings);
           surface.gl.activeTexture(surface.gl.TEXTURE1);
           surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
-          surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+          drawOverlayPass(surface.gl, "beamKernel", surface.renderer.diagnoseFrame);
           let beamComposeInputTexture = surface.renderer.beamKernelTexture;
           if (
             surface.renderer.beamStripeProgram &&
@@ -1602,7 +1592,7 @@ function createOverlay(settings) {
             applyBeamStripeSettings(surface.gl, surface.renderer, limitedSize, currentSettings);
             surface.gl.activeTexture(surface.gl.TEXTURE2);
             surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
-            surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+            drawOverlayPass(surface.gl, "beamStripe", surface.renderer.diagnoseFrame);
             beamComposeInputTexture = surface.renderer.beamStripeTexture;
           }
           if (
@@ -1620,9 +1610,13 @@ function createOverlay(settings) {
             surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamSourcePrimaryTexture);
             surface.gl.activeTexture(surface.gl.TEXTURE2);
             surface.gl.bindTexture(surface.gl.TEXTURE_2D, beamComposeInputTexture);
-            surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+            drawOverlayPass(surface.gl, "beamCompose", surface.renderer.diagnoseFrame);
             pass2PrimaryTexture = surface.renderer.beamComposeTexture;
           }
+        }
+
+        if (surface.renderer.phosphorCoreProgram) {
+          pass2PrimaryTexture = drawOverlayIntermediate(surface.gl, surface.renderer, "phosphorCore", pass2PrimaryTexture, currentSettings);
         }
 
         surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, null);
@@ -1639,12 +1633,14 @@ function createOverlay(settings) {
           surface.gl.activeTexture(surface.gl.TEXTURE2);
           surface.gl.bindTexture(surface.gl.TEXTURE_2D, surface.renderer.beamKernelTexture);
         }
-        surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+        if (!surface.filteredFrameReported) traceOverlay("first-filtered-draw-start");
+        drawOverlayPass(surface.gl, "post", surface.renderer.diagnoseFrame);
         surface.gl.activeTexture(surface.gl.TEXTURE0);
         surface.markShaderActivated();
+        surface.filteredFrameReported = true;
       } else {
         surface.gl.useProgram(surface.renderer.program);
-        surface.gl.drawArrays(surface.gl.TRIANGLES, 0, 6);
+        drawOverlayPass(surface.gl, "post", surface.renderer.diagnoseFrame);
       }
     } catch (error) {
       if (isTransientVideoUploadError(error, drawableSource)) {
@@ -1662,8 +1658,8 @@ function createOverlay(settings) {
       if (!rejectedElements.has(targetElement)) {
         console.warn("Failed to upload overlay source to WebGL texture.", error);
       }
-      surface.fallbackTo2d(error);
       try {
+        surface.fallbackTo2d(error);
         surface.renderRaw(drawableSource);
         surface.didTargetChange = false;
       } catch (fallbackError) {
@@ -2333,7 +2329,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     flipH: initialFlipH = false,
     flipV: initialFlipV = false,
   } = initialFlipState;
-  const canvas = document.createElement("canvas");
+  let canvas = document.createElement("canvas");
   canvas.style.setProperty("all", "initial", "important");
   canvas.style.setProperty("position", "fixed", "important");
   canvas.style.setProperty("left", "0", "important");
@@ -2468,6 +2464,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       return;
     }
     rendererSetupStarted = true;
+    traceOverlay("context-create-start");
     gl = canvas.getContext("webgl2", {
       alpha: true,
       antialias: false,
@@ -2476,6 +2473,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       preserveDrawingBuffer: false,
       powerPreference: "default",
     });
+    traceOverlay("context-create-ready", { webgl2: !!gl });
     if (!gl) {
       ctx2d = canvas.getContext("2d");
       surfaceApi.gl = gl;
@@ -2483,6 +2481,13 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       surfaceApi.renderer = renderer;
       return;
     }
+    canvas.addEventListener("webglcontextlost", () => {
+      renderer?.cancel();
+      if (renderer) { renderer.error = new Error("WebGL context lost"); renderer.compiling = false; }
+      surfaceApi.hideCompileOverlay();
+      canvas.style.setProperty("display", "none", "important");
+      traceOverlay("context-lost");
+    }, { once: true });
     try {
       const activeSetupGeneration = ++setupGeneration;
       compileStatusMessage = "Preparing retro filter...";
@@ -2500,6 +2505,8 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
           compileStatusMessage = message || "";
           compileOverlayLabel.textContent = compileStatusMessage;
           if (compileStatusMessage) {
+            isShaderActivated = false;
+            surfaceApi.filteredFrameReported = false;
             publishOverlayCompileState(compileStatusMessage);
             showCompileOverlayNow();
           } else {
@@ -2518,12 +2525,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       surfaceApi.renderer = renderer;
     } catch (error) {
       console.warn("Overlay WebGL setup failed; falling back to 2d canvas.", error);
-      gl = null;
-      renderer = null;
-      ctx2d = canvas.getContext("2d");
-      surfaceApi.gl = gl;
-      surfaceApi.ctx2d = ctx2d;
-      surfaceApi.renderer = renderer;
+      surfaceApi.fallbackTo2d(error);
     }
   };
 
@@ -2541,6 +2543,8 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     proxyImageCapture: null,
     proxyBitmap: null,
     proxyFramePending: false,
+    proxyGeneration: 0,
+    proxyBitmapAt: 0,
     proxyReady: false,
     _proxyStuckSince: 0,
     startedAt: performance.now(),
@@ -2564,9 +2568,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
         this.targetElement.style.transform = "";
         this.targetElement.style.transformOrigin = "";
       }
-      // cancel() defers loseContext() until after the D3D shader cache load
-      // is done. Calling loseContext() while linkProgram is pending on
-      // Windows/ANGLE blocks the JS main thread for ~3 s (the cache load).
+      // Avoid explicitly losing a context while ANGLE is compiling.
       this.renderer?.cancel?.();
       this.disposeProxyVideo();
       if (compileStatusTimer != null) {
@@ -2593,6 +2595,8 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       this.targetElement = nextTarget;
       this.targetSourceIdentity = nextSourceIdentity;
       this.startedAt = performance.now();
+      this.slowUploadReported = false;
+      this.filteredFrameReported = false;
       this.lastRectKey = "";
       this.didTargetChange = true;
       isShaderActivated = false;
@@ -2642,6 +2646,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       canvas.style.setProperty("height", `${rect.height}px`, "important");
 
       if (canvas.width !== width || canvas.height !== height) {
+        if (this.renderer?.compiling) { this.lastRectKey = ""; return; }
         canvas.width = width;
         canvas.height = height;
       }
@@ -2670,16 +2675,18 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       try {
         const stream = captureStream();
         const videoTrack = stream.getVideoTracks()[0] ?? null;
+        if (!videoTrack) { stream.getTracks().forEach(track => track.stop()); return; }
+        const proxyGeneration = this.proxyGeneration;
         const proxyVideo = document.createElement("video");
         proxyVideo.muted = true;
         proxyVideo.autoplay = true;
         proxyVideo.playsInline = true;
         proxyVideo.srcObject = stream;
         proxyVideo.addEventListener("loadeddata", () => {
-          this.proxyReady = true;
+          if (this.proxyGeneration === proxyGeneration) this.proxyReady = true;
         });
         void proxyVideo.play().then(() => {
-          this.proxyReady = true;
+          if (this.proxyGeneration === proxyGeneration) this.proxyReady = true;
         }).catch(() => {});
         this.proxyTargetElement = targetElement;
         this.proxyStream = stream;
@@ -2691,10 +2698,15 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       } catch {}
     },
     requestProxyBitmapFrame() {
-      if (!this.proxyImageCapture || this.proxyFramePending) {
-        return;
+      if (this.proxyFramePending && performance.now() - this._proxyStuckSince > 1500) {
+        this.proxyImageCapture = null;
       }
+      if (!this.proxyImageCapture || this.proxyFramePending) return;
       this.proxyFramePending = true;
+      const generation = this.proxyGeneration;
+      const capture = this.proxyImageCapture;
+      const started = performance.now();
+      this._proxyStuckSince = started;
       let grabPromise;
       try {
         grabPromise = this.proxyImageCapture.grabFrame();
@@ -2704,6 +2716,11 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
       }
       void grabPromise
         .then((bitmap) => {
+          if (surfaceDisposed || generation !== this.proxyGeneration || capture !== this.proxyImageCapture) {
+            bitmap.close();
+            return;
+          }
+          this.proxyBitmapAt = performance.now();
           if (this.proxyBitmap && this.proxyBitmap !== bitmap) {
             try {
               this.proxyBitmap.close();
@@ -2714,10 +2731,12 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
         })
         .catch(() => {})
         .finally(() => {
-          this.proxyFramePending = false;
+          if (generation === this.proxyGeneration) this.proxyFramePending = false;
         });
     },
     disposeProxyVideo() {
+      this.proxyGeneration += 1;
+      this.proxyBitmapAt = 0;
       if (this.proxyBitmap) {
         try {
           this.proxyBitmap.close();
@@ -2751,7 +2770,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
         && this.proxyTargetElement === targetElement
       ) {
         this.requestProxyBitmapFrame();
-        if (this.proxyBitmap) {
+        if (this.proxyBitmap && performance.now() - this.proxyBitmapAt < 1000) {
           return this.proxyBitmap;
         }
         if (
@@ -2760,7 +2779,10 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
         ) {
           return this.proxyVideo;
         }
-        return null;
+        if (performance.now() - this.startedAt < 1500) return null;
+        traceOverlay("proxy-unavailable", { fallback: "source-video" });
+        this.disposeProxyVideo();
+        return targetElement;
       }
       if (
         this.proxyTargetElement === targetElement
@@ -2796,14 +2818,22 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
     },
     fallbackTo2d(error) {
       if (!this.ctx2d) {
-        this.ctx2d = canvas.getContext("2d");
-        if (!this.ctx2d) {
-          throw error;
-        }
+        const replacement = canvas.cloneNode(false);
+        const context = replacement.getContext("2d");
+        if (!context) throw error;
+        canvas.replaceWith(replacement);
+        canvas = replacement;
+        this.canvas = replacement;
+        this.ctx2d = context;
+        ctx2d = context;
       }
       this.renderer?.cancel?.();
       this.renderer = null;
       this.gl = null;
+      renderer = null;
+      gl = null;
+      this.hideCompileOverlay();
+      traceOverlay("fallback-2d", { message: error.message });
       canvas.style.setProperty("background", "transparent", "important");
     },
     showFailureOverlay(rect, message = null) {
@@ -2845,6 +2875,7 @@ function createOverlaySurface(index, onReady, initialSettings, initialFlipState 
         return;
       }
       isShaderActivated = true;
+      traceOverlay("first-filtered-frame");
       publishOverlayCompileState("");
       if (compileStatusTimer != null) {
         window.clearTimeout(compileStatusTimer);
@@ -2999,7 +3030,6 @@ function getMediaSourceIdentity(element) {
       "video",
       element.currentSrc || element.src || "",
       streamTracks,
-      element.readyState,
       element.videoWidth,
       element.videoHeight,
     ].join("|");
@@ -3204,7 +3234,7 @@ function getPhosphorDotLimitedTargetSize(gl, settings, visibleWidth, visibleHeig
 }
 
 function applySettings(gl, renderer, settings) {
-  if (!renderer) return;
+  if (!renderer || renderer.compiling || renderer.error) return;
   const dpr = window.devicePixelRatio || 1;
   const displaySize = {
     width: Math.max(1, Math.round((renderer.canvas?.clientWidth || gl.drawingBufferWidth || 1) * dpr)),
@@ -3219,6 +3249,10 @@ function applySettings(gl, renderer, settings) {
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
     gl.uniform2f(renderer.pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
+    gl.uniform1f(renderer.pass1UniformLocations.uSamplingMode, 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uColoredGlowEnabled, settings.coloredGlowEnabled ? 1 : 0);
     gl.uniform1f(renderer.pass1UniformLocations.uColorLevels, settings.colorLevels);
     gl.uniform1f(renderer.pass1UniformLocations.uDitherStrength, settings.ditherStrength);
     gl.uniform1f(renderer.pass1UniformLocations.uPaletteMode, paletteModeToUniform(settings.paletteMode));
@@ -3314,6 +3348,7 @@ function applySettings(gl, renderer, settings) {
 }
 
 function applyFlipUniforms(gl, renderer, flipH, flipV) {
+  if (!renderer || renderer.compiling || renderer.error) return;
   if (!gl || !renderer) {
     return;
   }
@@ -3323,17 +3358,22 @@ function applyFlipUniforms(gl, renderer, flipH, flipV) {
     gl.uniform1f(renderer.passthruUniformLocations.uFlipH, flipH ? 1 : 0);
     gl.uniform1f(renderer.passthruUniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
   }
+  if (renderer.samplingPrepProgram) {
+    gl.useProgram(renderer.samplingPrepProgram);
+    gl.uniform1f(renderer.samplingPrepUniformLocations.uFlipH, flipH ? 1 : 0);
+    gl.uniform1f(renderer.samplingPrepUniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
+  }
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
-    gl.uniform1f(renderer.pass1UniformLocations.uFlipH, flipH ? 1 : 0);
-    gl.uniform1f(renderer.pass1UniformLocations.uFlipV, effectiveFlipV ? 1 : 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uFlipH, renderer.samplingPrepProgram ? 0 : (flipH ? 1 : 0));
+    gl.uniform1f(renderer.pass1UniformLocations.uFlipV, renderer.samplingPrepProgram ? 0 : (effectiveFlipV ? 1 : 0));
   }
   if (renderer.program && renderer.uniformLocations) {
     gl.useProgram(renderer.program);
-    gl.uniform1f(renderer.uniformLocations.uFlipH, flipH ? 1 : 0);
+    gl.uniform1f(renderer.uniformLocations.uFlipH, 0);
     gl.uniform1f(
       renderer.uniformLocations.uFlipV,
-      renderer.pass1Program ? (flipV ? 1 : 0) : (effectiveFlipV ? 1 : 0),
+      0,
     );
   }
 }
@@ -3381,30 +3421,6 @@ void main() { fragColor = texture(uTexture, vTextureCoord); }
 `;
 
 function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
-  // --- Passthrough program (tiny; compiles instantly) ---
-  // Returned immediately so the overlay shows raw video while the full filter
-  // compiles in the background. After compilation, renderer.program is swapped.
-  let passthruProg = null;
-  onCompileState?.("Preparing retro filter (passthrough)...");
-  const passVert = compileShader(webgl, webgl.VERTEX_SHADER, vertexShaderSource, initialSettings);
-  const passFrag = compileShader(webgl, webgl.FRAGMENT_SHADER, PASSTHROUGH_FRAGMENT_OVERLAY, initialSettings);
-  const passthru = webgl.createProgram();
-  if (passthru) {
-    webgl.attachShader(passthru, passVert);
-    webgl.attachShader(passthru, passFrag);
-    webgl.linkProgram(passthru);
-    if (webgl.getProgramParameter(passthru, webgl.LINK_STATUS)) {
-      passthruProg = passthru;
-      webgl.useProgram(passthru);
-      webgl.uniform1i(webgl.getUniformLocation(passthru, "uTexture"), 0);
-    }
-  }
-
-  // CRITICAL: Do NOT call getProgramParameter here. On Windows/ANGLE, Chrome's
-  // D3D GPU shader cache causes any readback during cache loading to freeze the
-  // main thread. renderer.program starts as passthruProg and is replaced
-  // asynchronously with the full filter when compilation finishes.
-
   const vertices = new Float32Array([
     -1, -1,
      1, -1,
@@ -3446,16 +3462,19 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     new Uint8Array([0, 0, 0, 0]),
   );
 
-  // destroyed: set by cancel() when the surface is torn down before compilation
-  // finishes. compiling: true until the async block below exits. Together they
-  // ensure loseContext() is called exactly once — either immediately (if the
-  // surface is torn down after compilation) or deferred inside the async block
-  // (to avoid freezing while D3D DXBC is still loading from the shader cache).
   let destroyed = false;
-  let compiling = true;
-  let passthruUniformLocations = null;
+  let generation = 0;
+  let controller = null;
+  let desiredSignature = null;
+  const programs = createProgramCache(webgl, withShaderCompileCacheBuster(vertexShaderSource, initialSettings), {
+    onStage(label, stage, elapsedMs) {
+      traceOverlay(stage, { label, elapsedMs });
+      onCompileState?.(`${label}: ${stage}`);
+    },
+  });
   const renderer = {
-    program: passthruProg,
+    startedAt: performance.now(),
+    program: null,
     pass1Program: null,
     texture,
     uniformLocations: null,
@@ -3488,273 +3507,101 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
     beamComposeTexture: null,
     beamComposeFboWidth: 0,
     beamComposeFboHeight: 0,
-    passthruProgram: passthruProg,
-    passthruUniformLocations,
+    passthruProgram: null,
+    passthruUniformLocations: null,
+    compiling: false,
+    error: null,
     cancel() {
       destroyed = true;
-      if (!compiling) {
-        // Compilation already done; safe to lose context immediately.
-        webgl.getExtension("WEBGL_lose_context")?.loseContext();
+      controller?.abort(abortError());
+      programs.dispose();
+      if (!renderer.compiling && !webgl.isContextLost()) {
+        for (const [key, value] of Object.entries(renderer)) {
+          if (!value) continue;
+          if (key === "texture" || key.endsWith("Texture")) webgl.deleteTexture(value);
+          if (key === "fbo" || key.endsWith("Fbo")) webgl.deleteFramebuffer(value);
+        }
+        for (const target of renderer.intermediates?.values() ?? []) {
+          webgl.deleteTexture(target.texture);
+          webgl.deleteFramebuffer(target.fbo);
+        }
+        webgl.deleteBuffer(vertexBuffer);
+        webgl.deleteVertexArray(vao);
       }
-      // else: IIFE will call loseContext() after the 3 s wait completes.
+    },
+    updateSettings(settings) {
+      const signature = getOverlayRendererVariantSignature(settings);
+      if (signature === desiredSignature) return;
+      desiredSignature = signature;
+      const activeGeneration = ++generation;
+      controller?.abort(abortError());
+      controller = new AbortController();
+      const signal = controller.signal;
+      renderer.compiling = true;
+      renderer.error = null;
+      const check = () => {
+        checkSignal(signal);
+        if (destroyed || activeGeneration !== generation || webgl.isContextLost()) throw abortError();
+      };
+      onCompileState?.("Preparing retro filter...");
+      traceOverlay("variant-start", { signature });
+      void enqueueOverlayRendererCompile(async () => {
+        check();
+        await withOverlayCompileLease(createOverlayCompileRequesterId(), signal, async (leaseSignal, verifyLease) => {
+          const get = async (source, label) => {
+            check();
+            checkSignal(leaseSignal);
+            if (source) await verifyLease();
+            return source ? programs.get(withShaderCompileCacheBuster(source, settings), label, leaseSignal) : null;
+          };
+          const passthrough = await get(PASSTHROUGH_FRAGMENT_OVERLAY, "passthrough");
+          const sources = getWindowsLiteShaderSources(settings);
+          const next = {};
+          for (const [name, source] of Object.entries(sources)) {
+            next[name] = await get(source, name);
+          }
+          check();
+          checkSignal(leaseSignal);
+          await verifyLease();
+          check();
+          Object.assign(renderer, {
+            program: next.pass2,
+            pass1Program: next.pass1,
+            samplingPrepProgram: next.samplingPrep,
+            compositeProgram: next.composite,
+            phosphorCoreProgram: next.phosphorCore,
+            samplingPrepUniformLocations: null,
+            compositeUniformLocations: null,
+            phosphorCoreUniformLocations: null,
+            beamDownscaleProgram: next.beamDownscale,
+            beamKernelProgram: next.beamKernel,
+            beamStripeProgram: next.beamStripe,
+            beamComposeProgram: next.beamCompose,
+            passthruProgram: passthrough,
+            uniformLocations: null,
+            pass1UniformLocations: null,
+            beamDownscaleUniformLocations: null,
+            beamKernelUniformLocations: null,
+            beamStripeUniformLocations: null,
+            beamComposeUniformLocations: null,
+          });
+          finalizeOverlayRendererPrograms(webgl, renderer, settings);
+          renderer.passthruUniformLocations = collectOverlayUniformLocations(webgl, passthrough, ["uFlipH", "uFlipV"]);
+          renderer.compiling = false;
+          onCompileState?.("Waiting for first filtered frame...");
+          traceOverlay("variant-ready", { signature });
+          onReady?.(renderer);
+        });
+      }).catch((error) => {
+        if (destroyed || activeGeneration !== generation) return;
+        renderer.error = error;
+        renderer.compiling = false;
+        onCompileState?.("");
+        traceOverlay("variant-failed", { signature, message: error.message });
+      });
     },
   };
-
-  const compileRequesterId = createOverlayCompileRequesterId();
-  void enqueueOverlayRendererCompile(async () => {
-    if (destroyed) {
-      compiling = false;
-      onCompileState?.("");
-      return;
-    }
-    await acquireOverlayCompileSlot(compileRequesterId, onCompileState);
-    const compileSlotHeartbeatId = startOverlayCompileSlotHeartbeat(compileRequesterId);
-    try {
-      await yieldOverlayCompileTurn();
-      onCompileState?.("Compiling shader (shared vertex)...");
-      const vertexShader = compileShader(
-        webgl,
-        webgl.VERTEX_SHADER,
-        vertexShaderSource,
-        initialSettings,
-        { skipStatusCheck: true },
-      );
-      await yieldOverlayCompileTurn();
-      onCompileState?.("Preparing shader sources...");
-      const shaderSources = getWindowsLiteShaderSources(initialSettings ?? DEFAULT_SETTINGS);
-      await yieldOverlayCompileTurn();
-      onCompileState?.("Compiling shader (pass 1 fragment)...");
-      const pass1Frag = compileShader(
-        webgl,
-        webgl.FRAGMENT_SHADER,
-        shaderSources.pass1,
-        initialSettings,
-        { skipStatusCheck: true },
-      );
-      await yieldOverlayCompileTurn();
-      onCompileState?.("Compiling shader (pass 2 fragment)...");
-      const pass2Frag = compileShader(
-        webgl,
-        webgl.FRAGMENT_SHADER,
-        shaderSources.pass2,
-        initialSettings,
-        { skipStatusCheck: true },
-      );
-      await yieldOverlayCompileTurn();
-      if (shaderSources.beamDownscale) {
-        onCompileState?.("Compiling shader (beam downscale fragment)...");
-      }
-      const beamDownscaleFrag = shaderSources.beamDownscale
-        ? compileShader(
-          webgl,
-          webgl.FRAGMENT_SHADER,
-          shaderSources.beamDownscale,
-          initialSettings,
-          { skipStatusCheck: true },
-        )
-        : null;
-      if (beamDownscaleFrag) {
-        await yieldOverlayCompileTurn();
-      }
-      if (shaderSources.beamKernel) {
-        onCompileState?.("Compiling shader (beam kernel fragment)...");
-      }
-      const beamKernelFrag = shaderSources.beamKernel
-        ? compileShader(
-          webgl,
-          webgl.FRAGMENT_SHADER,
-          shaderSources.beamKernel,
-          initialSettings,
-          { skipStatusCheck: true },
-        )
-        : null;
-      if (beamKernelFrag) {
-        await yieldOverlayCompileTurn();
-      }
-      if (shaderSources.beamStripe) {
-        onCompileState?.("Compiling shader (beam stripe fragment)...");
-      }
-      const beamStripeFrag = shaderSources.beamStripe
-        ? compileShader(
-          webgl,
-          webgl.FRAGMENT_SHADER,
-          shaderSources.beamStripe,
-          initialSettings,
-          { skipStatusCheck: true },
-        )
-        : null;
-      if (beamStripeFrag) {
-        await yieldOverlayCompileTurn();
-      }
-      if (shaderSources.beamCompose) {
-        onCompileState?.("Compiling shader (beam finalize fragment)...");
-      }
-      const beamComposeFrag = shaderSources.beamCompose
-        ? compileShader(
-          webgl,
-          webgl.FRAGMENT_SHADER,
-          shaderSources.beamCompose,
-          initialSettings,
-          { skipStatusCheck: true },
-        )
-        : null;
-      if (beamComposeFrag) {
-        await yieldOverlayCompileTurn();
-      }
-      if (beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag) {
-        onCompileState?.("Compiling shader (beam shared vertex)...");
-      }
-      const auxiliaryVertexShader =
-        beamDownscaleFrag || beamKernelFrag || beamStripeFrag || beamComposeFrag
-          ? compileShader(
-            webgl,
-            webgl.VERTEX_SHADER,
-            vertexShaderSource,
-            initialSettings,
-            { skipStatusCheck: true },
-          )
-          : null;
-      if (auxiliaryVertexShader) {
-        await yieldOverlayCompileTurn();
-      }
-
-      const prog1 = webgl.createProgram();
-      const prog2 = webgl.createProgram();
-      const beamDownscaleProg = beamDownscaleFrag ? webgl.createProgram() : null;
-      const beamKernelProg = beamKernelFrag ? webgl.createProgram() : null;
-      const beamStripeProg = beamStripeFrag ? webgl.createProgram() : null;
-      const beamComposeProg = beamComposeFrag ? webgl.createProgram() : null;
-
-      if (
-        !prog1 ||
-        !prog2 ||
-        (beamDownscaleFrag && !beamDownscaleProg) ||
-        (beamKernelFrag && !beamKernelProg) ||
-        (beamStripeFrag && !beamStripeProg) ||
-        (beamComposeFrag && !beamComposeProg)
-      ) {
-        throw new Error("Failed to create WebGL program.");
-      }
-
-      webgl.attachShader(prog1, vertexShader);
-      webgl.attachShader(prog1, pass1Frag);
-      onCompileState?.("Linking shader (pass 1/2)...");
-      webgl.linkProgram(prog1);
-      await yieldOverlayCompileTurn();
-      webgl.attachShader(prog2, vertexShader);
-      webgl.attachShader(prog2, pass2Frag);
-      onCompileState?.("Linking shader (pass 2/2)...");
-      webgl.linkProgram(prog2);
-      await yieldOverlayCompileTurn();
-      if (beamDownscaleProg && beamDownscaleFrag) {
-        webgl.attachShader(beamDownscaleProg, auxiliaryVertexShader);
-        webgl.attachShader(beamDownscaleProg, beamDownscaleFrag);
-        onCompileState?.("Linking shader (beam downscale)...");
-        webgl.linkProgram(beamDownscaleProg);
-        await yieldOverlayCompileTurn();
-      }
-      if (beamKernelProg && beamKernelFrag) {
-        webgl.attachShader(beamKernelProg, auxiliaryVertexShader);
-        webgl.attachShader(beamKernelProg, beamKernelFrag);
-        onCompileState?.("Linking shader (beam kernel)...");
-        webgl.linkProgram(beamKernelProg);
-        await yieldOverlayCompileTurn();
-      }
-      if (beamStripeProg && beamStripeFrag) {
-        webgl.attachShader(beamStripeProg, auxiliaryVertexShader);
-        webgl.attachShader(beamStripeProg, beamStripeFrag);
-        onCompileState?.("Linking shader (beam stripe)...");
-        webgl.linkProgram(beamStripeProg);
-        await yieldOverlayCompileTurn();
-      }
-      if (beamComposeProg && beamComposeFrag) {
-        webgl.attachShader(beamComposeProg, auxiliaryVertexShader);
-        webgl.attachShader(beamComposeProg, beamComposeFrag);
-        onCompileState?.("Linking shader (beam finalize)...");
-        webgl.linkProgram(beamComposeProg);
-        await yieldOverlayCompileTurn();
-      }
-
-      const ext =
-        webgl.getExtension("WEBGL_parallel_shader_compile")
-        || webgl.getExtension("KHR_parallel_shader_compile");
-
-      await waitForOverlayProgramsToComplete(
-        webgl,
-        ext,
-        [prog1, prog2, beamDownscaleProg, beamKernelProg, beamStripeProg, beamComposeProg],
-        onCompileState,
-      );
-
-      if (destroyed) {
-        webgl.getExtension("WEBGL_lose_context")?.loseContext();
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-
-      if (!(await validateOverlayProgramLink(webgl, prog1, "pass 1/2", onCompileState))) {
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-
-      if (!(await validateOverlayProgramLink(webgl, prog2, "pass 2/2", onCompileState))) {
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-      if (!(await validateOverlayProgramLink(webgl, beamDownscaleProg, "beam downscale", onCompileState))) {
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-      if (!(await validateOverlayProgramLink(webgl, beamKernelProg, "beam kernel", onCompileState))) {
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-      if (!(await validateOverlayProgramLink(webgl, beamStripeProg, "beam stripe", onCompileState))) {
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-      if (!(await validateOverlayProgramLink(webgl, beamComposeProg, "beam finalize", onCompileState))) {
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-
-      if (destroyed) {
-        webgl.getExtension("WEBGL_lose_context")?.loseContext();
-        compiling = false;
-        onCompileState?.("");
-        return;
-      }
-
-      renderer.pass1Program = prog1;
-      renderer.program = prog2;
-      renderer.passthruProgram = passthruProg;
-      renderer.beamDownscaleProgram = beamDownscaleProg;
-      renderer.beamKernelProgram = beamKernelProg;
-      renderer.beamStripeProgram = beamStripeProg;
-      renderer.beamComposeProgram = beamComposeProg;
-      compiling = false;
-      onCompileState?.("Shader linked. Waiting for first filtered frame...");
-      onReady?.(renderer);
-    } finally {
-      window.clearInterval(compileSlotHeartbeatId);
-      await releaseOverlayCompileSlot(compileRequesterId);
-    }
-  });
-
-  if (passthruProg) {
-    passthruUniformLocations = {
-      uFlipH: webgl.getUniformLocation(passthruProg, "uFlipH"),
-      uFlipV: webgl.getUniformLocation(passthruProg, "uFlipV"),
-    };
-    renderer.passthruUniformLocations = passthruUniformLocations;
-  }
+  renderer.updateSettings(initialSettings);
 
   return renderer;
 }
@@ -3976,29 +3823,73 @@ function ensureBeamComposeFramebuffer(gl, renderer, width, height) {
 }
 
 function getSamplingModeValue(mode) {
-  if (mode === "average_fast_8") return 3;
-  if (mode === "average_fast_4") return 2;
-  if (mode === "average") return 1;
+  if (mode === "average_fast_8") return 2;
+  if (mode === "average_fast_4") return 1;
+  if (mode === "average") return 2;
   return 0;
 }
 
 function getBeamStripeModeValue(mode) {
-  return mode === "next" ? 1 : 0;
+  return mode === "modern" ? 1 : 0;
 }
 
-function compileShader(webgl, type, source, settings, options = {}) {
-  const { skipStatusCheck = false } = options;
-  const shader = webgl.createShader(type);
-  if (!shader) {
-    throw new Error("Failed to create shader.");
+
+function drawOverlayIntermediate(gl, renderer, stage, input, settings) {
+  renderer.intermediates ??= new Map();
+  const width = gl.drawingBufferWidth;
+  const height = gl.drawingBufferHeight;
+  let target = renderer.intermediates.get(stage);
+  gl.activeTexture(gl.TEXTURE0);
+  if (!target || target.width !== width || target.height !== height) {
+    if (target) {
+      gl.deleteTexture(target.texture);
+      gl.deleteFramebuffer(target.fbo);
+    }
+    const texture = gl.createTexture();
+    const fbo = gl.createFramebuffer();
+    if (!texture || !fbo) throw new Error(`Cannot allocate ${stage} framebuffer`);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    target = { texture, fbo, width, height };
+    renderer.intermediates.set(stage, target);
   }
-
-  webgl.shaderSource(shader, withShaderCompileCacheBuster(source, settings));
-  webgl.compileShader(shader);
-
-  if (!skipStatusCheck && !webgl.getShaderParameter(shader, webgl.COMPILE_STATUS)) {
-    throw new Error(webgl.getShaderInfoLog(shader) || "Failed to compile shader.");
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+  gl.viewport(0, 0, width, height);
+  const program = renderer[`${stage}Program`];
+  const locs = renderer[`${stage}UniformLocations`];
+  gl.useProgram(program);
+  gl.bindTexture(gl.TEXTURE_2D, input);
+  const time = (performance.now() - renderer.startedAt) / 1000;
+  if (stage === "phosphorCore") {
+    applySettings(gl, { ...renderer, program, uniformLocations: locs, pass1Program: null }, settings);
+    gl.uniform1f(locs.uTime, time);
+  } else {
+    const size = getOverlayDisplaySize(gl, renderer);
+    const targetSize = getPhosphorDotLimitedTargetSize(gl, settings, size.width, size.height);
+    gl.uniform2f(locs.uTargetSize, targetSize.w, targetSize.h);
+    if (stage === "samplingPrep") {
+      gl.uniform1f(locs.uSamplingMode, getSamplingModeValue(settings.samplingMode));
+    } else {
+      gl.uniform1f(locs.uCompositeAmount, settings.compositeAmount);
+      gl.uniform1f(locs.uCompositeChromaBlur, settings.compositeChromaBlur);
+      gl.uniform1f(locs.uCompositeChromaDelay, settings.compositeChromaDelay);
+      gl.uniform1f(locs.uCompositeNoise, settings.compositeNoise);
+      gl.uniform1f(locs.uTime, time);
+    }
   }
+  drawOverlayPass(gl, stage, renderer.diagnoseFrame);
+  return target.texture;
+}
 
-  return shader;
+function drawOverlayPass(gl, label, diagnose) {
+  const started = diagnose ? performance.now() : 0;
+  if (diagnose) traceOverlay("draw-start", { label });
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  if (diagnose) traceOverlay("draw-submitted", { label, elapsedMs: performance.now() - started });
 }
