@@ -1,3 +1,4 @@
+import { FILTER_FRAGMENT_PASS1_MSX1_SCREEN2 } from "../retro/filterPass1Msx1Screen2Shader.ts";
 import { limitBeamViewportByDensity } from "./beamDensity";
 import {
   MONO_TINTS,
@@ -476,6 +477,7 @@ const waitForCompileStatusPaint = async () => {
 };
 
 type WindowsLitePass1Variant =
+  | "msx1"
   | "basic_nearest"
   | "basic"
   | "basic_sampled"
@@ -523,7 +525,9 @@ const getWindowsLiteVariantKey = (
 ): WindowsLiteVariantKey => {
   const pass1: WindowsLitePass1Variant =
     filterState
-      ? isPc98PaletteMode(filterState.paletteMode)
+      ? (filterState.paletteMode === "msx1" || filterState.paletteMode === "msx1_32")
+        ? "msx1"
+        : isPc98PaletteMode(filterState.paletteMode)
         ? isCompositeNtscEnabled(filterState)
           ? "pc98_composite"
           : shouldUsePass1SamplingPrep(filterState) &&
@@ -806,6 +810,10 @@ export const getEffectiveRetroTargetSize = (
   visibleHeight?: number,
   isCapActive = false,
 ) => {
+  if ((filterState.paletteMode === "msx1" || filterState.paletteMode === "msx1_32")) return {
+    width: 256, height: 192, sampleWidth: 256, sampleHeight: 192, internalScale: 1,
+    isPhosphorDotMode: isPhosphorDotModeEnabled(filterState) || isBeamCrossModeEnabled(filterState),
+  };
   const internalScale = getPhosphorDotInternalScale(filterState);
   const isBeamMode = isBeamCrossModeEnabled(filterState);
   const effectiveResolutionScale = isBeamMode ? 1 : internalScale;
@@ -2139,7 +2147,9 @@ export class TetoricaRetroVideoPipeline {
 
     return {
       pass1:
-        pass1Variant === "pc98_nearest"
+        pass1Variant === "msx1"
+          ? FILTER_FRAGMENT_PASS1_MSX1_SCREEN2
+          : pass1Variant === "pc98_nearest"
           ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
           : pass1Variant === "pc98_sampled"
             ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
@@ -3478,8 +3488,9 @@ export class TetoricaRetroVideoPipeline {
         sourceSize.width,
         sourceSize.height,
       );
-      const pass1RenderWidth = usePass1SamplingPrep ? pass1TargetSize.width : w;
-      const pass1RenderHeight = usePass1SamplingPrep ? pass1TargetSize.height : h;
+      const useNativePass1Size = usePass1SamplingPrep || (filterState.paletteMode === "msx1" || filterState.paletteMode === "msx1_32");
+      const pass1RenderWidth = useNativePass1Size ? pass1TargetSize.width : w;
+      const pass1RenderHeight = useNativePass1Size ? pass1TargetSize.height : h;
       let pass1InputTexture: WebGLTexture | null = null;
 
       if (usePass1SamplingPrep && this.compositePrepProgram && this.compositePrepLocs) {
@@ -4173,7 +4184,9 @@ export class TetoricaRetroVideoPipeline {
     gl.uniform1f(this.pass1Locs.uDitherStrength, filterState.ditherStrength);
     gl.uniform1f(
       this.pass1Locs.uSamplingMode,
-      shouldUsePass1SamplingPrep(filterState) ? 0 : getSamplingModeValue(filterState.samplingMode),
+      (filterState.paletteMode === "msx1" || filterState.paletteMode === "msx1_32")
+        ? getSamplingModeValue(filterState.samplingMode)
+        : shouldUsePass1SamplingPrep(filterState) ? 0 : getSamplingModeValue(filterState.samplingMode),
     );
     gl.uniform1f(this.pass1Locs.uPaletteMode, paletteModeToUniform(filterState.paletteMode));
     gl.uniform1f(this.pass1Locs.uGlowStrength, filterState.glowStrength);

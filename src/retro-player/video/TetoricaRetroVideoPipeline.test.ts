@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TetoricaRetroVideoPipeline, type RetroVideoFilterState } from "./TetoricaRetroVideoPipeline";
+import { getEffectiveRetroTargetSize, TetoricaRetroVideoPipeline, type RetroVideoFilterState } from "./TetoricaRetroVideoPipeline";
 
 type Entry = { pass1: WebGLProgram; pass2: WebGLProgram };
 type Internals = {
@@ -295,4 +295,25 @@ it("keeps the previous canvas during layout/target settling and commits only the
   expect(gl.canvas).toEqual({ width: 640, height: 360 });
   expect(gl.drawArrays).toHaveBeenCalledTimes(draws + 1);
   pipeline.dispose();
+});
+
+
+it("uses a dedicated SCREEN 2 quantizer before the selected CRT pass", async () => {
+  const { pipeline, internal, gl } = createPipeline();
+  await internal.compileWindowsLiteVariant("msx1:basic");
+  await internal.compileWindowsLiteVariant("msx1:beam");
+  const submitted = gl.shaderSource.mock.calls.map(call => String(call[1]));
+  expect(submitted.some(source => source.includes("uint pattern = 0u"))).toBe(true);
+  pipeline.dispose();
+});
+
+
+it("keeps SCREEN 2 at 256×192 despite aspect matching, render caps and dot scaling", () => {
+  const size = getEffectiveRetroTargetSize({
+    paletteMode: "msx1", targetWidth: 640, targetHeight: 480,
+    matchTargetAspect: true, phosphorDotInternalScale: 4,
+    phosphorDotShape: "circle", spotMaskStrength: 1,
+  } as RetroVideoFilterState, 1920, 1080, 100, 50, true);
+  expect(size.width).toBe(256);
+  expect(size.height).toBe(192);
 });

@@ -226,6 +226,8 @@ const resolveColorLevelsForPalette = (
   paletteMode: PaletteMode,
   fallback: number,
 ) => {
+  if (paletteMode === "msx1") return 16;
+  if (paletteMode === "msx1_32") return 32;
   if (paletteMode === "pc98") return 16;
   if (paletteMode === "pc98_tile") return 16;
   if (paletteMode === "pc98_4096") return 16;

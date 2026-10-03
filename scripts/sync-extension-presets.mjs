@@ -98,6 +98,8 @@ function paletteModeToUniform(mode) {
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
   if (mode === "anime") return 10;
+  if (mode === "msx1") return 11;
+  if (mode === "msx1_32") return 12;
   return 0;
 }
 

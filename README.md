@@ -33,6 +33,31 @@ https://kyorohiro.itch.io/tetorica-retro-player
 - Use playback controls for video, including seek, loop, volume, playback speed, and keyboard shortcuts
 - Maximize the preview in-page without duplicating the rendering pipeline
 
+## MSX1 / SCREEN 2
+
+In the Classic presets, choose **MSX1 / SCREEN 2 → Nearest** or **Error diffusion**.
+**Extended 32** is the default preset, with Error diffusion set to **0.12**.
+It sits beside Error diffusion and adds dark tones, browns and skin
+tones for 32 distinct opaque colors. It retains 256×192, two colors per 8×1 block
+and vertical diffusion, but uses an expanded palette rather than the MSX1 hardware palette.
+The conversion runs in a dedicated Pass 1 at a fixed 256×192, before the existing
+CRT, scanline and display effects. Each aligned 8×1 block selects a pair from the
+fixed TMS9918A RGB palette approximation and encodes an 8-bit 1bpp pattern.
+Nearest minimizes RGB reconstruction error across the block; diffusion also
+scores color mixtures, then carries quantization error vertically along the selected
+pair’s color axis. The Error diffusion slider ranges from 0 (nearest) to 1 (full
+vertical diffusion). Each scanline selects pairs independently, allowing
+horizontal bands without an added stripe overlay.
+
+Color 0 (transparent) resolves to a black backdrop. This approximates the
+Graphic II background restrictions described in the [TI TMS9918A data manual](https://www.bitsavers.org/components/ti/TMS9900/TMS9918A_TMS9928A_TMS9929A_Video_Display_Processors_Data_Manual_Nov82.pdf);
+it does not emulate sprites, VRAM table sharing, or analog video timing.
+Diffusion replays up to eight source rows using the current row’s color pair and
+resets every eight rows. This is a local approximation rather than full-frame
+error diffusion; preceding rows may select different pairs. Flat tones alternate
+by scanline, producing horizontal bands instead of repeated vertical columns.
+CRT effects can change the displayed RGB values after quantization.
+
 ## Tech Stack
 
 - React

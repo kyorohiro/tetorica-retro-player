@@ -1,3 +1,4 @@
+import { FILTER_FRAGMENT_PASS1_MSX1_SCREEN2 } from "./shared/filterPass1Msx1Screen2Shader.js";
 import { createProgramCache } from "./shared/overlayCompiler.js";
 import { FILTER_FRAGMENT_PASS1_LITE } from "./shared/filterPass1LiteShader.js";
 import { FILTER_FRAGMENT_PASS1_LITE_BASE } from "./shared/filterPass1LiteBaseShader.js";
@@ -160,7 +161,7 @@ function shouldUsePreFilterDownscale(settings) {
 }
 
 function getWindowsLiteVariantKey(settings) {
-  const pass1 = isPc98PaletteMode(settings.paletteMode)
+  const pass1 = (settings.paletteMode === "msx1" || settings.paletteMode === "msx1_32") ? "msx1" : isPc98PaletteMode(settings.paletteMode)
     ? "pc98"
     : settings.presetKey === "crtBeam"
       ? "basic_nearest"
@@ -184,7 +185,9 @@ function getWindowsLiteShaderSources(settings) {
   const variantKey = getWindowsLiteVariantKey(settings);
   const [pass1Variant, pass2Variant] = variantKey.split(":");
   const pass1 =
-    pass1Variant === "pc98_nearest"
+    pass1Variant === "msx1"
+      ? FILTER_FRAGMENT_PASS1_MSX1_SCREEN2
+      : pass1Variant === "pc98_nearest"
       ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
       : pass1Variant === "pc98"
         ? FILTER_FRAGMENT_PASS1_PC98_LITE
@@ -570,10 +573,11 @@ function drawFrame() {
     }
     applyPass1Settings();
     applyPass2Settings();
-    ensureFramebuffer(gl.drawingBufferWidth, gl.drawingBufferHeight);
+    const msx1 = (currentSettings.paletteMode === "msx1" || currentSettings.paletteMode === "msx1_32");
+    ensureFramebuffer(msx1 ? 256 : gl.drawingBufferWidth, msx1 ? 192 : gl.drawingBufferHeight);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.viewport(0, 0, fboWidth, fboHeight);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(pass1Program);
@@ -935,6 +939,7 @@ function applyPreset(presetKey) {
 }
 
 function getPhosphorDotLimitedTargetSize(settings, visibleWidth, visibleHeight) {
+  if ((settings.paletteMode === "msx1" || settings.paletteMode === "msx1_32")) return { w: 256, h: 192 };
   const isBeamMode = isBeamCrossModeEnabled(settings);
   const isDotMode = isPhosphorDotModeEnabled(settings);
   if ((!isBeamMode && !isDotMode) || !visibleWidth || !visibleHeight) {
@@ -979,6 +984,7 @@ function applyPass1Settings() {
   gl.uniform2f(pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
   gl.uniform1f(pass1UniformLocations.uColorLevels, currentSettings.colorLevels);
   gl.uniform1f(pass1UniformLocations.uDitherStrength, currentSettings.ditherStrength);
+  gl.uniform1f(pass1UniformLocations.uSamplingMode, getSamplingModeValue(currentSettings.samplingMode));
   gl.uniform1f(pass1UniformLocations.uPaletteMode, paletteModeToUniform(currentSettings.paletteMode));
   gl.uniform1f(pass1UniformLocations.uGlowStrength, currentSettings.glowStrength);
   gl.uniform1f(pass1UniformLocations.uSmoothStrength, currentSettings.smoothStrength ?? 0);
@@ -1387,6 +1393,7 @@ async function prepareRenderer(webgl, settings, setupGeneration) {
   webgl.useProgram(prog1);
   webgl.uniform1i(webgl.getUniformLocation(prog1, "uTexture"), 0);
   pass1UniformLocations = {
+    uSamplingMode: webgl.getUniformLocation(prog1, "uSamplingMode"),
     uTargetSize: webgl.getUniformLocation(prog1, "uTargetSize"),
     uColorLevels: webgl.getUniformLocation(prog1, "uColorLevels"),
     uDitherStrength: webgl.getUniformLocation(prog1, "uDitherStrength"),
@@ -1714,6 +1721,8 @@ function paletteModeToUniform(mode) {
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
   if (mode === "anime") return 10;
+  if (mode === "msx1") return 11;
+  if (mode === "msx1_32") return 12;
   return 0;
 }
 

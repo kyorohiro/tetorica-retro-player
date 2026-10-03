@@ -828,7 +828,7 @@ export function RetroFilterPanel({
           <span className="text-[#12141c]">Palette</span>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(
-              ["free", "pc98", "pc98_tile", "pc98_512", "pc98_512_sat", "pc98_4096", "color32", "color64", "mono", "neon", "anime"] as const
+              ["free", "msx1", "msx1_32", "pc98", "pc98_tile", "pc98_512", "pc98_512_sat", "pc98_4096", "color32", "color64", "mono", "neon", "anime"] as const
             ).map(
               (mode) => (
               <button
@@ -846,6 +846,10 @@ export function RetroFilterPanel({
               >
                 {mode === "free"
                   ? "Free"
+                  : mode === "msx1_32"
+                    ? "MSX1 Extended 32"
+                  : mode === "msx1"
+                    ? "MSX1 SCREEN 2"
                   : mode === "pc98"
                     ? "Color 16"
                     : mode === "pc98_tile"
@@ -1059,6 +1063,7 @@ export function RetroFilterPanel({
                   onSetColorLevels(Number(ev.currentTarget.value));
                 }}
                 disabled={
+                  (paletteMode === "msx1" || paletteMode === "msx1_32") ||
                   paletteMode === "pc98" ||
                   paletteMode === "pc98_tile" ||
                   paletteMode === "pc98_512" ||
@@ -1073,8 +1078,8 @@ export function RetroFilterPanel({
             <label className="block">
               <span className="text-[#12141c]">
                 <InfoTip
-                  label={`Bayer dither: ${fixedNumber(ditherStrength, 2)}`}
-                  text={helpText.bayerDither}
+                  label={`${(paletteMode === "msx1" || paletteMode === "msx1_32") ? "Error diffusion" : "Bayer dither"}: ${fixedNumber(ditherStrength, 2)}`}
+                  text={(paletteMode === "msx1" || paletteMode === "msx1_32") ? "0: nearest color. 1: local vertical error diffusion over up to 8 source rows, producing horizontal bands. Each 8×1 block still selects its own color pair." : helpText.bayerDither}
                   helpSuffix={helpText.helpSuffix}
                 />
               </span>

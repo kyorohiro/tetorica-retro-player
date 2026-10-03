@@ -1,5 +1,7 @@
 export type PaletteMode =
   | "free"
+  | "msx1"
+  | "msx1_32"
   | "pc98"
   | "pc98_tile"
   | "pc98_512"
@@ -169,7 +171,31 @@ export type RetroPresetVariantPreparation = {
   compositeAmount: number;
 };
 
+const MSX1_SCREEN2_PRESET = {
+  autoTargetSize: false,
+  samplingMode: "nearest",
+  width: 256, height: 192, colors: 16,
+  palette: "msx1",
+  curvature: 0, scanline: 0, scanline2: 0, vignette: 0, glow: 0,
+  phosphor: 0, spotMask: 0, bulbRadius: 0, blackFloor: 0,
+  horizontalSharpness: 1, rgbConvergenceOffset: 0,
+  monoTint: "gray", neonBoost: 1, neonSaturation: 1, neonDetail: 1,
+} as const;
+
 export const RETRO_PRESETS = {
+  msx1Screen2: {
+    ...MSX1_SCREEN2_PRESET,
+    label: "MSX1 / SCREEN 2", dither: 0,
+  },
+  msx1Screen2Diffusion: {
+    ...MSX1_SCREEN2_PRESET,
+    label: "MSX1 / SCREEN 2 (Error diffusion)", dither: 1,
+  },
+  msx1Screen2Extended32: {
+    ...MSX1_SCREEN2_PRESET,
+    label: "MSX1 / SCREEN 2 (Extended 32)",
+    palette: "msx1_32", colors: 32, dither: 0.12,
+  },
   none: {
     label: "None",
     autoTargetSize: true,
@@ -1389,7 +1415,7 @@ export type RetroPresetKey = keyof typeof RETRO_PRESETS;
 // Single source of truth for "which preset is the app's default".
 // Change this one line to try a different default; every consumer (initial
 // filter state, saved-settings fallback, etc.) resolves through this key.
-export const defaultPresetId: RetroPresetKey = "phosphorDot";
+export const defaultPresetId: RetroPresetKey = "msx1Screen2Extended32";
 // デフォルト候補: "phosphorDot";//"tetorica";
 
 export const buildRetroPresetVariantPreparation = (
@@ -1462,6 +1488,9 @@ export const RETRO_PRESET_CATEGORY_ORDER: RetroPresetCategory[] = [
 ];
 
 export const RETRO_PRESET_CATEGORIES = {
+  msx1Screen2: "classic",
+  msx1Screen2Diffusion: "classic",
+  msx1Screen2Extended32: "classic",
   chunky: "classic",
   arcade: "classic",
   gbLite: "classic",
@@ -1520,6 +1549,14 @@ export const RETRO_PRESET_CATEGORY_ITEMS: Record<
   readonly RetroPresetCategoryItem[]
 > = {
   classic: [
+    {
+      type: "family", id: "msx1", label: "MSX1 / SCREEN 2",
+      variants: [
+        { key: "msx1Screen2", label: "Nearest" },
+        { key: "msx1Screen2Diffusion", label: "Error diffusion" },
+        { key: "msx1Screen2Extended32", label: "Extended 32" },
+      ],
+    },
     { type: "preset", key: "chunky" },
     { type: "preset", key: "arcade" },
     { type: "preset", key: "pc98" },
@@ -1623,6 +1660,8 @@ export const paletteModeToUniform = (mode: PaletteMode) => {
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
   if (mode === "anime") return 10;
+  if (mode === "msx1") return 11;
+  if (mode === "msx1_32") return 12;
 
   return 0;
 };

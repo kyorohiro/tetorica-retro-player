@@ -2,6 +2,8 @@ export const SETTINGS_STORAGE_KEY = "retroPluginSettings";
 export const CUSTOM_PRESET_KEY = "custom";
 
 export const PALETTE_OPTIONS = [
+  { value: "msx1_32", label: "MSX1 Extended 32" },
+  { value: "msx1", label: "MSX1 SCREEN 2" },
   { value: "free", label: "Free" },
   { value: "pc98", label: "Color 16" },
   { value: "pc98_tile", label: "PC-98 Tile" },
@@ -23,6 +25,93 @@ export const MONO_TINT_OPTIONS = [
 ];
 
 export const PRESETS = {
+  msx1Screen2: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    label: "MSX1 / SCREEN 2",
+    targetWidth: 256,
+    targetHeight: 192,
+    colorLevels: 16,
+    ditherStrength: 0,
+    paletteMode: 11,
+    curvature: 0,
+    scanlineStrength: 0,
+    scanline2Strength: 0,
+    vignetteStrength: 0,
+    glowStrength: 0,
+    phosphorStrength: 0,
+    spotMaskStrength: 0,
+    bulbRadius: 0,
+    blackFloor: 0,
+    monoTint: "gray",
+    neonBoost: 1,
+    neonSaturation: 1,
+    neonDetail: 1,
+    isAudioFxEnabled: false,
+    lofiAmount: 0,
+    wowFlutterAmount: 0,
+    isNoiseEnabled: false,
+    noiseLevel: 0,
+  },
+  msx1Screen2Diffusion: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    label: "MSX1 / SCREEN 2 (Error diffusion)",
+    targetWidth: 256,
+    targetHeight: 192,
+    colorLevels: 16,
+    ditherStrength: 1,
+    paletteMode: 11,
+    curvature: 0,
+    scanlineStrength: 0,
+    scanline2Strength: 0,
+    vignetteStrength: 0,
+    glowStrength: 0,
+    phosphorStrength: 0,
+    spotMaskStrength: 0,
+    bulbRadius: 0,
+    blackFloor: 0,
+    monoTint: "gray",
+    neonBoost: 1,
+    neonSaturation: 1,
+    neonDetail: 1,
+    isAudioFxEnabled: false,
+    lofiAmount: 0,
+    wowFlutterAmount: 0,
+    isNoiseEnabled: false,
+    noiseLevel: 0,
+  },
+  msx1Screen2Extended32: {
+    samplingMode: "nearest",
+    horizontalSharpness: 1,
+    rgbConvergenceOffset: 0,
+    label: "MSX1 / SCREEN 2 (Extended 32)",
+    targetWidth: 256,
+    targetHeight: 192,
+    colorLevels: 32,
+    ditherStrength: 0.12,
+    paletteMode: 12,
+    curvature: 0,
+    scanlineStrength: 0,
+    scanline2Strength: 0,
+    vignetteStrength: 0,
+    glowStrength: 0,
+    phosphorStrength: 0,
+    spotMaskStrength: 0,
+    bulbRadius: 0,
+    blackFloor: 0,
+    monoTint: "gray",
+    neonBoost: 1,
+    neonSaturation: 1,
+    neonDetail: 1,
+    isAudioFxEnabled: false,
+    lofiAmount: 0,
+    wowFlutterAmount: 0,
+    isNoiseEnabled: false,
+    noiseLevel: 0,
+  },
   none: {
     samplingMode: "nearest",
     horizontalSharpness: 1,
@@ -1273,7 +1362,7 @@ export const PRESETS = {
   },
 };
 
-export const DEFAULT_PRESET_KEY = "phosphorDot";
+export const DEFAULT_PRESET_KEY = "msx1Screen2Extended32";
 
 export const DEFAULT_SETTINGS = {
   samplingMode: "nearest",
@@ -2203,6 +2292,8 @@ function isMonoTint(value) {
 }
 
 export function getDefaultColorLevelsForPalette(paletteMode) {
+  if (paletteMode === "msx1") return 16;
+  if (paletteMode === "msx1_32") return 32;
   if (paletteMode === "free") return 256;
   if (paletteMode === "pc98") return 16;
   if (paletteMode === "pc98_tile") return 16;
@@ -2236,5 +2327,7 @@ function paletteModeFromUniform(value) {
   if (value === 8) return "mono";
   if (value === 9) return "neon";
   if (value === 10) return "anime";
+  if (value === 11) return "msx1";
+  if (value === 12) return "msx1_32";
   return "free";
 }

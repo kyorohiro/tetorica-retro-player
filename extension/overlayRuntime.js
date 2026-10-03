@@ -1,3 +1,4 @@
+import { FILTER_FRAGMENT_PASS1_MSX1_SCREEN2 } from "./shared/filterPass1Msx1Screen2Shader.js";
 import { FILTER_FRAGMENT_PASS_COMPOSITE_PREP } from "./shared/filterPassCompositePrepShader.js";
 import { FILTER_FRAGMENT_PASS_COMPOSITE_APPLY } from "./shared/filterPassCompositeApplyShader.js";
 import { FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE } from "./shared/filterPass2PhosphorLiteCoreShader.js";
@@ -362,7 +363,7 @@ function shouldUsePreFilterDownscale(settings) {
 function getWindowsLiteVariantKey(settings) {
   const pc98 = isPc98PaletteMode(settings.paletteMode);
   const heavyPc98 = settings.paletteMode === "pc98_tile" || settings.paletteMode === "pc98_512_sat";
-  const pass1 = pc98 ? (heavyPc98 ? "pc98" : "pc98_nearest") : "basic_nearest";
+  const pass1 = (settings.paletteMode === "msx1" || settings.paletteMode === "msx1_32") ? "msx1" : pc98 ? (heavyPc98 ? "pc98" : "pc98_nearest") : "basic_nearest";
 
   if (isBeamCrossModeEnabled(settings)) {
     return `${pass1}:beam`;
@@ -382,7 +383,9 @@ function getWindowsLiteShaderSources(settings) {
   const variantKey = getWindowsLiteVariantKey(settings);
   const [pass1Variant, pass2Variant] = variantKey.split(":");
   const pass1 =
-    pass1Variant === "pc98_nearest"
+    pass1Variant === "msx1"
+      ? FILTER_FRAGMENT_PASS1_MSX1_SCREEN2
+      : pass1Variant === "pc98_nearest"
       ? FILTER_FRAGMENT_PASS1_PC98_LITE_NEAREST
       : pass1Variant === "pc98"
       ? FILTER_FRAGMENT_PASS1_PC98_LITE
@@ -398,7 +401,7 @@ function getWindowsLiteShaderSources(settings) {
         ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST
         : FILTER_FRAGMENT_PASS2_LITE;
   return {
-    samplingPrep: getSamplingModeValue(settings.samplingMode) > 0 ? FILTER_FRAGMENT_PASS_COMPOSITE_PREP : null,
+    samplingPrep: settings.paletteMode !== "msx1" && settings.paletteMode !== "msx1_32" && getSamplingModeValue(settings.samplingMode) > 0 ? FILTER_FRAGMENT_PASS_COMPOSITE_PREP : null,
     pass1,
     composite: settings.compositeEnabled && settings.compositeAmount > 0.001 ? FILTER_FRAGMENT_PASS_COMPOSITE_APPLY : null,
     phosphorCore: pass2Variant === "phosphor" ? FILTER_FRAGMENT_PASS2_PHOSPHOR_LITE_CORE : null,
@@ -1516,9 +1519,9 @@ function createOverlay(settings) {
         if (surface.renderer.samplingPrepProgram) {
           paletteSource = drawOverlayIntermediate(surface.gl, surface.renderer, "samplingPrep", paletteSource, currentSettings);
         }
-        ensureRendererFramebuffer(surface.gl, surface.renderer);
+        ensureRendererFramebuffer(surface.gl, surface.renderer, (currentSettings.paletteMode === "msx1" || currentSettings.paletteMode === "msx1_32") ? 256 : surface.gl.drawingBufferWidth, (currentSettings.paletteMode === "msx1" || currentSettings.paletteMode === "msx1_32") ? 192 : surface.gl.drawingBufferHeight);
         surface.gl.bindFramebuffer(surface.gl.FRAMEBUFFER, surface.renderer.fbo);
-        surface.gl.viewport(0, 0, surface.gl.drawingBufferWidth, surface.gl.drawingBufferHeight);
+        surface.gl.viewport(0, 0, surface.renderer.fboWidth, surface.renderer.fboHeight);
         surface.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         surface.gl.clear(surface.gl.COLOR_BUFFER_BIT);
         surface.gl.useProgram(surface.renderer.pass1Program);
@@ -3203,6 +3206,7 @@ function getRecordingMimeType() {
 }
 
 function getPhosphorDotLimitedTargetSize(gl, settings, visibleWidth, visibleHeight) {
+  if ((settings.paletteMode === "msx1" || settings.paletteMode === "msx1_32")) return { w: 256, h: 192 };
   const isBeamMode = settings.phosphorDotShape === "beam";
   const isDotMode = isPhosphorDotModeEnabled(settings);
   if ((!isBeamMode && !isDotMode) || !visibleWidth || !visibleHeight) {
@@ -3249,7 +3253,7 @@ function applySettings(gl, renderer, settings) {
   if (renderer.pass1Program && renderer.pass1UniformLocations) {
     gl.useProgram(renderer.pass1Program);
     gl.uniform2f(renderer.pass1UniformLocations.uTargetSize, limitedSize.w, limitedSize.h);
-    gl.uniform1f(renderer.pass1UniformLocations.uSamplingMode, 0);
+    gl.uniform1f(renderer.pass1UniformLocations.uSamplingMode, (settings.paletteMode === "msx1" || settings.paletteMode === "msx1_32") ? getSamplingModeValue(settings.samplingMode) : 0);
     gl.uniform1f(renderer.pass1UniformLocations.uHorizontalSharpness, settings.horizontalSharpness ?? 0);
     gl.uniform1f(renderer.pass1UniformLocations.uRgbConvergenceOffset, settings.rgbConvergenceOffset ?? 0);
     gl.uniform1f(renderer.pass1UniformLocations.uColoredGlowEnabled, settings.coloredGlowEnabled ? 1 : 0);
@@ -3402,6 +3406,8 @@ function paletteModeToUniform(mode) {
   if (mode === "mono") return 8;
   if (mode === "neon") return 9;
   if (mode === "anime") return 10;
+  if (mode === "msx1") return 11;
+  if (mode === "msx1_32") return 12;
   return 0;
 }
 
@@ -3606,12 +3612,12 @@ function setupRenderer(webgl, onReady, initialSettings, onCompileState) {
   return renderer;
 }
 
-function ensureRendererFramebuffer(gl, renderer) {
+function ensureRendererFramebuffer(gl, renderer, width = gl.drawingBufferWidth, height = gl.drawingBufferHeight) {
   if (
     renderer.fbo &&
     renderer.fboTexture &&
-    renderer.fboWidth === gl.drawingBufferWidth &&
-    renderer.fboHeight === gl.drawingBufferHeight
+    renderer.fboWidth === width &&
+    renderer.fboHeight === height
   ) {
     return;
   }
@@ -3634,8 +3640,8 @@ function ensureRendererFramebuffer(gl, renderer) {
     gl.TEXTURE_2D,
     0,
     gl.RGBA,
-    gl.drawingBufferWidth,
-    gl.drawingBufferHeight,
+    width,
+    height,
     0,
     gl.RGBA,
     gl.UNSIGNED_BYTE,
@@ -3662,8 +3668,8 @@ function ensureRendererFramebuffer(gl, renderer) {
 
   renderer.fbo = fbo;
   renderer.fboTexture = texture;
-  renderer.fboWidth = gl.drawingBufferWidth;
-  renderer.fboHeight = gl.drawingBufferHeight;
+  renderer.fboWidth = width;
+  renderer.fboHeight = height;
 }
 
 function getOverlayDisplaySize(gl, renderer) {

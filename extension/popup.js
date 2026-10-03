@@ -1219,6 +1219,7 @@ function renderSettings(settings) {
       ? COLOR_LEVEL_LIMITS.max
       : getDefaultColorLevelsForPalette(settings.paletteMode),
   );
+  document.getElementById("ditherLabel").textContent = (settings.paletteMode === "msx1" || settings.paletteMode === "msx1_32") ? "Vertical diffusion" : "Bayer dither";
   ditherStrengthInput.value = String(settings.ditherStrength);
   ditherStrengthValue.textContent = settings.ditherStrength.toFixed(2);
   if (shaderCompileCacheBusterEnabledInput) {

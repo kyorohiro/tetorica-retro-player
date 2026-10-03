@@ -5,6 +5,7 @@ const sourceDir = path.join("src", "retro-player", "retro");
 const outputDir = path.join("extension", "shared");
 
 const DIRECT_SHADER_FILES = [
+  "filterPass1Msx1Screen2Shader.ts",
   "filterPassCompositePrepShader.ts",
   "filterPassCompositeApplyShader.ts",
   "filterPass2BeamLiteFinalizeShader.ts",
