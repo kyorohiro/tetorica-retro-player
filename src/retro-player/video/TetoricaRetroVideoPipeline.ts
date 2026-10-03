@@ -21,6 +21,7 @@ import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE4_KERNEL } from "../retro/filterPass2BeamLiteAverage4KernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE8_KERNEL } from "../retro/filterPass2BeamLiteAverage8KernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL } from "../retro/filterPass2BeamLiteNearestKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
@@ -490,7 +491,7 @@ type WindowsLitePass1Variant =
 type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
 type WindowsLiteVariantKey =
   | `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`
-  | `${WindowsLitePass1Variant}:beam:average8`;
+  | `${WindowsLitePass1Variant}:beam:${"average4" | "average8"}`;
 
 const isBeamVariantKey = (key: WindowsLiteVariantKey | null) =>
   key?.split(":")[1] === "beam";
@@ -555,7 +556,9 @@ const getWindowsLiteVariantKey = (
     // kernels must have distinct keys so a sampling change prepares the right one.
     return getSamplingModeValue(filterState.samplingMode) >= 1.5
       ? `${pass1}:beam:average8`
-      : `${pass1}:beam`;
+      : getSamplingModeValue(filterState.samplingMode) >= 0.5
+        ? `${pass1}:beam:average4`
+        : `${pass1}:beam`;
   }
   const pass2: WindowsLitePass2Variant =
     filterState &&
@@ -2245,15 +2248,20 @@ export class TetoricaRetroVideoPipeline {
           ? this.appendShaderCompileBuster(source)
           : source;
 
-    const beamKernelBaseSource = isBeamVariantKey(variantKey)
-      ? variantKey.endsWith(":average8")
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE8_KERNEL
-        : variantKey.startsWith("basic_nearest:beam")
-        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
-        : variantKey.startsWith("basic_composite:beam")
-          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL
-          : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
-      : null;
+    let beamKernelBaseSource: string | null = null;
+    if (isBeamVariantKey(variantKey)) {
+      if (variantKey.endsWith(":average8")) {
+        beamKernelBaseSource = FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE8_KERNEL;
+      } else if (variantKey.endsWith(":average4")) {
+        beamKernelBaseSource = FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE4_KERNEL;
+      } else if (variantKey.startsWith("basic_nearest:beam")) {
+        beamKernelBaseSource = FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL;
+      } else if (variantKey.startsWith("basic_composite:beam")) {
+        beamKernelBaseSource = FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL;
+      } else {
+        beamKernelBaseSource = FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL;
+      }
+    }
 
     return {
       pass1: withBuster(pass1),

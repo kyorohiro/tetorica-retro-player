@@ -380,7 +380,7 @@ it("prepares a distinct eight-tap Beam kernel and reuses the other split passes"
   const first = pipeline.prepareFilterStateVariant(base);
   await vi.runAllTimersAsync();
   await first;
-  const four = internal.windowsLiteProgramCache.get("basic_composite_sampled:beam")!;
+  const four = internal.windowsLiteProgramCache.get("basic_composite_sampled:beam:average4")!;
   const count = gl.createProgram.mock.calls.length;
   const eightSettings = { ...base, samplingMode: "average_fast_8" } as RetroVideoFilterState;
   expect(pipeline.hasPreparedFilterStateVariant(eightSettings)).toBe(false);
@@ -403,6 +403,36 @@ it("prepares a distinct eight-tap Beam kernel and reuses the other split passes"
   expect(specialized.beamKernel).not.toContain("uSamplingMode");
   for (const stage of ["pass1", "compositePrep", "compositeMid", "beamStripe", "beamCompose", "pass2"]) {
     expect(specialized[stage]).toBe(old[stage]);
+  }
+  pipeline.dispose();
+});
+
+it("specializes four-tap Beam sampling without changing the other passes or controls", async () => {
+  vi.useFakeTimers();
+  const { pipeline, internal } = createPipeline();
+  const settings = {
+    isFilterEnabled: true, paletteMode: "free", samplingMode: "average_fast_4",
+    phosphorDotShape: "beam", compositeEnabled: true, compositeAmount: 0.85,
+    wideGlowEnabled: false, curvature: 0.03,
+  } as RetroVideoFilterState;
+  const pending = pipeline.prepareFilterStateVariant(settings);
+  await vi.runAllTimersAsync();
+  await pending;
+  expect(internal.windowsLiteProgramCache.has("basic_composite_sampled:beam:average4")).toBe(true);
+  expect(pipeline.hasPreparedFilterStateVariant(settings)).toBe(true);
+  expect(pipeline.hasPreparedFilterStateVariant({ ...settings, samplingMode: "average_fast_8" })).toBe(false);
+  const sources = pipeline as unknown as { getVariantStageSources(key: string): Record<string, string | null> };
+  const before = sources.getVariantStageSources("basic_composite_sampled:beam");
+  const after = sources.getVariantStageSources("basic_composite_sampled:beam:average4");
+  expect(after.beamKernel).toContain("sampleSourceTextureAverage4");
+  expect(after.beamKernel).not.toContain("sampleSourceTextureAverage8");
+  expect(after.beamKernel).not.toContain("texelFetch");
+  expect(after.beamKernel).not.toContain("uSamplingMode");
+  for (const control of ["uRgbConvergenceOffset", "uHorizontalSharpness", "uSmoothStrength", "uCurvature", "uBeamWhiteBloom"]) {
+    expect(after.beamKernel).toContain(`uniform float ${control};`);
+  }
+  for (const stage of ["pass1", "compositePrep", "compositeMid", "beamStripe", "beamCompose", "pass2"]) {
+    expect(after[stage]).toBe(before[stage]);
   }
   pipeline.dispose();
 });
