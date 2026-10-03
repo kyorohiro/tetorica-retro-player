@@ -1,3 +1,4 @@
+import type { RetroPlayerLocale } from "../types";
 import { getDisplayAutoTargetSize, isDisplayAutoTargetReady } from "../video/autoTargetSize";
 import { preferredOutputScale, useDisplayPixelRatio } from "./useOutputPixelScale";
 import {
@@ -23,6 +24,7 @@ import { isTauriRuntime } from "../platform/runtime";
 import {
   hideShaderBusyOverlay,
   showShaderBusyOverlay,
+  showShaderPreparationNotice,
   waitForShaderBusyOverlayPaint,
 } from "../ui/shaderBusyOverlay";
 
@@ -81,6 +83,7 @@ export type CanvasStageApp = {
 };
 
 type UseRetroPixiStageParams = {
+  locale?: RetroPlayerLocale;
   filterState: RetroFilterState;
   fitMode: "contain" | "width";
   renderResolutionScale: number;
@@ -329,6 +332,7 @@ export const resolveCanvasSizing = ({
 };
 
 export function useRetroPixiStage({
+  locale = "en",
   filterState,
   fitMode,
   renderResolutionScale,
@@ -341,6 +345,8 @@ export function useRetroPixiStage({
   previewKindRef,
   debugVideo,
 }: UseRetroPixiStageParams) {
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   const displayPixelRatio = useDisplayPixelRatio();
   const displayPixelRatioRef = useRef(displayPixelRatio);
   displayPixelRatioRef.current = displayPixelRatio;
@@ -978,7 +984,12 @@ export function useRetroPixiStage({
       setIsFilterReady(false);
       setIsShaderCompiling(true);
       setShaderCompileLabel("Compiling shader...");
-      showShaderBusyOverlay("Compiling shader...", "Shader preparation in progress.");
+      showShaderBusyOverlay(
+        localeRef.current === "ja" ? "表示処理を準備中..." : "Compiling shader...",
+        localeRef.current === "ja" ? "表示処理を準備しています。" : "Shader preparation in progress.",
+        undefined,
+        localeRef.current,
+      );
       await waitForShaderBusyOverlayPaint();
       if (generation !== initGenerationRef.current || !host.isConnected) return;
       filterReadyPromiseRef.current = new Promise<void>((resolve) => {
@@ -996,15 +1007,29 @@ export function useRetroPixiStage({
         renderFrameRef.current();
         startTicker();
       };
-      const handleCompileStateChange = (state: { active: boolean; label?: string; error?: string }) => {
+      const handleCompileStateChange = (state: { active: boolean; label?: string; error?: string; cancelled?: boolean }) => {
         if (generation !== initGenerationRef.current || !host.isConnected) return;
         if (state.active) {
           showShaderBusyOverlay(
             state.label ?? "Compiling shader...",
-            "Shader preparation in progress.",
+            localeRef.current === "ja"
+              ? "表示を準備中です。完了後に切り替わります。"
+              : "Preparing the filter before switching.",
+            () => appRef.current?.pipeline.cancelShaderPreparation(),
+            localeRef.current,
+          );
+        } else if (state.cancelled) {
+          showShaderPreparationNotice(
+            localeRef.current === "ja" ? "表示の準備を中断しました" : "Preparation cancelled",
+            localeRef.current === "ja" ? "フィルターを適用せず表示しています。" : "Showing the source without the filter.",
+            localeRef.current,
           );
         } else if (state.error) {
-          showShaderBusyOverlay("Filter unavailable", state.error);
+          showShaderPreparationNotice(
+            localeRef.current === "ja" ? "表示を準備できませんでした" : "Filter unavailable",
+            state.error,
+            localeRef.current,
+          );
         } else {
           hideShaderBusyOverlay();
           refreshLayout();
@@ -1107,6 +1132,14 @@ export function useRetroPixiStage({
 
     await app.pipeline.prepareFilterStateVariant(nextFilterState);
   }, [initPixi]);
+
+  const isFilterVariantPreparationCancelled = useCallback((state: RetroVideoFilterState) => {
+    return appRef.current?.pipeline.isFilterStateVariantPreparationCancelled(state) ?? false;
+  }, []);
+
+  const cancelFilterPreparation = useCallback(() => {
+    appRef.current?.pipeline.cancelShaderPreparation();
+  }, []);
 
   const destroyPixi = useCallback(() => {
     initGenerationRef.current++;
@@ -1299,6 +1332,8 @@ export function useRetroPixiStage({
     ensureFilterReady,
     hasPreparedFilterVariant,
     prepareFilterVariant,
+    cancelFilterPreparation,
+    isFilterVariantPreparationCancelled,
     resetRenderer,
     refreshLayout,
     resetFilterInstance,

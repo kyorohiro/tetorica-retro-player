@@ -186,23 +186,77 @@ it("waits beyond 900ms without LINK_STATUS, uploads, draws, or buffer resizing",
   pipeline.dispose();
 });
 
-it("times out without a synchronous readback and blocks further GPU work until recreation", async () => {
+it("waits past 15 seconds until the user cancels, and allows another preparation", async () => {
   vi.useFakeTimers();
   const { pipeline, internal, gl } = createPipeline();
   gl.getProgramParameter.mockReturnValue(false);
-  const pending = internal.getOrCompileSharedProgram("pass1", "stuck", "basic:basic").catch(error => error);
-  await vi.advanceTimersByTimeAsync(15100);
-  expect((await pending).message).toMatch(/timed out/);
-  expect(gl.getProgramParameter.mock.calls.some(([, parameter]) => parameter === gl.LINK_STATUS)).toBe(false);
-  expect(internal.sharedProgramCache.size).toBe(0);
+  let settled = false;
+  const pending = internal.getOrCompileSharedProgram("pass1", "stuck", "basic:basic")
+    .catch(error => { settled = true; return error; });
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(settled).toBe(false);
   expect(pipeline.isShaderPreparationBlocking()).toBe(true);
-  pipeline.render();
-  expect(gl.drawArrays).not.toHaveBeenCalled();
-  expect(() => pipeline.readPixels()).toThrow(/not ready/);
-  await expect(internal.getOrCompileSharedProgram("pass2", "next", "basic:basic")).rejects.toThrow(/timed out/);
-  expect(gl.createProgram).toHaveBeenCalledTimes(1);
-  pipeline.dispose();
+  pipeline.cancelShaderPreparation();
+  await vi.advanceTimersByTimeAsync(30);
+  expect((await pending).name).toBe("AbortError");
+  expect(gl.getProgramParameter.mock.calls.some(([, parameter]) => parameter === gl.LINK_STATUS)).toBe(false);
   expect(gl.deleteProgram).not.toHaveBeenCalled();
+  expect(internal.sharedProgramCache.size).toBe(0);
+  expect(internal.sharedProgramCompileInflight.size).toBe(0);
+  expect(pipeline.isShaderPreparationBlocking()).toBe(false);
+  gl.getProgramParameter.mockReturnValue(true);
+  const retry = internal.getOrCompileSharedProgram("pass1", "stuck", "basic:basic");
+  await vi.runAllTimersAsync();
+  await retry;
+  expect(internal.sharedProgramCache.size).toBe(1);
+  pipeline.dispose();
+});
+
+it("cancels queued variants before submitting any shader and releases their turns", async () => {
+  const { pipeline, internal, gl } = createPipeline();
+  const blocker = internal.reserveCompileTurn();
+  const pending = internal.compileWindowsLiteVariant("basic_nearest:beam").catch(error => error);
+  pipeline.cancelShaderPreparation();
+  blocker.releaseCompileTurn();
+  expect((await pending).name).toBe("AbortError");
+  expect(gl.compileShader).not.toHaveBeenCalled();
+  expect(internal.windowsLiteVariantCompileInflight.size).toBe(0);
+  const next = internal.reserveCompileTurn();
+  await next.waitForCompileTurn;
+  next.releaseCompileTurn();
+  pipeline.dispose();
+});
+
+it("cancels support shader polling without installing or synchronously deleting it", async () => {
+  vi.useFakeTimers();
+  const { pipeline, internal, gl } = createPipeline();
+  gl.getProgramParameter.mockReturnValue(false);
+  const pending = internal.ensureBeamDownscaleProgram().catch(error => error);
+  await vi.advanceTimersByTimeAsync(40);
+  pipeline.cancelShaderPreparation();
+  await vi.advanceTimersByTimeAsync(30);
+  expect((await pending).name).toBe("AbortError");
+  expect(internal.beamDownscaleProgram).toBeNull();
+  expect(gl.deleteProgram).not.toHaveBeenCalled();
+  expect(pipeline.isShaderPreparationBlocking()).toBe(false);
+  pipeline.dispose();
+});
+
+it("reuses Beam's nearest color program when enabling Composite", async () => {
+  vi.useFakeTimers();
+  const { pipeline, internal, gl } = createPipeline();
+  const first = internal.compileWindowsLiteVariant("basic_nearest:beam");
+  await vi.runAllTimersAsync();
+  const nearest = await first;
+  const programCount = gl.createProgram.mock.calls.length;
+  const second = internal.compileWindowsLiteVariant("basic_composite:beam");
+  await vi.runAllTimersAsync();
+  const composite = await second;
+  expect(composite.pass1).toBe(nearest.pass1);
+  expect(composite.pass2).toBe(nearest.pass2);
+  // Composite prep/apply and its distinct Beam kernel are new.
+  expect(gl.createProgram).toHaveBeenCalledTimes(programCount + 3);
+  pipeline.dispose();
 });
 
 it("also pauses rendering while a support shader is linking", async () => {
@@ -294,5 +348,23 @@ it("keeps the previous canvas during layout/target settling and commits only the
   pipeline.render();
   expect(gl.canvas).toEqual({ width: 640, height: 360 });
   expect(gl.drawArrays).toHaveBeenCalledTimes(draws + 1);
+  pipeline.dispose();
+});
+
+it("removes averaging only from the nearest Composite Beam kernel", () => {
+  const { pipeline } = createPipeline();
+  const sources = pipeline as unknown as { getVariantStageSources(key: string): { beamKernel: string; compositePrep: string; compositeMid: string; beamStripe: string; beamCompose: string } };
+  const nearest = sources.getVariantStageSources("basic_composite:beam");
+  const sampled = sources.getVariantStageSources("basic_composite_sampled:beam");
+  expect(nearest.beamKernel).not.toContain("uSamplingMode");
+  expect(nearest.beamKernel).not.toContain("sampleSourceTextureAverage");
+  for (const control of ["uRgbConvergenceOffset", "uHorizontalSharpness", "uSmoothStrength", "uCurvature", "uBeamWhiteBloom"]) {
+    expect(nearest.beamKernel).toContain(`uniform float ${control};`);
+  }
+  expect(sampled.beamKernel).toContain("sampleSourceTextureAverage8");
+  for (const stage of ["compositePrep", "compositeMid", "beamStripe", "beamCompose"] as const) {
+    expect(nearest[stage]).toBeTruthy();
+    if (stage !== "compositeMid") expect(nearest[stage]).toBe(sampled[stage]);
+  }
   pipeline.dispose();
 });

@@ -1,3 +1,4 @@
+import { isShaderPreparationCancelled } from "../video/TetoricaRetroVideoPipeline";
 import { isDisplayCaptureStream } from "../media/displayCaptureOptions";
 import { hasCurrentPlaybackData } from "../media/playbackReadiness";
 import { describeAudioTracks, recordCaptureAudioDiagnostic } from "../media/captureAudioDiagnostics";
@@ -333,6 +334,7 @@ export function usePixiVideoPlayer(
   });
 
   const stage = useRetroPixiStage({
+    locale: options?.locale ?? "en",
     filterState: effectiveFilterState,
     fitMode,
     renderResolutionScale,
@@ -369,6 +371,8 @@ export function usePixiVideoPlayer(
     ensureFilterReady,
     hasPreparedFilterVariant,
     prepareFilterVariant,
+    cancelFilterPreparation,
+    isFilterVariantPreparationCancelled,
     resetRenderer,
     refreshLayout,
     resetFilterInstance,
@@ -663,7 +667,14 @@ export function usePixiVideoPlayer(
     const existingPrepare = variantPrepareInFlightRef.current;
     if (existingPrepare?.key === nextKey) {
       beginLoading(label);
-      showShaderBusyOverlay(label, "Preparing filter state...");
+      showShaderBusyOverlay(
+        label,
+        options?.locale === "ja"
+          ? "完了後に切り替わります。中断すると現在の設定を保ちます。"
+          : "The filter will switch when ready. Cancel to keep the current settings.",
+        cancelFilterPreparation,
+        options?.locale ?? "en",
+      );
       try {
         await existingPrepare.promise;
       } finally {
@@ -675,7 +686,14 @@ export function usePixiVideoPlayer(
 
     const preparePromise = (async () => {
       beginLoading(label);
-      showShaderBusyOverlay(label, "Preparing filter state...");
+      showShaderBusyOverlay(
+        label,
+        options?.locale === "ja"
+          ? "完了後に切り替わります。中断すると現在の設定を保ちます。"
+          : "The filter will switch when ready. Cancel to keep the current settings.",
+        cancelFilterPreparation,
+        options?.locale ?? "en",
+      );
       try {
         await prepareFilterVariant(nextFilterState);
       } finally {
@@ -702,6 +720,8 @@ export function usePixiVideoPlayer(
     buildVariantPreparationState,
     finishLoading,
     prepareFilterVariant,
+    cancelFilterPreparation,
+    options?.locale,
     variantPrepareInFlightRef,
   ]);
 
@@ -1013,6 +1033,8 @@ export function usePixiVideoPlayer(
       return;
     }
 
+    if (isFilterVariantPreparationCancelled(currentVariantPreparationState)) return;
+
     genericVariantPrepareInFlightRef.current = true;
     genericVariantPreparedKeyRef.current = currentVariantPreparationKey;
     const label = options?.locale === "ja"
@@ -1022,6 +1044,10 @@ export function usePixiVideoPlayer(
     void (async () => {
       try {
         await prepareFilterVariantWithLabel(label);
+      } catch (error) {
+        if (!isShaderPreparationCancelled(error)) {
+          console.warn("[retro-player] automatic filter preparation failed", error);
+        }
       } finally {
         genericVariantPrepareInFlightRef.current = false;
       }
@@ -1029,6 +1055,7 @@ export function usePixiVideoPlayer(
   }, [
     currentVariantPreparationKey,
     currentVariantPreparationState,
+    isFilterVariantPreparationCancelled,
     effectiveFilterState.isFilterEnabled,
     hasPreparedFilterVariant,
     isFilterReady,
@@ -1933,19 +1960,19 @@ export function usePixiVideoPlayer(
     }
 
     if (shaderBusyOverlayVisibleRef.current) {
-      showShaderBusyOverlay(nextShaderBusyLabel);
+      showShaderBusyOverlay(nextShaderBusyLabel, undefined, undefined, options?.locale ?? "en");
       return;
     }
 
     if (isShaderCompiling) {
-      showShaderBusyOverlay(nextShaderBusyLabel);
+      showShaderBusyOverlay(nextShaderBusyLabel, undefined, undefined, options?.locale ?? "en");
       shaderBusyOverlayVisibleRef.current = true;
       return;
     }
 
     shaderBusyOverlayTimerRef.current = window.setTimeout(() => {
       shaderBusyOverlayTimerRef.current = null;
-      showShaderBusyOverlay(nextShaderBusyLabel);
+      showShaderBusyOverlay(nextShaderBusyLabel, undefined, undefined, options?.locale ?? "en");
       shaderBusyOverlayVisibleRef.current = true;
     }, SHADER_BUSY_OVERLAY_DELAY_MS);
 
@@ -1960,6 +1987,7 @@ export function usePixiVideoPlayer(
     isShaderCompiling,
     loadingLabel,
     shaderCompileLabel,
+    options?.locale,
   ]);
 
   useEffect(() => {

@@ -1,5 +1,21 @@
+import type { RetroPlayerLocale } from "../types";
+
 const SHADER_BUSY_OVERLAY_ID = "retro-player-shader-busy-overlay";
 const SHADER_BUSY_OVERLAY_STYLE_ID = "retro-player-shader-busy-overlay-style";
+
+let cancelPreparation: (() => void) | undefined;
+let elapsedTimer: ReturnType<typeof setInterval> | undefined;
+let startedAt = 0;
+let overlayLocale: RetroPlayerLocale = "en";
+const strings = {
+  en: { cancel: "Cancel", cancelling: "Cancelling…", close: "Close", elapsed: "Elapsed", wait: "Please wait while the shader is prepared." },
+  ja: { cancel: "中断", cancelling: "中断中…", close: "閉じる", elapsed: "経過", wait: "表示処理を準備しています。" },
+};
+
+const updateElapsed = (overlay: HTMLElement) => {
+  const elapsed = overlay.querySelector("[data-shader-busy-elapsed]");
+  if (elapsed) elapsed.textContent = `${strings[overlayLocale].elapsed}: ${Math.floor((Date.now() - startedAt) / 1000)} s`;
+};
 
 const ensureShaderBusyOverlay = () => {
   if (typeof document === "undefined") {
@@ -34,7 +50,12 @@ const ensureShaderBusyOverlay = () => {
   card.style.fontFamily = "system-ui, sans-serif";
   card.style.fontSize = "15px";
   card.style.textAlign = "center";
-  card.style.minWidth = "320px";
+  card.style.minWidth = "280px";
+  card.style.maxWidth = "min(640px, 90vw)";
+  card.style.overflowWrap = "anywhere";
+  card.style.pointerEvents = "auto";
+  card.setAttribute("role", "status");
+  card.setAttribute("aria-live", "polite");
 
   const spinner = document.createElement("div");
   spinner.setAttribute("data-shader-busy-spinner", "true");
@@ -70,7 +91,7 @@ const ensureShaderBusyOverlay = () => {
 
   const subtitle = document.createElement("div");
   subtitle.setAttribute("data-shader-busy-subtitle", "true");
-  subtitle.textContent = "Please wait while the shader is prepared.";
+  subtitle.textContent = strings[overlayLocale].wait;
   subtitle.style.marginTop = "6px";
   subtitle.style.fontSize = "12px";
   subtitle.style.color = "#cbd5e1";
@@ -78,6 +99,25 @@ const ensureShaderBusyOverlay = () => {
   card.appendChild(spinner);
   card.appendChild(title);
   card.appendChild(subtitle);
+  const elapsed = document.createElement("div");
+  elapsed.setAttribute("data-shader-busy-elapsed", "true");
+  elapsed.style.marginTop = "8px";
+  elapsed.style.fontSize = "12px";
+  card.appendChild(elapsed);
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.setAttribute("data-shader-busy-cancel", "true");
+  cancel.textContent = strings[overlayLocale].cancel;
+  cancel.style.cssText = "margin-top:12px;padding:6px 18px;border:1px solid #94a3b8;border-radius:8px;background:#1e293b;color:#f8fafc;cursor:pointer";
+  cancel.onclick = () => {
+    if (!cancelPreparation) return;
+    cancel.disabled = true;
+    cancel.textContent = strings[overlayLocale].cancelling;
+    const callback = cancelPreparation;
+    cancelPreparation = undefined;
+    callback();
+  };
+  card.appendChild(cancel);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
@@ -92,12 +132,30 @@ const ensureShaderBusyOverlay = () => {
   return overlay;
 };
 
-export const showShaderBusyOverlay = (label: string, detail?: string) => {
+export const showShaderBusyOverlay = (
+  label: string,
+  detail?: string,
+  onCancel?: () => void,
+  locale: RetroPlayerLocale = overlayLocale,
+) => {
+  overlayLocale = locale;
   const overlay = ensureShaderBusyOverlay();
   if (!overlay) {
     return;
   }
 
+  if (overlay.style.visibility !== "visible") {
+    startedAt = Date.now();
+    elapsedTimer = setInterval(() => updateElapsed(overlay), 1000);
+  }
+  updateElapsed(overlay);
+  (overlay.querySelector("[data-shader-busy-spinner]") as HTMLElement).hidden = false;
+  (overlay.querySelector("[data-shader-busy-elapsed]") as HTMLElement).hidden = false;
+  if (onCancel) cancelPreparation = onCancel;
+  const cancel = overlay.querySelector("[data-shader-busy-cancel]") as HTMLButtonElement;
+  cancel.hidden = !cancelPreparation;
+  cancel.disabled = false;
+  cancel.textContent = strings[overlayLocale].cancel;
   const title = overlay.querySelector("[data-shader-busy-label='true']");
   if (title instanceof HTMLElement) {
     title.textContent = label;
@@ -107,7 +165,7 @@ export const showShaderBusyOverlay = (label: string, detail?: string) => {
   if (subtitle instanceof HTMLElement) {
     subtitle.textContent = detail && detail.trim().length > 0
       ? detail
-      : "Please wait while the shader is prepared.";
+      : strings[overlayLocale].wait;
   }
 
   overlay.style.visibility = "visible";
@@ -118,6 +176,9 @@ export const showShaderBusyOverlay = (label: string, detail?: string) => {
 };
 
 export const hideShaderBusyOverlay = () => {
+  clearInterval(elapsedTimer);
+  elapsedTimer = undefined;
+  cancelPreparation = undefined;
   if (typeof document === "undefined") {
     return;
   }
@@ -127,6 +188,22 @@ export const hideShaderBusyOverlay = () => {
     overlay.style.opacity = "0";
     overlay.style.visibility = "hidden";
   }
+};
+
+export const showShaderPreparationNotice = (
+  message: string,
+  detail?: string,
+  locale: RetroPlayerLocale = overlayLocale,
+) => {
+  hideShaderBusyOverlay();
+  showShaderBusyOverlay(message, detail, hideShaderBusyOverlay, locale);
+  clearInterval(elapsedTimer);
+  elapsedTimer = undefined;
+  const overlay = ensureShaderBusyOverlay();
+  if (!overlay) return;
+  (overlay.querySelector("[data-shader-busy-spinner]") as HTMLElement).hidden = true;
+  (overlay.querySelector("[data-shader-busy-elapsed]") as HTMLElement).hidden = true;
+  (overlay.querySelector("[data-shader-busy-cancel]") as HTMLButtonElement).textContent = strings[overlayLocale].close;
 };
 
 export const waitForShaderBusyOverlayPaint = async () => {

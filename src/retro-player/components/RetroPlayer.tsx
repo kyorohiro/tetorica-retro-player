@@ -1,3 +1,4 @@
+import { isShaderPreparationCancelled } from "../video/TetoricaRetroVideoPipeline";
 import { getDisplayAutoTargetSize } from "../video/autoTargetSize";
 import React from "react";
 import { usePixiVideoPlayer, type RetroPlaybackEvent } from "../hooks/usePixiVideoPlayer";
@@ -192,6 +193,7 @@ export function RetroPlayer({
   auxAudioStream,
 }: RetroPlayerProps) {
   const { showConfirmDialog } = useDialog();
+  const [preparationMessage, setPreparationMessage] = React.useState("");
   const confirmDialog: ConfirmDialogFn = confirmDialogProp ??
     ((opts) => showConfirmDialog({ ...opts, title: opts.title ?? "", body: opts.body ?? "" }).then((v) => v ?? false));
 
@@ -666,13 +668,29 @@ export function RetroPlayer({
       }
     }
 
-    await runWithFullPresetLock(async () => {
-      await player.prepareFilterVariantWithLabel(
-        locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
-        variantOverrides,
-      );
-    }, locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`);
-    return true;
+    setPreparationMessage("");
+    try {
+      await runWithFullPresetLock(async () => {
+        await player.prepareFilterVariantWithLabel(
+          locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`,
+          variantOverrides,
+        );
+      }, locale === "ja" ? `${label} を準備中...` : `Preparing ${label}...`);
+      return true;
+    } catch (error) {
+      if (isShaderPreparationCancelled(error)) {
+        setPreparationMessage(locale === "ja"
+          ? "表示の準備を中断しました。現在の設定を保持しています。"
+          : "Filter preparation cancelled. Your current settings were kept.");
+      } else {
+        console.warn("[retro-player] filter preparation failed", error);
+        const detail = error instanceof Error ? error.message : String(error);
+        setPreparationMessage(locale === "ja"
+          ? `表示を準備できませんでした。現在の設定を保持しています。 ${detail}`
+          : `Could not prepare the filter. Your current settings were kept. ${detail}`);
+      }
+      return false;
+    }
   }, [
     confirmDialog,
     isPreparingFullPreset,
@@ -1142,6 +1160,12 @@ export function RetroPlayer({
       }}
     >
       <section className={`relative flex flex-col flex-1 min-h-0 ${layoutMode === "fitwidth" ? "overflow-y-auto" : "overflow-hidden"} rounded-[13px] bg-[rgba(245,241,234,0.78)] p-3`}>
+        {preparationMessage && (
+          <div role="status" className="flex items-center gap-2 rounded bg-slate-900 px-3 py-2 text-sm text-white">
+            <span className="flex-1">{preparationMessage}</span>
+            <button type="button" onClick={() => setPreparationMessage("")} aria-label={locale === "ja" ? "閉じる" : "Dismiss"}>×</button>
+          </div>
+        )}
         <RetroPlayerLayout
           mode={layoutMode}
           preview={

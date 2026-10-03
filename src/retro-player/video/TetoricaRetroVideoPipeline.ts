@@ -21,6 +21,7 @@ import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL } from "../retro/filterPass2BeamLiteNearestKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_STRIPE } from "../retro/filterPass2BeamLiteStripeShader.ts";
@@ -990,7 +991,15 @@ const waitMs = (ms: number) =>
 // Verify link status after submitProgram() has already compiled and linked.
 // If KHR_parallel_shader_compile is available, poll COMPLETION_STATUS_KHR first
 // and defer the LINK_STATUS readback until the driver reports completion.
-class ShaderCompileTimeoutError extends Error {}
+class ShaderPreparationCancelledError extends Error {
+  constructor() {
+    super("Shader preparation cancelled.");
+    this.name = "AbortError";
+  }
+}
+
+export const isShaderPreparationCancelled = (error: unknown): boolean =>
+  error instanceof Error && error.name === "AbortError";
 
 async function waitAndVerifyPrograms(
   gl: WebGL2RenderingContext,
@@ -1005,8 +1014,6 @@ async function waitAndVerifyPrograms(
   const parallelShaderCompileExt = getParallelShaderCompileExtension(gl);
 
   if (parallelShaderCompileExt) {
-    const pollStart = nowMs();
-    const pollTimeoutMs = 15000;
     while (true) {
       check();
       let allCompleted = true;
@@ -1018,9 +1025,6 @@ async function waitAndVerifyPrograms(
       }
       if (allCompleted) {
         break;
-      }
-      if (nowMs() - pollStart >= pollTimeoutMs) {
-        throw new ShaderCompileTimeoutError("Shader preparation timed out. Reload the player to retry.");
       }
       await waitMs(24);
     }
@@ -1190,13 +1194,15 @@ export class TetoricaRetroVideoPipeline {
   private windowsLitePrewarmStarted = false;
   private isDisposed = false;
   private activeShaderCompiles = 0;
-  private shaderCompileFailure: Error | null = null;
+  private activePreparations = 0;
+  private compileGeneration = 0;
+  private hasAbandonedShaderWork = false;
   private failedWindowsLiteVariantKey: WindowsLiteVariantKey | null = null;
   private pendingDrawingBufferSize: { width: number; height: number } | null = null;
   private compileSourceNonce = 0;
   private shaderCompileBusterTag: string | null = null;
   private readonly shaderCompileCacheBusterEnabled: boolean;
-  private readonly onCompileStateChange?: (state: { active: boolean; label?: string; error?: string }) => void;
+  private readonly onCompileStateChange?: (state: { active: boolean; label?: string; error?: string; cancelled?: boolean }) => void;
   private readonly windowsLiteVariantCompileInflight = new Map<
     WindowsLiteVariantKey,
     Promise<WindowsLiteCompiledPrograms>
@@ -2152,7 +2158,9 @@ export class TetoricaRetroVideoPipeline {
             : pass1Variant === "basic_composite_sampled"
               ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
             : pass1Variant === "basic_composite"
-              ? FILTER_FRAGMENT_PASS1_LITE_BASE
+              // Composite is applied in a separate pass; nearest needs no
+              // averaging branches. Reuse the ordinary nearest program/cache.
+              ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
               : pass1Variant === "basic_nearest"
                 ? FILTER_FRAGMENT_PASS1_LITE_NEAREST
                 : pass1Variant === "basic"
@@ -2230,7 +2238,9 @@ export class TetoricaRetroVideoPipeline {
     const beamKernelBaseSource = variantKey.endsWith(":beam")
       ? variantKey.startsWith("basic_nearest:beam")
         ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
-        : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
+        : variantKey.startsWith("basic_composite:beam")
+          ? FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL
+          : FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL
       : null;
 
     return {
@@ -2291,7 +2301,8 @@ export class TetoricaRetroVideoPipeline {
     fragmentSource: string,
     variantKey: WindowsLiteVariantKey,
   ) {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     const cacheKey = this.getSharedProgramCacheKey(fragmentSource);
     const cached = this.sharedProgramCache.get(cacheKey);
     if (cached) {
@@ -2308,18 +2319,19 @@ export class TetoricaRetroVideoPipeline {
       let linked = false;
       this.activeShaderCompiles += 1;
       try {
-        await this.updateCompileState(`Compiling shader (${variantKey} / ${stage})...`);
+        await this.updateCompileState(`Compiling shader (${variantKey} / ${stage})...`, generation);
         this.logProgramCompile(`variant:${variantKey}:${stage}`);
         submitted = compileProgramShaders(this.gl, VERTEX_SHADER_SOURCE, fragmentSource);
-        await this.updateCompileState(`Linking shader (${variantKey} / ${stage})...`);
+        await this.updateCompileState(`Linking shader (${variantKey} / ${stage})...`, generation);
         const program = finishProgramLink(this.gl, submitted);
         linked = true;
-        await this.verifyCompiledProgram(program);
-        this.assertCompileActive();
+        await this.verifyCompiledProgram(program, generation);
+        this.assertCompileActive(generation);
         this.sharedProgramCache.set(cacheKey, program);
         return program;
       } catch (error) {
-        if (submitted && !(error instanceof ShaderCompileTimeoutError)) {
+        if (submitted && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+        if (submitted && !(error instanceof ShaderPreparationCancelledError)) {
           this.gl.deleteProgram(submitted.program);
           if (!linked) {
             this.gl.deleteShader(submitted.vertexShader);
@@ -2366,7 +2378,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   isShaderPreparationBlocking() {
-    return this.activeShaderCompiles > 0 || this.shaderCompileFailure !== null;
+    return this.activeShaderCompiles > 0;
   }
 
   setDrawingBufferSize(width: number, height: number) {
@@ -2386,34 +2398,37 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private reportCompileIdle() {
-    if (this.isDisposed || this.activeShaderCompiles > 0) return;
-    this.onCompileStateChange?.({ active: false, ...(this.shaderCompileFailure ? { error: this.shaderCompileFailure.message } : {}) });
+    if (this.isDisposed || this.activeShaderCompiles > 0 || this.activePreparations > 0) return;
+    this.onCompileStateChange?.({ active: false });
   }
 
-  private async verifyCompiledProgram(program: WebGLProgram) {
-    try {
-      await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive());
-    } catch (error) {
-      if (error instanceof ShaderCompileTimeoutError) this.shaderCompileFailure = error;
-      throw error;
-    }
+  cancelShaderPreparation() {
+    this.compileGeneration += 1;
+    // Do not automatically restart the cancelled startup/foreground variant.
+    this.failedWindowsLiteVariantKey = this.windowsLitePendingVariantKey ??
+      (this.currentFilterState ? getWindowsLiteVariantKey(this.currentFilterState) : null);
+    this.windowsLitePendingVariantKey = null;
   }
 
-  private assertCompileActive() {
+  private async verifyCompiledProgram(program: WebGLProgram, generation = this.compileGeneration) {
+    await waitAndVerifyPrograms(this.gl, [program], () => this.assertCompileActive(generation));
+  }
+
+  private assertCompileActive(generation = this.compileGeneration) {
     if (this.isDisposed) throw new Error("Pipeline was disposed during shader compile.");
-    if (this.shaderCompileFailure) throw this.shaderCompileFailure;
+    if (generation !== this.compileGeneration) throw new ShaderPreparationCancelledError();
     if (this.gl.isContextLost()) throw new Error("WebGL context lost during shader compile.");
   }
 
-  private async updateCompileState(label: string) {
-    this.assertCompileActive();
+  private async updateCompileState(label: string, generation = this.compileGeneration) {
+    this.assertCompileActive(generation);
     this.onCompileStateChange?.({ active: true, label });
     await waitForCompileStatusPaint();
-    this.assertCompileActive();
+    this.assertCompileActive(generation);
   }
 
   private queueWindowsLiteVariant(filterState: RetroVideoFilterState | null) {
-    if (!this.windowsLiteMode || this.isDisposed || this.shaderCompileFailure) {
+    if (!this.windowsLiteMode || this.isDisposed) {
       return;
     }
 
@@ -2462,7 +2477,6 @@ export class TetoricaRetroVideoPipeline {
   private scheduleWindowsLiteForegroundCompile() {
     if (
       this.isDisposed ||
-      this.shaderCompileFailure ||
       this.windowsLiteCompilePromise ||
       this.windowsLiteCompileScheduled ||
       !this.windowsLitePendingVariantKey ||
@@ -2484,31 +2498,38 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async compileSupportProgramsForFilterState(filterState: RetroVideoFilterState | null) {
+    const generation = this.compileGeneration;
     if (!filterState || this.isDisposed || this.gl.isContextLost()) {
       return;
     }
 
     if (shouldUsePreFilterDownscale(filterState) && (!this.beamDownscaleProgram || !this.beamDownscaleLocs)) {
       await this.ensureBeamDownscaleProgram();
+      this.assertCompileActive(generation);
     }
 
     if (shouldUsePostCurvaturePass(filterState) && (!this.postCurvatureProgram || !this.postCurvatureLocs)) {
       await this.ensurePostCurvatureProgram();
+      this.assertCompileActive(generation);
     }
 
     if (shouldUseWideGlow(filterState)) {
       if (isOpticalWideGlowMode(filterState)) {
         if (!this.wideGlowOpticalDownsampleProgram || !this.wideGlowOpticalDownsampleLocs) {
           await this.ensureWideGlowOpticalDownsampleProgram();
+          this.assertCompileActive(generation);
         }
       } else if (!this.wideGlowSmokyDownsampleProgram || !this.wideGlowSmokyDownsampleLocs) {
         await this.ensureWideGlowSmokyDownsampleProgram();
+        this.assertCompileActive(generation);
       }
       if (!this.wideGlowBlurProgram || !this.wideGlowBlurLocs) {
         await this.ensureWideGlowBlurProgram();
+        this.assertCompileActive(generation);
       }
       if (!this.wideGlowCompositeProgram || !this.wideGlowCompositeLocs) {
         await this.ensureWideGlowCompositeProgram();
+        this.assertCompileActive(generation);
       }
     }
   }
@@ -2524,7 +2545,7 @@ export class TetoricaRetroVideoPipeline {
 
     await this.compileSupportProgramsForFilterState(filterState)
       .catch((error) => {
-        console.warn("[retro-player] support shader compile failed", error);
+        if (!isShaderPreparationCancelled(error)) console.warn("[retro-player] support shader compile failed", error);
         throw error;
       })
       .finally(() => {
@@ -2543,7 +2564,8 @@ export class TetoricaRetroVideoPipeline {
   private async compileWindowsLiteVariant(
     variantKey: WindowsLiteVariantKey,
   ): Promise<WindowsLiteCompiledPrograms> {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     const cached = this.windowsLiteProgramCache.get(variantKey);
     if (cached) return cached;
     const assembledFromSharedCache = this.tryAssembleCachedWindowsLiteVariant(variantKey);
@@ -2564,7 +2586,7 @@ export class TetoricaRetroVideoPipeline {
     const compilePromise = (async () => {
       try {
         await waitForCompileTurn;
-        this.assertCompileActive();
+        this.assertCompileActive(generation);
 
         const cachedAfterWait = this.windowsLiteProgramCache.get(variantKey);
         if (cachedAfterWait) {
@@ -2590,8 +2612,10 @@ export class TetoricaRetroVideoPipeline {
           pass2: pass2Source,
         } = this.getVariantStageSources(variantKey);
 
+        this.assertCompileActive(generation);
         this.throwIfVariantCompileSuperseded(variantKey);
         const pass1Program = await this.getOrCompileSharedProgram("pass1", pass1Source!, variantKey);
+        this.assertCompileActive(generation);
         this.throwIfVariantCompileSuperseded(variantKey);
         let compositePrepProgram: WebGLProgram | null = null;
         let compositeMidProgram: WebGLProgram | null = null;
@@ -2600,29 +2624,36 @@ export class TetoricaRetroVideoPipeline {
         let beamStripeProgram: WebGLProgram | null = null;
         let beamComposeProgram: WebGLProgram | null = null;
         if (compositePrepSource) {
+          this.assertCompileActive(generation);
           this.throwIfVariantCompileSuperseded(variantKey);
           compositePrepProgram = await this.getOrCompileSharedProgram("compositePrep", compositePrepSource, variantKey);
         }
         if (compositeMidSource) {
+          this.assertCompileActive(generation);
           this.throwIfVariantCompileSuperseded(variantKey);
           compositeMidProgram = await this.getOrCompileSharedProgram("compositeMid", compositeMidSource, variantKey);
         }
         if (phosphorCoreSource) {
+          this.assertCompileActive(generation);
           this.throwIfVariantCompileSuperseded(variantKey);
           phosphorCoreProgram = await this.getOrCompileSharedProgram("phosphorCore", phosphorCoreSource, variantKey);
         }
         if (beamKernelSource) {
+          this.assertCompileActive(generation);
           this.throwIfVariantCompileSuperseded(variantKey);
           beamKernelProgram = await this.getOrCompileSharedProgram("beamKernel", beamKernelSource, variantKey);
         }
         if (beamStripeSource) {
+          this.assertCompileActive(generation);
           this.throwIfVariantCompileSuperseded(variantKey);
           beamStripeProgram = await this.getOrCompileSharedProgram("beamStripe", beamStripeSource, variantKey);
         }
         if (beamComposeSource) {
+          this.assertCompileActive(generation);
           this.throwIfVariantCompileSuperseded(variantKey);
           beamComposeProgram = await this.getOrCompileSharedProgram("beamCompose", beamComposeSource, variantKey);
         }
+        this.assertCompileActive(generation);
         this.throwIfVariantCompileSuperseded(variantKey);
         const pass2Program = await this.getOrCompileSharedProgram("pass2", pass2Source!, variantKey);
         if (this.isDisposed || this.gl.isContextLost()) {
@@ -2632,6 +2663,7 @@ export class TetoricaRetroVideoPipeline {
           throw new Error("Pass 2 program did not compile.");
         }
 
+        this.assertCompileActive(generation);
         const entry: WindowsLiteCompiledPrograms = {
           pass1: pass1Program,
           pass2: pass2Program,
@@ -2660,7 +2692,6 @@ export class TetoricaRetroVideoPipeline {
   private startWindowsLiteForegroundCompile() {
     if (
       this.isDisposed ||
-      this.shaderCompileFailure ||
       this.windowsLiteCompilePromise ||
       !this.windowsLitePendingVariantKey ||
       this.windowsLitePendingVariantKey === this.windowsLiteVariantKey
@@ -2682,6 +2713,7 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async compilePendingWindowsLiteVariant() {
+    const generation = this.compileGeneration;
     while (
       !this.isDisposed &&
       !this.gl.isContextLost() &&
@@ -2693,7 +2725,7 @@ export class TetoricaRetroVideoPipeline {
 
       try {
         await this.windowsLiteCompileSerialPromise;
-        this.assertCompileActive();
+        this.assertCompileActive(generation);
         const { pass1, pass2, compositePrep, compositeMid, phosphorCore, beamKernel, beamStripe, beamCompose } = await this.compileWindowsLiteVariant(variantKey);
         if (this.isDisposed || this.gl.isContextLost()) return;
 
@@ -2722,7 +2754,7 @@ export class TetoricaRetroVideoPipeline {
           `filter: Windows lite variant ${variantKey} failed, keeping previous programs (${message})`,
         );
         this.failedWindowsLiteVariantKey = variantKey;
-        if (this.windowsLitePendingVariantKey !== variantKey && !this.shaderCompileFailure) continue;
+        if (this.windowsLitePendingVariantKey !== variantKey) continue;
         this.windowsLitePendingVariantKey = null;
         this.reportCompileIdle();
         return;
@@ -2738,7 +2770,7 @@ export class TetoricaRetroVideoPipeline {
       shaderCompileCacheBusterEnabled?: boolean;
     },
     onFilterReady?: () => void,
-    onCompileStateChange?: (state: { active: boolean; label?: string; error?: string }) => void,
+    onCompileStateChange?: (state: { active: boolean; label?: string; error?: string; cancelled?: boolean }) => void,
   ): Promise<TetoricaRetroVideoPipeline> {
     // Passthrough is tiny — compiles in <10 ms even on ANGLE/Windows.
     logShaderCompileInfo("base:passthrough");
@@ -2746,7 +2778,7 @@ export class TetoricaRetroVideoPipeline {
     try {
       await waitAndVerifyPrograms(gl, [passthroughProgram]);
     } catch (error) {
-      if (!(error instanceof ShaderCompileTimeoutError)) gl.deleteProgram(passthroughProgram);
+      if (!(error instanceof ShaderPreparationCancelledError)) gl.deleteProgram(passthroughProgram);
       throw error;
     }
     const pipeline = new TetoricaRetroVideoPipeline(
@@ -2787,9 +2819,13 @@ export class TetoricaRetroVideoPipeline {
       } catch (error) {
         if (pipeline.isDisposed) return;
         pipeline.failedWindowsLiteVariantKey = getWindowsLiteVariantKey(initialCompileFilterState);
-        console.warn("[retro-player] initial shader compile failed", error);
+        if (!isShaderPreparationCancelled(error)) console.warn("[retro-player] initial shader compile failed", error);
         onFilterReady?.();
         pipeline.reportCompileIdle();
+        pipeline.onCompileStateChange?.({ active: false,
+          ...(isShaderPreparationCancelled(error) ? { cancelled: true }
+            : { error: error instanceof Error ? error.message : String(error) }),
+        });
       }
     }, 0);
 
@@ -2801,7 +2837,7 @@ export class TetoricaRetroVideoPipeline {
     passthroughProgram: WebGLProgram,
     windowsLiteMode = false,
     shaderCompileCacheBusterEnabled = false,
-    onCompileStateChange?: (state: { active: boolean; label?: string; error?: string }) => void,
+    onCompileStateChange?: (state: { active: boolean; label?: string; error?: string; cancelled?: boolean }) => void,
   ) {
     this.gl = gl;
     this.passthroughProgram = passthroughProgram;
@@ -2841,7 +2877,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async ensureBeamDownscaleProgram() {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     if (this.beamDownscaleProgram && this.beamDownscaleLocs) {
       return;
     }
@@ -2852,18 +2889,18 @@ export class TetoricaRetroVideoPipeline {
     let program: WebGLProgram | null = null;
     this.activeShaderCompiles += 1;
     try {
-      this.assertCompileActive();
+      this.assertCompileActive(generation);
       if (this.beamDownscaleProgram && this.beamDownscaleLocs) return;
-      await this.updateCompileState("Compiling shader (beam downscale)...");
+      await this.updateCompileState("Compiling shader (beam downscale)...", generation);
       logShaderCompileInfo("base:beamDownscale");
       program = submitProgram(
         this.gl,
         VERTEX_SHADER_SOURCE,
         BEAM_SOURCE_DOWNSCALE_FRAGMENT,
       );
-      await this.updateCompileState("Linking shader (beam downscale)...");
-      await this.verifyCompiledProgram(program);
-      this.assertCompileActive();
+      await this.updateCompileState("Linking shader (beam downscale)...", generation);
+      await this.verifyCompiledProgram(program, generation);
+      this.assertCompileActive(generation);
       this.beamDownscaleProgram = program;
       this.gl.useProgram(program);
       this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
@@ -2873,7 +2910,8 @@ export class TetoricaRetroVideoPipeline {
         uTargetSize: this.gl.getUniformLocation(program, "uTargetSize"),
       };
     } catch (error) {
-      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
+      if (program && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+      if (program && !(error instanceof ShaderPreparationCancelledError)) this.gl.deleteProgram(program);
       this.beamDownscaleProgram = null;
       this.beamDownscaleLocs = null;
       throw error;
@@ -2884,7 +2922,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async ensurePostCurvatureProgram() {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     if (this.postCurvatureProgram && this.postCurvatureLocs) {
       return;
     }
@@ -2895,18 +2934,18 @@ export class TetoricaRetroVideoPipeline {
     let program: WebGLProgram | null = null;
     this.activeShaderCompiles += 1;
     try {
-      this.assertCompileActive();
+      this.assertCompileActive(generation);
       if (this.postCurvatureProgram && this.postCurvatureLocs) return;
-      await this.updateCompileState("Compiling shader (post curvature)...");
+      await this.updateCompileState("Compiling shader (post curvature)...", generation);
       logShaderCompileInfo("base:postCurvature");
       program = submitProgram(
         this.gl,
         VERTEX_SHADER_SOURCE,
         POST_CURVATURE_FRAGMENT,
       );
-      await this.updateCompileState("Linking shader (post curvature)...");
-      await this.verifyCompiledProgram(program);
-      this.assertCompileActive();
+      await this.updateCompileState("Linking shader (post curvature)...", generation);
+      await this.verifyCompiledProgram(program, generation);
+      this.assertCompileActive(generation);
       this.postCurvatureProgram = program;
       this.gl.useProgram(program);
       this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
@@ -2915,7 +2954,8 @@ export class TetoricaRetroVideoPipeline {
         uCurvature: this.gl.getUniformLocation(program, "uCurvature"),
       };
     } catch (error) {
-      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
+      if (program && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+      if (program && !(error instanceof ShaderPreparationCancelledError)) this.gl.deleteProgram(program);
       this.postCurvatureProgram = null;
       this.postCurvatureLocs = null;
       throw error;
@@ -2926,7 +2966,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async ensureWideGlowOpticalDownsampleProgram() {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     if (this.wideGlowOpticalDownsampleProgram && this.wideGlowOpticalDownsampleLocs) {
       return;
     }
@@ -2937,18 +2978,18 @@ export class TetoricaRetroVideoPipeline {
     let program: WebGLProgram | null = null;
     this.activeShaderCompiles += 1;
     try {
-      this.assertCompileActive();
+      this.assertCompileActive(generation);
       if (this.wideGlowOpticalDownsampleProgram && this.wideGlowOpticalDownsampleLocs) return;
-      await this.updateCompileState("Compiling shader (wide glow optical downsample)...");
+      await this.updateCompileState("Compiling shader (wide glow optical downsample)...", generation);
       logShaderCompileInfo("base:wideGlowOpticalDownsample");
       program = submitProgram(
         this.gl,
         VERTEX_SHADER_SOURCE,
         FILTER_FRAGMENT_WIDE_GLOW_OPTICAL_DOWNSAMPLE,
       );
-      await this.updateCompileState("Linking shader (wide glow optical downsample)...");
-      await this.verifyCompiledProgram(program);
-      this.assertCompileActive();
+      await this.updateCompileState("Linking shader (wide glow optical downsample)...", generation);
+      await this.verifyCompiledProgram(program, generation);
+      this.assertCompileActive(generation);
       this.wideGlowOpticalDownsampleProgram = program;
       this.gl.useProgram(program);
       this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
@@ -2957,7 +2998,8 @@ export class TetoricaRetroVideoPipeline {
         uTexelSize: this.gl.getUniformLocation(program, "uTexelSize"),
       };
     } catch (error) {
-      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
+      if (program && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+      if (program && !(error instanceof ShaderPreparationCancelledError)) this.gl.deleteProgram(program);
       this.wideGlowOpticalDownsampleProgram = null;
       this.wideGlowOpticalDownsampleLocs = null;
       throw error;
@@ -2968,7 +3010,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async ensureWideGlowSmokyDownsampleProgram() {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     if (this.wideGlowSmokyDownsampleProgram && this.wideGlowSmokyDownsampleLocs) {
       return;
     }
@@ -2979,18 +3022,18 @@ export class TetoricaRetroVideoPipeline {
     let program: WebGLProgram | null = null;
     this.activeShaderCompiles += 1;
     try {
-      this.assertCompileActive();
+      this.assertCompileActive(generation);
       if (this.wideGlowSmokyDownsampleProgram && this.wideGlowSmokyDownsampleLocs) return;
-      await this.updateCompileState("Compiling shader (wide glow smoky downsample)...");
+      await this.updateCompileState("Compiling shader (wide glow smoky downsample)...", generation);
       logShaderCompileInfo("base:wideGlowSmokyDownsample");
       program = submitProgram(
         this.gl,
         VERTEX_SHADER_SOURCE,
         FILTER_FRAGMENT_WIDE_GLOW_SMOKY_DOWNSAMPLE,
       );
-      await this.updateCompileState("Linking shader (wide glow smoky downsample)...");
-      await this.verifyCompiledProgram(program);
-      this.assertCompileActive();
+      await this.updateCompileState("Linking shader (wide glow smoky downsample)...", generation);
+      await this.verifyCompiledProgram(program, generation);
+      this.assertCompileActive(generation);
       this.wideGlowSmokyDownsampleProgram = program;
       this.gl.useProgram(program);
       this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
@@ -2999,7 +3042,8 @@ export class TetoricaRetroVideoPipeline {
         uTexelSize: this.gl.getUniformLocation(program, "uTexelSize"),
       };
     } catch (error) {
-      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
+      if (program && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+      if (program && !(error instanceof ShaderPreparationCancelledError)) this.gl.deleteProgram(program);
       this.wideGlowSmokyDownsampleProgram = null;
       this.wideGlowSmokyDownsampleLocs = null;
       throw error;
@@ -3010,7 +3054,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async ensureWideGlowBlurProgram() {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     if (this.wideGlowBlurProgram && this.wideGlowBlurLocs) {
       return;
     }
@@ -3021,18 +3066,18 @@ export class TetoricaRetroVideoPipeline {
     let program: WebGLProgram | null = null;
     this.activeShaderCompiles += 1;
     try {
-      this.assertCompileActive();
+      this.assertCompileActive(generation);
       if (this.wideGlowBlurProgram && this.wideGlowBlurLocs) return;
-      await this.updateCompileState("Compiling shader (wide glow blur)...");
+      await this.updateCompileState("Compiling shader (wide glow blur)...", generation);
       logShaderCompileInfo("base:wideGlowBlur");
       program = submitProgram(
         this.gl,
         VERTEX_SHADER_SOURCE,
         FILTER_FRAGMENT_WIDE_GLOW_BLUR,
       );
-      await this.updateCompileState("Linking shader (wide glow blur)...");
-      await this.verifyCompiledProgram(program);
-      this.assertCompileActive();
+      await this.updateCompileState("Linking shader (wide glow blur)...", generation);
+      await this.verifyCompiledProgram(program, generation);
+      this.assertCompileActive(generation);
       this.wideGlowBlurProgram = program;
       this.gl.useProgram(program);
       this.gl.uniform1i(this.gl.getUniformLocation(program, "uTexture"), 0);
@@ -3043,7 +3088,8 @@ export class TetoricaRetroVideoPipeline {
         uRadius: this.gl.getUniformLocation(program, "uRadius"),
       };
     } catch (error) {
-      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
+      if (program && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+      if (program && !(error instanceof ShaderPreparationCancelledError)) this.gl.deleteProgram(program);
       this.wideGlowBlurProgram = null;
       this.wideGlowBlurLocs = null;
       throw error;
@@ -3054,7 +3100,8 @@ export class TetoricaRetroVideoPipeline {
   }
 
   private async ensureWideGlowCompositeProgram() {
-    this.assertCompileActive();
+    const generation = this.compileGeneration;
+    this.assertCompileActive(generation);
     if (this.wideGlowCompositeProgram && this.wideGlowCompositeLocs) {
       return;
     }
@@ -3065,18 +3112,18 @@ export class TetoricaRetroVideoPipeline {
     let program: WebGLProgram | null = null;
     this.activeShaderCompiles += 1;
     try {
-      this.assertCompileActive();
+      this.assertCompileActive(generation);
       if (this.wideGlowCompositeProgram && this.wideGlowCompositeLocs) return;
-      await this.updateCompileState("Compiling shader (wide glow composite)...");
+      await this.updateCompileState("Compiling shader (wide glow composite)...", generation);
       logShaderCompileInfo("base:wideGlowComposite");
       program = submitProgram(
         this.gl,
         VERTEX_SHADER_SOURCE,
         FILTER_FRAGMENT_WIDE_GLOW_COMPOSITE,
       );
-      await this.updateCompileState("Linking shader (wide glow composite)...");
-      await this.verifyCompiledProgram(program);
-      this.assertCompileActive();
+      await this.updateCompileState("Linking shader (wide glow composite)...", generation);
+      await this.verifyCompiledProgram(program, generation);
+      this.assertCompileActive(generation);
       this.wideGlowCompositeProgram = program;
       this.gl.useProgram(program);
       this.gl.uniform1i(this.gl.getUniformLocation(program, "uSharpTexture"), 0);
@@ -3089,7 +3136,8 @@ export class TetoricaRetroVideoPipeline {
         uOpticalMode: this.gl.getUniformLocation(program, "uOpticalMode"),
       };
     } catch (error) {
-      if (program && !(error instanceof ShaderCompileTimeoutError)) this.gl.deleteProgram(program);
+      if (program && error instanceof ShaderPreparationCancelledError) this.hasAbandonedShaderWork = true;
+      if (program && !(error instanceof ShaderPreparationCancelledError)) this.gl.deleteProgram(program);
       this.wideGlowCompositeProgram = null;
       this.wideGlowCompositeLocs = null;
       throw error;
@@ -3235,19 +3283,29 @@ export class TetoricaRetroVideoPipeline {
     return this.windowsLiteProgramCache.has(getWindowsLiteVariantKey(filterState));
   }
 
+  isFilterStateVariantPreparationCancelled(filterState: RetroVideoFilterState) {
+    return this.failedWindowsLiteVariantKey === getWindowsLiteVariantKey(filterState);
+  }
+
   async prepareFilterStateVariant(filterState: RetroVideoFilterState) {
+    const generation = this.compileGeneration;
+    this.activePreparations += 1;
     try {
       await this.ensureSupportProgramsForFilterState(filterState);
-      if (!this.windowsLiteMode) {
-        this.reportCompileIdle();
-        return;
+      this.assertCompileActive(generation);
+      if (this.windowsLiteMode) {
+        await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
+        this.assertCompileActive(generation);
       }
-
-      await this.compileWindowsLiteVariant(getWindowsLiteVariantKey(filterState));
-      this.reportCompileIdle();
+      this.failedWindowsLiteVariantKey = null;
     } catch (error) {
-      this.reportCompileIdle();
+      if (isShaderPreparationCancelled(error)) {
+        this.failedWindowsLiteVariantKey = getWindowsLiteVariantKey(filterState);
+      }
       throw error;
+    } finally {
+      this.activePreparations -= 1;
+      this.reportCompileIdle();
     }
   }
 
@@ -4012,9 +4070,9 @@ export class TetoricaRetroVideoPipeline {
     this.isDisposed = true;
     this.windowsLitePendingVariantKey = null;
     const { gl } = this;
-    // A timed-out driver may still own pending work. Leave that context to GC
+    // A cancelled driver may still own pending work. Leave that context to GC
     // instead of issuing synchronization-prone cleanup calls during reload.
-    if (!this.shaderCompileFailure) {
+    if (!this.hasAbandonedShaderWork) {
       gl.deleteTexture(this.texture);
       gl.deleteVertexArray(this.vao);
       gl.deleteBuffer(this.vertexBuffer);
