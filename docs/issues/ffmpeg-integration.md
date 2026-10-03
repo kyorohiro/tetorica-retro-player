@@ -190,90 +190,120 @@ macOS 側の同種の問題は [`wkwebview-hls-webaudio.md`](wkwebview-hls-webau
 
 #### ffmpeg バイナリの準備
 
-##### Apple Silicon ネイティブ版の取得・確認（2026-09-12 追記）
+##### Intel版・Apple Siliconネイティブ版の取得・配置
 
-ARM64 の静的ビルドは次の配布元から取得できる。自前ビルドは必須ではない。
+リポジトリのルートで、以下のブロックをまとめて実行する。
+Intel版は evermeet.cx の FFmpeg 7.1、ARM版は OSXExperts の FFmpeg 9.0 を取得する。
+ダウンロード・展開先を分け、対応するバイナリだけを各ターゲット名に配置する。
 
-- [OSXExperts](https://www.osxexperts.net/): **Apple Silicon** の ffmpeg を選ぶ。確認時点では「Download ffmpeg 9.0 (Apple Silicon)」。
-- [Martin Riedl](https://ffmpeg.martin-riedl.de/): **macOS / Apple Silicon・arm64** の ffmpeg を選ぶ。安定版を試す場合は release を選択する。
-
-取得先は確認済みだが、このプロジェクトでの新しい ARM64 バイナリの実行・同梱検証はこれから行う。以前動作確認した ARM 版がどちらの配布元だったかは未特定。
-
-調査時の `src-tauri/binaries/ffmpeg-aarch64-apple-darwin` は、名前に反して中身が **x86_64** だった。以下の旧手順で Intel 版を両方に配置した構成なので、ファイル名だけでは判断しない。
-
-1. 上記サイトから Apple Silicon / arm64 の ZIP を取得・展開する。
-2. 展開した実行ファイルを確認する。以下のパスは実際の展開先に置き換える。
+zsh の対話シェルでは、設定によって `#` コメント行がコマンドとして扱われる。
+そこに `set -e` を直接貼り付けると、`command not found: #`（終了コード127）で
+ターミナル自体が終了する場合がある。以下は `/bin/bash` の子プロセス内で実行するため、
+コメントを解釈でき、エラー時にも親のターミナルを終了させない。
+既にターミナルが終了した場合は、新しいターミナルを開いて実行する。
 
 ```bash
-file /展開先/ffmpeg
-# Mach-O 64-bit executable arm64 であること
+/bin/bash <<'FFMPEG_SETUP'
+set -e
+trap 'echo "失敗した行: $LINENO / コマンド: $BASH_COMMAND" >&2' ERR
 
-otool -L /展開先/ffmpeg
-# /opt/homebrew/、/usr/local/、配布元のビルド環境などへの依存がないか確認
-# /usr/lib/ や /System/Library/ の macOS 標準ライブラリへの依存はあり得る
+# リポジトリのルートか確認
+test -d src-tauri
 
-chmod +x /展開先/ffmpeg
-/展開先/ffmpeg -version
-/展開先/ffmpeg -hide_banner -encoders
-# 本体の HLS 変換で使う libx264、aac などを確認
-```
+# 既存ファイルを退避
+backup_dir=$(mktemp -d /tmp/tetorica-ffmpeg-backup.XXXXXX)
 
-3. リポジトリのルートで既存ファイルを退避し、ARM 版だけを置き換える。
+for arch in x86_64 aarch64; do
+  existing="src-tauri/binaries/ffmpeg-${arch}-apple-darwin"
+  if [ -f "$existing" ]; then
+    cp "$existing" "$backup_dir/"
+  fi
+done
 
-```bash
-# 退避先は毎回別ディレクトリになる
-ffmpeg_backup_dir=$(mktemp -d /tmp/tetorica-ffmpeg-backup.XXXXXX)
-cp src-tauri/binaries/ffmpeg-aarch64-apple-darwin "$ffmpeg_backup_dir/"
-echo "$ffmpeg_backup_dir"
+echo "Backup: $backup_dir"
 
-cp /展開先/ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-file src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-src-tauri/binaries/ffmpeg-aarch64-apple-darwin -version
-shasum -a 256 src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-```
+# Intel版
+intel_dir=$(mktemp -d /tmp/ffmpeg-intel.XXXXXX)
 
-Intel 向けの `ffmpeg-x86_64-apple-darwin` はそのまま残す。配布元URL、取得バージョン、SHA-256、`-version` のビルド構成を控えておくと再取得しやすい。同梱する際は、取得したビルドに合わせてライセンス表記・対応ソースの案内も確認する。
+curl -fL "https://evermeet.cx/ffmpeg/ffmpeg-7.1.zip" \
+  -o "$intel_dir/ffmpeg.zip"
 
-4. 以下のサイドカービルド手順で ARM64 向けにビルドし、アプリから HLS 変換・再生を試す。`-version` が動くだけではアプリ同梱時の動作確認にはならない。
+unzip "$intel_dir/ffmpeg.zip" -d "$intel_dir"
 
-##### 旧運用: Intel 版を Rosetta で実行
+file "$intel_dir/ffmpeg"
+lipo "$intel_dir/ffmpeg" -verify_arch x86_64
 
-以下は過去の配置手順。**ARM64 版を配置した後に実行すると、Intel 版で上書きするため注意。**
-
-evermeet.cx は **x86_64（Intel）の静的ビルド**のみ提供している。
-Homebrew の ffmpeg は `/opt/homebrew/` への動的リンクが多く、配布アプリには使用不可。
-
-**v1.0.x 方針**: x86_64 静的バイナリを両アーキテクチャに配置する。
-- Intel Mac → ネイティブ実行
-- Apple Silicon Mac → Rosetta 2 で実行（動作確認済み）
-
-```bash
-# evermeet.cx から x86_64 静的ビルドをダウンロード
-curl -L "https://evermeet.cx/ffmpeg/ffmpeg-7.1.zip" -o /tmp/ffmpeg.zip
-unzip /tmp/ffmpeg.zip -d /tmp/
-
-# アーキテクチャを確認（x86_64 であることを確認）
-file /tmp/ffmpeg
-
-
-ffmpeg_dir=$(mktemp -d /tmp/ffmpeg-arm64.XXXXXX)
+# Apple Silicon版
+arm_dir=$(mktemp -d /tmp/ffmpeg-arm64.XXXXXX)
 
 curl -fL "https://www.osxexperts.net/ffmpeg9arm.zip" \
-  -o "$ffmpeg_dir/ffmpeg.zip"
+  -o "$arm_dir/ffmpeg.zip"
 
-unzip "$ffmpeg_dir/ffmpeg.zip" -d "$ffmpeg_dir"
+unzip "$arm_dir/ffmpeg.zip" -d "$arm_dir"
 
-file "$ffmpeg_dir/ffmpeg"
-shasum -a 256 "$ffmpeg_dir/ffmpeg"
+file "$arm_dir/ffmpeg"
+lipo "$arm_dir/ffmpeg" -verify_arch arm64
 
+# アーキテクチャごとに配置
+mkdir -p src-tauri/binaries
 
-# 両アーキテクチャ向けに配置（同じバイナリを使用）
-cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-cp /tmp/ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+cp "$intel_dir/ffmpeg" \
+  src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+
+cp "$arm_dir/ffmpeg" \
+  src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+
+chmod +x \
+  src-tauri/binaries/ffmpeg-x86_64-apple-darwin \
+  src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+
+# 配置結果とSHA-256を確認
+file \
+  src-tauri/binaries/ffmpeg-x86_64-apple-darwin \
+  src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+
+shasum -a 256 \
+  src-tauri/binaries/ffmpeg-x86_64-apple-darwin \
+  src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+
+# ARM版の依存ライブラリを確認
+otool -L src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+
+# Apple Silicon Macでの起動・エンコーダー確認
+if [ "$(uname -m)" = "arm64" ]; then
+  src-tauri/binaries/ffmpeg-aarch64-apple-darwin -version
+  src-tauri/binaries/ffmpeg-aarch64-apple-darwin -hide_banner -encoders
+else
+  echo "ARM版の起動・エンコーダー確認はApple Silicon Macで行ってください"
+fi
+
+echo "配置・確認が完了しました"
+FFMPEG_SETUP
 ```
+
+確認ポイント:
+
+- Intel向けファイルの `file` 出力が `x86_64`、Apple Silicon向けが `arm64` になっていること。
+  ファイル名の変更だけではアーキテクチャは変わらない。
+- ARM版の `otool -L` 出力に `/opt/homebrew/`、`/usr/local/`、配布元のビルド環境への依存がないこと。
+  `/usr/lib/` や `/System/Library/` の macOS 標準ライブラリへの依存はあり得る。
+- Apple Silicon Macで `-version` が動き、`-encoders` に HLS 変換で使用する `libx264`、`aac` があること。
+- 配布元URL、取得バージョン、SHA-256、`-version` のビルド構成を記録すること。
+  同梱時には取得したビルドに合わせてライセンス表記・対応ソースの案内も確認する。
+
+配置後は、以下のサイドカービルド手順でビルドし、アプリから HLS 変換・再生を試す。
+`-version` の起動確認だけではアプリ同梱時の動作確認にはならない。
+この手順の記載は、新しいARM版のアプリ同梱検証が完了したことを意味しない。
+
+別のARM64配布元を利用する場合は、[Martin Riedl](https://ffmpeg.martin-riedl.de/) の
+macOS / Apple Silicon・arm64 のビルドも候補になる。取得したバイナリは同様にアーキテクチャ・依存・動作を確認する。
+
+##### 旧運用: Intel版をRosettaで実行（参考）
+
+以前はIntel版の同じバイナリを両方のターゲット名に配置し、Apple Silicon上ではRosetta 2で実行していた。
+そのため、調査時の `ffmpeg-aarch64-apple-darwin` も中身はx86_64だった。
+現在の配置手順は上記のアーキテクチャ別の手順を使用する。
+ARM版をIntel版で上書きする旧コピー手順は削除した。
 
 ##### サイドカービルドの実行
 
