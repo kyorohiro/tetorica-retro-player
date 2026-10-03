@@ -152,3 +152,33 @@ full shader を Windows で無理に自動 compile へ戻すより、lite varian
 
 pass1 の詳細な機能差分（Glow / neon / edge boost / PC98 の式レベルの違いなど）は
 [`windows-lite-shader-parity.md`](windows-lite-shader-parity.md) に棚卸し済み。
+
+
+## MSX1 / SCREEN 2 compile mitigation (2026-10-03)
+
+MSX presets triggered near-freezes one or two times on a Windows PC. The exact
+GPU/compiler cause has not been reproduced locally.
+
+The original color-pair search used nested fixed-bound loops (`32 × 32 × 8`),
+with runtime breaks for the smaller palette. It now enumerates the same pairs
+in the same order with one loop whose trip count depends on the palette uniform
+(105 pairs for strict MSX1, 496 for Extended 32). This reduces opportunities for
+large static loop expansion while retaining exhaustive selection.
+
+Source sampling now uses `textureLod(..., 0.0)`: the source only uploads level
+zero. This removes implicit texture gradients from the vertical diffusion loop
+and its sampling helpers. ANGLE's [HLSL translator](https://chromium.googlesource.com/experimental/angle/angle/+/438f42b754202e556f7fef608f1a0fa8d0516dde/src/compiler/translator/hlsl/OutputHLSL.cpp)
+contains handling for gradient-dependent loop unrolling; treating it as a likely
+contributor here is an inference, not a confirmed diagnosis of this incident.
+An unused nested-loop sampling helper was also removed. The extension receives
+the same shader through the existing sync script.
+
+Validation: ten actual WebGL input/settings combinations produce byte-identical
+output against the previous shader, including Extended 32 at diffusion 0.12,
+nearest/averaged sampling, exact palette patterns, and horizontal bands. Windows
+D3D/ANGLE compile time and freeze frequency still require a real Windows check;
+macOS compile timings cannot establish the size of that improvement.
+
+For a before/after comparison, set `MSX_REFERENCE_SHADER_PATH` to a saved previous
+shader `.ts` file when running `scripts/check-msx1-screen2.mjs`. The optional first
+argument points to an installed Playwright module.

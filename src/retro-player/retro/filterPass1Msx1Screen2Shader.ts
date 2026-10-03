@@ -43,37 +43,25 @@ vec3 sampleCellAverage4(vec2 cellMin, vec2 cellSize)
 {
   vec2 quarter = cellSize * 0.25;
   vec3 sum = vec3(0.0);
-  sum += texture(uTexture, clamp(cellMin + vec2(quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, quarter.y), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + vec2(quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0))).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + vec2(quarter.x, quarter.y), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, quarter.y), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + vec2(quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + vec2(cellSize.x - quarter.x, cellSize.y - quarter.y), vec2(0.0), vec2(1.0)), 0.0).rgb;
   return sum * 0.25;
 }
 
 vec3 sampleCellAverage8(vec2 cellMin, vec2 cellSize)
 {
   vec3 sum = vec3(0.0);
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.25, 0.25), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.75, 0.25), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.25, 0.75), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.75, 0.75), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.50, 0.20), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.50, 0.80), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.20, 0.50), vec2(0.0), vec2(1.0))).rgb;
-  sum += texture(uTexture, clamp(cellMin + cellSize * vec2(0.80, 0.50), vec2(0.0), vec2(1.0))).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.25, 0.25), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.75, 0.25), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.25, 0.75), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.75, 0.75), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.50, 0.20), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.50, 0.80), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.20, 0.50), vec2(0.0), vec2(1.0)), 0.0).rgb;
+  sum += textureLod(uTexture, clamp(cellMin + cellSize * vec2(0.80, 0.50), vec2(0.0), vec2(1.0)), 0.0).rgb;
   return sum * 0.125;
-}
-
-vec3 sampleCellAverage16(vec2 cellMin, vec2 cellSize)
-{
-  vec3 sum = vec3(0.0);
-  for (int y = 0; y < 4; y++) {
-    for (int x = 0; x < 4; x++) {
-      vec2 offset = (vec2(float(x), float(y)) + 0.5) / 4.0;
-      sum += texture(uTexture, clamp(cellMin + cellSize * offset, vec2(0.0), vec2(1.0))).rgb;
-    }
-  }
-  return sum * (1.0 / 16.0);
 }
 
 vec3 sampleBaseSourceColorAtCell(vec2 cell)
@@ -81,7 +69,7 @@ vec3 sampleBaseSourceColorAtCell(vec2 cell)
   vec2 safeTargetSize = max(uTargetSize, vec2(1.0));
   vec2 uv = targetCellUv(cell);
   if (uSamplingMode < 0.5) {
-    return texture(uTexture, uv).rgb;
+    return textureLod(uTexture, uv, 0.0).rgb;
   }
 
   vec2 clampedCell = clamp(cell, vec2(0.0), safeTargetSize - vec2(1.0));
@@ -104,37 +92,41 @@ void main()
   for (int x = 0; x < 8; x++) {
     pixels[x] = sampleBaseSourceColorAtCell(block + vec2(float(x), 0));
   }
-  // Exhaustively score all distinct opaque color pairs. Code 0 duplicates the
-  // black backdrop, so searching codes 1..15 covers every visible choice.
+  // Exhaustively score all distinct opaque color pairs. Strict MSX1 skips
+  // transparent code 0; Extended 32 uses it as an additional opaque gray.
   float diffusion = clamp(uDitherStrength, 0.0, 1.0);
   float bestScore = 1e20;
   vec3 background = vec3(0), foreground = vec3(0);
   bool extended = uPaletteMode > 11.5;
   int colorCount = extended ? 32 : 16;
-  for (int a = 0; a < 31; a++) {
-    if (!extended && a == 0) continue;
-    if (a >= colorCount - 1) break;
-    for (int b = a + 1; b < 32; b++) {
-      if (b >= colorCount) break;
-      vec3 ca = PALETTE[a] / 255.0, cb = PALETTE[b] / 255.0;
-      vec3 axis = cb - ca;
-      float axisLength = dot(axis, axis);
-      // Prefer nearby endpoints when equally accurate mixtures are available.
-      // Otherwise a flat gray can choose black/white and make sparse dark rows.
-      float score = diffusion * axisLength * 0.001;
-      for (int x = 0; x < 8; x++) {
-        vec3 c = pixels[x];
-        float nearestError = min(colorError(c - ca), colorError(c - cb));
-        // With diffusion, score representable mixtures as well. A small
-        // nearest-error penalty breaks ties in favor of less noisy pairs.
-        float t = clamp(dot(c - ca, axis) / axisLength, 0.0, 1.0);
-        float mixtureError = colorError(c - mix(ca, cb, t));
-        score += mix(nearestError, mixtureError + nearestError * 0.05, diffusion);
-      }
-      if (score < bestScore) {
-        bestScore = score; background = ca; foreground = cb;
-      }
+  int firstColor = extended ? 0 : 1;
+  int visibleColors = colorCount - firstColor;
+  int pairCount = visibleColors * (visibleColors - 1) / 2;
+  int a = firstColor;
+  int b = a + 1;
+  // Uniform-dependent trip count, one pair loop rather than nested 32×32
+  // loops. Keep exhaustive selection/order but avoid a huge static HLSL body.
+  for (int pair = 0; pair < pairCount; pair++) {
+    vec3 ca = PALETTE[a] / 255.0, cb = PALETTE[b] / 255.0;
+    vec3 axis = cb - ca;
+    float axisLength = dot(axis, axis);
+    // Prefer nearby endpoints when equally accurate mixtures are available.
+    // Otherwise a flat gray can choose black/white and make sparse dark rows.
+    float score = diffusion * axisLength * 0.001;
+    for (int x = 0; x < 8; x++) {
+      vec3 c = pixels[x];
+      float nearestError = min(colorError(c - ca), colorError(c - cb));
+      // With diffusion, score representable mixtures as well. A small
+      // nearest-error penalty breaks ties in favor of less noisy pairs.
+      float t = clamp(dot(c - ca, axis) / axisLength, 0.0, 1.0);
+      float mixtureError = colorError(c - mix(ca, cb, t));
+      score += mix(nearestError, mixtureError + nearestError * 0.05, diffusion);
     }
+    if (score < bestScore) {
+      bestScore = score; background = ca; foreground = cb;
+    }
+    b++;
+    if (b >= colorCount) { a++; b = a + 1; }
   }
   // Each fragment computes its bit of the row's 8-bit 1bpp pattern, MSB
   // first. Diffuse vertically: flat tones alternate whole scanlines rather

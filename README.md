@@ -126,7 +126,9 @@ The web build is emitted to `dist/`.
 
 ## Acknowledgments
 
-This project was inspired by [@komm64's post on X](https://x.com/komm64/status/2073558529097834584).
+The Beam presets were inspired by [@komm64's post on X](https://x.com/komm64/status/2073558529097834584).
+
+The MSX presets were inspired by [@mdpc___'s post on X](https://x.com/mdpc___/status/2106170546560086264?s=20).
 
 ## License
 
