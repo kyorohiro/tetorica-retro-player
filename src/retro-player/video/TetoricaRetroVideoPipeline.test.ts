@@ -368,3 +368,41 @@ it("removes averaging only from the nearest Composite Beam kernel", () => {
   }
   pipeline.dispose();
 });
+
+it("prepares a distinct eight-tap Beam kernel and reuses the other split passes", async () => {
+  vi.useFakeTimers();
+  const { pipeline, internal, gl } = createPipeline();
+  const base = {
+    isFilterEnabled: true, paletteMode: "free", samplingMode: "average_fast_4",
+    phosphorDotShape: "beam", compositeEnabled: true, compositeAmount: 0.85,
+    wideGlowEnabled: false, curvature: 0.03,
+  } as RetroVideoFilterState;
+  const first = pipeline.prepareFilterStateVariant(base);
+  await vi.runAllTimersAsync();
+  await first;
+  const four = internal.windowsLiteProgramCache.get("basic_composite_sampled:beam")!;
+  const count = gl.createProgram.mock.calls.length;
+  const eightSettings = { ...base, samplingMode: "average_fast_8" } as RetroVideoFilterState;
+  expect(pipeline.hasPreparedFilterStateVariant(eightSettings)).toBe(false);
+  const next = pipeline.prepareFilterStateVariant(eightSettings);
+  await vi.runAllTimersAsync();
+  await next;
+  const eight = internal.windowsLiteProgramCache.get("basic_composite_sampled:beam:average8")!;
+  expect(eight).toBeTruthy();
+  expect(eight.pass1).toBe(four.pass1);
+  expect(eight.pass2).toBe(four.pass2);
+  expect(gl.createProgram).toHaveBeenCalledTimes(count + 1);
+  expect(pipeline.hasPreparedFilterStateVariant(eightSettings)).toBe(true);
+  expect(pipeline.hasPreparedFilterStateVariant({ ...eightSettings, samplingMode: "average" })).toBe(true);
+  const sources = pipeline as unknown as { getVariantStageSources(key: string): Record<string, string | null> };
+  const old = sources.getVariantStageSources("basic_composite_sampled:beam");
+  const specialized = sources.getVariantStageSources("basic_composite_sampled:beam:average8");
+  expect(specialized.beamKernel).toContain("sampleSourceTextureAverage8");
+  expect(specialized.beamKernel).not.toContain("sampleSourceTextureAverage4");
+  expect(specialized.beamKernel).not.toContain("texelFetch");
+  expect(specialized.beamKernel).not.toContain("uSamplingMode");
+  for (const stage of ["pass1", "compositePrep", "compositeMid", "beamStripe", "beamCompose", "pass2"]) {
+    expect(specialized[stage]).toBe(old[stage]);
+  }
+  pipeline.dispose();
+});

@@ -21,6 +21,7 @@ import { FILTER_FRAGMENT_PASS2_LITE } from "../retro/filterPass2LiteShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_POST } from "../retro/filterPass2BeamLiteCrtPostShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL } from "../retro/filterPass2BeamLiteCrtKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_FINALIZE } from "../retro/filterPass2BeamLiteFinalizeShader.ts";
+import { FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE8_KERNEL } from "../retro/filterPass2BeamLiteAverage8KernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL } from "../retro/filterPass2BeamLiteNearestKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_KERNEL } from "../retro/filterPass2BeamLiteKernelShader.ts";
 import { FILTER_FRAGMENT_PASS2_BEAM_LITE_POST } from "../retro/filterPass2BeamLitePostShader.ts";
@@ -487,7 +488,12 @@ type WindowsLitePass1Variant =
   | "pc98_sampled"
   | "pc98_composite";
 type WindowsLitePass2Variant = "basic" | "phosphor" | "beam";
-type WindowsLiteVariantKey = `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`;
+type WindowsLiteVariantKey =
+  | `${WindowsLitePass1Variant}:${WindowsLitePass2Variant}`
+  | `${WindowsLitePass1Variant}:beam:average8`;
+
+const isBeamVariantKey = (key: WindowsLiteVariantKey | null) =>
+  key?.split(":")[1] === "beam";
 
 const isPc98PaletteMode = (mode: PaletteMode) =>
   mode === "pc98" ||
@@ -545,7 +551,11 @@ const getWindowsLiteVariantKey = (
           : "basic"
       : "basic";
   if (filterState && isBeamCrossModeEnabled(filterState)) {
-    return `${pass1}:beam`;
+    // The other stages share sources/cache entries, but four/eight-tap Beam
+    // kernels must have distinct keys so a sampling change prepares the right one.
+    return getSamplingModeValue(filterState.samplingMode) >= 1.5
+      ? `${pass1}:beam:average8`
+      : `${pass1}:beam`;
   }
   const pass2: WindowsLitePass2Variant =
     filterState &&
@@ -2235,8 +2245,10 @@ export class TetoricaRetroVideoPipeline {
           ? this.appendShaderCompileBuster(source)
           : source;
 
-    const beamKernelBaseSource = variantKey.endsWith(":beam")
-      ? variantKey.startsWith("basic_nearest:beam")
+    const beamKernelBaseSource = isBeamVariantKey(variantKey)
+      ? variantKey.endsWith(":average8")
+        ? FILTER_FRAGMENT_PASS2_BEAM_LITE_AVERAGE8_KERNEL
+        : variantKey.startsWith("basic_nearest:beam")
         ? FILTER_FRAGMENT_PASS2_BEAM_LITE_CRT_KERNEL
         : variantKey.startsWith("basic_composite:beam")
           ? FILTER_FRAGMENT_PASS2_BEAM_LITE_NEAREST_KERNEL
@@ -3616,7 +3628,7 @@ export class TetoricaRetroVideoPipeline {
       }
 
       // Pass 2: FBO → screen/FBO (CRT effects: curvature, scanlines, phosphor dots, vignette)
-      const isBeamVariant = this.windowsLiteVariantKey?.endsWith(":beam") ?? false;
+      const isBeamVariant = isBeamVariantKey(this.windowsLiteVariantKey);
       const isBeamKernelVariant = isBeamVariant;
       const usePreFilterDownscale = shouldUsePreFilterDownscale(filterState);
       const usePostCurvaturePass = shouldUsePostCurvaturePass(filterState);
