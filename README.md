@@ -99,6 +99,10 @@ The web build is emitted to `dist/`.
 
 
 
+## Acknowledgments
+
+The Beam presets were inspired by [@komm64's post on X](https://x.com/komm64/status/2073558529097834584).
+
 ## License
 
 This project is licensed under the MIT License.
