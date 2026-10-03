@@ -975,7 +975,7 @@ export const PRESETS = {
     postCurvatureEnabled: false,
     wideGlowEnabled: true,
     wideGlowMode: "optical",
-    wideGlowStrength: 0.4,
+    wideGlowStrength: 0.23,
     wideGlowRadius: 6.4,
     wideGlowDownscale: 4,
     wideGlowUpdateInterval: 4,
