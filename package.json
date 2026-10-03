@@ -37,8 +37,7 @@
     "pdfjs-dist": "^6.0.227",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-reader": "^0.20.4",
-    "tone": "^15.1.22"
+    "react-reader": "^0.20.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",

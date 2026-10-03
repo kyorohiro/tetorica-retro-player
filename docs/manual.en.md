@@ -25,7 +25,7 @@ Press the ☰ (hamburger) button in the top-left corner to open the menu.
 - **Capture Screen** — Pick a window or the whole screen from the OS share dialog and preview it through the filter live
 - **Microphone Input / Camera Input** — Capture microphone audio or camera video
 - **Select Microphone Device** — Pick a specific input device
-- **Test presets** — One-tap sample content for checking things work: color-bar video/image, a ToneJS lo-fi demo song (expand "More" for the full demo song list)
+- **Test presets** — One-tap sample content for checking things work: color-bar video and image
 - **Language** — Switch between Auto / English / Japanese
 
 **Long-press** the hamburger button to hide the entire toolbar (handy when streaming or just watching without the UI in the way). While hidden, a small translucent button remains in the top-left corner to bring it back.

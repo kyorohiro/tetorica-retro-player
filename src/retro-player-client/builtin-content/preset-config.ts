@@ -1,6 +1,4 @@
 export type PresetConfig =
-  | { type: 'lofi' }
-  | { type: 'demo-song'; songId: string }
   | { type: 'colorbars-video' }
   | { type: 'colorbars-image' }
   | { type: 'url'; url: string; label: string };
@@ -28,14 +26,18 @@ export const shouldPersistStartupPresetUrl = (value: string) =>
 export function loadStartupPreset(): PresetConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { type: 'lofi' };
+    if (!raw) return { type: 'colorbars-image' };
     const parsed = JSON.parse(raw) as PresetConfig;
     if (parsed.type === "url" && isTransientLocalMdropUrl(parsed.url)) {
       localStorage.removeItem(STORAGE_KEY);
-      return { type: "lofi" };
+      return { type: "colorbars-image" };
     }
-    return parsed;
-  } catch { return { type: 'lofi' }; }
+    if (parsed.type === 'colorbars-image' || parsed.type === 'colorbars-video') return parsed;
+    if (parsed.type === 'url' && typeof parsed.url === 'string' && typeof parsed.label === 'string') return parsed;
+    // Migrate removed Lo-fi/demo-song presets and invalid saved values.
+    localStorage.removeItem(STORAGE_KEY);
+    return { type: 'colorbars-image' };
+  } catch { return { type: 'colorbars-image' }; }
 }
 
 export function saveStartupPreset(config: PresetConfig): void {

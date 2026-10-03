@@ -1,8 +1,6 @@
-import React from "react";
 import { Camera, FileUp, FolderOpen, Mic, MonitorUp, Pin, Play, Power, ScrollText, X } from "lucide-react";
 import { t, type Locale, type LocalePreference } from "./i18n";
 import type { PersistedRecentLaunchItem } from "./retro-player/hooks/persistedRetroSettings";
-import { DEMO_SONGS, type DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
 
 interface MobileMenuProps {
   locale: Locale;
@@ -19,8 +17,6 @@ interface MobileMenuProps {
   onSelectMicrophoneDevice: () => void;
   onPresetVideo: () => void;
   onPresetImage: () => void;
-  onPresetLofi: () => void;
-  onPresetDemoSong: (meta: DemoSongMeta) => void;
   onOpenRecentItem: (item: PersistedRecentLaunchItem) => void;
   onRemoveRecentItem: (id: string) => void;
   onToggleRecentItemPinned: (id: string, pinned: boolean) => void;
@@ -44,8 +40,6 @@ export function MobileMenu({
   onSelectMicrophoneDevice,
   onPresetVideo,
   onPresetImage,
-  onPresetLofi,
-  onPresetDemoSong,
   onOpenRecentItem,
   onRemoveRecentItem,
   onToggleRecentItemPinned,
@@ -53,7 +47,6 @@ export function MobileMenu({
   onChangeLocale,
   onOpenLicenses,
 }: MobileMenuProps) {
-  const [showMore, setShowMore] = React.useState(false);
 
   return (
     <div className="safe-top-menu fixed left-3 z-9999 max-h-[calc(100dvh-1rem)] w-[min(85vw,20rem)] overflow-y-auto rounded-2xl border border-slate-300 bg-white p-2 shadow-lg">
@@ -209,7 +202,7 @@ export function MobileMenu({
         <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
           Test
         </p>
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-2 gap-1">
           <button
             type="button"
             onClick={onPresetVideo}
@@ -228,47 +221,7 @@ export function MobileMenu({
             <span className="text-[10px] font-medium leading-tight">ColorBars</span>
             <span className="text-[9px] text-slate-400">i</span>
           </button>
-          <button
-            type="button"
-            onClick={onPresetLofi}
-            className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-50 py-2 text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50"
-          >
-            <span className="text-sm">🎵</span>
-            <span className="text-[10px] font-medium leading-tight">ToneJS</span>
-            <span className="text-[9px] text-slate-400">lo-fi</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMore((v) => !v)}
-            className={[
-              "flex flex-col items-center gap-0.5 rounded-xl border py-2 text-slate-700 transition",
-              showMore
-                ? "border-violet-400 bg-violet-50 text-violet-700"
-                : "border-slate-200 bg-slate-50 hover:border-violet-300 hover:bg-violet-50",
-            ].join(" ")}
-          >
-            <span className="text-sm">⋯</span>
-            <span className="text-[10px] font-medium leading-tight">More</span>
-            <span className="text-[9px] text-slate-400">{DEMO_SONGS.length}</span>
-          </button>
         </div>
-
-        {/* Expanded song list */}
-        {showMore && (
-          <div className="mt-1.5 max-h-52 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/60">
-            {DEMO_SONGS.map((song) => (
-              <button
-                key={song.id}
-                type="button"
-                onClick={() => onPresetDemoSong(song)}
-                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition hover:bg-violet-100"
-              >
-                <span className="text-[12px] font-medium text-slate-700">{song.name}</span>
-                <span className="font-mono text-[10px] text-slate-400">{song.bpm} bpm</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Language */}

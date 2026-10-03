@@ -55,7 +55,6 @@ import {
 } from "./retro-player/events";
 import { MobileMenu } from "./MobileMenu";
 import { LicenseDialog } from "./LicenseDialog";
-import type { DemoSongMeta } from "./retro-player-client/builtin-content/demo-songs";
 import { listNativePathEntries, mdropShareFile, mdropUnshareAll } from "./mdrop-web/tauri";
 import { resolvePlayableUrl } from "./mdrop-web/resolvePlayableSource";
 import { usePreviewDialog } from "./mdrop-web/usePreviewDialog";
@@ -974,8 +973,6 @@ function App() {
           onSelectMicrophoneDevice={() => { void handleSelectMicrophoneDevice(); }}
           onPresetVideo={() => { setIsMobileMenuOpen(false); retroPlayerClientRef.current?.playPresetVideo(); }}
           onPresetImage={() => { setIsMobileMenuOpen(false); retroPlayerClientRef.current?.playPresetImage(); }}
-          onPresetLofi={() => { setIsMobileMenuOpen(false); void retroPlayerClientRef.current?.playPresetLofi(); }}
-          onPresetDemoSong={(meta: DemoSongMeta) => { setIsMobileMenuOpen(false); void retroPlayerClientRef.current?.playPresetDemoSong(meta); }}
           onOpenRecentItem={(item) => { void handleOpenRecentLaunchItem(item); }}
           onRemoveRecentItem={handleRemoveRecentLaunchItem}
           onToggleRecentItemPinned={handleToggleRecentLaunchPinned}

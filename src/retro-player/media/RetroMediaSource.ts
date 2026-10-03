@@ -31,11 +31,7 @@ import { shouldBypassPlaybackWebAudio } from "./RetroAudioRouting";
 
 export type RetroMediaElement = HTMLVideoElement | HTMLAudioElement | HTMLImageElement;
 export type RetroMediaSourceKind = "video" | "audio" | "image";
-// Tone.js / screen-capture audio is modeled as an "audio" kind with a
-// "stream" origin — not a separate kind. Tone.js runs on its own
-// AudioContext and is bridged out via createMediaStreamDestination() in
-// src/retro-player-client/builtin-content/demo-song-session.ts; by the time it reaches this
-// module it's just a MediaStream like any other.
+// Captured and built-in emulator audio use the same MediaStream source path.
 export type RetroMediaSourceOrigin = "url" | "stream";
 
 export type RetroMediaSource = {
@@ -507,7 +503,7 @@ export function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
       return;
     }
 
-    // For MediaStream sources (Tone.js, screen capture audio), Safari does not
+    // For MediaStream sources (emulator or screen capture audio), Safari does not
     // fire loadedmetadata/canplay after audio.load(), causing a permanent hang.
     // Skip load() and resolve immediately — the caller's playback-start flow
     // handles errors from there.

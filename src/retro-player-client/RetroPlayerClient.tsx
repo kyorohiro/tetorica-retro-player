@@ -4,7 +4,6 @@ import { t } from "../i18n";
 import { useDialog } from "../useDialog";
 import { mdropShareFile } from "../mdrop-web/tauri";
 import { resolvePlayableUrl } from "../mdrop-web/resolvePlayableSource";
-import type { DemoSongMeta } from "./builtin-content/demo-songs";
 import { isGameBoyRomFile, startGbSession } from "./builtin-content/gb-session";
 import { isNesRomFile, startNesSession } from "./builtin-content/nes-session";
 import {
@@ -28,13 +27,6 @@ import { primeImageElementCache } from "../retro-player/media/RetroMediaSource";
 
 const RetroPlayer = React.lazy(() => import("../retro-player/components/RetroPlayer"));
 
-const preloadToneBuiltins = () => {
-  void import("tone");
-  void import("./builtin-content/lofi-engine");
-  void import("./builtin-content/demo-song-session");
-  void import("./builtin-content/demo-songs");
-};
-
 type PlaylistItem =
   | { kind: "file"; file: File }
   | { kind: "path"; url: string; path: string };
@@ -49,10 +41,8 @@ const compareComicOrder = (a: string, b: string) =>
     sensitivity: "base",
   });
 
-// 'pending' = loading (dark overlay covers colorbars flash)
-// 'blocked' = AudioContext suspended (Safari) → shows Touch & Play button
-// 'done'    = playing or user chose something else
-type AutoStartState = 'pending' | 'blocked' | 'done';
+// Emulator audio can require a user gesture on Safari.
+type AutoStartState = 'blocked' | 'done';
 
 const retroPlayerKey = "player:root";
 type BuiltinSessionCleanup = () => void;
@@ -64,8 +54,6 @@ export type RetroPlayerClientHandle = {
   stopBuiltinPlayback: () => void;
   playPresetVideo: () => void;
   playPresetImage: () => void;
-  playPresetLofi: () => Promise<void>;
-  playPresetDemoSong: (meta: DemoSongMeta) => Promise<void>;
 };
 
 type RetroPlayerClientProps = {
@@ -107,17 +95,14 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       startupPreset.type === 'colorbars-image' ? './test_colorbars.png' :
       startupPreset.type === 'colorbars-video' ? './test_colorbars.mp4' :
       startupPreset.type === 'url' ? startupPreset.url :
-      undefined; // lofi / demo-song → audio UI, no src needed
+      './test_colorbars.png';
     const defaultPreviewKind: "video" | "audio" | "image" =
       startupPreset.type === 'colorbars-image' ? 'image' :
       startupPreset.type === 'colorbars-video' ? 'video' :
       startupPreset.type === 'url' ? 'video' :
-      'audio'; // lofi / demo-song
+      'image';
 
     const currentPresetConfigRef = useRef<PresetConfig>(startupPreset);
-    const toneCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
-    const suppressNextBuiltinTonePlaySyncRef = useRef(false);
-    const builtinToneRestartingRef = useRef(false);
     const nesCleanupRef = useRef<BuiltinSessionCleanup | null>(null);
     const nesResumeAudioRef = useRef<(() => Promise<boolean>) | null>(null);
     const nesLaunchTokenRef = useRef(0);
@@ -125,9 +110,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const [nesCanvas, setNesCanvas] = useState<HTMLCanvasElement | null>(null);
     const [nesAudioStream, setNesAudioStream] = useState<MediaStream | null>(null);
     const [nesDisplayName, setNesDisplayName] = useState<string>("");
-    const [autoStartState, setAutoStartState] = useState<AutoStartState>('blocked');
-    const isDialogActiveRef = useRef(isDialogActive);
-    useEffect(() => { isDialogActiveRef.current = isDialogActive; }, [isDialogActive]);
+    const [autoStartState, setAutoStartState] = useState<AutoStartState>('done');
 
     const previewSourceRef = useRef(previewSource);
     useEffect(() => { previewSourceRef.current = previewSource; }, [previewSource]);
@@ -156,19 +139,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     const [showPlaybackRetryHint, setShowPlaybackRetryHint] = useState(false);
     const shouldShowFfmpegRetry = false;
 
-    useEffect(() => {
-      const idleCallback = window.setTimeout(() => {
-        preloadToneBuiltins();
-      }, 800);
-      return () => {
-        window.clearTimeout(idleCallback);
-      };
-    }, []);
-
-    // Restore startup preset on mount.
-    // ToneJS presets: do nothing — stay 'blocked' so Touch & Play shows.
-    //   handleRetry builds the session when the user taps.
-    // URL/ColorBar presets: load immediately and mark 'done'.
+    // Restore the saved media preset on mount.
     useEffect(() => {
       let cancelled = false;
 
@@ -176,9 +147,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
         if (cancelled) return;
         try {
           const preset = currentPresetConfigRef.current;
-          if (preset.type === 'lofi' || preset.type === 'demo-song') {
-            // Stay 'blocked' — Touch & Play required before audio starts.
-          } else if (preset.type === 'colorbars-video') {
+          if (preset.type === 'colorbars-video') {
             previewSourceRef.current.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
             setAutoStartState('done');
           } else if (preset.type === 'colorbars-image') {
@@ -194,12 +163,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       return () => { cancelled = true; };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const stopTone = useCallback(() => {
-      toneCleanupRef.current?.();
-      toneCleanupRef.current = null;
-      suppressNextBuiltinTonePlaySyncRef.current = false;
-    }, []);
-
     const stopNesSession = useCallback(() => {
       nesLaunchTokenRef.current += 1;
       nesCleanupRef.current?.();
@@ -212,17 +175,14 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, []);
 
     const stopBuiltinPlayback = useCallback(() => {
-      stopTone();
       stopNesSession();
       setAutoStartState('done');
-    }, [stopNesSession, stopTone]);
+    }, [stopNesSession]);
 
     const stopCurrentPlaybackBeforePresetStart = useCallback(() => {
-      builtinToneRestartingRef.current = true;
       previewSource.clearPreview();
-      stopTone();
       stopNesSession();
-    }, [previewSource, stopNesSession, stopTone]);
+    }, [previewSource, stopNesSession]);
 
     const clearPlaylistSession = useCallback(() => {
       playlistRef.current = [];
@@ -232,17 +192,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       currentPlayingPathRef.current = null;
       setShowFfmpegRetry(false);
       setShowPlaybackRetryHint(false);
-    }, []);
-
-    const syncToneTransportPlayback = useCallback((playing: boolean) => {
-      void import('tone').then(({ getTransport }) => {
-        const transport = getTransport();
-        if (playing) {
-          transport.start();
-        } else {
-          transport.pause();
-        }
-      });
     }, []);
 
     const currentPlaybackSource = React.useMemo<RetroPlaybackEvent["source"]>(
@@ -258,19 +207,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     useEffect(() => {
       if (!isDialogActive) return;
       dispatchRetroPlayerPausePlayback();
-      if (currentPlaybackSource !== "builtin-tone") return;
-      syncToneTransportPlayback(false);
-    }, [currentPlaybackSource, isDialogActive, syncToneTransportPlayback]);
-
-    // When a file/URL/stream is loaded while Touch & Play is showing, dismiss the overlay and stop ToneJS.
-    useEffect(() => {
-      if (!previewSource.previewSrc && !previewSource.previewStream) return;
-      if (autoStartState !== 'blocked') return;
-      if (nesResumeAudioRef.current) return;
-      toneCleanupRef.current?.();
-      toneCleanupRef.current = null;
-      setAutoStartState('done');
-    }, [previewSource.previewSrc, previewSource.previewStream, autoStartState]);
+    }, [isDialogActive]);
 
     const savePreset = useCallback((config: PresetConfig) => {
       currentPresetConfigRef.current = config;
@@ -292,32 +229,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
     }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
 
-    const playPresetLofi = useCallback(async () => {
-      clearPlaylistSession();
-      savePreset({ type: 'lofi' });
-      stopCurrentPlaybackBeforePresetStart();
-      const [{ startLofiSession }, Tone] = await Promise.all([
-        import('./builtin-content/lofi-engine'),
-        import('tone'),
-      ]);
-      await Tone.start().catch(() => {});
-      const session = await startLofiSession();
-      toneCleanupRef.current = session.dispose;
-      suppressNextBuiltinTonePlaySyncRef.current = true;
-      previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
-    }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
-
-    const playPresetDemoSong = useCallback(async (meta: DemoSongMeta) => {
-      clearPlaylistSession();
-      savePreset({ type: 'demo-song', songId: meta.id });
-      stopCurrentPlaybackBeforePresetStart();
-      const { startDemoSongSession } = await import('./builtin-content/demo-song-session');
-      const session = await startDemoSongSession(meta);
-      toneCleanupRef.current = session.dispose;
-      suppressNextBuiltinTonePlaySyncRef.current = true;
-      previewSource.previewAudioStream(session.stream, meta.name);
-    }, [clearPlaylistSession, previewSource, savePreset, stopCurrentPlaybackBeforePresetStart]);
-
     // Restart the currently saved preset. Called from RetroPlayer's onRetry
     // (play button pressed while media is in error/ended state).
     const handleRetry = useCallback(async () => {
@@ -330,29 +241,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       setAutoStartState('done');
       const preset = currentPresetConfigRef.current;
       stopCurrentPlaybackBeforePresetStart();
-      if (preset.type === 'lofi') {
-        const [{ startLofiSession }, Tone] = await Promise.all([
-          import('./builtin-content/lofi-engine'),
-          import('tone'),
-        ]);
-        await Tone.start().catch(() => {});
-        const session = await startLofiSession();
-        toneCleanupRef.current = session.dispose;
-        suppressNextBuiltinTonePlaySyncRef.current = true;
-        previewSource.previewAudioStream(session.stream, 'Lo-fi Chill');
-      } else if (preset.type === 'demo-song') {
-        const [{ DEMO_SONGS }, { startDemoSongSession }] = await Promise.all([
-          import('./builtin-content/demo-songs'),
-          import('./builtin-content/demo-song-session'),
-        ]);
-        const meta = DEMO_SONGS.find(s => s.id === preset.songId);
-        if (meta) {
-          const session = await startDemoSongSession(meta);
-          toneCleanupRef.current = session.dispose;
-          suppressNextBuiltinTonePlaySyncRef.current = true;
-          previewSource.previewAudioStream(session.stream, meta.name);
-        }
-      } else if (preset.type === 'colorbars-video') {
+      if (preset.type === 'colorbars-video') {
         previewSource.previewPath('./test_colorbars.mp4', 'test_colorbars.mp4');
       } else if (preset.type === 'colorbars-image') {
         previewSource.previewPath('./test_colorbars.png', 'test_colorbars.png');
@@ -362,7 +251,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
     }, [previewSource, stopCurrentPlaybackBeforePresetStart]);
 
     const launchGameFile = useCallback((file: File) => {
-      stopTone();
       stopNesSession();
       clearPlaylistSession();
       previewSource.clearPreview();
@@ -391,7 +279,7 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       }).catch((error) => {
         console.error("[retro-game] failed to start", error);
       });
-    }, [clearPlaylistSession, previewSource, stopNesSession, stopTone]);
+    }, [clearPlaylistSession, previewSource, stopNesSession]);
 
     const previewItem = useCallback((item: PlaylistItem) => {
       setShowFfmpegRetry(false);
@@ -621,8 +509,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       stopBuiltinPlayback,
       playPresetVideo,
       playPresetImage,
-      playPresetLofi,
-      playPresetDemoSong,
     }), [
       loadPaths,
       loadFiles,
@@ -630,8 +516,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       stopBuiltinPlayback,
       playPresetVideo,
       playPresetImage,
-      playPresetLofi,
-      playPresetDemoSong,
     ]);
 
     const isNesDirectPreviewActive = Boolean(nesCanvas);
@@ -680,27 +564,6 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
             onPlaybackChange={(event) => {
               if (event.playing) {
                 setShowPlaybackRetryHint(false);
-              }
-              if (event.source === "builtin-tone") {
-                if (isDialogActiveRef.current) {
-                  syncToneTransportPlayback(false);
-                  return;
-                }
-                if (builtinToneRestartingRef.current) {
-                  if (event.playing) {
-                    builtinToneRestartingRef.current = false;
-                  }
-                  return;
-                }
-                if (event.playing && suppressNextBuiltinTonePlaySyncRef.current) {
-                  suppressNextBuiltinTonePlaySyncRef.current = false;
-                  return;
-                }
-                syncToneTransportPlayback(event.playing);
-                return;
-              }
-              if (event.playing) {
-                stopTone();
               }
             }}
             onPrevTrack={playlistLength > 1 ? prevTrack : undefined}

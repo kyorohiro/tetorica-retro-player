@@ -102,11 +102,6 @@
       "license": "MIT"
     },
     {
-      "name": "@babel/runtime",
-      "version": "7.29.7",
-      "license": "MIT"
-    },
-    {
       "name": "@babel/template",
       "version": "7.29.7",
       "license": "MIT"
@@ -389,11 +384,6 @@
     {
       "name": "assertion-error",
       "version": "2.0.1",
-      "license": "MIT"
-    },
-    {
-      "name": "automation-events",
-      "version": "7.1.19",
       "license": "MIT"
     },
     {
@@ -867,11 +857,6 @@
       "license": "MIT"
     },
     {
-      "name": "standardized-audio-context",
-      "version": "25.3.77",
-      "license": "MIT"
-    },
-    {
       "name": "std-env",
       "version": "4.1.0",
       "license": "MIT"
@@ -927,11 +912,6 @@
       "license": "MIT"
     },
     {
-      "name": "tone",
-      "version": "15.1.22",
-      "license": "MIT"
-    },
-    {
       "name": "tough-cookie",
       "version": "6.0.1",
       "license": "BSD-3-Clause"
@@ -940,11 +920,6 @@
       "name": "tr46",
       "version": "6.0.0",
       "license": "MIT"
-    },
-    {
-      "name": "tslib",
-      "version": "2.8.1",
-      "license": "0BSD"
     },
     {
       "name": "type",
