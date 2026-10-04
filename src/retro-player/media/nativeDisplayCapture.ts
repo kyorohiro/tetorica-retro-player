@@ -1,14 +1,17 @@
+import { RetroPreviewError } from "../i18n";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "../platform/runtime";
 import { getDisplayCaptureOptions } from "./displayCaptureOptions";
 import { recordCaptureAudioDiagnostic } from "./captureAudioDiagnostics";
 import { decodeNativeAudioPacket, nextNativeAudioTime } from "./nativeCaptureProtocol";
 
-const nativeStreams = new WeakSet<MediaStream>();
+const nativeStreams = new WeakMap<MediaStream, string>();
 
 export function getDisplayCaptureLabel(stream: MediaStream, locale: string) {
   if (nativeStreams.has(stream)) {
-    return locale === "ja" ? "Display Capture（Native・音声入力）" : "Display Capture (native, audio input)";
+    return nativeStreams.get(stream) === "system-output"
+      ? locale === "ja" ? "Display Capture（Native・システム音声）" : "Display Capture (native, system audio)"
+      : locale === "ja" ? "Display Capture（Native・音声入力）" : "Display Capture (native, audio input)";
   }
   return stream.getAudioTracks().length > 0 ? "Display Capture"
     : locale === "ja" ? "Display Capture（音声なし）" : "Display Capture (no audio)";
@@ -16,18 +19,46 @@ export function getDisplayCaptureLabel(stream: MediaStream, locale: string) {
 
 export function canRequestDisplayCapture() {
   return Boolean(navigator.mediaDevices?.getDisplayMedia) ||
-    (isTauriRuntime() && /Mac/i.test(navigator.userAgent));
+    (isTauriRuntime() && /Mac|Windows/i.test(navigator.userAgent));
 }
 
-export async function requestDisplayCapture(): Promise<MediaStream> {
-  if (isTauriRuntime() && /Mac/i.test(navigator.userAgent) &&
+type CaptureTarget = { id: string; title: string; kind: "window" | "display" };
+export type NativeCaptureSelection = {
+  locale: string;
+  select: (options: { title: string; message: string; options: { value: string; label: string; description: string }[]; cancelText: string }) => Promise<string | null>;
+};
+
+export async function requestDisplayCapture(selection?: NativeCaptureSelection): Promise<MediaStream> {
+  if (isTauriRuntime() && /Mac|Windows/i.test(navigator.userAgent) &&
       await invoke<boolean>("native_capture_available")) {
-    return startNativeCapture();
+    if (!selection) throw new Error("Native capture requires a window or display selection.");
+    const ja = selection.locale === "ja";
+    const windows = /Windows/i.test(navigator.userAgent);
+    const targets = await invoke<CaptureTarget[]>("native_capture_targets").catch(error => {
+      const permissionRequired = String(error).includes("NATIVE_CAPTURE_PERMISSION_REQUIRED");
+      recordCaptureAudioDiagnostic("native-targets-failed", { reason: permissionRequired ? "permission-required" : "target-query-failed" });
+      if (permissionRequired) throw new RetroPreviewError("capture-permission-required", "Native capture permission required");
+      throw error;
+    });
+    const targetId = await selection.select({
+      title: ja ? "キャプチャーする画面・ウィンドウ" : "Choose a display or window",
+      message: windows
+        ? ja ? "音声は既定の出力デバイス全体を取得します。他のアプリの音声も含まれます。" : "Audio includes all apps playing through the default output device."
+        : ja ? "ウィンドウはそのアプリの音声、画面はシステム音声を取得します。このプレイヤーの出力音声は除外します。" : "Window capture includes application audio; display capture includes system audio. This player's output is excluded.",
+      options: targets.map(target => ({
+        value: target.id,
+        label: target.title || (ja ? "無題のウィンドウ" : "Untitled window"),
+        description: target.kind === "display" ? ja ? "画面" : "Display" : ja ? "ウィンドウ" : "Window",
+      })),
+      cancelText: ja ? "キャンセル" : "Cancel",
+    });
+    if (!targetId) throw new DOMException("Capture cancelled.", "NotAllowedError");
+    return startNativeCapture(targetId, windows ? "system-output" : "application-or-display");
   }
   return navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
 }
 
-async function startNativeCapture(): Promise<MediaStream> {
+async function startNativeCapture(targetId: string, audioScope: string): Promise<MediaStream> {
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
   canvas.height = 720;
@@ -36,7 +67,7 @@ async function startNativeCapture(): Promise<MediaStream> {
   const audio = new AudioContext({ sampleRate: 48000 });
   const destination = audio.createMediaStreamDestination();
   const stream = canvas.captureStream(30);
-  nativeStreams.add(stream);
+  nativeStreams.set(stream, audioScope);
   destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
   let sessionId: string | null = null;
   let disposed = false;
@@ -85,12 +116,15 @@ async function startNativeCapture(): Promise<MediaStream> {
     if (kind === 1 || kind === 2) acknowledged++;
     if (disposed) return;
     if (kind === 0) {
-      recordCaptureAudioDiagnostic("native-started", { videoMaxDimension: 1280, fps: 30, audioScope: "application-or-display" });
+      recordCaptureAudioDiagnostic("native-started", { videoMaxDimension: 1280, fps: 30, audioScope });
       started = true;
       resolveReady(stream);
     } else if (kind === 3) {
+      recordCaptureAudioDiagnostic("native-ended", { beforeReady: !started, hasError: packet.byteLength > 1 });
       const message = new TextDecoder().decode(packet.slice(1));
-      if (!started) rejectReady(new Error(message || "Native capture ended before starting."));
+      if (!started) rejectReady(message.includes("NATIVE_CAPTURE_PERMISSION_REQUIRED")
+        ? new RetroPreviewError("capture-permission-required", "Native capture permission required")
+        : new Error(message || "Native capture ended before starting."));
       dispose(true);
     } else if (kind === 1 && !decoding) {
       decoding = true;
@@ -144,7 +178,7 @@ async function startNativeCapture(): Promise<MediaStream> {
   try {
     await audio.resume();
     if (audio.state !== "running") throw new Error("Audio capture could not start. Try the capture button again.");
-    sessionId = await invoke<string>("native_capture_start", { packets });
+    sessionId = await invoke<string>("native_capture_start", { targetId, packets });
     if (disposed) await invoke("native_capture_stop", { sessionId });
     const result = await ready;
     if (disposed) throw new Error("Native capture ended before the preview was ready.");

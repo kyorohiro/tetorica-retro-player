@@ -1,3 +1,4 @@
+import { useDialog } from "../../useDialog";
 import { canRequestDisplayCapture, requestDisplayCapture, getDisplayCaptureLabel } from "../media/nativeDisplayCapture";
 import { useRef } from "react";
 import { hasCurrentPlaybackData } from "../media/playbackReadiness";
@@ -194,6 +195,7 @@ export function useRetroPreviewMedia({
   onEndedRef,
   autoPlayRef,
 }: UseRetroPreviewMediaParams) {
+  const { showSelectDialog } = useDialog();
   const _setPreviewError = setPreviewError;
   const playbackStartAttemptRef = useRef(0);
   const isPauseRequested = () => playbackIntentRef.current === "pause";
@@ -1492,7 +1494,7 @@ export function useRetroPreviewMedia({
 
     try {
       await ensureRendererReady();
-      const stream = await requestDisplayCapture();
+      const stream = await requestDisplayCapture({ locale, select: showSelectDialog });
       markDisplayCaptureStream(stream);
 
       if (requestId !== previewRequestIdRef.current) {

@@ -67,7 +67,7 @@ function collectRustLicenses() {
   const metadata = JSON.parse(raw);
 
   return metadata.packages
-    .filter((p) => p.source !== null) // drop this repo's own workspace crates
+    .filter((p) => p.source !== null || p.name === "scap") // include our patched upstream crate
     .map((p) => ({
       name: p.name,
       version: p.version,

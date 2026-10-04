@@ -1,3 +1,17 @@
 [workspace]
-members = ["src-tauri", "src-mdrop-core"]
+members = ["src-tauri", "src-mdrop-core", "src-native-capture"]
 resolver = "2"
+exclude = ["third_party/scap"]
+
+[patch.crates-io]
+scap = { path = "third_party/scap" }
+
+# Real-time capture must keep up in `tauri dev` and debug test apps too.
+[profile.dev.package.tetorica-native-capture]
+opt-level = 3
+
+[profile.dev.package.scap]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3

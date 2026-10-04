@@ -1,3 +1,4 @@
+import { useDialog } from "../../useDialog";
 import { canRequestDisplayCapture, requestDisplayCapture, getDisplayCaptureLabel } from "../media/nativeDisplayCapture";
 import { useCallback, useEffect, useState } from "react";
 import { markDisplayCaptureStream } from "../media/displayCaptureOptions";
@@ -79,6 +80,7 @@ const resolvePreviewKind = (src: string, filePath: string): PreviewSourceKind =>
     : kindFromPath(filePath);
 
 export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
+  const { showSelectDialog } = useDialog();
   const [preferredAudioInputDeviceId, setPreferredAudioInputDeviceIdState] = useState<string | null>(
     () => getPreferredAudioInputDeviceId(),
   );
@@ -177,7 +179,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     }
 
     try {
-      const stream = await requestDisplayCapture();
+      const stream = await requestDisplayCapture({ locale, select: showSelectDialog });
       markDisplayCaptureStream(stream);
 
       clearPreviewSrc();
@@ -206,7 +208,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
       setCaptureError(message);
       return message;
     }
-  }, [clearPreviewSrc, locale]);
+  }, [clearPreviewSrc, locale, showSelectDialog]);
 
   const startMicrophoneInput = useCallback(async (
     deviceIdOverride?: string | null,

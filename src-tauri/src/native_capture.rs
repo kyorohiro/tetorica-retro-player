@@ -1,81 +1,84 @@
 use tauri::ipc::{Channel, Response};
+use tetorica_target::CaptureTarget;
 
-#[cfg(target_os = "macos")]
-mod mac {
+// Keep commands available on Linux/mobile so frontend fallback remains predictable.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use tetorica_native_capture as tetorica_target;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+mod tetorica_target {
+    #[derive(serde::Serialize)]
+    pub struct CaptureTarget {}
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod desktop {
     use super::*;
-    use std::ffi::c_void;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     };
-
-    pub struct Session {
+    struct Session {
         id: String,
         channel: Channel<Response>,
         pending: AtomicUsize,
+        stopping: Arc<AtomicBool>,
     }
     static SESSION: Mutex<Option<Arc<Session>>> = Mutex::new(None);
-    extern "C" {
-        fn retro_capture_available() -> bool;
-        fn retro_capture_start(
-            callback: unsafe extern "C" fn(*const u8, usize, *mut c_void),
-            release: unsafe extern "C" fn(*mut c_void),
-            context: *mut c_void,
-        );
-        fn retro_capture_stop();
-    }
-    unsafe extern "C" fn release(context: *mut c_void) {
-        drop(Arc::from_raw(context.cast::<Session>()));
-    }
-    unsafe extern "C" fn packet(bytes: *const u8, len: usize, context: *mut c_void) {
-        if bytes.is_null() || len == 0 {
-            return;
-        }
-        let session = &*context.cast::<Session>();
-        let data = std::slice::from_raw_parts(bytes, len);
-        if data[0] == 1 || data[0] == 2 {
-            // Bound IPC memory if the webview stalls. Dropped samples are never queued.
-            if session.pending.fetch_add(1, Ordering::Relaxed) >= 32 {
-                session.pending.fetch_sub(1, Ordering::Relaxed);
-                return;
+
+    pub fn start(target_id: String, channel: Channel<Response>) -> Result<String, String> {
+        // Replacing a source stops the previous worker before opening a new one.
+        stop(None)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            if SESSION.lock().map_err(|e| e.to_string())?.is_none() {
+                break;
             }
-            if session.channel.send(Response::new(data.to_vec())).is_err() {
-                session.pending.fetch_sub(1, Ordering::Relaxed);
+            if std::time::Instant::now() >= deadline {
+                return Err("The previous capture is still stopping. Try again.".into());
             }
-        } else {
-            let _ = session.channel.send(Response::new(data.to_vec()));
-            if data[0] == 3 {
-                if let Ok(mut current) = SESSION.lock() {
-                    if current.as_ref().map(|s| s.id.as_str()) == Some(session.id.as_str()) {
-                        *current = None;
-                    }
-                }
-            }
-        }
-    }
-    pub fn available() -> bool {
-        unsafe { retro_capture_available() }
-    }
-    pub fn start(app: tauri::AppHandle, channel: Channel<Response>) -> Result<String, String> {
-        if !available() {
-            return Err("Native window capture requires macOS 14 or later.".into());
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
         let mut current = SESSION.lock().map_err(|e| e.to_string())?;
         if current.is_some() {
-            return Err("A native capture is already active.".into());
+            return Err("A native capture is already active. Wait for it to stop.".into());
         }
         let session = Arc::new(Session {
             id: uuid::Uuid::new_v4().to_string(),
             channel,
             pending: AtomicUsize::new(0),
+            stopping: Arc::new(AtomicBool::new(false)),
         });
         let id = session.id.clone();
-        // Transfer a retained Arc to Swift on the main thread; its deinit releases it.
-        let owned = session.clone();
-        app.run_on_main_thread(move || unsafe {
-            retro_capture_start(packet, release, Arc::into_raw(owned).cast_mut().cast());
-        })
-        .map_err(|e| e.to_string())?;
+        let worker = session.clone();
+        std::thread::Builder::new().name("native-capture".into()).spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                tetorica_native_capture::run(&target_id, worker.stopping.clone(), |data| {
+                    if worker.stopping.load(Ordering::Relaxed) { return false; }
+                    let media = data[0] == 1 || data[0] == 2;
+                    if media && worker.pending.fetch_add(1, Ordering::Relaxed) >= 32 {
+                        worker.pending.fetch_sub(1, Ordering::Relaxed);
+                        return true;
+                    }
+                    if worker.channel.send(Response::new(data)).is_err() {
+                        if media { worker.pending.fetch_sub(1, Ordering::Relaxed); }
+                        return false;
+                    }
+                    true
+                })
+            }));
+            let message = match result {
+                Ok(Ok(())) => String::new(),
+                Ok(Err(message)) => message,
+                Err(_) => "Native capture could not start. Check screen/audio permission and the selected source.".into(),
+            };
+            // Clear only this session, before notifying frontend that it may start another.
+            if let Ok(mut current) = SESSION.lock() {
+                if current.as_ref().is_some_and(|s| s.id == worker.id) { *current = None; }
+            }
+            let mut packet = vec![3];
+            packet.extend_from_slice(message.as_bytes());
+            let _ = worker.channel.send(Response::new(packet));
+        }).map_err(|e| e.to_string())?;
         *current = Some(session);
         Ok(id)
     }
@@ -90,50 +93,63 @@ mod mac {
             }
         }
     }
-    pub fn stop(app: &tauri::AppHandle, id: Option<&str>) -> Result<(), String> {
+    pub fn stop(id: Option<&str>) -> Result<(), String> {
         let current = SESSION.lock().map_err(|e| e.to_string())?;
-        if current
+        if let Some(session) = current
             .as_ref()
-            .is_some_and(|s| id.is_none() || id == Some(s.id.as_str()))
+            .filter(|s| id.is_none() || id == Some(s.id.as_str()))
         {
-            app.run_on_main_thread(|| unsafe { retro_capture_stop() })
-                .map_err(|e| e.to_string())?;
+            session.stopping.store(true, Ordering::Relaxed);
         }
         Ok(())
     }
 }
-
 #[tauri::command]
 pub fn native_capture_available() -> bool {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
-        return mac::available();
+        return tetorica_native_capture::available();
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         false
     }
 }
 #[tauri::command]
-pub fn native_capture_start(
-    app: tauri::AppHandle,
+pub async fn native_capture_targets() -> Result<Vec<CaptureTarget>, String> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        return tauri::async_runtime::spawn_blocking(tetorica_native_capture::targets)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Err("Native capture is unavailable on this platform.".into())
+    }
+}
+#[tauri::command]
+pub async fn native_capture_start(
+    target_id: String,
     packets: Channel<Response>,
 ) -> Result<String, String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
-        return mac::start(app, packets);
+        return tauri::async_runtime::spawn_blocking(move || desktop::start(target_id, packets))
+            .await
+            .map_err(|e| e.to_string())?;
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (app, packets);
-        Err("Native window capture is only available on macOS.".into())
+        let _ = (target_id, packets);
+        Err("Native capture is unavailable on this platform.".into())
     }
 }
 #[tauri::command]
 pub fn native_capture_ack(session_id: String, count: usize) {
-    #[cfg(target_os = "macos")]
-    mac::ack(&session_id, count);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    desktop::ack(&session_id, count);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let _ = (session_id, count);
 }
 #[tauri::command]
@@ -141,13 +157,14 @@ pub fn native_capture_stop(app: tauri::AppHandle, session_id: String) -> Result<
     stop(&app, Some(&session_id))
 }
 pub fn stop(app: &tauri::AppHandle, session_id: Option<&str>) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+    let _ = app;
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
-        return mac::stop(app, session_id);
+        return desktop::stop(session_id);
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (app, session_id);
+        let _ = session_id;
         Ok(())
     }
 }

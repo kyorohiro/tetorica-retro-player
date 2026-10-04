@@ -1,0 +1,12 @@
+[package]
+name = "tetorica-native-capture"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+scap = "=0.1.0-beta.1"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }

@@ -660,6 +660,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             native_capture::native_capture_available,
+            native_capture::native_capture_targets,
             native_capture::native_capture_start,
             native_capture::native_capture_ack,
             native_capture::native_capture_stop,

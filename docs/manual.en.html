@@ -109,6 +109,22 @@
 <li><strong>Bottom control panel</strong> — Playback controls, Video / Audio setting tabs, Reset, and settings save/load</li>
 </ul>
 <hr />
+<h3 id="screen-and-window-capture">Screen and Window Capture</h3>
+<p>Choose <strong>Capture</strong> from the menu. On macOS 13 or later
+and Windows, the desktop app uses an in-app window/display picker for
+native capture. macOS requires screen recording permission on first use.
+On macOS, window audio includes the entire application that owns the
+selected window. Display capture includes system audio. The player’s own
+audio is excluded.</p>
+<p>This prototype limits video input to a maximum dimension of 1280
+pixels at 30 fps and feeds the existing video filters, Audio FX, and
+recorder. Muting local monitoring during capture preserves the recording
+audio input. Use <strong>Stop capture</strong> to end capture; source
+termination or switching inputs also releases it. On Windows, audio
+includes all apps on the default output device, including the player
+itself; keep capture monitoring muted. macOS before 13, Linux/mobile,
+and the browser app retain browser capture, whose audio support depends
+on the environment.</p>
 <h2 id="4-basic-playback">4. Basic Playback</h2>
 <ul>
 <li><strong>Seek bar</strong> — Click or drag to jump to a position</li>

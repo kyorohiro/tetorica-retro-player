@@ -1,0 +1,470 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -45,10 +45,6 @@
+ [lib]
+ name = "scap"
+ path = "src/lib.rs"
+-
+-[[bin]]
+-name = "scap"
+-path = "src/main.rs"
+ 
+ [dependencies.futures]
+ version = "0.3.31"
+--- a/src/capturer/engine/linux/mod.rs
++++ b/src/capturer/engine/linux/mod.rs
+@@ -44,7 +44,7 @@
+ 
+ #[derive(Clone)]
+ struct ListenerUserData {
+-    pub tx: mpsc::Sender<Frame>,
++    pub tx: mpsc::SyncSender<Frame>,
+     pub format: spa::param::video::VideoInfoRaw,
+ }
+ 
+@@ -134,25 +134,25 @@
+             };
+ 
+             if let Err(e) = match user_data.format.format() {
+-                VideoFormat::RGBx => user_data.tx.send(Frame::RGBx(RGBxFrame {
++                VideoFormat::RGBx => user_data.tx.try_send(Frame::RGBx(RGBxFrame {
+                     display_time: timestamp as u64,
+                     width: frame_size.width as i32,
+                     height: frame_size.height as i32,
+                     data: frame_data,
+                 })),
+-                VideoFormat::RGB => user_data.tx.send(Frame::RGB(RGBFrame {
++                VideoFormat::RGB => user_data.tx.try_send(Frame::RGB(RGBFrame {
+                     display_time: timestamp as u64,
+                     width: frame_size.width as i32,
+                     height: frame_size.height as i32,
+                     data: frame_data,
+                 })),
+-                VideoFormat::xBGR => user_data.tx.send(Frame::XBGR(XBGRFrame {
++                VideoFormat::xBGR => user_data.tx.try_send(Frame::XBGR(XBGRFrame {
+                     display_time: timestamp as u64,
+                     width: frame_size.width as i32,
+                     height: frame_size.height as i32,
+                     data: frame_data,
+                 })),
+-                VideoFormat::BGRx => user_data.tx.send(Frame::BGRx(BGRxFrame {
++                VideoFormat::BGRx => user_data.tx.try_send(Frame::BGRx(BGRxFrame {
+                     display_time: timestamp as u64,
+                     width: frame_size.width as i32,
+                     height: frame_size.height as i32,
+@@ -173,7 +173,7 @@
+ // TODO: Format negotiation
+ fn pipewire_capturer(
+     options: Options,
+-    tx: mpsc::Sender<Frame>,
++    tx: mpsc::SyncSender<Frame>,
+     ready_sender: &SyncSender<bool>,
+     stream_id: u32,
+ ) -> Result<(), LinCapError> {
+@@ -317,7 +317,7 @@
+ 
+ impl LinuxCapturer {
+     // TODO: Error handling
+-    pub fn new(options: &Options, tx: mpsc::Sender<Frame>) -> Self {
++    pub fn new(options: &Options, tx: mpsc::SyncSender<Frame>) -> Self {
+         let connection =
+             dbus::blocking::Connection::new_session().expect("Failed to create dbus connection");
+         let stream_id = ScreenCastPortal::new(&connection)
+@@ -364,6 +364,6 @@
+     }
+ }
+ 
+-pub fn create_capturer(options: &Options, tx: mpsc::Sender<Frame>) -> LinuxCapturer {
++pub fn create_capturer(options: &Options, tx: mpsc::SyncSender<Frame>) -> LinuxCapturer {
+     LinuxCapturer::new(options, tx)
+ }
+--- a/src/capturer/engine/mac/mod.rs
++++ b/src/capturer/engine/mac/mod.rs
+@@ -53,7 +53,7 @@
+ 
+ #[repr(C)]
+ pub struct CapturerInner {
+-    pub tx: mpsc::Sender<ChannelItem>,
++    pub tx: mpsc::SyncSender<ChannelItem>,
+ }
+ 
+ define_obj_type!(pub Capturer + StreamOutputImpl, CapturerInner, CAPTURER);
+@@ -69,7 +69,7 @@
+         sample_buf: &mut cm::SampleBuf,
+         kind: sc::OutputType,
+     ) {
+-        let _ = self.inner_mut().tx.send((sample_buf.retained(), kind));
++        let _ = self.inner_mut().tx.try_send((sample_buf.retained(), kind));
+     }
+ }
+ 
+@@ -85,7 +85,7 @@
+ 
+ pub(crate) fn create_capturer(
+     options: &Options,
+-    tx: mpsc::Sender<ChannelItem>,
++    tx: mpsc::SyncSender<ChannelItem>,
+     error_flag: Arc<AtomicBool>,
+ ) -> Result<(arc::R<Capturer>, arc::R<ErrorHandler>, arc::R<sc::Stream>), CreateCapturerError> {
+     // If no target is specified, capture the main display
+@@ -183,6 +183,9 @@
+         flags: cm::TimeFlags::VALID,
+     });
+     stream_config.set_captures_audio(options.captures_audio);
++    stream_config.set_sample_rate(48_000);
++    stream_config.set_channel_count(2);
++    stream_config.set_excludes_current_process_audio(options.exclude_current_process_audio);
+ 
+     let error_handler = ErrorHandler::with(ErrorHandlerInner { error_flag });
+     let stream = sc::Stream::with_delegate(&filter, &stream_config, error_handler.as_ref());
+@@ -371,7 +374,7 @@
+             return Some(Frame::Audio(AudioFrame::new(
+                 AudioFormat::F32,
+                 2,
+-                false,
++                true,
+                 bytes,
+                 sample.num_samples() as usize,
+                 48_000,
+--- a/src/capturer/engine/mod.rs
++++ b/src/capturer/engine/mod.rs
+@@ -58,7 +58,7 @@
+ }
+ 
+ impl Engine {
+-    pub fn new(options: &Options, tx: mpsc::Sender<ChannelItem>) -> Engine {
++    pub fn new(options: &Options, tx: mpsc::SyncSender<ChannelItem>) -> Engine {
+         #[cfg(target_os = "macos")]
+         {
+             let error_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+@@ -114,7 +114,7 @@
+         {
+             use futures::executor::block_on;
+ 
+-            block_on(self.mac.2.stop()).expect("Failed to stop capture");
++            let _ = block_on(self.mac.2.stop());
+         }
+ 
+         #[cfg(target_os = "windows")]
+@@ -126,6 +126,15 @@
+         {
+             self.linux.stop_capture();
+         }
++    }
++
++    pub fn is_stopped(&self) -> bool {
++        #[cfg(target_os = "macos")]
++        { return self.error_flag.load(std::sync::atomic::Ordering::Relaxed); }
++        #[cfg(target_os = "windows")]
++        { return self.win.is_stopped(); }
++        #[cfg(target_os = "linux")]
++        { false }
+     }
+ 
+     pub fn get_output_frame_size(&mut self) -> [u32; 2] {
+--- a/src/capturer/engine/win/mod.rs
++++ b/src/capturer/engine/win/mod.rs
+@@ -29,10 +29,11 @@
+ 
+ #[derive(Debug)]
+ struct Capturer {
+-    pub tx: mpsc::Sender<Frame>,
++    pub tx: mpsc::SyncSender<Frame>,
+     pub crop: Option<Area>,
+     pub start_time: (i64, SystemTime),
+     pub perf_freq: i64,
++    closed: std::sync::Arc<std::sync::atomic::AtomicBool>,
+ }
+ 
+ #[derive(Clone)]
+@@ -45,6 +46,7 @@
+     settings: Settings,
+     capture_control: Option<CaptureControl<Capturer, Box<dyn std::error::Error + Send + Sync>>>,
+     audio_stream: Option<AudioStreamHandle>,
++    closed: std::sync::Arc<std::sync::atomic::AtomicBool>,
+ }
+ 
+ impl GraphicsCaptureApiHandler for Capturer {
+@@ -53,6 +55,7 @@
+ 
+     fn new(context: Context<Self::Flags>) -> Result<Self, Self::Error> {
+         Ok(Self {
++            closed: context.flags.closed,
+             tx: context.flags.tx,
+             crop: context.flags.crop,
+             start_time: (
+@@ -76,14 +79,7 @@
+         frame: &mut WCFrame,
+         _: InternalCaptureControl,
+     ) -> Result<(), Self::Error> {
+-        let elapsed = frame.timespan().Duration - self.start_time.0;
+-        let display_time = self
+-            .start_time
+-            .1
+-            .checked_add(Duration::from_secs_f64(
+-                elapsed as f64 / self.perf_freq as f64,
+-            ))
+-            .unwrap();
++        let display_time = SystemTime::now();
+ 
+         match &self.crop {
+             Some(cropped_area) => {
+@@ -116,12 +112,12 @@
+                     data: raw_frame_buffer.to_vec(),
+                 };
+ 
+-                let _ = self.tx.send(Frame::Video(VideoFrame::BGRA(bgr_frame)));
++                let _ = self.tx.try_send(Frame::Video(VideoFrame::BGRA(bgr_frame)));
+             }
+             None => {
+                 // get raw frame buffer
+                 let mut frame_buffer = frame.buffer().unwrap();
+-                let raw_frame_buffer = frame_buffer.as_raw_buffer();
++                let raw_frame_buffer = frame_buffer.as_nopadding_buffer()?;
+                 let frame_data = raw_frame_buffer.to_vec();
+                 let current_time = SystemTime::now()
+                     .duration_since(UNIX_EPOCH)
+@@ -134,19 +130,20 @@
+                     data: frame_data,
+                 };
+ 
+-                let _ = self.tx.send(Frame::Video(VideoFrame::BGRA(bgr_frame)));
++                let _ = self.tx.try_send(Frame::Video(VideoFrame::BGRA(bgr_frame)));
+             }
+         }
+         Ok(())
+     }
+ 
+     fn on_closed(&mut self) -> Result<(), Self::Error> {
+-        println!("Closed");
++        self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
+         Ok(())
+     }
+ }
+ 
+ impl WCStream {
++    pub fn is_stopped(&self) -> bool { self.closed.load(std::sync::atomic::Ordering::Relaxed) }
+     pub fn start_capture(&mut self) {
+         let cc = match &self.settings {
+             Settings::Display(st) => Capturer::start_free_threaded(st.to_owned()).unwrap(),
+@@ -161,8 +158,7 @@
+     }
+ 
+     pub fn stop_capture(&mut self) {
+-        let capture_control = self.capture_control.take().unwrap();
+-        let _ = capture_control.stop();
++        if let Some(capture_control) = self.capture_control.take() { let _ = capture_control.stop(); }
+ 
+         if let Some(audio_stream) = &self.audio_stream {
+             let _ = audio_stream.ctrl_tx.send(AudioStreamControl::Stop);
+@@ -172,7 +168,8 @@
+ 
+ #[derive(Clone, Debug)]
+ struct FlagStruct {
+-    pub tx: mpsc::Sender<Frame>,
++    closed: std::sync::Arc<std::sync::atomic::AtomicBool>,
++    pub tx: mpsc::SyncSender<Frame>,
+     pub crop: Option<Area>,
+ }
+ 
+@@ -184,7 +181,7 @@
+ 
+ pub fn create_capturer(
+     options: &Options,
+-    tx: mpsc::Sender<Frame>,
++    tx: mpsc::SyncSender<Frame>,
+ ) -> Result<WCStream, CreateCapturerError> {
+     let target = options
+         .target
+@@ -210,18 +207,20 @@
+         DrawBorderSettings::Default
+     };
+ 
++    let closed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+     let settings = match target {
+         Target::Display(display) => Settings::Display(WCSettings::new(
+             WCMonitor::from_raw_hmonitor(display.raw_handle.0),
+             show_cursor,
+             draw_border,
+-            color_format,
+             SecondaryWindowSettings::Default,
+             MinimumUpdateIntervalSettings::Default,
+             DirtyRegionSettings::Default,
++            color_format,
+             FlagStruct {
++                closed: closed.clone(),
+                 tx: tx.clone(),
+-                crop: Some(get_crop_area(options)),
++                crop: options.crop_area.clone(),
+             },
+         )),
+         Target::Window(window) => Settings::Window(WCSettings::new(
+@@ -233,8 +232,9 @@
+             DirtyRegionSettings::Default,
+             color_format,
+             FlagStruct {
++                closed: closed.clone(),
+                 tx: tx.clone(),
+-                crop: Some(get_crop_area(options)),
++                crop: options.crop_area.clone(),
+             },
+         )),
+     };
+@@ -257,6 +257,7 @@
+     };
+ 
+     Ok(WCStream {
++        closed,
+         settings,
+         capture_control: None,
+         audio_stream,
+@@ -342,7 +343,7 @@
+ }
+ 
+ fn build_audio_stream(
+-    sample_tx: mpsc::Sender<
++    sample_tx: mpsc::SyncSender<
+         Result<(Vec<u8>, cpal::InputCallbackInfo, SystemTime), cpal::StreamError>,
+     >,
+ ) -> Result<(cpal::Stream, cpal::SupportedStreamConfig), CreateCapturerError> {
+@@ -364,13 +365,11 @@
+             {
+                 let sample_tx = sample_tx.clone();
+                 move |data, info: &cpal::InputCallbackInfo| {
+-                    sample_tx
+-                        .send(Ok((data.bytes().to_vec(), info.clone(), SystemTime::now())))
+-                        .unwrap();
++                    let _ = sample_tx.try_send(Ok((data.bytes().to_vec(), info.clone(), SystemTime::now())));
+                 }
+             },
+             move |e| {
+-                let _ = sample_tx.send(Err(e));
++                let _ = sample_tx.try_send(Err(e));
+             },
+             None,
+         )
+@@ -380,12 +379,12 @@
+ }
+ 
+ fn spawn_audio_stream(
+-    tx: Sender<Frame>,
++    tx: mpsc::SyncSender<Frame>,
+     ready_tx: Sender<Result<(), CreateCapturerError>>,
+     ctrl_rx: Receiver<AudioStreamControl>,
+ ) {
+     std::thread::spawn(move || {
+-        let (sample_tx, sample_rx) = mpsc::channel();
++        let (sample_tx, sample_rx) = mpsc::sync_channel(8);
+ 
+         let res = build_audio_stream(sample_tx);
+ 
+@@ -445,7 +444,7 @@
+                 timestamp,
+             );
+ 
+-            if let Err(_) = tx.send(Frame::Audio(frame)) {
++            if let Err(mpsc::TrySendError::Disconnected(_)) = tx.try_send(Frame::Audio(frame)) {
+                 return;
+             };
+         }
+--- a/src/capturer/mod.rs
++++ b/src/capturer/mod.rs
+@@ -111,7 +111,7 @@
+             return Err(CapturerBuildError::PermissionNotGranted);
+         }
+ 
+-        let (tx, rx) = mpsc::channel();
++        let (tx, rx) = mpsc::sync_channel(8);
+         let engine = engine::Engine::new(&options, tx);
+ 
+         Ok(Capturer { engine, rx })
+@@ -140,6 +140,16 @@
+         }
+     }
+ 
++    /// Wait up to the deadline, including discarded/incomplete native frames.
++    pub fn get_next_frame_timeout(&self, timeout: std::time::Duration) -> Result<Frame, mpsc::RecvTimeoutError> {
++        let deadline = std::time::Instant::now() + timeout;
++        loop {
++            if self.engine.is_stopped() { return Err(mpsc::RecvTimeoutError::Disconnected); }
++            let item = self.rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))?;
++            if let Some(frame) = self.engine.process_channel_item(item) { return Ok(frame); }
++        }
++    }
++
+     /// Get the dimensions the frames will be captured in
+     pub fn get_output_frame_size(&mut self) -> [u32; 2] {
+         self.engine.get_output_frame_size()
+--- a/src/targets/mac/mod.rs
++++ b/src/targets/mac/mod.rs
+@@ -56,6 +56,9 @@
+ 
+     // Add windows to targets
+     for window in content.windows().iter() {
++        // Hide desktop overlays and background helper windows from the picker.
++        let frame = window.frame();
++        if !window.is_on_screen() || window.window_layer() != 0 || frame.size.width <= 0.0 || frame.size.height <= 0.0 { continue; }
+         let id = window.id();
+         let title = window
+             .title()
+@@ -64,7 +67,9 @@
+ 
+         let target = Target::Window(super::Window {
+             id,
+-            title: title.map(|v| v.to_string()).unwrap_or_default(),
++            title: title.map(|v| v.to_string()).filter(|v| !v.is_empty())
++                .or_else(|| window.owning_app().map(|app| app.app_name().to_string()))
++                .unwrap_or_default(),
+             raw_handle: id,
+         });
+         targets.push(target);
+@@ -86,13 +91,8 @@
+ 
+ pub fn get_scale_factor(target: &Target) -> f64 {
+     match target {
+-        Target::Window(window) => unsafe {
+-            let cg_win_id = window.raw_handle;
+-            let ns_app: id = NSApp();
+-            let ns_window: id = msg_send![ns_app, windowWithWindowNumber: cg_win_id as NSUInteger];
+-            let scale_factor: f64 = msg_send![ns_window, backingScaleFactor];
+-            scale_factor
+-        },
++        // Logical points are sufficient: output is capped at 1280 pixels.
++        Target::Window(_) => 1.0,
+         Target::Display(display) => {
+             let mode = display.raw_handle.display_mode().unwrap();
+             (mode.pixel_width() / mode.width()) as f64
+@@ -102,11 +102,11 @@
+ 
+ pub fn get_target_dimensions(target: &Target) -> (u64, u64) {
+     match target {
+-        Target::Window(window) => unsafe {
+-            let cg_win_id = window.raw_handle;
+-            let ns_app: id = NSApp();
+-            let ns_window: id = msg_send![ns_app, windowWithWindowNumber: cg_win_id as NSUInteger];
+-            let frame: NSRect = msg_send![ns_window, frame];
++        Target::Window(window) => {
++            let content = block_on(sc::ShareableContent::current()).expect("Could not query window dimensions");
++            let windows = content.windows();
++            let native = windows.iter().find(|w| w.id() == window.id).expect("Selected window closed");
++            let frame = native.frame();
+             (frame.size.width as u64, frame.size.height as u64)
+         },
+         Target::Display(display) => {
+--- a/src/utils/mac/mod.rs
++++ b/src/utils/mac/mod.rs
+@@ -10,12 +10,6 @@
+ }
+ 
+ pub fn is_supported() -> bool {
+-    let os_version = System::os_version()
+-        .expect("Failed to get macOS version")
+-        .as_bytes()
+-        .to_vec();
+-
+-    let min_version: Vec<u8> = "12.3\n".as_bytes().to_vec();
+-
+-    os_version >= min_version
++    // Audio capture requires macOS 13. Compare numerically (not lexicographically).
++    System::os_version().and_then(|v| v.split('.').next()?.parse::<u32>().ok()).is_some_and(|v| v >= 13)
+ }

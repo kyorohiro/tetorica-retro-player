@@ -1,3 +1,4 @@
+import { downloadCaptureAudioDiagnostics } from "../media/captureAudioDiagnostics";
 import React from "react";
 import { createPortal } from "react-dom";
 import {
@@ -597,6 +598,13 @@ export function RetroPreviewToolbar({
             <div className="sticky top-0 z-10 mb-3 border-b border-slate-700/90 bg-slate-950/98 py-2 text-[10px] uppercase tracking-[0.24em] text-slate-500 backdrop-blur-sm">
               menu
             </div>
+            <button
+              type="button"
+              onClick={downloadCaptureAudioDiagnostics}
+              className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800"
+            >
+              {locale === "ja" ? "キャプチャー診断ログを保存" : "Save capture diagnostics"}
+            </button>
             <div className="mb-3 border-b border-slate-700 pb-3">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
                 <span>Playback Profile</span>

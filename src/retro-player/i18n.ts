@@ -9,6 +9,7 @@ export type RetroPreviewErrorCode =
   | "video-preview-failed"
   | "capture-unsupported"
   | "capture-failed"
+  | "capture-permission-required"
   | "playback-failed"
   | "video-load-failed"
   | "video-load-timeout"
@@ -26,6 +27,7 @@ const RETRO_MESSAGES: Record<RetroPlayerLocale, Record<RetroPreviewErrorCode, st
     "video-preview-failed": "Failed to load the video preview.",
     "capture-unsupported": "Screen capture is not supported in this browser.",
     "capture-failed": "Could not start screen capture.",
+    "capture-permission-required": "Allow this .app in System Settings > Privacy & Security > Screen & System Audio Recording, then restart it.",
     "playback-failed": "Could not start playback.",
     "video-load-failed": "Failed to load the video.",
     "video-load-timeout": "Loading the video timed out.",
@@ -42,6 +44,7 @@ const RETRO_MESSAGES: Record<RetroPlayerLocale, Record<RetroPreviewErrorCode, st
     "video-preview-failed": "動画プレビューに失敗しました。",
     "capture-unsupported": "このブラウザでは画面キャプチャーに対応していません。",
     "capture-failed": "画面キャプチャーを開始できませんでした。",
+    "capture-permission-required": "システム設定 → プライバシーとセキュリティ → 画面収録とシステムオーディオ録音で、この.appを許可して再起動してください。",
     "playback-failed": "再生を開始できませんでした。",
     "video-load-failed": "動画の読み込みに失敗しました。",
     "video-load-timeout": "動画の読み込みがタイムアウトしました。",

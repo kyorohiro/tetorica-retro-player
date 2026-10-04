@@ -56,9 +56,9 @@ Formats that need ffmpeg conversion only play when ffmpeg is enabled in the desk
 
 ### Screen and Window Capture
 
-Choose **Capture** from the menu. On macOS 14 or later, the desktop app uses the native OS picker. Window audio includes the entire application that owns the selected window. Display capture includes system audio. The player’s own audio is excluded.
+Choose **Capture** from the menu. On macOS 13 or later and Windows, the desktop app uses an in-app window/display picker for native capture. macOS requires screen recording permission on first use. On macOS, window audio includes the entire application that owns the selected window. Display capture includes system audio. The player’s own audio is excluded.
 
-This prototype limits video input to a maximum dimension of 1280 pixels at 30 fps and feeds the existing video filters, Audio FX, and recorder. Muting local monitoring during capture preserves the recording audio input. Use **Stop capture** to end capture; source termination or switching inputs also releases it. Older macOS versions, other operating systems, and the browser app retain browser capture, whose audio support depends on the environment.
+This prototype limits video input to a maximum dimension of 1280 pixels at 30 fps and feeds the existing video filters, Audio FX, and recorder. Muting local monitoring during capture preserves the recording audio input. Use **Stop capture** to end capture; source termination or switching inputs also releases it. On Windows, audio includes all apps on the default output device, including the player itself; keep capture monitoring muted. macOS before 13, Linux/mobile, and the browser app retain browser capture, whose audio support depends on the environment.
 
 ## 4. Basic Playback
 
