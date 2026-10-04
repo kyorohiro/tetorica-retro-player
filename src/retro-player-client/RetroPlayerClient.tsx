@@ -538,6 +538,20 @@ export const RetroPlayerClient = React.forwardRef<RetroPlayerClientHandle, Retro
       <div className="relative flex-1 min-h-0">
         <React.Suspense fallback={null}>
           <RetroPlayer
+            recordingConfirmation={previewSource.nativeRecordingActive ? (
+              <div className="relative h-full w-full">
+                {previewSource.nativeRecordingThumbnail && <img src={previewSource.nativeRecordingThumbnail} alt={locale === "ja" ? "録画対象の確認用静止画" : "Recording window confirmation"} className="h-full w-full object-contain" draggable={false} />}
+                <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-black/75 p-2 text-sm text-white">
+                  <div className="min-w-0">
+                    <p className="font-semibold"><span className="text-red-500">●</span> {locale === "ja" ? "録画中" : "Recording"} — <span className="break-all">{previewSource.nativeRecordingTarget}</span></p>
+                    <p className="text-xs text-slate-300">{locale === "ja" ? "確認用静止画・約3秒ごとに更新" : "Confirmation image · updates about every 3 seconds"} {previewSource.nativeRecordingThumbnailTime}</p>
+                    {previewSource.nativeRecordingProgress && <p className="text-xs">{Math.floor(previewSource.nativeRecordingProgress.elapsedMs / 1000)}s / {(previewSource.nativeRecordingProgress.bytes / 1024 / 1024).toFixed(2)} MB{previewSource.nativeRecordingStalled ? (locale === "ja" ? " — 保存データ更新なし" : " — Data is not updating") : ""}</p>}
+                  </div>
+                  <button type="button" onClick={previewSource.stopFfmpegCapture} className="shrink-0 rounded-lg border border-red-400 bg-red-950 px-3 py-1">{locale === "ja" ? "録画停止" : "Stop recording"}</button>
+                </div>
+                <p className="absolute inset-x-0 bottom-0 break-all bg-black/75 p-2 text-xs text-slate-300">{previewSource.nativeRecordingDestination}</p>
+              </div>
+            ) : undefined}
             locale={locale}
             key={retroPlayerKey}
             src={activePreviewSrc}

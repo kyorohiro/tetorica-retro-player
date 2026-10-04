@@ -11,6 +11,7 @@ use tetorica_mdrop_core::http::{ServerStatus, SharedHttpServerContext};
 
 mod ffmpeg;
 mod native_capture;
+mod native_ffmpeg_capture;
 
 const GRAPHICS_BACKEND_SETTINGS_FILE_NAME: &str = "dev-options.json";
 #[cfg(windows)]
@@ -57,7 +58,9 @@ fn startup_dev_options_settings_path() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         let app_data = env::var_os("APPDATA")?;
-        Some(dev_options_settings_path_from_base(PathBuf::from(app_data).join(APP_IDENTIFIER)))
+        Some(dev_options_settings_path_from_base(
+            PathBuf::from(app_data).join(APP_IDENTIFIER),
+        ))
     }
 }
 
@@ -289,7 +292,9 @@ fn build_shared_file_info(
     path: PathBuf,
     display_path: String,
 ) -> Result<SharedFileInfo, String> {
-    let shared = state.server.register_shared_file(path, display_path, false)?;
+    let shared = state
+        .server
+        .register_shared_file(path, display_path, false)?;
     Ok(SharedFileInfo {
         id: shared.id,
         name: shared.name,
@@ -659,6 +664,9 @@ pub fn run() {
     let app = builder
         .invoke_handler(tauri::generate_handler![
             greet,
+            native_ffmpeg_capture::native_ffmpeg_capture_start,
+            native_ffmpeg_capture::native_ffmpeg_capture_stop,
+            native_ffmpeg_capture::native_ffmpeg_capture_progress,
             native_capture::native_capture_available,
             native_capture::native_capture_targets,
             native_capture::native_capture_start,
@@ -691,6 +699,7 @@ pub fn run() {
 
     app.run(move |app_handle, event| {
         if matches!(event, tauri::RunEvent::Exit) {
+            let _ = native_ffmpeg_capture::stop(None);
             let _ = native_capture::stop(app_handle, None);
             let _ = mdrop_server_for_exit.stop_server();
             mdrop_server_for_exit.cleanup_hls_sessions();

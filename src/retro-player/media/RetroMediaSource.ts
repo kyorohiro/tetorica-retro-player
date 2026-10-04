@@ -106,8 +106,8 @@ const hasEnoughHlsStartupBuffer = (media: HTMLMediaElement): boolean => {
   if (!getHlsInstance(media)) {
     return true;
   }
-  const duration = Number.isFinite(media.duration) ? media.duration : 0;
   const bufferedEnd = getBufferedEnd(media);
+  const duration = Number.isFinite(media.duration) ? media.duration : 0;
   return Math.max(duration, bufferedEnd) >= HLS_STARTUP_MIN_BUFFER_SECONDS;
 };
 

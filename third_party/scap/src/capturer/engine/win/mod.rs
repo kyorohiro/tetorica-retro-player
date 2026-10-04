@@ -61,14 +61,14 @@ impl GraphicsCaptureApiHandler for Capturer {
             start_time: (
                 unsafe {
                     let mut time = 0;
-                    QueryPerformanceCounter(&mut time);
+                    let _ = QueryPerformanceCounter(&mut time);
                     time
                 },
                 SystemTime::now(),
             ),
             perf_freq: unsafe {
                 let mut freq = 0;
-                QueryPerformanceFrequency(&mut freq);
+                let _ = QueryPerformanceFrequency(&mut freq);
                 freq
             },
         })
@@ -79,7 +79,10 @@ impl GraphicsCaptureApiHandler for Capturer {
         frame: &mut WCFrame,
         _: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        let display_time = SystemTime::now();
+        let anchor_ns = self.start_time.0 as i128 * 1_000_000_000 / self.perf_freq.max(1) as i128;
+        let delta_ns = frame.timestamp().Duration as i128 * 100 - anchor_ns;
+        let delta = Duration::from_nanos(delta_ns.unsigned_abs().min(u64::MAX as u128) as u64);
+        let display_time = if delta_ns >= 0 { self.start_time.1.checked_add(delta) } else { self.start_time.1.checked_sub(delta) }.unwrap_or(self.start_time.1);
 
         match &self.crop {
             Some(cropped_area) => {
@@ -365,7 +368,10 @@ fn build_audio_stream(
             {
                 let sample_tx = sample_tx.clone();
                 move |data, info: &cpal::InputCallbackInfo| {
-                    let _ = sample_tx.try_send(Ok((data.bytes().to_vec(), info.clone(), SystemTime::now())));
+                    let delivered = SystemTime::now();
+                    let clock = info.timestamp();
+                    let capture_time = clock.callback.duration_since(&clock.capture).and_then(|delay| delivered.checked_sub(delay)).unwrap_or(delivered);
+                    let _ = sample_tx.try_send(Ok((data.bytes().to_vec(), info.clone(), capture_time)));
                 }
             },
             move |e| {
@@ -449,4 +455,9 @@ fn spawn_audio_stream(
             };
         }
     });
+}
+
+pub fn capture_audio_format() -> Option<(u32, u16)> {
+    let config = cpal::default_host().default_output_device()?.default_output_config().ok()?;
+    Some((config.sample_rate().0, config.channels()))
 }

@@ -605,9 +605,9 @@ function App() {
     onInputPaths,
   });
 
-  const handleDisplayCapture = useCallback(async () => {
+  const handleDisplayCapture = useCallback(async (mode: "browser" | "native" = "browser") => {
     retroPlayerClientRef.current?.stopBuiltinPlayback();
-    const errorMessage = await previewSource.startDisplayCapture();
+    const errorMessage = await previewSource.startDisplayCapture(mode);
     const isItchDisplayCaptureError =
       typeof errorMessage === "string" &&
       (errorMessage.includes("DisplayCapture") ||
@@ -776,8 +776,19 @@ function App() {
     if (isIosOrAndroid) return;
     setIsMobileMenuOpen(false);
     await waitForExternalNavigationPause();
-    void handleDisplayCapture();
-  }, [handleDisplayCapture, isIosOrAndroid]);
+    if (isTauriRuntime() && /Mac|Windows/i.test(navigator.userAgent)) {
+      const mode = await showSelectDialog({
+        title: locale === "ja" ? "キャプチャー方式" : "Capture method",
+        options: [
+          { value: "browser", label: "Browser capture", description: locale === "ja" ? "Browser APIで画面に表示。mac版のウィンドウ共有では音声を録音できません。他の環境もOS・ブラウザーの制限があります。" : "Show the capture using the browser API. Window audio cannot be recorded on macOS; support elsewhere depends on the OS/browser." },
+          { value: "ffmpeg", label: locale === "ja" ? "ウィンドウを録画" : "Record a window", description: locale === "ja" ? "選んだウィンドウを音付きMP4へ保存。加工なし。確認用の静止画のみ約3秒ごとに表示します。" : "Save original window video/audio to MP4 without filters. A confirmation image updates about every 3 seconds; no live player preview." },
+        ],
+      });
+      if (!mode) return;
+      if (mode === "ffmpeg") { await previewSource.startFfmpegCapture(); return; }
+      void handleDisplayCapture("browser");
+    } else { void handleDisplayCapture("browser"); }
+  }, [handleDisplayCapture, isIosOrAndroid, locale, showSelectDialog, previewSource.startFfmpegCapture]);
 
   const handleReloadApp = useCallback(() => {
     setIsMobileMenuOpen(false);
@@ -989,7 +1000,7 @@ function App() {
         <div className="relative flex flex-col flex-1 min-h-0 w-full mx-auto max-w-5xl px-4 pt-4 pb-4">
           <header className="shrink-0 mb-3" />
 
-          {previewSource.previewStream && previewSource.previewStreamSource !== "audio-preview" && (
+          {(previewSource.previewStream && previewSource.previewStreamSource !== "audio-preview") && (
           <div className="mb-4">
             <button
               type="button"
@@ -1000,6 +1011,7 @@ function App() {
             </button>
           </div>
         )}
+        {previewSource.nativeFfmpegStatus && <p className="mb-4 text-sm text-slate-700">{previewSource.nativeFfmpegStatus}</p>}
         {previewSource.captureError && (
           <p className="mb-4 text-sm text-rose-500">{previewSource.captureError}</p>
         )}

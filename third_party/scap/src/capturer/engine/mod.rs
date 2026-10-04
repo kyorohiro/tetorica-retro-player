@@ -150,3 +150,10 @@ impl Engine {
         return Some(data);
     }
 }
+
+/// Configuration used by this backend's audio capture (including a silent source).
+pub fn capture_audio_format() -> Option<(u32, u16)> {
+    #[cfg(target_os = "macos")] { Some((48_000, 2)) }
+    #[cfg(target_os = "windows")] { win::capture_audio_format() }
+    #[cfg(target_os = "linux")] { None }
+}

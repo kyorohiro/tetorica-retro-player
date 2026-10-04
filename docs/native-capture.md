@@ -1,75 +1,72 @@
-# Desktop native capture maintenance
+# ウィンドウ録画とBrowserキャプチャー
 
-macOS と Windows は同じ `src-native-capture` パッケージを通して `scap` を使用します。
-Tauri 側はセッション管理とIPC、frontend は対象選択と MediaStream 生成を担当します。
-映像はJPEG、音声はインターリーブfloat32 PCMにそろえ、既存の加工・録画へ渡します。
+通常のキャプチャー・プレビュー・加工録画は従来のBrowser APIを使用します。
+デスクトップ版の「ウィンドウを録画」は、選んだウィンドウの加工前の映像・音声を
+MP4へ直接保存する独立した機能です。常時の映像プレビューは行わず、既存の動画View内で録画対象の確認用静止画を約3秒ごとに表示します。連続したIPC/JPEG/PCMとHLSのネイティブプレビューは使いません。
 
-| 環境 | 映像 | 音声 |
-| --- | --- | --- |
-| macOS 13+ | ScreenCaptureKitの画面／ウィンドウ | 画面はシステム音声、ウィンドウはアプリ音声。自プロセス音声は除外 |
-| Windows | Windows.GraphicsCaptureの画面／ウィンドウ | CPAL/WASAPIの既定出力デバイス全体。自プロセスも含む |
-| Browser / Linux / mobile | 従来のgetDisplayMedia | Browser APIの提供範囲 |
+Browser API経由では共有音声の録音がOS・ブラウザーの制限を受けます。
+確認済みのmac版のウィンドウ共有では音声を録音できません。
+音付きのウィンドウ保存には「ウィンドウを録画」を使用してください。
 
-両OSの音声の取得範囲は完全には一致しません。Windowsではモニターミュートを維持してください。
-選択画面にも取得範囲を表示します。macの初回権限はシステム設定で許可し、アプリを再起動します。
+Viewに録画マーク・対象名・保存先・録画時間・出力済みサイズと停止ボタンを表示します。
+停止すると確認表示を消し、元のView表示へ戻ります。データ更新が5秒以上止まると表示で知らせます。
+データ増加は録画内容・音声の正しさを保証しません。短い試し録画の再生で確認してください。
 
-## 固定した依存パッケージ
+## 操作
 
-音声対応の crates.io `scap 0.1.0-beta.1` を `third_party/scap` に保存し、workspaceの
-`[patch.crates-io]` で使用しています。MITライセンスを同梱し、アプリのライセンス一覧にも含めます。
-公開パッケージのrepositoryは `https://github.com/helmerapp/scap`、元revisionは
-`f9a62144bf1011e29ffa6ac1f49e5e0d020ca40a` です。最新stable 0.0.8への単純な変更では音声対応が失われます。
+1. キャプチャーメニューで「ウィンドウを録画」を選ぶ。
+2. 対象ウィンドウとMP4保存先を選ぶと録画開始。
+3. 「ウィンドウ録画を停止」で保存完了。画面に保存先を表示する。
 
-公開版への変更は `third_party/scap/LOCAL.patch` に記録しています。
+録画中もBrowserキャプチャーなどのプレイヤー表示は維持します。
+プレイヤーの通常の録画ボタンはBrowser側の加工録画用で、このMP4とは独立しています。
+対象ウィンドウの映像、原音を保存し、フィルター、Audio FX、プレイヤーの音量は適用しません。
+アプリ終了前に録画を停止してください。失敗時は画面に復旧用一時ディレクトリを表示します。
 
-- 受信タイムアウトとOSの終了通知: 静止画面・無音時も停止要求を処理する。
-- nativeフレーム／Windows音声コールバックのキューを8件に制限し、満杯なら破棄する。
-  Tauri IPCは別途32件に制限する。遅いwebviewへ無制限に蓄積しない。
-- mac音声のplanar指定、48kHz/2ch設定と自プロセス音声の除外。
-- macの候補を画面上の通常ウィンドウに絞り、タイトルなしではアプリ名を表示。
-- macの外部ウィンドウ寸法をSCWindowから取得（NSAppは自アプリのウィンドウしか返さない）。
-- macの対応OS判定を数値比較に変更し、音声対応の13以降に制限。
-- Windows依存 `windows-capture 1.5.0` のAPIに合わせた設定順と時刻取得。
-- Windows映像のrow padding除去、固定サイズの全画面cropを外しリサイズに対応。
-- 終了後のWindows音声コールバックで、受信先終了によるpanicを避ける。
+## 対応と音声の範囲
 
-独自のSwift/C++/WASAPI実装は持ちません。ただしベータ版の上記補正は更新時に再確認が必要です。
+- macOS 13以降: 選んだウィンドウのアプリ音声。自アプリの音声は除外。
+  初回は「画面収録とシステムオーディオ録音」の権限を与え、再起動する。
+- Windows: 映像は選んだウィンドウ。音声は既定の出力デバイス全体。
+  他アプリやプレイヤーの再生音も含まれるため、録画中の再生に注意する。
+- Web/Linux/mobile: このネイティブ録画は提供せず、Browserキャプチャーを使用する。
 
-## 表示遅延の確認
+## 共通の録画経路
 
-`cargo run -p tetorica-native-capture --example encoding_latency` でキャプチャー前処理とJPEG変換を測れます。
-workspace の `profile.dev.package` で共通コード・scap・imageを最適化し、`tauri dev` でもリアルタイム処理を維持します。
-受信映像が200ms以上古い場合は破棄して追いつきます（静止した共有元の初回映像は保持）。
+両OSとも `src-native-capture` と固定した `scap 0.1.0-beta.1` を使用します。
+BGRA映像とPCMを取得時刻付きMatroskaとしてffmpegの標準入力へ送り、H.264/AACのMP4へ保存します。
+常時のJPEG転送とHTTP/HLSプレビューは行いません。確認用に縮小JPEGを約3秒ごとに送ります。
+1280×720枠・最大30fps。macはVideoToolbox、WindowsはQSVを先に試し、起動できなければlibx264へ切り替えます。
+静止画面・無音時は前フレームと無音を補います。出力デバイスの形式が変わったら録画を再開します。
 
-## macから行う確認
+通常のdevにはシステムffmpegが必要です。macではHomebrewの標準パスも検索します。
+配布版とGitHub Actionsのsidecarビルドは同梱ffmpegを使用します。
+
+## 検証
 
 ```sh
-cargo test -p tetorica-native-capture --locked
-cargo check -p tetorica-retro-player --locked
-npm test -- src/retro-player/media/nativeDisplayCapture.test.ts src/retro-player/media/nativeCaptureProtocol.test.ts src/retro-player/media/displayCaptureOptions.test.ts
+npm test
 npm run build
-
-# 初回のみ標準ライブラリを追加。型チェックはWindowsを起動せず実行できる。
-rustup target add x86_64-pc-windows-gnu
+cargo test -p tetorica-native-capture --locked
 cargo check -p tetorica-native-capture --target x86_64-pc-windows-gnu --locked
+python3 scripts/check-native-ffmpeg-sync.py
 ```
 
-Windows向けのチェックは共通パッケージの型チェックです。Windowsアプリ全体のリンク・インストーラー作成は
-GitHub Actionsの **Build Desktop** を手動実行します。`windows-test-installers-*` artifactの
-`.exe` を動作確認用PCに入れれば、PC上に開発環境を置く必要はありません。
+同期検証は実ffmpegで合成映像・音声を保存し、同時の点滅と音が1フレーム以内に一致すること、
+コマ欠落で時間が縮まないこと、MP4のみを生成することを確認します。
+Windowsアプリ全体はGitHub Actionsの「Build Desktop」でビルドし、実機にインストーラーを入れて確認します。
+macからの型チェックだけではWindows実機の動作は保証できません。
+長時間同期、対象ウィンドウ終了、リサイズ、停止・再選択も実機で確認してください。
 
-実機では、別アプリで音を再生してキャプチャーし、モニターミュートONで保存します。
-保存ファイルの音声、左右チャンネル、停止／再選択、対象ウィンドウ終了、リサイズ、
-Audio FX ON/OFF、長時間の同期、Windowsでは別アプリの音が混じる仕様を確認してください。
-More メニューの「キャプチャー診断ログを保存」は最大120件のイベントをJSONに保存します。
-音声サンプル・ウィンドウ名を含めず、音声の受信状況・ピーク値・OS情報を確認できます。
+## scapの保守
 
-## scapの更新手順
+MITの公開パッケージを `third_party/scap` に固定し、workspaceの `[patch.crates-io]` で使用します。
+元repositoryは https://github.com/helmerapp/scap 、元revisionは
+`f9a62144bf1011e29ffa6ac1f49e5e0d020ca40a`。stable 0.0.8には音声対応がありません。
+補正は `third_party/scap/LOCAL.patch` に記録しています。
+停止・受信タイムアウト、上限付きキュー、macのPCM配列・自音声除外・候補と寸法取得、
+Windows依存API・row padding・取得時刻などを補正しています。
 
-1. 新版の音声対応とライセンスを確認し、元パッケージを別ディレクトリに展開する。
-2. `LOCAL.patch` の各補正が新版に取り込まれたかを確認する。必要な補正だけ適用する。
-3. `third_party/scap` のソース・manifest・ライセンスを置き換え、元version/revisionと差分を更新する。
-4. `src-native-capture/Cargo.toml` のversionを変更し、Cargo.lockを更新する。
-5. 上記ローカル確認、mac実機確認、GitHub Actionsビルド、Windows実機確認を行う。
-
-Windows上の開発は不要ですが、OS固有の実行時動作はWindows実機で確認する必要があります。
+更新時は元パッケージを別ディレクトリに展開し、各補正の取り込み状況を確認して必要分のみ適用します。
+ソース・manifest・ライセンス・元revision・LOCAL.patchを更新し、共通crateのversionとCargo.lockを更新します。
+上記検証に加えてmac実機、Actionsビルド、Windows実機で確認してください。

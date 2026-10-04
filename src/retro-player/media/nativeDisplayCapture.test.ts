@@ -70,8 +70,17 @@ describe("native capture lifecycle", () => {
     vi.unstubAllGlobals();
     Reflect.deleteProperty(HTMLCanvasElement.prototype, "captureStream");
   });
+  it("keeps Browser capture available without invoking the native backend", async () => {
+    const browserCapture = vi.fn().mockResolvedValue(stream);
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getDisplayMedia: browserCapture } });
+    try {
+      expect(await requestDisplayCapture(selection)).toBe(stream);
+      expect(browserCapture).toHaveBeenCalledOnce();
+      expect(mocks.invoke).not.toHaveBeenCalled();
+    } finally { Reflect.deleteProperty(navigator, "mediaDevices"); }
+  });
   it("feeds audio into the stream and releases native capture once when the player stops tracks", async () => {
-    await requestDisplayCapture(selection);
+    await requestDisplayCapture(selection, "native");
     const audio = new ArrayBuffer(17);
     const view = new DataView(audio);
     view.setUint8(0, 2);
@@ -94,13 +103,13 @@ describe("native capture lifecycle", () => {
       if (command === "native_capture_targets") return [{ id: "window:42", title: "Test", kind: "window" }];
       if (command === "native_capture_start") { mocks.channel!.onmessage(packet(3, "Capture cancelled.")); return "session-1"; }
     });
-    await expect(requestDisplayCapture(selection)).rejects.toThrow("Capture cancelled.");
+    await expect(requestDisplayCapture(selection, "native")).rejects.toThrow("Capture cancelled.");
     expect(audioClose).toHaveBeenCalledOnce();
     expect(mocks.invoke).toHaveBeenCalledWith("native_capture_stop", { sessionId: "session-1" });
   });
   it("does not start a worker or create audio when the picker is cancelled", async () => {
     select.mockResolvedValue(null);
-    await expect(requestDisplayCapture(selection)).rejects.toThrow("Capture cancelled.");
+    await expect(requestDisplayCapture(selection, "native")).rejects.toThrow("Capture cancelled.");
     expect(audioClose).not.toHaveBeenCalled();
     expect(mocks.invoke.mock.calls.some(([command]) => command === "native_capture_start")).toBe(false);
   });
@@ -109,18 +118,18 @@ describe("native capture lifecycle", () => {
       if (command === "native_capture_available") return true;
       if (command === "native_capture_targets") throw "NATIVE_CAPTURE_PERMISSION_REQUIRED";
     });
-    await expect(requestDisplayCapture(selection)).rejects.toMatchObject({ code: "capture-permission-required" });
+    await expect(requestDisplayCapture(selection, "native")).rejects.toMatchObject({ code: "capture-permission-required" });
     expect(select).not.toHaveBeenCalled();
     expect(audioClose).not.toHaveBeenCalled();
   });
   it("explains Windows system audio before starting the selected source", async () => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Windows NT 10.0");
-    await requestDisplayCapture(selection);
+    await requestDisplayCapture(selection, "native");
     expect(select.mock.calls[0][0].message).toContain("他のアプリ");
     expect(mocks.invoke).toHaveBeenCalledWith("native_capture_start", expect.objectContaining({ targetId: "window:42" }));
   });
   it("propagates OS capture termination to existing source end handlers", async () => {
-    await requestDisplayCapture(selection);
+    await requestDisplayCapture(selection, "native");
     const ended = vi.fn();
     stream.getTracks()[0].addEventListener("ended", ended);
     mocks.channel!.onmessage(packet(3, "Window closed."));

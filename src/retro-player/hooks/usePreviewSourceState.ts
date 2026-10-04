@@ -1,6 +1,7 @@
+import { startNativeFfmpegCapture, stopNativeFfmpegCapture, getNativeRecordingProgress, type NativeRecordingProgress } from "../media/nativeFfmpegCapture";
 import { useDialog } from "../../useDialog";
 import { canRequestDisplayCapture, requestDisplayCapture, getDisplayCaptureLabel } from "../media/nativeDisplayCapture";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { markDisplayCaptureStream } from "../media/displayCaptureOptions";
 import {
   getPreferredAudioInputDeviceId,
@@ -81,6 +82,17 @@ const resolvePreviewKind = (src: string, filePath: string): PreviewSourceKind =>
 
 export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
   const { showSelectDialog } = useDialog();
+  const nativeFfmpegUrl = useRef<string | undefined>(undefined);
+  const nativeRecordingStopping = useRef(false);
+  const [nativeRecordingActive, setNativeRecordingActive] = useState(false);
+  const [nativeRecordingThumbnail, setNativeRecordingThumbnail] = useState<string | undefined>();
+  const [nativeRecordingThumbnailTime, setNativeRecordingThumbnailTime] = useState("");
+  useEffect(() => () => { if (nativeRecordingThumbnail) URL.revokeObjectURL(nativeRecordingThumbnail); }, [nativeRecordingThumbnail]);
+  const [nativeRecordingTarget, setNativeRecordingTarget] = useState("");
+  const [nativeRecordingDestination, setNativeRecordingDestination] = useState("");
+  const [nativeRecordingProgress, setNativeRecordingProgress] = useState<NativeRecordingProgress | null>(null);
+  const [nativeRecordingStalled, setNativeRecordingStalled] = useState(false);
+  const [nativeFfmpegStatus, setNativeFfmpegStatus] = useState("");
   const [preferredAudioInputDeviceId, setPreferredAudioInputDeviceIdState] = useState<string | null>(
     () => getPreferredAudioInputDeviceId(),
   );
@@ -171,7 +183,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     setPreviewKind(isVideo ? "video" : isAudio ? "audio" : "image");
   }, [revokePreviewSrc, stopPreviewStream]);
 
-  const startDisplayCapture = useCallback(async (): Promise<DisplayCaptureResult> => {
+  const startDisplayCapture = useCallback(async (mode: "browser" | "native" = "browser"): Promise<DisplayCaptureResult> => {
     if (!canRequestDisplayCapture()) {
       const message = retroT(locale, "capture-unsupported");
       setCaptureError(message);
@@ -179,7 +191,7 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
     }
 
     try {
-      const stream = await requestDisplayCapture({ locale, select: showSelectDialog });
+      const stream = await requestDisplayCapture({ locale, select: showSelectDialog }, mode);
       markDisplayCaptureStream(stream);
 
       clearPreviewSrc();
@@ -209,6 +221,87 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
       return message;
     }
   }, [clearPreviewSrc, locale, showSelectDialog]);
+
+  const clearNativeRecordingView = useCallback(() => {
+    setNativeRecordingActive(false);
+    setNativeRecordingThumbnail(undefined);
+    setNativeRecordingThumbnailTime("");
+    setNativeRecordingTarget("");
+    setNativeRecordingDestination("");
+    setNativeRecordingProgress(null);
+    setNativeRecordingStalled(false);
+  }, []);
+  const stopFfmpegCapture = useCallback(() => {
+    nativeRecordingStopping.current = true;
+    clearNativeRecordingView();
+    stopNativeFfmpegCapture(nativeFfmpegUrl.current);
+    setNativeFfmpegStatus(locale === "ja" ? "録画を停止してMP4を保存中…" : "Stopping and saving MP4…");
+  }, [locale, clearNativeRecordingView]);
+  const startFfmpegCapture = useCallback(async () => {
+    if (nativeFfmpegUrl.current) return;
+    nativeRecordingStopping.current = false;
+    clearNativeRecordingView();
+    setNativeFfmpegStatus(locale === "ja" ? "ウィンドウ録画を準備中…" : "Preparing window recording…");
+    try {
+      let ended = false;
+      const id = await startNativeFfmpegCapture({ locale, select: showSelectDialog }, event => {
+        if (event.stage === "preview") {
+          if (ended || nativeRecordingStopping.current) return;
+          if (event.image) {
+            setNativeRecordingThumbnail(URL.createObjectURL(new Blob([new Uint8Array(event.image)], { type: "image/jpeg" })));
+            setNativeRecordingThumbnailTime(new Date().toLocaleTimeString());
+          }
+          return;
+        }
+        if (event.stage === "selected") {
+          setNativeRecordingTarget(event.targetTitle || (locale === "ja" ? "無題のウィンドウ" : "Untitled window"));
+          setNativeRecordingDestination(event.destination || "");
+          return;
+        }
+        if (event.stage === "started") return;
+        ended = true;
+        nativeFfmpegUrl.current = undefined;
+        clearNativeRecordingView();
+        setNativeFfmpegStatus(event.stage === "saved"
+          ? `${locale === "ja" ? "保存完了" : "Saved"}: ${event.message}`
+          : `${locale === "ja" ? "録画失敗" : "Recording failed"}: ${event.message}`);
+      });
+      if (!id) { setNativeFfmpegStatus(""); return; }
+      if (ended) return;
+      nativeFfmpegUrl.current = id;
+      setNativeRecordingProgress(null);
+      setNativeRecordingStalled(false);
+      setNativeRecordingActive(true);
+      setNativeFfmpegStatus(locale === "ja" ? "ウィンドウの映像・音声をMP4録画中。確認用の静止画を約3秒ごとに更新します。「ウィンドウ録画を停止」で保存完了。" : "Recording original window video/audio to MP4. A confirmation image updates about every 3 seconds. Use Stop window recording to finish saving.");
+    } catch (error) {
+      setNativeFfmpegStatus(error instanceof DOMException ? "" : `${locale === "ja" ? "開始失敗" : "Could not start"}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [locale, showSelectDialog, clearNativeRecordingView]);
+  useEffect(() => {
+    if (!nativeRecordingActive) return;
+    let disposed = false;
+    let polling = false;
+    let lastBytes = -1;
+    let lastGrowth = Date.now();
+    const poll = async () => {
+      const id = nativeFfmpegUrl.current;
+      if (!id || polling) return;
+      polling = true;
+      try {
+        const value = await getNativeRecordingProgress(id);
+        if (!disposed && value) {
+          if (value.bytes !== lastBytes) { lastBytes = value.bytes; lastGrowth = Date.now(); }
+          setNativeRecordingProgress(value);
+          setNativeRecordingStalled(Date.now() - lastGrowth > 5000);
+        }
+      } catch { if (!disposed) setNativeRecordingStalled(true); }
+      finally { polling = false; }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 1000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [nativeRecordingActive]);
+  useEffect(() => () => stopNativeFfmpegCapture(nativeFfmpegUrl.current), []);
 
   const startMicrophoneInput = useCallback(async (
     deviceIdOverride?: string | null,
@@ -333,6 +426,16 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
 
   return {
     previewSrc,
+    nativeRecordingThumbnail,
+    nativeRecordingThumbnailTime,
+    nativeRecordingTarget,
+    nativeRecordingDestination,
+    nativeRecordingProgress,
+    nativeRecordingStalled,
+    nativeRecordingActive,
+    stopFfmpegCapture,
+    nativeFfmpegStatus,
+    startFfmpegCapture,
     previewStream,
     previewStreamSource,
     previewLabel,

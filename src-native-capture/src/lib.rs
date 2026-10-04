@@ -1,5 +1,8 @@
 //! Shared macOS/Windows capture and packet conversion. OS integration lives in scap.
 use serde::Serialize;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub mod ffmpeg_capture;
+pub mod timed_input;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -166,6 +169,112 @@ mod desktop {
         result.unwrap_or_else(|_| Err("Native capture failed while processing frames.".into()))
     }
 
+    pub enum RawCaptureFrame {
+        Video {
+            pts_us: u64,
+            width: u32,
+            height: u32,
+            bgra: Vec<u8>,
+        },
+        Audio {
+            pts_us: u64,
+            rate: u32,
+            channels: u16,
+            pcm: Vec<u8>,
+        },
+    }
+    pub fn run_raw(
+        target_id: &str,
+        stop: Arc<AtomicBool>,
+        mut receive: impl FnMut(RawCaptureFrame) -> Result<(), String>,
+    ) -> Result<(), String> {
+        permitted()?;
+        let target = scap::get_all_targets()
+            .into_iter()
+            .find(|t| identity(t).id == target_id)
+            .ok_or("Selected capture source disappeared")?;
+        let mut capturer = Capturer::build(Options {
+            fps: 30,
+            show_cursor: true,
+            show_highlight: true,
+            target: Some(target),
+            output_type: FrameType::BGRAFrame,
+            output_resolution: Resolution::_720p,
+            captures_audio: true,
+            exclude_current_process_audio: true,
+            ..Options::default()
+        })
+        .map_err(|e| e.to_string())?;
+        let epoch = std::time::SystemTime::now();
+        let mut audio_format = scap::capturer::engine::capture_audio_format()
+            .ok_or("No capture audio device available")?;
+        let mut last_audio = std::time::Instant::now();
+        capturer.start_capture();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            while !stop.load(Ordering::Relaxed) {
+                // WASAPI may emit nothing during silence. Keep the shared timeline and
+                // static-window preview moving without playing sound in this process.
+                if last_audio.elapsed() >= Duration::from_millis(200) {
+                    let pts_us = std::time::SystemTime::now()
+                        .duration_since(epoch)
+                        .unwrap_or_default()
+                        .as_micros()
+                        .saturating_sub(100_000) as u64;
+                    let (rate, channels) = audio_format;
+                    receive(RawCaptureFrame::Audio {
+                        pts_us,
+                        rate,
+                        channels,
+                        pcm: vec![0; (rate as usize / 10) * channels as usize * 4],
+                    })?;
+                    last_audio = std::time::Instant::now() - Duration::from_millis(100);
+                }
+                let frame = match capturer.get_next_frame_timeout(Duration::from_millis(100)) {
+                    Ok(frame) => frame,
+                    Err(RecvTimeoutError::Timeout) => continue,
+                    Err(RecvTimeoutError::Disconnected) => {
+                        return Err("Capture source closed".into())
+                    }
+                };
+                let timestamp = match &frame {
+                    Frame::Audio(a) => a.time(),
+                    Frame::Video(VideoFrame::BGRA(v)) => v.display_time,
+                    _ => continue,
+                };
+                let pts_us = timestamp
+                    .duration_since(epoch)
+                    .unwrap_or_default()
+                    .as_micros()
+                    .min(u64::MAX as u128) as u64;
+                match frame {
+                    Frame::Audio(a) => {
+                        last_audio = std::time::Instant::now();
+                        audio_format = (a.rate(), a.channels());
+                        let packet = audio_packet(&a)?;
+                        receive(RawCaptureFrame::Audio {
+                            pts_us,
+                            rate: a.rate(),
+                            channels: a.channels(),
+                            pcm: packet[9..].to_vec(),
+                        })?;
+                    }
+                    Frame::Video(VideoFrame::BGRA(v)) if v.width > 0 && v.height > 0 => {
+                        receive(RawCaptureFrame::Video {
+                            pts_us,
+                            width: v.width as u32,
+                            height: v.height as u32,
+                            bgra: v.data,
+                        })?
+                    }
+                    _ => {}
+                }
+            }
+            Ok(())
+        }));
+        capturer.stop_capture();
+        result.unwrap_or_else(|_| Err("Native capture failed".into()))
+    }
+
     fn audio_packet(frame: &AudioFrame) -> Result<Vec<u8>, String> {
         encode_audio(
             frame.raw_data(),
@@ -270,4 +379,4 @@ mod desktop {
     }
 }
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-pub use desktop::{available, run, targets};
+pub use desktop::{available, run, run_raw, targets, RawCaptureFrame};

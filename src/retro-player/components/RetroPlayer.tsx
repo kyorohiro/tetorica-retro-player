@@ -126,6 +126,7 @@ const resolveRenderResolutionPreset = (
 
 
 type RetroPlayerProps = {
+  recordingConfirmation?: React.ReactNode;
   locale?: RetroPlayerLocale;
   src?: string;
   displayName?: string;
@@ -160,6 +161,7 @@ type RetroPlayerProps = {
 };
 
 export function RetroPlayer({
+  recordingConfirmation,
   locale = "en",
   src,
   displayName,
@@ -1025,6 +1027,7 @@ export function RetroPlayer({
       <section className={className}>
         <div className="space-y-4">
           <RetroPreviewView
+            recordingConfirmation={recordingConfirmation}
             locale={locale}
             src={src}
             kind={kind}
@@ -1170,6 +1173,7 @@ export function RetroPlayer({
           mode={layoutMode}
           preview={
             <RetroPreviewView
+              recordingConfirmation={recordingConfirmation}
               locale={locale}
               src={src}
               kind={kind}

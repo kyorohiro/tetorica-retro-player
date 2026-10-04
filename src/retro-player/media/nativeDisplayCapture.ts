@@ -18,20 +18,17 @@ export function getDisplayCaptureLabel(stream: MediaStream, locale: string) {
 }
 
 export function canRequestDisplayCapture() {
-  return Boolean(navigator.mediaDevices?.getDisplayMedia) ||
-    (isTauriRuntime() && /Mac|Windows/i.test(navigator.userAgent));
+  return Boolean(navigator.mediaDevices?.getDisplayMedia);
 }
 
 type CaptureTarget = { id: string; title: string; kind: "window" | "display" };
 export type NativeCaptureSelection = {
   locale: string;
+  onSelected?: (target: CaptureTarget) => void;
   select: (options: { title: string; message: string; options: { value: string; label: string; description: string }[]; cancelText: string }) => Promise<string | null>;
 };
 
-export async function requestDisplayCapture(selection?: NativeCaptureSelection): Promise<MediaStream> {
-  if (isTauriRuntime() && /Mac|Windows/i.test(navigator.userAgent) &&
-      await invoke<boolean>("native_capture_available")) {
-    if (!selection) throw new Error("Native capture requires a window or display selection.");
+export async function selectNativeCaptureTarget(selection: NativeCaptureSelection, windowsOnly = false) {
     const ja = selection.locale === "ja";
     const windows = /Windows/i.test(navigator.userAgent);
     const targets = await invoke<CaptureTarget[]>("native_capture_targets").catch(error => {
@@ -41,11 +38,11 @@ export async function requestDisplayCapture(selection?: NativeCaptureSelection):
       throw error;
     });
     const targetId = await selection.select({
-      title: ja ? "キャプチャーする画面・ウィンドウ" : "Choose a display or window",
+      title: windowsOnly ? (ja ? "録画するウィンドウ" : "Choose a window to record") : (ja ? "キャプチャーする画面・ウィンドウ" : "Choose a display or window"),
       message: windows
         ? ja ? "音声は既定の出力デバイス全体を取得します。他のアプリの音声も含まれます。" : "Audio includes all apps playing through the default output device."
         : ja ? "ウィンドウはそのアプリの音声、画面はシステム音声を取得します。このプレイヤーの出力音声は除外します。" : "Window capture includes application audio; display capture includes system audio. This player's output is excluded.",
-      options: targets.map(target => ({
+      options: targets.filter(target => !windowsOnly || target.kind === "window").map(target => ({
         value: target.id,
         label: target.title || (ja ? "無題のウィンドウ" : "Untitled window"),
         description: target.kind === "display" ? ja ? "画面" : "Display" : ja ? "ウィンドウ" : "Window",
@@ -53,6 +50,18 @@ export async function requestDisplayCapture(selection?: NativeCaptureSelection):
       cancelText: ja ? "キャンセル" : "Cancel",
     });
     if (!targetId) throw new DOMException("Capture cancelled.", "NotAllowedError");
+    const target = targets.find(target => target.id === targetId);
+    if (target) selection.onSelected?.(target);
+    return targetId;
+
+}
+
+export async function requestDisplayCapture(selection?: NativeCaptureSelection, mode: "browser" | "native" = "browser"): Promise<MediaStream> {
+  if (mode !== "browser" && isTauriRuntime() && /Mac|Windows/i.test(navigator.userAgent) &&
+      await invoke<boolean>("native_capture_available")) {
+    if (!selection) throw new Error("Native capture requires a window or display selection.");
+    const windows = /Windows/i.test(navigator.userAgent);
+    const targetId = await selectNativeCaptureTarget(selection);
     return startNativeCapture(targetId, windows ? "system-output" : "application-or-display");
   }
   return navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());

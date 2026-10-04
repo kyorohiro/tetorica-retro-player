@@ -166,6 +166,7 @@ export type RetroPreviewPlayerSlice = {
 } & Pick<RetroAudioSettings, (typeof RETRO_AUDIO_AMOUNT_KEYS)[number]> & RetroAudioAmountSetters;
 
 export type RetroPreviewViewProps = {
+  recordingConfirmation?: React.ReactNode;
   locale: RetroPlayerLocale;
   src?: string;
   kind: "video" | "image" | "audio";
@@ -212,6 +213,7 @@ export type RetroPreviewViewProps = {
 };
 
 export function RetroPreviewView({
+  recordingConfirmation,
   locale,
   src: _src,
   kind: _kind,
@@ -984,6 +986,7 @@ export function RetroPreviewView({
   // --- Render ---
 
   const handleRecordClick = () => {
+    if (recordingConfirmation) return;
     void (async () => {
       if (player.isRecording) {
         try {
@@ -1286,8 +1289,8 @@ export function RetroPreviewView({
           <div
             className={`relative w-full overflow-visible rounded-xl bg-slate-950 ${previewAspectRatio ? "h-full" : "h-full min-h-[100px]"}`}
             style={{
-              filter: brightness !== 1.0 ? `brightness(${brightness})` : undefined,
-              transform: (flipH || flipV) ? `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` : undefined,
+              filter: !recordingConfirmation && brightness !== 1.0 ? `brightness(${brightness})` : undefined,
+              transform: !recordingConfirmation && (flipH || flipV) ? `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` : undefined,
             }}
             onPointerDown={handlePreviewPointerDown}
             onPointerMove={handlePreviewPointerMove}
@@ -1317,6 +1320,7 @@ export function RetroPreviewView({
                 }}
               />
             )}
+            {recordingConfirmation && <div className="absolute inset-0 z-40 overflow-hidden rounded-xl bg-black" onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()}>{recordingConfirmation}</div>}
             {!player.isPoweredOn && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/72">
                 <div className="rounded-2xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-center text-sm text-slate-300 shadow-lg">
@@ -1482,7 +1486,7 @@ export function RetroPreviewView({
             <div className="absolute -bottom-8 -right-4 z-50 flex items-center gap-2">
               <RetroPreviewToolbar
                 locale={locale}
-                player={player}
+                player={recordingConfirmation ? { ...player, canRecord: false } : player}
                 interactionLocked={interactionLocked}
                 isHighResolution={isHighResolution}
                 renderResolutionPreset={renderResolutionPreset}
@@ -1547,7 +1551,7 @@ export function RetroPreviewView({
           <div className="absolute -bottom-8 right-0 z-50 flex items-center gap-2">
             <RetroPreviewToolbar
               locale={locale}
-              player={player}
+              player={recordingConfirmation ? { ...player, canRecord: false } : player}
               interactionLocked={interactionLocked}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
@@ -1632,7 +1636,7 @@ export function RetroPreviewView({
           <div className="flex items-center justify-end gap-2 pt-2 pr-0">
             <RetroPreviewToolbar
               locale={locale}
-              player={player}
+              player={recordingConfirmation ? { ...player, canRecord: false } : player}
               interactionLocked={interactionLocked}
               isHighResolution={isHighResolution}
               renderResolutionPreset={renderResolutionPreset}
@@ -1696,7 +1700,7 @@ export function RetroPreviewView({
         <div className="flex items-center justify-end gap-2 -mt-3 pr-1">
           <RetroPreviewToolbar
             locale={locale}
-            player={player}
+            player={recordingConfirmation ? { ...player, canRecord: false } : player}
             interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
@@ -1758,7 +1762,7 @@ export function RetroPreviewView({
         <div className="flex items-center justify-end gap-2 -mt-3 pr-1">
           <RetroPreviewToolbar
             locale={locale}
-            player={player}
+            player={recordingConfirmation ? { ...player, canRecord: false } : player}
             interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
@@ -1822,7 +1826,7 @@ export function RetroPreviewView({
         <div className="flex items-center justify-end gap-2 pt-2 pr-0">
           <RetroPreviewToolbar
             locale={locale}
-            player={player}
+            player={recordingConfirmation ? { ...player, canRecord: false } : player}
             interactionLocked={interactionLocked}
             isHighResolution={isHighResolution}
             renderResolutionPreset={renderResolutionPreset}
