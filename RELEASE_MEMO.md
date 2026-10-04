@@ -3,21 +3,21 @@
 Update versions before release:
 
 ```sh
-npm run version:set -- 0.44.7
+npm run version:set -- 0.52.2
 ```
 
 ```sh
 sh deploy_mac.sh
 ~/bin/butler login
-~/bin/butler push target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.44.7_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.44.7
-~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.44.7_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.44.7
-~/bin/butler push "tetorica-retro-player_0.44.7_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.44.7
-~/bin/butler push "tetorica-retro-player_0.44.7_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.44.7
-~/bin/butler push "tetorica-retro-player_0.44.7_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.44.7
+~/bin/butler push target/aarch64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.52.2_aarch64.dmg kyorohiro/tetorica-retro-player:mac-apple-silicon --userversion 0.52.2
+~/bin/butler push target/x86_64-apple-darwin/release/bundle/dmg/tetorica-retro-player_0.52.2_x64.dmg kyorohiro/tetorica-retro-player:mac-intel --userversion 0.52.2
+~/bin/butler push "tetorica-retro-player_0.52.2_x64-setup.exe" kyorohiro/tetorica-retro-player:windows --userversion 0.52.2
+~/bin/butler push "tetorica-retro-player_0.52.2_aarch64.AppImage" kyorohiro/tetorica-retro-player:linux-arm --userversion 0.52.2
+~/bin/butler push "tetorica-retro-player_0.52.2_amd64.AppImage" kyorohiro/tetorica-retro-player:linux-intel --userversion 0.52.2
 ~/bin/butler push \
-  "app-release-signed_0.44.7.apk" \
+  "app-release-signed_0.52.2.apk" \
   kyorohiro/tetorica-retro-player:android \
-  --userversion 0.44.7
+  --userversion 0.52.2
 ```
 
 Web build archive:
@@ -25,7 +25,7 @@ Web build archive:
 ```sh
 npm run build
 cd dist
-zip -r ../web-build_0.44.7_gh.zip .
+zip -r ../web-build_0.52.2_gh.zip .
 ```
 
 ## 未リリース: ウィンドウ録画
