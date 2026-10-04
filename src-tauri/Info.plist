@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Capture audio from the selected window’s application for preview and recording.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Audio permission is required when capturing a screen or window with sound.</string>
 </dict>

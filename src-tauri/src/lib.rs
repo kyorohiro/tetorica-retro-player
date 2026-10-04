@@ -10,6 +10,7 @@ use tetorica_mdrop_core::bonjour::{BonjourStatus, SharedBonjourContext};
 use tetorica_mdrop_core::http::{ServerStatus, SharedHttpServerContext};
 
 mod ffmpeg;
+mod native_capture;
 
 const GRAPHICS_BACKEND_SETTINGS_FILE_NAME: &str = "dev-options.json";
 #[cfg(windows)]
@@ -658,6 +659,10 @@ pub fn run() {
     let app = builder
         .invoke_handler(tauri::generate_handler![
             greet,
+            native_capture::native_capture_available,
+            native_capture::native_capture_start,
+            native_capture::native_capture_ack,
+            native_capture::native_capture_stop,
             persist_recording_for_share,
             get_graphics_backend_mode,
             set_graphics_backend_mode,
@@ -683,8 +688,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(move |_app, event| {
+    app.run(move |app_handle, event| {
         if matches!(event, tauri::RunEvent::Exit) {
+            let _ = native_capture::stop(app_handle, None);
             let _ = mdrop_server_for_exit.stop_server();
             mdrop_server_for_exit.cleanup_hls_sessions();
         }

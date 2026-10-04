@@ -1,5 +1,6 @@
+import { canRequestDisplayCapture, requestDisplayCapture, getDisplayCaptureLabel } from "../media/nativeDisplayCapture";
 import { useCallback, useEffect, useState } from "react";
-import { getDisplayCaptureOptions, markDisplayCaptureStream } from "../media/displayCaptureOptions";
+import { markDisplayCaptureStream } from "../media/displayCaptureOptions";
 import {
   getPreferredAudioInputDeviceId,
   setPreferredAudioInputDeviceId,
@@ -169,21 +170,19 @@ export function usePreviewSourceState(locale: RetroPlayerLocale = "en") {
   }, [revokePreviewSrc, stopPreviewStream]);
 
   const startDisplayCapture = useCallback(async (): Promise<DisplayCaptureResult> => {
-    if (!navigator.mediaDevices?.getDisplayMedia) {
+    if (!canRequestDisplayCapture()) {
       const message = retroT(locale, "capture-unsupported");
       setCaptureError(message);
       return message;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
+      const stream = await requestDisplayCapture();
       markDisplayCaptureStream(stream);
 
       clearPreviewSrc();
       setPreviewKind("video");
-      setPreviewLabel(stream.getAudioTracks().length > 0
-        ? "Display Capture"
-        : (locale === "ja" ? "Display Capture（音声なし）" : "Display Capture (no audio)"));
+      setPreviewLabel(getDisplayCaptureLabel(stream, locale));
       setPreviewStreamSource("display-capture");
       setCaptureError("");
       setPreviewStream((current) => {

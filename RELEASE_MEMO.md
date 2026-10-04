@@ -28,6 +28,13 @@ cd dist
 zip -r ../web-build_0.44.7_gh.zip .
 ```
 
+## 未リリース: macOS ネイティブキャプチャー試作
+
+- macOS 14以降のDesktop版でScreenCaptureKitによるウィンドウ・画面キャプチャーを使用。ウィンドウ音声はアプリ単位、画面音声はシステム音声。自アプリの音声は除外。
+- 最大辺1280px・30fpsで既存のフィルター／Audio FX／録画へ接続。Browser版・ほかのOSは従来の取得経路。
+- mac版ビルド、型チェック、106件のテストが通過。実機では映像プレビューと音声トラックの存在を確認。別アプリの音声が保存ファイルに入ること、長時間の音ズレ、Intel Mac・旧macOSでの動作は未確認。
+- 実機確認: 音の鳴る別アプリを選び、モニターミュートONで録画・保存して音声を確認。Native表示／フィルターON、Audio FX ON/OFF、停止・再選択・OS側の共有停止も確認する。Consoleの `[retro capture audio]` の `native-audio` はサンプル受信・ピーク値を示す（`acquired` の音声トラック数だけでは音声の取得を保証しない）。
+
 ## v0.44.7 Changes
 
 - Playlist: D&D / Open With で複数ファイル → Auto Next / Loop All モード時に連続再生

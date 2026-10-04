@@ -1,7 +1,8 @@
+import { canRequestDisplayCapture, requestDisplayCapture, getDisplayCaptureLabel } from "../media/nativeDisplayCapture";
 import { useRef } from "react";
 import { hasCurrentPlaybackData } from "../media/playbackReadiness";
 import { waitForPreviewFrame } from "../media/waitForPreviewFrame";
-import { getDisplayCaptureOptions, markDisplayCaptureStream, isDisplayCaptureStream } from "../media/displayCaptureOptions";
+import { markDisplayCaptureStream, isDisplayCaptureStream } from "../media/displayCaptureOptions";
 import type { CanvasStageApp } from "./useRetroPixiStage";
 import type { RetroFilterState } from "./useRetroFilterState";
 import type { RetroAudioSettings } from "../audio/preset";
@@ -1478,7 +1479,7 @@ export function useRetroPreviewMedia({
   const startDisplayCapture = async () => {
     powerOn();
 
-    if (!navigator.mediaDevices?.getDisplayMedia) {
+    if (!canRequestDisplayCapture()) {
       _setPreviewError(retroT(locale, "capture-unsupported"));
       return;
     }
@@ -1491,7 +1492,7 @@ export function useRetroPreviewMedia({
 
     try {
       await ensureRendererReady();
-      const stream = await navigator.mediaDevices.getDisplayMedia(getDisplayCaptureOptions());
+      const stream = await requestDisplayCapture();
       markDisplayCaptureStream(stream);
 
       if (requestId !== previewRequestIdRef.current) {
@@ -1499,9 +1500,7 @@ export function useRetroPreviewMedia({
         return;
       }
 
-      setPreviewName(stream.getAudioTracks().length > 0
-        ? "Display Capture"
-        : (locale === "ja" ? "Display Capture（音声なし）" : "Display Capture (no audio)"));
+      setPreviewName(getDisplayCaptureLabel(stream, locale));
 
       setCaptureMonitorMuted();
       const videoSource = await createVideoMediaSource(
